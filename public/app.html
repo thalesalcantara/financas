@@ -71,7 +71,6 @@
     text-align: center;
     cursor: pointer;
     transition: background 0.15s ease;
-    user-select: none;
   }
   nav li.active, nav li:hover {
     background: var(--sidebar-active);
@@ -212,7 +211,7 @@
 
 <div class="fab" id="fabBtn" title="Adicionar lançamento">+</div>
 
-<div class="modal-bg" id="modal"></div>
+<div class="modal-bg" id="modal" onclick="closeModal(event)"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -233,230 +232,149 @@
   const db = firebase.firestore();
   const auth = firebase.auth();
 
+  const MENUS = [
+    {id:"dashboard", label:"Dashboard", icon:"📊"},
+    {id:"transactions", label:"Lançamentos", icon:"💸"},
+    {id:"metas", label:"Metas", icon:"🎯"},
+    {id:"contas", label:"Contas", icon:"🏦"},
+    {id:"categorias", label:"Categorias", icon:"🏷️"},
+    {id:"relatorios", label:"Relatórios", icon:"📈"},
+    {id:"configuracoes", label:"Configurações", icon:"⚙️"},
+  ];
+
   let appData = null;
   let userEmail = null;
 
-  const mainPainel = document.getElementById('mainPainel');
-  const fabBtn = document.getElementById('fabBtn');
-  const modalContainer = document.getElementById('modal');
-
-  const MENUS = [
-    { id: "dashboard", label: "Dashboard", icon: "📊" },
-    { id: "transactions", label: "Lançamentos", icon: "💸" },
-    { id: "metas", label: "Metas", icon: "🎯" },
-    { id: "contas", label: "Contas", icon: "🏦" },
-    { id: "categorias", label: "Categorias", icon: "🏷️" },
-    { id: "relatorios", label: "Relatórios", icon: "📈" },
-    { id: "configuracoes", label: "Configurações", icon: "⚙️" }
-  ];
+  const menuList = document.getElementById("menuList");
+  const fabBtn = document.getElementById("fabBtn");
+  const modal = document.getElementById("modal");
 
   // Renderiza menu no DOM
   function renderMenu() {
-    const menuList = document.getElementById('menuList');
-    menuList.innerHTML = '';
-    MENUS.forEach(menu => {
-      const li = document.createElement('li');
-      li.textContent = `${menu.icon} ${menu.label}`;
-      li.dataset.panel = menu.id;
+    menuList.innerHTML = "";
+    MENUS.forEach(m => {
+      const li = document.createElement("li");
+      li.id = "menu-" + m.id;
+      li.textContent = m.icon + " " + m.label;
       li.style.userSelect = "none";
       li.onclick = () => {
-        document.querySelectorAll('#menuList li').forEach(i => i.classList.remove('active'));
-        li.classList.add('active');
-        loadPanel(menu.id);
+        showPanel(m.id);
+        // aqui pode-se implementar carregamento dinâmico se quiser
       };
       menuList.appendChild(li);
     });
   }
 
-  // Carrega o painel específico
-  function loadPanel(panelId) {
-    fabBtn.style.display = 'none'; // por padrão oculta fab
-    mainPainel.innerHTML = '';
+  // Mostra painel ativo
+  function showPanel(id) {
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+    const panel = document.getElementById(id);
+    if (panel) panel.classList.add("active");
+    document.querySelectorAll("#menuList li").forEach(li => li.classList.remove("active"));
+    const menuItem = document.getElementById("menu-" + id);
+    if (menuItem) menuItem.classList.add("active");
 
-    if (panelId === 'dashboard') {
-      fetch('dashboard.html').then(res => res.text()).then(html => {
-        mainPainel.innerHTML = html;
-        renderDashboard();
-        fabBtn.style.display = 'none'; // Não mostra fab aqui (exemplo)
-      });
-    } 
-    else if (panelId === 'transactions') {
-      fetch('transactions.html').then(res => res.text()).then(html => {
-        mainPainel.innerHTML = html;
-        renderTransactions();
-        setupFabForTransactions();
-      });
-    }
-    else {
-      mainPainel.innerHTML = `<section><h2>${panelId}</h2><p>Conteúdo não implementado ainda.</p></section>`;
+    // Carregando conteúdo dos painéis:
+    if(id === "dashboard") {
+      renderDashboard();
+      fabBtn.style.display = "none";
+    } else if(id === "transactions") {
+      renderTransactions();
+      fabBtn.style.display = "flex";
+    } else {
+      fabBtn.style.display = "none";
+      const panel = document.getElementById(id);
+      if(panel) panel.innerHTML = `<h2>${id}</h2><p>Conteúdo não implementado ainda.</p>`;
     }
   }
 
-  // Função exemplo para dashboard (implemente conforme sua necessidade)
+  // Função exemplo para dashboard
   function renderDashboard() {
-    const dash = document.getElementById('dashboard');
+    const dash = document.getElementById("dashboard");
     if (!dash) return;
     dash.innerHTML = `<h2>Dashboard</h2><p>Bem-vindo, ${userEmail}!</p>`;
   }
 
-  // Função exemplo para transações (implemente conforme sua necessidade)
+  // Função exemplo para transações
   function renderTransactions() {
-    const trans = document.getElementById('transactions');
+    const trans = document.getElementById("transactions");
     if (!trans) return;
-    trans.innerHTML = `<h2>Transações</h2><p>Aqui vai a tabela e filtros.</p>`;
-    // TODO: preencher tabela, filtros, eventos
-  }
+    trans.innerHTML = `
+      <h2>Lançamentos</h2>
+      <p>Aqui vai a tabela e filtros.</p>
+      <table border="1" cellpadding="5" cellspacing="0" style="width:100%;background:#fff;color:#000;border-radius:8px;overflow:hidden;">
+        <thead>
+          <tr>
+            <th>Descrição</th><th>Valor</th><th>Data</th>
+          </tr>
+        </thead>
+        <tbody id="transactionsTableBody"></tbody>
+      </table>
+    `;
 
-  // Configura botão flutuante no painel transações
-  function setupFabForTransactions() {
-    fabBtn.style.display = 'flex';
-    fabBtn.onclick = () => openTransactionModal();
-  }
-
-  // Abre modal de lançamento novo ou edição
-  function openTransactionModal(transactionIndex = null) {
-    fetch('modal.html')
-      .then(r => r.text())
-      .then(html => {
-        modalContainer.innerHTML = html;
-        modalContainer.classList.add('active');
-        modalContainer.style.display = 'flex';
-
-        // Preencher selects com contas e categorias
-        const txAccount = document.getElementById('txAccount');
-        const txAccountTo = document.getElementById('txAccountTo');
-        const txCategory = document.getElementById('txCategory');
-        const accountToContainer = document.getElementById('accountToContainer');
-        const txType = document.getElementById('txType');
-
-        if (txAccount) txAccount.innerHTML = appData.contas.map(c => `<option>${c.nome}</option>`).join('');
-        if (txAccountTo) txAccountTo.innerHTML = appData.contas.map(c => `<option>${c.nome}</option>`).join('');
-        if (txCategory) txCategory.innerHTML = appData.categorias.map(c => `<option>${c.nome}</option>`).join('');
-
-        txType.onchange = () => {
-          if (!accountToContainer) return;
-          accountToContainer.style.display = txType.value === 'transfer' ? 'block' : 'none';
-        };
-        txType.onchange();
-
-        // Se for edição preenche os dados
-        if (transactionIndex !== null && appData.transacoes && appData.transacoes[transactionIndex]) {
-          const tx = appData.transacoes[transactionIndex];
-          document.getElementById('modalTitle').textContent = 'Editar Lançamento';
-          txType.value = tx.type;
-          txAccount.value = tx.account;
-          txAccountTo.value = tx.accountTo || '';
-          txCategory.value = tx.category;
-          document.getElementById('txDescription').value = tx.description || '';
-          document.getElementById('txDate').value = tx.date || new Date().toISOString().slice(0, 10);
-          document.getElementById('txValue').value = tx.value;
-          document.getElementById('txNotes').value = tx.notes || '';
-          txType.onchange();
-        } else {
-          document.getElementById('modalTitle').textContent = 'Novo Lançamento';
-        }
-
-        // Form submit
-        const form = document.getElementById('transactionForm');
-        form.onsubmit = e => {
-          e.preventDefault();
-          saveTransaction(transactionIndex);
-        };
-
-        // Cancelar modal
-        document.getElementById('btnCancel').onclick = closeModal;
+    // Exemplo simples de dados:
+    if(appData && appData.transacoes && appData.transacoes.length > 0) {
+      const tbody = document.getElementById("transactionsTableBody");
+      tbody.innerHTML = "";
+      appData.transacoes.forEach(tx => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${tx.description || ""}</td><td>${tx.value.toFixed(2)}</td><td>${tx.date || ""}</td>`;
+        tbody.appendChild(tr);
       });
+    }
+  }
+
+  // Abre modal com formulário para novo lançamento simples
+  function openModal() {
+    modal.innerHTML = `
+      <div class="modal" onclick="event.stopPropagation()">
+        <h3>Novo lançamento</h3>
+        <form id="newTransactionForm">
+          <label>Descrição:
+            <input type="text" id="txDescription" required />
+          </label>
+          <label>Valor:
+            <input type="number" id="txValue" step="0.01" required />
+          </label>
+          <div style="display:flex; gap: 10px; justify-content:flex-end;">
+            <button type="submit">Salvar</button>
+            <button type="button" id="btnCancel">Cancelar</button>
+          </div>
+        </form>
+      </div>
+    `;
+    modal.classList.add("active");
+
+    document.getElementById("btnCancel").onclick = closeModal;
+
+    document.getElementById("newTransactionForm").onsubmit = e => {
+      e.preventDefault();
+      // Salvar no appData (em memória)
+      if(!appData.transacoes) appData.transacoes = [];
+      appData.transacoes.push({
+        description: document.getElementById("txDescription").value,
+        value: parseFloat(document.getElementById("txValue").value),
+        date: new Date().toISOString().slice(0,10)
+      });
+      saveData();
+      closeModal();
+      renderTransactions();
+    };
   }
 
   // Fecha modal
   function closeModal() {
-    modalContainer.classList.remove('active');
-    modalContainer.style.display = 'none';
-    modalContainer.innerHTML = '';
+    modal.classList.remove("active");
+    modal.innerHTML = "";
   }
 
-  // Salvar transação (novo ou editar)
-  function saveTransaction(transactionIndex) {
-    const type = document.getElementById('txType').value;
-    const account = document.getElementById('txAccount').value;
-    const accountTo = document.getElementById('txAccountTo').value;
-    const category = document.getElementById('txCategory').value;
-    const description = document.getElementById('txDescription').value.trim();
-    const date = document.getElementById('txDate').value;
-    const value = parseFloat(document.getElementById('txValue').value);
-    const notes = document.getElementById('txNotes').value.trim();
+  modal.onclick = (e) => {
+    if(e.target === modal) closeModal();
+  };
 
-    if (!account || (type === 'transfer' && !accountTo) || !category || !date || !value) {
-      alert('Por favor preencha todos os campos obrigatórios.');
-      return;
-    }
-
-    // Atualiza saldo contas
-    const contaOrigem = appData.contas.find(c => c.nome === account);
-    if (!contaOrigem) {
-      alert('Conta de origem inválida');
-      return;
-    }
-    let contaDestino = null;
-    if (type === 'transfer') {
-      contaDestino = appData.contas.find(c => c.nome === accountTo);
-      if (!contaDestino) {
-        alert('Conta destino inválida');
-        return;
-      }
-    }
-
-    // Reverter saldo transação anterior (se edição)
-    if (transactionIndex !== null) {
-      const oldTx = appData.transacoes[transactionIndex];
-      if (oldTx.type === 'income') {
-        const c = appData.contas.find(c => c.nome === oldTx.account);
-        if (c) c.saldo -= oldTx.value;
-      } else if (oldTx.type === 'expense') {
-        const c = appData.contas.find(c => c.nome === oldTx.account);
-        if (c) c.saldo += oldTx.value;
-      } else if (oldTx.type === 'transfer') {
-        const cFrom = appData.contas.find(c => c.nome === oldTx.account);
-        const cTo = appData.contas.find(c => c.nome === oldTx.accountTo);
-        if (cFrom && cTo) {
-          cFrom.saldo += oldTx.value;
-          cTo.saldo -= oldTx.value;
-        }
-      }
-    }
-
-    // Aplica saldo com novos valores
-    if (type === 'income') {
-      contaOrigem.saldo += value;
-    } else if (type === 'expense') {
-      contaOrigem.saldo -= value;
-    } else if (type === 'transfer') {
-      contaOrigem.saldo -= value;
-      contaDestino.saldo += value;
-    }
-
-    const transactionObj = {
-      type,
-      account,
-      accountTo: type === 'transfer' ? accountTo : undefined,
-      category,
-      description,
-      date,
-      value,
-      notes,
-    };
-
-    if (transactionIndex !== null) {
-      appData.transacoes[transactionIndex] = transactionObj;
-    } else {
-      if (!appData.transacoes) appData.transacoes = [];
-      appData.transacoes.push(transactionObj);
-    }
-
-    saveData();
-    closeModal();
-    loadPanel('transactions');
-  }
+  fabBtn.onclick = () => {
+    openModal();
+  };
 
   // Salva dados no Firestore
   function saveData() {
@@ -469,40 +387,29 @@
       if (doc.exists) {
         appData = doc.data();
       } else {
-        appData = getModeloZerado();
+        appData = {
+          user: userEmail,
+          contas: [{ nome: "Carteira", saldo: 0, cor: "#246bfd" }],
+          categorias: [
+            { nome: "Salário", tipo: "income", cor: "#24c176" },
+            { nome: "Alimentação", tipo: "expense", cor: "#e14c54" }
+          ],
+          transacoes: [],
+          metas: [],
+          config: { theme: "dark", alertas: [], limites: {}, excelSep: ";" },
+          anexos: {}
+        };
         saveData();
       }
       renderMenu();
-      // Carrega painel inicial
-      const firstMenuId = MENUS[0].id;
-      // Marca primeiro menu ativo visualmente
-      document.querySelectorAll('#menuList li').forEach(li => {
-        li.classList.toggle('active', li.dataset.panel === firstMenuId);
-      });
-      loadPanel(firstMenuId);
-      fabBtn.style.display = 'flex';
+      showPanel("dashboard");
+      fabBtn.style.display = "flex";
     });
   }
 
-  // Modelo inicial caso não exista dados
-  function getModeloZerado() {
-    return {
-      user: userEmail,
-      contas: [{ nome: "Carteira", saldo: 0, cor: "#246bfd" }],
-      categorias: [
-        { nome: "Salário", tipo: "income", cor: "#24c176" },
-        { nome: "Alimentação", tipo: "expense", cor: "#e14c54" }
-      ],
-      transacoes: [],
-      metas: [],
-      config: { theme: "dark", alertas: [], limites: {}, excelSep: ";" },
-      anexos: {}
-    };
-  }
-
-  // Autenticação Firebase - controla redirecionamento se não logado
+  // Controle autenticação e carregamento inicial
   auth.onAuthStateChanged(user => {
-    if (!user) {
+    if(!user) {
       window.location.href = "login.html";
       return;
     }
@@ -510,16 +417,11 @@
     loadUserData();
   });
 
-  // Botão sair logout
-  document.getElementById('logoutBtn').onclick = () => {
+  // Logout
+  document.getElementById("logoutBtn").onclick = () => {
     auth.signOut().then(() => {
-      window.location.href = 'login.html';
+      window.location.href = "login.html";
     });
-  };
-
-  // Fecha modal ao clicar fora
-  modalContainer.onclick = (e) => {
-    if (e.target === modalContainer) closeModal();
   };
 </script>
 
