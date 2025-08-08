@@ -118,7 +118,7 @@
     height: 58px;
     border-radius: 50%;
     font-size: 2.4rem;
-    display: none;
+    display: flex;
     align-items: center;
     justify-content: center;
     box-shadow: 0 3px 16px #246bfd30;
@@ -231,6 +231,7 @@
   const db = firebase.firestore();
   const auth = firebase.auth();
 
+  // MENU
   const MENUS = [
     {id:"dashboard", label:"Dashboard", icon:"📊"},
     {id:"transactions", label:"Lançamentos", icon:"💸"},
@@ -248,7 +249,6 @@
   const fabBtn = document.getElementById("fabBtn");
   const modal = document.getElementById("modal");
 
-  // Renderiza menu no DOM
   function renderMenu() {
     menuList.innerHTML = "";
     MENUS.forEach(m => {
@@ -261,7 +261,6 @@
     });
   }
 
-  // Exibe o painel ativo e renderiza conteúdo
   function showPanel(id) {
     document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
     const panel = document.getElementById(id);
@@ -269,158 +268,47 @@
     document.querySelectorAll("#menuList li").forEach(li => li.classList.remove("active"));
     const menuItem = document.getElementById("menu-" + id);
     if (menuItem) menuItem.classList.add("active");
-
-    if(id === "dashboard") {
-      renderDashboard();
-      fabBtn.style.display = "none";
-    } else if(id === "transactions") {
-      renderTransactions();
-      fabBtn.style.display = "flex";
-    } else {
-      fabBtn.style.display = "none";
-      if(panel) panel.innerHTML = `<h2>${id}</h2><p>Conteúdo não implementado ainda.</p>`;
-    }
   }
 
-  // Renderiza painel dashboard
+  function logoutUser() {
+    auth.signOut().then(() => {
+      window.location.href = "login.html";
+    });
+  }
+  document.getElementById("logoutBtn").onclick = logoutUser;
+
+  // TODO: Implement render functions for each panel and add event listeners for fabBtn, modal, etc.
+  // Placeholder example:
   function renderDashboard() {
     const dash = document.getElementById("dashboard");
-    if (!dash) return;
-    dash.innerHTML = `<h2>Dashboard</h2><p>Bem-vindo, ${userEmail || "Usuário"}!</p>`;
+    dash.innerHTML = "<h2>Dashboard</h2><p>Bem-vindo, " + userEmail + "!</p>";
   }
 
-  // Renderiza painel transações com tabela
-  function renderTransactions() {
-    const trans = document.getElementById("transactions");
-    if (!trans) return;
-    trans.innerHTML = `
-      <h2>Lançamentos</h2>
-      <p>Aqui vai a tabela de lançamentos.</p>
-      <table border="1" cellpadding="5" cellspacing="0" style="width:100%; background:#fff; color:#000; border-radius:8px; overflow:hidden;">
-        <thead>
-          <tr><th>Descrição</th><th>Valor</th><th>Data</th></tr>
-        </thead>
-        <tbody id="transactionsTableBody"></tbody>
-      </table>
-    `;
-
-    const tbody = document.getElementById("transactionsTableBody");
-    tbody.innerHTML = "";
-
-    if (appData && Array.isArray(appData.transacoes) && appData.transacoes.length > 0) {
-      appData.transacoes.forEach(tx => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${tx.description || ""}</td>
-          <td>R$ ${tx.value ? tx.value.toFixed(2) : "0.00"}</td>
-          <td>${tx.date || ""}</td>
-        `;
-        tbody.appendChild(tr);
-      });
+  // Firebase auth state
+  auth.onAuthStateChanged(user => {
+    if(user) {
+      userEmail = user.email;
+      renderMenu();
+      showPanel("dashboard");
+      renderDashboard();
+      fabBtn.style.display = "flex";
     } else {
-      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">Nenhuma transação cadastrada.</td></tr>`;
+      window.location.href = "login.html";
     }
-  }
+  });
 
-  // Abre modal para novo lançamento
-  function openModal() {
-    modal.innerHTML = `
-      <div class="modal" onclick="event.stopPropagation()">
-        <h3>Novo lançamento</h3>
-        <form id="newTransactionForm">
-          <label>Descrição:
-            <input type="text" id="txDescription" required />
-          </label>
-          <label>Valor:
-            <input type="number" id="txValue" step="0.01" required />
-          </label>
-          <div style="display:flex; gap: 10px; justify-content:flex-end;">
-            <button type="submit">Salvar</button>
-            <button type="button" id="btnCancel">Cancelar</button>
-          </div>
-        </form>
-      </div>
-    `;
-    modal.classList.add("active");
+  fabBtn.onclick = () => {
+    alert("Abrir modal de novo lançamento - implemente você :)");
+  };
 
-    document.getElementById("btnCancel").onclick = closeModal;
-
-    document.getElementById("newTransactionForm").onsubmit = e => {
-      e.preventDefault();
-      if(!appData.transacoes) appData.transacoes = [];
-      appData.transacoes.push({
-        description: document.getElementById("txDescription").value,
-        value: parseFloat(document.getElementById("txValue").value),
-        date: new Date().toISOString().slice(0,10)
-      });
-      saveData();
-      closeModal();
-      renderTransactions();
-    };
-  }
-
-  // Fecha modal
-  function closeModal() {
-    modal.classList.remove("active");
-    modal.innerHTML = "";
-  }
-
-  // Fecha modal ao clicar fora
   modal.onclick = (e) => {
     if(e.target === modal) closeModal();
   };
 
-  fabBtn.onclick = () => {
-    openModal();
-  };
-
-  // Salva dados no Firestore
-  function saveData() {
-    db.collection("usuarios").doc(userEmail).set(appData);
+  function closeModal() {
+    modal.classList.remove("active");
+    modal.innerHTML = "";
   }
-
-  // Carrega dados do usuário
-  function loadUserData() {
-    db.collection("usuarios").doc(userEmail).get().then(doc => {
-      if (doc.exists) {
-        appData = doc.data();
-      } else {
-        appData = {
-          user: userEmail,
-          contas: [{ nome: "Carteira", saldo: 0, cor: "#246bfd" }],
-          categorias: [
-            { nome: "Salário", tipo: "income", cor: "#24c176" },
-            { nome: "Alimentação", tipo: "expense", cor: "#e14c54" }
-          ],
-          transacoes: [],
-          metas: [],
-          config: { theme: "dark", alertas: [], limites: {}, excelSep: ";" },
-          anexos: {}
-        };
-        saveData();
-      }
-      renderMenu();
-      showPanel("dashboard");
-      fabBtn.style.display = "none"; // inicial no dashboard não mostrar fab
-    });
-  }
-
-  // Controla autenticação e inicializa dados
-  auth.onAuthStateChanged(user => {
-    if(!user) {
-      window.location.href = "login.html";
-      return;
-    }
-    userEmail = user.email;
-    loadUserData();
-  });
-
-  // Logout
-  document.getElementById("logoutBtn").onclick = () => {
-    auth.signOut().then(() => {
-      window.location.href = "login.html";
-    });
-  };
 </script>
 
 </body>
