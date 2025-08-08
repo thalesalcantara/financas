@@ -71,6 +71,7 @@
     text-align: center;
     cursor: pointer;
     transition: background 0.15s ease;
+    user-select: none;
   }
   nav li.active, nav li:hover {
     background: var(--sidebar-active);
@@ -95,18 +96,6 @@
     width: 100%;
     overflow-y: auto;
   }
-  .panel {
-    display: none;
-  }
-  .panel.active {
-    display: block;
-    animation: fadeIn 0.4s ease forwards;
-  }
-  @keyframes fadeIn {
-    from {opacity: 0;}
-    to {opacity: 1;}
-  }
-  /* FAB button */
   .fab {
     position: fixed;
     bottom: 2.2rem;
@@ -118,7 +107,7 @@
     height: 58px;
     border-radius: 50%;
     font-size: 2.4rem;
-    display: flex;
+    display: none; /* mostrado apenas onde for necessário */
     align-items: center;
     justify-content: center;
     box-shadow: 0 3px 16px #246bfd30;
@@ -140,48 +129,6 @@
   .modal-bg.active {
     display: flex;
   }
-  .modal {
-    background: var(--card-dark);
-    color: var(--text-dark);
-    border-radius: 1rem;
-    padding: 1.5rem 1rem;
-    min-width: 320px;
-    max-width: 90vw;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-  .modal form label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    margin-bottom: 0.7rem;
-    font-weight: 500;
-  }
-  .modal form input, .modal form select, .modal form textarea {
-    padding: 0.4rem;
-    border-radius: 0.5rem;
-    border: 1px solid #2b3552;
-    font-size: 1rem;
-    background: #192132;
-    color: var(--text-dark);
-  }
-  .modal form button {
-    padding: 0.6rem 1.4rem;
-    border-radius: 0.9rem;
-    border: none;
-    background: var(--azul);
-    color: white;
-    font-size: 1rem;
-    margin-right: 0.5rem;
-    cursor: pointer;
-    margin-top: 0.4rem;
-  }
-  .modal form button[type=button] {
-    background: #333;
-    color: #eee;
-  }
 </style>
 </head>
 <body>
@@ -198,19 +145,13 @@
   </aside>
 
   <main class="main" id="mainPainel">
-    <section id="dashboard" class="panel active"></section>
-    <section id="transactions" class="panel"></section>
-    <section id="metas" class="panel"></section>
-    <section id="contas" class="panel"></section>
-    <section id="categorias" class="panel"></section>
-    <section id="relatorios" class="panel"></section>
-    <section id="configuracoes" class="panel"></section>
+    <!-- Conteúdo dos painéis carregado aqui -->
   </main>
 </div>
 
 <div class="fab" id="fabBtn" title="Adicionar lançamento">+</div>
 
-<div class="modal-bg" id="modal" onclick="closeModal(event)"></div>
+<div class="modal-bg" id="modal" onclick="if(event.target.id === 'modal') closeModal()"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -231,7 +172,6 @@
   const db = firebase.firestore();
   const auth = firebase.auth();
 
-  // MENU
   const MENUS = [
     {id:"dashboard", label:"Dashboard", icon:"📊"},
     {id:"transactions", label:"Lançamentos", icon:"💸"},
@@ -248,8 +188,9 @@
   const menuList = document.getElementById("menuList");
   const fabBtn = document.getElementById("fabBtn");
   const modal = document.getElementById("modal");
+  const mainPainel = document.getElementById("mainPainel");
 
-  // Renderiza menu e ativa o primeiro
+  // Renderiza menu lateral
   function renderMenu() {
     menuList.innerHTML = "";
     MENUS.forEach(m => {
@@ -257,61 +198,98 @@
       li.id = "menu-" + m.id;
       li.textContent = m.icon + " " + m.label;
       li.style.userSelect = "none";
-      li.onclick = () => showPanel(m.id);
+      li.onclick = () => {
+        document.querySelectorAll("#menuList li").forEach(i => i.classList.remove("active"));
+        li.classList.add("active");
+        loadPanel(m.id);
+      };
       menuList.appendChild(li);
     });
-    if(menuList.firstChild) menuList.firstChild.classList.add("active");
+    if(menuList.firstChild) {
+      menuList.firstChild.classList.add("active");
+      loadPanel(menuList.firstChild.id.replace("menu-", ""));
+    }
   }
 
-  // Mostra o painel selecionado e oculta os demais
-  function showPanel(id) {
-    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
-    const painel = document.getElementById(id);
-    if(painel) painel.classList.add("active");
-    document.querySelectorAll("#menuList li").forEach(li => li.classList.remove("active"));
-    const menuItem = document.getElementById("menu-" + id);
-    if(menuItem) menuItem.classList.add("active");
-  }
+  // Carrega conteúdo do painel dinamicamente via fetch do arquivo HTML correspondente
+  function loadPanel(panelId) {
+    mainPainel.innerHTML = "<p>Carregando...</p>";
 
-  // Logout
-  function logoutUser() {
-    auth.signOut().then(() => {
-      window.location.href = "login.html";
-    });
-  }
-  document.getElementById("logoutBtn").onclick = logoutUser;
-
-  // Função exemplo para dashboard
-  function renderDashboard() {
-    const dash = document.getElementById("dashboard");
-    dash.innerHTML = "<h2>Dashboard</h2><p>Bem-vindo, " + userEmail + "!</p>";
-  }
-
-  // Firebase auth state
-  auth.onAuthStateChanged(user => {
-    if(user) {
-      userEmail = user.email;
-      renderMenu();
-      showPanel("dashboard");
-      renderDashboard();
+    // Mostrar FAB somente em painéis específicos
+    if (["transactions", "metas", "contas", "categorias"].includes(panelId)) {
       fabBtn.style.display = "flex";
     } else {
-      window.location.href = "login.html";
+      fabBtn.style.display = "none";
     }
-  });
 
+    fetch(panelId + ".html")
+      .then(resp => {
+        if (!resp.ok) throw new Error("Erro ao carregar painel: " + panelId);
+        return resp.text();
+      })
+      .then(html => {
+        mainPainel.innerHTML = html;
+        // Chamar função de renderização do painel, se existir
+        const fnName = "render_" + panelId;
+        if(typeof window[fnName] === "function") window[fnName]();
+      })
+      .catch(err => {
+        mainPainel.innerHTML = `<section><h2>${panelId}</h2><p>Conteúdo não encontrado.</p></section>`;
+        console.error(err);
+      });
+  }
+
+  // Exemplo: função para painel dashboard (substitua pelo seu conteúdo se precisar)
+  function render_dashboard() {
+    // Se quiser, atualize o conteúdo depois de carregar o dashboard.html
+    const dash = document.getElementById("dashboard");
+    if(dash) dash.innerHTML += `<p>Bem-vindo, ${userEmail}!</p>`;
+  }
+
+  // Abre modal de lançamento (carrega o modal.html)
   fabBtn.onclick = () => {
-    alert("Abrir modal de novo lançamento - implemente você :)");
-  };
+    fetch("modal.html")
+      .then(r => r.text())
+      .then(html => {
+        modal.innerHTML = html;
+        modal.classList.add("active");
 
-  modal.onclick = (e) => {
-    if(e.target === modal) closeModal();
+        // Vincular eventos do modal carregado dinamicamente
+        const btnCancel = modal.querySelector("#btnCancel");
+        if(btnCancel) btnCancel.onclick = closeModal;
+
+        const form = modal.querySelector("#transactionForm");
+        if(form) {
+          form.onsubmit = e => {
+            e.preventDefault();
+            alert("Salvar lançamento (implemente aqui)"); // Sua lógica para salvar aqui
+            closeModal();
+          };
+        }
+      });
   };
 
   function closeModal() {
     modal.classList.remove("active");
     modal.innerHTML = "";
   }
+
+  // Logout
+  document.getElementById("logoutBtn").onclick = () => {
+    auth.signOut().then(() => {
+      window.location.href = "login.html";
+    });
+  };
+
+  // Autenticação e carregamento inicial
+  auth.onAuthStateChanged(user => {
+    if(user) {
+      userEmail = user.email;
+      renderMenu();
+    } else {
+      window.location.href = "login.html";
+    }
+  });
 </script>
 
 </body>
