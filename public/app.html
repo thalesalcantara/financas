@@ -48,7 +48,8 @@
     width: 56px;
     margin-bottom: 1rem;
     border-radius: 50%;
-    background: #fff;
+    background: white;
+    padding: 8px;
   }
   .sidebar h1 {
     font-size: 1.18rem;
@@ -71,6 +72,7 @@
     text-align: center;
     cursor: pointer;
     transition: background 0.15s ease;
+    user-select: none;
   }
   nav li.active, nav li:hover {
     background: var(--sidebar-active);
@@ -123,7 +125,6 @@
     justify-content: center;
     box-shadow: 0 3px 16px #246bfd30;
     cursor: pointer;
-    display: none;
   }
   .fab:hover {
     background: #193b70;
@@ -182,6 +183,54 @@
   .modal form button[type=button] {
     background: #333;
     color: #eee;
+  }
+  /* Responsivo simples */
+  @media (max-width: 600px) {
+    .container {
+      flex-direction: column;
+    }
+    aside.sidebar {
+      width: 100%;
+      min-width: auto;
+      flex-direction: row;
+      padding: 0.5rem 1rem;
+      overflow-x: auto;
+    }
+    .logo {
+      width: 40px;
+      margin: 0 1rem 0 0;
+      background: white;
+      padding: 6px;
+    }
+    nav ul {
+      display: flex;
+      gap: 1rem;
+      width: auto;
+    }
+    nav li {
+      margin-bottom: 0;
+      border-radius: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      white-space: nowrap;
+    }
+    .logout-btn {
+      margin-top: 0;
+      margin-left: auto;
+      padding: 0.3rem 0.8rem;
+      border-radius: 0.5rem;
+      width: auto;
+      font-size: 0.9rem;
+    }
+    main.main {
+      padding: 1rem 0.5rem;
+    }
+    .fab {
+      bottom: 1.5rem;
+      right: 1.5rem;
+      width: 50px;
+      height: 50px;
+      font-size: 2rem;
+    }
   }
 </style>
 </head>
@@ -249,7 +298,7 @@
   const fabBtn = document.getElementById("fabBtn");
   const modal = document.getElementById("modal");
 
-  // Renderiza menu no DOM
+  // Renderiza menu e adiciona evento para carregar painel
   function renderMenu() {
     menuList.innerHTML = "";
     MENUS.forEach(m => {
@@ -259,13 +308,12 @@
       li.style.userSelect = "none";
       li.onclick = () => {
         showPanel(m.id);
-        // aqui pode-se implementar carregamento dinâmico se quiser
       };
       menuList.appendChild(li);
     });
   }
 
-  // Mostra painel ativo
+  // Mostra painel e ativa menu correspondente
   function showPanel(id) {
     document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
     const panel = document.getElementById(id);
@@ -274,12 +322,12 @@
     const menuItem = document.getElementById("menu-" + id);
     if (menuItem) menuItem.classList.add("active");
 
-    // Carregando conteúdo dos painéis:
+    // Carrega conteúdo dinâmico
     if(id === "dashboard") {
-      renderDashboard();
+      loadDashboard();
       fabBtn.style.display = "none";
     } else if(id === "transactions") {
-      renderTransactions();
+      loadTransactions();
       fabBtn.style.display = "flex";
     } else {
       fabBtn.style.display = "none";
@@ -288,43 +336,50 @@
     }
   }
 
-  // Função exemplo para dashboard
-  function renderDashboard() {
+  // Função que carrega o dashboard
+  function loadDashboard() {
     const dash = document.getElementById("dashboard");
-    if (!dash) return;
+    if(!dash) return;
     dash.innerHTML = `<h2>Dashboard</h2><p>Bem-vindo, ${userEmail}!</p>`;
+    // Aqui você pode colocar gráficos, saldo, etc
   }
 
-  // Função exemplo para transações
-  function renderTransactions() {
+  // Função que carrega lançamentos
+  function loadTransactions() {
     const trans = document.getElementById("transactions");
-    if (!trans) return;
+    if(!trans) return;
+
     trans.innerHTML = `
       <h2>Lançamentos</h2>
-      <p>Aqui vai a tabela e filtros.</p>
-      <table border="1" cellpadding="5" cellspacing="0" style="width:100%;background:#fff;color:#000;border-radius:8px;overflow:hidden;">
+      <p>Lista de transações:</p>
+      <table style="width:100%;border-collapse:collapse;color:#000;background:#fff;border-radius:8px;overflow:hidden;">
         <thead>
           <tr>
-            <th>Descrição</th><th>Valor</th><th>Data</th>
+            <th style="padding:8px;border-bottom:2px solid #ccc;">Descrição</th>
+            <th style="padding:8px;border-bottom:2px solid #ccc;">Valor</th>
+            <th style="padding:8px;border-bottom:2px solid #ccc;">Data</th>
           </tr>
         </thead>
         <tbody id="transactionsTableBody"></tbody>
       </table>
     `;
 
-    // Exemplo simples de dados:
+    const tbody = document.getElementById("transactionsTableBody");
+    tbody.innerHTML = "";
     if(appData && appData.transacoes && appData.transacoes.length > 0) {
-      const tbody = document.getElementById("transactionsTableBody");
-      tbody.innerHTML = "";
       appData.transacoes.forEach(tx => {
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${tx.description || ""}</td><td>${tx.value.toFixed(2)}</td><td>${tx.date || ""}</td>`;
+        tr.innerHTML = `
+          <td style="padding:8px;border-bottom:1px solid #ddd;">${tx.description || ""}</td>
+          <td style="padding:8px;border-bottom:1px solid #ddd;">R$ ${tx.value.toFixed(2)}</td>
+          <td style="padding:8px;border-bottom:1px solid #ddd;">${tx.date || ""}</td>
+        `;
         tbody.appendChild(tr);
       });
     }
   }
 
-  // Abre modal com formulário para novo lançamento simples
+  // Função para abrir modal de novo lançamento
   function openModal() {
     modal.innerHTML = `
       <div class="modal" onclick="event.stopPropagation()">
@@ -336,7 +391,7 @@
           <label>Valor:
             <input type="number" id="txValue" step="0.01" required />
           </label>
-          <div style="display:flex; gap: 10px; justify-content:flex-end;">
+          <div style="display:flex; justify-content:flex-end; gap:10px;">
             <button type="submit">Salvar</button>
             <button type="button" id="btnCancel">Cancelar</button>
           </div>
@@ -349,7 +404,6 @@
 
     document.getElementById("newTransactionForm").onsubmit = e => {
       e.preventDefault();
-      // Salvar no appData (em memória)
       if(!appData.transacoes) appData.transacoes = [];
       appData.transacoes.push({
         description: document.getElementById("txDescription").value,
@@ -358,7 +412,7 @@
       });
       saveData();
       closeModal();
-      renderTransactions();
+      loadTransactions();
     };
   }
 
@@ -368,7 +422,7 @@
     modal.innerHTML = "";
   }
 
-  modal.onclick = (e) => {
+  modal.onclick = e => {
     if(e.target === modal) closeModal();
   };
 
@@ -378,13 +432,15 @@
 
   // Salva dados no Firestore
   function saveData() {
+    if(!userEmail) return;
     db.collection("usuarios").doc(userEmail).set(appData);
   }
 
-  // Carrega dados do usuário
+  // Carrega dados do usuário no Firestore
   function loadUserData() {
+    if(!userEmail) return;
     db.collection("usuarios").doc(userEmail).get().then(doc => {
-      if (doc.exists) {
+      if(doc.exists) {
         appData = doc.data();
       } else {
         appData = {
@@ -407,7 +463,7 @@
     });
   }
 
-  // Controle autenticação e carregamento inicial
+  // Controla autenticação
   auth.onAuthStateChanged(user => {
     if(!user) {
       window.location.href = "login.html";
