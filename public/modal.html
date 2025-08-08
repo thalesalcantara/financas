@@ -1,47 +1,470 @@
-<div id="transactionModal" style="display:none; position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; z-index: 100;">
-  <div style="background:#222b44; padding: 2rem; border-radius:1rem; width: 320px; max-width: 90vw; color: #e6eefc;">
-    <h3 id="modalTitle">Novo Lançamento</h3>
-    <form id="transactionForm">
-      <label>
-        Tipo:
-        <select id="txType" required>
-          <option value="income">Receita</option>
-          <option value="expense">Despesa</option>
-          <option value="transfer">Transferência</option>
-        </select>
-      </label>
-      <label>
-        Conta:
-        <select id="txAccount" required></select>
-      </label>
-      <div id="accountToContainer" style="display:none;">
-        <label>
-          Para Conta:
-          <select id="txAccountTo"></select>
-        </label>
-      </div>
-      <label>
-        Categoria:
-        <select id="txCategory" required></select>
-      </label>
-      <label>
-        Descrição:
-        <input type="text" id="txDescription" maxlength="40" placeholder="Ex: Pix recebido" />
-      </label>
-      <label>
-        Data:
-        <input type="date" id="txDate" required />
-      </label>
-      <label>
-        Valor:
-        <input type="number" id="txValue" min="0.01" step="0.01" required />
-      </label>
-      <label>
-        Notas:
-        <textarea id="txNotes" maxlength="100" placeholder="Observações"></textarea>
-      </label>
-      <button type="submit">Salvar</button>
-      <button type="button" id="btnCancel">Cancelar</button>
-    </form>
-  </div>
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kratos System Finanças Pessoais</title>
+<link rel="icon" href="/static/logo.png" type="image/png" />
+<style>
+  /* Seu CSS anterior */
+  :root {
+    --azul: #163772;
+    --azul-claro: #2a4172;
+    --preto: #0b101e;
+    --card-dark: #182336;
+    --cinza: #232a39;
+    --verde: #24c176;
+    --vermelho: #e14c54;
+    --amarelo: #ffd26e;
+    --text-dark: #e6eefc;
+    --sidebar: #131b2d;
+    --sidebar-active: #222b44;
+  }
+  html, body {
+    margin:0; padding:0; height:100%;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: var(--cinza);
+    color: var(--text-dark);
+  }
+  .container {
+    display: flex;
+    min-height: 100vh;
+    width: 100vw;
+    overflow-x: hidden;
+  }
+  aside.sidebar {
+    background: var(--sidebar);
+    color: var(--text-dark);
+    width: 230px;
+    min-width: 160px;
+    padding: 2.2rem 1rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 10;
+    transition: left 0.2s ease;
+  }
+  .logo {
+    width: 56px;
+    margin-bottom: 1rem;
+    border-radius: 50%;
+    background: #fff;
+  }
+  .sidebar h1 {
+    font-size: 1.18rem;
+    margin: 0 0 .2rem 0;
+  }
+  .sidebar h2 {
+    font-size: 1.01rem;
+    margin-bottom: 1.1rem;
+    font-weight: 400;
+  }
+  nav ul {
+    list-style: none;
+    padding: 0;
+    width: 100%;
+  }
+  nav li {
+    padding: .67rem 1rem;
+    border-radius: 1rem;
+    margin-bottom: .37rem;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    user-select: none;
+  }
+  nav li.active, nav li:hover {
+    background: var(--sidebar-active);
+    font-weight: 700;
+    color: var(--amarelo);
+  }
+  .logout-btn {
+    background: var(--vermelho);
+    color: white;
+    border: none;
+    border-radius: 1rem;
+    margin-top: 2rem;
+    padding: .5rem 1.2rem;
+    cursor: pointer;
+    font-weight: 700;
+    width: 100%;
+  }
+  main.main {
+    flex: 1;
+    padding: 2.2rem 1rem;
+    min-width: 0;
+    width: 100%;
+    overflow-y: auto;
+  }
+  .panel {
+    display: none;
+  }
+  .panel.active {
+    display: block;
+    animation: fadeIn 0.4s ease forwards;
+  }
+  @keyframes fadeIn {
+    from {opacity: 0;}
+    to {opacity: 1;}
+  }
+  .fab {
+    position: fixed;
+    bottom: 2.2rem;
+    right: 2rem;
+    z-index: 110;
+    background: var(--azul);
+    color: white;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    font-size: 2.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 16px #246bfd30;
+    cursor: pointer;
+  }
+  .fab:hover {
+    background: #193b70;
+  }
+  .modal-bg {
+    display: none;
+    position: fixed;
+    top:0; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,0.7);
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+  }
+  .modal-bg.active {
+    display: flex;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <aside class="sidebar" id="sidebar">
+    <img src="/static/logo.png" alt="Logo Kratos" class="logo" />
+    <h1>Kratos System</h1>
+    <h2>Finanças Pessoais</h2>
+    <nav>
+      <ul id="menuList"></ul>
+    </nav>
+    <button class="logout-btn" id="logoutBtn">Sair</button>
+  </aside>
+
+  <main class="main" id="mainPainel">
+    <section id="dashboard" class="panel active"></section>
+    <section id="transactions" class="panel"></section>
+    <section id="metas" class="panel"></section>
+    <section id="contas" class="panel"></section>
+    <section id="categorias" class="panel"></section>
+    <section id="relatorios" class="panel"></section>
+    <section id="configuracoes" class="panel"></section>
+  </main>
 </div>
+
+<div class="fab" id="fabBtn" title="Adicionar lançamento">+</div>
+
+<div class="modal-bg" id="modal" onclick="if(event.target.id === 'modal') closeModal()"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+
+<script>
+  // Config Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyD32JNIb-IplbuAM8WD-Nw_P3gA5wNSNwY",
+    authDomain: "kratosfinancas.firebaseapp.com",
+    projectId: "kratosfinancas",
+    storageBucket: "kratosfinancas.firebasestorage.app",
+    messagingSenderId: "740158664268",
+    appId: "1:740158664268:web:9e4583e75c94cbd90c0ee9"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const auth = firebase.auth();
+
+  // Menu Items
+  const MENUS = [
+    {id:"dashboard", label:"Dashboard", icon:"📊"},
+    {id:"transactions", label:"Lançamentos", icon:"💸"},
+    {id:"metas", label:"Metas", icon:"🎯"},
+    {id:"contas", label:"Contas", icon:"🏦"},
+    {id:"categorias", label:"Categorias", icon:"🏷️"},
+    {id:"relatorios", label:"Relatórios", icon:"📈"},
+    {id:"configuracoes", label:"Configurações", icon:"⚙️"},
+  ];
+
+  let appData = null;
+  let userEmail = null;
+
+  const menuList = document.getElementById("menuList");
+  const fabBtn = document.getElementById("fabBtn");
+  const modal = document.getElementById("modal");
+  const mainPainel = document.getElementById("mainPainel");
+
+  // RENDER MENU
+  function renderMenu() {
+    menuList.innerHTML = "";
+    MENUS.forEach(m => {
+      const li = document.createElement("li");
+      li.id = "menu-" + m.id;
+      li.dataset.panel = m.id;
+      li.textContent = m.icon + " " + m.label;
+      li.onclick = () => {
+        document.querySelectorAll("#menuList li").forEach(i => i.classList.remove("active"));
+        li.classList.add("active");
+        loadPanel(m.id);
+      };
+      menuList.appendChild(li);
+    });
+    // Define ativo o primeiro menu
+    menuList.querySelector("li").classList.add("active");
+  }
+
+  // LOAD PANEL
+  function loadPanel(panel) {
+    // Limpa todos os painéis
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+
+    // Tenta mostrar painel se existir
+    const panelEl = document.getElementById(panel);
+    if (panelEl) {
+      panelEl.classList.add("active");
+      // Chama a função de renderização do painel
+      const fnName = "render_" + panel;
+      if (typeof window[fnName] === "function") {
+        window[fnName]();
+      }
+    }
+
+    // Exibir ou ocultar FAB
+    fabBtn.style.display = (panel === "transactions" || panel === "metas" || panel === "contas" || panel === "categorias") ? "flex" : "none";
+  }
+
+  // LOGOUT
+  document.getElementById("logoutBtn").onclick = () => {
+    auth.signOut().then(() => {
+      window.location.href = "login.html";
+    });
+  };
+
+  // Modal Control
+  function openModal(html) {
+    modal.innerHTML = html;
+    modal.classList.add("active");
+  }
+  function closeModal() {
+    modal.classList.remove("active");
+    modal.innerHTML = "";
+  }
+
+  // Exemplo de abrir modal do lançamento
+  fabBtn.onclick = () => {
+    openTransactionModal();
+  };
+
+  // Modal transação (carregar modal.html e preencher selects)
+  function openTransactionModal(transactionIndex = null) {
+    fetch("modal.html")
+      .then(r => r.text())
+      .then(html => {
+        openModal(html);
+
+        const txAccount = document.getElementById("txAccount");
+        const txAccountTo = document.getElementById("txAccountTo");
+        const txCategory = document.getElementById("txCategory");
+        const accountToContainer = document.getElementById("accountToContainer");
+        const txType = document.getElementById("txType");
+
+        // Preenche selects
+        txAccount.innerHTML = appData.contas.map(c => `<option>${c.nome}</option>`).join("");
+        txAccountTo.innerHTML = appData.contas.map(c => `<option>${c.nome}</option>`).join("");
+        txCategory.innerHTML = appData.categorias.map(c => `<option>${c.nome}</option>`).join("");
+
+        // Mostrar/ocultar campo 'Para Conta'
+        txType.onchange = () => {
+          accountToContainer.style.display = txType.value === "transfer" ? "block" : "none";
+        };
+        txType.onchange();
+
+        // Se editar, preencher os dados
+        if (transactionIndex !== null) {
+          const tx = appData.transacoes[transactionIndex];
+          document.getElementById("modalTitle").textContent = "Editar Lançamento";
+          txType.value = tx.type;
+          txAccount.value = tx.account;
+          txAccountTo.value = tx.accountTo || "";
+          txCategory.value = tx.category;
+          document.getElementById("txDescription").value = tx.description || "";
+          document.getElementById("txDate").value = tx.date || new Date().toISOString().slice(0, 10);
+          document.getElementById("txValue").value = tx.value;
+          document.getElementById("txNotes").value = tx.notes || "";
+          txType.onchange();
+        }
+
+        // Salvar dados
+        document.getElementById("transactionForm").onsubmit = e => {
+          e.preventDefault();
+          saveTransaction(transactionIndex);
+        };
+
+        document.getElementById("btnCancel").onclick = closeModal;
+      });
+  }
+
+  // Salvar transação
+  function saveTransaction(transactionIndex) {
+    const type = document.getElementById("txType").value;
+    const account = document.getElementById("txAccount").value;
+    const accountTo = document.getElementById("txAccountTo").value;
+    const category = document.getElementById("txCategory").value;
+    const description = document.getElementById("txDescription").value.trim();
+    const date = document.getElementById("txDate").value;
+    const value = parseFloat(document.getElementById("txValue").value);
+    const notes = document.getElementById("txNotes").value.trim();
+
+    if (!account || (type === "transfer" && !accountTo) || !category || !date || !value) {
+      alert("Por favor preencha todos os campos obrigatórios.");
+      return;
+    }
+
+    const contaOrigem = appData.contas.find(c => c.nome === account);
+    if (!contaOrigem) {
+      alert("Conta de origem inválida");
+      return;
+    }
+    let contaDestino = null;
+    if (type === "transfer") {
+      contaDestino = appData.contas.find(c => c.nome === accountTo);
+      if (!contaDestino) {
+        alert("Conta destino inválida");
+        return;
+      }
+    }
+
+    // Reverter saldo anterior se editar
+    if (transactionIndex !== null) {
+      const oldTx = appData.transacoes[transactionIndex];
+      if (oldTx.type === "income") {
+        const c = appData.contas.find(c => c.nome === oldTx.account);
+        if (c) c.saldo -= oldTx.value;
+      } else if (oldTx.type === "expense") {
+        const c = appData.contas.find(c => c.nome === oldTx.account);
+        if (c) c.saldo += oldTx.value;
+      } else if (oldTx.type === "transfer") {
+        const cFrom = appData.contas.find(c => c.nome === oldTx.account);
+        const cTo = appData.contas.find(c => c.nome === oldTx.accountTo);
+        if (cFrom && cTo) {
+          cFrom.saldo += oldTx.value;
+          cTo.saldo -= oldTx.value;
+        }
+      }
+    }
+
+    // Aplicar saldo novo
+    if (type === "income") {
+      contaOrigem.saldo += value;
+    } else if (type === "expense") {
+      contaOrigem.saldo -= value;
+    } else if (type === "transfer") {
+      contaOrigem.saldo -= value;
+      contaDestino.saldo += value;
+    }
+
+    const transactionObj = {
+      type,
+      account,
+      accountTo: type === "transfer" ? accountTo : undefined,
+      category,
+      description,
+      date,
+      value,
+      notes,
+    };
+
+    if (transactionIndex !== null) {
+      appData.transacoes[transactionIndex] = transactionObj;
+    } else {
+      appData.transacoes.push(transactionObj);
+    }
+
+    saveData();
+    closeModal();
+    loadPanel("transactions");
+  }
+
+  // Salvar dados no Firestore
+  function saveData() {
+    db.collection("usuarios").doc(userEmail).set(appData);
+  }
+
+  // Render painel dashboard (exemplo básico, adapte conforme seu dashboard.html)
+  window.render_dashboard = function() {
+    const dash = document.getElementById("dashboard");
+    if (!dash) return;
+    dash.innerHTML = `
+      <h2>Resumo Financeiro</h2>
+      <p>Usuário: ${userEmail}</p>
+      <p>Contas: ${appData.contas.map(c => `${c.nome} (${c.saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})`).join(", ")}</p>
+    `;
+  };
+
+  // Render painel transações (exemplo simples)
+  window.render_transactions = function() {
+    const panel = document.getElementById("transactions");
+    if (!panel) return;
+    if (!appData.transacoes || appData.transacoes.length === 0) {
+      panel.innerHTML = "<p>Nenhuma transação cadastrada.</p>";
+      return;
+    }
+    const rows = appData.transacoes.map((t, i) => `
+      <div>
+        <b>${t.type.toUpperCase()}</b>: ${t.description} - ${t.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em ${t.date}
+        <button onclick="openTransactionModal(${i})">Editar</button>
+      </div>
+    `).join("");
+    panel.innerHTML = "<h2>Transações</h2>" + rows;
+  };
+
+  // Inicializa app quando usuário logar
+  auth.onAuthStateChanged(user => {
+    if (!user) {
+      window.location.href = "login.html";
+      return;
+    }
+    userEmail = user.email;
+    db.collection("usuarios").doc(userEmail).get().then(doc => {
+      if (doc.exists) {
+        appData = doc.data();
+      } else {
+        // Modelo zerado se novo usuário
+        appData = {
+          user: userEmail,
+          contas: [{ nome: "Carteira", saldo: 0 }],
+          categorias: [
+            { nome: "Salário", tipo: "income", cor: "#24c176" },
+            { nome: "Alimentação", tipo: "expense", cor: "#e14c54" }
+          ],
+          transacoes: [],
+          metas: [],
+          config: { theme: "dark", alertas: [], limites: {}, excelSep: ";" },
+          anexos: {}
+        };
+        saveData();
+      }
+      renderMenu();
+      loadPanel("dashboard");
+      fabBtn.style.display = "flex";
+    });
+  });
+</script>
+
+</body>
+</html>

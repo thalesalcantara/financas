@@ -231,7 +231,6 @@
   const db = firebase.firestore();
   const auth = firebase.auth();
 
-  // MENU
   const MENUS = [
     {id:"dashboard", label:"Dashboard", icon:"📊"},
     {id:"transactions", label:"Lançamentos", icon:"💸"},
@@ -256,7 +255,10 @@
       li.id = "menu-" + m.id;
       li.textContent = m.icon + " " + m.label;
       li.style.userSelect = "none";
-      li.onclick = () => showPanel(m.id);
+      li.onclick = () => {
+        showPanel(m.id);
+        // aqui pode-se implementar carregamento dinâmico se quiser
+      };
       menuList.appendChild(li);
     });
   }
@@ -277,13 +279,55 @@
   }
   document.getElementById("logoutBtn").onclick = logoutUser;
 
-  // Função para renderizar o dashboard (exemplo)
+  // Função simples para demo do dashboard
   function renderDashboard() {
     const dash = document.getElementById("dashboard");
     dash.innerHTML = "<h2>Dashboard</h2><p>Bem-vindo, " + userEmail + "!</p>";
   }
 
-  // Verifica estado de autenticação do usuário
+  // Abre o modal com formulário básico
+  function openModal() {
+    modal.innerHTML = `
+      <div class="modal" onclick="event.stopPropagation()">
+        <h3>Novo lançamento</h3>
+        <form id="newTransactionForm">
+          <label>Descrição:
+            <input type="text" id="txDescription" required />
+          </label>
+          <label>Valor:
+            <input type="number" id="txValue" step="0.01" required />
+          </label>
+          <div style="display:flex; gap: 10px; justify-content:flex-end;">
+            <button type="submit">Salvar</button>
+            <button type="button" id="btnCancel">Cancelar</button>
+          </div>
+        </form>
+      </div>
+    `;
+    modal.classList.add("active");
+
+    document.getElementById("btnCancel").onclick = closeModal;
+
+    document.getElementById("newTransactionForm").onsubmit = e => {
+      e.preventDefault();
+      // Aqui você pode salvar os dados no Firebase ou na sua estrutura
+      alert(`Lançamento salvo: ${document.getElementById("txDescription").value}, R$ ${document.getElementById("txValue").value}`);
+      closeModal();
+    };
+  }
+
+  function closeModal() {
+    modal.classList.remove("active");
+    modal.innerHTML = "";
+  }
+
+  modal.onclick = closeModal;
+
+  fabBtn.onclick = () => {
+    openModal();
+  };
+
+  // Autenticação Firebase
   auth.onAuthStateChanged(user => {
     if(user) {
       userEmail = user.email;
@@ -295,19 +339,6 @@
       window.location.href = "login.html";
     }
   });
-
-  fabBtn.onclick = () => {
-    alert("Abrir modal de novo lançamento - implemente você :)");
-  };
-
-  modal.onclick = (e) => {
-    if(e.target === modal) closeModal();
-  };
-
-  function closeModal() {
-    modal.classList.remove("active");
-    modal.innerHTML = "";
-  }
 </script>
 
 </body>
