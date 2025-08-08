@@ -107,7 +107,7 @@
     height: 58px;
     border-radius: 50%;
     font-size: 2.4rem;
-    display: none; /* Oculto por padrão, mostra quando necessário */
+    display: none; /* Oculto por padrão */
     align-items: center;
     justify-content: center;
     box-shadow: 0 3px 16px #246bfd30;
@@ -145,7 +145,7 @@
   </aside>
 
   <main class="main" id="mainPainel">
-    <!-- Aqui o conteúdo será carregado dinamicamente -->
+    <!-- Conteúdo dos painéis será carregado aqui -->
   </main>
 </div>
 
@@ -173,7 +173,6 @@
   const db = firebase.firestore();
   const auth = firebase.auth();
 
-  // Menus disponíveis
   const MENUS = [
     {id:"dashboard", label:"Dashboard", icon:"📊"},
     {id:"transactions", label:"Lançamentos", icon:"💸"},
@@ -208,26 +207,27 @@
       };
       menuList.appendChild(li);
     });
-    // Marca o primeiro menu como ativo
-    if(menuList.firstChild) menuList.firstChild.classList.add("active");
+    // Marca o primeiro menu como ativo e carrega
+    if(menuList.firstChild) {
+      menuList.firstChild.classList.add("active");
+      loadPanel(menuList.firstChild.dataset.panel);
+    }
   }
 
-  // Carrega e exibe o painel solicitado
+  // Carrega painel via fetch e chama função render_*
   function loadPanel(panel) {
-    // Limpa conteúdo atual
     mainPainel.innerHTML = "";
-    // Ajusta visibilidade FAB
-    fabBtn.style.display = (panel === "transactions" || panel === "metas" || panel === "contas" || panel === "categorias") ? "flex" : "none";
+    // Define quando mostrar FAB
+    fabBtn.style.display = ["transactions", "metas", "contas", "categorias"].includes(panel) ? "flex" : "none";
 
-    // Carrega o conteúdo HTML do painel dinamicamente
-    fetch(`${panel}.html`)
+    fetch(panel + ".html")
       .then(res => {
         if(!res.ok) throw new Error("Painel não encontrado: " + panel);
         return res.text();
       })
       .then(html => {
         mainPainel.innerHTML = html;
-        // Após carregar conteúdo, chama a função específica para renderizar dados
+        // Chama função render_ correspondente, se existir
         const fnName = "render_" + panel;
         if(typeof window[fnName] === "function") window[fnName]();
       })
@@ -237,22 +237,19 @@
       });
   }
 
-  // Exemplos de funções render_* para cada painel
+  // Exemplo simples para dashboard
   function render_dashboard() {
-    // exemplo simples, pode ser expandido conforme necessidade
     const el = document.getElementById("dashboard");
     if(el) el.innerHTML += `<p>Bem-vindo, ${userEmail}!</p>`;
   }
 
+  // Exemplo de função para transações (deixe pronto para expansão)
   function render_transactions() {
-    // Pode ser expandido para preencher tabela, filtros, etc
-    // exemplo: preencher tabela da página transactions.html com dados do appData
+    // Aqui pode adicionar lógica para montar tabelas, filtros etc
   }
 
-  // Modal para adicionar lançamento
-  fabBtn.onclick = () => {
-    openTransactionModal();
-  };
+  // Abre modal novo lançamento
+  fabBtn.onclick = () => openTransactionModal();
 
   function openTransactionModal(transactionIndex = null) {
     fetch("modal.html")
@@ -261,22 +258,20 @@
         modal.innerHTML = html;
         modal.classList.add("active");
 
-        // Preencher selects de contas e categorias
+        // Preencher selects se appData já carregado
+        if(!appData) return;
         const txAccount = document.getElementById("txAccount");
         const txAccountTo = document.getElementById("txAccountTo");
         const txCategory = document.getElementById("txCategory");
-        const accountToContainer = document.getElementById("accountToLabel");
+        const accountToLabel = document.getElementById("accountToLabel");
         const txType = document.getElementById("txType");
-
-        // Só preenche se appData já carregado
-        if(!appData) return;
 
         txAccount.innerHTML = appData.contas.map(c => `<option>${c.nome}</option>`).join("");
         txAccountTo.innerHTML = appData.contas.map(c => `<option>${c.nome}</option>`).join("");
         txCategory.innerHTML = appData.categorias.map(c => `<option>${c.nome}</option>`).join("");
 
         txType.onchange = () => {
-          accountToContainer.style.display = txType.value === "transfer" ? "block" : "none";
+          accountToLabel.style.display = txType.value === "transfer" ? "block" : "none";
         };
         txType.onchange();
 
@@ -296,7 +291,6 @@
           document.getElementById("modalTitle").textContent = "Novo Lançamento";
         }
 
-        // Salvar form
         document.getElementById("transactionForm").onsubmit = e => {
           e.preventDefault();
           saveTransaction(transactionIndex);
@@ -311,7 +305,7 @@
     modal.innerHTML = "";
   }
 
-  // Salvar transação, atualizar appData e Firestore
+  // Salva ou atualiza transação no Firestore
   function saveTransaction(transactionIndex) {
     const type = document.getElementById("txType").value;
     const account = document.getElementById("txAccount").value;
@@ -327,34 +321,34 @@
       return;
     }
 
-    // Atualiza saldo contas
     const contaOrigem = appData.contas.find(c => c.nome === account);
     if (!contaOrigem) {
       alert("Conta de origem inválida");
       return;
     }
+
     let contaDestino = null;
-    if (type === "transfer") {
+    if(type === "transfer") {
       contaDestino = appData.contas.find(c => c.nome === accountTo);
-      if (!contaDestino) {
+      if(!contaDestino) {
         alert("Conta destino inválida");
         return;
       }
     }
 
-    // Reverte saldo anterior se edição
-    if (transactionIndex !== null) {
+    // Reverte saldo anterior se for edição
+    if(transactionIndex !== null) {
       const oldTx = appData.transacoes[transactionIndex];
-      if (oldTx.type === "income") {
+      if(oldTx.type === "income") {
         const c = appData.contas.find(c => c.nome === oldTx.account);
-        if (c) c.saldo -= oldTx.value;
-      } else if (oldTx.type === "expense") {
+        if(c) c.saldo -= oldTx.value;
+      } else if(oldTx.type === "expense") {
         const c = appData.contas.find(c => c.nome === oldTx.account);
-        if (c) c.saldo += oldTx.value;
-      } else if (oldTx.type === "transfer") {
+        if(c) c.saldo += oldTx.value;
+      } else if(oldTx.type === "transfer") {
         const cFrom = appData.contas.find(c => c.nome === oldTx.account);
         const cTo = appData.contas.find(c => c.nome === oldTx.accountTo);
-        if (cFrom && cTo) {
+        if(cFrom && cTo) {
           cFrom.saldo += oldTx.value;
           cTo.saldo -= oldTx.value;
         }
@@ -362,11 +356,11 @@
     }
 
     // Aplica saldo novo
-    if (type === "income") {
+    if(type === "income") {
       contaOrigem.saldo += value;
-    } else if (type === "expense") {
+    } else if(type === "expense") {
       contaOrigem.saldo -= value;
-    } else if (type === "transfer") {
+    } else if(type === "transfer") {
       contaOrigem.saldo -= value;
       contaDestino.saldo += value;
     }
@@ -379,10 +373,10 @@
       description,
       date,
       value,
-      notes,
+      notes
     };
 
-    if (transactionIndex !== null) {
+    if(transactionIndex !== null) {
       appData.transacoes[transactionIndex] = transactionObj;
     } else {
       if(!appData.transacoes) appData.transacoes = [];
@@ -404,10 +398,9 @@
   function loadUserData() {
     db.collection("usuarios").doc(userEmail).get()
       .then(doc => {
-        if (doc.exists) {
+        if(doc.exists) {
           appData = doc.data();
         } else {
-          // Modelo inicial
           appData = {
             user: userEmail,
             contas: [{ nome: "Carteira", saldo: 0, cor: "#246bfd" }],
@@ -423,15 +416,11 @@
           saveData();
         }
         renderMenu();
-        loadPanel("dashboard");
-        fabBtn.style.display = "flex";
       })
-      .catch(err => {
-        console.error("Erro ao carregar dados do usuário:", err);
-      });
+      .catch(err => console.error("Erro ao carregar dados do usuário:", err));
   }
 
-  // Controla estado da autenticação Firebase
+  // Controle de autenticação
   auth.onAuthStateChanged(user => {
     if(!user) {
       window.location.href = "login.html";
@@ -449,7 +438,7 @@
   };
 
   // Fecha modal clicando fora
-  modal.onclick = (e) => {
+  modal.onclick = e => {
     if(e.target === modal) closeModal();
   };
 </script>
