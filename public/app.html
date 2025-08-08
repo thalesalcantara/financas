@@ -277,14 +277,13 @@
   }
   document.getElementById("logoutBtn").onclick = logoutUser;
 
-  // TODO: Implement render functions for each panel and add event listeners for fabBtn, modal, etc.
-  // Placeholder example:
+  // Função para renderizar o dashboard (exemplo)
   function renderDashboard() {
     const dash = document.getElementById("dashboard");
     dash.innerHTML = "<h2>Dashboard</h2><p>Bem-vindo, " + userEmail + "!</p>";
   }
 
-  // Firebase auth state
+  // Verifica estado de autenticação do usuário
   auth.onAuthStateChanged(user => {
     if(user) {
       userEmail = user.email;
