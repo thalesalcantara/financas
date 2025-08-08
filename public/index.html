@@ -89,6 +89,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
 <script>
+  // Configuração do Firebase para o projeto kratosfinancas
   const firebaseConfig = {
     apiKey: "AIzaSyD32JNIb-IplbuAM8WD-Nw_P3gA5wNSNwY",
     authDomain: "kratosfinancas.firebaseapp.com",
@@ -97,6 +98,8 @@
     messagingSenderId: "740158664268",
     appId: "1:740158664268:web:9e4583e75c94cbd90c0ee9"
   };
+
+  // Inicializa o Firebase
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
 
@@ -168,6 +171,7 @@
     document.getElementById('showRegister').onclick = renderRegister;
   }
 
+  // Inicializa mostrando o formulário de login
   renderLogin();
 </script>
 </body>
