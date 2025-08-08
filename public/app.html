@@ -160,6 +160,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
 
 <script>
+  // Config Firebase
   const firebaseConfig = {
     apiKey: "AIzaSyD32JNIb-IplbuAM8WD-Nw_P3gA5wNSNwY",
     authDomain: "kratosfinancas.firebaseapp.com",
@@ -172,6 +173,7 @@
   const db = firebase.firestore();
   const auth = firebase.auth();
 
+  // Menus
   const MENUS = [
     {id:"dashboard", label:"Dashboard", icon:"📊"},
     {id:"transactions", label:"Lançamentos", icon:"💸"},
@@ -205,18 +207,18 @@
       };
       menuList.appendChild(li);
     });
+    // Seleciona o primeiro menu e carrega
     if(menuList.firstChild) {
       menuList.firstChild.classList.add("active");
       loadPanel(menuList.firstChild.id.replace("menu-", ""));
     }
   }
 
-  // Carrega conteúdo do painel dinamicamente via fetch do arquivo HTML correspondente
+  // Carrega conteúdo do painel via fetch (arquivos HTML enviados)
   function loadPanel(panelId) {
     mainPainel.innerHTML = "<p>Carregando...</p>";
-
-    // Mostrar FAB somente em painéis específicos
-    if (["transactions", "metas", "contas", "categorias"].includes(panelId)) {
+    // Define quando mostrar FAB
+    if(["transactions", "metas", "contas", "categorias"].includes(panelId)) {
       fabBtn.style.display = "flex";
     } else {
       fabBtn.style.display = "none";
@@ -224,12 +226,12 @@
 
     fetch(panelId + ".html")
       .then(resp => {
-        if (!resp.ok) throw new Error("Erro ao carregar painel: " + panelId);
+        if(!resp.ok) throw new Error("Painel não encontrado: " + panelId);
         return resp.text();
       })
       .then(html => {
         mainPainel.innerHTML = html;
-        // Chamar função de renderização do painel, se existir
+        // Chama função render_ específica para painel, se existir
         const fnName = "render_" + panelId;
         if(typeof window[fnName] === "function") window[fnName]();
       })
@@ -239,14 +241,14 @@
       });
   }
 
-  // Exemplo: função para painel dashboard (substitua pelo seu conteúdo se precisar)
+  // Exemplo render_dashboard
   function render_dashboard() {
-    // Se quiser, atualize o conteúdo depois de carregar o dashboard.html
+    // Se quiser atualizar algo após carregar dashboard.html
     const dash = document.getElementById("dashboard");
     if(dash) dash.innerHTML += `<p>Bem-vindo, ${userEmail}!</p>`;
   }
 
-  // Abre modal de lançamento (carrega o modal.html)
+  // Exemplo abrir modal para lançamentos
   fabBtn.onclick = () => {
     fetch("modal.html")
       .then(r => r.text())
@@ -254,16 +256,18 @@
         modal.innerHTML = html;
         modal.classList.add("active");
 
-        // Vincular eventos do modal carregado dinamicamente
+        // Botão cancelar modal
         const btnCancel = modal.querySelector("#btnCancel");
         if(btnCancel) btnCancel.onclick = closeModal;
 
+        // Formulário dentro do modal
         const form = modal.querySelector("#transactionForm");
         if(form) {
           form.onsubmit = e => {
             e.preventDefault();
-            alert("Salvar lançamento (implemente aqui)"); // Sua lógica para salvar aqui
+            alert("Salvar lançamento (implemente lógica de salvar aqui)");
             closeModal();
+            // Atualize a lista de lançamentos se quiser
           };
         }
       });
