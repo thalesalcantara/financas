@@ -20,7 +20,7 @@
     --sidebar-active: #222b44;
   }
   html, body {
-    margin: 0; padding: 0; height: 100%;
+    margin:0; padding:0; height:100%;
     font-family: 'Segoe UI', Arial, sans-serif;
     background: var(--cinza);
     color: var(--text-dark);
@@ -45,25 +45,17 @@
     transition: left 0.2s ease;
   }
   .logo {
-    width: 64px;
-    height: 64px;
+    width: 56px;
     margin-bottom: 1rem;
     border-radius: 50%;
     background: #fff;
-    padding: 8px;
-    box-sizing: border-box;
-  }
-  .logo img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
   }
   .sidebar h1 {
-    font-size: 1.25rem;
+    font-size: 1.18rem;
     margin: 0 0 .2rem 0;
   }
   .sidebar h2 {
-    font-size: 1.05rem;
+    font-size: 1.01rem;
     margin-bottom: 1.1rem;
     font-weight: 400;
   }
@@ -90,8 +82,8 @@
     color: white;
     border: none;
     border-radius: 1rem;
-    margin-top: auto;
-    padding: .6rem 1.2rem;
+    margin-top: 2rem;
+    padding: .5rem 1.2rem;
     cursor: pointer;
     font-weight: 700;
     width: 100%;
@@ -190,55 +182,13 @@
     background: #333;
     color: #eee;
   }
-  /* Responsividade básica */
-  @media (max-width: 600px) {
-    aside.sidebar {
-      width: 60px;
-      padding: 1rem 0.5rem 1rem;
-    }
-    .logo {
-      width: 40px;
-      height: 40px;
-      margin-bottom: 0.5rem;
-      padding: 6px;
-    }
-    .sidebar h1, .sidebar h2 {
-      display: none;
-    }
-    nav li {
-      padding: 0.5rem 0.25rem;
-      font-size: 0;
-      position: relative;
-    }
-    nav li::after {
-      content: attr(data-label);
-      position: absolute;
-      left: 70px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--text-dark);
-      font-size: 1rem;
-      white-space: nowrap;
-      opacity: 0;
-      transition: opacity 0.2s ease;
-      pointer-events: none;
-    }
-    nav li:hover::after {
-      opacity: 1;
-    }
-    nav li svg {
-      margin: 0;
-    }
-  }
 </style>
 </head>
 <body>
 
 <div class="container">
   <aside class="sidebar" id="sidebar">
-    <div class="logo">
-      <img src="/static/logo_branco.png" alt="Logo Kratos System" />
-    </div>
+    <img src="/static/logo.png" alt="Logo Kratos" class="logo" />
     <h1>Kratos System</h1>
     <h2>Finanças Pessoais</h2>
     <nav>
@@ -281,6 +231,7 @@
   const db = firebase.firestore();
   const auth = firebase.auth();
 
+  // MENU
   const MENUS = [
     {id:"dashboard", label:"Dashboard", icon:"📊"},
     {id:"transactions", label:"Lançamentos", icon:"💸"},
@@ -305,11 +256,7 @@
       li.id = "menu-" + m.id;
       li.textContent = m.icon + " " + m.label;
       li.style.userSelect = "none";
-      li.setAttribute('data-label', m.label);
-      li.onclick = () => {
-        showPanel(m.id);
-        // aqui pode-se implementar carregamento dinâmico se quiser
-      };
+      li.onclick = () => showPanel(m.id);
       menuList.appendChild(li);
     });
   }
@@ -321,149 +268,47 @@
     document.querySelectorAll("#menuList li").forEach(li => li.classList.remove("active"));
     const menuItem = document.getElementById("menu-" + id);
     if (menuItem) menuItem.classList.add("active");
-
-    // Carregando conteúdo dos painéis:
-    if(id === "dashboard") {
-      renderDashboard();
-      fabBtn.style.display = "none";
-    } else if(id === "transactions") {
-      renderTransactions();
-      fabBtn.style.display = "flex";
-    } else {
-      fabBtn.style.display = "none";
-      const panel = document.getElementById(id);
-      if(panel) panel.innerHTML = `<h2>${id}</h2><p>Conteúdo não implementado ainda.</p>`;
-    }
   }
 
-  // Função exemplo para dashboard
+  function logoutUser() {
+    auth.signOut().then(() => {
+      window.location.href = "login.html";
+    });
+  }
+  document.getElementById("logoutBtn").onclick = logoutUser;
+
+  // TODO: Implement render functions for each panel and add event listeners for fabBtn, modal, etc.
+  // Placeholder example:
   function renderDashboard() {
     const dash = document.getElementById("dashboard");
-    if (!dash) return;
-    dash.innerHTML = `<h2>Dashboard</h2><p>Bem-vindo, ${userEmail}!</p>`;
+    dash.innerHTML = "<h2>Dashboard</h2><p>Bem-vindo, " + userEmail + "!</p>";
   }
 
-  // Função exemplo para transações
-  function renderTransactions() {
-    const trans = document.getElementById("transactions");
-    if (!trans) return;
-    trans.innerHTML = `
-      <h2>Lançamentos</h2>
-      <p>Aqui vai a tabela e filtros.</p>
-      <table border="1" cellpadding="5" cellspacing="0" style="width:100%;background:#fff;color:#000;border-radius:8px;overflow:hidden;">
-        <thead>
-          <tr>
-            <th>Descrição</th><th>Valor</th><th>Data</th>
-          </tr>
-        </thead>
-        <tbody id="transactionsTableBody"></tbody>
-      </table>
-    `;
-
-    if(appData && appData.transacoes && appData.transacoes.length > 0) {
-      const tbody = document.getElementById("transactionsTableBody");
-      tbody.innerHTML = "";
-      appData.transacoes.forEach(tx => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${tx.description || ""}</td><td>${tx.value.toFixed(2)}</td><td>${tx.date || ""}</td>`;
-        tbody.appendChild(tr);
-      });
+  // Firebase auth state
+  auth.onAuthStateChanged(user => {
+    if(user) {
+      userEmail = user.email;
+      renderMenu();
+      showPanel("dashboard");
+      renderDashboard();
+      fabBtn.style.display = "flex";
+    } else {
+      window.location.href = "login.html";
     }
-  }
+  });
 
-  // Abre modal com formulário para novo lançamento simples
-  function openModal() {
-    modal.innerHTML = `
-      <div class="modal" onclick="event.stopPropagation()">
-        <h3>Novo lançamento</h3>
-        <form id="newTransactionForm">
-          <label>Descrição:
-            <input type="text" id="txDescription" required />
-          </label>
-          <label>Valor:
-            <input type="number" id="txValue" step="0.01" required />
-          </label>
-          <div style="display:flex; gap: 10px; justify-content:flex-end;">
-            <button type="submit">Salvar</button>
-            <button type="button" id="btnCancel">Cancelar</button>
-          </div>
-        </form>
-      </div>
-    `;
-    modal.classList.add("active");
+  fabBtn.onclick = () => {
+    alert("Abrir modal de novo lançamento - implemente você :)");
+  };
 
-    document.getElementById("btnCancel").onclick = closeModal;
-
-    document.getElementById("newTransactionForm").onsubmit = e => {
-      e.preventDefault();
-      if(!appData.transacoes) appData.transacoes = [];
-      appData.transacoes.push({
-        description: document.getElementById("txDescription").value,
-        value: parseFloat(document.getElementById("txValue").value),
-        date: new Date().toISOString().slice(0,10)
-      });
-      saveData();
-      closeModal();
-      renderTransactions();
-    };
-  }
+  modal.onclick = (e) => {
+    if(e.target === modal) closeModal();
+  };
 
   function closeModal() {
     modal.classList.remove("active");
     modal.innerHTML = "";
   }
-
-  modal.onclick = closeModal;
-
-  fabBtn.onclick = () => {
-    openModal();
-  };
-
-  function saveData() {
-    if(!userEmail || !appData) return;
-    db.collection("usuarios").doc(userEmail).set(appData);
-  }
-
-  function loadUserData() {
-    if(!userEmail) return;
-    db.collection("usuarios").doc(userEmail).get().then(doc => {
-      if(doc.exists) {
-        appData = doc.data();
-      } else {
-        appData = {
-          user: userEmail,
-          contas: [{ nome: "Carteira", saldo: 0, cor: "#246bfd" }],
-          categorias: [
-            { nome: "Salário", tipo: "income", cor: "#24c176" },
-            { nome: "Alimentação", tipo: "expense", cor: "#e14c54" }
-          ],
-          transacoes: [],
-          metas: [],
-          config: { theme: "dark", alertas: [], limites: {}, excelSep: ";" },
-          anexos: {}
-        };
-        saveData();
-      }
-      renderMenu();
-      showPanel("dashboard");
-      fabBtn.style.display = "flex";
-    }).catch(console.error);
-  }
-
-  auth.onAuthStateChanged(user => {
-    if(!user) {
-      window.location.href = "login.html";
-      return;
-    }
-    userEmail = user.email;
-    loadUserData();
-  });
-
-  document.getElementById("logoutBtn").onclick = () => {
-    auth.signOut().then(() => {
-      window.location.href = "login.html";
-    });
-  };
 </script>
 
 </body>
