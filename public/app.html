@@ -20,7 +20,7 @@
     --sidebar-active: #222b44;
   }
   html, body {
-    margin:0; padding:0; height:100%;
+    margin: 0; padding: 0; height: 100%;
     font-family: 'Segoe UI', Arial, sans-serif;
     background: var(--cinza);
     color: var(--text-dark);
@@ -45,18 +45,25 @@
     transition: left 0.2s ease;
   }
   .logo {
-    width: 56px;
+    width: 64px;
+    height: 64px;
     margin-bottom: 1rem;
     border-radius: 50%;
-    background: white;
+    background: #fff;
     padding: 8px;
+    box-sizing: border-box;
+  }
+  .logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
   .sidebar h1 {
-    font-size: 1.18rem;
+    font-size: 1.25rem;
     margin: 0 0 .2rem 0;
   }
   .sidebar h2 {
-    font-size: 1.01rem;
+    font-size: 1.05rem;
     margin-bottom: 1.1rem;
     font-weight: 400;
   }
@@ -72,7 +79,6 @@
     text-align: center;
     cursor: pointer;
     transition: background 0.15s ease;
-    user-select: none;
   }
   nav li.active, nav li:hover {
     background: var(--sidebar-active);
@@ -84,8 +90,8 @@
     color: white;
     border: none;
     border-radius: 1rem;
-    margin-top: 2rem;
-    padding: .5rem 1.2rem;
+    margin-top: auto;
+    padding: .6rem 1.2rem;
     cursor: pointer;
     font-weight: 700;
     width: 100%;
@@ -184,52 +190,44 @@
     background: #333;
     color: #eee;
   }
-  /* Responsivo simples */
+  /* Responsividade básica */
   @media (max-width: 600px) {
-    .container {
-      flex-direction: column;
-    }
     aside.sidebar {
-      width: 100%;
-      min-width: auto;
-      flex-direction: row;
-      padding: 0.5rem 1rem;
-      overflow-x: auto;
+      width: 60px;
+      padding: 1rem 0.5rem 1rem;
     }
     .logo {
       width: 40px;
-      margin: 0 1rem 0 0;
-      background: white;
+      height: 40px;
+      margin-bottom: 0.5rem;
       padding: 6px;
     }
-    nav ul {
-      display: flex;
-      gap: 1rem;
-      width: auto;
+    .sidebar h1, .sidebar h2 {
+      display: none;
     }
     nav li {
-      margin-bottom: 0;
-      border-radius: 0.5rem;
-      padding: 0.5rem 0.75rem;
+      padding: 0.5rem 0.25rem;
+      font-size: 0;
+      position: relative;
+    }
+    nav li::after {
+      content: attr(data-label);
+      position: absolute;
+      left: 70px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dark);
+      font-size: 1rem;
       white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      pointer-events: none;
     }
-    .logout-btn {
-      margin-top: 0;
-      margin-left: auto;
-      padding: 0.3rem 0.8rem;
-      border-radius: 0.5rem;
-      width: auto;
-      font-size: 0.9rem;
+    nav li:hover::after {
+      opacity: 1;
     }
-    main.main {
-      padding: 1rem 0.5rem;
-    }
-    .fab {
-      bottom: 1.5rem;
-      right: 1.5rem;
-      width: 50px;
-      height: 50px;
-      font-size: 2rem;
+    nav li svg {
+      margin: 0;
     }
   }
 </style>
@@ -238,7 +236,9 @@
 
 <div class="container">
   <aside class="sidebar" id="sidebar">
-    <img src="/static/logo.png" alt="Logo Kratos" class="logo" />
+    <div class="logo">
+      <img src="/static/logo_branco.png" alt="Logo Kratos System" />
+    </div>
     <h1>Kratos System</h1>
     <h2>Finanças Pessoais</h2>
     <nav>
@@ -298,7 +298,6 @@
   const fabBtn = document.getElementById("fabBtn");
   const modal = document.getElementById("modal");
 
-  // Renderiza menu e adiciona evento para carregar painel
   function renderMenu() {
     menuList.innerHTML = "";
     MENUS.forEach(m => {
@@ -306,14 +305,15 @@
       li.id = "menu-" + m.id;
       li.textContent = m.icon + " " + m.label;
       li.style.userSelect = "none";
+      li.setAttribute('data-label', m.label);
       li.onclick = () => {
         showPanel(m.id);
+        // aqui pode-se implementar carregamento dinâmico se quiser
       };
       menuList.appendChild(li);
     });
   }
 
-  // Mostra painel e ativa menu correspondente
   function showPanel(id) {
     document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
     const panel = document.getElementById(id);
@@ -322,12 +322,12 @@
     const menuItem = document.getElementById("menu-" + id);
     if (menuItem) menuItem.classList.add("active");
 
-    // Carrega conteúdo dinâmico
+    // Carregando conteúdo dos painéis:
     if(id === "dashboard") {
-      loadDashboard();
+      renderDashboard();
       fabBtn.style.display = "none";
     } else if(id === "transactions") {
-      loadTransactions();
+      renderTransactions();
       fabBtn.style.display = "flex";
     } else {
       fabBtn.style.display = "none";
@@ -336,50 +336,42 @@
     }
   }
 
-  // Função que carrega o dashboard
-  function loadDashboard() {
+  // Função exemplo para dashboard
+  function renderDashboard() {
     const dash = document.getElementById("dashboard");
-    if(!dash) return;
+    if (!dash) return;
     dash.innerHTML = `<h2>Dashboard</h2><p>Bem-vindo, ${userEmail}!</p>`;
-    // Aqui você pode colocar gráficos, saldo, etc
   }
 
-  // Função que carrega lançamentos
-  function loadTransactions() {
+  // Função exemplo para transações
+  function renderTransactions() {
     const trans = document.getElementById("transactions");
-    if(!trans) return;
-
+    if (!trans) return;
     trans.innerHTML = `
       <h2>Lançamentos</h2>
-      <p>Lista de transações:</p>
-      <table style="width:100%;border-collapse:collapse;color:#000;background:#fff;border-radius:8px;overflow:hidden;">
+      <p>Aqui vai a tabela e filtros.</p>
+      <table border="1" cellpadding="5" cellspacing="0" style="width:100%;background:#fff;color:#000;border-radius:8px;overflow:hidden;">
         <thead>
           <tr>
-            <th style="padding:8px;border-bottom:2px solid #ccc;">Descrição</th>
-            <th style="padding:8px;border-bottom:2px solid #ccc;">Valor</th>
-            <th style="padding:8px;border-bottom:2px solid #ccc;">Data</th>
+            <th>Descrição</th><th>Valor</th><th>Data</th>
           </tr>
         </thead>
         <tbody id="transactionsTableBody"></tbody>
       </table>
     `;
 
-    const tbody = document.getElementById("transactionsTableBody");
-    tbody.innerHTML = "";
     if(appData && appData.transacoes && appData.transacoes.length > 0) {
+      const tbody = document.getElementById("transactionsTableBody");
+      tbody.innerHTML = "";
       appData.transacoes.forEach(tx => {
         const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td style="padding:8px;border-bottom:1px solid #ddd;">${tx.description || ""}</td>
-          <td style="padding:8px;border-bottom:1px solid #ddd;">R$ ${tx.value.toFixed(2)}</td>
-          <td style="padding:8px;border-bottom:1px solid #ddd;">${tx.date || ""}</td>
-        `;
+        tr.innerHTML = `<td>${tx.description || ""}</td><td>${tx.value.toFixed(2)}</td><td>${tx.date || ""}</td>`;
         tbody.appendChild(tr);
       });
     }
   }
 
-  // Função para abrir modal de novo lançamento
+  // Abre modal com formulário para novo lançamento simples
   function openModal() {
     modal.innerHTML = `
       <div class="modal" onclick="event.stopPropagation()">
@@ -391,7 +383,7 @@
           <label>Valor:
             <input type="number" id="txValue" step="0.01" required />
           </label>
-          <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <div style="display:flex; gap: 10px; justify-content:flex-end;">
             <button type="submit">Salvar</button>
             <button type="button" id="btnCancel">Cancelar</button>
           </div>
@@ -412,31 +404,26 @@
       });
       saveData();
       closeModal();
-      loadTransactions();
+      renderTransactions();
     };
   }
 
-  // Fecha modal
   function closeModal() {
     modal.classList.remove("active");
     modal.innerHTML = "";
   }
 
-  modal.onclick = e => {
-    if(e.target === modal) closeModal();
-  };
+  modal.onclick = closeModal;
 
   fabBtn.onclick = () => {
     openModal();
   };
 
-  // Salva dados no Firestore
   function saveData() {
-    if(!userEmail) return;
+    if(!userEmail || !appData) return;
     db.collection("usuarios").doc(userEmail).set(appData);
   }
 
-  // Carrega dados do usuário no Firestore
   function loadUserData() {
     if(!userEmail) return;
     db.collection("usuarios").doc(userEmail).get().then(doc => {
@@ -460,10 +447,9 @@
       renderMenu();
       showPanel("dashboard");
       fabBtn.style.display = "flex";
-    });
+    }).catch(console.error);
   }
 
-  // Controla autenticação
   auth.onAuthStateChanged(user => {
     if(!user) {
       window.location.href = "login.html";
@@ -473,7 +459,6 @@
     loadUserData();
   });
 
-  // Logout
   document.getElementById("logoutBtn").onclick = () => {
     auth.signOut().then(() => {
       window.location.href = "login.html";
