@@ -1,0 +1,47 @@
+<div id="transactionModal" style="display:none; position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; z-index: 100;">
+  <div style="background:#222b44; padding: 2rem; border-radius:1rem; width: 320px; max-width: 90vw; color: #e6eefc;">
+    <h3 id="modalTitle">Novo Lançamento</h3>
+    <form id="transactionForm">
+      <label>
+        Tipo:
+        <select id="txType" required>
+          <option value="income">Receita</option>
+          <option value="expense">Despesa</option>
+          <option value="transfer">Transferência</option>
+        </select>
+      </label>
+      <label>
+        Conta:
+        <select id="txAccount" required></select>
+      </label>
+      <div id="accountToContainer" style="display:none;">
+        <label>
+          Para Conta:
+          <select id="txAccountTo"></select>
+        </label>
+      </div>
+      <label>
+        Categoria:
+        <select id="txCategory" required></select>
+      </label>
+      <label>
+        Descrição:
+        <input type="text" id="txDescription" maxlength="40" placeholder="Ex: Pix recebido" />
+      </label>
+      <label>
+        Data:
+        <input type="date" id="txDate" required />
+      </label>
+      <label>
+        Valor:
+        <input type="number" id="txValue" min="0.01" step="0.01" required />
+      </label>
+      <label>
+        Notas:
+        <textarea id="txNotes" maxlength="100" placeholder="Observações"></textarea>
+      </label>
+      <button type="submit">Salvar</button>
+      <button type="button" id="btnCancel">Cancelar</button>
+    </form>
+  </div>
+</div>

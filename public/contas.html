@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kratos System - Contas</title>
+  <style>
+    :root {
+      --azul: #163772;
+      --cinza: #232a39;
+      --card-dark: #182336;
+      --text-dark: #e6eefc;
+      --sidebar-active: #222b44;
+      --vermelho: #e14c54;
+    }
+    body {
+      background: var(--cinza);
+      color: var(--text-dark);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 1rem;
+    }
+    h2 {
+      margin-bottom: 1rem;
+    }
+    button {
+      background: var(--azul);
+      color: white;
+      border: none;
+      border-radius: 0.6rem;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    button:hover {
+      background: #0f2756;
+    }
+    .account-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .account-card {
+      background: var(--card-dark);
+      padding: 1rem 1.4rem;
+      border-radius: 1.2rem;
+      box-shadow: 0 2px 10px #00000050;
+      min-width: 180px;
+      flex: 1 0 180px;
+      color: var(--text-dark);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .account-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.7rem;
+    }
+    .account-color {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      margin-right: 0.6rem;
+      border: 1px solid #555;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .account-name {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--azul);
+    }
+    .account-balance {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text-dark);
+    }
+    .actions button {
+      background: none;
+      border: none;
+      color: var(--azul);
+      font-size: 1.3rem;
+      cursor: pointer;
+      margin-left: 0.5rem;
+    }
+    .modal-bg {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-bg.active {
+      display: flex;
+    }
+    .modal {
+      background: var(--card-dark);
+      padding: 1.5rem 2rem;
+      border-radius: 1rem;
+      max-width: 400px;
+      width: 95%;
+      color: var(--text-dark);
+      box-shadow: 0 8px 32px #000000aa;
+    }
+    .modal h3 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      text-align: center;
+      color: var(--azul);
+    }
+    .modal form label {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 1rem;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .modal form input {
+      padding: 0.4rem 0.6rem;
+      border-radius: 0.5rem;
+      border: 1px solid #2b3552;
+      background: #192132;
+      color: var(--text-dark);
+      font-size: 1rem;
+      margin-top: 0.3rem;
+    }
+    .modal form button {
+      background: var(--azul);
+      border: none;
+      border-radius: 0.8rem;
+      color: white;
+      padding: 0.6rem 1.2rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 0.8rem;
+      width: 100%;
+    }
+    .modal form button.cancel-btn {
+      background: #555;
+      margin-top: 0.4rem;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Contas</h2>
+  <button id="btnAddAccount">+ Nova conta</button>
+
+  <div class="account-list" id="accountList">
+    <!-- Contas serão exibidas aqui -->
+  </div>
+
+  <!-- Modal para adicionar/editar conta -->
+  <div id="modal" class="modal-bg">
+    <div class="modal">
+      <h3 id="modalTitle">Nova conta</h3>
+      <form id="accountForm">
+        <label>
+          Nome da conta
+          <input type="text" id="accountName" maxlength="24" required placeholder="Ex: Carteira, Banco do Brasil" />
+        </label>
+        <label>
+          Cor
+          <input type="color" id="accountColor" value="#163772" required />
+        </label>
+        <label>
+          Saldo inicial (R$)
+          <input type="number" id="accountBalance" step="0.01" min="0" required value="0" />
+        </label>
+        <button type="submit">Salvar</button>
+        <button type="button" class="cancel-btn" id="btnCancel">Cancelar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+
+  <script>
+    // Config Firebase (troque pelos seus dados)
+    const firebaseConfig = {
+      apiKey: "AIzaSyD32JNIb-IplbuAM8WD-Nw_P3gA5wNSNwY",
+      authDomain: "kratosfinancas.firebaseapp.com",
+      projectId: "kratosfinancas",
+      storageBucket: "kratosfinancas.firebasestorage.app",
+      messagingSenderId: "740158664268",
+      appId: "1:740158664268:web:9e4583e75c94cbd90c0ee9"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+
+    let currentUser = null;
+    let accounts = [];
+    let editIndex = null;
+
+    // DOM elements
+    const accountList = document.getElementById('accountList');
+    const modal = document.getElementById('modal');
+    const accountForm = document.getElementById('accountForm');
+    const modalTitle = document.getElementById('modalTitle');
+    const btnAddAccount = document.getElementById('btnAddAccount');
+    const btnCancel = document.getElementById('btnCancel');
+
+    const accountName = document.getElementById('accountName');
+    const accountColor = document.getElementById('accountColor');
+    const accountBalance = document.getElementById('accountBalance');
+
+    // Abre modal para nova conta
+    btnAddAccount.addEventListener('click', () => {
+      editIndex = null;
+      modalTitle.textContent = 'Nova conta';
+      accountForm.reset();
+      accountColor.value = '#163772';
+      accountBalance.value = 0;
+      modal.classList.add('active');
+    });
+
+    // Cancela modal
+    btnCancel.addEventListener('click', () => {
+      modal.classList.remove('active');
+    });
+
+    // Salva conta (novo ou edição)
+    accountForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!currentUser) {
+        alert('Usuário não autenticado!');
+        return;
+      }
+
+      const acc = {
+        nome: accountName.value.trim(),
+        cor: accountColor.value,
+        saldo: parseFloat(accountBalance.value)
+      };
+
+      if (!acc.nome) {
+        alert('Informe o nome da conta.');
+        return;
+      }
+
+      try {
+        if (editIndex !== null) {
+          // Editar conta existente
+          const docId = accounts[editIndex].id;
+          await db.collection('usuarios').doc(currentUser.email)
+            .collection('contas').doc(docId).set(acc);
+          accounts[editIndex] = { id: docId, ...acc };
+        } else {
+          // Criar nova conta
+          const docRef = await db.collection('usuarios').doc(currentUser.email)
+            .collection('contas').add(acc);
+          accounts.push({ id: docRef.id, ...acc });
+        }
+        renderAccounts();
+        modal.classList.remove('active');
+      } catch (err) {
+        alert('Erro ao salvar conta: ' + err.message);
+      }
+    });
+
+    // Renderiza contas na tela
+    function renderAccounts() {
+      accountList.innerHTML = '';
+      if (accounts.length === 0) {
+        accountList.innerHTML = `<p style="color:#888;">Nenhuma conta cadastrada.</p>`;
+        return;
+      }
+
+      accounts.forEach((acc, idx) => {
+        const card = document.createElement('div');
+        card.className = 'account-card';
+
+        const header = document.createElement('div');
+        header.className = 'account-header';
+
+        const colorBox = document.createElement('span');
+        colorBox.className = 'account-color';
+        colorBox.style.backgroundColor = acc.cor;
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'account-name';
+        nameSpan.textContent = acc.nome;
+
+        header.appendChild(colorBox);
+        header.appendChild(nameSpan);
+
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+
+        const btnEdit = document.createElement('button');
+        btnEdit.title = 'Editar';
+        btnEdit.textContent = '✏️';
+        btnEdit.onclick = () => openEditModal(idx);
+        actions.appendChild(btnEdit);
+
+        const btnDelete = document.createElement('button');
+        btnDelete.title = 'Excluir';
+        btnDelete.textContent = '🗑️';
+        btnDelete.onclick = () => deleteAccount(idx);
+        actions.appendChild(btnDelete);
+
+        header.appendChild(actions);
+
+        const balanceDiv = document.createElement('div');
+        balanceDiv.className = 'account-balance';
+        balanceDiv.textContent = acc.saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        card.appendChild(header);
+        card.appendChild(balanceDiv);
+
+        accountList.appendChild(card);
+      });
+    }
+
+    // Abre modal para editar conta
+    function openEditModal(idx) {
+      editIndex = idx;
+      const acc = accounts[idx];
+      modalTitle.textContent = 'Editar conta';
+      accountName.value = acc.nome;
+      accountColor.value = acc.cor;
+      accountBalance.value = acc.saldo;
+      modal.classList.add('active');
+    }
+
+    // Deleta conta
+    async function deleteAccount(idx) {
+      if (!confirm('Excluir esta conta? Isso pode apagar lançamentos relacionados!')) return;
+      try {
+        await db.collection('usuarios').doc(currentUser.email)
+          .collection('contas').doc(accounts[idx].id).delete();
+
+        // Opcional: deletar lançamentos associados a essa conta? (Requer lógica extra)
+
+        accounts.splice(idx, 1);
+        renderAccounts();
+      } catch (err) {
+        alert('Erro ao excluir conta: ' + err.message);
+      }
+    }
+
+    // Observa autenticação Firebase e carrega contas
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        currentUser = user;
+        try {
+          const snapshot = await db.collection('usuarios').doc(user.email).collection('contas').get();
+          accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          renderAccounts();
+        } catch (err) {
+          alert('Erro ao carregar contas: ' + err.message);
+        }
+      } else {
+        currentUser = null;
+        accounts = [];
+        renderAccounts();
+        alert('Usuário não autenticado. Faça login para continuar.');
+      }
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kratos System - Metas</title>
+  <style>
+    :root {
+      --azul: #163772;
+      --cinza: #232a39;
+      --card-dark: #182336;
+      --text-dark: #e6eefc;
+      --sidebar-active: #222b44;
+      --verde: #24c176;
+      --vermelho: #e14c54;
+    }
+    body {
+      background: var(--cinza);
+      color: var(--text-dark);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 1rem;
+    }
+    h2 {
+      margin-bottom: 1rem;
+    }
+    form {
+      background: var(--card-dark);
+      padding: 1rem;
+      border-radius: 1rem;
+      max-width: 480px;
+      margin-bottom: 1.5rem;
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+    input, select {
+      margin-top: 0.3rem;
+      padding: 0.4rem 0.6rem;
+      border-radius: 0.5rem;
+      border: 1px solid #2b3552;
+      background: #192132;
+      color: var(--text-dark);
+      font-size: 1rem;
+    }
+    button {
+      background: var(--azul);
+      border: none;
+      border-radius: 0.8rem;
+      color: white;
+      padding: 0.6rem 1.2rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 0.4rem;
+    }
+    button:hover {
+      background: #0f2756;
+    }
+    .goal-list {
+      max-width: 600px;
+    }
+    .goal-item {
+      background: var(--card-dark);
+      padding: 1rem 1.4rem;
+      border-radius: 1.2rem;
+      box-shadow: 0 2px 10px #00000050;
+      margin-bottom: 1rem;
+      color: var(--text-dark);
+    }
+    .goal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.6rem;
+    }
+    .goal-name {
+      font-weight: 700;
+      font-size: 1.2rem;
+      color: var(--azul);
+    }
+    .goal-date {
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+    .progress-bar {
+      background: #2a4172;
+      border-radius: 8px;
+      overflow: hidden;
+      height: 14px;
+      margin-bottom: 0.4rem;
+    }
+    .progress-fill {
+      background: var(--verde);
+      height: 14px;
+      width: 0;
+      transition: width 0.6s ease;
+    }
+    .goal-amounts {
+      font-size: 0.95rem;
+      margin-bottom: 0.4rem;
+    }
+    .goal-actions button {
+      background: none;
+      border: none;
+      color: var(--azul);
+      font-size: 1.2rem;
+      cursor: pointer;
+      margin-right: 0.7rem;
+    }
+    .goal-expired {
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Metas de Economia</h2>
+
+  <form id="goalForm">
+    <label>
+      Nome da Meta
+      <input type="text" id="goalName" maxlength="32" placeholder="Ex: Reserva de Emergência" required />
+    </label>
+    <label>
+      Valor Alvo (R$)
+      <input type="number" id="goalValue" min="1" step="0.01" placeholder="R$" required />
+    </label>
+    <label>
+      Data Limite
+      <input type="date" id="goalDate" required />
+    </label>
+    <label>
+      Conta
+      <select id="goalAccount" required>
+        <!-- Contas carregadas via JS -->
+      </select>
+    </label>
+    <button type="submit">Salvar Meta</button>
+  </form>
+
+  <div class="goal-list" id="goalList">
+    <!-- Metas aparecerão aqui -->
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyD32JNIb-IplbuAM8WD-Nw_P3gA5wNSNwY",
+      authDomain: "kratosfinancas.firebaseapp.com",
+      projectId: "kratosfinancas",
+      storageBucket: "kratosfinancas.firebasestorage.app",
+      messagingSenderId: "740158664268",
+      appId: "1:740158664268:web:9e4583e75c94cbd90c0ee9"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+
+    let currentUser = null;
+    let goals = [];
+    let accounts = [];
+    let editIndex = null;
+
+    const goalForm = document.getElementById('goalForm');
+    const goalList = document.getElementById('goalList');
+    const goalName = document.getElementById('goalName');
+    const goalValue = document.getElementById('goalValue');
+    const goalDate = document.getElementById('goalDate');
+    const goalAccount = document.getElementById('goalAccount');
+
+    function resetForm() {
+      goalName.value = '';
+      goalValue.value = '';
+      goalDate.value = '';
+      if(accounts.length > 0) {
+        goalAccount.value = accounts[0].nome;
+      }
+      editIndex = null;
+    }
+
+    function renderAccounts() {
+      goalAccount.innerHTML = '';
+      accounts.forEach(acc => {
+        const opt = document.createElement('option');
+        opt.value = acc.nome;
+        opt.textContent = acc.nome;
+        goalAccount.appendChild(opt);
+      });
+      if(accounts.length > 0) {
+        goalAccount.value = accounts[0].nome;
+      }
+    }
+
+    function renderGoals() {
+      goalList.innerHTML = '';
+      if(goals.length === 0) {
+        goalList.innerHTML = '<p style="color:#888;">Nenhuma meta cadastrada.</p>';
+        return;
+      }
+
+      goals.forEach((goal, idx) => {
+        const totalIncome = calculateIncome(goal.conta);
+
+        let progress = Math.min(100, Math.round((totalIncome / goal.valorAlvo) * 100));
+
+        const expired = new Date(goal.dataLimite) < new Date();
+
+        const goalItem = document.createElement('div');
+        goalItem.className = 'goal-item' + (expired ? ' goal-expired' : '');
+
+        const header = document.createElement('div');
+        header.className = 'goal-header';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'goal-name';
+        nameSpan.textContent = goal.nome;
+
+        const dateSpan = document.createElement('span');
+        dateSpan.className = 'goal-date';
+        dateSpan.textContent = 'Até: ' + (goal.dataLimite || '-');
+
+        header.appendChild(nameSpan);
+        header.appendChild(dateSpan);
+
+        const progressBar = document.createElement('div');
+        progressBar.className = 'progress-bar';
+
+        const progressFill = document.createElement('div');
+        progressFill.className = 'progress-fill';
+        progressFill.style.width = progress + '%';
+
+        progressBar.appendChild(progressFill);
+
+        const amounts = document.createElement('div');
+        amounts.className = 'goal-amounts';
+        amounts.textContent = `${totalIncome.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / ${Number(goal.valorAlvo).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (${progress}%)`;
+
+        const actions = document.createElement('div');
+        actions.className = 'goal-actions';
+
+        const btnEdit = document.createElement('button');
+        btnEdit.title = 'Editar';
+        btnEdit.textContent = '✏️';
+        btnEdit.onclick = () => openEdit(idx);
+
+        const btnDelete = document.createElement('button');
+        btnDelete.title = 'Excluir';
+        btnDelete.textContent = '🗑️';
+        btnDelete.onclick = () => deleteGoal(idx);
+
+        actions.appendChild(btnEdit);
+        actions.appendChild(btnDelete);
+
+        goalItem.appendChild(header);
+        goalItem.appendChild(progressBar);
+        goalItem.appendChild(amounts);
+        goalItem.appendChild(actions);
+
+        goalList.appendChild(goalItem);
+      });
+    }
+
+    function calculateIncome(accountName) {
+      // Calcula a soma das receitas relacionadas a uma conta
+      if (!currentUser) return 0;
+      const transactions = currentUserTransactions.filter(tx => tx.account === accountName && tx.type === 'income');
+      return transactions.reduce((acc, tx) => acc + Number(tx.value), 0);
+    }
+
+    function openEdit(idx) {
+      const goal = goals[idx];
+      goalName.value = goal.nome;
+      goalValue.value = goal.valorAlvo;
+      goalDate.value = goal.dataLimite;
+      goalAccount.value = goal.conta;
+      editIndex = idx;
+    }
+
+    async function deleteGoal(idx) {
+      if (!confirm('Excluir esta meta?')) return;
+      try {
+        await db.collection('usuarios').doc(currentUser.email)
+          .collection('metas').doc(goals[idx].id).delete();
+        goals.splice(idx, 1);
+        renderGoals();
+      } catch (err) {
+        alert('Erro ao excluir meta: ' + err.message);
+      }
+    }
+
+    // Variável para guardar todas transações do usuário para calcular receita da conta
+    let currentUserTransactions = [];
+
+    auth.onAuthStateChanged(async user => {
+      if (user) {
+        currentUser = user;
+        try {
+          // Carrega metas
+          const metasSnap = await db.collection('usuarios').doc(user.email).collection('metas').get();
+          goals = metasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+          // Carrega contas para o select
+          const contasSnap = await db.collection('usuarios').doc(user.email).collection('contas').get();
+          accounts = contasSnap.docs.map(doc => doc.data());
+
+          // Carrega transações para calcular progresso da meta
+          const txSnap = await db.collection('usuarios').doc(user.email).collection('transacoes').get();
+          currentUserTransactions = txSnap.docs.map(doc => doc.data());
+
+          renderAccounts();
+          renderGoals();
+          resetForm();
+        } catch (err) {
+          alert('Erro ao carregar dados: ' + err.message);
+        }
+      } else {
+        currentUser = null;
+        goals = [];
+        accounts = [];
+        currentUserTransactions = [];
+        renderGoals();
+        renderAccounts();
+        alert('Usuário não autenticado. Faça login para continuar.');
+      }
+    });
+
+    goalForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      if (!currentUser) {
+        alert('Usuário não autenticado!');
+        return;
+      }
+
+      const meta = {
+        nome: goalName.value.trim(),
+        valorAlvo: Number(goalValue.value),
+        dataLimite: goalDate.value,
+        conta: goalAccount.value
+      };
+
+      if (!meta.nome || !meta.valorAlvo || !meta.dataLimite || !meta.conta) {
+        alert('Preencha todos os campos corretamente.');
+        return;
+      }
+
+      try {
+        if (editIndex !== null) {
+          const id = goals[editIndex].id;
+          await db.collection('usuarios').doc(currentUser.email)
+            .collection('metas').doc(id).set(meta);
+          goals[editIndex] = { id, ...meta };
+        } else {
+          const docRef = await db.collection('usuarios').doc(currentUser.email)
+            .collection('metas').add(meta);
+          goals.push({ id: docRef.id, ...meta });
+        }
+        renderGoals();
+        resetForm();
+        editIndex = null;
+      } catch (err) {
+        alert('Erro ao salvar meta: ' + err.message);
+      }
+    });
+  </script>
+
+</body>
+</html>

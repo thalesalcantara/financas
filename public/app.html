@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kratos System Finanças Pessoais</title>
+<link rel="icon" href="/static/logo.png" type="image/png" />
+<style>
+  :root {
+    --azul: #163772;
+    --azul-claro: #2a4172;
+    --preto: #0b101e;
+    --card-dark: #182336;
+    --cinza: #232a39;
+    --verde: #24c176;
+    --vermelho: #e14c54;
+    --amarelo: #ffd26e;
+    --text-dark: #e6eefc;
+    --sidebar: #131b2d;
+    --sidebar-active: #222b44;
+  }
+  html, body {
+    margin:0; padding:0; height:100%;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: var(--cinza);
+    color: var(--text-dark);
+  }
+  .container {
+    display: flex;
+    min-height: 100vh;
+    width: 100vw;
+    overflow-x: hidden;
+  }
+  aside.sidebar {
+    background: var(--sidebar);
+    color: var(--text-dark);
+    width: 230px;
+    min-width: 160px;
+    padding: 2.2rem 1rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 10;
+    transition: left 0.2s ease;
+  }
+  .logo {
+    width: 56px;
+    margin-bottom: 1rem;
+    border-radius: 50%;
+    background: #fff;
+  }
+  .sidebar h1 {
+    font-size: 1.18rem;
+    margin: 0 0 .2rem 0;
+  }
+  .sidebar h2 {
+    font-size: 1.01rem;
+    margin-bottom: 1.1rem;
+    font-weight: 400;
+  }
+  nav ul {
+    list-style: none;
+    padding: 0;
+    width: 100%;
+  }
+  nav li {
+    padding: .67rem 1rem;
+    border-radius: 1rem;
+    margin-bottom: .37rem;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  nav li.active, nav li:hover {
+    background: var(--sidebar-active);
+    font-weight: 700;
+    color: var(--amarelo);
+  }
+  .logout-btn {
+    background: var(--vermelho);
+    color: white;
+    border: none;
+    border-radius: 1rem;
+    margin-top: 2rem;
+    padding: .5rem 1.2rem;
+    cursor: pointer;
+    font-weight: 700;
+    width: 100%;
+  }
+  main.main {
+    flex: 1;
+    padding: 2.2rem 1rem;
+    min-width: 0;
+    width: 100%;
+    overflow-y: auto;
+  }
+  .panel {
+    display: none;
+  }
+  .panel.active {
+    display: block;
+    animation: fadeIn 0.4s ease forwards;
+  }
+  @keyframes fadeIn {
+    from {opacity: 0;}
+    to {opacity: 1;}
+  }
+  /* FAB button */
+  .fab {
+    position: fixed;
+    bottom: 2.2rem;
+    right: 2rem;
+    z-index: 110;
+    background: var(--azul);
+    color: white;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    font-size: 2.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 16px #246bfd30;
+    cursor: pointer;
+  }
+  .fab:hover {
+    background: #193b70;
+  }
+  /* Modal */
+  .modal-bg {
+    display: none;
+    position: fixed;
+    top:0; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,0.7);
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+  }
+  .modal-bg.active {
+    display: flex;
+  }
+  .modal {
+    background: var(--card-dark);
+    color: var(--text-dark);
+    border-radius: 1rem;
+    padding: 1.5rem 1rem;
+    min-width: 320px;
+    max-width: 90vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .modal form label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin-bottom: 0.7rem;
+    font-weight: 500;
+  }
+  .modal form input, .modal form select, .modal form textarea {
+    padding: 0.4rem;
+    border-radius: 0.5rem;
+    border: 1px solid #2b3552;
+    font-size: 1rem;
+    background: #192132;
+    color: var(--text-dark);
+  }
+  .modal form button {
+    padding: 0.6rem 1.4rem;
+    border-radius: 0.9rem;
+    border: none;
+    background: var(--azul);
+    color: white;
+    font-size: 1rem;
+    margin-right: 0.5rem;
+    cursor: pointer;
+    margin-top: 0.4rem;
+  }
+  .modal form button[type=button] {
+    background: #333;
+    color: #eee;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <aside class="sidebar" id="sidebar">
+    <img src="/static/logo.png" alt="Logo Kratos" class="logo" />
+    <h1>Kratos System</h1>
+    <h2>Finanças Pessoais</h2>
+    <nav>
+      <ul id="menuList"></ul>
+    </nav>
+    <button class="logout-btn" id="logoutBtn">Sair</button>
+  </aside>
+
+  <main class="main" id="mainPainel">
+    <section id="dashboard" class="panel active"></section>
+    <section id="transactions" class="panel"></section>
+    <section id="metas" class="panel"></section>
+    <section id="contas" class="panel"></section>
+    <section id="categorias" class="panel"></section>
+    <section id="relatorios" class="panel"></section>
+    <section id="configuracoes" class="panel"></section>
+  </main>
+</div>
+
+<div class="fab" id="fabBtn" title="Adicionar lançamento">+</div>
+
+<div class="modal-bg" id="modal" onclick="closeModal(event)"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyD32JNIb-IplbuAM8WD-Nw_P3gA5wNSNwY",
+    authDomain: "kratosfinancas.firebaseapp.com",
+    projectId: "kratosfinancas",
+    storageBucket: "kratosfinancas.firebasestorage.app",
+    messagingSenderId: "740158664268",
+    appId: "1:740158664268:web:9e4583e75c94cbd90c0ee9"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const auth = firebase.auth();
+
+  // MENU
+  const MENUS = [
+    {id:"dashboard", label:"Dashboard", icon:"📊"},
+    {id:"transactions", label:"Lançamentos", icon:"💸"},
+    {id:"metas", label:"Metas", icon:"🎯"},
+    {id:"contas", label:"Contas", icon:"🏦"},
+    {id:"categorias", label:"Categorias", icon:"🏷️"},
+    {id:"relatorios", label:"Relatórios", icon:"📈"},
+    {id:"configuracoes", label:"Configurações", icon:"⚙️"},
+  ];
+
+  let appData = null;
+  let userEmail = null;
+
+  const menuList = document.getElementById("menuList");
+  const fabBtn = document.getElementById("fabBtn");
+  const modal = document.getElementById("modal");
+
+  function renderMenu() {
+    menuList.innerHTML = "";
+    MENUS.forEach(m => {
+      const li = document.createElement("li");
+      li.id = "menu-" + m.id;
+      li.textContent = m.icon + " " + m.label;
+      li.style.userSelect = "none";
+      li.onclick = () => showPanel(m.id);
+      menuList.appendChild(li);
+    });
+  }
+
+  function showPanel(id) {
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+    const panel = document.getElementById(id);
+    if (panel) panel.classList.add("active");
+    document.querySelectorAll("#menuList li").forEach(li => li.classList.remove("active"));
+    const menuItem = document.getElementById("menu-" + id);
+    if (menuItem) menuItem.classList.add("active");
+  }
+
+  function logoutUser() {
+    auth.signOut().then(() => {
+      window.location.href = "login.html";
+    });
+  }
+  document.getElementById("logoutBtn").onclick = logoutUser;
+
+  // TODO: Implement render functions for each panel and add event listeners for fabBtn, modal, etc.
+  // Placeholder example:
+  function renderDashboard() {
+    const dash = document.getElementById("dashboard");
+    dash.innerHTML = "<h2>Dashboard</h2><p>Bem-vindo, " + userEmail + "!</p>";
+  }
+
+  // Firebase auth state
+  auth.onAuthStateChanged(user => {
+    if(user) {
+      userEmail = user.email;
+      renderMenu();
+      showPanel("dashboard");
+      renderDashboard();
+      fabBtn.style.display = "flex";
+    } else {
+      window.location.href = "login.html";
+    }
+  });
+
+  fabBtn.onclick = () => {
+    alert("Abrir modal de novo lançamento - implemente você :)");
+  };
+
+  modal.onclick = (e) => {
+    if(e.target === modal) closeModal();
+  };
+
+  function closeModal() {
+    modal.classList.remove("active");
+    modal.innerHTML = "";
+  }
+</script>
+
+</body>
+</html>
