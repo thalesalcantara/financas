@@ -249,6 +249,7 @@
   const fabBtn = document.getElementById("fabBtn");
   const modal = document.getElementById("modal");
 
+  // Renderiza menu e ativa o primeiro
   function renderMenu() {
     menuList.innerHTML = "";
     MENUS.forEach(m => {
@@ -259,17 +260,20 @@
       li.onclick = () => showPanel(m.id);
       menuList.appendChild(li);
     });
+    if(menuList.firstChild) menuList.firstChild.classList.add("active");
   }
 
+  // Mostra o painel selecionado e oculta os demais
   function showPanel(id) {
     document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
-    const panel = document.getElementById(id);
-    if (panel) panel.classList.add("active");
+    const painel = document.getElementById(id);
+    if(painel) painel.classList.add("active");
     document.querySelectorAll("#menuList li").forEach(li => li.classList.remove("active"));
     const menuItem = document.getElementById("menu-" + id);
-    if (menuItem) menuItem.classList.add("active");
+    if(menuItem) menuItem.classList.add("active");
   }
 
+  // Logout
   function logoutUser() {
     auth.signOut().then(() => {
       window.location.href = "login.html";
@@ -277,8 +281,7 @@
   }
   document.getElementById("logoutBtn").onclick = logoutUser;
 
-  // TODO: Implement render functions for each panel and add event listeners for fabBtn, modal, etc.
-  // Placeholder example:
+  // Função exemplo para dashboard
   function renderDashboard() {
     const dash = document.getElementById("dashboard");
     dash.innerHTML = "<h2>Dashboard</h2><p>Bem-vindo, " + userEmail + "!</p>";
