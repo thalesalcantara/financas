@@ -1,178 +1,418 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Login - Kratos System</title>
-<link rel="icon" href="/static/logo.png" type="image/png" />
-<style>
-  body {
-    margin:0; padding:0; min-height:100vh;
-    display:flex; align-items:center; justify-content:center;
-    background:#232a39; color:#e6eefc;
-    font-family: 'Segoe UI', Arial, sans-serif;
-  }
-  .auth-card {
-    background:#222b44;
-    padding:2rem;
-    border-radius:1rem;
-    width:320px;
-    box-shadow:0 8px 32px #0002;
-    display:flex; flex-direction:column; align-items:center;
-  }
-  .auth-card img {
-    width:64px; margin-bottom:1rem;
-  }
-  h2 {
-    margin-bottom:1rem;
-  }
-  form {
-    width:100%;
-  }
-  label {
-    display:block;
-    margin-bottom:1rem;
-  }
-  input[type="text"], input[type="password"] {
-    width:100%;
-    padding:0.5rem;
-    border-radius:0.5rem;
-    border:1px solid #2b3552;
-    background:#171f2e;
-    color:#e6eefc;
-    font-size:1rem;
-  }
-  button {
-    width:100%;
-    padding:0.6rem;
-    border:none;
-    border-radius:1rem;
-    background:#163772;
-    color:white;
-    font-size:1.1rem;
-    cursor:pointer;
-  }
-  .alt-link {
-    margin-top:1rem;
-    color:#24c176;
-    cursor:pointer;
-    text-align:center;
-    text-decoration:underline;
-  }
-  small {
-    display:block;
-    margin-top:1rem;
-    color:#aaa;
-    text-align:center;
-  }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#1990E6" />
+  <title>Kratos System - Finance (Mobile)</title>
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <style>
+    :root{
+      --bg:#0b1320;            /* fundo geral */
+      --surface:#0f1a2e;       /* cartões */
+      --line:#1e2a42;          /* linhas */
+      --text:#ecf2ff;          /* texto principal */
+      --muted:#a7b4d6;         /* texto secundário */
+      --brand:#1990E6;         /* azul Kratos */
+      --green:#22c55e;         /* sucesso */
+      --red:#ef4444;           /* erro/danger */
+      --yellow:#f59e0b;        /* aviso */
+    }
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif}
+    img{display:block;max-width:100%}
+
+    /* Containers */
+    .screen{display:none;min-height:100dvh;padding-bottom:84px}
+    .screen.active{display:block}
+    .wrap{padding:16px}
+
+    /* Header mobile */
+    .top{position:sticky;top:0;z-index:10;backdrop-filter:blur(6px);background:linear-gradient(180deg,#0b162bEE,#0b162b00);border-bottom:1px solid var(--line)}
+    .top-inner{display:flex;align-items:center;gap:12px;padding:12px 16px}
+    .logo{height:28px;width:auto;border-radius:6px;background:#0d203d;padding:6px;border:1px solid #1a2a46}
+    .brand{font-weight:800;letter-spacing:.3px}
+
+    /* Cards e inputs */
+    .card{background:linear-gradient(180deg,var(--surface),#0b162b);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .col{display:flex;flex-direction:column;gap:8px}
+    .kpi{font-size:22px;font-weight:800}
+    .tag{font-weight:800}
+    .tag.r{color:var(--green)}
+    .tag.d{color:var(--red)}
+    .muted{color:var(--muted)}
+    label.small{font-size:12px;color:var(--muted)}
+    input,select,textarea{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#0b162b;color:#fff;outline:none;min-height:44px}
+    input:focus,select:focus,textarea:focus{border-color:#345a96;box-shadow:0 0 0 3px rgba(25,144,230,.2)}
+
+    .btn{appearance:none;border:0;border-radius:12px;padding:12px 14px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px}
+    .btn.primary{background:var(--brand);color:#fff}
+    .btn.ghost{background:transparent;border:1px solid var(--line);color:#fff}
+    .btn.warn{background:var(--yellow);color:#000}
+    .btn.danger{background:var(--red);color:#fff}
+
+    /* Lista */
+    .list{display:flex;flex-direction:column}
+    .item{display:flex;align-items:center;justify-content:space-between;padding:12px 10px;border-bottom:1px solid var(--line)}
+    .it-left{display:flex;align-items:center;gap:10px}
+    .bubble{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:900}
+    .b-r{background:#0c2d1d;border:1px solid #174b31;color:#79f2a7}
+    .b-d{background:#2a1010;border:1px solid #4b1d1d;color:#ff9e9e}
+    .it-right{display:flex;gap:8px}
+    .sm{font-size:12px;color:var(--muted)}
+
+    /* Bottom nav */
+    .nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(7,12,24,.8);backdrop-filter:blur(8px);border-top:1px solid var(--line)}
+    .nav ul{margin:0;padding:8px 8px calc(8px + env(safe-area-inset-bottom));list-style:none;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    .nav button{appearance:none;border:1px solid transparent;background:transparent;color:var(--muted);border-radius:12px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;font-weight:800}
+    .nav button.active{color:#fff;background:#0b162b;border-color:var(--line)}
+
+    .fab{position:fixed;right:16px;bottom:88px;width:56px;height:56px;border-radius:16px;background:var(--brand);color:#fff;border:0;display:grid;place-items:center;font-size:26px;box-shadow:0 10px 30px rgba(25,144,230,.5)}
+
+    /* Auth */
+    .center{min-height:100dvh;display:grid;place-items:center;padding:20px}
+    .auth-card{width:100%;max-width:460px}
+    .logo-big{height:48px;width:auto;border-radius:10px;background:#0d203d;padding:10px;border:1px solid #1a2a46}
+    .seg{display:grid;grid-template-columns:1fr 1fr;background:#0b162b;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+    .seg button{appearance:none;border:0;padding:10px;color:var(--muted);font-weight:800;background:transparent}
+    .seg button.active{background:#0f203b;color:#fff}
+
+    /* Hide elements helper */
+    .hidden{display:none!important}
+  </style>
 </head>
 <body>
-  <div class="auth-card" id="authCard">
-    <img src="/static/logo.png" alt="Logo Kratos" />
-    <h2>Kratos System</h2>
-    <form id="loginForm">
-      <label>
-        Email:
-        <input type="text" id="loginEmail" required autocomplete="username" />
-      </label>
-      <label>
-        Senha:
-        <input type="password" id="loginSenha" required autocomplete="current-password" />
-      </label>
-      <button type="submit">Entrar</button>
-    </form>
-    <div class="alt-link" id="showRegister">Cadastrar nova conta</div>
-    <small>Seus dados ficam protegidos na nuvem com Firebase</small>
-  </div>
+  <!-- AUTH -->
+  <section id="scrAuth" class="screen active">
+    <div class="center">
+      <div class="card auth-card">
+        <div class="row" style="justify-content:center;gap:12px">
+          <img id="logoBig" class="logo-big" alt="Kratos System" src=""/>
+          <div class="col" style="gap:2px">
+            <div class="brand">KRATOS SYSTEM</div>
+            <div class="muted" style="font-weight:700">Finance • Acesso</div>
+          </div>
+        </div>
+        <div style="height:8px"></div>
+        <div class="seg">
+          <button id="tabLogin" class="active">Entrar</button>
+          <button id="tabRegister">Criar conta</button>
+        </div>
+        <div style="height:12px"></div>
+        <div id="boxLogin" class="col">
+          <label class="small">E-mail</label>
+          <input id="inEmail" type="email" inputmode="email" autocomplete="username" placeholder="voce@email.com" />
+          <label class="small">Senha</label>
+          <input id="inPass" type="password" autocomplete="current-password" placeholder="********" />
+          <button id="btnLogin" class="btn primary">Entrar</button>
+          <div class="row" style="justify-content:center">
+            <button id="btnGoogle" class="btn ghost">Google</button>
+            <button id="btnApple" class="btn ghost">Apple</button>
+          </div>
+          <div id="errLogin" class="sm" style="color:#ffc7c7"></div>
+        </div>
+        <div id="boxRegister" class="col hidden">
+          <label class="small">Nome</label>
+          <input id="regName" type="text" autocomplete="name" placeholder="Seu nome" />
+          <label class="small">E-mail</label>
+          <input id="regEmail" type="email" autocomplete="email" placeholder="voce@email.com" />
+          <label class="small">Senha</label>
+          <input id="regPass" type="password" autocomplete="new-password" placeholder="Crie uma senha" />
+          <button id="btnRegister" class="btn primary">Criar e entrar</button>
+          <div id="errReg" class="sm" style="color:#ffc7c7"></div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
-<script>
-  // Configuração do Firebase para o projeto kratosfinancas
-  const firebaseConfig = {
-    apiKey: "AIzaSyD32JNIb-IplbuAM8WD-Nw_P3gA5wNSNwY",
-    authDomain: "kratosfinancas.firebaseapp.com",
-    projectId: "kratosfinancas",
-    storageBucket: "kratosfinancas.firebasestorage.app",
-    messagingSenderId: "740158664268",
-    appId: "1:740158664268:web:9e4583e75c94cbd90c0ee9"
-  };
+  <!-- APP -->
+  <section id="scrApp" class="screen">
+    <div class="top">
+      <div class="top-inner">
+        <img id="logoSm" class="logo" alt="Logo" src=""/>
+        <div class="brand">KRATOS Finance</div>
+        <div class="sm" style="margin-left:auto" id="userName"></div>
+      </div>
+    </div>
 
-  // Inicializa o Firebase
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
+    <!-- Resumo -->
+    <div id="viewResumo" class="wrap">
+      <div class="row">
+        <label class="small">Mês</label>
+        <input id="fltMonth" type="month" />
+      </div>
+      <div style="height:10px"></div>
+      <div class="row">
+        <div class="card" style="flex:1">
+          <div class="muted">Saldo</div>
+          <div id="kpiSaldo" class="kpi"></div>
+          <div class="sm muted">Receitas - Despesas</div>
+        </div>
+        <div class="card" style="flex:1">
+          <div class="muted">Receitas</div>
+          <div id="kpiRec" class="kpi tag r"></div>
+          <div class="sm muted">no período</div>
+        </div>
+        <div class="card" style="flex:1">
+          <div class="muted">Despesas</div>
+          <div id="kpiDes" class="kpi tag d"></div>
+          <div class="sm muted">no período</div>
+        </div>
+      </div>
+      <div style="height:12px"></div>
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <div class="muted">Últimos lançamentos</div>
+          <select id="fltCat" style="max-width:180px">
+            <option value="">Todas categorias</option>
+          </select>
+        </div>
+        <div id="listHome" class="list"></div>
+      </div>
+    </div>
 
-  const authCard = document.getElementById('authCard');
+    <!-- Lançar -->
+    <div id="viewLanc" class="wrap hidden">
+      <div class="card col">
+        <div class="row" style="gap:8px">
+          <button id="btnTipoR" class="btn" style="flex:1;background:#10341f;border:1px solid #205f3a">Receita</button>
+          <button id="btnTipoD" class="btn" style="flex:1;background:#3a1313;border:1px solid #6a2323">Despesa</button>
+        </div>
+        <input id="txDate" type="date" />
+        <input id="txCat" type="text" placeholder="Categoria (ex: Salário, Mercado)" />
+        <input id="txAmount" type="number" step="0.01" min="0" inputmode="decimal" placeholder="Valor" />
+        <textarea id="txNote" rows="2" placeholder="Observação (opcional)"></textarea>
+        <button id="btnSalvar" class="btn primary">Salvar lançamento</button>
+        <button id="btnCancelarEdit" class="btn ghost hidden">Cancelar edição</button>
+        <div id="formInfo" class="sm muted"></div>
+      </div>
+    </div>
 
-  function renderRegister() {
-    authCard.innerHTML = `
-      <img src="/static/logo.png" alt="Logo Kratos" />
-      <h2>Nova Conta</h2>
-      <form id="registerForm">
-        <label>
-          Email:
-          <input type="text" id="regEmail" required autocomplete="username" />
-        </label>
-        <label>
-          Senha:
-          <input type="password" id="regSenha" required autocomplete="new-password" />
-        </label>
-        <button type="submit">Cadastrar</button>
-      </form>
-      <div class="alt-link" id="showLogin">Já tem conta? Entrar</div>
-    `;
+    <!-- Lista -->
+    <div id="viewLista" class="wrap hidden">
+      <div class="card">
+        <div class="row" style="justify-content:space-between;gap:8px">
+          <div class="row"><label class="small">Categoria</label>
+            <select id="fltCat2" style="min-width:160px">
+              <option value="">Todas</option>
+            </select>
+          </div>
+          <button id="btnCSV" class="btn ghost">Exportar CSV</button>
+        </div>
+        <div id="listFull" class="list"></div>
+      </div>
+    </div>
 
-    document.getElementById('registerForm').onsubmit = e => {
-      e.preventDefault();
-      const email = document.getElementById('regEmail').value.trim();
-      const senha = document.getElementById('regSenha').value;
-      auth.createUserWithEmailAndPassword(email, senha)
-        .then(() => {
-          alert("Cadastro realizado com sucesso! Faça login.");
-          renderLogin();
-        })
-        .catch(err => alert("Erro: " + (err.message || err)));
+    <!-- Simulador -->
+    <div id="viewSim" class="wrap hidden">
+      <div class="card col">
+        <div class="row">
+          <input id="simInicial" type="number" step="0.01" inputmode="decimal" placeholder="Aporte inicial" />
+          <input id="simMensal" type="number" step="0.01" inputmode="decimal" placeholder="Aporte mensal" />
+        </div>
+        <div class="row">
+          <input id="simTaxa" type="number" step="0.01" inputmode="decimal" placeholder="Taxa (% a.m.)" />
+          <input id="simMeses" type="number" step="1" inputmode="numeric" placeholder="Meses" />
+        </div>
+        <button id="btnSimular" class="btn primary">Simular</button>
+        <div id="simOut" class="muted"></div>
+      </div>
+    </div>
+
+    <button id="fab" class="fab">＋</button>
+
+    <!-- Bottom Nav -->
+    <nav class="nav">
+      <ul>
+        <li><button class="active" data-view="Resumo">🏠<span>Resumo</span></button></li>
+        <li><button data-view="Lanc">✚<span>Lançar</span></button></li>
+        <li><button data-view="Lista">📄<span>Lista</span></button></li>
+        <li><button data-view="Sim">📈<span>Simulador</span></button></li>
+      </ul>
+    </nav>
+  </section>
+
+  <script type="module">
+    // ===== Firebase =====
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, OAuthProvider, signInWithPopup, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
+    import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, Timestamp, enableIndexedDbPersistence } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: 'AIzaSyD32JNIb-IplbuAM8WD-Nw_P3gA5wNSNwY',
+      authDomain: 'kratosfinancas.firebaseapp.com',
+      projectId: 'kratosfinancas',
+      storageBucket: 'kratosfinancas.firebasestorage.app',
+      messagingSenderId: '740158664268',
+      appId: '1:740158664268:web:9e4583e75c94cbd90c0ee9'
     };
 
-    document.getElementById('showLogin').onclick = renderLogin;
-  }
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    enableIndexedDbPersistence(db).catch(()=>{});
 
-  function renderLogin() {
-    authCard.innerHTML = `
-      <img src="/static/logo.png" alt="Logo Kratos" />
-      <h2>Kratos System</h2>
-      <form id="loginForm">
-        <label>
-          Email:
-          <input type="text" id="loginEmail" required autocomplete="username" />
-        </label>
-        <label>
-          Senha:
-          <input type="password" id="loginSenha" required autocomplete="current-password" />
-        </label>
-        <button type="submit">Entrar</button>
-      </form>
-      <div class="alt-link" id="showRegister">Cadastrar nova conta</div>
-      <small>Seus dados ficam protegidos na nuvem com Firebase</small>
-    `;
+    // ===== Helpers =====
+    const $ = (s,root=document)=>root.querySelector(s);
+    const $$ = (s,root=document)=>Array.from(root.querySelectorAll(s));
+    const brl = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0));
+    const fmtDate = d => new Date(d).toLocaleDateString('pt-BR');
+    const ymd = (d)=>{ const x=new Date(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}` };
 
-    document.getElementById('loginForm').onsubmit = e => {
-      e.preventDefault();
-      const email = document.getElementById('loginEmail').value.trim();
-      const senha = document.getElementById('loginSenha').value;
-      auth.signInWithEmailAndPassword(email, senha)
-        .then(() => {
-          window.location.href = "app.html";
-        })
-        .catch(err => alert("Erro: " + (err.message || err)));
+    // ===== Brand logo (inline base64) =====
+    const LOGO_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAIAAAAiOjnJAABa/0lEQVR42u19d5xdVbX/WnvvU26Ze6fXzKT3EBKS0EIgVOkI8l9M94hHRcFR4SXI0LrHFgHe1u8/g6sPX/AbYuKHgD/Q4XAAAAAElFTkSuQmCC';
+    $('#logoBig').src = LOGO_DATA;
+    $('#logoSm').src = LOGO_DATA;
+
+    // ===== State =====
+    let unsub = null; let txCache=[]; let editingId=null; let currentType='despesa';
+
+    // ===== Auth Tabs =====
+    const tabLogin=$('#tabLogin'), tabRegister=$('#tabRegister');
+    const boxLogin=$('#boxLogin'), boxRegister=$('#boxRegister');
+    tabLogin.onclick=()=>{ tabLogin.classList.add('active'); tabRegister.classList.remove('active'); boxLogin.classList.remove('hidden'); boxRegister.classList.add('hidden'); };
+    tabRegister.onclick=()=>{ tabRegister.classList.add('active'); tabLogin.classList.remove('active'); boxRegister.classList.remove('hidden'); boxLogin.classList.add('hidden'); };
+
+    // ===== Auth Actions =====
+    $('#btnLogin').onclick = async()=>{
+      $('#errLogin').textContent='';
+      try{ await signInWithEmailAndPassword(auth, $('#inEmail').value, $('#inPass').value); }
+      catch(e){ $('#errLogin').textContent = e.message.replace('Firebase:','').trim(); }
+    };
+    $('#btnRegister').onclick = async()=>{
+      $('#errReg').textContent='';
+      try{
+        const cred = await createUserWithEmailAndPassword(auth, $('#regEmail').value, $('#regPass').value);
+        if($('#regName').value) await updateProfile(cred.user,{displayName:$('#regName').value});
+      }catch(e){ $('#errReg').textContent = e.message.replace('Firebase:','').trim(); }
+    };
+    $('#btnGoogle').onclick = async()=>{
+      try{ await signInWithPopup(auth,new GoogleAuthProvider()); }catch(e){ $('#errLogin').textContent=e.message; }
+    };
+    $('#btnApple').onclick = async()=>{
+      try{ const p=new OAuthProvider('apple.com'); p.addScope('email'); p.addScope('name'); await signInWithPopup(auth,p); }catch(e){ $('#errLogin').textContent=e.message+"\n(Configure o Apple no Firebase e Apple Developer)"; }
     };
 
-    document.getElementById('showRegister').onclick = renderRegister;
-  }
+    // ===== App guard =====
+    onAuthStateChanged(auth,(user)=>{
+      if(user){
+        $('#scrAuth').classList.remove('active'); $('#scrAuth').classList.add('hidden');
+        $('#scrApp').classList.add('active');
+        $('#userName').textContent = user.displayName||user.email;
+        initMonth(); attachListener();
+      }else{
+        $('#scrApp').classList.remove('active'); $('#scrApp').classList.add('hidden');
+        $('#scrAuth').classList.remove('hidden'); $('#scrAuth').classList.add('active');
+      }
+    });
 
-  // Inicializa mostrando o formulário de login
-  renderLogin();
-</script>
+    // ===== Bottom nav =====
+    $$('.nav button').forEach(b=>b.onclick=()=>{
+      $$('.nav button').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+      const v=b.dataset.view; showView(v);
+    });
+    $('#fab').onclick=()=>{ showView('Lanc'); window.scrollTo({top:0,behavior:'smooth'}); };
+
+    function showView(v){
+      ['Resumo','Lanc','Lista','Sim'].forEach(name=>$('#view'+name).classList.toggle('hidden', name!==v));
+    }
+
+    // ===== Month init/listener =====
+    function initMonth(){ const now=new Date(); $('#fltMonth').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`; $('#txDate').value=ymd(new Date()); }
+    $('#fltMonth').addEventListener('change', attachListener);
+
+    function userCol(path){ return collection(db, `users/${auth.currentUser.uid}/${path}`); }
+
+    function attachListener(){
+      if(unsub) unsub();
+      const [y,m] = $('#fltMonth').value.split('-').map(Number);
+      const start = Timestamp.fromDate(new Date(y,m-1,1));
+      const end   = Timestamp.fromDate(new Date(y,m,0,23,59,59,999));
+      const q = query(userCol('transactions'), where('date','>=',start), where('date','<=',end), orderBy('date','desc'));
+      unsub = onSnapshot(q,(snap)=>{
+        txCache = snap.docs.map(d=>({id:d.id,...d.data()}));
+        refreshUI();
+      });
+    }
+
+    function refreshUI(){
+      // KPIs
+      const totR = txCache.filter(t=>t.type==='receita').reduce((a,b)=>a+b.amount,0);
+      const totD = txCache.filter(t=>t.type==='despesa').reduce((a,b)=>a+b.amount,0);
+      $('#kpiRec').textContent=brl(totR); $('#kpiDes').textContent=brl(totD); $('#kpiSaldo').textContent=brl(totR-totD);
+      // Categorias
+      const set=new Set(['Salário','Alimentação','Transporte','Moradia','Lazer','Saúde','Educação','Investimentos','Outros']);
+      txCache.forEach(t=>set.add(t.cat));
+      const opts='<option value="">Todas</option>'+Array.from(set).map(c=>`<option>${c}</option>`).join('');
+      $('#fltCat').innerHTML=opts; $('#fltCat2').innerHTML=opts;
+      // Listas
+      renderList($('#listHome'), txCache.slice(0,8));
+      renderList($('#listFull'), filterCat($('#fltCat2').value));
+    }
+
+    function filterCat(cat){ return cat? txCache.filter(t=>t.cat===cat): txCache }
+
+    $('#fltCat').onchange=()=> renderList($('#listHome'), filterCat($('#fltCat').value).slice(0,8));
+    $('#fltCat2').onchange=()=> renderList($('#listFull'), filterCat($('#fltCat2').value));
+
+    function renderList(container, rows){
+      container.innerHTML='';
+      rows.forEach(r=>{
+        const el=document.createElement('div'); el.className='item';
+        const bubble=`<div class="bubble ${r.type==='receita'?'b-r':'b-d'}">${r.type==='receita'?'+':'−'}</div>`;
+        el.innerHTML=`
+          <div class="it-left">${bubble}<div>
+            <div style="font-weight:800">${r.cat||'—'} • <span class="sm">${fmtDate(r.date.toDate())}</span></div>
+            <div class="sm">${r.note||''}</div>
+          </div></div>
+          <div class="it-right">
+            <div class="tag ${r.type==='receita'?'r':'d'}">${r.type==='despesa'?'-':''}${brl(r.amount)}</div>
+            <button class="btn warn btn-edit">Editar</button>
+            <button class="btn danger btn-del">Excluir</button>
+          </div>`;
+        el.querySelector('.btn-edit').onclick=()=> startEdit(r);
+        el.querySelector('.btn-del').onclick=()=> delTx(r.id);
+        container.appendChild(el);
+      });
+    }
+
+    // ===== Create/Edit =====
+    $('#btnTipoR').onclick=()=>{ currentType='receita'; };
+    $('#btnTipoD').onclick=()=>{ currentType='despesa'; };
+    $('#btnCancelarEdit').onclick=()=>{ editingId=null; $('#btnCancelarEdit').classList.add('hidden'); $('#btnSalvar').textContent='Salvar lançamento'; clearForm(); };
+
+    function clearForm(){ currentType='despesa'; $('#txDate').value=ymd(new Date()); $('#txCat').value=''; $('#txAmount').value=''; $('#txNote').value=''; $('#formInfo').textContent=''; }
+
+    async function delTx(id){ if(confirm('Excluir este lançamento?')) await deleteDoc(doc(userCol('transactions'), id)); }
+
+    function startEdit(r){
+      editingId = r.id; currentType = r.type; $('#txDate').value=ymd(r.date.toDate()); $('#txCat').value=r.cat; $('#txAmount').value=r.amount; $('#txNote').value=r.note||''; $('#btnSalvar').textContent='Atualizar'; $('#btnCancelarEdit').classList.remove('hidden'); showView('Lanc'); window.scrollTo({top:0,behavior:'smooth'});
+    }
+
+    $('#btnSalvar').onclick = async()=>{
+      const payload={ type: currentType, date: $('#txDate').value? Timestamp.fromDate(new Date($('#txDate').value)):Timestamp.now(), cat: ($('#txCat').value||'Outros').trim(), amount: Number($('#txAmount').value||0), note: $('#txNote').value.trim(), createdAt: Timestamp.now() };
+      if(!payload.amount||payload.amount<=0){ alert('Informe um valor válido.'); return; }
+      try{ if(editingId) await updateDoc(doc(userCol('transactions'), editingId), payload); else await addDoc(userCol('transactions'), payload); $('#formInfo').textContent='Salvo com sucesso.'; clearForm(); editingId=null; setTimeout(()=>{showView('Resumo')},300); }catch(e){ alert('Erro: '+e.message); }
+    }
+
+    // ===== CSV Export (lista) =====
+    $('#btnCSV').onclick=()=>{
+      const rows = [['Data','Tipo','Categoria','Observação','Valor']];
+      txCache.forEach(t=> rows.push([fmtDate(t.date.toDate()), t.type, t.cat, (t.note||'').replace(/\n/g,' '), (t.type==='despesa'?'-':'')+t.amount.toFixed(2)]));
+      const csv = rows.map(r=> r.map(x=>`"${String(x).replace(/"/g,'\"')}"`).join(',')).join('\n');
+      const blob = new Blob(["\ufeff"+csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='lancamentos.csv'; a.click();
+    };
+
+    // ===== Simulador =====
+    $('#btnSimular').onclick=()=>{
+      const P=Number($('#simInicial').value||0), PMT=Number($('#simMensal').value||0), i=Number($('#simTaxa').value||0)/100, n=Math.max(1,Number($('#simMeses').value||1));
+      let saldo=P; for(let m=1;m<=n;m++) saldo=saldo*(1+i)+PMT; const invest=P+PMT*n; const ganho=saldo-invest; $('#simOut').textContent=`Final: ${brl(saldo)} • Investido: ${brl(invest)} • Ganho: ${brl(ganho)}`;
+    };
+
+    // ===== Sign out (gesture: long press brand) =====
+    let pressT=null; $('.brand').addEventListener('pointerdown',()=>{ pressT=setTimeout(()=>signOut(auth),1200); }); $('.brand').addEventListener('pointerup',()=>clearTimeout(pressT));
+  </script>
 </body>
 </html>
