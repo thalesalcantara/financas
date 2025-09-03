@@ -1,0 +1,1847 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Painel Admin - Coopex</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <style>
+    :root{
+      --royal-blue:#2747d9; --hover-blue:#3b61e3;
+      --danger:#e74c3c; --success:#2ecc71; --warning:#f1c40f;
+      --sidebar-w:260px;
+    }
+    html,body{height:100%}
+    body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
+    .sidebar{width:var(--sidebar-w);height:100vh;position:fixed;left:0;top:0;background:var(--royal-blue);color:#fff;overflow-y:auto}
+    .brand{display:flex;align-items:center;gap:.6rem;padding:16px 18px 8px}
+    .brand img{height:34px;width:auto}
+    .brand h3{font-family:'Orbitron',sans-serif;font-size:1.5rem;margin:0}
+    .sidebar .nav-link{color:#fff;border-radius:8px;margin:6px 10px;padding:.55rem .8rem}
+    .sidebar .nav-link:hover,.sidebar .nav-link.active{background:var(--hover-blue)}
+    .sidebar .nav-link i{width:18px;margin-right:.4rem}
+    .main{margin-left:var(--sidebar-w);max-width:calc(100vw - var(--sidebar-w));padding:18px}
+    .card{border-radius:12px;box-shadow:0 2px 6px #0002}
+    .btn-royal{background:var(--royal-blue);color:#fff}
+    .btn-royal:hover{background:var(--hover-blue)}
+    .btn-danger{background:var(--danger)} .btn-success{background:var(--success)} .btn-warning{background:var(--warning);color:#222}
+    .muted{color:#6c757d}
+    .table thead{background:#eef2ff}
+    .avatar{width:40px;height:40px;border-radius:50%;object-fit:cover}
+    .pill{display:inline-block;font-size:.8rem;background:#eef2ff;border-radius:999px;padding:.15rem .55rem;margin:.1rem}
+    .chart-card{padding:14px;height:360px}
+    .chart-card canvas{width:100% !important;height:300px !important;display:block}
+    .tab-content,.card,.table-responsive{max-width:100%}
+    .badge-soft{background:#eef2ff;color:#223;border-radius:999px;padding:.15rem .55rem}
+    .text-tight{line-height:1.15}
+    @media(max-width:900px){
+      :root{--sidebar-w:64px}
+      .brand h3,.brand img{display:none}
+      .main{margin-left:var(--sidebar-w);max-width:calc(100vw - var(--sidebar-w))}
+      .sidebar .nav-link span{display:none}
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo Coopex">
+      <h3>COOPEX</h3>
+    </div>
+    <nav class="nav flex-column pb-3">
+      <a class="nav-link active" data-bs-toggle="tab" href="#resumo"><i class="bi bi-graph-up"></i> <span>Resumo</span></a>
+      <a class="nav-link" data-bs-toggle="tab" href="#lancamentos"><i class="bi bi-journal-text"></i> <span>Lançamentos</span></a>
+      <a class="nav-link" data-bs-toggle="tab" href="#receitas"><i class="bi bi-cash"></i> <span>Receitas Coop</span></a>
+      <a class="nav-link" data-bs-toggle="tab" href="#despesas"><i class="bi bi-cart-dash"></i> <span>Despesas Coop</span></a>
+      <a class="nav-link" data-bs-toggle="tab" href="#coop_receitas"><i class="bi bi-cash-coin"></i> <span>Receitas Cooperados</span></a>
+      <a class="nav-link" data-bs-toggle="tab" href="#coop_despesas"><i class="bi bi-people"></i> <span>Despesas Cooperados</span></a>
+      <a class="nav-link" data-bs-toggle="tab" href="#folha"><i class="bi bi-receipt"></i> <span>Folha de Pagamento</span></a>
+      <a class="nav-link" data-bs-toggle="tab" href="#beneficios"><i class="bi bi-heart-pulse"></i> <span>Benefícios</span></a>
+      <a class="nav-link" data-bs-toggle="tab" href="#cooperados"><i class="bi bi-person-badge"></i> <span>Cooperados</span></a>
+      <a class="nav-link" data-bs-toggle="tab" href="#restaurantes"><i class="bi bi-shop"></i> <span>Estabelecimentos</span></a>
+      <a class="nav-link" data-bs-toggle="tab" href="#escalas"><i class="bi bi-calendar2-week"></i> <span>Escalas</span></a>
+      <a class="nav-link" data-bs-toggle="tab" href="#config"><i class="bi bi-gear"></i> <span>Configurações</span></a>
+      <a class="nav-link" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> <span>Sair</span></a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="tab-content">
+
+      <!-- RESUMO -->
+      <section class="tab-pane fade show active" id="resumo">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <div class="card p-3 text-center">
+              <h6>Total Produções</h6>
+              <p class="fw-bold mb-0">R$ {{ "%.2f"|format(total_producoes|default(0)) }}</p>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card p-3 text-center">
+              <h6>Total INSS</h6>
+              <p class="fw-bold mb-0">R$ {{ "%.2f"|format(total_inss|default(0)) }}</p>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card p-3 text-center">
+              <h6>Receitas Coop</h6>
+              <p class="fw-bold mb-0">R$ {{ "%.2f"|format(total_receitas|default(0)) }}</p>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card p-3 text-center">
+              <h6>Despesas Coop</h6>
+              <p class="fw-bold mb-0">R$ {{ "%.2f"|format(total_despesas|default(0)) }}</p>
+            </div>
+          </div>
+
+          <div class="col-md-3">
+            <div class="card p-3 text-center">
+              <h6>Receitas Cooperados</h6>
+              <p class="fw-bold mb-0">R$ {{ "%.2f"|format(total_receitas_coop|default(0)) }}</p>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card p-3 text-center">
+              <h6>Despesas Cooperados</h6>
+              <p class="fw-bold mb-0">R$ {{ "%.2f"|format(total_despesas_coop|default(0)) }}</p>
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div class="card p-3">
+              <h6>Parâmetro (Salário Mínimo)</h6>
+              <p class="mb-0">
+                Atual: <b>R$ {{ "%.2f"|format(salario_minimo|default(0)) }}</b> &middot;
+                Base complemento INSS = <b>20%</b> de R$ {{ "%.2f"|format(salario_minimo|default(0)) }}
+                (= {{ "%.2f"|format((salario_minimo|default(0))*0.2) }})
+              </p>
+              <small class="muted">Altere em Configurações → Salário Mínimo Atual</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="row g-3 mt-2">
+          <div class="col-md-6">
+            <div class="card chart-card">
+              <h6 class="mb-2"><i class="bi bi-graph-up-arrow"></i> Crescimento de Produções — Cooperativa</h6>
+              <canvas id="chartLancCoop"></canvas>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card chart-card">
+              <h6 class="mb-2"><i class="bi bi-graph-up-arrow"></i> Crescimento de Produções — Cooperados</h6>
+              <canvas id="chartLancCooperados"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LANÇAMENTOS -->
+      <section class="tab-pane fade" id="lancamentos">
+        <h4 class="mb-3">Filtrar Lançamentos</h4>
+
+        <form method="GET" action="{{ url_for('filtrar_lancamentos') }}" class="card p-3 mb-3">
+          <input type="hidden" name="tab" value="lancamentos">
+          <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+              <label class="form-label">Restaurante</label>
+              <select class="form-select" name="restaurante_id">
+                <option value="">Todos</option>
+                {% for r in restaurantes %}
+                  <option value="{{ r.id }}" {{ 'selected' if (request.args.get('restaurante_id')|int) == r.id else '' }}>{{ r.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Cooperado</label>
+              <select class="form-select" name="cooperado_id">
+                <option value="">Todos</option>
+                {% for c in cooperados %}
+                  <option value="{{ c.id }}" {{ 'selected' if (request.args.get('cooperado_id')|int) == c.id else '' }}>{{ c.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Data Início</label>
+              <input type="date" class="form-control" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Data Fim</label>
+              <input type="date" class="form-control" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+            </div>
+            <div class="col-md-2">
+              <div class="form-check mt-4">
+                <input class="form-check-input" type="checkbox" name="considerar_periodo" value="1" {{ 'checked' if request.args.get('considerar_periodo') else '' }}>
+                <label class="form-check-label" title="Aplica a regra de período do restaurante (Seg-Dom, Sáb-Sex, Sex-Qui)">Considerar período do restaurante</label>
+              </div>
+            </div>
+          </div>
+          <div class="row g-2 mt-2">
+            <div class="col-12">
+              <label class="form-label mb-1">Dias da Semana</label>
+              <div class="d-flex flex-wrap">
+                {% set dows = request.args.getlist('dow') %}
+                {% set dlabels = [('1','Seg'),('2','Ter'),('3','Qua'),('4','Qui'),('5','Sex'),('6','Sáb'),('7','Dom')] %}
+                {% for val,label in dlabels %}
+                  <div class="form-check form-check-inline me-2">
+                    <input class="form-check-input" id="dow{{ val }}" type="checkbox" name="dow" value="{{ val }}" {{ 'checked' if val in dows else '' }}>
+                    <label class="form-check-label" for="dow{{ val }}">{{ label }}</label>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-royal"><i class="bi bi-funnel"></i> Filtrar</button>
+            <a href="{{ url_for('exportar_lancamentos', **request.args) }}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV</a>
+          </div>
+        </form>
+
+        <div class="card p-3 mb-3">
+          <h5 class="mb-2">Lançar Produção</h5>
+          <p class="muted mb-3 small">Obs.: a competência por <b>período do restaurante</b> é aplicada no back-end.</p>
+          <form method="POST" action="{{ url_for('admin_add_lancamento') }}" class="row g-2 align-items-end">
+            <div class="col-md-3">
+              <label class="form-label">Restaurante</label>
+              <select class="form-select" name="restaurante_id" required>
+                {% for r in restaurantes %}<option value="{{ r.id }}">{{ r.nome }} ({{ r.periodo }})</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Cooperado</label>
+              <select class="form-select" name="cooperado_id" required>
+                {% for c in cooperados %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Descrição</label>
+              <input type="text" class="form-control" name="descricao" placeholder="Ex: almoço, jantar" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Valor (R$)</label>
+              <input type="number" step="0.01" class="form-control" name="valor" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Data</label>
+              <input type="date" class="form-control" name="data" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Horário</label>
+              <div class="input-group">
+                <input type="time" class="form-control" name="hora_inicio">
+                <span class="input-group-text">às</span>
+                <input type="time" class="form-control" name="hora_fim">
+              </div>
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-royal w-100"><i class="bi bi-plus-circle"></i> Lançar</button>
+            </div>
+          </form>
+          <small class="muted">Nota: o INSS mostrado abaixo é o cálculo bruto linha-a-linha (4,5%). <b>Isenções por benefício</b> entram na <u>Folha</u> e nos <u>totais</u> do Resumo.</small>
+        </div>
+
+        <div class="card p-3">
+          <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle">
+              <thead>
+                <tr>
+                  <th>Restaurante</th><th>Período</th><th>Cooperado</th><th>Descrição</th>
+                  <th>Valor</th><th>Data</th><th>Horário</th><th>INSS (4,5%)</th><th>Líquido</th><th class="text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for l in lancamentos %}
+                  {% set inss = (l.valor or 0)*0.045 %}
+                  {% set liq  = (l.valor or 0) - inss %}
+                  <tr>
+                    <td>{{ l.restaurante.nome }}</td>
+                    <td class="text-nowrap"><span class="badge bg-light text-dark">{{ l.restaurante.periodo }}</span></td>
+                    <td>{{ l.cooperado.nome }}</td>
+                    <td>{{ l.descricao }}</td>
+                    <td>R$ {{ "%.2f"|format(l.valor) }}</td>
+                    <td>{{ l.data.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ l.hora_inicio }}{% if l.hora_fim %} às {{ l.hora_fim }}{% endif %}</td>
+                    <td>R$ {{ "%.2f"|format(inss) }}</td>
+                    <td>R$ {{ "%.2f"|format(liq) }}</td>
+                    <td class="text-center">
+                      <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalEditLancamento"
+                              data-id="{{ l.id }}" data-restaurante="{{ l.restaurante.id }}" data-cooperado="{{ l.cooperado.id }}"
+                              data-descricao="{{ l.descricao }}" data-valor="{{ l.valor }}" data-data="{{ l.data.strftime('%Y-%m-%d') }}"
+                              data-hora_inicio="{{ l.hora_inicio }}" data-hora_fim="{{ l.hora_fim }}"
+                              data-url="{{ url_for('admin_edit_lancamento', id=l.id) }}"><i class="bi bi-pencil"></i></button>
+                      <a class="btn btn-danger btn-sm btn-del" href="{{ url_for('admin_delete_lancamento', id=l.id) }}"><i class="bi bi-trash"></i></a>
+                    </td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="10" class="text-center text-muted">Nenhum lançamento encontrado</td></tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                {% set soma_valor = (lancamentos|sum(attribute='valor')) if lancamentos else 0 %}
+                {% set soma_inss  = (soma_valor * 0.045) %}
+                {% set soma_liq   = (soma_valor - soma_inss) %}
+                <tr class="table-light">
+                  <th colspan="4" class="text-end">Totais do Filtro:</th>
+                  <th>R$ {{ "%.2f"|format(soma_valor) }}</th>
+                  <th></th><th></th>
+                  <th>R$ {{ "%.2f"|format(soma_inss) }}</th>
+                  <th>R$ {{ "%.2f"|format(soma_liq) }}</th>
+                  <th></th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- RECEITAS COOP -->
+      <section class="tab-pane fade" id="receitas">
+        <h4 class="mb-3">Receitas da Cooperativa</h4>
+
+        <form method="GET" class="card p-3 mb-3">
+          <input type="hidden" name="tab" value="receitas">
+          <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+              <label class="form-label">Data Início</label>
+              <input type="date" class="form-control" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Data Fim</label>
+              <input type="date" class="form-control" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-royal w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+            </div>
+          </div>
+        </form>
+
+        <form method="POST" action="{{ url_for('add_receita') }}" class="row g-2 mb-3">
+          <div class="col-md-5"><input type="text" class="form-control" name="descricao" placeholder="Descrição" required></div>
+          <div class="col-md-2"><input type="number" step="0.01" class="form-control" name="valor" placeholder="Valor R$" required></div>
+          <div class="col-md-3"><input type="date" class="form-control" name="data" required></div>
+          <div class="col-md-2"><button class="btn btn-success w-100"><i class="bi bi-plus-circle"></i> Adicionar</button></div>
+        </form>
+
+        <table class="table table-bordered table-hover">
+          <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th class="text-center">Ações</th></tr></thead>
+          <tbody>
+            {% for r in receitas %}
+              <tr>
+                <td>{{ r.data.strftime('%d/%m/%Y') if r.data else '-' }}</td>
+                <td>{{ r.descricao }}</td>
+                <td>R$ {{ "%.2f"|format(r.valor) }}</td>
+                <td class="text-center">
+                  <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalEditReceita"
+                          data-id="{{ r.id }}" data-descricao="{{ r.descricao }}" data-valor="{{ r.valor }}"
+                          data-data="{{ r.data.strftime('%Y-%m-%d') if r.data else '' }}"
+                          data-url="{{ url_for('edit_receita', id=r.id) }}"><i class="bi bi-pencil"></i></button>
+                  <a class="btn btn-danger btn-sm btn-del" href="{{ url_for('delete_receita', id=r.id) }}"><i class="bi bi-trash"></i></a>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4" class="text-center text-muted">Nenhuma receita</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-light">
+              <th colspan="2" class="text-end">Total</th>
+              <th>R$ {{ "%.2f"|format((receitas|sum(attribute='valor')) if receitas else 0) }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+
+      <!-- DESPESAS COOP -->
+      <section class="tab-pane fade" id="despesas">
+        <h4 class="mb-3">Despesas da Cooperativa</h4>
+
+        <form method="GET" class="card p-3 mb-3">
+          <input type="hidden" name="tab" value="despesas">
+          <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+              <label class="form-label">Data Início</label>
+              <input type="date" class="form-control" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Data Fim</label>
+              <input type="date" class="form-control" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-royal w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+            </div>
+          </div>
+        </form>
+
+        <form method="POST" action="{{ url_for('add_despesa') }}" class="row g-2 mb-3">
+          <div class="col-md-5"><input type="text" class="form-control" name="descricao" placeholder="Descrição" required></div>
+          <div class="col-md-2"><input type="number" step="0.01" class="form-control" name="valor" placeholder="Valor R$" required></div>
+          <div class="col-md-3"><input type="date" class="form-control" name="data" required></div>
+          <div class="col-md-2"><button class="btn btn-danger w-100"><i class="bi bi-plus-circle"></i> Adicionar</button></div>
+        </form>
+
+        <table class="table table-bordered table-hover">
+          <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th class="text-center">Ações</th></tr></thead>
+          <tbody>
+            {% for d in despesas %}
+              <tr>
+                <td>{{ d.data.strftime('%d/%m/%Y') if d.data else '-' }}</td>
+                <td>{{ d.descricao }}</td>
+                <td>R$ {{ "%.2f"|format(d.valor) }}</td>
+                <td class="text-center">
+                  <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalEditDespesa"
+                          data-id="{{ d.id }}" data-descricao="{{ d.descricao }}" data-valor="{{ d.valor }}"
+                          data-data="{{ d.data.strftime('%Y-%m-%d') if d.data else '' }}"
+                          data-url="{{ url_for('edit_despesa', id=d.id) }}"><i class="bi bi-pencil"></i></button>
+                  <a class="btn btn-danger btn-sm btn-del" href="{{ url_for('delete_despesa', id=d.id) }}"><i class="bi bi-trash"></i></a>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4" class="text-center text-muted">Nenhuma despesa</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-light">
+              <th colspan="2" class="text-end">Total</th>
+              <th>R$ {{ "%.2f"|format((despesas|sum(attribute='valor')) if despesas else 0) }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+
+      <!-- RECEITAS COOPERADOS -->
+      <section class="tab-pane fade" id="coop_receitas">
+        <h4 class="mb-3">Receitas para Cooperados</h4>
+
+        <form method="GET" class="card p-3 mb-3">
+          <input type="hidden" name="tab" value="coop_receitas">
+          <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+              <label class="form-label">Data Início</label>
+              <input type="date" class="form-control" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Data Fim</label>
+              <input type="date" class="form-control" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-royal w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+            </div>
+          </div>
+        </form>
+
+        <form method="POST" action="{{ url_for('add_receita_coop') }}" class="row g-2 mb-3">
+          <div class="col-md-3">
+            <select class="form-select" name="cooperado_id" required>
+              <option disabled selected>Selecione o Cooperado</option>
+              {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3"><input type="text" class="form-control" name="descricao" placeholder="Descrição" required></div>
+          <div class="col-md-2"><input type="number" step="0.01" class="form-control" name="valor" placeholder="Valor R$" required></div>
+          <div class="col-md-3"><input type="date" class="form-control" name="data" required></div>
+          <div class="col-md-1"><button class="btn btn-success w-100"><i class="bi bi-plus-circle"></i></button></div>
+        </form>
+
+        <table class="table table-bordered">
+          <thead><tr><th>Data</th><th>Cooperado</th><th>Descrição</th><th>Valor</th><th class="text-center">Ações</th></tr></thead>
+          <tbody>
+            {% for rc in receitas_coop %}
+              <tr>
+                <td>{{ rc.data.strftime('%d/%m/%Y') if rc.data else '-' }}</td>
+                <td>{{ rc.cooperado.nome }}</td>
+                <td>{{ rc.descricao }}</td>
+                <td>R$ {{ "%.2f"|format(rc.valor) }}</td>
+                <td class="text-center">
+                  <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalEditReceitaCoop"
+                          data-id="{{ rc.id }}" data-cooperado="{{ rc.cooperado.id }}" data-descricao="{{ rc.descricao }}" data-valor="{{ rc.valor }}"
+                          data-data="{{ rc.data.strftime('%Y-%m-%d') if rc.data else '' }}"
+                          data-url="{{ url_for('edit_receita_coop', id=rc.id) }}"><i class="bi bi-pencil"></i></button>
+                  <a class="btn btn-danger btn-sm btn-del" href="{{ url_for('delete_receita_coop', id=rc.id) }}"><i class="bi bi-trash"></i></a>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="5" class="text-center text-muted">Nenhuma receita</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-light">
+              <th colspan="3" class="text-end">Total</th>
+              <th>R$ {{ "%.2f"|format((receitas_coop|sum(attribute='valor')) if receitas_coop else 0) }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+
+      <!-- DESPESAS COOPERADOS -->
+      <section class="tab-pane fade" id="coop_despesas">
+        <h4 class="mb-3">Despesas para Cooperados</h4>
+
+        <form method="GET" class="card p-3 mb-3">
+          <input type="hidden" name="tab" value="coop_despesas">
+          <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+              <label class="form-label">Data Início</label>
+              <input type="date" class="form-control" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Data Fim</label>
+              <input type="date" class="form-control" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-royal w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+            </div>
+          </div>
+        </form>
+
+        <form method="POST" action="{{ url_for('add_despesa_coop') }}" class="row g-2 mb-3">
+          <div class="col-md-4">
+            <select class="form-select" name="cooperado_ids[]" multiple>
+              <option value="all">Todos</option>
+              {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+            </select>
+            <small class="text-muted">Selecione 1, vários ou "Todos".</small>
+          </div>
+          <div class="col-md-3"><input type="text" class="form-control" name="descricao" placeholder="Descrição" required></div>
+          <div class="col-md-2"><input type="number" step="0.01" class="form-control" name="valor" placeholder="Valor R$" required></div>
+          <div class="col-md-2"><input type="date" class="form-control" name="data" required></div>
+          <div class="col-md-1"><button class="btn btn-danger w-100"><i class="bi bi-plus-circle"></i></button></div>
+        </form>
+
+        <table class="table table-bordered">
+          <thead><tr><th>Data</th><th>Cooperado</th><th>Descrição</th><th>Valor</th><th class="text-center">Ações</th></tr></thead>
+          <tbody>
+            {% for dc in despesas_coop %}
+              <tr>
+                <td>{{ dc.data.strftime('%d/%m/%Y') if dc.data else '-' }}</td>
+                <td>{{ dc.cooperado.nome if dc.cooperado else 'Todos' }}</td>
+                <td>{{ dc.descricao }}</td>
+                <td>R$ {{ "%.2f"|format(dc.valor) }}</td>
+                <td class="text-center">
+                  <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalEditDespesaCoop"
+                          data-id="{{ dc.id }}" data-cooperado="{{ dc.cooperado.id if dc.cooperado else '' }}"
+                          data-descricao="{{ dc.descricao }}" data-valor="{{ dc.valor }}"
+                          data-data="{{ dc.data.strftime('%Y-%m-%d') if dc.data else '' }}"
+                          data-url="{{ url_for('edit_despesa_coop', id=dc.id) }}"><i class="bi bi-pencil"></i></button>
+                  <a class="btn btn-danger btn-sm btn-del" href="{{ url_for('delete_despesa_coop', id=dc.id) }}"><i class="bi bi-trash"></i></a>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="5" class="text-center text-muted">Nenhuma despesa</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-light">
+              <th colspan="3" class="text-end">Total</th>
+              <th>R$ {{ "%.2f"|format((despesas_coop|sum(attribute='valor')) if despesas_coop else 0) }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+
+      <!-- FOLHA DE PAGAMENTO -->
+      {% set folha_list = folha_por_coop if folha_por_coop is defined else [] %}
+      <section class="tab-pane fade" id="folha">
+        <h4 class="mb-3">Folha de Pagamento</h4>
+
+        <form method="GET" action="{{ url_for('admin_dashboard') }}" class="card p-3 mb-3">
+          <input type="hidden" name="tab" value="folha">
+          <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+              <label class="form-label">De</label>
+              <input type="date" class="form-control" name="folha_inicio" value="{{ folha_inicio.strftime('%Y-%m-%d') if folha_inicio else '' }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Até</label>
+              <input type="date" class="form-control" name="folha_fim" value="{{ folha_fim.strftime('%Y-%m-%d') if folha_fim else '' }}">
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-royal w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+            </div>
+          </div>
+        </form>
+
+        {% for f in folha_list %}
+          <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <div class="d-flex align-items-center gap-2">
+                <img src="{{ f.cooperado.foto_url or url_for('static', filename='img/default.png') }}" class="avatar" alt="">
+                <div>
+                  <b>{{ f.cooperado.nome }}</b><br>
+                  <small class="muted">ID: {{ f.cooperado.id }}</small>
+                </div>
+              </div>
+              <div class="text-end">
+                <div>Bruto (produções + receitas): <b>R$ {{ '%.2f'|format(f.bruto) }}</b></div>
+                <div>INSS (4,5%) — despesa: <b>R$ {{ '%.2f'|format(f.inss) }}</b></div>
+                <div>Outras despesas (inclui benefícios): <b>R$ {{ '%.2f'|format(f.outras_desp) }}</b></div>
+                <div class="fs-5 mt-1">Líquido: <b>R$ {{ '%.2f'|format(f.liquido) }}</b></div>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-3">
+              <div class="col-12">
+                <h6 class="mb-2"><i class="bi bi-journal-text"></i> Lançamentos do cooperado (INSS segue competência)</h6>
+                <div class="table-responsive">
+                  <table class="table table-bordered align-middle">
+                    <thead><tr>
+                      <th>Data</th><th>Restaurante</th><th>Descrição</th><th>Bruto</th><th>INSS (4,5%)</th>
+                    </tr></thead>
+                    <tbody>
+                      {% for l in f.lancamentos %}
+                        <tr>
+                          <td>{{ l.data.strftime('%d/%m/%Y') }}</td>
+                          <td>{{ l.restaurante.nome }}</td>
+                          <td>
+                            {{ l.descricao }}
+                            {% if l.isento_benef %}<span class="badge bg-success ms-2">Isento por benefício</span>{% endif %}
+                          </td>
+                          <td>R$ {{ '%.2f'|format(l.valor) }}</td>
+                          <td class="{{ '' if l.conta_inss else 'text-muted' }}">R$ {{ '%.2f'|format(l.inss) }}</td>
+                        </tr>
+                      {% else %}
+                        <tr><td colspan="5" class="text-center text-muted">Sem lançamentos</td></tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="col-lg-6">
+                <h6 class="mb-2"><i class="bi bi-cash"></i> Receitas do cooperado</h6>
+                <table class="table table-bordered align-middle">
+                  <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead>
+                  <tbody>
+                    {% for r in f.receitas %}
+                      <tr><td>{{ r.data.strftime('%d/%m/%Y') }}</td><td>{{ r.descricao }}</td><td>R$ {{ '%.2f'|format(r.valor) }}</td></tr>
+                    {% else %}
+                      <tr><td colspan="3" class="text-center text-muted">Sem receitas</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="col-lg-6">
+                <h6 class="mb-2"><i class="bi bi-bag-dash"></i> Despesas do cooperado (inclui benefícios/rateios)</h6>
+                <table class="table table-bordered align-middle">
+                  <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead>
+                  <tbody>
+                    {% for d in f.despesas %}
+                      <tr><td>{{ d.data.strftime('%d/%m/%Y') }}</td><td>{{ d.descricao }}</td><td>R$ {{ '%.2f'|format(d.valor) }}</td></tr>
+                    {% else %}
+                      <tr><td colspan="3" class="text-center text-muted">Sem despesas</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        {% else %}
+          <div class="text-center text-muted">Sem dados na faixa selecionada.</div>
+        {% endfor %}
+      </section>
+
+      <!-- BENEFÍCIOS (valor por beneficiado + isenções) -->
+      <section class="tab-pane fade" id="beneficios">
+        <h4 class="mb-3">Benefícios (rateio entre quem <u>não</u> recebe)</h4>
+
+        <div class="card p-3 mb-3">
+          <p class="mb-2">
+            Informe o <b>período semanal</b> e, para cada tipo, o <b>valor por cooperado que recebe</b> (ex.: R$ 379,50).
+            Na submissão, calculamos automaticamente o <b>valor total</b> (= unitário × nº de beneficiados) e
+            rateamos entre os <b>pagantes</b> = <i>todos</i> − <i>beneficiados</i> − <i>isentos</i>.
+            Isentos não pagam e não entram no divisor.
+          </p>
+
+          <form id="form-beneficios" method="POST" action="{{ url_for('ratear_beneficios') }}" class="row g-3">
+            <div class="col-12 col-md-3">
+              <label class="form-label">Data inicial</label>
+              <input type="date" class="form-control" name="data_inicial" required value="{{ request.args.get('data_inicio','') }}">
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label">Data final</label>
+              <input type="date" class="form-control" name="data_final" required value="{{ request.args.get('data_fim','') }}">
+              <small class="muted">Ex.: 18/05/2025 a 24/05/2025</small>
+            </div>
+
+            <!-- Hospitalar -->
+            <div class="col-12"><hr class="my-2"></div>
+            <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <h6 class="mb-0"><i class="bi bi-heart-pulse"></i> Benefício Hospitalar</h6>
+              <span class="badge-soft" id="hosp_badge">Prévia: —</span>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Valor por beneficiado (R$)</label>
+              <input type="number" step="0.01" class="form-control" name="hosp_valor_unit" id="hosp_valor_unit" placeholder="0,00">
+              <!-- TOTAL esperado pelo back-end -->
+              <input type="hidden" name="hosp_valor" id="hosp_valor_total">
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Cooperados que <b>recebem</b></label>
+              <select class="form-select" name="hosp_beneficiarios[]" id="hosp_beneficiarios" multiple size="6">
+                {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+              </select>
+              <small class="muted">Serão <b>cobrados</b> todos os <u>não selecionados</u>, exceto os isentos.</small>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Cooperados <b>isentos</b></label>
+              <select class="form-select" name="hosp_isencoes[]" id="hosp_isencoes" multiple size="6">
+                {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+              </select>
+              <small class="muted">Isentos não pagam e não entram no divisor.</small>
+            </div>
+
+            <!-- Farmacêutico -->
+            <div class="col-12"><hr class="my-2"></div>
+            <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <h6 class="mb-0"><i class="bi bi-capsule"></i> Benefício Farmacêutico</h6>
+              <span class="badge-soft" id="farm_badge">Prévia: —</span>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Valor por beneficiado (R$)</label>
+              <input type="number" step="0.01" class="form-control" name="farm_valor_unit" id="farm_valor_unit" placeholder="0,00">
+              <!-- TOTAL esperado pelo back-end -->
+              <input type="hidden" name="farm_valor" id="farm_valor_total">
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Cooperados que <b>recebem</b></label>
+              <select class="form-select" name="farm_beneficiarios[]" id="farm_beneficiarios" multiple size="6">
+                {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Cooperados <b>isentos</b></label>
+              <select class="form-select" name="farm_isencoes[]" id="farm_isencoes" multiple size="6">
+                {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+              </select>
+            </div>
+
+            <!-- Alimentar -->
+            <div class="col-12"><hr class="my-2"></div>
+            <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <h6 class="mb-0"><i class="bi bi-basket"></i> Benefício Alimentar</h6>
+              <span class="badge-soft" id="alim_badge">Prévia: —</span>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Valor por beneficiado (R$)</label>
+              <input type="number" step="0.01" class="form-control" name="alim_valor_unit" id="alim_valor_unit" placeholder="0,00">
+              <!-- TOTAL esperado pelo back-end -->
+              <input type="hidden" name="alim_valor" id="alim_valor_total">
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Cooperados que <b>recebem</b></label>
+              <select class="form-select" name="alim_beneficiarios[]" id="alim_beneficiarios" multiple size="6">
+                {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Cooperados <b>isentos</b></label>
+              <select class="form-select" name="alim_isencoes[]" id="alim_isencoes" multiple size="6">
+                {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+              </select>
+            </div>
+
+            <div class="col-12">
+              <button class="btn btn-royal"><i class="bi bi-scissors"></i> Aplicar rateios</button>
+              <small class="muted ms-2">Os lançamentos aparecerão em <b>Despesas para Cooperados</b> com a descrição “(rateio ref mm/aaaa)”.</small>
+            </div>
+          </form>
+        </div>
+
+        <!-- Registros de benefícios recebidos -->
+        <div class="card p-3">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h6 class="mb-0"><i class="bi bi-journal-medical"></i> Registros de Benefícios Recebidos</h6>
+            <form method="GET" class="row g-2 align-items-end">
+              <input type="hidden" name="tab" value="beneficios">
+              <div class="col-md-3">
+                <label class="form-label">De</label>
+                <input type="date" class="form-control" name="b_ini" value="{{ request.args.get('b_ini','') }}">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Até</label>
+                <input type="date" class="form-control" name="b_fim" value="{{ request.args.get('b_fim','') }}">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Cooperado</label>
+                <select class="form-select" name="coop_benef_id">
+                  <option value="">Todos</option>
+                  {% set coop_benef_id = request.args.get('coop_benef_id') %}
+                  {% for coop in cooperados %}
+                    <option value="{{ coop.id }}" {{ 'selected' if coop_benef_id and coop_benef_id|int == coop.id else '' }}>{{ coop.nome }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-2">
+                <button class="btn btn-royal w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="table-responsive mt-3">
+            <table class="table table-bordered align-middle">
+              <thead>
+                <tr>
+                  <th>Referência</th>
+                  <th>Data Lançamento</th>
+                  <th>Tipo</th>
+                  <th>Recebedor</th>
+                  <th>Valor p/ Recebedor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% set _bini  = request.args.get('b_ini') %}
+                {% set _bfim  = request.args.get('b_fim') %}
+                {% set _coopf = request.args.get('coop_benef_id') %}
+
+                {% for b in beneficios_view %}
+                  {% set qtd = b.recebedores|length %}
+                  {% set vpb = ((b.valor_total or 0) / (qtd if qtd>0 else 1)) %}
+                  {% for rec in b.recebedores %}
+                    {% set mostrar = True %}
+                    {% if _coopf and rec.id and (rec.id|int) != (_coopf|int) %}{% set mostrar = False %}{% endif %}
+                    {% if _bini %}{% set mostrar = mostrar and (b.data_final.strftime('%Y-%m-%d') >= _bini) %}{% endif %}
+                    {% if _bfim %}{% set mostrar = mostrar and (b.data_inicial.strftime('%Y-%m-%d') <= _bfim) %}{% endif %}
+
+                    {% if mostrar %}
+                      <tr>
+                        <td>{{ b.data_inicial.strftime('%d/%m/%Y') }} – {{ b.data_final.strftime('%d/%m/%Y') }}</td>
+                        <td>{% if b.data_lancamento %}{{ b.data_lancamento.strftime('%d/%m/%Y') }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                        <td class="text-capitalize">{{ b.tipo }}</td>
+                        <td>{{ rec.nome }}</td>
+                        <td>R$ {{ '%.2f'|format(vpb) }}</td>
+                      </tr>
+                    {% endif %}
+                  {% endfor %}
+                {% else %}
+                  <tr><td colspan="5" class="text-center text-muted">Sem registros</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- COOPERADOS -->
+      <section class="tab-pane fade" id="cooperados">
+        <h4 class="mb-3">Cadastro de Cooperados</h4>
+        <form method="POST" action="{{ url_for('add_cooperado') }}" enctype="multipart/form-data" class="row g-2 mb-3">
+          <div class="col-md-3"><input type="text" class="form-control" name="nome" placeholder="Nome" required></div>
+          <div class="col-md-3"><input type="text" class="form-control" name="usuario" placeholder="Usuário" required></div>
+          <div class="col-md-3"><input type="password" class="form-control" name="senha" placeholder="Senha" required></div>
+          <div class="col-md-3"><input type="file" class="form-control" name="foto"></div>
+          <div class="col-md-12"><button class="btn btn-royal"><i class="bi bi-save"></i> Cadastrar</button></div>
+        </form>
+        <table class="table table-bordered">
+          <thead><tr><th>Foto</th><th>Nome</th><th>Usuário</th><th class="text-center">Ações</th></tr></thead>
+          <tbody>
+            {% for coop in cooperados %}
+              <tr>
+                <td><img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}" class="avatar" alt=""></td>
+                <td>{{ coop.nome }}</td>
+                <td>{{ coop.usuario_ref.usuario }}</td>
+                <td class="text-center">
+                  <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalEditCooperado"
+                          data-id="{{ coop.id }}" data-nome="{{ coop.nome }}" data-usuario="{{ coop.usuario_ref.usuario }}"
+                          data-url="{{ url_for('edit_cooperado', id=coop.id) }}"><i class="bi bi-pencil"></i></button>
+                  <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalResetSenhaCooperado"
+                          data-id="{{ coop.id }}" data-url="{{ url_for('reset_senha_cooperado', id=coop.id) }}"><i class="bi bi-key"></i></button>
+                  <a class="btn btn-danger btn-sm btn-del" href="{{ url_for('delete_cooperado', id=coop.id) }}"><i class="bi bi-trash"></i></a>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4" class="text-center text-muted">Nenhum cooperado</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+
+      <!-- RESTAURANTES -->
+      <section class="tab-pane fade" id="restaurantes">
+        <h4 class="mb-3">Cadastro de Estabelecimentos</h4>
+        <form method="POST" action="{{ url_for('add_restaurante') }}" enctype="multipart/form-data" class="row g-2 mb-3">
+          <div class="col-md-3"><input type="text" class="form-control" name="nome" placeholder="Nome" required></div>
+          <div class="col-md-3">
+            <select class="form-select" name="periodo" required>
+              <option value="seg-dom">Seg a Dom</option>
+              <option value="sab-sex">Sáb a Sex</option>
+              <option value="sex-qui">Sex a Qui</option>
+            </select>
+          </div>
+          <div class="col-md-2"><input type="text" class="form-control" name="usuario" placeholder="Usuário" required></div>
+          <div class="col-md-2"><input type="password" class="form-control" name="senha" placeholder="Senha" required></div>
+          <div class="col-md-2"><input type="file" class="form-control" name="foto"></div>
+          <div class="col-md-12"><button class="btn btn-royal"><i class="bi bi-save"></i> Cadastrar</button></div>
+        </form>
+        <table class="table table-bordered">
+          <thead><tr><th>Logo</th><th>Nome</th><th>Usuário</th><th>Período</th><th class="text-center">Ações</th></tr></thead>
+          <tbody>
+            {% for r in restaurantes %}
+              <tr>
+                <td><img src="{{ r.foto_url or url_for('static', filename='img/default.png') }}" class="avatar" alt=""></td>
+                <td>{{ r.nome }}</td>
+                <td>{{ r.usuario_ref.usuario }}</td>
+                <td>{{ r.periodo }}</td>
+                <td class="text-center">
+                  <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalEditRestaurante"
+                          data-id="{{ r.id }}" data-nome="{{ r.nome }}" data-usuario="{{ r.usuario_ref.usuario }}" data-periodo="{{ r.periodo }}"
+                          data-url="{{ url_for('edit_restaurante', id=r.id) }}"><i class="bi bi-pencil"></i></button>
+                  <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalResetSenhaRestaurante"
+                          data-id="{{ r.id }}" data-url="{{ url_for('reset_senha_restaurante', id=r.id) }}"><i class="bi bi-key"></i></button>
+                  <a class="btn btn-danger btn-sm btn-del" href="{{ url_for('delete_restaurante', id=r.id) }}"><i class="bi bi-trash"></i></a>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="5" class="text-center text-muted">Nenhum estabelecimento</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ESCALAS -->
+      <section class="tab-pane fade" id="escalas">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h4 class="mb-0">Escalas</h4>
+          <div class="alert alert-info py-1 px-2 mb-0">
+            <b>Prazo-limite geral:</b> 31/12/<span id="prazoAno">—</span> — faltam <b><span id="prazoDias">0</span> dias</b>.
+          </div>
+        </div>
+
+        <!-- Upload -->
+        <div class="card p-3 mb-3">
+          <h6 class="mb-2">Upload da Escala (.xlsx)</h6>
+          <form method="POST" action="{{ url_for('upload_escala') }}" enctype="multipart/form-data" class="row g-2 align-items-end">
+            <div class="col-md-6">
+              <input type="file" class="form-control" name="file" accept=".xlsx" required>
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-royal w-100"><i class="bi bi-upload"></i> Enviar Planilha</button>
+            </div>
+          </form>
+          <small class="muted">A associação do cooperado é feita por nome (mínimo 2 partes em comum, ignorando acentos).</small>
+        </div>
+
+        <!-- Cooperados & Escalas -->
+        <div class="card p-3 mb-3">
+          <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+              <thead>
+                <tr>
+                  <th>Cooperado</th>
+                  <th>CNH</th>
+                  <th>Val. CNH</th>
+                  <th>Placa</th>
+                  <th>Val. Placa</th>
+                  <th>Situação</th>
+                  <th>Última atualização</th>
+                  <th class="text-center">Qtde de linhas</th>
+                  <th class="text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for c in cooperados %}
+                {% set lst = (escalas_por_coop[c.id] if (escalas_por_coop is defined and c.id in escalas_por_coop) else []) %}
+                {% set sdoc = status_doc_por_coop.get(c.id) if status_doc_por_coop is defined else None %}
+                {% set ok_cnh   = sdoc.cnh_ok if sdoc is not none and 'cnh_ok' in sdoc else None %}
+                {% set ok_placa = sdoc.placa_ok if sdoc is not none and 'placa_ok' in sdoc else None %}
+                <tr>
+                  <td>{{ c.nome }}</td>
+                  <td>{{ c.cnh_numero if c.cnh_numero is defined and c.cnh_numero else '—' }}</td>
+                  <td>{% if c.cnh_validade is defined and c.cnh_validade %}{{ c.cnh_validade.strftime('%d/%m') }}{% else %}—{% endif %}</td>
+                  <td>{{ c.placa if c.placa is defined and c.placa else '—' }}</td>
+                  <td>{% if c.placa_validade is defined and c.placa_validade %}{{ c.placa_validade.strftime('%d/%m') }}{% else %}—{% endif %}</td>
+                  <td class="text-nowrap">
+                    {% if ok_cnh is not none %}
+                      <span class="badge {{ 'bg-success' if ok_cnh else 'bg-danger' }} me-1">CNH {{ 'OK' if ok_cnh else 'Pend.' }}</span>
+                    {% else %}
+                      <span class="badge bg-secondary me-1">CNH —</span>
+                    {% endif %}
+                    {% if ok_placa is not none %}
+                      <span class="badge {{ 'bg-success' if ok_placa else 'bg-danger' }}">Placa {{ 'OK' if ok_placa else 'Pend.' }}</span>
+                    {% else %}
+                      <span class="badge bg-secondary">Placa —</span>
+                    {% endif %}
+                    {% if ok_cnh and ok_placa %}<span class="ms-1 text-success">👏</span>{% endif %}
+                  </td>
+                  <td>{{ c.ultima_atualizacao.strftime('%d/%m/%Y %H:%M') if c.ultima_atualizacao else '—' }}</td>
+                  <td class="text-center">{{ lst|length }}</td>
+                  <td class="text-center">
+                    <button class="btn btn-sm btn-royal" data-bs-toggle="modal" data-bs-target="#modalEscalas" data-coopid="{{ c.id }}">
+                      <i class="bi bi-eye"></i> Ver escala
+                    </button>
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('editar_documentos', coop_id=c.id) }}">
+                      <i class="bi bi-pen"></i> Documentos
+                    </a>
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="text-center text-muted">Nenhum cooperado</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SOLICITAÇÕES DE TROCA (pendentes) -->
+        <div class="card p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-arrow-left-right"></i> Solicitações de Troca de Escala</h5>
+            <span class="badge-soft">Pendentes: {{ trocas_pendentes|length if trocas_pendentes else 0 }}</span>
+          </div>
+          <div class="table-responsive mt-2">
+            <table class="table table-bordered align-middle">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Solicitante</th>
+                  <th>Origem</th>
+                  <th>Destino</th>
+                  <th>Mensagem</th>
+                  <th>Solicitada em</th>
+                  <th class="text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for t in trocas_pendentes %}
+                  <tr>
+                    <td class="text-muted">#{{ t.id }}</td>
+                    <td>
+                      <div class="text-tight"><b>{{ t.solicitante.nome }}</b></div>
+                      <small class="text-muted">ID {{ t.solicitante.id }}</small>
+                    </td>
+                    <td>
+                      <div><i class="bi bi-calendar-event"></i> {{ t.origem.data }}</div>
+                      <div><i class="bi bi-sun"></i> {{ t.origem.turno }}</div>
+                      <div><i class="bi bi-clock"></i> {{ t.origem.horario }}</div>
+                      <div><i class="bi bi-briefcase"></i> {{ t.origem.contrato }}</div>
+                    </td>
+                    <td><b>{{ t.destino.nome }}</b> <small class="text-muted d-block">ID {{ t.destino.id }}</small></td>
+                    <td class="text-break">{{ t.mensagem or '—' }}</td>
+                    <td>{{ t.criada_em.strftime('%d/%m/%Y %H:%M') if t.criada_em else '—' }}</td>
+                    <td class="text-center">
+                      <div class="d-flex justify-content-center gap-1">
+                        <form method="POST" action="{{ url_for('admin_aprovar_troca', id=t.id) }}" onsubmit="return confirm('Confirmar aprovação desta troca?');">
+                          <button class="btn btn-success btn-sm"><i class="bi bi-check2"></i> Aprovar</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('admin_recusar_troca', id=t.id) }}" onsubmit="return confirm('Recusar esta solicitação?');">
+                          <button class="btn btn-danger btn-sm"><i class="bi bi-x"></i> Recusar</button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="7" class="text-center text-muted">Nenhuma solicitação pendente.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <small class="muted">Ao aprovar, os nomes são trocados nas escalas e a ação aparece em “Trocas aplicadas”.</small>
+        </div>
+
+        <!-- TROCAS APLICADAS (histórico) -->
+        <div class="card p-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-clock-history"></i> Trocas aplicadas</h5>
+            <span class="badge-soft">{{ trocas_historico_flat|length if trocas_historico_flat else (trocas_historico|length if trocas_historico else 0) }} registro(s)</span>
+          </div>
+
+          {% if trocas_historico_flat %}
+            <div class="table-responsive mt-2">
+              <table class="table table-bordered align-middle">
+                <thead>
+                  <tr>
+                    <th>Dia do plantão</th>
+                    <th>Turno / Horário</th>
+                    <th>Contrato</th>
+                    <th>Cooperado (saiu)</th>
+                    <th><i class="bi bi-arrow-right"></i></th>
+                    <th>Cooperado (entrou)</th>
+                    <th>Aprovada em</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for r in trocas_historico_flat %}
+                    <tr>
+                      <td>{{ r.data }}</td>
+                      <td>{{ r.turno }}{% if r.horario %} · {{ r.horario }}{% endif %}</td>
+                      <td>{{ r.contrato }}</td>
+                      <td class="text-danger">{{ r.saiu_nome }}</td>
+                      <td class="text-center"><i class="bi bi-arrow-right"></i></td>
+                      <td class="text-success">{{ r.entrou_nome }}</td>
+                      <td>{{ r.aplicada_em.strftime('%d/%m/%Y %H:%M') if r.aplicada_em else '—' }}</td>
+                    </tr>
+                  {% else %}
+                    <tr><td colspan="7" class="text-center text-muted">Sem trocas aplicadas.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+          {% elif trocas_historico %}
+            <div class="table-responsive mt-2">
+              <table class="table table-bordered align-middle">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Aplicada em</th>
+                    <th>Solicitante</th>
+                    <th>Destinatário</th>
+                    <th>Linhas afetadas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for t in trocas_historico %}
+                    <tr>
+                      <td class="text-muted">#{{ t.id }}</td>
+                      <td>{{ t.aplicada_em.strftime('%d/%m/%Y %H:%M') if t.aplicada_em else '—' }}</td>
+                      <td>{{ t.solicitante.nome }}</td>
+                      <td>{{ t.destinatario.nome }}</td>
+                      <td>
+                        <div class="table-responsive">
+                          <table class="table table-sm mb-0">
+                            <thead>
+                              <tr>
+                                <th>Dia</th><th>Turno/Horário</th><th>Contrato</th><th>Saiu</th><th>Entrou</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {% for i in t.itens %}
+                                <tr>
+                                  <td>{{ i.data }}</td>
+                                  <td>{{ i.turno }}{% if i.horario %} · {{ i.horario }}{% endif %}</td>
+                                  <td>{{ i.contrato }}</td>
+                                  <td class="text-danger">{{ i.saiu_nome }}</td>
+                                  <td class="text-success">{{ i.entrou_nome }}</td>
+                                </tr>
+                              {% endfor %}
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
+                    </tr>
+                  {% else %}
+                    <tr><td colspan="5" class="text-center text-muted">Sem trocas aplicadas.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="text-center text-muted mt-2">Sem trocas aplicadas.</div>
+          {% endif %}
+        </div>
+
+        <!-- NOVO: TROCAS POR COOPERADO (detalhado) -->
+        <div class="card p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-people"></i> Trocas por Cooperado (detalhado)</h5>
+            <span class="badge-soft">Mostrando escalas trocadas por cada cooperado</span>
+          </div>
+          <div class="table-responsive mt-2">
+            <table class="table table-bordered align-middle">
+              <thead>
+                <tr>
+                  <th>Cooperado</th>
+                  <th>Ação</th>
+                  <th>Dia do plantão</th>
+                  <th>Turno</th>
+                  <th>Horário</th>
+                  <th>Contrato</th>
+                  <th>Com quem trocou</th>
+                  <th>Aprovada em</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% if trocas_historico_flat %}
+                  {% for r in trocas_historico_flat %}
+                    <tr>
+                      <td class="text-danger">{{ r.saiu_nome }}</td>
+                      <td><span class="badge bg-danger">Saiu</span></td>
+                      <td>{{ r.data }}</td>
+                      <td>{{ r.turno }}</td>
+                      <td>{{ r.horario or '' }}</td>
+                      <td>{{ r.contrato }}</td>
+                      <td>{{ r.entrou_nome }}</td>
+                      <td>{{ r.aplicada_em.strftime('%d/%m/%Y %H:%M') if r.aplicada_em else '—' }}</td>
+                    </tr>
+                    <tr>
+                      <td class="text-success">{{ r.entrou_nome }}</td>
+                      <td><span class="badge bg-success">Entrou</span></td>
+                      <td>{{ r.data }}</td>
+                      <td>{{ r.turno }}</td>
+                      <td>{{ r.horario or '' }}</td>
+                      <td>{{ r.contrato }}</td>
+                      <td>{{ r.saiu_nome }}</td>
+                      <td>{{ r.aplicada_em.strftime('%d/%m/%Y %H:%M') if r.aplicada_em else '—' }}</td>
+                    </tr>
+                  {% else %}
+                    <tr><td colspan="8" class="text-center text-muted">Sem trocas aplicadas.</td></tr>
+                  {% endfor %}
+                {% elif trocas_historico %}
+                  {% for t in trocas_historico %}
+                    {% for i in t.itens %}
+                      <tr>
+                        <td class="text-danger">{{ i.saiu_nome }}</td>
+                        <td><span class="badge bg-danger">Saiu</span></td>
+                        <td>{{ i.data }}</td>
+                        <td>{{ i.turno }}</td>
+                        <td>{{ i.horario or '' }}</td>
+                        <td>{{ i.contrato }}</td>
+                        <td>{{ i.entrou_nome }}</td>
+                        <td>{{ t.aplicada_em.strftime('%d/%m/%Y %H:%M') if t.aplicada_em else '—' }}</td>
+                      </tr>
+                      <tr>
+                        <td class="text-success">{{ i.entrou_nome }}</td>
+                        <td><span class="badge bg-success">Entrou</span></td>
+                        <td>{{ i.data }}</td>
+                        <td>{{ i.turno }}</td>
+                        <td>{{ i.horario or '' }}</td>
+                        <td>{{ i.contrato }}</td>
+                        <td>{{ i.saiu_nome }}</td>
+                        <td>{{ t.aplicada_em.strftime('%d/%m/%Y %H:%M') if t.aplicada_em else '—' }}</td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr><td colspan="8" class="text-center text-muted">Sem trocas aplicadas.</td></tr>
+                  {% endfor %}
+                {% else %}
+                  <tr><td colspan="8" class="text-center text-muted">Sem trocas aplicadas.</td></tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Modal visualizar escala do cooperado -->
+        <div class="modal fade" id="modalEscalas" tabindex="-1">
+          <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+              <div class="modal-header"><h5 class="modal-title">Escala do Cooperado</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+              <div class="modal-body">
+                <div class="table-responsive">
+                  <table class="table table-bordered align-middle">
+                    <thead>
+                      <tr>
+                        <th>Data</th>
+                        <th>Turno</th>
+                        <th>Horário</th>
+                        <th>Contrato</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbody-escala"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONFIG -->
+      <section class="tab-pane fade" id="config">
+        <h4 class="mb-3">Configurações</h4>
+        <div class="card p-3 mb-4">
+          <h6>Salário Mínimo Atual</h6>
+          <form method="POST" action="{{ url_for('update_config') }}" class="row g-2">
+            <div class="col-md-4">
+              <input type="number" step="0.01" class="form-control" name="salario_minimo" value="{{ salario_minimo|default(0) }}" required>
+            </div>
+            <div class="col-md-3"><button class="btn btn-royal w-100"><i class="bi bi-save"></i> Salvar</button></div>
+          </form>
+        </div>
+
+        <div class="card p-3">
+          <h6>Conta do Administrador</h6>
+          <form method="POST" action="{{ url_for('alterar_admin') }}" class="row g-2">
+            <div class="col-md-3">
+              <label class="form-label">Usuário</label>
+              <input type="text" class="form-control" name="usuario" value="{{ admin.usuario if admin is defined and admin and admin.usuario else 'coopex' }}" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Nova Senha</label>
+              <input type="password" class="form-control" name="nova_senha" placeholder="Deixe em branco p/ manter">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Confirmar Senha</label>
+              <input type="password" class="form-control" name="confirmar_senha">
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+              <button class="btn btn-royal w-100"><i class="bi bi-save"></i> Atualizar</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- MODAIS =================================================== -->
+  <div class="modal fade" id="modalEditLancamento" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <form method="POST" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Editar Lançamento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-2 px-3">
+          <input type="hidden" name="id">
+          <div class="col-md-4">
+            <label class="form-label">Restaurante</label>
+            <select class="form-select" name="restaurante_id" required>
+              {% for r in restaurantes %}<option value="{{ r.id }}">{{ r.nome }} ({{ r.periodo }})</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Cooperado</label>
+            <select class="form-select" name="cooperado_id" required>
+              {% for c in cooperados %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Descrição</label>
+            <input type="text" class="form-control" name="descricao" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Valor (R$)</label>
+            <input type="number" step="0.01" class="form-control" name="valor" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Data</label>
+            <input type="date" class="form-control" name="data" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Horário</label>
+            <div class="input-group">
+              <input type="time" class="form-control" name="hora_inicio">
+              <span class="input-group-text">às</span>
+              <input type="time" class="form-control" name="hora_fim">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalEditReceita" tabindex="-1">
+    <div class="modal-dialog">
+      <form method="POST" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Editar Receita (Cooperativa)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-2 px-3">
+          <input type="hidden" name="id">
+          <div class="col-12"><input type="text" class="form-control" name="descricao" required></div>
+          <div class="col-12"><input type="number" step="0.01" class="form-control" name="valor" required></div>
+          <div class="col-12"><input type="date" class="form-control" name="data" required></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalEditDespesa" tabindex="-1">
+    <div class="modal-dialog">
+      <form method="POST" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Editar Despesa (Cooperativa)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-2 px-3">
+          <input type="hidden" name="id">
+          <div class="col-12"><input type="text" class="form-control" name="descricao" required></div>
+          <div class="col-12"><input type="number" step="0.01" class="form-control" name="valor" required></div>
+          <div class="col-12"><input type="date" class="form-control" name="data" required></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalEditReceitaCoop" tabindex="-1">
+    <div class="modal-dialog">
+      <form method="POST" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Editar Receita (Cooperado)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-2 px-3">
+          <input type="hidden" name="id">
+          <div class="col-12">
+            <select class="form-select" name="cooperado_id" required>
+              {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-12"><input type="text" class="form-control" name="descricao" required></div>
+          <div class="col-12"><input type="number" step="0.01" class="form-control" name="valor" required></div>
+          <div class="col-12"><input type="date" class="form-control" name="data" required></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalEditDespesaCoop" tabindex="-1">
+    <div class="modal-dialog">
+      <form method="POST" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Editar Despesa (Cooperado)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-2 px-3">
+          <input type="hidden" name="id">
+          <div class="col-12">
+            <select class="form-select" name="cooperado_id" required>
+              {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-12"><input type="text" class="form-control" name="descricao" required></div>
+          <div class="col-12"><input type="number" step="0.01" class="form-control" name="valor" required></div>
+          <div class="col-12"><input type="date" class="form-control" name="data" required></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalEditCooperado" tabindex="-1">
+    <div class="modal-dialog">
+      <form method="POST" enctype="multipart/form-data" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Editar Cooperado</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-2 px-3">
+          <input type="hidden" name="id">
+          <div class="col-12"><input type="text" class="form-control" name="nome" required></div>
+          <div class="col-12"><input type="text" class="form-control" name="usuario" required></div>
+          <div class="col-12"><input type="file" class="form-control" name="foto"></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalResetSenhaCooperado" tabindex="-1">
+    <div class="modal-dialog">
+      <form method="POST" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Redefinir Senha (Cooperado)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-2 px-3">
+          <input type="hidden" name="id">
+          <div class="col-12"><input type="password" class="form-control" name="nova_senha" placeholder="Nova senha" required></div>
+          <div class="col-12"><input type="password" class="form-control" name="confirmar_senha" placeholder="Confirmar senha" required></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Atualizar</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalEditRestaurante" tabindex="-1">
+    <div class="modal-dialog">
+      <form method="POST" enctype="multipart/form-data" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Editar Estabelecimento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-2 px-3">
+          <input type="hidden" name="id">
+          <div class="col-12"><input type="text" class="form-control" name="nome" required></div>
+          <div class="col-12">
+            <select class="form-select" name="periodo" required>
+              <option value="seg-dom">Seg a Dom</option>
+              <option value="sab-sex">Sáb a Sex</option>
+              <option value="sex-qui">Sex a Qui</option>
+            </select>
+          </div>
+          <div class="col-12"><input type="text" class="form-control" name="usuario" required></div>
+          <div class="col-12"><input type="file" class="form-control" name="foto"></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalResetSenhaRestaurante" tabindex="-1">
+    <div class="modal-dialog">
+      <form method="POST" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Redefinir Senha (Estabelecimento)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-2 px-3">
+          <input type="hidden" name="id">
+          <div class="col-12"><input type="password" class="form-control" name="nova_senha" placeholder="Nova senha" required></div>
+          <div class="col-12"><input type="password" class="form-control" name="confirmar_senha" placeholder="Confirmar senha" required></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Atualizar</button></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    // Confirmar exclusão
+    document.addEventListener('click', function(e){
+      if(e.target.closest('.btn-del')){
+        if(!confirm('Tem certeza que deseja excluir este registro?')) e.preventDefault();
+      }
+    });
+
+    // Preenche modais a partir dos data-*
+    function bindModal(modalId, mapFields){
+      const el = document.getElementById(modalId);
+      if(!el) return;
+      el.addEventListener('show.bs.modal', (ev)=>{
+        const btn = ev.relatedTarget;
+        const form = el.querySelector('form');
+        const ds = btn?.dataset || {};
+        if(ds.url) form.setAttribute('action', ds.url);
+        Object.keys(mapFields).forEach(k=>{
+          const name = mapFields[k];
+          const input = form.querySelector(`[name="${name}"]`);
+          if(!input) return;
+          const val = ds[k] ?? '';
+          if(input.tagName === 'SELECT'){
+            [...input.options].forEach(o => o.selected = (String(o.value) === String(val)));
+          }else{
+            input.value = val;
+          }
+        });
+      });
+    }
+    bindModal('modalEditLancamento',   {id:'id', restaurante:'restaurante_id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', hora_inicio:'hora_inicio', hora_fim:'hora_fim'});
+    bindModal('modalEditReceita',      {id:'id', descricao:'descricao', valor:'valor', data:'data'});
+    bindModal('modalEditDespesa',      {id:'id', descricao:'descricao', valor:'valor', data:'data'});
+    bindModal('modalEditReceitaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
+    bindModal('modalEditDespesaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
+    bindModal('modalEditCooperado',    {id:'id', nome:'nome', usuario:'usuario'});
+    bindModal('modalResetSenhaCooperado', {id:'id'});
+    bindModal('modalEditRestaurante',  {id:'id', nome:'nome', periodo:'periodo', usuario:'usuario'});
+    bindModal('modalResetSenhaRestaurante', {id:'id'});
+
+    // ===== Gráficos =====
+    const rawLancCoop   = {{ (chart_data_lancamentos_coop or {'labels':[], 'values':[]}) | tojson }};
+    const rawLancCooper = {{ (chart_data_lancamentos_cooperados or {'labels':[], 'values':[]}) | tojson }};
+    const fallbackLancCoop   = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
+    const fallbackLancCooper = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
+    const dataLancCoop   = (rawLancCoop.labels && rawLancCoop.labels.length && rawLancCoop.values && rawLancCoop.values.length) ? rawLancCoop : fallbackLancCoop;
+    const dataLancCooper = (rawLancCooper.labels && rawLancCooper.labels.length && rawLancCooper.values && rawLancCooper.values.length) ? rawLancCooper : fallbackLancCooper;
+
+    function buildLineChart(canvasId, labels, values, label){
+      const ctx = document.getElementById(canvasId);
+      if(!ctx) return;
+      new Chart(ctx, {
+        type:'line',
+        data:{ labels: labels, datasets:[{ label: label, data: values, tension:.25, borderWidth:2, pointRadius:3, fill:false }] },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          scales:{ y:{beginAtZero:true,ticks:{callback:(v)=>'R$ '+Number(v).toLocaleString('pt-BR')}} },
+          plugins:{ legend:{display:true}, tooltip:{callbacks:{label:(c)=>'R$ '+Number(c.parsed.y).toLocaleString('pt-BR',{minimumFractionDigits:2})}} }
+        }
+      });
+    }
+    buildLineChart('chartLancCoop', dataLancCoop.labels, dataLancCoop.values, 'Lançamentos/Produções');
+    buildLineChart('chartLancCooperados', dataLancCooper.labels, dataLancCooper.values, 'Lançamentos/Produções');
+
+    // ===== Preservar aba ativa via ?tab= =====
+    document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(location.search);
+      const targetTab = params.get('tab');
+      if(targetTab){
+        const link = document.querySelector(`.sidebar .nav-link[href="#${targetTab}"]`);
+        if(link){ new bootstrap.Tab(link).show(); }
+      }
+      document.querySelectorAll('.sidebar .nav-link[data-bs-toggle="tab"]').forEach(a => {
+        a.addEventListener('shown.bs.tab', (e) => {
+          const id = e.target.getAttribute('href')?.slice(1) || '';
+          if(!id) return;
+          const p = new URLSearchParams(location.search);
+          p.set('tab', id);
+          history.replaceState(null, '', location.pathname + '?' + p.toString() + e.target.getAttribute('href'));
+        });
+      });
+
+      // Contagem regressiva até 31/12 (aba Escalas)
+      const anoSpan = document.getElementById('prazoAno');
+      const diasSpan = document.getElementById('prazoDias');
+      function updatePrazo() {
+        const now = new Date();
+        let target = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+        if (now > target) target = new Date(now.getFullYear()+1, 11, 31, 23, 59, 59);
+        const diff = target - now;
+        const dias = Math.max(0, Math.ceil(diff / (1000*60*60*24)));
+        if (anoSpan) anoSpan.textContent = target.getFullYear();
+        if (diasSpan) diasSpan.textContent = dias;
+      }
+      updatePrazo();
+      setInterval(updatePrazo, 60*1000);
+    });
+  </script>
+
+  <!-- ==== ESCALAS: horário & cores (robusto) ==== -->
+  <script>
+    const ESCALAS = {{ escalas_por_coop|default({})|tojson }};
+    const modalEsc = document.getElementById('modalEscalas');
+
+    const norm = (s) => String(s||'')
+      .normalize('NFD').replace(/\p{Diacritic}/gu,'')
+      .toLowerCase().replace(/[^a-z0-9]/g,'');
+
+    function pick(obj, aliases){
+      const keys = Object.keys(obj||{});
+      for(const name of aliases){
+        const target = norm(name);
+        for(const k of keys){
+          if(norm(k).includes(target)){
+            const v = obj[k];
+            if(v !== undefined && v !== null && String(v).trim() !== '') return v;
+          }
+        }
+      }
+      return '';
+    }
+
+    function guessHorario(obj){
+      for(const [k,v] of Object.entries(obj||{})){
+        const s = String(v??'').trim();
+        if(!s) continue;
+        if(/\b\d{1,2}:\d{2}/.test(s)) return s;
+      }
+      return '';
+    }
+
+    function formatHorarioCell(v){
+      if(!v) return '';
+      let s = String(v).trim();
+      s = s.replace(/\s*–\s*/g,'-');
+      s = s.replace(/\s*-\s*/g,'-');
+      const parts = s.split(/\s*\/\s*/).map(seg=>{
+        seg = seg.trim();
+        seg = seg.replace(/\s*(?:-|a|as|às)\s*/i,' às ');
+        return seg;
+      });
+      return parts.join(' / ');
+    }
+
+    function resolveCores(row){
+      const spec = pick(row, ['cor_linha','cores','cor','color','row_color','linha_cor','bg','background','style']) || '';
+      function normColor(c){
+        if(!c) return null;
+        c = String(c).trim();
+        if (/^[0-9A-Fa-f]{8}$/.test(c)) {
+          const a = parseInt(c.slice(0,2),16)/255;
+          const r = parseInt(c.slice(2,4),16);
+          const g = parseInt(c.slice(4,6),16);
+          const b = parseInt(c.slice(6,8),16);
+          return `rgba(${r},${g},${b},${a.toFixed(3)})`;
+        }
+        if (/^[0-9A-Fa-f]{6}$/.test(c)) return `#${c}`;
+        if (/^#[0-9A-Fa-f]{6,8}$/.test(c)) {
+          if (c.length === 9) {
+            const a = parseInt(c.slice(1,3),16)/255;
+            const r = parseInt(c.slice(3,5),16);
+            const g = parseInt(c.slice(5,7),16);
+            const b = parseInt(c.slice(7,9),16);
+            return `rgba(${r},${g},${b},${a.toFixed(3)})`;
+          }
+          return c;
+        }
+        const map = { 'amarelo':'#fff3cd','vermelho':'#f8d7da','verde':'#d1e7dd','azul':'#cfe2ff','cinza':'#e9ecef','laranja':'#ffe5b4','roxo':'#e0d1ff','rosa':'#ffd6e7' };
+        const low = c.toLowerCase();
+        if (map[low]) return map[low];
+        return c;
+      }
+      function parseColorSpec(spec){
+        const out = { rowBg:null, rowFg:null, colBg:[null,null,null,null], colFg:[null,null,null,null] };
+        if(!spec) return out;
+        if (Array.isArray(spec)) {
+          const parts = spec.map(normColor);
+          if (parts.length === 1){ out.rowBg = parts[0]; return out; }
+          if (parts.length === 2){ out.rowBg = parts[0]; out.rowFg = parts[1]; return out; }
+          if (parts.length >= 4){
+            out.colBg = [parts[0],parts[1],parts[2],parts[3]];
+            if (parts.length >= 8) out.colFg = [parts[4],parts[5],parts[6],parts[7]];
+            return out;
+          }
+        }
+        if (typeof spec === 'string') {
+          try { if (spec.trim().startsWith('[') || spec.trim().startsWith('{')) return parseColorSpec(JSON.parse(spec)); } catch(_) {}
+          const parts = spec.split('|').map(s=>normColor(s.trim())).filter(Boolean);
+          if (parts.length === 1){ out.rowBg = parts[0]; return out; }
+          if (parts.length === 2){ out.rowBg = parts[0]; out.rowFg = parts[1]; return out; }
+          if (parts.length >= 4){
+            out.colBg = [parts[0],parts[1],parts[2],parts[3]];
+            if (parts.length >= 8) out.colFg = [parts[4],parts[5],parts[6],parts[7]];
+            return out;
+          }
+          out.rowBg = normColor(spec);
+          return out;
+        }
+        if (typeof spec === 'object') {
+          if (spec.rowBg || spec.rowFg || spec.colBg || spec.colFg) {
+            out.rowBg = normColor(spec.rowBg);
+            out.rowFg = normColor(spec.rowFg);
+            out.colBg = (spec.colBg||[]).map(normColor).concat([null,null,null,null]).slice(0,4);
+            out.colFg = (spec.colFg||[]).map(normColor).concat([null,null,null,null]).slice(0,4);
+            return out;
+          }
+          const bgData     = normColor(spec.bgData||spec.data||spec.bg_data);
+          const bgTurno    = normColor(spec.bgTurno||spec.turno||spec.bg_turno);
+          const bgHorario  = normColor(spec.bgHorario||spec.horario||spec.bg_horario||spec.hora);
+          const bgContrato = normColor(spec.bgContrato||spec.contrato||spec.bg_contrato);
+          const fgData     = normColor(spec.fgData||spec.textData);
+          const fgTurno    = normColor(spec.fgTurno||spec.textTurno);
+          const fgHorario  = normColor(spec.fgHorario||spec.textHorario||spec.textHora);
+          const fgContrato = normColor(spec.fgContrato||spec.textContrato);
+          if (bgData || bgTurno || bgHorario || bgContrato) {
+            out.colBg = [bgData,bgTurno,bgHorario,bgContrato];
+            out.colFg = [fgData,fgTurno,fgHorario,fgContrato];
+          }
+          return out;
+        }
+        return out;
+      }
+      return parseColorSpec(spec);
+    }
+
+    if (modalEsc) {
+      modalEsc.addEventListener('show.bs.modal', (ev) => {
+        const coopId = ev.relatedTarget?.dataset?.coopid;
+        const tbody = modalEsc.querySelector('#tbody-escala');
+        tbody.innerHTML = '';
+
+        const raw = ESCALAS[String(coopId)] || [];
+        if (!raw.length) {
+          tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhuma escala</td></tr>`;
+          return;
+        }
+
+        const grouped = new Map();
+        for (const e of raw) {
+          const data     = pick(e, ['data','dt','dia','date']) || '';
+          const turno    = pick(e, ['turno','periodo','shift']) || '';
+          const contrato = pick(e, ['contrato','setor','unidade','contr','local']) || '';
+          let horario  = pick(e, ['horário','horario','hora','horas','turno/horario','escala','jornada']);
+          if(!horario){
+            for(const [k,v] of Object.entries(e||{})){
+              const s = String(v??'').trim(); if(s && /\b\d{1,2}:\d{2}/.test(s)){ horario = s; break; }
+            }
+          }
+          const fmtHorario = (h)=>{
+            if(!h) return '';
+            let s = String(h).trim().replace(/\s*–\s*/g,'-').replace(/\s*-\s*/g,'-');
+            return s.split(/\s*\/\s*/).map(seg=>seg.trim().replace(/\s*(?:-|a|as|às)\s*/i,' às ')).join(' / ');
+          };
+          const key = [data, turno, contrato].map(v=>String(v).toLowerCase()).join('|');
+          const cur = grouped.get(key);
+          const val = { data, turno, contrato, horario: fmtHorario(horario), src: e };
+          if (!cur) grouped.set(key, val);
+          else if (!cur.horario && val.horario) grouped.set(key, val);
+        }
+
+        for (const { data, turno, contrato, horario, src } of grouped.values()) {
+          const cores = resolveCores(src);
+          const tr = document.createElement('tr');
+          if (cores.rowBg) tr.style.background = cores.rowBg;
+          if (cores.rowFg) tr.style.color = cores.rowFg;
+          tr.innerHTML = `
+            <td class="cel-data">${data}</td>
+            <td class="cel-turno">${turno}</td>
+            <td class="cel-horario">${horario || ''}</td>
+            <td class="cel-contrato">${contrato}</td>
+          `;
+          const cols = [
+            tr.querySelector('.cel-data'),
+            tr.querySelector('.cel-turno'),
+            tr.querySelector('.cel-horario'),
+            tr.querySelector('.cel-contrato')
+          ];
+          cols.forEach((td,i)=>{
+            if (cores.colBg[i]) td.style.background = cores.colBg[i];
+            if (cores.colFg[i]) td.style.color = cores.colFg[i];
+            if (cores.colBg[i] || cores.colFg[i]) { td.style.borderRadius = '6px'; td.style.padding = '6px 8px'; }
+          });
+          tbody.appendChild(tr);
+        }
+      });
+    }
+  </script>
+
+  <!-- ==== BENEFÍCIOS: prévia + cálculo do TOTAL antes de enviar ==== -->
+  <script>
+    (function(){
+      const TOTAL_COOPS = {{ cooperados|length or 0 }};
+
+      function idsFromSelect(sel){
+        return Array.from(sel?.selectedOptions || []).map(o => String(o.value));
+      }
+      function valNum(inp){
+        const n = parseFloat(String(inp?.value ?? '').replace(',','.'));
+        return isFinite(n) ? n : 0;
+      }
+      function setBadge(el, txt){ if(el) el.textContent = txt; }
+      function money(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+      function calcPreview(prefix){
+        const unit    = document.getElementById(`${prefix}_valor_unit`);
+        const bensSel = document.getElementById(`${prefix}_beneficiarios`);
+        const isenSel = document.getElementById(`${prefix}_isencoes`);
+        const badge   = document.getElementById(`${prefix}_badge`);
+
+        if(!unit || !bensSel || !isenSel || !badge) return;
+
+        const vUnit = Math.max(0, valNum(unit));
+        const bens  = idsFromSelect(bensSel);
+        const isen  = idsFromSelect(isenSel);
+
+        const unique = new Set([...bens, ...isen]); // quem não paga
+        const numBens = bens.length;
+        const numIsen = isen.length;
+        const pagantes = Math.max(0, TOTAL_COOPS - unique.size);
+        const total = vUnit * numBens;
+        const porPag = pagantes > 0 ? (total / pagantes) : 0;
+
+        setBadge(badge,
+          `Recebem: ${numBens} · Isentos: ${numIsen} · Pagantes: ${pagantes} · Total a ratear: ${money(total)} · Cobrança por pagante: ${money(porPag)}`
+        );
+      }
+
+      ['hosp','farm','alim'].forEach(p=>{
+        ['change','keyup'].forEach(ev=>{
+          document.getElementById(`${p}_valor_unit`)?.addEventListener(ev, ()=>calcPreview(p));
+          document.getElementById(`${p}_beneficiarios`)?.addEventListener(ev, ()=>calcPreview(p));
+          document.getElementById(`${p}_isencoes`)?.addEventListener(ev, ()=>calcPreview(p));
+        });
+        calcPreview(p);
+      });
+
+      // >>>>>>>>>>>>>>>>> CÁLCULO DOS TOTAIS ANTES DE ENVIAR <<<<<<<<<<<<<<<<<
+      const form = document.getElementById('form-beneficios');
+      if(form){
+        form.addEventListener('submit', function(){
+          ['hosp','farm','alim'].forEach(p=>{
+            const unit = document.getElementById(`${p}_valor_unit`);
+            const bens = document.getElementById(`${p}_beneficiarios`);
+            const totalOut = document.getElementById(`${p}_valor_total`) || document.getElementById(`${p}_valor_total`) || null;
+          });
+
+          function setTotal(prefix){
+            const unit = document.getElementById(`${prefix}_valor_unit`);
+            const bensSel = document.getElementById(`${prefix}_beneficiarios`);
+            const hiddenTotal = document.getElementById(`${prefix}_valor_total`) || document.getElementById(`${prefix}_valor_total`);
+            // nossos hidden têm id `${prefix}_valor_total`
+            const ht = document.getElementById(`${prefix}_valor_total`);
+            const ht2 = document.getElementById(`${prefix}_valor_total`); // apenas garantia
+            const finalHidden = ht || ht2 || document.querySelector(`input[name="${prefix}_valor"]`);
+            const count = (bensSel && bensSel.selectedOptions) ? bensSel.selectedOptions.length : 0;
+            const total = Math.max(0, valNum(unit) * count);
+            if(finalHidden) finalHidden.value = total.toFixed(2);
+          }
+          ['hosp','farm','alim'].forEach(setTotal);
+        });
+
+        // garantir ids corretos dos hidden
+        document.getElementById('hosp_valor_total') || (()=>{
+          const i = document.querySelector('input[name="hosp_valor"]'); if(i) i.id = 'hosp_valor_total';
+        })();
+        document.getElementById('farm_valor_total') || (()=>{
+          const i = document.querySelector('input[name="farm_valor"]'); if(i) i.id = 'farm_valor_total';
+        })();
+        document.getElementById('alim_valor_total') || (()=>{
+          const i = document.querySelector('input[name="alim_valor"]'); if(i) i.id = 'alim_valor_total';
+        })();
+      }
+    })();
+  </script>
+</body>
+</html>

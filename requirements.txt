@@ -1,0 +1,5 @@
+Flask>=3.0
+Flask-SQLAlchemy>=3.1
+psycopg[binary]
+openpyxl>=3.1
+gunicorn>=21.2
