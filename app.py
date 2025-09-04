@@ -200,72 +200,64 @@ class Config(db.Model):
 # =========================
 def init_db():
     """
-    Cria as tabelas e garante pequenos upgrades de schema.
-    - Em SQLite: usa PRAGMA para detectar colunas e ALTER TABLE quando faltar.
-    - Em Postgres: usa information_schema e 'ALTER TABLE ... ADD COLUMN IF NOT EXISTS'.
-    Também cria o admin padrão e a config default.
+    Cria tabelas e faz pequenos ajustes compatíveis com SQLite e Postgres.
     """
-    db.create_all()  # idempotente
+    db.create_all()
 
-    # Dialeto atual
-    try:
-        dialect = db.session.bind.dialect.name
-    except Exception:
-        dialect = "unknown"
+    # detectar banco
+    dialect = db.session.get_bind().dialect.name  # 'sqlite' | 'postgresql' | ...
 
-    def _sqlite_has_column(table: str, column: str) -> bool:
-        rows = db.session.execute(sa_text(f"PRAGMA table_info({table});")).fetchall()
-        names = {r[1] for r in rows}
-        return column in names
-
-    def _pg_add_column_if_missing(table: str, col: str, ddl_type: str):
-        sql = sa_text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {ddl_type}")
-        db.session.execute(sql)
-
-    # Upgrades leves por dialeto
-    try:
-        if dialect == "sqlite":
-            # --- qtd_entregas em lancamentos ---
-            if _sqlite_has_column("lancamentos", "qtd_entregas") is False:
+    if dialect == "sqlite":
+        # --- qtd_entregas em lancamentos ---
+        try:
+            cols = db.session.execute(sa_text("PRAGMA table_info(lancamentos);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "qtd_entregas" not in colnames:
                 db.session.execute(sa_text("ALTER TABLE lancamentos ADD COLUMN qtd_entregas INTEGER"))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
 
-            # --- cooperado_nome em escalas ---
-            if _sqlite_has_column("escalas", "cooperado_nome") is False:
+        # --- cooperado_nome em escalas ---
+        try:
+            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "cooperado_nome" not in colnames:
                 db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
 
-            # --- restaurante_id em escalas ---
-            if _sqlite_has_column("escalas", "restaurante_id") is False:
+        # --- restaurante_id em escalas ---
+        try:
+            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "restaurante_id" not in colnames:
                 db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
 
+    else:
+        # Postgres (e afins): usa IF NOT EXISTS
+        try:
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS lancamentos ADD COLUMN IF NOT EXISTS qtd_entregas INTEGER"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS escalas ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS escalas ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"))
             db.session.commit()
-        elif dialect == "postgresql":
-            # Em DBs já existentes (sem migrações), adiciona colunas se faltarem.
-            _pg_add_column_if_missing("lancamentos", "qtd_entregas", "INTEGER")
-            _pg_add_column_if_missing("escalas", "cooperado_nome", "VARCHAR(120)")
-            _pg_add_column_if_missing("escalas", "restaurante_id", "INTEGER")
-            db.session.commit()
-        else:
-            # outros dialetos: apenas segue com create_all
-            pass
-    except Exception:
-        db.session.rollback()  # upgrades são best-effort
+        except Exception:
+            db.session.rollback()
 
     # --- usuário admin + config padrão ---
-    try:
-        if not Usuario.query.filter_by(tipo="admin").first():
-            admin = Usuario(usuario="coopex", tipo="admin", senha_hash="")
-            admin.set_password("coopex05289")
-            db.session.add(admin)
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
+    if not Usuario.query.filter_by(tipo="admin").first():
+        admin = Usuario(usuario="coopex", tipo="admin", senha_hash="")
+        admin.set_password("coopex05289")
+        db.session.add(admin)
+        db.session.commit()
 
-    try:
-        if not Config.query.get(1):
-            db.session.add(Config(id=1, salario_minimo=0.0))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
+    if not Config.query.get(1):
+        db.session.add(Config(id=1, salario_minimo=0.0))
+        db.session.commit()
 
 
 def get_config() -> Config:
@@ -1067,7 +1059,8 @@ def edit_receita(id):
     r = ReceitaCooperativa.query.get_or_404(id)
     f = request.form
     r.descricao = f.get("descricao", "").strip()
-    r.valor_total = f.get("valor", type=float)  # <- corrigido
+    # BUGFIX: campo correto é valor_total
+    r.valor_total = f.get("valor", type=float)
     r.data = _parse_date(f.get("data"))
     db.session.commit()
     flash("Receita atualizada.", "success")
@@ -2348,21 +2341,13 @@ def excluir_lancamento(id):
     return redirect(url_for("portal_restaurante"))
 
 # =========================
-# Inicialização em produção (Render/gunicorn)
+# Inicialização sempre (gunicorn/flask)
 # =========================
-# Garante que o schema exista ANTES do primeiro request,
-# mesmo quando rodando com "gunicorn app:app"
 with app.app_context():
-    try:
-        init_db()
-    except Exception as e:
-        # Não falha o boot; apenas loga (Render mostra no log)
-        app.logger.warning(f"init_db() falhou/ignorou: {e}")
+    init_db()
 
 # =========================
-# Main (dev local)
+# Main (modo dev local)
 # =========================
 if __name__ == "__main__":
-    with app.app_context():
-        init_db()
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
