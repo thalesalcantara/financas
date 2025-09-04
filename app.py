@@ -199,54 +199,37 @@ class Config(db.Model):
 # Helpers
 # =========================
 def init_db():
-    """
-    Cria tabelas e faz pequenos ajustes compatíveis com SQLite e Postgres.
-    """
     db.create_all()
 
-    # detectar banco
-    dialect = db.session.get_bind().dialect.name  # 'sqlite' | 'postgresql' | ...
-
-    if dialect == "sqlite":
-        # --- qtd_entregas em lancamentos ---
-        try:
-            cols = db.session.execute(sa_text("PRAGMA table_info(lancamentos);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "qtd_entregas" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE lancamentos ADD COLUMN qtd_entregas INTEGER"))
-                db.session.commit()
-        except Exception:
-            db.session.rollback()
-
-        # --- cooperado_nome em escalas ---
-        try:
-            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "cooperado_nome" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
-                db.session.commit()
-        except Exception:
-            db.session.rollback()
-
-        # --- restaurante_id em escalas ---
-        try:
-            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "restaurante_id" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
-                db.session.commit()
-        except Exception:
-            db.session.rollback()
-
-    else:
-        # Postgres (e afins): usa IF NOT EXISTS
-        try:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS lancamentos ADD COLUMN IF NOT EXISTS qtd_entregas INTEGER"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS escalas ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS escalas ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"))
+    # --- qtd_entregas em lancamentos ---
+    try:
+        cols = db.session.execute(sa_text("PRAGMA table_info(lancamentos);")).fetchall()
+        colnames = {row[1] for row in cols}
+        if "qtd_entregas" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE lancamentos ADD COLUMN qtd_entregas INTEGER"))
             db.session.commit()
-        except Exception:
-            db.session.rollback()
+    except Exception:
+        db.session.rollback()
+
+    # --- cooperado_nome em escalas ---
+    try:
+        cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+        colnames = {row[1] for row in cols}
+        if "cooperado_nome" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # --- restaurante_id em escalas ---
+    try:
+        cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+        colnames = {row[1] for row in cols}
+        if "restaurante_id" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
     # --- usuário admin + config padrão ---
     if not Usuario.query.filter_by(tipo="admin").first():
@@ -1059,7 +1042,7 @@ def edit_receita(id):
     r = ReceitaCooperativa.query.get_or_404(id)
     f = request.form
     r.descricao = f.get("descricao", "").strip()
-    # BUGFIX: campo correto é valor_total
+    # CORREÇÃO: campo correto é valor_total
     r.valor_total = f.get("valor", type=float)
     r.data = _parse_date(f.get("data"))
     db.session.commit()
@@ -1806,15 +1789,20 @@ def portal_cooperado():
     except Exception:
         coop.usuario = ""
 
+    # ---------- FILTRO POR DATA (padrão = HOJE) ----------
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
 
+    # padrão: mostrar SOMENTE a data do lançamento (hoje)
+    if di and not df:
+        df = di
+    if df and not di:
+        di = df
+    if not di and not df:
+        di = df = date.today()
+
     def in_range(qs, col):
-        if di:
-            qs = qs.filter(col >= di)
-        if df:
-            qs = qs.filter(col <= df)
-        return qs
+        return qs.filter(col >= di, col <= df)
 
     ql = in_range(Lancamento.query.filter_by(cooperado_id=coop.id), Lancamento.data)
     producoes = ql.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
@@ -1825,6 +1813,7 @@ def portal_cooperado():
     qd = in_range(DespesaCooperado.query.filter_by(cooperado_id=coop.id), DespesaCooperado.data)
     despesas_coop = qd.order_by(DespesaCooperado.data.desc(), DespesaCooperado.id.desc()).all()
 
+    # INSS calculado por lançamento e somado APENAS dentro do período filtrado
     total_bruto = sum((l.valor or 0.0) for l in producoes) + sum((r.valor or 0.0) for r in receitas_coop)
     inss_valor = sum((l.valor or 0.0) * 0.045 for l in producoes)
     total_descontos = sum((d.valor or 0.0) for d in despesas_coop)
@@ -2341,13 +2330,22 @@ def excluir_lancamento(id):
     return redirect(url_for("portal_restaurante"))
 
 # =========================
-# Inicialização sempre (gunicorn/flask)
+# Inicialização automática do DB em servidores (Gunicorn/Render)
 # =========================
-with app.app_context():
-    init_db()
+try:
+    with app.app_context():
+        init_db()
+except Exception as _e:
+    # Evita crash no import; logs úteis no servidor
+    try:
+        app.logger.warning(f"Falha ao inicializar DB: {_e}")
+    except Exception:
+        pass
 
 # =========================
-# Main (modo dev local)
+# Main
 # =========================
 if __name__ == "__main__":
+    with app.app_context():
+        init_db()
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
