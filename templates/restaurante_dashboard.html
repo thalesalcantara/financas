@@ -10,21 +10,21 @@
   <style>
     :root{ --royal-blue:#2747d9; --white:#fff; --danger:#e74c3c; --edit:#f1c40f; --sidebar-dark:#101218; --hover-blue:#3b61e3; }
     body{ background:#191c20; font-family:'Roboto',Arial,sans-serif; min-height:100vh; }
-
-    /* Sidebar alargada para comportar logo 210x210 */
-    .sidebar{ width:260px; height:100vh; position:fixed; top:0; left:0;
+    .sidebar{ width:200px; height:100vh; position:fixed; top:0; left:0;
       background:linear-gradient(160deg, var(--royal-blue) 80%, var(--sidebar-dark) 100%); color:var(--white); z-index:10; }
     .logo-area{ display:flex; flex-direction:column; align-items:center; padding:18px 0 10px; }
-    .logo-img{ width:210px; height:210px; object-fit:contain; margin-bottom:6px; }
+    .logo-img{ width:68px; height:68px; object-fit:contain; margin-bottom:6px; }
     .logo-title{ font-family:'Orbitron',Arial,sans-serif; font-size:1.2rem; text-align:center; letter-spacing:1.5px; }
-
     .sidebar .nav-link{ color:var(--white); font-size:1.06rem; margin-bottom:7px; border-radius:7px; transition:background .2s; cursor:pointer; }
     .sidebar .nav-link.active, .sidebar .nav-link:hover{ background:var(--hover-blue); color:#fff; }
-
-    .main-content{ margin-left:270px; padding:25px 3vw 30px; min-height:100vh; }
-
+    .main-content{ margin-left:210px; padding:25px 3vw 30px; min-height:100vh; }
     .section-title{ font-family:'Orbitron',Arial,sans-serif; color:var(--royal-blue); font-size:1.4rem; margin-bottom:15px; }
     .card-white{ background:#fff; border-radius:12px; padding:10px; box-shadow:0 2px 8px 0 #0002; margin-bottom:30px; }
+    .cooperado-item{ display:flex; align-items:center; padding:9px 0; border-bottom:1px solid #eee; cursor:pointer; transition:background .2s; }
+    .cooperado-item:hover{ background:#f1f6ff; } .cooperado-item.selected{ background:#e6edfc; }
+    .cooperado-item:last-child{ border-bottom:none; }
+    .cooperado-avatar{ width:45px; height:45px; border-radius:50%; object-fit:cover; margin-right:13px; border:2.5px solid var(--royal-blue); }
+    .cooperado-nome{ font-size:1.1rem; font-weight:600; color:#222; }
     .btn-royal{ background:var(--royal-blue); color:#fff; }
     .btn-royal:hover{ background:var(--hover-blue); color:#fff; }
     .btn-edit{ background:var(--edit); color:#191c20; } .btn-edit:hover{ background:#ffe566; color:#191c20; }
@@ -34,31 +34,11 @@
     .stat .label{ color:#6b7280; font-size:.9rem; }
     .stat .val{ font-weight:700; font-size:1.25rem; }
     .contrato-header{ font-weight:700; color:#2747d9; margin-top:.5rem; margin-bottom:.25rem; }
-
-    /* Combobox (input + seta + dropdown com fotos) */
-    .combobox{ position:relative; }
-    .combo-input{ padding-right:44px; }
-    .combo-btn{ position:absolute; right:6px; top:6px; bottom:6px; width:36px; border:1px solid #ced4da; background:#f8f9fa; border-radius:6px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
-    .combo-btn:hover{ background:#eef1f4; }
-    .combo-menu{ position:absolute; left:0; right:0; top:100%; margin-top:6px; background:#fff; border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 12px 30px rgba(0,0,0,.12); max-height:340px; overflow:auto; display:none; z-index:30; }
-    .combo-menu.open{ display:block; }
-    .combo-item{ display:flex; align-items:center; gap:10px; padding:10px; cursor:pointer; }
-    .combo-item:not(:last-child){ border-bottom:1px solid #f2f4f7; }
-    .combo-item:hover, .combo-item.active{ background:#f1f6ff; }
-    .combo-avatar{ width:36px; height:36px; border-radius:50%; object-fit:cover; border:2px solid var(--royal-blue); }
-    .combo-name{ font-weight:600; color:#111827; }
-    .combo-sub{ font-size:.85rem; color:#6b7280; }
-
-    .sticky-top-card{ position: sticky; top: 10px; z-index: 5; }
-    .coop-avatar{ width:90px; height:90px; border-radius:50%; object-fit:cover; border:4px solid var(--royal-blue); }
-    .muted{ color:#6b7280; }
-    .input-help{ font-size:.85rem; color:#6b7280; }
-
     @media (max-width:800px){
       .sidebar{ width:60px; }
       .logo-title, .sidebar .nav-link span{ display:none; }
       .main-content{ margin-left:70px; padding:15px 1vw; }
-      .logo-img{ width:60px; height:60px; }
+      .cooperado-nome{ font-size:.9em; }
     }
   </style>
 </head>
@@ -70,10 +50,12 @@
       <span class="logo-title">COOPEX</span>
     </div>
     <nav class="nav flex-column mt-4">
+      <!-- Link Cooperados (lançamentos) -->
       <a class="nav-link {{ 'active' if (view|default('lancar') != 'escalas') else '' }}"
          href="{{ url_for('portal_restaurante', view='lancar', data_inicio=filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else None, data_fim=filtro_fim.strftime('%Y-%m-%d') if filtro_fim else None) }}">
         <i class="bi bi-person-lines-fill me-2"></i> <span>Cooperados</span>
       </a>
+      <!-- Link Escala Semanal -->
       <a class="nav-link {{ 'active' if view=='escalas' else '' }}"
          href="{{ url_for('portal_restaurante', view='escalas') }}">
         <i class="bi bi-calendar-week me-2"></i> <span>Escala semanal</span>
@@ -130,6 +112,7 @@
               <div class="val">{{ total_qtd or 0 }}</div>
             </div>
           </div>
+          <!-- Entregas no período -->
           <div class="col-md-3">
             <div class="stat">
               <div class="label">Entregas no período</div>
@@ -139,42 +122,30 @@
         </div>
       </div>
 
-      <!-- === Combobox: Buscar & Selecionar Cooperado (com foto) === -->
+      <!-- Lista de Cooperados -->
       <div class="card-white">
-        <div class="row g-3">
-          <div class="col-12 col-md-8">
-            <label class="form-label">Cooperado</label>
-            <div class="combobox" role="combobox" aria-haspopup="listbox" aria-owns="comboMenu" aria-expanded="false">
-              <input type="text" id="comboInput" class="form-control combo-input" placeholder="Digite o nome ou clique na seta para ver todos" autocomplete="off">
-              <button class="combo-btn" type="button" id="comboBtn" aria-label="Abrir lista">
-                <i class="bi bi-caret-down-fill"></i>
-              </button>
-              <div class="combo-menu" id="comboMenu" role="listbox" aria-label="Cooperados"></div>
-            </div>
-            <div class="input-help mt-1">Use ↑/↓ para navegar, Enter para selecionar, Esc para fechar.</div>
-          </div>
-          <div class="col-12 col-md-4 d-flex gap-2 align-items-end justify-content-md-end">
-            <button class="btn btn-outline-secondary" id="btnPrev" type="button"><i class="bi bi-chevron-left"></i> Anterior</button>
-            <button class="btn btn-outline-secondary" id="btnNext" type="button">Próximo <i class="bi bi-chevron-right"></i></button>
+        {% for coop in cooperados %}
+        <div class="cooperado-item" data-target="form-{{ coop.id }}">
+          <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}" class="cooperado-avatar" alt="">
+          <div class="d-flex flex-column">
+            <span class="cooperado-nome">{{ coop.nome }}</span>
+            <small class="text-muted">Total no período: R$ {{ '%.2f'|format(coop.total_periodo or 0) }}</small>
           </div>
         </div>
+        {% endfor %}
       </div>
 
-      <!-- === Formulário (sempre no topo) === -->
-      <div id="cardForm" class="card-white sticky-top-card" style="display:none;">
-        <div class="d-flex align-items-center gap-3 mb-2">
-          <img id="coopAvatar" class="coop-avatar" src="{{ url_for('static', filename='img/default.png') }}" alt="" loading="lazy">
-          <div>
-            <div class="fw-bold fs-5" id="coopNome">—</div>
-            <div class="muted">Total no período: <span id="coopTotal">R$ 0,00</span></div>
-          </div>
-          <div class="ms-auto">
-            <span class="badge text-bg-primary" id="badgePeriodo">{{ filtro_inicio.strftime('%d/%m/%Y') }} a {{ filtro_fim.strftime('%d/%m/%Y') }}</span>
-          </div>
+      <!-- Formulários de Lançamento -->
+      {% for coop in cooperados %}
+      <div id="form-{{ coop.id }}" class="card-white" style="display:none;">
+        <div class="text-center mb-2">
+          <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}" class="cooperado-avatar" style="width:90px; height:90px; border:4px solid var(--royal-blue);" alt="">
+          <div class="fw-bold fs-5 mt-1">{{ coop.nome }}</div>
+          <div class="text-muted">Total no período: R$ {{ '%.2f'|format(coop.total_periodo or 0) }}</div>
         </div>
 
-        <form id="formLanc" method="POST" action="{{ url_for('lancar_producao') }}" class="row g-2 align-items-end">
-          <input type="hidden" name="cooperado_id" id="cooperadoId">
+        <form method="POST" action="{{ url_for('lancar_producao') }}" class="row g-2 align-items-end mb-3">
+          <input type="hidden" name="cooperado_id" value="{{ coop.id }}">
           <div class="col-md-3">
             <label class="form-label">Valor (R$)</label>
             <input type="number" class="form-control" name="valor" step="0.01" required>
@@ -183,15 +154,16 @@
             <label class="form-label">Data</label>
             <input type="date" class="form-control" name="data" required>
           </div>
-          <div class="col-md-2">
+          <div class="col-md-3">
             <label class="form-label">Hora Início</label>
             <input type="time" class="form-control" name="hora_inicio">
           </div>
-          <div class="col-md-2">
+          <div class="col-md-3">
             <label class="form-label">Hora Fim</label>
             <input type="time" class="form-control" name="hora_fim">
           </div>
-          <div class="col-md-2">
+          <!-- Entregas (opcional) -->
+          <div class="col-md-3">
             <label class="form-label">Entregas</label>
             <input type="number" class="form-control" name="qtd_entregas" min="0" step="1" placeholder="">
           </div>
@@ -199,14 +171,8 @@
             <button class="btn btn-royal"><i class="bi bi-plus-circle"></i> Lançar</button>
           </div>
         </form>
-      </div>
 
-      <!-- === Tabela de lançamentos do cooperado selecionado === -->
-      <div id="cardTabela" class="card-white" style="display:none;">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-          <div class="fw-bold">Lançamentos no período</div>
-          <div class="muted small">Exibindo: <span id="lblNomeTabela">—</span></div>
-        </div>
+        <!-- Tabela dos lançamentos -->
         <table class="table table-bordered table-hover table-light align-middle">
           <thead>
             <tr>
@@ -218,11 +184,23 @@
               <th>Excluir</th>
             </tr>
           </thead>
-          <tbody id="tbodyLanc">
-            <tr><td colspan="6" class="text-center text-muted">Selecione um cooperado</td></tr>
+          <tbody>
+            {% for lanc in coop.lancamentos %}
+            <tr>
+              <td>R$ {{ '%.2f'|format(lanc.valor or 0) }}</td>
+              <td>{{ lanc.data.strftime('%d/%m/%Y') if lanc.data }}</td>
+              <td>{{ lanc.hora_inicio or '' }} às {{ lanc.hora_fim or '' }}</td>
+              <td>{{ lanc.qtd_entregas if lanc.qtd_entregas is not none else '-' }}</td>
+              <td><a href="{{ url_for('editar_lancamento', id=lanc.id) }}" class="btn btn-edit btn-sm"><i class="bi bi-pencil"></i></a></td>
+              <td><a href="{{ url_for('excluir_lancamento', id=lanc.id) }}" class="btn btn-delete btn-sm"><i class="bi bi-trash"></i></a></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted">Nenhum lançamento no período selecionado</td></tr>
+            {% endfor %}
           </tbody>
         </table>
       </div>
+      {% endfor %}
 
     {% else %}
       <!-- ============= PÁGINA ESCALA (SEMANA ou DIA) ============= -->
@@ -263,6 +241,7 @@
                   <div style="max-height:360px; overflow:auto; border-top:1px dashed #e5e7eb;">
                     {% set lista = agenda.get(dia, []) %}
                     {% if lista %}
+                      {# agrupa por contrato (a rota já ordena por contrato->nome, então o groupby funciona) #}
                       {% for grupo in (lista | groupby('contrato')) %}
                         {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
                         <div class="contrato-header">{{ contrato_nome }}</div>
@@ -329,191 +308,24 @@
     {% endif %}
   </div>
 
-  <!-- ==== JS ==== -->
   <script>
     document.addEventListener('DOMContentLoaded', function () {
+      // JS só para a página de lançamentos
       var isLanc = "{{ view|default('lancar') }}" !== "escalas";
       if (!isLanc) return;
 
-      // ===== Serialização dos dados no lado do cliente =====
-      const COOPS = {
-        {% set coop_list = cooperados_todos if (cooperados_todos is defined) else cooperados %}
-        {% for coop in coop_list %}
-        "{{ coop.id }}": {
-          id: {{ coop.id }},
-          nome: {{ coop.nome|tojson }},
-          foto_url: {{ (coop.foto_url or url_for('static', filename='img/default.png'))|tojson }},
-          total_periodo_fmt: {{ ('R$ ' + ('%.2f'|format(coop.total_periodo or 0)))|tojson }},
-          lancamentos: [
-            {% for lanc in coop.lancamentos %}
-            {
-              id: {{ lanc.id }},
-              valor_fmt: {{ ('R$ ' + ('%.2f'|format(lanc.valor or 0)))|tojson }},
-              data_fmt: {{ (lanc.data.strftime('%d/%m/%Y') if lanc.data else '')|tojson }},
-              horario_fmt: {{ ((lanc.hora_inicio or '') ~ ((' às ' ~ lanc.hora_fim) if lanc.hora_fim else ''))|tojson }},
-              qtd_fmt: {{ (lanc.qtd_entregas if lanc.qtd_entregas is not none else '-')|string|tojson }},
-              edit_url: {{ url_for('editar_lancamento', id=lanc.id)|tojson }},
-              del_url: {{ url_for('excluir_lancamento', id=lanc.id)|tojson }}
-            }{% if not loop.last %},{% endif %}
-            {% endfor %}
-          ]
-        }{% if not loop.last %},{% endif %}
-        {% endfor %}
-      };
-      const COOP_IDS = Object.keys(COOPS);
-
-      // ===== Elementos =====
-      const combo = document.querySelector('.combobox');
-      const comboInput = document.getElementById('comboInput');
-      const comboBtn = document.getElementById('comboBtn');
-      const comboMenu = document.getElementById('comboMenu');
-      const cardForm   = document.getElementById('cardForm');
-      const cardTabela = document.getElementById('cardTabela');
-      const cooperadoIdInput = document.getElementById('cooperadoId');
-      const coopAvatar = document.getElementById('coopAvatar');
-      const coopNome   = document.getElementById('coopNome');
-      const coopTotal  = document.getElementById('coopTotal');
-      const tbodyLanc  = document.getElementById('tbodyLanc');
-      const lblNomeTabela = document.getElementById('lblNomeTabela');
-      const btnPrev = document.getElementById('btnPrev');
-      const btnNext = document.getElementById('btnNext');
-
-      let open = false;
-      let activeIndex = -1; // índice do item ativo no menu filtrado
-      let filteredIds = [...COOP_IDS];
-      let selectedId = null;
-
-      function formatItemHTML(id){
-        const c = COOPS[id];
-        const foto = c.foto_url || "{{ url_for('static', filename='img/default.png') }}";
-        return `
-          <div class="combo-item" role="option" data-id="${c.id}">
-            <img src="${foto}" class="combo-avatar" loading="lazy" alt="">
-            <div>
-              <div class="combo-name">${c.nome}</div>
-              <div class="combo-sub">${c.total_periodo_fmt} no período</div>
-            </div>
-          </div>`;
-      }
-
-      function renderMenu(){
-        if(filteredIds.length === 0){
-          comboMenu.innerHTML = '<div class="p-3 text-muted">Nenhum cooperado encontrado</div>';
-          return;
-        }
-        comboMenu.innerHTML = filteredIds.map(formatItemHTML).join('');
-        setActive(Math.max(0, activeIndex));
-      }
-
-      function openMenu(){ renderMenu(); comboMenu.classList.add('open'); combo.setAttribute('aria-expanded', 'true'); open = true; }
-      function closeMenu(){ comboMenu.classList.remove('open'); combo.setAttribute('aria-expanded', 'false'); open = false; activeIndex = -1; }
-
-      function filterMenu(term){
-        const t = (term||'').toLowerCase().trim();
-        filteredIds = COOP_IDS.filter(id => COOPS[id].nome.toLowerCase().includes(t));
-        activeIndex = 0;
-        renderMenu();
-      }
-
-      function setActive(index){
-        const items = comboMenu.querySelectorAll('.combo-item');
-        items.forEach(i => i.classList.remove('active'));
-        if(items.length === 0) return;
-        if(index < 0) index = 0;
-        if(index >= items.length) index = items.length - 1;
-        items[index].classList.add('active');
-        activeIndex = index;
-        const el = items[index];
-        const menuRect = comboMenu.getBoundingClientRect();
-        const elRect = el.getBoundingClientRect();
-        if (elRect.bottom > menuRect.bottom) comboMenu.scrollTop += (elRect.bottom - menuRect.bottom);
-        if (elRect.top < menuRect.top) comboMenu.scrollTop -= (menuRect.top - elRect.top);
-      }
-
-      function selectByIndex(index){
-        const items = comboMenu.querySelectorAll('.combo-item');
-        if(items.length === 0) return;
-        if(index < 0 || index >= items.length) return;
-        selectById(items[index].dataset.id);
-      }
-
-      function selectById(id){
-        const c = COOPS[id];
-        if(!c) return;
-        selectedId = String(id);
-        comboInput.value = c.nome;
-        closeMenu();
-
-        cooperadoIdInput.value = c.id;
-        coopAvatar.src = c.foto_url || "{{ url_for('static', filename='img/default.png') }}";
-        coopNome.textContent = c.nome || '—';
-        coopTotal.textContent = c.total_periodo_fmt || 'R$ 0,00';
-
-        cardForm.style.display = '';
-        cardTabela.style.display = '';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-
-        lblNomeTabela.textContent = c.nome || '—';
-        if (!c.lancamentos || c.lancamentos.length === 0) {
-          tbodyLanc.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum lançamento no período selecionado</td></tr>';
-        } else {
-          const rows = c.lancamentos.map(l => `
-            <tr>
-              <td>${l.valor_fmt}</td>
-              <td>${l.data_fmt}</td>
-              <td>${l.horario_fmt || ''}</td>
-              <td>${l.qtd_fmt}</td>
-              <td><a href="${l.edit_url}" class="btn btn-edit btn-sm"><i class="bi bi-pencil"></i></a></td>
-              <td><a href="${l.del_url}" class="btn btn-delete btn-sm btn-del"><i class="bi bi-trash"></i></a></td>
-            </tr>
-          `).join('');
-          tbodyLanc.innerHTML = rows;
-        }
-        localStorage.setItem('restaurante_selected_coop', selectedId);
-      }
-
-      // Debounce para filtrar sem travar
-      function debounce(fn, delay){ let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); }; }
-      const applyFilter = debounce(() => { filterMenu(comboInput.value); if(!open) openMenu(); }, 120);
-
-      // Eventos da Combobox
-      comboBtn.addEventListener('click', (e) => { e.preventDefault(); if(open){ closeMenu(); } else { filterMenu(comboInput.value); openMenu(); comboInput.focus(); } });
-      comboInput.addEventListener('input', applyFilter);
-      comboInput.addEventListener('keydown', (e) => {
-        const items = comboMenu.querySelectorAll('.combo-item');
-        switch(e.key){
-          case 'ArrowDown': e.preventDefault(); if(!open){ filterMenu(comboInput.value); openMenu(); return; } setActive((activeIndex+1) % Math.max(items.length,1)); break;
-          case 'ArrowUp':   e.preventDefault(); if(!open){ filterMenu(comboInput.value); openMenu(); return; } setActive((activeIndex-1+items.length) % Math.max(items.length,1)); break;
-          case 'Enter':     if(open){ e.preventDefault(); selectByIndex(activeIndex); } break;
-          case 'Escape':    if(open){ e.preventDefault(); closeMenu(); } break;
-        }
+      let items = document.querySelectorAll('.cooperado-item');
+      let forms = document.querySelectorAll('.card-white[id^="form-"]');
+      items.forEach(item => {
+        item.addEventListener('click', function () {
+          items.forEach(i => i.classList.remove('selected'));
+          forms.forEach(f => f.style.display = 'none');
+          item.classList.add('selected');
+          let target = this.getAttribute('data-target');
+          document.getElementById(target).style.display = 'block';
+          window.scrollTo({top: 0, behavior: 'smooth'});
+        });
       });
-      comboMenu.addEventListener('click', (e) => { const item = e.target.closest('.combo-item'); if(item){ selectById(item.dataset.id); } });
-      document.addEventListener('click', (e) => { if(!combo.contains(e.target)) closeMenu(); });
-
-      // Confirmar exclusão
-      document.addEventListener('click', (e) => {
-        const btn = e.target.closest('.btn-del');
-        if (btn && !confirm('Excluir este lançamento?')) { e.preventDefault(); }
-      });
-
-      // Anterior/Próximo obedecendo filtragem atual
-      function selectOffset(offset){
-        if(filteredIds.length === 0){ filterMenu(''); }
-        if(!selectedId){
-          if(filteredIds.length){ selectById(filteredIds[0]); }
-          return;
-        }
-        const idx = filteredIds.indexOf(String(selectedId));
-        let next = idx === -1 ? 0 : (idx + offset + filteredIds.length) % filteredIds.length;
-        selectById(filteredIds[next]);
-      }
-      btnPrev.addEventListener('click', () => selectOffset(-1));
-      btnNext.addEventListener('click', () => selectOffset(1));
-
-      // Restaura seleção anterior
-      const saved = localStorage.getItem('restaurante_selected_coop');
-      if(saved && COOPS[saved]){ selectById(saved); } else { if(COOP_IDS[0]) selectById(COOP_IDS[0]); }
     });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
