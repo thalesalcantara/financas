@@ -195,6 +195,14 @@ class Config(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     salario_minimo = db.Column(db.Float, default=0.0)
 
+class Midia(db.Model):
+    __tablename__ = "midia"
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255))
+    mimetype = db.Column(db.String(100))
+    data = db.Column(db.LargeBinary)  # bytes da imagem
+
+
 # =========================
 # Helpers
 # =========================
@@ -347,14 +355,32 @@ def _build_docinfo(c: Cooperado) -> dict:
 
 
 def _save_upload(file_storage) -> str | None:
-    if not file_storage:
+    """
+    Se STORE_UPLOADS=db, salva o arquivo na tabela Midia e retorna URL /media/<id>.
+    Caso contrário, salva em disco (comportamento antigo) e retorna /static/uploads/...
+    """
+    if not file_storage or not getattr(file_storage, "filename", ""):
         return None
-    fname = secure_filename(file_storage.filename or "")
+
+    fname = secure_filename(file_storage.filename)
     if not fname:
         return None
-    path = os.path.join(UPLOAD_DIR, fname)
-    file_storage.save(path)
-    return f"/static/uploads/{fname}"
+
+    mode = os.environ.get("STORE_UPLOADS", "db").lower()
+
+    if mode == "db":
+        # lê bytes e grava no banco
+        blob = file_storage.read()
+        m = Midia(filename=fname, mimetype=file_storage.mimetype, data=blob)
+        db.session.add(m)
+        db.session.commit()
+        # gera URL pública servida pela rota /media/<id>
+        return url_for("media_file", mid=m.id)
+    else:
+        # fallback: salva em disco (local/dev)
+        path = os.path.join(UPLOAD_DIR, fname)
+        file_storage.save(path)
+        return f"/static/uploads/{fname}"
 
 
 def _prox_ocorrencia_anual(dt: date | None) -> date | None:
