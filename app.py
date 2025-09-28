@@ -7,11 +7,12 @@ import re
 import json
 import difflib
 import unicodedata
+import re
+from sqlalchemy.inspection import inspect as sa_inspect
 from datetime import datetime, date, timedelta, time
 from functools import wraps
 from collections import defaultdict, namedtuple
 from types import SimpleNamespace
-
 from flask import (
     Flask, render_template, request, redirect, url_for,
     session, flash, send_file, abort
@@ -28,6 +29,10 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+DOCS_DIR = os.path.join(UPLOAD_DIR, "docs")
+os.makedirs(DOCS_DIR, exist_ok=True)
+TABELAS_DIR = os.path.join(UPLOAD_DIR, "tabelas")
+os.makedirs(TABELAS_DIR, exist_ok=True)
 def _build_db_uri() -> str:
     """
     Usa SQLite local se não houver DATABASE_URL.
@@ -56,7 +61,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "coopex-secret")
 app.config["SQLALCHEMY_DATABASE_URI"] = _build_db_uri()
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JSON_SORT_KEYS"] = False  # evita comparar None com int ao serializar |tojson
-
+app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32MB
 db = SQLAlchemy(app)
 
 # =========================
@@ -82,6 +87,11 @@ class Cooperado(db.Model):
     nome = db.Column(db.String(120), nullable=False)
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
     usuario_ref = db.relationship("Usuario", backref="coop_account", uselist=False)
+    # Foto: agora guardada no banco (bytea no Postgres / BLOB no SQLite)
+    foto_bytes = db.Column(db.LargeBinary)
+    foto_mime = db.Column(db.String(100))
+    foto_filename = db.Column(db.String(255))
+    # Para manter compatibilidade com os templates existentes que usam 'foto_url'
     foto_url = db.Column(db.String(255))
     cnh_numero = db.Column(db.String(50))
     cnh_validade = db.Column(db.Date)
@@ -97,6 +107,11 @@ class Restaurante(db.Model):
     periodo = db.Column(db.String(20), nullable=False)  # seg-dom | sab-sex | sex-qui
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
     usuario_ref = db.relationship("Usuario", backref="rest_account", uselist=False)
+    # Foto no banco (bytea)
+    foto_bytes = db.Column(db.LargeBinary)
+    foto_mime = db.Column(db.String(100))
+    foto_filename = db.Column(db.String(255))
+    # compatibilidade
     foto_url = db.Column(db.String(255))
 
 
@@ -114,6 +129,33 @@ class Lancamento(db.Model):
     hora_fim = db.Column(db.String(10))
     # opcional: quantidade de entregas
     qtd_entregas = db.Column(db.Integer)
+
+# === AVALIAÇÕES DE COOPERADO (NOVO) =========================================
+class AvaliacaoCooperado(db.Model):
+    __tablename__ = "avaliacoes"
+    id = db.Column(db.Integer, primary_key=True)
+
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False)
+    cooperado_id    = db.Column(db.Integer, db.ForeignKey("cooperados.id"),  nullable=False)
+    lancamento_id   = db.Column(db.Integer, db.ForeignKey("lancamentos.id"))
+
+    # notas 1..5
+    estrelas_geral         = db.Column(db.Integer)
+    estrelas_pontualidade  = db.Column(db.Integer)
+    estrelas_educacao      = db.Column(db.Integer)
+    estrelas_eficiencia    = db.Column(db.Integer)
+    estrelas_apresentacao  = db.Column(db.Integer)  # "Bem apresentado"
+
+    comentario       = db.Column(db.Text)
+
+    # IA/heurísticas
+    media_ponderada  = db.Column(db.Float)
+    sentimento       = db.Column(db.String(12))     # positivo | neutro | negativo
+    temas            = db.Column(db.String(255))    # palavras-chave resumidas
+    alerta_crise     = db.Column(db.Boolean, default=False)
+    feedback_motoboy = db.Column(db.Text)
+
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class ReceitaCooperativa(db.Model):
@@ -195,46 +237,217 @@ class Config(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     salario_minimo = db.Column(db.Float, default=0.0)
 
-class Midia(db.Model):
-    __tablename__ = "midia"
+
+class Documento(db.Model):
+    __tablename__ = "documentos"
     id = db.Column(db.Integer, primary_key=True)
-    filename = db.Column(db.String(255))
-    mimetype = db.Column(db.String(100))
-    data = db.Column(db.LargeBinary)  # bytes da imagem
+    titulo = db.Column(db.String(200), nullable=False)
+    categoria = db.Column(db.String(40))
+    descricao = db.Column(db.String(255))
+    arquivo_url = db.Column(db.String(255), nullable=False)
+    arquivo_nome = db.Column(db.String(255))
+    enviado_em = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Tabela(db.Model):
+
+    id = db.Column(db.Integer, primary_key=True)
+    titulo = db.Column(db.String(200), nullable=False)
+    categoria = db.Column(db.String(40))
+    descricao = db.Column(db.String(255))
+    arquivo_url = db.Column(db.String(255), nullable=False)
+    arquivo_nome = db.Column(db.String(255))
+    enviado_em = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ---------- AVISOS (NOVO) ----------
+aviso_restaurantes = db.Table(
+    "aviso_restaurantes",
+    db.Column("aviso_id", db.Integer, db.ForeignKey("avisos.id"), primary_key=True),
+    db.Column("restaurante_id", db.Integer, db.ForeignKey("restaurantes.id"), primary_key=True),
+)
+
+class Aviso(db.Model):
+    __tablename__ = "avisos"
+    id = db.Column(db.Integer, primary_key=True)
+    titulo = db.Column(db.String(140), nullable=False)
+    corpo = db.Column(db.Text, nullable=False)
+    # escopo: global | restaurante | cooperado
+    tipo = db.Column(db.String(20), nullable=False, default="global")
+
+    # destino individual (opcional)
+    destino_cooperado_id = db.Column(db.Integer, db.ForeignKey("cooperados.id"))
+    destino_cooperado = db.relationship("Cooperado", foreign_keys=[destino_cooperado_id])
+
+    # destino por restaurante (opcional, N:N)
+    restaurantes = db.relationship("Restaurante", secondary=aviso_restaurantes, backref="avisos")
+
+    prioridade = db.Column(db.String(10), default="normal")  # normal | alta
+    fixado = db.Column(db.Boolean, default=False)
+    ativo = db.Column(db.Boolean, default=True)
+    inicio_em = db.Column(db.DateTime)  # janela de exibição opcional
+    fim_em = db.Column(db.DateTime)
+
+    criado_por_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class AvisoLeitura(db.Model):
+    __tablename__ = "aviso_leituras"
+    id = db.Column(db.Integer, primary_key=True)
+    aviso_id = db.Column(db.Integer, db.ForeignKey("avisos.id"), nullable=False, index=True)
+    cooperado_id = db.Column(db.Integer, db.ForeignKey("cooperados.id"), nullable=True, index=True)
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=True, index=True)
+    lido_em = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint("aviso_id", "cooperado_id", "restaurante_id", name="uq_aviso_dest"), )
 
 
 # =========================
 # Helpers
 # =========================
+def _is_sqlite() -> bool:
+    try:
+        return db.session.get_bind().dialect.name == "sqlite"
+    except Exception:
+        return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
+
 def init_db():
     db.create_all()
 
     # --- qtd_entregas em lancamentos ---
     try:
-        cols = db.session.execute(sa_text("PRAGMA table_info(lancamentos);")).fetchall()
-        colnames = {row[1] for row in cols}
-        if "qtd_entregas" not in colnames:
-            db.session.execute(sa_text("ALTER TABLE lancamentos ADD COLUMN qtd_entregas INTEGER"))
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(lancamentos);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "qtd_entregas" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE lancamentos ADD COLUMN qtd_entregas INTEGER"))
+                db.session.commit()
+        else:
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS lancamentos ADD COLUMN IF NOT EXISTS qtd_entregas INTEGER"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
     # --- cooperado_nome em escalas ---
     try:
-        cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-        colnames = {row[1] for row in cols}
-        if "cooperado_nome" not in colnames:
-            db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "cooperado_nome" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
+                db.session.commit()
+        else:
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS escalas ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
     # --- restaurante_id em escalas ---
     try:
-        cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-        colnames = {row[1] for row in cols}
-        if "restaurante_id" not in colnames:
-            db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "restaurante_id" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
+                db.session.commit()
+        else:
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS escalas ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # --- fotos no banco (cooperados/restaurantes) ---
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "foto_bytes" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_bytes BLOB"))
+            if "foto_mime" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_mime VARCHAR(100)"))
+            if "foto_filename" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_filename VARCHAR(255)"))
+            if "foto_url" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_url VARCHAR(255)"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+   
+        # --- tabela avaliacoes_restaurante (se não existir) ---
+    try:
+        if _is_sqlite():
+            db.session.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS avaliacoes_restaurante (
+                  id INTEGER PRIMARY KEY,
+                  restaurante_id INTEGER NOT NULL,
+                  cooperado_id   INTEGER NOT NULL,
+                  lancamento_id  INTEGER UNIQUE,
+                  estrelas_geral INTEGER,
+                  estrelas_pontualidade INTEGER,
+                  estrelas_educacao INTEGER,
+                  estrelas_eficiencia INTEGER,
+                  estrelas_apresentacao INTEGER,
+                  comentario TEXT,
+                  media_ponderada REAL,
+                  sentimento TEXT,
+                  temas TEXT,
+                  alerta_crise INTEGER DEFAULT 0,
+                  criado_em TIMESTAMP
+                );
+            """))
+            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
+            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS avaliacoes_restaurante (
+                  id SERIAL PRIMARY KEY,
+                  restaurante_id INTEGER NOT NULL,
+                  cooperado_id   INTEGER NOT NULL,
+                  lancamento_id  INTEGER UNIQUE,
+                  estrelas_geral INTEGER,
+                  estrelas_pontualidade INTEGER,
+                  estrelas_educacao INTEGER,
+                  estrelas_eficiencia INTEGER,
+                  estrelas_apresentacao INTEGER,
+                  comentario TEXT,
+                  media_ponderada DOUBLE PRECISION,
+                  sentimento VARCHAR(12),
+                  temas VARCHAR(255),
+                  alerta_crise BOOLEAN DEFAULT FALSE,
+                  criado_em TIMESTAMP
+                );
+            """))
+            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
+            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "foto_bytes" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_bytes BLOB"))
+            if "foto_mime" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_mime VARCHAR(100)"))
+            if "foto_filename" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_filename VARCHAR(255)"))
+            if "foto_url" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_url VARCHAR(255)"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
@@ -355,33 +568,37 @@ def _build_docinfo(c: Cooperado) -> dict:
 
 
 def _save_upload(file_storage) -> str | None:
-    """
-    Se STORE_UPLOADS=db, salva o arquivo na tabela Midia e retorna URL /media/<id>.
-    Caso contrário, salva em disco (comportamento antigo) e retorna /static/uploads/...
-    """
-    if not file_storage or not getattr(file_storage, "filename", ""):
+    # Mantido para compatibilidade com outras partes do app (ex.: uploads de xlsx)
+    if not file_storage:
         return None
-
-    fname = secure_filename(file_storage.filename)
+    fname = secure_filename(file_storage.filename or "")
     if not fname:
         return None
+    path = os.path.join(UPLOAD_DIR, fname)
+    file_storage.save(path)
+    return f"/static/uploads/{fname}"
 
-    mode = os.environ.get("STORE_UPLOADS", "db").lower()
-
-    if mode == "db":
-        # lê bytes e grava no banco
-        blob = file_storage.read()
-        m = Midia(filename=fname, mimetype=file_storage.mimetype, data=blob)
-        db.session.add(m)
-        db.session.commit()
-        # gera URL pública servida pela rota /media/<id>
-        return url_for("media_file", mid=m.id)
+def _save_foto_to_db(entidade, file_storage, *, is_cooperado: bool) -> str | None:
+    """
+    Salva o arquivo enviado diretamente no banco (bytea/Blob) e
+    retorna uma URL interna (/media/coop/<id> ou /media/rest/<id>).
+    """
+    if not file_storage or not file_storage.filename:
+        return getattr(entidade, "foto_url", None)
+    data = file_storage.read()
+    if not data:
+        return getattr(entidade, "foto_url", None)
+    entidade.foto_bytes = data
+    entidade.foto_mime = (file_storage.mimetype or "application/octet-stream")
+    entidade.foto_filename = secure_filename(file_storage.filename)
+    # garante que temos ID
+    db.session.flush()
+    if is_cooperado:
+        url = url_for("media_coop", coop_id=entidade.id)
     else:
-        # fallback: salva em disco (local/dev)
-        path = os.path.join(UPLOAD_DIR, fname)
-        file_storage.save(path)
-        return f"/static/uploads/{fname}"
-
+        url = url_for("media_rest", rest_id=entidade.id)
+    entidade.foto_url = f"{url}?v={int(datetime.utcnow().timestamp())}"
+    return entidade.foto_url
 
 def _prox_ocorrencia_anual(dt: date | None) -> date | None:
     if not dt:
@@ -406,6 +623,235 @@ def _parse_date(s: str | None) -> date | None:
 
 def _dow(dt: date) -> str:
     return str((dt.weekday() % 7) + 1)
+
+
+# === Helpers de Avaliação (NLP leve + métricas) =============================
+def _clamp_star(v):
+    try:
+        v = int(v)
+    except Exception:
+        return None
+    return min(5, max(1, v))
+
+def _media_ponderada(geral, pont, educ, efic, apres):
+    """
+    Ponderação (soma=1.0):
+      Geral 0.40 + Pontualidade 0.15 + Educação 0.15 + Eficiência 0.15 + Bem Apresentado 0.15
+    Calcula só com os campos presentes (ignora None) e renormaliza pesos.
+    """
+    pares = [
+        (geral, 0.40),
+        (pont,  0.15),
+        (educ,  0.15),
+        (efic,  0.15),
+        (apres, 0.15),
+    ]
+    num = 0.0
+    den = 0.0
+    for nota, w in pares:
+        if nota is not None:
+            num += float(nota) * w
+            den += w
+    return round(num / den, 2) if den > 0 else None
+
+_POS = set("""
+bom ótima otimo excelente parabéns educado gentil atencioso cordial limpo cheiroso organizado rápido rapida rapido pontual
+""".split())
+_NEG = set("""
+ruim péssimo pessimo horrível horrivel sujo atrasado grosseiro mal educado agressivo impaciente amassado quebrado frio derramou
+""".split())
+
+def _analise_sentimento(txt: str | None) -> str:
+    if not txt:
+        return "neutro"
+    t = (txt or "").lower()
+    # contagem bem simples
+    pos = sum(1 for w in _POS if w in t)
+    neg = sum(1 for w in _NEG if w in t)
+    if neg > pos + 0: return "negativo"
+    if pos > neg + 0: return "positivo"
+    return "neutro"
+
+# mapeia temas por palavras-chave simples
+_TEMAS = {
+    "Pontualidade":  ["pontual", "atras", "horario", "horário", "demor", "rápido", "rapido", "lent"],
+    "Educação":      ["educad", "grosseir", "simpat", "antipatic", "mal trat", "sem paciencia", "sem paciência", "atencios"],
+    "Eficiência":    ["amass", "vazou", "quebrad", "frio", "bagunça", "bagunca", "cuidado", "eficien", "desorgan"],
+    "Bem apresentado": ["uniform", "higien", "apresenta", "limpo", "cheiroso", "aparencia", "aparência"],
+}
+
+def _identifica_temas(txt: str | None) -> list[str]:
+    if not txt:
+        return []
+    t = (txt or "").lower()
+    hits = []
+    for tema, keys in _TEMAS.items():
+        if any(k in t for k in keys):
+            hits.append(tema)
+    return hits[:4]
+
+_RISCO = ["ameaça","ameaca","acidente","quebrado","agress","roubo","violên","violenc","lesão","lesao","sangue","caiu","bateu","droga","alcool","álcool"]
+
+def _sinaliza_crise(nota_geral: int | None, txt: str | None) -> bool:
+    if nota_geral == 1 and txt:
+        low = txt.lower()
+        return any(k in low for k in _RISCO)
+    return False
+
+def _gerar_feedback(pont, educ, efic, apres, comentario, sentimento):
+    partes = []
+    def badge(nome, nota):
+        return f"{nome}: {nota} ★" if nota is not None else None
+
+    for nome, nota in (("Pontualidade", pont), ("Educação", educ), ("Eficiência", efic), ("Apresentação", apres)):
+        b = badge(nome, nota)
+        if b: partes.append(b)
+
+    dicas = []
+    if educ is not None and educ <= 2: dicas.append("melhore a abordagem/educação ao falar com o cliente")
+    if pont is not None and pont <= 2: dicas.append("tente chegar no horário combinado")
+    if efic is not None and efic <= 2: dicas.append("redobre o cuidado com o pedido durante o transporte")
+    if apres is not None and apres <= 2: dicas.append("capriche na apresentação pessoal (higiene/uniforme)")
+
+    txt = f"Notas — " + " | ".join(partes) if partes else "Obrigado pelo trabalho!"
+    if comentario:
+        txt += f". Cliente comentou: \"{comentario.strip()}\""
+    if dicas:
+        txt += ". Dica: " + "; ".join(dicas) + "."
+    if sentimento == "positivo":
+        txt += " 👏"
+    return txt[:1000]
+
+from datetime import datetime, date
+from sqlalchemy import or_, and_
+
+# routes_avisos.py
+from datetime import datetime
+from flask import Blueprint, render_template, redirect, request, url_for, abort
+from flask_login import login_required, current_user
+
+
+# opcional: se você já tem outro blueprint de "portal", use o mesmo
+portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
+
+def _cooperado_atual() -> Cooperado:
+    # ajuste de acordo com seu auth:
+    #   - se current_user JÁ é um Cooperado, retorne current_user
+    #   - se current_user tem .cooperado_id, busque o Cooperado
+    coop = getattr(current_user, "cooperado", None)
+    if isinstance(coop, Cooperado):
+        return coop
+    coop_id = getattr(current_user, "cooperado_id", None)
+    if coop_id:
+        return Cooperado.query.get(coop_id)
+    return None
+
+@portal_bp.get("/avisos", endpoint="portal_cooperado_avisos")
+@login_required
+def avisos_list():
+    coop = _cooperado_atual()
+    if not coop:
+        abort(403)
+
+    # pega todos os avisos que se aplicam ao cooperado (seu helper)
+    avisos = get_avisos_for_cooperado(coop)
+
+    # busca leituras de uma vez (evita N+1)
+    lidos_ids = {
+        r.aviso_id
+        for r in AvisoLeitura.query.filter_by(cooperado_id=coop.id).all()
+    }
+
+    # injeta flag lido para o template (sem tocar no banco)
+    for a in avisos:
+        a.lido = (a.id in lidos_ids)
+
+    avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
+    current_year = datetime.now().year
+
+    return render_template(
+        "portal_cooperado_avisos.html",
+        avisos=avisos,
+        avisos_nao_lidos_count=avisos_nao_lidos_count,
+        current_year=current_year
+    )
+
+# === AVALIAÇÕES: Cooperado -> Restaurante (NOVO) =============================
+class AvaliacaoRestaurante(db.Model):
+    __tablename__ = "avaliacoes_restaurante"
+    id = db.Column(db.Integer, primary_key=True)
+
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False, index=True)
+    cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),   nullable=False, index=True)
+    lancamento_id  = db.Column(db.Integer, db.ForeignKey("lancamentos.id"),  unique=True, index=True)
+
+    # mesmas métricas 1..5
+    estrelas_geral        = db.Column(db.Integer)
+    estrelas_pontualidade = db.Column(db.Integer)
+    estrelas_educacao     = db.Column(db.Integer)
+    estrelas_eficiencia   = db.Column(db.Integer)
+    estrelas_apresentacao = db.Column(db.Integer)
+
+    comentario      = db.Column(db.Text)
+    media_ponderada = db.Column(db.Float)
+    sentimento      = db.Column(db.String(12))
+    temas           = db.Column(db.String(255))
+    alerta_crise    = db.Column(db.Boolean, default=False)
+
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+@portal_bp.post("/avisos/<int:aviso_id>/lido", endpoint="marcar_aviso_lido")
+@login_required
+def avisos_marcar_lido(aviso_id: int):
+    coop = _cooperado_atual()
+    if not coop:
+        abort(403)
+
+    aviso = Aviso.query.get_or_404(aviso_id)
+
+    # idempotente: só cria se ainda não houver leitura
+    ja_leu = AvisoLeitura.query.filter_by(
+        cooperado_id=coop.id,
+        aviso_id=aviso.id
+    ).first()
+
+    if not ja_leu:
+        db.session.add(AvisoLeitura(
+            cooperado_id=coop.id,
+            aviso_id=aviso.id,
+            lido_em=datetime.utcnow()
+        ))
+        db.session.commit()
+
+    next_url = request.form.get("next") or (url_for("portal_cooperado_avisos") + f"#aviso-{aviso.id}")
+    return redirect(next_url)
+
+@portal_bp.post("/avisos/marcar-todos", endpoint="marcar_todos_avisos_lidos")
+@login_required
+def avisos_marcar_todos():
+    coop = _cooperado_atual()
+    if not coop:
+        abort(403)
+
+    avisos = get_avisos_for_cooperado(coop)
+    if not avisos:
+        return redirect(url_for("portal_cooperado_avisos"))
+
+    ids_todos = {a.id for a in avisos}
+    ids_ja_lidos = {
+        r.aviso_id
+        for r in AvisoLeitura.query.filter_by(cooperado_id=coop.id).all()
+    }
+    ids_pendentes = list(ids_todos - ids_ja_lidos)
+
+    if ids_pendentes:
+        db.session.bulk_save_objects([
+            AvisoLeitura(cooperado_id=coop.id, aviso_id=aid, lido_em=datetime.utcnow())
+            for aid in ids_pendentes
+        ])
+        db.session.commit()
+
+    return redirect(url_for("portal_cooperado_avisos"))
 
 # ======== Helpers p/ troca: data/weekday/turno ========
 def _parse_data_escala_str(s: str) -> date | None:
@@ -500,7 +946,7 @@ def _parse_linhas_from_msg(msg: str | None) -> list[dict]:
         payload = json.loads(raw)
     except Exception:
         try:
-            payload = json.loads(raw.replace("'", '"'))
+            payload = json.loads(raw.replace("'", '\"'))
         except Exception:
             return []
     linhas = payload.get("linhas") or payload.get("rows") or []
@@ -558,6 +1004,74 @@ def to_css_color(v: str) -> str:
         "branco": "white", "laranja": "orange", "roxo": "purple",
     }
     return mapa.get(t_low, t)
+
+# ---------- AVISOS: helpers ----------
+def _avisos_base_query(now=None):
+    if now is None:
+        now = datetime.utcnow()
+    return (Aviso.query
+        .filter(Aviso.ativo.is_(True))
+        .filter((Aviso.inicio_em.is_(None)) | (Aviso.inicio_em <= now))
+        .filter((Aviso.fim_em.is_(None)) | (Aviso.fim_em >= now)))
+
+def get_avisos_for_cooperado(coop: Cooperado):
+    """
+    Mostra:
+      - global
+      - cooperado destinado para mim OU broadcast (destino_cooperado_id IS NULL)
+      - restaurante destinado a um dos meus restaurantes OU broadcast (sem restaurantes ligados)
+    """
+    rest_ids = {
+        e.restaurante_id for e in Escala.query.filter_by(cooperado_id=coop.id).all()
+        if e.restaurante_id
+    }
+
+    q = _avisos_base_query().filter(
+        (Aviso.tipo == "global")
+        |
+        ((Aviso.tipo == "cooperado") & (
+            (Aviso.destino_cooperado_id == coop.id) | (Aviso.destino_cooperado_id.is_(None))
+        ))
+        |
+        ((Aviso.tipo == "restaurante") & (
+            (~Aviso.restaurantes.any()) |  # lista vazia = broadcast para todos restaurantes
+            Aviso.restaurantes.any(Restaurante.id.in_(rest_ids))
+        ))
+    )
+
+    avisos = list(q.all())
+    avisos.sort(
+        key=lambda a: (not a.fixado, str(a.prioridade or "").lower() != "alta",
+                       -(a.criado_em.timestamp() if a.criado_em else 0))
+    )
+    return avisos
+
+# =========================
+# Rotas de mídia (fotos armazenadas no banco)
+# =========================
+@app.get("/media/coop/<int:coop_id>")
+def media_coop(coop_id: int):
+    c = Cooperado.query.get_or_404(coop_id)
+    if c.foto_bytes:
+        return send_file(
+            io.BytesIO(c.foto_bytes),
+            mimetype=(c.foto_mime or "application/octet-stream"),
+            as_attachment=False,
+            download_name=(c.foto_filename or f"coop_{coop_id}.bin"),
+        )
+    abort(404)
+
+@app.get("/media/rest/<int:rest_id>")
+def media_rest(rest_id: int):
+    r = Restaurante.query.get_or_404(rest_id)
+    if r.foto_bytes:
+        return send_file(
+            io.BytesIO(r.foto_bytes),
+            mimetype=(r.foto_mime or "application/octet-stream"),
+            as_attachment=False,
+            download_name=(r.foto_filename or f"rest_{rest_id}.bin"),
+        )
+    abort(404)
 
 # =========================
 # Rota raiz
@@ -634,6 +1148,7 @@ def logout():
 @admin_required
 def admin_dashboard():
     args = request.args
+    active_tab = args.get("tab", "lancamentos")  # <- NOVO: controla a aba ativa
     restaurante_id = args.get("restaurante_id", type=int)
     cooperado_id = args.get("cooperado_id", type=int)
     data_inicio = _parse_date(args.get("data_inicio"))
@@ -1045,6 +1560,297 @@ def admin_delete_lancamento(id):
     flash("Lançamento excluído.", "success")
     return redirect(url_for("admin_dashboard", tab="lancamentos"))
 
+# ===== IMPORTS =====
+from flask import request, render_template, send_file, url_for
+from sqlalchemy import func, literal, and_
+from types import SimpleNamespace
+import io, csv
+
+# =========================
+# /admin/avaliacoes — Lista + KPIs + Ranking (sempre na aba "Avaliações")
+# =========================
+@app.route("/admin/avaliacoes", methods=["GET"])
+@admin_required
+def admin_avaliacoes():
+    # Tipo padrão: 'cooperado' (Rest. -> Coop.). Use ?tipo=restaurante p/ Cooperado -> Restaurante.
+    tipo = (request.args.get("tipo", "cooperado") or "cooperado").strip().lower()
+
+    restaurante_id = request.args.get("restaurante_id", type=int)
+    cooperado_id   = request.args.get("cooperado_id", type=int)
+    data_inicio    = request.args.get("data_inicio")  # 'YYYY-MM-DD'
+    data_fim       = request.args.get("data_fim")     # 'YYYY-MM-DD'
+
+    Model = AvaliacaoRestaurante if (tipo == "restaurante") else AvaliacaoCooperado
+
+    # Helper de coluna com fallback (útil durante migração de schema)
+    def col(*names):
+        for n in names:
+            if hasattr(Model, n):
+                return getattr(Model, n)
+        return None
+
+    f_geral = col("estrelas_geral")
+
+    # Campos por tipo
+    if tipo == "restaurante":  # Cooperado -> Restaurante
+        f_trat = col("estrelas_tratamento", "estrelas_pontualidade")
+        f_amb  = col("estrelas_ambiente",   "estrelas_educacao")
+        f_sup  = col("estrelas_suporte",    "estrelas_eficiencia")
+    else:                      # Restaurante -> Cooperado
+        f_pont  = col("estrelas_pontualidade")
+        f_educ  = col("estrelas_educacao")
+        f_efic  = col("estrelas_eficiencia")
+        f_apres = col("estrelas_apresentacao")
+
+    # ===== Query com nomes (sem precisar de relationship)
+    base = (db.session.query(
+                Model,
+                Restaurante.id.label("rest_id"),
+                Restaurante.nome.label("rest_nome"),
+                Cooperado.id.label("coop_id"),
+                Cooperado.nome.label("coop_nome"),
+            )
+            .join(Restaurante, Model.restaurante_id == Restaurante.id)
+            .join(Cooperado,   Model.cooperado_id   == Cooperado.id))
+
+    filtros = []
+    if restaurante_id: filtros.append(Model.restaurante_id == restaurante_id)
+    if cooperado_id:   filtros.append(Model.cooperado_id   == cooperado_id)
+    if data_inicio:    filtros.append(func.date(Model.criado_em) >= data_inicio)
+    if data_fim:       filtros.append(func.date(Model.criado_em) <= data_fim)
+    if filtros:        base = base.filter(and_(*filtros))
+
+    rows = base.order_by(Model.criado_em.desc()).all()
+
+    # ===== Achata nos nomes que o SEU TEMPLATE usa
+    avaliacoes = []
+    for a, rest_id, rest_nome, coop_id, coop_nome in rows:
+        # comuns
+        item = {
+            "criado_em": a.criado_em,
+            "rest_id":   rest_id,
+            "rest_nome": rest_nome,
+            "coop_id":   coop_id,
+            "coop_nome": coop_nome,
+            "geral":     getattr(a, "estrelas_geral", 0) or 0,
+            "comentario": (getattr(a, "comentario", "") or "").strip(),
+            "media":       getattr(a, "media_ponderada", None),
+            "sentimento":  getattr(a, "sentimento", None),
+            "temas":       getattr(a, "temas", None),
+            "alerta":      bool(getattr(a, "alerta_crise", False)),
+        }
+
+        if tipo == "restaurante":
+            # Cooperado -> Restaurante: Trat/Amb/Sup (com fallbacks)
+            trat = getattr(a, "estrelas_tratamento", None)
+            amb  = getattr(a, "estrelas_ambiente", None)
+            sup  = getattr(a, "estrelas_suporte", None)
+            if trat is None: trat = getattr(a, "estrelas_pontualidade", None)
+            if amb  is None: amb  = getattr(a, "estrelas_educacao", None)
+            if sup  is None: sup  = getattr(a, "estrelas_eficiencia", None)
+            item.update({"trat": trat or 0, "amb": amb or 0, "sup": sup or 0})
+        else:
+            # Restaurante -> Cooperado
+            item.update({
+                "pont":  getattr(a, "estrelas_pontualidade", 0) or 0,
+                "educ":  getattr(a, "estrelas_educacao", 0) or 0,
+                "efic":  getattr(a, "estrelas_eficiencia", 0) or 0,
+                "apres": getattr(a, "estrelas_apresentacao", 0) or 0,
+            })
+
+        avaliacoes.append(SimpleNamespace(**item))
+
+    # ===== KPIs
+    def avg_or_zero(coluna):
+        if coluna is None:
+            return 0.0
+        q = db.session.query(func.coalesce(func.avg(coluna), 0.0))
+        if filtros: q = q.filter(and_(*filtros))
+        return float(q.scalar() or 0.0)
+
+    total_qtd = (db.session.query(func.count(Model.id)).filter(and_(*filtros)).scalar()
+                 if filtros else db.session.query(func.count(Model.id)).scalar())
+    kpis = {"qtd": int(total_qtd or 0), "geral": avg_or_zero(f_geral)}
+
+    if tipo == "restaurante":
+        kpis.update({
+            "trat": avg_or_zero(f_trat),
+            "amb":  avg_or_zero(f_amb),
+            "sup":  avg_or_zero(f_sup),
+        })
+    else:
+        kpis.update({
+            "pont":  avg_or_zero(f_pont),
+            "educ":  avg_or_zero(f_educ),
+            "efic":  avg_or_zero(f_efic),
+            "apres": avg_or_zero(f_apres),
+        })
+
+    # ===== Ranking
+    if tipo == "restaurante":
+        q_rank = (db.session.query(
+                    Restaurante.id.label("id"),
+                    Restaurante.nome.label("nome"),
+                    func.count(Model.id).label("qtd"),
+                    func.coalesce(func.avg(f_geral), 0.0).label("m_geral"),
+                    (func.coalesce(func.avg(f_trat), 0.0) if f_trat is not None else literal(0.0)).label("m_trat"),
+                    (func.coalesce(func.avg(f_amb),  0.0) if f_amb  is not None else literal(0.0)).label("m_amb"),
+                    (func.coalesce(func.avg(f_sup),  0.0) if f_sup  is not None else literal(0.0)).label("m_sup"),
+                 )
+                 .join(Model, Model.restaurante_id == Restaurante.id))
+        if filtros: q_rank = q_rank.filter(and_(*filtros))
+        ranking_rows = q_rank.group_by(Restaurante.id, Restaurante.nome).all()
+        ranking = [{
+            "rest_nome": r.nome, "qtd": int(r.qtd or 0),
+            "m_geral": float(r.m_geral or 0),
+            "m_trat":  float(r.m_trat or 0),
+            "m_amb":   float(r.m_amb or 0),
+            "m_sup":   float(r.m_sup or 0),
+        } for r in ranking_rows]
+        top = sorted([x for x in ranking if x["qtd"] >= 3], key=lambda x: x["m_geral"], reverse=True)[:10]
+        chart_top = {"labels": [r["rest_nome"] for r in top], "values": [round(r["m_geral"], 2) for r in top]}
+    else:
+        q_rank = (db.session.query(
+                    Cooperado.id.label("id"),
+                    Cooperado.nome.label("nome"),
+                    func.count(Model.id).label("qtd"),
+                    func.coalesce(func.avg(f_geral), 0.0).label("m_geral"),
+                    (func.coalesce(func.avg(f_pont), 0.0) if f_pont is not None else literal(0.0)).label("m_pont"),
+                    (func.coalesce(func.avg(f_educ), 0.0) if f_educ is not None else literal(0.0)).label("m_educ"),
+                    (func.coalesce(func.avg(f_efic), 0.0) if f_efic is not None else literal(0.0)).label("m_efic"),
+                    (func.coalesce(func.avg(f_apres),0.0) if f_apres is not None else literal(0.0)).label("m_apres"),
+                 )
+                 .join(Model, Model.cooperado_id == Cooperado.id))
+        if filtros: q_rank = q_rank.filter(and_(*filtros))
+        ranking_rows = q_rank.group_by(Cooperado.id, Cooperado.nome).all()
+        ranking = [{
+            "coop_nome": r.nome, "qtd": int(r.qtd or 0),
+            "m_geral": float(r.m_geral or 0),
+            "m_pont":  float(r.m_pont or 0),
+            "m_educ":  float(r.m_educ or 0),
+            "m_efic":  float(r.m_efic or 0),
+            "m_apres": float(r.m_apres or 0),
+        } for r in ranking_rows]
+        top = sorted([x for x in ranking if x["qtd"] >= 3], key=lambda x: x["m_geral"], reverse=True)[:10]
+        chart_top = {"labels": [r["coop_nome"] for r in top], "values": [round(r["m_geral"], 2) for r in top]}
+
+    # ===== Compatibilidade Cooperado × Restaurante (média de "geral" por par)
+    compat_map = {}
+    for a in avaliacoes:
+        key = (a.coop_id, a.rest_id)
+        d = compat_map.get(key)
+        if not d:
+            d = {"coop": a.coop_nome, "rest": a.rest_nome, "sum": 0.0, "count": 0}
+        d["sum"] += (a.geral or 0)
+        d["count"] += 1
+        compat_map[key] = d
+    compat = []
+    for d in compat_map.values():
+        avg = (d["sum"] / d["count"]) if d["count"] else 0.0
+        compat.append({"coop": d["coop"], "rest": d["rest"], "avg": avg, "count": d["count"]})
+    # pré-ordena por média desc e, em caso de empate, por qtd desc
+    compat.sort(key=lambda x: (-(x["avg"] or 0), -(x["count"] or 0), x["coop"], x["rest"]))
+
+    # Filtros p/ repopular o form
+    _flt = SimpleNamespace(
+        restaurante_id=restaurante_id,
+        cooperado_id=cooperado_id,
+        data_inicio=data_inicio or "",
+        data_fim=data_fim or "",
+    )
+
+    # >>> IMPORTANTÍSSIMO: renderiza o DASHBOARD com a aba "avaliacoes" ativa
+    return render_template(
+        "admin_dashboard.html",
+        tab="avaliacoes",        # <- garante que a UI fique na aba Avaliações
+        tipo=tipo,
+        avaliacoes=avaliacoes,   # lista de SimpleNamespace com campos *planos* esperados no seu template
+        kpis=kpis,
+        ranking=ranking,
+        chart_top=chart_top,
+        compat=compat,
+        _flt=_flt,
+        restaurantes=Restaurante.query.order_by(Restaurante.nome).all(),
+        cooperados=Cooperado.query.order_by(Cooperado.nome).all(),
+    )
+
+# =========================
+# /admin/avaliacoes/export.csv — Exportação CSV (combina com o template)
+# =========================
+@app.route("/admin/avaliacoes/export.csv", methods=["GET"])
+@admin_required
+def admin_export_avaliacoes_csv():
+    tipo = (request.args.get("tipo", "restaurante") or "restaurante").strip().lower()
+    restaurante_id = request.args.get("restaurante_id", type=int)
+    cooperado_id   = request.args.get("cooperado_id", type=int)
+    data_inicio    = request.args.get("data_inicio")
+    data_fim       = request.args.get("data_fim")
+
+    Model = AvaliacaoRestaurante if (tipo == "restaurante") else AvaliacaoCooperado
+
+    base = (db.session.query(
+                Model,
+                Restaurante.nome.label("rest_nome"),
+                Cooperado.nome.label("coop_nome"))
+            .join(Restaurante, Model.restaurante_id == Restaurante.id)
+            .join(Cooperado,   Model.cooperado_id   == Cooperado.id))
+
+    filtros = []
+    if restaurante_id: filtros.append(Model.restaurante_id == restaurante_id)
+    if cooperado_id:   filtros.append(Model.cooperado_id   == cooperado_id)
+    if data_inicio:    filtros.append(func.date(Model.criado_em) >= data_inicio)
+    if data_fim:       filtros.append(func.date(Model.criado_em) <= data_fim)
+    if filtros:        base = base.filter(and_(*filtros))
+
+    rows = base.order_by(Model.criado_em.desc()).all()
+
+    buf = io.StringIO()
+    w = csv.writer(buf, delimiter=";")
+
+    if tipo == "restaurante":
+        # Cooperado -> Restaurante
+        w.writerow(["Data/Hora","Restaurante","Cooperado","Geral","Tratamento","Ambiente","Suporte",
+                    "Comentário","Média Ponderada","Sentimento","Temas","Crítico?"])
+        for a, rest_nome, coop_nome in rows:
+            trat = getattr(a, "estrelas_tratamento", None) or getattr(a, "estrelas_pontualidade", None)
+            amb  = getattr(a, "estrelas_ambiente",   None) or getattr(a, "estrelas_educacao", None)
+            sup  = getattr(a, "estrelas_suporte",    None) or getattr(a, "estrelas_eficiencia", None)
+            w.writerow([
+                a.criado_em.strftime("%d/%m/%Y %H:%M") if a.criado_em else "",
+                rest_nome, coop_nome,
+                a.estrelas_geral or 0,
+                (trat or 0), (amb or 0), (sup or 0),
+                (getattr(a, "comentario", "") or "").strip(),
+                (getattr(a, "media_ponderada", "") or ""),
+                (getattr(a, "sentimento", "") or ""),
+                (getattr(a, "temas", "") or ""),
+                "SIM" if getattr(a, "alerta_crise", False) else "NÃO",
+            ])
+    else:
+        # Restaurante -> Cooperado
+        w.writerow(["Data/Hora","Restaurante","Cooperado","Geral","Pontualidade","Educação","Eficiência","Apresentação",
+                    "Comentário","Média Ponderada","Sentimento","Temas","Crítico?"])
+        for a, rest_nome, coop_nome in rows:
+            w.writerow([
+                a.criado_em.strftime("%d/%m/%Y %H:%M") if a.criado_em else "",
+                rest_nome, coop_nome,
+                a.estrelas_geral or 0,
+                (getattr(a, "estrelas_pontualidade", 0) or 0),
+                (getattr(a, "estrelas_educacao", 0) or 0),
+                (getattr(a, "estrelas_eficiencia", 0) or 0),
+                (getattr(a, "estrelas_apresentacao", 0) or 0),
+                (getattr(a, "comentario", "") or "").strip(),
+                (getattr(a, "media_ponderada", "") or ""),
+                (getattr(a, "sentimento", "") or ""),
+                (getattr(a, "temas", "") or ""),
+                "SIM" if getattr(a, "alerta_crise", False) else "NÃO",
+            ])
+
+    mem = io.BytesIO(buf.getvalue().encode("utf-8-sig"))
+    return send_file(mem, as_attachment=True,
+                     download_name=f"avaliacoes_{tipo}.csv",
+                     mimetype="text/csv")
+
 # =========================
 # CRUD Receitas/Despesas Coop (Admin)
 # =========================
@@ -1119,6 +1925,186 @@ def delete_despesa(id):
     flash("Despesa excluída.", "success")
     return redirect(url_for("admin_dashboard", tab="despesas"))
 
+@app.get("/avisos", endpoint="avisos_publicos")
+def avisos_publicos():
+    t = session.get("user_tipo")
+    if t == "cooperado":
+        return redirect(url_for("portal_cooperado_avisos"))
+    if t == "restaurante":
+        return redirect(url_for("portal_restaurante_avisos"))
+    return redirect(url_for("login"))
+
+# admin_avisos.py (ou onde ficam suas rotas de admin)
+import re
+from datetime import datetime, time
+from flask import request, session, render_template, redirect, url_for, flash
+
+# se seu projeto já tiver essa função, pode remover esta versão
+def _parse_date(s: str | None):
+    if not s:
+        return None
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+@app.route("/admin/avisos", methods=["GET", "POST"])
+@admin_required
+def admin_avisos():
+    cooperados = Cooperado.query.order_by(Cooperado.nome.asc()).all()
+    restaurantes = Restaurante.query.order_by(Restaurante.nome.asc()).all()
+
+    if request.method == "POST":
+        f = request.form
+
+        # ——— Alcance/destino ———
+        alcance = f.get("destino_tipo")  # 'cooperados' | 'restaurantes' | 'ambos'
+        # subalcances:
+        coop_alc = f.get("coop_alcance") or f.get("coop_alcance_ambos")  # 'todos' | 'selecionados'
+        rest_alc = f.get("rest_alcance") or f.get("rest_alcance_ambos")  # 'todos' | 'selecionados'
+
+        sel_coops = request.form.getlist("dest_cooperados[]") or request.form.getlist("dest_cooperados_ambos[]")
+        sel_rests = request.form.getlist("dest_restaurantes[]") or request.form.getlist("dest_restaurantes_ambos[]")
+
+        if alcance == "cooperados":
+            tipo = "cooperado"
+        elif alcance == "restaurantes":
+            tipo = "restaurante"
+        elif alcance == "ambos":
+            # se ambos têm seleção -> trata como global
+            tipo = "global" if ((coop_alc == "todos" or sel_coops) and (rest_alc == "todos" or sel_rests)) else \
+                   ("cooperado" if (coop_alc == "todos" or sel_coops) else "restaurante")
+        else:
+            # fallback: se não veio nada do template novo
+            tipo = (f.get("tipo") or "global").strip()
+
+        # ——— Conteúdo ——— (aceita vários names do form)
+        def _pick_msg(form):
+            for key in (
+                "corpo_html", "html", "mensagem_html", "conteudo_html", "descricao_html", "texto_html",
+                "mensagem", "corpo", "conteudo", "descricao", "texto", "resumo", "body", "content"
+            ):
+                v = form.get(key)
+                if v and v.strip():
+                    return v.strip()
+            return ""
+        msg = _pick_msg(f)
+
+        a = Aviso(
+            titulo=(f.get("titulo") or "").strip(),
+            corpo=msg,  # <- salvamos sempre em Aviso.corpo
+            tipo=tipo,  # 'global' | 'cooperado' | 'restaurante'
+            prioridade=(f.get("prioridade") or "normal"),
+            fixado=False,  # ajuste se quiser
+            criado_por_id=session.get("user_id"),
+            inicio_em=(lambda d=_parse_date(f.get("inicio_em")): datetime.combine(d, time()) if d else None)(),
+            fim_em=(lambda d=_parse_date(f.get("fim_em")): datetime.combine(d, time()) if d else None)(),
+        )
+
+        # publica ativo se vier marcado
+        if hasattr(a, "ativo"):
+            a.ativo = bool(f.get("ativo"))
+
+        # confirmação de leitura se seu modelo tiver esse campo:
+        if hasattr(a, "exigir_confirmacao"):
+            a.exigir_confirmacao = bool(f.get("exigir_confirmacao"))
+
+        # Destinações
+        if tipo == "cooperado":
+            if coop_alc == "selecionados" and sel_coops:
+                try:
+                    a.destino_cooperado_id = int(sel_coops[0])  # modelo atual aceita 1 cooperado
+                    if len(sel_coops) > 1:
+                        flash("Aviso individual aceita apenas 1 cooperado; usando o primeiro.", "warning")
+                except Exception:
+                    pass
+
+        if tipo == "restaurante":
+            if rest_alc == "selecionados" and sel_rests:
+                ids = [int(x) for x in sel_rests]
+                a.restaurantes = Restaurante.query.filter(Restaurante.id.in_(ids)).all()
+
+        db.session.add(a)
+        db.session.commit()
+        flash("Aviso publicado.", "success")
+        return redirect(url_for("admin_avisos"))
+
+    # GET
+    avisos = Aviso.query.order_by(Aviso.fixado.desc(), Aviso.criado_em.desc()).all()
+    return render_template(
+        "admin_avisos.html",
+        avisos=avisos,
+        cooperados=cooperados,
+        restaurantes=restaurantes,
+    )
+
+# Toggle VISIBILIDADE (aceita POST e GET para evitar 405 ao usar link)
+@app.route("/admin/avisos/<int:aviso_id>/toggle", methods=["POST", "GET"])
+@admin_required
+def admin_avisos_toggle(aviso_id):
+    a = Aviso.query.get_or_404(aviso_id)
+    if hasattr(a, "ativo"):
+        a.ativo = not bool(a.ativo)
+    else:
+        a.fixado = not bool(a.fixado)
+    db.session.commit()
+    flash("Aviso atualizado.", "success")
+    return redirect(url_for("admin_avisos"))
+
+# EXCLUIR aviso (com limpeza segura das relações/leitorias)
+@app.route("/admin/avisos/<int:aviso_id>/excluir", methods=["POST"])
+@admin_required
+def admin_avisos_excluir(aviso_id):
+    a = Aviso.query.get_or_404(aviso_id)
+
+    # apaga confirmações/leitorias
+    try:
+        AvisoLeitura.query.filter_by(aviso_id=aviso_id).delete(synchronize_session=False)
+    except Exception:
+        pass
+
+    # limpa m2m com restaurantes, se existir
+    try:
+        if hasattr(a, "restaurantes"):
+            a.restaurantes.clear()
+    except Exception:
+        pass
+
+    db.session.delete(a)
+    db.session.commit()
+    flash("Aviso excluído.", "success")
+    return redirect(url_for("admin_avisos"))
+
+# (opcional) marcar lido universal
+@app.post("/avisos/<int:aviso_id>/lido")
+def marcar_aviso_lido_universal(aviso_id: int):
+    if "user_id" not in session:
+        return ("", 401)
+
+    user_id = session.get("user_id")
+    user_tipo = session.get("user_tipo")
+    Aviso.query.get_or_404(aviso_id)
+
+    if user_tipo == "cooperado":
+        coop = Cooperado.query.filter_by(usuario_id=user_id).first()
+        if not coop:
+            return ("", 403)
+        if not AvisoLeitura.query.filter_by(aviso_id=aviso_id, cooperado_id=coop.id).first():
+            db.session.add(AvisoLeitura(aviso_id=aviso_id, cooperado_id=coop.id, lido_em=datetime.utcnow()))
+            db.session.commit()
+        return ("", 204)
+
+    if user_tipo == "restaurante":
+        rest = Restaurante.query.filter_by(usuario_id=user_id).first()
+        if not rest:
+            return ("", 403)
+        if not AvisoLeitura.query.filter_by(aviso_id=aviso_id, restaurante_id=rest.id).first():
+            db.session.add(AvisoLeitura(aviso_id=aviso_id, restaurante_id=rest.id, lido_em=datetime.utcnow()))
+            db.session.commit()
+        return ("", 204)
+
+    return ("", 403)
+
 # =========================
 # CRUD Cooperados / Restaurantes / Senhas (Admin)
 # =========================
@@ -1140,9 +2126,13 @@ def add_cooperado():
     db.session.add(u)
     db.session.flush()
 
-    foto_url = _save_upload(foto)
-    c = Cooperado(nome=nome, usuario_id=u.id, foto_url=foto_url, ultima_atualizacao=datetime.now())
+    c = Cooperado(nome=nome, usuario_id=u.id, ultima_atualizacao=datetime.now())
     db.session.add(c)
+    db.session.flush()  # garante c.id
+
+    if foto and foto.filename:
+        _save_foto_to_db(c, foto, is_cooperado=True)
+
     db.session.commit()
     flash("Cooperado cadastrado.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
@@ -1156,7 +2146,7 @@ def edit_cooperado(id):
     c.usuario_ref.usuario = f.get("usuario", "").strip()
     foto = request.files.get("foto")
     if foto and foto.filename:
-        c.foto_url = _save_upload(foto)
+        _save_foto_to_db(c, foto, is_cooperado=True)
     c.ultima_atualizacao = datetime.now()
     db.session.commit()
     flash("Cooperado atualizado.", "success")
@@ -1206,9 +2196,11 @@ def add_restaurante():
     u.set_password(senha)
     db.session.add(u)
     db.session.flush()
-    foto_url = _save_upload(foto)
-    r = Restaurante(nome=nome, periodo=periodo, usuario_id=u.id, foto_url=foto_url)
+    r = Restaurante(nome=nome, periodo=periodo, usuario_id=u.id)
     db.session.add(r)
+    db.session.flush()  # garante r.id
+    if foto and foto.filename:
+        _save_foto_to_db(r, foto, is_cooperado=False)
     db.session.commit()
     flash("Estabelecimento cadastrado.", "success")
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
@@ -1223,7 +2215,7 @@ def edit_restaurante(id):
     r.usuario_ref.usuario = f.get("usuario", "").strip()
     foto = request.files.get("foto")
     if foto and foto.filename:
-        r.foto_url = _save_upload(foto)
+        _save_foto_to_db(r, foto, is_cooperado=False)
     db.session.commit()
     flash("Estabelecimento atualizado.", "success")
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
@@ -1253,6 +2245,42 @@ def reset_senha_restaurante(id):
     db.session.commit()
     flash("Senha do restaurante atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
+# app.py (ou onde ficam suas rotas)
+from flask import request, redirect, url_for, flash, session
+from werkzeug.security import check_password_hash, generate_password_hash
+@app.route("/rest/alterar-senha", methods=["POST"], endpoint="rest_alterar_senha")
+@role_required("restaurante")
+def alterar_senha_rest():
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+    user = rest.usuario_ref  # Usuario vinculado ao restaurante
+
+    atual = (request.form.get("senha_atual") or "").strip()
+    nova  = (request.form.get("senha_nova")  or "").strip()
+    conf  = (request.form.get("senha_conf")  or "").strip()
+
+    if not (nova and conf):
+        flash("Preencha todos os campos.", "warning")
+        return redirect(url_for("portal_restaurante", view="config"))
+    if nova != conf:
+        flash("A confirmação não confere com a nova senha.", "warning")
+        return redirect(url_for("portal_restaurante", view="config"))
+    if len(nova) < 6:
+        flash("A nova senha deve ter pelo menos 6 caracteres.", "warning")
+        return redirect(url_for("portal_restaurante", view="config"))
+
+    # exige senha atual somente se já houver uma definida
+    if user.senha_hash and not atual:
+        flash("Informe a senha atual.", "warning")
+        return redirect(url_for("portal_restaurante", view="config"))
+    if user.senha_hash and not check_password_hash(user.senha_hash, atual):
+        flash("Senha atual incorreta.", "danger")
+        return redirect(url_for("portal_restaurante", view="config"))
+
+    user.senha_hash = generate_password_hash(nova)
+    db.session.commit()
+    flash("Senha alterada com sucesso!", "success")
+    return redirect(url_for("portal_restaurante", view="config"))
 
 @app.route("/config/update", methods=["POST"])
 @admin_required
@@ -1526,7 +2554,7 @@ def upload_escala():
         if isinstance(v, date):
             return v.strftime("%d/%m/%Y")
         s = str(v).strip()
-        m = _re.fullmatch(r"(\d{4})[-/](\d{1,2})[-/](\d{1,2})", s)
+        m = re.fullmatch(r"(\d{4})[-/](\d{1,2})[-/](\d{1,2})", s)
         if m:
             y, mth, d = map(int, m.groups())
             try:
@@ -1832,6 +2860,26 @@ def portal_cooperado():
 
     ql = in_range(Lancamento.query.filter_by(cooperado_id=coop.id), Lancamento.data)
     producoes = ql.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
+    
+        # --- Marca se o cooperado já avaliou cada produção ---
+    ids = [l.id for l in producoes]
+    minhas = {}
+    if ids:
+        rows = (
+            db.session.query(
+                AvaliacaoRestaurante.lancamento_id,
+                AvaliacaoRestaurante.estrelas_geral
+            )
+            .filter(
+                AvaliacaoRestaurante.lancamento_id.in_(ids),
+                AvaliacaoRestaurante.cooperado_id == coop.id
+            )
+            .all()
+        )
+        minhas = {lid: nota for lid, nota in rows}
+
+    for l in producoes:
+        l.minha_avaliacao = minhas.get(l.id)
 
     qr = in_range(ReceitaCooperado.query.filter_by(cooperado_id=coop.id), ReceitaCooperado.data)
     receitas_coop = qr.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
@@ -2025,6 +3073,72 @@ def portal_cooperado():
         trocas_recebidas_historico=trocas_recebidas_historico,
         trocas_enviadas=trocas_enviadas,
     )
+
+from datetime import datetime
+from flask import request, redirect, url_for, flash, abort, session
+
+@app.post("/coop/avaliar/restaurante/<int:lanc_id>")
+@role_required("cooperado")
+def coop_avaliar_restaurante(lanc_id):
+    # 1) Cooperado logado
+    u_id = session.get("user_id")
+    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
+
+    # 2) Lançamento existe e é dele
+    lanc = Lancamento.query.get_or_404(lanc_id)
+    if lanc.cooperado_id != coop.id:
+        abort(403)
+
+    # 3) Já existe avaliação DESTE cooperado para ESTE lançamento?
+    ja = (AvaliacaoRestaurante.query
+          .filter_by(lancamento_id=lanc.id, cooperado_id=coop.id)
+          .first())
+    if ja:
+        flash("Você já avaliou esta produção.", "info")
+        return redirect(request.referrer or url_for("coop_dashboard"))
+
+    # 4) Lê os campos do form (suporta 'nota' simples OU 'av_geral')
+    f  = request.form
+    g  = _clamp_star(f.get("nota") or f.get("av_geral"))   # obrigatório
+    p  = _clamp_star(f.get("av_pontualidade"))
+    ed = _clamp_star(f.get("av_educacao"))
+    ef = _clamp_star(f.get("av_eficiencia"))
+    ap = _clamp_star(f.get("av_apresentacao"))
+    tx = (f.get("av_comentario") or "").strip()
+
+    if not g:
+        flash("Selecione uma nota de 1 a 5.", "warning")
+        return redirect(request.referrer or url_for("coop_dashboard"))
+
+    # 5) Cria e salva
+    a = AvaliacaoRestaurante(
+        restaurante_id=lanc.restaurante_id,
+        cooperado_id=coop.id,
+        lancamento_id=lanc.id,
+        estrelas_geral=g,
+        estrelas_pontualidade=p,
+        estrelas_educacao=ed,
+        estrelas_eficiencia=ef,
+        estrelas_apresentacao=ap,
+        comentario=tx,
+        media_ponderada=_media_ponderada(g, p, ed, ef, ap),
+        sentimento=_analise_sentimento(tx),
+        temas="; ".join(_identifica_temas(tx)),
+        alerta_crise=_sinaliza_crise(g, tx),
+        criado_em=datetime.utcnow(),
+    )
+    db.session.add(a)
+    db.session.commit()
+
+    flash("Avaliação do restaurante registrada.", "success")
+    return redirect(request.referrer or url_for("coop_dashboard"))
+
+# Alias para manter compatibilidade com o action do formulário
+@app.post("/producoes/<int:lanc_id>/avaliar", endpoint="producoes_avaliar")
+@role_required("cooperado")
+def producoes_avaliar(lanc_id):
+    # IMPORTANTÍSSIMO: retornar o que a função real retorna
+    return coop_avaliar_restaurante(lanc_id)
 
 @app.route("/painel/cooperado")
 @role_required("cooperado")
@@ -2305,6 +3419,8 @@ def lancar_producao():
     if not rest:
         abort(403)
     f = request.form
+
+    # 1) cria o lançamento normalmente
     l = Lancamento(
         restaurante_id=rest.id,
         cooperado_id=f.get("cooperado_id", type=int),
@@ -2316,8 +3432,48 @@ def lancar_producao():
         qtd_entregas=f.get("qtd_entregas", type=int),
     )
     db.session.add(l)
+    db.session.flush()  # garante l.id para amarrar avaliação
+
+    # 2) (OPCIONAL) lê os campos de avaliação se vieram do form
+    g   = _clamp_star(f.get("av_geral"))
+    p   = _clamp_star(f.get("av_pontualidade"))
+    ed  = _clamp_star(f.get("av_educacao"))
+    ef  = _clamp_star(f.get("av_eficiencia"))
+    ap  = _clamp_star(f.get("av_apresentacao"))
+    txt = (f.get("av_comentario") or "").strip()
+
+    tem_avaliacao = any(x is not None for x in (g, p, ed, ef, ap)) or bool(txt)
+    if tem_avaliacao:
+        media = _media_ponderada(g, p, ed, ef, ap)
+        senti = _analise_sentimento(txt)
+        temas = _identifica_temas(txt)
+        crise = _sinaliza_crise(g, txt)
+        feed  = _gerar_feedback(p, ed, ef, ap, txt, senti)
+
+        av = AvaliacaoCooperado(
+            restaurante_id=rest.id,
+            cooperado_id=l.cooperado_id,
+            lancamento_id=l.id,
+            estrelas_geral=g,
+            estrelas_pontualidade=p,
+            estrelas_educacao=ed,
+            estrelas_eficiencia=ef,
+            estrelas_apresentacao=ap,
+            comentario=txt,
+            media_ponderada=media,
+            sentimento=senti,
+            temas="; ".join(temas),
+            alerta_crise=crise,
+            feedback_motoboy=feed,
+        )
+        db.session.add(av)
+
+        # Alerta visível imediato (opcional)
+        if crise:
+            flash("⚠️ Avaliação crítica registrada (1★ + termo de risco). A gerência deve revisar.", "danger")
+
     db.session.commit()
-    flash("Produção lançada.", "success")
+    flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
     return redirect(url_for("portal_restaurante"))
 
 @app.route("/lancamentos/<int:id>/editar", methods=["GET", "POST"])
@@ -2355,6 +3511,73 @@ def excluir_lancamento(id):
     flash("Lançamento excluído.", "success")
     return redirect(url_for("portal_restaurante"))
 
+
+# =========================
+# Documentos (Admin + Público)
+# =========================
+@app.route("/admin/documentos")
+@admin_required
+def admin_documentos():
+    documentos = Documento.query.order_by(Documento.enviado_em.desc()).all()
+    return render_template("admin_documentos.html", documentos=documentos)
+
+@app.post("/admin/documentos/upload")
+@admin_required
+def admin_upload_documento():
+    f = request.form
+    titulo = (f.get("titulo") or "").strip()
+    categoria = (f.get("categoria") or "outro").strip()
+    descricao = (f.get("descricao") or "").strip()
+    arquivo = request.files.get("arquivo")
+    if not titulo or not (arquivo and arquivo.filename):
+        flash("Preencha o título e selecione o arquivo.", "warning")
+        return redirect(url_for("admin_documentos"))
+    from werkzeug.utils import secure_filename
+    fname = secure_filename(arquivo.filename)
+    base, ext = os.path.splitext(fname)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    fname_final = f"{re.sub(r'[^A-Za-z0-9_-]+','-', base)}_{ts}{ext}"
+    path = os.path.join(DOCS_DIR, fname_final)
+    arquivo.save(path)
+    url = f"/static/uploads/docs/{fname_final}"
+    d = Documento(titulo=titulo, categoria=categoria, descricao=descricao,
+                  arquivo_url=url, arquivo_nome=arquivo.filename, enviado_em=datetime.utcnow())
+    db.session.add(d)
+    db.session.commit()
+    flash("Documento publicado.", "success")
+    return redirect(url_for("admin_documentos"))
+
+@app.get("/admin/documentos/<int:doc_id>/delete")
+@admin_required
+def admin_delete_documento(doc_id):
+    d = Documento.query.get_or_404(doc_id)
+    try:
+        local_path = os.path.join(BASE_DIR, d.arquivo_url.lstrip("/"))
+        if os.path.exists(local_path):
+            os.remove(local_path)
+    except Exception:
+        pass
+    db.session.delete(d)
+    db.session.commit()
+    flash("Documento removido.", "success")
+    return redirect(url_for("admin_documentos"))
+
+@app.route("/documentos")
+def documentos_publicos():
+    uid = session.get("user_id")
+    if not uid:
+        return redirect(url_for("login"))
+    documentos = Documento.query.order_by(Documento.enviado_em.desc()).all()
+    return render_template("documentos_publicos.html", documentos=documentos)
+
+@app.route('/documentos/<int:doc_id>/baixar')
+def baixar_documento(doc_id):
+    doc = Documento.query.get_or_404(doc_id)
+    path = os.path.join(BASE_DIR, doc.arquivo_url.lstrip("/"))
+    if not os.path.exists(path):
+        abort(404)
+    return send_file(path, as_attachment=True, download_name=doc.arquivo_nome)
+
 # =========================
 # Inicialização automática do DB em servidores (Gunicorn/Render)
 # =========================
@@ -2368,6 +3591,425 @@ except Exception as _e:
     except Exception:
         pass
 
+
+@app.errorhandler(413)
+def too_large(e):
+    flash("Arquivo excede o tamanho máximo permitido (32MB).", "danger")
+    return redirect(url_for('admin_documentos'))
+
+# =========================
+# Inicialização automática do DB em servidores (Gunicorn/Render)
+# =========================
+try:
+    with app.app_context():
+        init_db()
+except Exception as _e:
+    ...
+
+# =========================
+# TABELAS
+# =========================
+
+# imports que podem já existir — deixe somente 1 vez no arquivo
+from flask import render_template, request, redirect, url_for, flash, session, send_file, abort
+from werkzeug.utils import secure_filename
+from datetime import datetime
+import os, re, unicodedata
+
+# ---------------- TABELAS (Admin) ----------------
+@app.route("/admin/tabelas")
+@admin_required
+def admin_tabelas():
+    tabelas = Tabela.query.order_by(Tabela.enviado_em.desc()).all()
+    return render_template("admin_tabelas.html", tabelas=tabelas)
+
+@app.post("/admin/tabelas/upload")
+@admin_required
+def admin_upload_tabela():
+    f = request.form
+    titulo = (f.get("titulo") or "").strip()
+    categoria = (f.get("categoria") or "outro").strip()
+    descricao = (f.get("descricao") or "").strip()
+    arquivo = request.files.get("arquivo")
+
+    if not titulo or not (arquivo and arquivo.filename):
+        flash("Preencha o título e selecione o arquivo.", "warning")
+        return redirect(url_for("admin_tabelas"))
+
+    fname = secure_filename(arquivo.filename)
+    base, ext = os.path.splitext(fname)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    safe_base = re.sub(r"[^A-Za-z0-9_-]+", "-", base)
+    fname_final = f"{safe_base}_{ts}{ext}"
+    path = os.path.join(TABELAS_DIR, fname_final)
+    arquivo.save(path)
+
+    url = f"/static/uploads/tabelas/{fname_final}"
+    t = Tabela(
+        titulo=titulo, categoria=categoria, descricao=descricao,
+        arquivo_url=url, arquivo_nome=arquivo.filename, enviado_em=datetime.utcnow()
+    )
+    db.session.add(t)
+    db.session.commit()
+
+    flash("Tabela publicada.", "success")
+    return redirect(url_for("admin_tabelas"))
+
+@app.get("/admin/tabelas/<int:tab_id>/delete")
+@admin_required
+def admin_delete_tabela(tab_id):
+    t = Tabela.query.get_or_404(tab_id)
+    try:
+        local_path = os.path.join(BASE_DIR, t.arquivo_url.lstrip("/"))
+        if os.path.exists(local_path):
+            os.remove(local_path)
+    except Exception:
+        pass
+    db.session.delete(t)
+    db.session.commit()
+    flash("Tabela removida.", "success")
+    return redirect(url_for("admin_tabelas"))
+
+
+# ---------------- TABELAS (Cooperado - lista autenticada) ----------------
+@app.route("/tabelas")
+def tabelas_publicas():
+    # Permite cooperado OU admin (usa seu modelo de sessão atual)
+    if session.get("user_tipo") not in {"cooperado", "admin"}:
+        return redirect(url_for("login"))
+    tabelas = Tabela.query.order_by(Tabela.enviado_em.desc()).all()
+    return render_template(
+        "tabelas_publicas.html",
+        tabelas=tabelas,
+        viewer_tipo=session.get("user_tipo")  # "cooperado" ou "admin"
+    )
+
+
+# ---------------- TABELAS (Restaurante) ----------------
+@app.route("/rest/tabelas")
+@role_required("restaurante")
+def rest_tabelas():
+    """
+    Página do restaurante para abrir/baixar SOMENTE a tabela cujo título
+    coincide (ou contém) o login do restaurante. Se não achar, mostra a mais recente.
+    """
+    u_id = session.get("user_id")
+    restaurante = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+
+    # login do restaurante (prioriza o login de usuário)
+    login_nome = (
+        getattr(getattr(restaurante, "usuario_ref", None), "usuario", None)
+        or getattr(restaurante, "usuario", None)
+        or (restaurante.nome or "")
+    )
+
+    tabelas = Tabela.query.order_by(Tabela.enviado_em.desc()).all()
+
+    def _norm(s: str) -> str:
+        s = unicodedata.normalize("NFD", (s or "").strip())
+        s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+        s = re.sub(r"\s+", " ", s)
+        return s.lower()
+
+    ln = _norm(login_nome)
+    match_exato = None
+    match_parcial = None
+
+    for t in tabelas:
+        tt = _norm(t.titulo)
+        if not tt or not ln:
+            continue
+        if tt == ln:
+            match_exato = t
+            break
+        if (ln in tt) or (tt in ln):
+            if not match_parcial:
+                match_parcial = t
+
+    # Fallback: se não achou por nome, usa a mais recente (se houver)
+    tabela_alvo = match_exato or match_parcial or (tabelas[0] if tabelas else None)
+
+    return render_template(
+        "restaurantes_tabelas.html",  # crie esse template simples de visualização
+        restaurante=restaurante,
+        login_nome=login_nome,
+        tabela=tabela_alvo
+    )
+
+# ---------------- Download compartilhado ----------------
+@app.route("/tabelas/<int:tab_id>/baixar")
+def baixar_tabela(tab_id):
+    # Permite qualquer usuário autenticado (cooperado, restaurante ou admin)
+    if session.get("user_tipo") not in {"cooperado", "restaurante", "admin"}:
+        return redirect(url_for("login"))
+
+    t = Tabela.query.get_or_404(tab_id)
+    path = os.path.join(BASE_DIR, t.arquivo_url.lstrip("/"))
+    if not os.path.exists(path):
+        abort(404)
+    return send_file(path, as_attachment=True, download_name=t.arquivo_nome)
+
+
+# =========================
+# AVISOS — Portais (cooperado)
+# =========================
+# === IMPORTS (garanta que já existam) ===
+from flask import g, session, url_for
+from datetime import datetime
+from sqlalchemy import or_
+
+# ---------- helper: conta avisos não lidos p/ usuário logado ----------
+def _avisos_nao_lidos_para_usuario():
+    if "user_id" not in session:
+        return 0, None
+
+    u_id   = session.get("user_id")
+    u_tipo = session.get("user_tipo")
+
+    if u_tipo == "cooperado":
+        coop = Cooperado.query.filter_by(usuario_id=u_id).first()
+        if not coop:
+            return 0, None
+        try:
+            avisos = get_avisos_for_cooperado(coop)  # usa sua função existente
+        except NameError:
+            # fallback simples: global + cooperado específico
+            avisos = (Aviso.query
+                      .filter(Aviso.ativo.is_(True))
+                      .filter(or_(Aviso.tipo == "global",
+                                  Aviso.tipo == "cooperado"))
+                      .order_by(Aviso.criado_em.desc())
+                      .all())
+        lidos_ids = {
+            a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
+            .filter(AvisoLeitura.cooperado_id == coop.id).all()
+        }
+        unread = [a for a in avisos if a.id not in lidos_ids]
+        return len(unread), url_for("portal_cooperado_avisos")
+
+    if u_tipo == "restaurante":
+        rest = Restaurante.query.filter_by(usuario_id=u_id).first()
+        if not rest:
+            return 0, None
+        try:
+            avisos = get_avisos_for_restaurante(rest)  # se você já tiver
+        except NameError:
+            # fallback: global + restaurante (associado ou broadcast)
+            avisos = (Aviso.query
+                      .filter(Aviso.ativo.is_(True))
+                      .filter(or_(Aviso.tipo == "global",
+                                  Aviso.tipo == "restaurante"))
+                      .order_by(Aviso.criado_em.desc())
+                      .all())
+        lidos_ids = {
+            a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
+            .filter(AvisoLeitura.restaurante_id == rest.id).all()
+        }
+        unread = [a for a in avisos if a.id not in lidos_ids]
+        return len(unread), url_for("portal_restaurante_avisos")
+
+    return 0, None
+
+# ---------- context processor: disponível em TODOS os templates ----------
+@app.context_processor
+def inject_avisos_banner():
+    try:
+        qtd, link = _avisos_nao_lidos_para_usuario()
+    except Exception:
+        qtd, link = 0, None
+    return {
+        "avisos_unread_count": qtd,
+        "avisos_unread_url": link
+    }
+
+from datetime import datetime
+from flask import render_template, request, redirect, url_for, session
+# (pressupõe que você já tenha: db, app, role_required, Cooperado, AvisoLeitura, get_avisos_for_cooperado)
+
+from sqlalchemy.inspection import inspect as sa_inspect
+from datetime import datetime
+from flask import render_template
+
+@app.get("/portal/cooperado/avisos")
+@role_required("cooperado")
+def portal_cooperado_avisos():
+    u_id = session.get("user_id")
+    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
+
+    # Avisos aplicáveis ao cooperado
+    avisos_db = get_avisos_for_cooperado(coop)
+
+    # Quais avisos este cooperado já leu
+    lidos_ids = {
+        a_id
+        for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
+        .filter(AvisoLeitura.cooperado_id == coop.id)
+        .all()
+    }
+
+    # Pega o texto do aviso (aceita vários nomes de campo)
+    def corpo_do_aviso(a: Aviso) -> str:
+        for k in (
+            "corpo_html", "html", "conteudo_html", "mensagem_html", "descricao_html", "texto_html",
+            "corpo", "mensagem", "conteudo", "descricao", "texto", "resumo", "body", "content"
+        ):
+            v = getattr(a, k, None)
+            if isinstance(v, str) and v.strip():
+                return v
+        return ""
+
+    # Monta os itens para o template
+    avisos = []
+    for a in avisos_db:
+        avisos.append({
+            "id": a.id,
+            "titulo": a.titulo or "Aviso",
+            "criado_em": a.criado_em,
+            "lido": (a.id in lidos_ids),
+            "prioridade_alta": (str(a.prioridade or "").lower() == "alta"),
+            "corpo_html": corpo_do_aviso(a),
+        })
+
+    avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
+
+    return render_template(
+        "portal_cooperado_avisos.html",
+        avisos=avisos,
+        avisos_nao_lidos_count=avisos_nao_lidos_count,
+        current_year=datetime.now().year,
+    )
+
+# =========================
+# AVISOS — Ações (cooperado)
+# =========================
+
+@app.post("/avisos/<int:aviso_id>/lido", endpoint="marcar_aviso_lido")
+@role_required("cooperado")
+def marcar_aviso_lido(aviso_id: int):
+    u_id = session.get("user_id")
+    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
+
+    aviso = Aviso.query.get_or_404(aviso_id)
+
+    ja_lido = AvisoLeitura.query.filter_by(
+        cooperado_id=coop.id, aviso_id=aviso.id
+    ).first()
+
+    if not ja_lido:
+        db.session.add(AvisoLeitura(
+            cooperado_id=coop.id,
+            aviso_id=aviso.id,
+            lido_em=datetime.utcnow(),
+        ))
+        db.session.commit()
+
+    # volta para a lista; se quiser voltar ancorado: + f"#aviso-{aviso.id}"
+    return redirect(url_for("portal_cooperado_avisos"))
+
+@app.post("/avisos/marcar-todos", endpoint="marcar_todos_avisos_lidos")
+@role_required("cooperado")
+def marcar_todos_avisos_lidos():
+    u_id = session.get("user_id")
+    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
+
+    # todos avisos visíveis ao cooperado
+    avisos = get_avisos_for_cooperado(coop)
+
+    # ids já lidos
+    lidos_ids = {
+        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
+        .filter(AvisoLeitura.cooperado_id == coop.id).all()
+    }
+
+    # persiste só os que faltam
+    now = datetime.utcnow()
+    for a in avisos:
+        if a.id not in lidos_ids:
+            db.session.add(AvisoLeitura(
+                cooperado_id=coop.id,
+                aviso_id=a.id,
+                lido_em=now,
+            ))
+
+    db.session.commit()
+    return redirect(url_for("portal_cooperado_avisos"))
+
+@app.get("/portal/restaurante/avisos")
+@role_required("restaurante")
+def portal_restaurante_avisos():
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+
+    # avisos aplicáveis
+    try:
+        avisos_db = get_avisos_for_restaurante(rest)
+    except NameError:
+        # fallback: global + restaurante (associados ou broadcast)
+        avisos_db = (Aviso.query
+                     .filter(Aviso.ativo.is_(True))
+                     .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
+                     .order_by(Aviso.fixado.desc(), Aviso.criado_em.desc())
+                     .all())
+
+    # ids já lidos
+    lidos_ids = {
+        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
+        .filter(AvisoLeitura.restaurante_id == rest.id).all()
+    }
+
+    def corpo_do_aviso(a: Aviso) -> str:
+        for k in ("corpo_html","html","conteudo_html","mensagem_html","descricao_html","texto_html",
+                  "corpo","conteudo","mensagem","descricao","texto","resumo","body","content"):
+            v = getattr(a, k, None)
+            if isinstance(v, str) and v.strip():
+                return v
+        return ""
+
+    avisos = [{
+        "id": a.id,
+        "titulo": a.titulo or "Aviso",
+        "criado_em": a.criado_em,
+        "lido": (a.id in lidos_ids),
+        "prioridade_alta": (str(a.prioridade or "").lower() == "alta"),
+        "corpo_html": corpo_do_aviso(a),
+    } for a in avisos_db]
+
+    avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
+    return render_template(
+        "portal_restaurante_avisos.html",   # crie/clone seu template
+        avisos=avisos,
+        avisos_nao_lidos_count=avisos_nao_lidos_count,
+        current_year=datetime.now().year,
+    )
+
+@app.post("/avisos-restaurante/marcar-todos", endpoint="marcar_todos_avisos_lidos_restaurante")
+@role_required("restaurante")
+def marcar_todos_avisos_lidos_restaurante():
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+
+    try:
+        avisos = get_avisos_for_restaurante(rest)
+    except NameError:
+        avisos = (Aviso.query
+                  .filter(Aviso.ativo.is_(True))
+                  .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
+                  .all())
+
+    lidos_ids = {
+        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
+        .filter(AvisoLeitura.restaurante_id == rest.id).all()
+    }
+
+    now = datetime.utcnow()
+    for a in avisos:
+        if a.id not in lidos_ids:
+            db.session.add(AvisoLeitura(
+                restaurante_id=rest.id, aviso_id=a.id, lido_em=now
+            ))
+    db.session.commit()
+    return redirect(url_for("portal_restaurante_avisos"))
+
 # =========================
 # Main
 # =========================
@@ -2375,3 +4017,5 @@ if __name__ == "__main__":
     with app.app_context():
         init_db()
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
+

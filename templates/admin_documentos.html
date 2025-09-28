@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin • Documentos</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <style>
+    :root{
+      --royal-blue:#2747d9; --hover-blue:#3b61e3;
+      --danger:#e74c3c; --success:#2ecc71; --warning:#f1c40f;
+      --sidebar-w:260px;
+    }
+    html,body{height:100%}
+    body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
+    .sidebar{width:var(--sidebar-w);height:100vh;position:fixed;left:0;top:0;background:var(--royal-blue);color:#fff;overflow-y:auto}
+    .brand{display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:20px 10px 12px}
+    .brand img{width:100%;max-width:180px;max-height:180px;height:auto;display:block;margin:0 auto 8px;border-radius:16px}
+    .brand h3{font-family:'Orbitron',sans-serif;font-size:1.6rem;margin:0;letter-spacing:2px;text-align:center;color:#fff}
+    .sidebar .nav-link{color:#fff;border-radius:10px;margin:6px 10px;padding:.6rem .8rem;display:flex;align-items:center;gap:.5rem}
+    .sidebar .nav-link:hover,.sidebar .nav-link.active{background:var(--hover-blue)}
+    .sidebar .nav-link i{width:18px}
+    .main{margin-left:var(--sidebar-w);max-width:calc(100vw - var(--sidebar-w));padding:18px}
+    .card{border-radius:12px;box-shadow:0 2px 6px #0002}
+    .btn-royal{background:var(--royal-blue);color:#fff}
+    .btn-royal:hover{background:var(--hover-blue)}
+    .badge-soft{background:#eef2ff;color:#223;border-radius:999px;padding:.15rem .55rem}
+    /* Documentos */
+    .doc-row{border:1px solid #e6e6e6;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fff}
+    .doc-title{font-weight:700}
+    .doc-cat{font-size:.85rem;color:#6c757d;text-transform:uppercase;letter-spacing:.04em}
+    @media(max-width:900px){
+      :root{--sidebar-w:64px}
+      .brand h3,.brand img{display:none}
+      .main{margin-left:var(--sidebar-w);max-width:calc(100vw - var(--sidebar-w))}
+      .sidebar .nav-link span{display:none}
+    }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar (igual ao dashboard) -->
+<aside class="sidebar">
+  <div class="brand">
+    <h5>Painel Central Coopex</h5>
+  </div>
+
+  <nav class="nav flex-column pb-3">
+    <!-- Links de abas do dashboard viram navegação para /admin?tab=... -->
+    <a class="nav-link" href="{{ url_for('admin_dashboard') }}?tab=resumo">
+      <i class="bi bi-graph-up"></i> <span>Resumo</span>
+    </a>
+    <a class="nav-link" href="{{ url_for('admin_dashboard') }}?tab=lancamentos">
+      <i class="bi bi-journal-text"></i> <span>Lançamentos</span>
+    </a>
+    <a class="nav-link" href="{{ url_for('admin_dashboard') }}?tab=receitas">
+      <i class="bi bi-cash"></i> <span>Receitas Coop</span>
+    </a>
+    <a class="nav-link" href="{{ url_for('admin_dashboard') }}?tab=despesas">
+      <i class="bi bi-cart-dash"></i> <span>Despesas Coop</span>
+    </a>
+    <a class="nav-link" href="{{ url_for('admin_dashboard') }}?tab=coop_receitas">
+      <i class="bi bi-cash-coin"></i> <span>Receitas Cooperados</span>
+    </a>
+    <a class="nav-link" href="{{ url_for('admin_dashboard') }}?tab=coop_despesas">
+      <i class="bi bi-people"></i> <span>Despesas Cooperados</span>
+    </a>
+    <a class="nav-link" href="{{ url_for('admin_dashboard') }}?tab=folha">
+      <i class="bi bi-receipt"></i> <span>Folha de Pagamento</span>
+    </a>
+    <a class="nav-link" href="{{ url_for('admin_dashboard') }}?tab=beneficios">
+      <i class="bi bi-heart-pulse"></i> <span>Benefícios</span>
+    </a>
+    <a class="nav-link" href="{{ url_for('admin_dashboard') }}?tab=cooperados">
+      <i class="bi bi-person-badge"></i> <span>Cooperados</span>
+    </a>
+    <a class="nav-link" href="{{ url_for('admin_dashboard') }}?tab=restaurantes">
+      <i class="bi bi-shop"></i> <span>Estabelecimentos</span>
+    </a>
+    <a class="nav-link" href="{{ url_for('admin_dashboard') }}?tab=escalas">
+      <i class="bi bi-calendar2-week"></i> <span>Escalas</span>
+    </a>
+
+    <!-- Páginas dedicadas -->
+    <a class="nav-link {% if request.endpoint == 'admin_documentos' %}active{% endif %}" href="{{ url_for('admin_documentos') }}">
+      <i class="bi bi-folder2"></i> <span>Documentos</span>
+    </a>
+    <a class="nav-link {% if request.endpoint == 'admin_tabelas' %}active{% endif %}" href="{{ url_for('admin_tabelas') }}">
+      <i class="bi bi-table"></i> <span>Tabelas</span>
+    </a>
+    <a class="nav-link {% if request.endpoint == 'admin_avisos' %}active{% endif %}" href="{{ url_for('admin_avisos') }}">
+      <i class="bi bi-megaphone"></i> <span>Avisos</span>
+    </a>
+
+    <a class="nav-link {% if request.endpoint == 'admin_dashboard' and request.args.get('tab') == 'config' %}active{% endif %}"
+   href="{{ url_for('admin_dashboard') }}?tab=config">
+  <i class="bi bi-gear"></i> <span>Configurações</span>
+</a>
+
+    <a class="nav-link" href="{{ url_for('logout') }}">
+      <i class="bi bi-box-arrow-right"></i> <span>Sair</span>
+    </a>
+  </nav>
+</aside>
+
+<!-- Main -->
+<main class="main">
+  <header class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="m-0">Documentos</h4>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('documentos_publicos') }}" class="btn btn-outline-secondary btn-sm">Ver como cooperado</a>
+      {% if request and request.referrer %}
+      {% endif %}
+    </div>
+  </header>
+
+  <section class="mb-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-upload"></i> Publicar novo documento</div>
+      <div class="card-body">
+        <form action="{{ url_for('admin_upload_documento') }}" method="post" enctype="multipart/form-data" class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label">Título *</label>
+            <input type="text" name="titulo" class="form-control" placeholder="Ex.: " required>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">Categoria</label>
+            <select name="categoria" class="form-select">
+              <option value="regimento">Regimento</option>
+              <option value="estatuto">Estatuto</option>
+              <option value="ata">Ata AGO</option>
+              <option value="ata">Ata AGE</option>
+              <option value="outro" selected>Outro</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Descrição (opcional)</label>
+            <input type="text" name="descricao" class="form-control" placeholder="Breve descrição do conteúdo">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label">Arquivo (PDF / Word) *</label>
+            <input type="file" name="arquivo" class="form-control" accept=".pdf,.doc,.docx,.odt,.rtf" required>
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-royal"><i class="bi bi-cloud-arrow-up"></i> Publicar</button>
+            <a class="btn btn-link" href="{{ url_for('documentos_publicos') }}">Ver como cooperado</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h5 class="mb-3">Documentos publicados</h5>
+    {% if not documentos %}
+      <div class="text-muted">Nenhum documento publicado ainda.</div>
+    {% else %}
+      <div class="list-group">
+        {% for d in documentos %}
+          <div class="doc-row">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div class="doc-title">{{ d.titulo }}</div>
+                <div class="doc-cat">
+                  {{ (d.categoria or 'outro')|upper }} • 
+                  {{ d.enviado_em.strftime('%d/%m/%Y %H:%M') if d.enviado_em else '' }}
+                </div>
+                {% if d.descricao %}
+                  <div class="text-muted small mt-1">{{ d.descricao }}</div>
+                {% endif %}
+              </div>
+              <div class="ms-3">
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('baixar_documento', doc_id=d.id) }}" target="_blank">Abrir</a>
+                <a class="btn btn-sm btn-outline-danger" href="{{ url_for('admin_delete_documento', doc_id=d.id) }}" onclick="return confirm('Remover este documento?')">Excluir</a>
+              </div>
+            </div>
+            <div class="small text-muted mt-2">Arquivo: {{ d.arquivo_nome or '—' }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+</main>
+
+<!-- JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

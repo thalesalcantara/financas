@@ -8,25 +8,25 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <style>
-    :root{ --royal-blue:#2747d9; --white:#fff; --danger:#e74c3c; --edit:#f1c40f; --sidebar-dark:#101218; --hover-blue:#3b61e3; }
+    :root{ --royal-blue:#2747d9; --white:#fff; --danger:#e74c3c; --edit:#f1c40f; --sidebar-dark:#101218; --hover-blue:#3b61e3; --muted:#6b7280; }
     body{ background:#191c20; font-family:'Roboto',Arial,sans-serif; min-height:100vh; }
-    .sidebar{ width:220px; height:100vh; position:fixed; top:0; left:0;
-      background:linear-gradient(160deg, var(--royal-blue) 80%, var(--sidebar-dark) 100%); color:var(--white); z-index:10; }
+    .sidebar{ width:220px; height:100vh; position:fixed; top:0; left:0; background:linear-gradient(160deg, var(--royal-blue) 80%, var(--sidebar-dark) 100%); color:var(--white); z-index:10; }
     .logo-area{ display:flex; flex-direction:column; align-items:center; padding:22px 0 12px; }
     .logo-img{ width:110px; height:110px; object-fit:contain; margin-bottom:8px; }
     .logo-title{ font-family:'Orbitron',Arial,sans-serif; font-size:1.35rem; text-align:center; letter-spacing:1.5px; }
-    .sidebar .nav-link{ color:var(--white); font-size:1.06rem; margin-bottom:7px; border-radius:7px; transition:background .2s; cursor:pointer; }
+    .sidebar .nav-link{ color:var(--white); font-size:1.06rem; margin-bottom:7px; border-radius:7px; transition:background .2s; cursor:pointer; display:flex; align-items:center; gap:8px; }
     .sidebar .nav-link.active, .sidebar .nav-link:hover{ background:var(--hover-blue); color:#fff; }
+    .sidebar .nav-link .badge{ margin-left:auto; }
+
     .main-content{ margin-left:230px; padding:25px 3vw 30px; min-height:100vh; }
-    .section-title{ font-family:'Orbitron',Arial,sans-serif; color:var(--royal-blue); font-size:1.4rem; margin-bottom:15px; }
+    .section-title{ font-family:'Orbitron',Arial,sans-serif; color:var(--royal-blue); font-size:1.4rem; margin-bottom:15px; display:flex; align-items:center; gap:10px; }
     .card-white{ background:#fff; border-radius:12px; padding:10px; box-shadow:0 2px 8px 0 #0002; margin-bottom:30px; }
     .cooperado-item{ display:flex; align-items:center; padding:9px 8px; border-bottom:1px solid #eee; cursor:pointer; transition:background .2s; }
     .cooperado-item:hover{ background:#f1f6ff; } .cooperado-item.selected{ background:#e6edfc; }
     .cooperado-item:last-child{ border-bottom:none; }
     .cooperado-avatar{ width:42px; height:42px; border-radius:50%; object-fit:cover; margin-right:10px; border:2px solid var(--royal-blue); }
     .cooperado-nome{ font-size:1rem; font-weight:600; color:#222; line-height:1.1; }
-    .btn-royal{ background:var(--royal-blue); color:#fff; }
-    .btn-royal:hover{ background:var(--hover-blue); color:#fff; }
+    .btn-royal{ background:var(--royal-blue); color:#fff; } .btn-royal:hover{ background:var(--hover-blue); color:#fff; }
     .btn-edit{ background:var(--edit); color:#191c20; } .btn-edit:hover{ background:#ffe566; color:#191c20; }
     .btn-delete{ background:var(--danger); color:#fff; } .btn-delete:hover{ background:#b93222; color:#fff; }
     .table thead{ background:var(--royal-blue); color:#fff; }
@@ -36,12 +36,23 @@
     .contrato-header{ font-weight:700; color:#2747d9; margin-top:.5rem; margin-bottom:.25rem; }
     .sticky-launch{ position:sticky; top:10px; z-index:5; }
     .search-input{ background:#f8f9ff; border:1px solid #e6e8f5; }
+    .muted{ color:var(--muted); }
+
+    /* Config */
+    .form-password .toggle{ cursor:pointer; user-select:none; }
+
+    /* Avisos */
+    .aviso-card{ border-left:6px solid #3b82f6; }
+    .aviso-card.lido{ border-left-color:#cbd5e1; opacity:.95; }
+    .aviso-card.prioridade{ border-left-color:#e74c3c; }
+    .aviso-title{ font-weight:700; font-size:1.1rem; }
+    .aviso-meta{ color:#6b7280; font-size:.9rem; }
+
     @media (max-width:800px){
       .sidebar{ width:70px; }
       .logo-title, .sidebar .nav-link span{ display:none; }
       .logo-img{ width:50px; height:50px; }
       .main-content{ margin-left:80px; padding:15px 1vw; }
-      .cooperado-nome{ font-size:.92em; }
     }
   </style>
 </head>
@@ -53,206 +64,79 @@
       <span class="logo-title">COOPEX</span>
     </div>
     <nav class="nav flex-column mt-4">
-      <!-- Link Cooperados (lançamentos) -->
-      <a class="nav-link {{ 'active' if (view|default('lancar') != 'escalas') else '' }}"
+      <a class="nav-link {{ 'active' if (view|default('lancar') not in ['escalas','config','avisos']) else '' }}"
          href="{{ url_for('portal_restaurante', view='lancar', data_inicio=filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else None, data_fim=filtro_fim.strftime('%Y-%m-%d') if filtro_fim else None) }}">
-        <i class="bi bi-person-lines-fill me-2"></i> <span>Cooperados</span>
+        <i class="bi bi-person-lines-fill"></i> <span>Cooperados</span>
       </a>
-      <!-- Link Escala Semanal -->
-      <a class="nav-link {{ 'active' if view=='escalas' else '' }}"
-         href="{{ url_for('portal_restaurante', view='escalas') }}">
-        <i class="bi bi-calendar-week me-2"></i> <span>Escala semanal</span>
+      <a class="nav-link {{ 'active' if view=='escalas' else '' }}" href="{{ url_for('portal_restaurante', view='escalas') }}">
+        <i class="bi bi-calendar-week"></i> <span>Escala semanal</span>
       </a>
-      <a class="nav-link" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right me-2"></i> <span>Sair</span></a>
+      <a class="nav-link {{ 'active' if request.endpoint=='rest_tabelas' else '' }}" href="{{ url_for('rest_tabelas') }}">
+        <i class="bi bi-table"></i> <span>Tabelas</span>
+      </a>
+      <a class="nav-link {{ 'active' if view=='config' else '' }}" href="{{ url_for('portal_restaurante', view='config') }}">
+        <i class="bi bi-gear"></i> <span>Configuração</span>
+      </a>
+      <a id="linkAvisos" class="nav-link {{ 'active' if request.endpoint=='portal_restaurante_avisos' else '' }}" href="{{ url_for('portal_restaurante_avisos') }}">
+        <i class="bi bi-megaphone"></i> <span>Avisos</span>
+        {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
+        {% if _cntAvisos > 0 %}<span class="badge text-bg-danger ms-auto">{{ _cntAvisos }}</span>{% endif %}
+      </a>
+      <a class="nav-link" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> <span>Sair</span></a>
     </nav>
   </div>
 
   <!-- Main -->
   <div class="main-content">
 
-    {% if view|default('lancar') != 'escalas' %}
-      <!-- ============= PÁGINA COOPERADOS (LANÇAMENTOS) ============= -->
-      <div class="section-title">Lançar Produção Diária</div>
+    <!-- Flashes -->
+    {% with msgs = get_flashed_messages(with_categories=True) %}
+      {% if msgs %}
+        <div class="mb-3">
+          {% for cat, msg in msgs %}
+            <div class="alert alert-{{ 'danger' if cat=='error' else cat }} py-2 px-3 mb-2">{{ msg|safe }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
 
-      <!-- Filtros & Totais -->
+    {% if view == 'config' %}
+      <!-- =================== CONFIGURAÇÃO =================== -->
+      <div class="section-title"><i class="bi bi-shield-lock"></i> Configuração</div>
       <div class="card-white">
-        <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
-          <input type="hidden" name="view" value="lancar">
-          <div class="col-md-3">
-            <label class="form-label">Início</label>
-            <input type="date" name="data_inicio" class="form-control"
-                   value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Fim</label>
-            <input type="date" name="data_fim" class="form-control"
-                   value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
-          </div>
-          <div class="col-md-3">
-            <div class="small text-muted mb-1">Período em uso</div>
-            <div class="badge text-bg-primary p-2">
-              {% if filtro_inicio and filtro_fim %}
-                {{ filtro_inicio.strftime('%d/%m/%Y') }} a {{ filtro_fim.strftime('%d/%m/%Y') }}
-              {% else %} — {% endif %}
+        <h5 class="mb-3"><i class="bi bi-shield-lock"></i> Trocar senha de acesso</h5>
+        <form class="row g-3 form-password" method="POST" action="{{ url_for('rest_alterar_senha') }}">
+          <div class="col-md-4">
+            <label class="form-label">Senha atual</label>
+            <div class="input-group">
+              <input type="password" class="form-control" name="senha_atual" required>
+              <span class="input-group-text toggle" onclick="togglePwd(this)"><i class="bi bi-eye"></i></span>
             </div>
           </div>
-          <div class="col-md-3 text-end">
-            <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
-            <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-arrow-counterclockwise"></i> Limpar</a>
+          <div class="col-md-4">
+            <label class="form-label">Nova senha</label>
+            <div class="input-group">
+              <input type="password" class="form-control" name="senha_nova" minlength="6" required>
+              <span class="input-group-text toggle" onclick="togglePwd(this)"><i class="bi bi-eye"></i></span>
+            </div>
+            <div class="form-text">Mínimo de 6 caracteres.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Confirmar nova senha</label>
+            <div class="input-group">
+              <input type="password" class="form-control" name="senha_conf" minlength="6" required>
+              <span class="input-group-text toggle" onclick="togglePwd(this)"><i class="bi bi-eye"></i></span>
+            </div>
+          </div>
+          <div class="col-12 text-end">
+            <button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button>
           </div>
         </form>
-
-        <hr class="my-3">
-
-        <div class="row g-3">
-          <div class="col-md-3">
-            <div class="stat">
-              <div class="label">Total a pagar (R$)</div>
-              <div class="val">{{ '%.2f'|format(total_bruto or 0) }}</div>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="stat">
-              <div class="label">Qtd. de Lançamentos</div>
-              <div class="val">{{ total_qtd or 0 }}</div>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="stat">
-              <div class="label">Entregas no período</div>
-              <div class="val">{{ total_entregas or 0 }}</div>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <!-- Layout: Coluna esquerda (busca+lista) | Coluna direita (form fixo + tabela dinâmica) -->
-      <div class="row">
-        <!-- Coluna esquerda: Busca com datalist + Select + Lista -->
-        <div class="col-lg-4 mb-3">
-          <div class="card-white">
-            <!-- Grupo: busca com lista suspensa embutida (datalist) + select lateral -->
-            <div class="input-group mb-2">
-              <span class="input-group-text"><i class="bi bi-search"></i></span>
-              <!-- Busca com datalist (sugestões embutidas enquanto digita) -->
-              <input id="buscaCoop" type="text" class="form-control search-input"
-                     placeholder="Buscar cooperado pelo nome..."
-                     list="cooperadosList">
-              <datalist id="cooperadosList">
-                {% for coop in cooperados %}
-                  <option value="{{ coop.nome }}"></option>
-                {% endfor %}
-              </datalist>
-              <!-- Select embutido com todos os cooperados -->
-              <select id="selectCoop" class="form-select" title="Selecionar cooperado">
-                <option value="">Lista...</option>
-                {% for coop in cooperados %}
-                  <option value="{{ coop.id }}">{{ coop.nome }}</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <!-- Lista clicável (leve, rolagem própria) -->
-            <div id="listaCooperados" style="max-height:60vh; overflow:auto;">
-              {% for coop in cooperados %}
-              <div class="cooperado-item" data-id="{{ coop.id }}"
-                   data-nome="{{ coop.nome }}"
-                   data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
-                   data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}">
-                <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}" class="cooperado-avatar" alt="">
-                <div class="d-flex flex-column">
-                  <span class="cooperado-nome">{{ coop.nome }}</span>
-                  <small class="text-muted">Total no período: R$ {{ '%.2f'|format(coop.total_periodo or 0) }}</small>
-                </div>
-              </div>
-              {% else %}
-                <div class="text-muted small">Nenhum cooperado encontrado.</div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-
-        <!-- Coluna direita: Formulário fixo + Tabela dinâmica -->
-        <div class="col-lg-8">
-          <!-- Cabeçalho do cooperado + FORM FIXO -->
-          <div class="card-white sticky-launch" id="blocoLancamento">
-            <div class="text-center mb-2" id="selectedHeader" style="display:none;">
-              <img id="selFoto" src="" class="cooperado-avatar" style="width:90px; height:90px; border:4px solid var(--royal-blue);" alt="">
-              <div class="fw-bold fs-5 mt-1" id="selNome"></div>
-              <div class="text-muted">Total no período: R$ <span id="selTotal">0,00</span></div>
-            </div>
-
-            <div class="alert alert-info py-2 px-3 mb-2" id="hintSelecione">
-              Selecione um cooperado na lista, no campo de busca ou no seletor ao lado para lançar.
-            </div>
-
-            <form id="formLancamento" method="POST" action="{{ url_for('lancar_producao') }}" class="row g-2 align-items-end mb-1" style="display:none;">
-              <input type="hidden" name="cooperado_id" id="inputCooperadoId" value="">
-              <div class="col-md-3">
-                <label class="form-label">Valor (R$)</label>
-                <input type="number" class="form-control" name="valor" step="0.01" required>
-              </div>
-              <div class="col-md-3">
-                <label class="form-label">Data</label>
-                <input type="date" class="form-control" name="data" required>
-              </div>
-              <div class="col-md-3">
-                <label class="form-label">Hora Início</label>
-                <input type="time" class="form-control" name="hora_inicio">
-              </div>
-              <div class="col-md-3">
-                <label class="form-label">Hora Fim</label>
-                <input type="time" class="form-control" name="hora_fim">
-              </div>
-              <div class="col-md-3">
-                <label class="form-label">Entregas</label>
-                <input type="number" class="form-control" name="qtd_entregas" min="0" step="1" placeholder="">
-              </div>
-              <div class="col-12 text-end">
-                <button class="btn btn-royal"><i class="bi bi-plus-circle"></i> Lançar</button>
-              </div>
-            </form>
-          </div>
-
-          <!-- Tabelas (uma por cooperado, mostradas sob demanda) -->
-          <div id="blocoTabelas">
-            {% for coop in cooperados %}
-            <div id="tabela-{{ coop.id }}" class="card-white lancamentos-table" style="display:none;">
-              <table class="table table-bordered table-hover table-light align-middle">
-                <thead>
-                  <tr>
-                    <th>Valor</th>
-                    <th>Data</th>
-                    <th>Horário</th>
-                    <th>Entregas</th>
-                    <th>Editar</th>
-                    <th>Excluir</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for lanc in coop.lancamentos %}
-                  <tr>
-                    <td>R$ {{ '%.2f'|format(lanc.valor or 0) }}</td>
-                    <td>{{ lanc.data.strftime('%d/%m/%Y') if lanc.data }}</td>
-                    <td>{{ lanc.hora_inicio or '' }}{% if lanc.hora_inicio or lanc.hora_fim %} às {% endif %}{{ lanc.hora_fim or '' }}</td>
-                    <td>{{ lanc.qtd_entregas if lanc.qtd_entregas is not none else '-' }}</td>
-                    <td><a href="{{ url_for('editar_lancamento', id=lanc.id) }}" class="btn btn-edit btn-sm"><i class="bi bi-pencil"></i></a></td>
-                    <td><a href="{{ url_for('excluir_lancamento', id=lanc.id) }}" class="btn btn-delete btn-sm"><i class="bi bi-trash"></i></a></td>
-                  </tr>
-                  {% else %}
-                  <tr><td colspan="6" class="text-center text-muted">Nenhum lançamento no período selecionado</td></tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-
-    {% else %}
-      <!-- ============= PÁGINA ESCALA (SEMANA ou DIA) ============= -->
-      <div class="section-title">Escala semanal</div>
+    {% elif view == 'escalas' %}
+      <!-- =================== ESCALA =================== -->
+      <div class="section-title"><i class="bi bi-calendar-week"></i> Escala semanal</div>
 
       <div class="card-white">
         <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
@@ -323,12 +207,7 @@
 
             <table class="table table-bordered table-hover table-light align-middle">
               <thead>
-                <tr>
-                  <th>Contrato</th>
-                  <th>Cooperado</th>
-                  <th>Turno</th>
-                  <th>Horário</th>
-                </tr>
+                <tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr>
               </thead>
               <tbody>
                 {% set lista = agenda.get(ref_data, []) %}
@@ -352,110 +231,474 @@
           </div>
         {% endif %}
       </div>
+
+    {% elif view == 'avisos' %}
+      {# =================== AVISOS =================== #}
+      {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
+      {% set _unread_from_list = (_avisos | selectattr('lido','equalto',False) | list | length) %}
+      {% set _unread_from_ctx = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
+      {% set _unread = _unread_from_list if (_avisos is not none) else _unread_from_ctx %}
+
+      <div class="section-title">
+        <i class="bi bi-megaphone-fill"></i> Avisos
+        {% if (_unread_from_list or _unread_from_ctx) > 0 %}
+          <span id="badgeTitulo" class="badge text-bg-danger">{{ _unread_from_list if _unread_from_list>0 else _unread_from_ctx }} não lido(s)</span>
+        {% else %}
+          <span id="badgeTitulo" class="badge text-bg-success">Tudo lido</span>
+        {% endif %}
+      </div>
+
+      <div class="card-white">
+        <div class="d-flex align-items-center gap-2">
+          <form method="POST" action="{{ url_for('marcar_todos_avisos_lidos_restaurante') }}" class="m-0">
+            <button class="btn btn-royal" type="submit" {% if (_unread_from_list or _unread_from_ctx) == 0 %}disabled{% endif %}>
+              <i class="bi bi-check2-circle me-1"></i> Marcar todos como lidos
+            </button>
+          </form>
+
+          <div class="form-check ms-auto">
+            <input class="form-check-input" type="checkbox" id="toggleNaoLidos">
+            <label class="form-check-label" for="toggleNaoLidos" style="cursor:pointer;">Mostrar apenas não lidos</label>
+          </div>
+        </div>
+      </div>
+
+      {% if _unread_from_ctx > 0 and (_avisos | length) == 0 %}
+        <div class="card-white">
+          <div class="alert alert-warning mb-0">
+            Existem {{ _unread_from_ctx }} aviso(s) não lido(s), porém nenhum item foi carregado nesta página.
+            Verifique se a rota do dashboard está preenchendo a variável <code>avisos</code> para este restaurante.
+          </div>
+        </div>
+      {% endif %}
+
+      {% if _avisos and (_avisos | length) > 0 %}
+        {% for a in _avisos %}
+          <div id="aviso-{{ a.id }}" class="card-white aviso-card {% if a.lido %}lido{% endif %} {% if a.prioridade_alta %}prioridade{% endif %}" data-lido="{{ '1' if a.lido else '0' }}">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div class="aviso-title">
+                  {{ a.titulo or 'Aviso' }}
+                  {% if a.prioridade_alta %}
+                    <span class="badge text-bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Prioridade</span>
+                  {% endif %}
+                </div>
+                <div class="aviso-meta">
+                  Publicado em {{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em }}
+                  {% if a.lido %} • <span class="text-success">Lido</span>{% else %} • <span class="text-danger">Não lido</span>{% endif %}
+                </div>
+              </div>
+
+              <div class="ms-3">
+                {% if not a.lido %}
+                  <button
+                    class="btn btn-outline-primary btn-sm"
+                    data-acao="marcar-lido"
+                    data-id="{{ a.id }}"
+                    data-url="{{ url_for('marcar_aviso_lido_universal', aviso_id=a.id) }}">
+                    <i class="bi bi-check2"></i> Marcar como lido
+                  </button>
+                {% endif %}
+              </div>
+            </div>
+
+            <hr class="my-2">
+            <div class="aviso-body">
+              {{ a.corpo_html | safe if a.corpo_html else (a.conteudo or a.texto or '') }}
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="card-white"><div class="text-muted"><i class="bi bi-inbox me-1"></i> Nenhum aviso disponível no momento.</div></div>
+      {% endif %}
+
+    {% else %}
+      <!-- =================== COOPERADOS / LANÇAMENTOS =================== -->
+      <div class="section-title">Lançar Produção Diária</div>
+
+      <div class="card-white">
+        <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
+          <input type="hidden" name="view" value="lancar">
+          <div class="col-md-3">
+            <label class="form-label">Início</label>
+            <input type="date" name="data_inicio" class="form-control" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Fim</label>
+            <input type="date" name="data_fim" class="form-control" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
+          </div>
+          <div class="col-md-3">
+            <div class="small text-muted mb-1">Período em uso</div>
+            <div class="badge text-bg-primary p-2">
+              {% if filtro_inicio and filtro_fim %}
+                {{ filtro_inicio.strftime('%d/%m/%Y') }} a {{ filtro_fim.strftime('%d/%m/%Y') }}
+              {% else %} — {% endif %}
+            </div>
+          </div>
+          <div class="col-md-3 text-end">
+            <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-arrow-counterclockwise"></i> Limpar</a>
+          </div>
+        </form>
+
+        <hr class="my-3">
+
+        <div class="row g-3">
+          <div class="col-md-3"><div class="stat"><div class="label">Total a pagar (R$)</div><div class="val">{{ '%.2f'|format(total_bruto or 0) }}</div></div></div>
+          <div class="col-md-3"><div class="stat"><div class="label">Qtd. de Lançamentos</div><div class="val">{{ total_qtd or 0 }}</div></div></div>
+          <div class="col-md-3"><div class="stat"><div class="label">Entregas no período</div><div class="val">{{ total_entregas or 0 }}</div></div></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-lg-4 mb-3">
+          <div class="card-white">
+            <div class="input-group mb-2">
+              <span class="input-group-text"><i class="bi bi-search"></i></span>
+              <input id="buscaCoop" type="text" class="form-control search-input" placeholder="Buscar cooperado pelo nome..." list="cooperadosList">
+              <datalist id="cooperadosList">{% for coop in cooperados %}<option value="{{ coop.nome }}"></option>{% endfor %}</datalist>
+              <select id="selectCoop" class="form-select"><option value="">Lista...</option>{% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}</select>
+            </div>
+            <div id="listaCooperados" style="max-height:60vh; overflow:auto;">
+              {% for coop in cooperados %}
+              <div class="cooperado-item" data-id="{{ coop.id }}" data-nome="{{ coop.nome }}" data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}" data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}">
+                <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}" class="cooperado-avatar" alt="">
+                <div class="d-flex flex-column"><span class="cooperado-nome">{{ coop.nome }}</span><small class="text-muted">Total no período: R$ {{ '%.2f'|format(coop.total_periodo or 0) }}</small></div>
+              </div>
+              {% else %}<div class="text-muted small">Nenhum cooperado encontrado.</div>{% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-8">
+          <div class="card-white sticky-launch" id="blocoLancamento">
+            <div class="text-center mb-2" id="selectedHeader" style="display:none;">
+              <img id="selFoto" src="" class="cooperado-avatar" style="width:90px; height:90px; border:4px solid var(--royal-blue);" alt="">
+              <div class="fw-bold fs-5 mt-1" id="selNome"></div>
+              <div class="text-muted">Total no período: R$ <span id="selTotal">0,00</span></div>
+            </div>
+
+            <div class="alert alert-info py-2 px-3 mb-2" id="hintSelecione">
+              Selecione um cooperado na lista, no campo de busca ou no seletor ao lado para lançar.
+            </div>
+
+            <!-- FORM DE LANÇAMENTO + AVALIAÇÃO -->
+            <form id="formLancamento" method="POST" action="{{ url_for('lancar_producao') }}" class="row g-2 align-items-end mb-1" style="display:none;">
+              <input type="hidden" name="cooperado_id" id="inputCooperadoId" value="">
+              <div class="col-md-3"><label class="form-label">Valor (R$)</label><input type="number" class="form-control" name="valor" step="0.01" required></div>
+              <div class="col-md-3"><label class="form-label">Data</label><input type="date" class="form-control" name="data" required></div>
+              <div class="col-md-3"><label class="form-label">Hora Início</label><input type="time" class="form-control" name="hora_inicio"></div>
+              <div class="col-md-3"><label class="form-label">Hora Fim</label><input type="time" class="form-control" name="hora_fim"></div>
+              <div class="col-md-3"><label class="form-label">Entregas</label><input type="number" class="form-control" name="qtd_entregas" min="0" step="1"></div>
+
+              <!-- Toggle de Avaliação -->
+              <div class="col-12"><hr class="my-2"></div>
+              <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="chkAvaliar"
+                         onclick="document.getElementById('boxAval').style.display=this.checked?'block':'none'; document.getElementById('inputAvaliar').value=this.checked?'1':'0';">
+                  <label class="form-check-label" for="chkAvaliar">Registrar avaliação do cooperado agora</label>
+                </div>
+                <input type="hidden" name="avaliar" id="inputAvaliar" value="0">
+              </div>
+
+              <!-- Bloco de Avaliação -->
+              <div id="boxAval" class="row g-2" style="display:none;">
+                <div class="col-md-3">
+                  <label class="form-label">Geral</label>
+                  <select class="form-select" name="av_geral">
+                    <option value="">—</option>
+                    {% for n in range(1,6) %}<option value="{{n}}">{{n}} ★</option>{% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Pontualidade</label>
+                  <select class="form-select" name="av_pontualidade">
+                    <option value="">—</option>
+                    {% for n in range(1,6) %}<option value="{{n}}">{{n}} ★</option>{% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Educação</label>
+                  <select class="form-select" name="av_educacao">
+                    <option value="">—</option>
+                    {% for n in range(1,6) %}<option value="{{n}}">{{n}} ★</option>{% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Eficiência / Cuidado</label>
+                  <select class="form-select" name="av_eficiencia">
+                    <option value="">—</option>
+                    {% for n in range(1,6) %}<option value="{{n}}">{{n}} ★</option>{% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Bem apresentado</label>
+                  <select class="form-select" name="av_apresentacao">
+                    <option value="">—</option>
+                    {% for n in range(1,6) %}<option value="{{n}}">{{n}} ★</option>{% endfor %}
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Comentário (opcional)</label>
+                  <textarea class="form-control" name="av_comentario" rows="2" placeholder="Conte rapidamente como foi a experiência..."></textarea>
+                  <div class="form-text">Usamos este texto para identificar <b>temas</b> e <b>sentimento</b>.</div>
+                </div>
+              </div>
+
+              <div class="col-12 text-end mt-2">
+                <button class="btn btn-royal"><i class="bi bi-plus-circle"></i> Lançar</button>
+              </div>
+            </form>
+            <!-- /FORM -->
+          </div>
+
+          <div id="blocoTabelas">
+            {% for coop in cooperados %}
+            <div id="tabela-{{ coop.id }}" class="card-white lancamentos-table" style="display:none;">
+              <table class="table table-bordered table-hover table-light align-middle">
+                <thead><tr><th>Valor</th><th>Data</th><th>Horário</th><th>Entregas</th><th>Editar</th><th>Excluir</th></tr></thead>
+                <tbody>
+                  {% for lanc in coop.lancamentos %}
+                  <tr>
+                    <td>R$ {{ '%.2f'|format(lanc.valor or 0) }}</td>
+                    <td>{{ lanc.data.strftime('%d/%m/%Y') if lanc.data }}</td>
+                    <td>{{ lanc.hora_inicio or '' }}{% if lanc.hora_inicio or lanc.hora_fim %} às {% endif %}{{ lanc.hora_fim or '' }}</td>
+                    <td>{{ lanc.qtd_entregas if lanc.qtd_entregas is not none else '-' }}</td>
+                    <td><a href="{{ url_for('editar_lancamento', id=lanc.id) }}" class="btn btn-edit btn-sm"><i class="bi bi-pencil"></i></a></td>
+                    <td><a href="{{ url_for('excluir_lancamento', id=lanc.id) }}" class="btn btn-delete btn-sm"><i class="bi bi-trash"></i></a></td>
+                  </tr>
+                  {% else %}<tr><td colspan="6" class="text-center text-muted">Nenhum lançamento no período selecionado</td></tr>{% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
     {% endif %}
   </div>
 
+  <!-- TOAST de novos avisos -->
+  {% set _avisos_for_toast = avisos if avisos is defined and avisos is not none else [] %}
+  {% set _unread_from_list_t = (_avisos_for_toast | selectattr('lido','equalto',False) | list | length) %}
+  {% set _unread_from_ctx_t = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
+  {% set _toast_unread = _unread_from_list_t if _unread_from_list_t>0 else _unread_from_ctx_t %}
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1055;">
+    <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="8000">
+      <div class="toast-header">
+        <i class="bi bi-megaphone-fill me-2"></i><strong class="me-auto">Novos avisos</strong><small>agora</small>
+        <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
+      </div>
+      <div class="toast-body">
+        Você tem {{ _toast_unread }} aviso(s) não lido(s).
+        <a href="{{ url_for('portal_restaurante_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST de confirmação (marcar como lido) -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1056;">
+    <div id="toastOK" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="2500">
+      <div class="toast-header">
+        <i class="bi bi-check2-circle text-success me-2"></i>
+        <strong class="me-auto">Pronto</strong>
+        <small>agora</small>
+        <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
+      </div>
+      <div class="toast-body">Aviso marcado como lido.</div>
+    </div>
+  </div>
+
+  <!-- MODAL: Pergunta se deseja avaliar ao enviar -->
+  <div class="modal fade" id="modalAval" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-stars me-1"></i> Deseja avaliar agora?</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          Você pode registrar a avaliação do cooperado agora ou enviar o lançamento sem avaliação.
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" id="btnPularAval">Pular e enviar</button>
+          <button type="button" class="btn btn-royal" id="btnAvaliarAgora">Avaliar agora</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- /MODAL -->
+
   <script>
+    function togglePwd(el){
+      const i = el.previousElementSibling;
+      if(!i) return;
+      i.type = i.type==='password'?'text':'password';
+      el.querySelector('i').classList.toggle('bi-eye');
+      el.querySelector('i').classList.toggle('bi-eye-slash');
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
-      const isLanc = "{{ view|default('lancar') }}" !== "escalas";
-      if (!isLanc) return;
+      const viewNow = "{{ view|default('lancar') }}";
 
-      const busca = document.getElementById('buscaCoop');
-      const select = document.getElementById('selectCoop');
-      const itens = Array.from(document.querySelectorAll('.cooperado-item'));
-      const form = document.getElementById('formLancamento');
-      const hint = document.getElementById('hintSelecione');
-      const header = document.getElementById('selectedHeader');
-      const inputCoopId = document.getElementById('inputCooperadoId');
+      // ===== Lançamentos (UI local) =====
+      if (!['escalas','config','avisos'].includes(viewNow)) {
+        const busca = document.getElementById('buscaCoop');
+        const select = document.getElementById('selectCoop');
+        const itens = Array.from(document.querySelectorAll('.cooperado-item'));
+        const form = document.getElementById('formLancamento');
+        const hint = document.getElementById('hintSelecione');
+        const header = document.getElementById('selectedHeader');
+        const inputCoopId = document.getElementById('inputCooperadoId');
+        const selFoto = document.getElementById('selFoto');
+        const selNome = document.getElementById('selNome');
+        const selTotal = document.getElementById('selTotal');
 
-      const selFoto = document.getElementById('selFoto');
-      const selNome = document.getElementById('selNome');
-      const selTotal = document.getElementById('selTotal');
+        const mapByName = {}; itens.forEach(el => { const n = (el.dataset.nome||'').toLowerCase(); if(n) mapByName[n] = el; });
+        function getItemById(id){ return itens.find(el => el.dataset.id === String(id)); }
 
-      // Mapa nome -> elemento da lista (para datalist / busca)
-      const mapByName = {};
-      itens.forEach(el => {
-        const n = (el.getAttribute('data-nome') || '').toLowerCase();
-        if (n) mapByName[n] = el;
-      });
+        function mostrarCooperado(el){
+          if (!el) return;
+          itens.forEach(i => i.classList.remove('selected')); el.classList.add('selected');
+          const id = el.dataset.id; selFoto.src = el.dataset.foto; selNome.textContent = el.dataset.nome; selTotal.textContent = el.dataset.total; inputCoopId.value = id;
+          header.style.display = 'block'; form.style.display = 'flex'; hint.style.display = 'none';
+          document.querySelectorAll('.lancamentos-table').forEach(t => t.style.display = 'none');
+          const tabela = document.getElementById('tabela-' + id); if (tabela) tabela.style.display = 'block';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        itens.forEach(el => el.addEventListener('click', () => mostrarCooperado(el)));
 
-      function getItemById(id){
-        return itens.find(el => el.getAttribute('data-id') === String(id));
+        if (busca){
+          busca.addEventListener('input', function(){
+            const q = this.value.trim().toLowerCase();
+            itens.forEach(el => { el.style.display = (el.dataset.nome||'').toLowerCase().includes(q) ? '' : 'none'; });
+          });
+          function acionarPorNome(){
+            const valor = busca.value.trim().toLowerCase();
+            if (!valor) return;
+            let alvo = mapByName[valor] || itens.find(el => (el.dataset.nome||'').toLowerCase().includes(valor));
+            if (alvo) mostrarCooperado(alvo);
+          }
+          busca.addEventListener('change', acionarPorNome);
+          busca.addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); acionarPorNome(); } });
+        }
+        select?.addEventListener('change', function(){ const el = getItemById(this.value); if (el) mostrarCooperado(el); });
+        const primeiroVisivel = itens.find(el => el.style.display !== 'none'); if (primeiroVisivel) mostrarCooperado(primeiroVisivel);
+
+        // ===== Perguntar avaliação no submit =====
+        const boxAval = document.getElementById('boxAval');
+        const inputAvaliar = document.getElementById('inputAvaliar');
+        const chkAvaliar = document.getElementById('chkAvaliar');
+        const modalAvalEl = document.getElementById('modalAval');
+        const modalAval = modalAvalEl ? new bootstrap.Modal(modalAvalEl) : null;
+
+        function algumCampoDeAvaliacaoPreenchido() {
+          const nomes = ['av_geral','av_pontualidade','av_educacao','av_eficiencia','av_apresentacao','av_comentario'];
+          return nomes.some(n => {
+            const el = form.querySelector(`[name="${n}"]`);
+            return el && String(el.value || '').trim() !== '';
+          });
+        }
+
+        if (form && modalAval) {
+          let allowSubmit = false;
+          form.addEventListener('submit', function(e) {
+            if (allowSubmit) return; // deixa passar na 2ª vez (pular)
+            const jaMarcouAvaliar = inputAvaliar?.value === '1';
+            const temAlgoPreenchido = algumCampoDeAvaliacaoPreenchido();
+            // Se não marcou avaliar e não preencheu nada, perguntar:
+            if (!jaMarcouAvaliar && !temAlgoPreenchido) {
+              e.preventDefault();
+              modalAval.show();
+            }
+          });
+
+          document.getElementById('btnAvaliarAgora')?.addEventListener('click', () => {
+            if (boxAval && inputAvaliar) {
+              boxAval.style.display = 'block';
+              inputAvaliar.value = '1';
+              if (chkAvaliar) chkAvaliar.checked = true;
+              modalAval.hide();
+              boxAval.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          });
+
+          document.getElementById('btnPularAval')?.addEventListener('click', () => {
+            modalAval.hide();
+            allowSubmit = true;
+            form.submit(); // envia sem avaliação
+          });
+        }
       }
 
-      function mostrarCooperado(el){
-        if (!el) return;
-        itens.forEach(i => i.classList.remove('selected'));
-        el.classList.add('selected');
+      // ===== Avisos (UI local) =====
+      if (viewNow === 'avisos') {
+        const toastOKEl = document.getElementById('toastOK');
+        const toastOK = toastOKEl ? new bootstrap.Toast(toastOKEl) : null;
+        const badgeTitulo = document.getElementById('badgeTitulo');
+        const badgeSidebar = document.querySelector('#linkAvisos .badge');
 
-        const id = el.getAttribute('data-id');
-        const nome = el.getAttribute('data-nome');
-        const foto = el.getAttribute('data-foto');
-        const total = el.getAttribute('data-total');
+        function getUnreadCount(){ return document.querySelectorAll('.aviso-card[data-lido="0"]').length; }
+        function refreshBadges(){
+          const n = getUnreadCount();
+          if (badgeTitulo){
+            badgeTitulo.className = 'badge ' + (n > 0 ? 'text-bg-danger' : 'text-bg-success');
+            badgeTitulo.textContent = n > 0 ? (n + ' não lido(s)') : 'Tudo lido';
+          }
+          if (badgeSidebar){
+            if (n > 0){ badgeSidebar.textContent = n; badgeSidebar.style.display = ''; }
+            else { badgeSidebar.style.display = 'none'; }
+          }
+        }
 
-        // Atualiza header e form
-        selFoto.src = foto;
-        selNome.textContent = nome;
-        selTotal.textContent = total;
-        inputCoopId.value = id;
+        const toggleNaoLidos = document.getElementById('toggleNaoLidos');
+        if (toggleNaoLidos){
+          toggleNaoLidos.addEventListener('change', () => {
+            const onlyUnread = toggleNaoLidos.checked;
+            document.querySelectorAll('.aviso-card').forEach(card => {
+              const lido = card.getAttribute('data-lido') === '1';
+              card.style.display = (onlyUnread && lido) ? 'none' : '';
+            });
+          });
+        }
 
-        header.style.display = 'block';
-        form.style.display = 'flex';
-        hint.style.display = 'none';
-
-        // Mostra tabela correspondente
-        document.querySelectorAll('.lancamentos-table').forEach(t => t.style.display = 'none');
-        const tabela = document.getElementById('tabela-' + id);
-        if (tabela) tabela.style.display = 'block';
-
-        // Mantém o formulário visível
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-
-      // Clique direto na lista
-      itens.forEach(el => el.addEventListener('click', () => mostrarCooperado(el)));
-
-      // Filtro visual da lista enquanto digita (sem afetar datalist)
-      if (busca){
-        busca.addEventListener('input', function(){
-          const q = this.value.trim().toLowerCase();
-          itens.forEach(el => {
-            const nome = (el.getAttribute('data-nome') || '').toLowerCase();
-            el.style.display = nome.includes(q) ? '' : 'none';
+        document.querySelectorAll('[data-acao="marcar-lido"]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const url = btn.getAttribute('data-url');
+            const card = btn.closest('.aviso-card');
+            try{
+              const resp = await fetch(url, { method: 'POST' });
+              if (resp.ok){
+                card.setAttribute('data-lido','1');
+                card.classList.add('lido');
+                const meta = card.querySelector('.aviso-meta');
+                if (meta){
+                  meta.innerHTML = meta.innerHTML.replace('Não lido','Lido');
+                  if (!meta.textContent.includes('Lido')) meta.innerHTML += ' • <span class="text-success">Lido</span>';
+                }
+                btn.remove();
+                refreshBadges();
+                if (toastOK) toastOK.show();
+              } else {
+                alert('Não foi possível marcar como lido (código ' + resp.status + ').');
+              }
+            } catch(e){
+              alert('Falha de rede ao marcar como lido.');
+            }
           });
         });
 
-        // Ao confirmar um nome pelo datalist (change) ou Enter, tenta selecionar
-        function acionarPorNome(){
-          const valor = busca.value.trim().toLowerCase();
-          if (!valor) return;
-
-          // Preferência: correspondência exata
-          let alvo = mapByName[valor];
-          if (!alvo){
-            // Senão, pega a primeira que contém
-            alvo = itens.find(el => (el.getAttribute('data-nome')||'').toLowerCase().includes(valor));
-          }
-          if (alvo) mostrarCooperado(alvo);
-        }
-        busca.addEventListener('change', acionarPorNome);
-        busca.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter'){ e.preventDefault(); acionarPorNome(); }
-        });
+        refreshBadges();
       }
 
-      // Seleção pelo select embutido
-      if (select){
-        select.addEventListener('change', function(){
-          const id = this.value;
-          const el = getItemById(id);
-          if (el) mostrarCooperado(el);
-        });
+      // Toast de novos avisos (aparece em qualquer view)
+      const unread = Number(`{{ _toast_unread }}`);
+      if (unread > 0) {
+        const toastEl = document.getElementById('toastAvisos');
+        if (toastEl) { const t = new bootstrap.Toast(toastEl); setTimeout(()=>t.show(), 600); }
       }
-
-      // Seleciona automaticamente o primeiro visível
-      const primeiroVisivel = itens.find(el => el.style.display !== 'none');
-      if (primeiroVisivel) mostrarCooperado(primeiroVisivel);
     });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
