@@ -53,6 +53,10 @@
       <a class="nav-link" href="{{ url_for('portal_restaurante', view='escalas') }}">
         <i class="bi bi-calendar-week"></i> <span>Escala semanal</span>
       </a>
+      <a class="nav-link {{ 'active' if request.endpoint=='rest_tabelas' else '' }}"
+   href="{{ url_for('rest_tabelas') }}">
+  <i class="bi bi-table"></i> <span>Tabelas</span>
+</a>
       <!-- Aba atual: Avisos -->
       <a class="nav-link active" href="{{ url_for('portal_restaurante_avisos') }}">
         <i class="bi bi-megaphone-fill"></i> <span>Avisos</span>
