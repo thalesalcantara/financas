@@ -314,10 +314,8 @@
 
     {% else %}
       <!-- =================== COOPERADOS / LANÇAMENTOS =================== -->
-      <div class="section-title">
-  Bem-vindo, {{ restaurante.nome or estabelecimento.nome or restaurante_nome or 'Restaurante' }}
-</div>
-
+      <div class="section-title">Lançar Produção Diária</div>
+    
       <div class="card-white">
         <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
           <input type="hidden" name="view" value="lancar">
