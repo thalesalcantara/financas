@@ -213,15 +213,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </a>
 
     <!-- Escalas (tab) -->
-    <a class="nav-link {{ 'active' if _tab=='escalas' else '' }}"
-      data-bs-toggle="tab"
-      data-bs-target="#escalas"
-      href="#escalas"
-      role="tab"
-      aria-controls="escalas"
-      aria-selected="{{ 'true' if _tab=='escalas' else 'false' }}">
-      <i class="bi bi-calendar2-week"></i> <span>Escalas</span>
-    </a>
+    <a class="nav-link" data-bs-toggle="tab" href="#escalas"><i class="bi bi-calendar2-week"></i> <span>Escalas</span></a>
 
     <!-- Páginas dedicadas (rotas próprias, não tabs) -->
     <a class="nav-link {% if request.endpoint == 'admin_documentos' %}active{% endif %}"
