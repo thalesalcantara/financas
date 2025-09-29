@@ -498,7 +498,8 @@
 
       
  <!-- ESCALAS -->
-      <div class="tab-pane fade" id="escalas">
+      <div class="tab-pane fade" id="escalas" role="tabpanel">
+        <!-- Documentos -->
         <div class="card p-3 mb-3">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <h6 class="mb-0"><i class="bi bi-file-earmark-check"></i> Documentos</h6>
@@ -558,7 +559,12 @@
 
           <table class="table table-bordered table-escala align-middle">
             <thead>
-              <tr><th style="min-width:96px">Data</th><th>Turno</th><th>Horário</th><th>Contrato</th></tr>
+              <tr>
+                <th style="min-width:96px">Data</th>
+                <th>Turno</th>
+                <th>Horário</th>
+                <th>Contrato</th>
+              </tr>
             </thead>
             <tbody>
               {% if minha_escala %}
@@ -577,6 +583,7 @@
                         {% else %}
                           <span class="pill" style="background:#fff;border:1px solid #0001">{{ e.data or '' }}</span>
                         {% endif %}
+
                         {% if e.status == 'today' %}
                           <span class="badge rounded-pill bg-success-subtle text-success">HOJE</span>
                         {% elif e.status == 'tomorrow' %}
@@ -587,15 +594,41 @@
                           <span class="badge rounded-pill bg-primary-subtle text-primary">FUTURO</span>
                         {% endif %}
                       </div>
+
                       <div class="actions-inline">
-                        <button type="button" class="btn btn-xs btn-outline-royal" data-bs-toggle="modal" data-bs-target="#trocaModal" data-escala-id="{{ e.id }}" data-escala-desc="{{ (e.data or '') ~ ' • ' ~ (e.turno or '') ~ ' • ' ~ (e.horario or '') ~ ' • ' ~ (e.contrato or '') }}">
-                          🔁 Trocar
+                        <button
+                          type="button"
+                          class="btn btn-xs btn-outline-primary"
+                          data-bs-toggle="modal"
+                          data-bs-target="#trocaModal"
+                          data-escala-id="{{ e.id }}"
+                          data-escala-desc="{{ (e.data or '') ~ ' • ' ~ (e.turno or '') ~ ' • ' ~ (e.horario or '') ~ ' • ' ~ (e.contrato or '') }}"
+                        >
+                          <i class="bi bi-arrow-left-right"></i> Trocar
                         </button>
                       </div>
                     </td>
-                    <td>{% if has_multi and cs|length>1 %}<span class="pill" style="background:{{ cs[1] }};color:#111; border:1px solid #0001">{{ e.turno or '' }}</span>{% else %}{{ e.turno or '' }}{% endif %}</td>
-                    <td class="cell-horario">{% if has_multi and cs|length>2 %}<span class="pill" style="background:{{ cs[2] }};color:#111; border:1px solid #0001">{{ e.horario or '' }}</span>{% else %}{{ e.horario or '' }}{% endif %}</td>
-                    <td>{% if has_multi and cs|length>3 %}<span class="pill" style="background:{{ cs[3] }};color:#111; border:1px solid #0001">{{ e.contrato or '' }}</span>{% else %}{{ e.contrato or '' }}{% endif %}</td>
+                    <td>
+                      {% if has_multi and cs|length>1 %}
+                        <span class="pill" style="background:{{ cs[1] }};color:#111; border:1px solid #0001">{{ e.turno or '' }}</span>
+                      {% else %}
+                        {{ e.turno or '' }}
+                      {% endif %}
+                    </td>
+                    <td class="cell-horario">
+                      {% if has_multi and cs|length>2 %}
+                        <span class="pill" style="background:{{ cs[2] }};color:#111; border:1px solid #0001">{{ e.horario or '' }}</span>
+                      {% else %}
+                        {{ e.horario or '' }}
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if has_multi and cs|length>3 %}
+                        <span class="pill" style="background:{{ cs[3] }};color:#111; border:1px solid #0001">{{ e.contrato or '' }}</span>
+                      {% else %}
+                        {{ e.contrato or '' }}
+                      {% endif %}
+                    </td>
                   </tr>
                 {% endfor %}
               {% else %}
@@ -603,12 +636,15 @@
               {% endif %}
             </tbody>
           </table>
-          <div class="mt-1 small text-muted"><i class="bi bi-info-circle"></i> As solicitações de troca ficam visíveis para o administrador.</div>
+
+          <div class="mt-1 small text-muted">
+            <i class="bi bi-info-circle"></i> As solicitações de troca ficam visíveis para o administrador.
+          </div>
         </div>
-      </div>
+      </div> <!-- /tab escalas -->
 
       <!-- TROCAS -->
-      <div class="tab-pane fade" id="trocas">
+      <div class="tab-pane fade" id="trocas" role="tabpanel">
         <div class="card p-3 mb-3">
           <div class="d-flex align-items-center justify-content-between">
             <h6 class="mb-0"><i class="bi bi-inbox"></i> Solicitações recebidas</h6>
@@ -617,22 +653,30 @@
           <div class="mt-2">
             {% if trocas_recebidas_pendentes %}
               {% for t in trocas_recebidas_pendentes %}
-              <div class="border rounded p-2 mb-2 no-x-scroll">
-                <div class="d-flex align-items-center justify-content-between">
-                  <div class="me-2">
-                    <div class="fw-semibold">{{ t.solicitante.nome }}</div>
-                    <div class="small text-muted">{{ t.origem_desc }}</div>
-                    {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
-                    <div class="small text-muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
-                  </div>
-                  <div class="text-end">
-                    <button class="btn btn-sm btn-royal mb-1" data-bs-toggle="modal" data-bs-target="#aceitarTrocaModal" data-troca-id="{{ t.id }}" data-origem-desc="{{ t.origem_desc }}" data-origem-weekday="{{ t.origem_weekday }}" data-origem-bucket="{{ t.origem_turno_bucket }}">✅ Aceitar</button>
-                    <form class="d-inline" method="POST" action="{{ url_for('recusar_troca', troca_id=t.id) }}">
-                      <button class="btn btn-sm btn-outline-danger">❌ Recusar</button>
-                    </form>
+                <div class="border rounded p-2 mb-2 no-x-scroll">
+                  <div class="d-flex align-items-center justify-content-between">
+                    <div class="me-2">
+                      <div class="fw-semibold">{{ t.solicitante.nome }}</div>
+                      <div class="small text-muted">{{ t.origem_desc }}</div>
+                      {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
+                      <div class="small text-muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
+                    </div>
+                    <div class="text-end">
+                      <button
+                        class="btn btn-sm btn-success mb-1"
+                        data-bs-toggle="modal"
+                        data-bs-target="#aceitarTrocaModal"
+                        data-troca-id="{{ t.id }}"
+                        data-origem-desc="{{ t.origem_desc }}"
+                        data-origem-weekday="{{ t.origem_weekday }}"
+                        data-origem-bucket="{{ t.origem_turno_bucket }}"
+                      ><i class="bi bi-check2"></i> Aceitar</button>
+                      <form class="d-inline" method="POST" action="{{ url_for('recusar_troca', troca_id=t.id) }}">
+                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i> Recusar</button>
+                      </form>
+                    </div>
                   </div>
                 </div>
-              </div>
               {% endfor %}
             {% else %}
               <div class="text-center text-muted">Nenhuma solicitação recebida.</div>
@@ -645,35 +689,37 @@
             <h6 class="mb-0"><i class="bi bi-send"></i> Minhas solicitações enviadas</h6>
             <span class="badge-soft">{{ trocas_enviadas|length }}</span>
           </div>
+
           <div class="mt-2">
             {% if trocas_enviadas %}
               {% for t in trocas_enviadas %}
-              <div class="border rounded p-2 mb-2 no-x-scroll">
-                <div class="d-flex align-items-center justify-content-between">
-                  <div class="me-2">
-                    <div class="fw-semibold">Para: {{ t.destino.nome }}</div>
-                    <div class="small text-muted">{{ t.origem_desc }}</div>
-                    {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
-                    <div class="small text-muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
-                  </div>
-                  <div class="text-end">
-                    {% if t.status == 'pendente' %}
-                      <span class="badge-status bg-warning-subtle text-warning">⏳ Pendente</span>
-                    {% elif t.status == 'aprovada' %}
-                      <span class="badge-status bg-success-subtle text-success">✅ Aprovada</span>
-                    {% else %}
-                      <span class="badge-status bg-danger-subtle text-danger">❌ Recusada</span>
-                    {% endif %}
+                <div class="border rounded p-2 mb-2 no-x-scroll">
+                  <div class="d-flex align-items-center justify-content-between">
+                    <div class="me-2">
+                      <div class="fw-semibold">Para: {{ t.destino.nome }}</div>
+                      <div class="small text-muted">{{ t.origem_desc }}</div>
+                      {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
+                      <div class="small text-muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
+                    </div>
+                    <div class="text-end">
+                      {% if t.status == 'pendente' %}
+                        <span class="badge-status bg-warning-subtle text-warning">Pendente</span>
+                      {% elif t.status == 'aprovada' %}
+                        <span class="badge-status bg-success-subtle text-success">Aprovada</span>
+                      {% else %}
+                        <span class="badge-status bg-danger-subtle text-danger">Recusada</span>
+                      {% endif %}
+                    </div>
                   </div>
                 </div>
-              </div>
               {% endfor %}
             {% else %}
               <div class="text-center text-muted">Nenhuma solicitação enviada.</div>
             {% endif %}
           </div>
         </div>
-      </div>
+      </div> <!-- /tab trocas -->
+
     </div>
 
     <!-- Rodapé -->
@@ -681,6 +727,252 @@
       <small>© {{ current_year|default('') }} Coopex</small>
     </div>
   </div>
+
+  <!-- MODAL: Solicitar troca de escala -->
+  <div class="modal fade" id="trocaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form id="trocaForm" method="POST" action="{{ url_for('solicitar_troca') }}">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Solicitar troca de escala</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" name="from_escala_id" id="fromEscalaId">
+            <input type="hidden" name="to_cooperado_id" id="toCooperadoId">
+
+            <div class="mb-2">
+              <div class="small text-muted">Seu plantão</div>
+              <div class="fw-semibold" id="fromEscalaDesc">—</div>
+            </div>
+
+            <hr>
+
+            <div class="mb-2">
+              <label class="form-label mb-1">Escolha o cooperado para propor a troca</label>
+              <input type="text" class="form-control form-control-sm" id="coopSearch" placeholder="Buscar por nome...">
+              <div class="border rounded mt-2" style="max-height: 220px; overflow:auto">
+                <ul class="list-group list-group-flush" id="coopList"></ul>
+              </div>
+              <small class="text-muted">A pessoa selecionada receberá esta proposta.</small>
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label mb-1">Mensagem (opcional)</label>
+              <textarea name="mensagem" class="form-control" rows="2" placeholder="Ex.: posso assumir seu turno e você assume o meu?"></textarea>
+            </div>
+          </div>
+          <div class="modal-footer d-flex justify-content-between">
+            <small class="text-muted"><i class="bi bi-eye"></i> O admin visualiza as solicitações.</small>
+            <div>
+              <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+              <button type="submit" class="btn btn-royal" id="btnEnviarTroca" disabled>Enviar solicitação</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Aceitar troca (sem scroll lateral) -->
+  <div class="modal fade" id="aceitarTrocaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form id="aceitarTrocaForm" method="POST">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-check2-circle"></i> Aceitar troca</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" name="destino_escala_id" id="destinoEscalaId">
+            <div class="mb-2 small text-muted">Plantão do solicitante</div>
+            <div class="fw-semibold" id="origemTrocaDesc">—</div>
+            <hr>
+            <div class="mb-2">
+              <div class="form-label mb-1">Escolha um <b>plantão seu compatível</b> (mesmo dia da semana e mesmo turno)</div>
+              <div class="border rounded" style="max-height:260px; overflow:auto; overflow-x:hidden;">
+                <ul class="list-group list-group-flush" id="minhaEscalaCompatList"></ul>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-royal" id="btnConfirmarAceite" disabled>Confirmar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Script: Solicitar troca -->
+  <script>
+    const COOPS_FINAL = {{ cooperados_json | default('[]') | safe }};
+    const MY_ESCALA = {{ minha_escala_json | default('[]') | safe }};
+
+    const coopListEl = document.getElementById('coopList');
+    const coopSearchEl = document.getElementById('coopSearch');
+    const fromEscalaIdEl = document.getElementById('fromEscalaId');
+    const fromEscalaDescEl = document.getElementById('fromEscalaDesc');
+    const toCooperadoIdEl = document.getElementById('toCooperadoId');
+    const btnEnviarTroca = document.getElementById('btnEnviarTroca');
+
+    function renderCoops(filter = '') {
+      const q = (filter || '').trim().toLowerCase();
+      coopListEl.innerHTML = '';
+      const base = Array.isArray(COOPS_FINAL) ? COOPS_FINAL : [];
+      if (!base.length) {
+        coopListEl.innerHTML = '<li class="list-group-item text-muted">Nenhum cooperado disponível para troca.</li>';
+        return;
+      }
+      const filtered = base.filter(c => !q || (String(c.nome || '').toLowerCase().includes(q))).slice(0, 200);
+      if (!filtered.length) {
+        coopListEl.innerHTML = '<li class="list-group-item text-muted">Nenhum resultado.</li>';
+        return;
+      }
+      filtered.forEach(c => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex align-items-center';
+        li.style.cursor = 'pointer';
+
+        const avatar = document.createElement('img');
+        avatar.src = c.foto_url || '{{ url_for("static", filename="img/default.png") }}';
+        avatar.alt = '';
+        avatar.style.width = '28px';
+        avatar.style.height = '28px';
+        avatar.style.objectFit = 'cover';
+        avatar.style.borderRadius = '50%';
+        avatar.style.border = '1px solid #0001';
+        avatar.style.marginRight = '.5rem';
+
+        const name = document.createElement('div');
+        name.className = 'flex-fill';
+        name.innerHTML = `<div class="fw-semibold">${c.nome || '—'}</div>`;
+
+        const choose = document.createElement('button');
+        choose.type = 'button';
+        choose.className = 'btn btn-sm btn-outline-primary';
+        choose.innerHTML = '<i class="bi bi-person-arrows"></i> Selecionar';
+        choose.addEventListener('click', () => {
+          const escala = fromEscalaDescEl.textContent || '';
+          const msg = `Deseja solicitar a troca deste plantão:\n\n${escala}\n\ncom o cooperado "${c.nome}"?`;
+          if (confirm(msg)) {
+            toCooperadoIdEl.value = c.id;
+            btnEnviarTroca.disabled = false;
+            [...coopListEl.querySelectorAll('.list-group-item')].forEach(x => x.classList.remove('active'));
+            li.classList.add('active');
+          }
+        });
+
+        li.appendChild(avatar);
+        li.appendChild(name);
+        li.appendChild(choose);
+        coopListEl.appendChild(li);
+      });
+    }
+
+    coopSearchEl?.addEventListener('input', () => renderCoops(coopSearchEl.value));
+
+    const trocaModalEl = document.getElementById('trocaModal');
+    trocaModalEl.addEventListener('show.bs.modal', (ev) => {
+      const btn = ev.relatedTarget;
+      const escalaId = btn?.getAttribute('data-escala-id') || '';
+      const escalaDesc = btn?.getAttribute('data-escala-desc') || '';
+
+      fromEscalaIdEl.value = escalaId;
+      fromEscalaDescEl.textContent = escalaDesc;
+      toCooperadoIdEl.value = '';
+      btnEnviarTroca.disabled = true;
+
+      coopSearchEl.value = '';
+      renderCoops('');
+    });
+
+    document.getElementById('trocaForm').addEventListener('submit', (e) => {
+      if (!fromEscalaIdEl.value || !toCooperadoIdEl.value) {
+        e.preventDefault();
+        alert('Selecione um cooperado para enviar a solicitação.');
+      }
+    });
+  </script>
+
+  <!-- Helpers: bucket de turno também via horário -->
+  <script>
+    function turnoBucket(turno, horario) {
+      const t = String(turno || "").toLowerCase().normalize("NFD").replace(/\p{Mn}/gu, "");
+      if (t.includes("noite") || t.includes("noturn")) return "noite";
+      if (t.includes("dia") || t.includes("diurn") || t.includes("manha") || t.includes("tarde")) return "dia";
+      const m = String(horario || "").match(/(\d{1,2}):(\d{2})/);
+      if (m) {
+        const h = parseInt(m[1], 10);
+        if (h >= 17 || h <= 6) return "noite";
+        return "dia";
+      }
+      return "dia";
+    }
+  </script>
+
+  <!-- Script: Aceitar troca (sem scroll lateral) -->
+  <script>
+    const aceitarModalEl = document.getElementById('aceitarTrocaModal');
+    const origemTrocaDescEl = document.getElementById('origemTrocaDesc');
+    const minhaEscalaCompatListEl = document.getElementById('minhaEscalaCompatList');
+    const destinoEscalaIdEl = document.getElementById('destinoEscalaId');
+    const btnConfirmarAceite = document.getElementById('btnConfirmarAceite');
+    const aceitarForm = document.getElementById('aceitarTrocaForm');
+
+    aceitarModalEl.addEventListener('show.bs.modal', (ev) => {
+      const btn = ev.relatedTarget;
+      const trocaId = btn?.getAttribute('data-troca-id');
+      const origemDesc = btn?.getAttribute('data-origem-desc') || '—';
+      const origemWeekday = parseInt(btn?.getAttribute('data-origem-weekday'));
+      const origemBucket = btn?.getAttribute('data-origem-bucket');
+
+      origemTrocaDescEl.textContent = origemDesc;
+      aceitarForm.action = `/trocas/${trocaId}/aceitar`;
+      destinoEscalaIdEl.value = '';
+      btnConfirmarAceite.disabled = true;
+
+      const base = Array.isArray(MY_ESCALA) ? MY_ESCALA : [];
+      const compativeis = base.filter(e => {
+        const bucket = e.turno_bucket || turnoBucket(e.turno, e.horario);
+        return e.weekday === origemWeekday && bucket === origemBucket;
+      });
+
+      minhaEscalaCompatListEl.innerHTML = '';
+      if (!compativeis.length) {
+        minhaEscalaCompatListEl.innerHTML = '<li class="list-group-item text-muted">Você não tem plantões compatíveis (mesmo dia da semana e turno).</li>';
+        return;
+      }
+
+      compativeis.forEach(e => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex align-items-center justify-content-between';
+        li.innerHTML = `
+          <div class="me-2">
+            <div class="fw-semibold">${e.data} • ${e.turno || ''} • ${e.horario || ''} • ${e.contrato || ''}</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary">Trocar com este</button>
+        `;
+        li.querySelector('button').addEventListener('click', () => {
+          destinoEscalaIdEl.value = e.id;
+          btnConfirmarAceite.disabled = false;
+          [...minhaEscalaCompatListEl.querySelectorAll('.list-group-item')].forEach(x => x.classList.remove('active'));
+          li.classList.add('active');
+        });
+        minhaEscalaCompatListEl.appendChild(li);
+      });
+    });
+
+    aceitarForm.addEventListener('submit', (e) => {
+      if (!destinoEscalaIdEl.value) {
+        e.preventDefault();
+        alert('Escolha um plantão seu compatível para concluir a troca.');
+      }
+    });
+  </script>
 
   <!-- OFFCANVAS: FINANÇAS (flutuante e completo) -->
 <div class="offcanvas offcanvas-bottom" tabindex="-1" id="financasSheet" aria-labelledby="financasSheetLabel" style="height:92vh">
@@ -1082,213 +1374,6 @@
       if (unread > 0) {
         const el = document.getElementById('toastAvisos');
         if (el && window.bootstrap?.Toast) new bootstrap.Toast(el).show();
-      }
-    });
-  </script>
-
-   <!-- MODAL: Solicitar troca -->
-  <div class="modal fade" id="trocaModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <form id="trocaForm" method="POST" action="{{ url_for('solicitar_troca') }}">
-          <div class="modal-header">
-            <h5 class="modal-title">🔁 Solicitar troca de escala</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" name="from_escala_id" id="fromEscalaId">
-            <input type="hidden" name="to_cooperado_id" id="toCooperadoId">
-            <div class="mb-2">
-              <div class="small text-muted">Seu plantão</div>
-              <div class="fw-semibold" id="fromEscalaDesc">—</div>
-            </div>
-            <hr>
-            <div class="mb-2">
-              <label class="form-label mb-1">Escolha o cooperado para propor a troca</label>
-              <input type="text" class="form-control form-control-sm" id="coopSearch" placeholder="Buscar por nome...">
-              <div class="border rounded mt-2" style="max-height: 220px; overflow:auto">
-                <ul class="list-group list-group-flush" id="coopList"></ul>
-              </div>
-              <small class="text-muted">A pessoa selecionada receberá esta proposta.</small>
-            </div>
-            <div class="mb-2">
-              <label class="form-label mb-1">Mensagem (opcional)</label>
-              <textarea name="mensagem" class="form-control" rows="2" placeholder="Ex.: posso assumir seu turno e você assume o meu?"></textarea>
-            </div>
-          </div>
-          <div class="modal-footer d-flex justify-content-between">
-            <small class="text-muted">👀 O admin visualiza as solicitações.</small>
-            <div>
-              <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-              <button type="submit" class="btn btn-royal" id="btnEnviarTroca" disabled>📨 Enviar solicitação</button>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: Aceitar troca -->
-  <div class="modal fade" id="aceitarTrocaModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <form id="aceitarTrocaForm" method="POST">
-          <div class="modal-header">
-            <h5 class="modal-title">✅ Aceitar troca</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" name="destino_escala_id" id="destinoEscalaId">
-            <div class="mb-2 small text-muted">Plantão do solicitante</div>
-            <div class="fw-semibold" id="origemTrocaDesc">—</div>
-            <hr>
-            <div class="mb-2">
-              <div class="form-label mb-1">Escolha um <b>plantão seu compatível</b> (mesmo dia da semana e mesmo turno)</div>
-              <div class="border rounded" style="max-height:260px; overflow:auto; overflow-x:hidden;">
-                <ul class="list-group list-group-flush" id="minhaEscalaCompatList"></ul>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-            <button type="submit" class="btn btn-royal" id="btnConfirmarAceite" disabled>👍 Confirmar</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <!-- Bootstrap -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
- <!-- Script MENU lateral -->
-  <script>
-    const menuLateral = document.getElementById('menuLateral');
-    const fundoMenu = document.getElementById('fundoMenu');
-    document.getElementById('abrirMenu').onclick = () => { menuLateral.classList.add('aberto'); fundoMenu.classList.add('aberto'); };
-    document.getElementById('fecharMenu').onclick = () => { menuLateral.classList.remove('aberto'); fundoMenu.classList.remove('aberto'); };
-    fundoMenu.onclick = () => { menuLateral.classList.remove('aberto'); fundoMenu.classList.remove('aberto'); };
-  </script>
-
-  <!-- Script: Solicitar troca -->
-  <script>
-    const COOPS_FINAL = {{ cooperados_json | default('[]') | safe }};
-    const MY_ESCALA = {{ minha_escala_json | default('[]') | safe }};
-
-    const coopListEl = document.getElementById('coopList');
-    const coopSearchEl = document.getElementById('coopSearch');
-    const fromEscalaIdEl = document.getElementById('fromEscalaId');
-    const fromEscalaDescEl = document.getElementById('fromEscalaDesc');
-    const toCooperadoIdEl = document.getElementById('toCooperadoId');
-    const btnEnviarTroca = document.getElementById('btnEnviarTroca');
-
-    function renderCoops(filter = '') {
-      const q = (filter || '').trim().toLowerCase();
-      coopListEl.innerHTML = '';
-      const base = Array.isArray(COOPS_FINAL) ? COOPS_FINAL : [];
-      if (!base.length) {
-        coopListEl.innerHTML = '<li class="list-group-item text-muted">Nenhum cooperado disponível para troca.</li>';
-        return;
-      }
-      const filtered = base.filter(c => !q || (String(c.nome || '').toLowerCase().includes(q))).slice(0, 200);
-      if (!filtered.length) {
-        coopListEl.innerHTML = '<li class="list-group-item text-muted">Nenhum resultado.</li>';
-        return;
-      }
-      filtered.forEach(c => {
-        const li = document.createElement('li');
-        li.className = 'list-group-item d-flex align-items-center justify-content-between gap-2';
-        li.style.cursor = 'pointer';
-        li.innerHTML = `
-          <div class="d-flex align-items-center gap-2">
-            <img src="${c.foto_url || '{{ url_for("static", filename="img/default.png") }}'}" style="width:28px;height:28px;object-fit:cover;border-radius:50%;border:1px solid #0001" alt="">
-            <div class="fw-semibold">${c.nome || '—'}</div>
-          </div>
-          <button type="button" class="btn btn-sm btn-royal">👤 Selecionar</button>
-        `;
-        li.querySelector('button').addEventListener('click', () => {
-          const escala = fromEscalaDescEl.textContent || '';
-          const msg = `Deseja solicitar a troca deste plantão:\n\n${escala}\n\ncom o cooperado "${c.nome}"?`;
-          if (confirm(msg)) {
-            toCooperadoIdEl.value = c.id;
-            btnEnviarTroca.disabled = false;
-            [...coopListEl.querySelectorAll('.list-group-item')].forEach(x => x.classList.remove('active'));
-            li.classList.add('active');
-          }
-        });
-        coopListEl.appendChild(li);
-      });
-    }
-    coopSearchEl?.addEventListener('input', () => renderCoops(coopSearchEl.value));
-    const trocaModalEl = document.getElementById('trocaModal');
-    trocaModalEl.addEventListener('show.bs.modal', (ev) => {
-      const btn = ev.relatedTarget;
-      const escalaId = btn?.getAttribute('data-escala-id') || '';
-      const escalaDesc = btn?.getAttribute('data-escala-desc') || '';
-      fromEscalaIdEl.value = escalaId; fromEscalaDescEl.textContent = escalaDesc;
-      toCooperadoIdEl.value = ''; btnEnviarTroca.disabled = true; coopSearchEl.value = ''; renderCoops('');
-    });
-    document.getElementById('trocaForm').addEventListener('submit', (e) => {
-      if (!fromEscalaIdEl.value || !toCooperadoIdEl.value) { e.preventDefault(); alert('Selecione um cooperado para enviar a solicitação.'); }
-    });
-  </script>
-  
-  <!-- Aceitar troca -->
-  <script>
-    const aceitarModalEl = document.getElementById('aceitarTrocaModal');
-    const origemTrocaDescEl = document.getElementById('origemTrocaDesc');
-    const minhaEscalaCompatListEl = document.getElementById('minhaEscalaCompatList');
-    const destinoEscalaIdEl = document.getElementById('destinoEscalaId');
-    const btnConfirmarAceite = document.getElementById('btnConfirmarAceite');
-    const aceitarForm = document.getElementById('aceitarTrocaForm');
-
-    aceitarModalEl?.addEventListener('show.bs.modal', (ev) => {
-      const btn = ev.relatedTarget;
-      const trocaId = btn?.getAttribute('data-troca-id');
-      const origemDesc = btn?.getAttribute('data-origem-desc') || '—';
-      const origemWeekday = parseInt(btn?.getAttribute('data-origem-weekday'));
-      const origemBucket = btn?.getAttribute('data-origem-bucket');
-
-      origemTrocaDescEl.textContent = origemDesc;
-      aceitarForm.action = `/trocas/${trocaId}/aceitar`;
-      destinoEscalaIdEl.value = '';
-      btnConfirmarAceite.disabled = true;
-
-      const base = Array.isArray(MY_ESCALA) ? MY_ESCALA : [];
-      const compativeis = base.filter(e => {
-        const bucket = e.turno_bucket || turnoBucket(e.turno, e.horario);
-        return e.weekday === origemWeekday && bucket === origemBucket;
-      });
-
-      minhaEscalaCompatListEl.innerHTML = '';
-      if (!compativeis.length) {
-        minhaEscalaCompatListEl.innerHTML = '<li class="list-group-item text-muted">Você não tem plantões compatíveis (mesmo dia da semana e turno).</li>';
-        return;
-      }
-
-      compativeis.forEach(e => {
-        const li = document.createElement('li');
-        li.className = 'list-group-item d-flex align-items-center justify-content-between';
-        li.innerHTML = `
-          <div class="me-2">
-            <div class="fw-semibold">${e.data} • ${e.turno || ''} • ${e.horario || ''} • ${e.contrato || ''}</div>
-          </div>
-          <button type="button" class="btn btn-sm btn-outline-primary">Trocar com este</button>
-        `;
-        li.querySelector('button').addEventListener('click', () => {
-          destinoEscalaIdEl.value = e.id;
-          btnConfirmarAceite.disabled = false;
-          [...minhaEscalaCompatListEl.querySelectorAll('.list-group-item')].forEach(x => x.classList.remove('active'));
-          li.classList.add('active');
-        });
-        minhaEscalaCompatListEl.appendChild(li);
-      });
-    });
-
-    aceitarForm?.addEventListener('submit', (e) => {
-      if (!destinoEscalaIdEl.value) {
-        e.preventDefault();
-        alert('Escolha um plantão seu compatível para concluir a troca.');
       }
     });
   </script>
