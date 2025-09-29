@@ -1109,6 +1109,78 @@
   <!-- Bootstrap -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
+ <!-- Script MENU lateral -->
+  <script>
+    const menuLateral = document.getElementById('menuLateral');
+    const fundoMenu = document.getElementById('fundoMenu');
+    document.getElementById('abrirMenu').onclick = () => { menuLateral.classList.add('aberto'); fundoMenu.classList.add('aberto'); };
+    document.getElementById('fecharMenu').onclick = () => { menuLateral.classList.remove('aberto'); fundoMenu.classList.remove('aberto'); };
+    fundoMenu.onclick = () => { menuLateral.classList.remove('aberto'); fundoMenu.classList.remove('aberto'); };
+  </script>
+
+  <!-- Script: Solicitar troca -->
+  <script>
+    const COOPS_FINAL = {{ cooperados_json | default('[]') | safe }};
+    const MY_ESCALA = {{ minha_escala_json | default('[]') | safe }};
+
+    const coopListEl = document.getElementById('coopList');
+    const coopSearchEl = document.getElementById('coopSearch');
+    const fromEscalaIdEl = document.getElementById('fromEscalaId');
+    const fromEscalaDescEl = document.getElementById('fromEscalaDesc');
+    const toCooperadoIdEl = document.getElementById('toCooperadoId');
+    const btnEnviarTroca = document.getElementById('btnEnviarTroca');
+
+    function renderCoops(filter = '') {
+      const q = (filter || '').trim().toLowerCase();
+      coopListEl.innerHTML = '';
+      const base = Array.isArray(COOPS_FINAL) ? COOPS_FINAL : [];
+      if (!base.length) {
+        coopListEl.innerHTML = '<li class="list-group-item text-muted">Nenhum cooperado disponível para troca.</li>';
+        return;
+      }
+      const filtered = base.filter(c => !q || (String(c.nome || '').toLowerCase().includes(q))).slice(0, 200);
+      if (!filtered.length) {
+        coopListEl.innerHTML = '<li class="list-group-item text-muted">Nenhum resultado.</li>';
+        return;
+      }
+      filtered.forEach(c => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex align-items-center justify-content-between gap-2';
+        li.style.cursor = 'pointer';
+        li.innerHTML = `
+          <div class="d-flex align-items-center gap-2">
+            <img src="${c.foto_url || '{{ url_for("static", filename="img/default.png") }}'}" style="width:28px;height:28px;object-fit:cover;border-radius:50%;border:1px solid #0001" alt="">
+            <div class="fw-semibold">${c.nome || '—'}</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-royal">👤 Selecionar</button>
+        `;
+        li.querySelector('button').addEventListener('click', () => {
+          const escala = fromEscalaDescEl.textContent || '';
+          const msg = `Deseja solicitar a troca deste plantão:\n\n${escala}\n\ncom o cooperado "${c.nome}"?`;
+          if (confirm(msg)) {
+            toCooperadoIdEl.value = c.id;
+            btnEnviarTroca.disabled = false;
+            [...coopListEl.querySelectorAll('.list-group-item')].forEach(x => x.classList.remove('active'));
+            li.classList.add('active');
+          }
+        });
+        coopListEl.appendChild(li);
+      });
+    }
+    coopSearchEl?.addEventListener('input', () => renderCoops(coopSearchEl.value));
+    const trocaModalEl = document.getElementById('trocaModal');
+    trocaModalEl.addEventListener('show.bs.modal', (ev) => {
+      const btn = ev.relatedTarget;
+      const escalaId = btn?.getAttribute('data-escala-id') || '';
+      const escalaDesc = btn?.getAttribute('data-escala-desc') || '';
+      fromEscalaIdEl.value = escalaId; fromEscalaDescEl.textContent = escalaDesc;
+      toCooperadoIdEl.value = ''; btnEnviarTroca.disabled = true; coopSearchEl.value = ''; renderCoops('');
+    });
+    document.getElementById('trocaForm').addEventListener('submit', (e) => {
+      if (!fromEscalaIdEl.value || !toCooperadoIdEl.value) { e.preventDefault(); alert('Selecione um cooperado para enviar a solicitação.'); }
+    });
+  </script>
+  
   <!-- Aceitar troca -->
   <script>
     const aceitarModalEl = document.getElementById('aceitarTrocaModal');
