@@ -549,174 +549,183 @@
         </div>
 
         <!-- Minha escala -->
-        <div class="card p-3">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="mb-0"><i class="bi bi-calendar2-week"></i> Minha Escala</h6>
-            <span class="badge-soft">{{ (minha_escala|length) if minha_escala else 0 }} itens</span>
-          </div>
+<div class="card p-3">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h6 class="mb-0"><i class="bi bi-calendar2-week"></i> Minha Escala</h6>
+    <span class="badge-soft">{{ (minha_escala|length) if minha_escala else 0 }} itens</span>
+  </div>
 
-          <table class="table table-bordered table-escala align-middle">
-            <thead>
-              <tr>
-                <th style="min-width:96px">Data</th>
-                <th>Turno</th>
-                <th>Horário</th>
-                <th>Contrato</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% if minha_escala %}
-                {% for e in minha_escala %}
-                  {% set colors = (e.cor or '')|string %}
-                  {% set has_multi = '|' in colors %}
-                  {% set cs = colors.split('|') if has_multi else [] %}
-                  {% set stripe = (colors if not has_multi else (cs[0] if cs|length>0 else '')) or e.status_color %}
-                  <tr class="row-stripe esc-{{ e.status }}" style="border-left-color: {{ stripe }}">
-                    <td>
-                      <div class="date-wrap">
-                        {% if has_multi %}
-                          <span class="pill" style="background:{{ cs[0] if cs|length>0 else '#fff' }};color:#111; border:1px solid #0001">{{ e.data or '' }}</span>
-                        {% elif colors %}
-                          <span class="pill" style="background:{{ colors }};color:#111; border:1px solid #0001">{{ e.data or '' }}</span>
-                        {% else %}
-                          <span class="pill" style="background:#fff;border:1px solid #0001">{{ e.data or '' }}</span>
-                        {% endif %}
+  <table class="table table-bordered table-escala align-middle">
+    <thead>
+      <tr>
+        <th style="min-width:96px">Data</th>
+        <th>Turno</th>
+        <th>Horário</th>
+        <th>Contrato</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if minha_escala %}
+        {% for e in minha_escala %}
+          {% set colors = (e.cor or '')|string %}
+          {% set has_multi = '|' in colors %}
+          {% set cs = colors.split('|') if has_multi else [] %}
+          {% set stripe = (colors if not has_multi else (cs[0] if cs|length>0 else '')) or e.status_color %}
 
-                        {% if e.status == 'today' %}
-                          <span class="badge rounded-pill bg-success-subtle text-success">HOJE</span>
-                        {% elif e.status == 'tomorrow' %}
-                          <span class="badge rounded-pill bg-primary-subtle text-primary">AMANHÃ</span>
-                        {% elif e.status == 'past' %}
-                          <span class="badge rounded-pill bg-danger-subtle text-danger">PASSADO</span>
-                        {% else %}
-                          <span class="badge rounded-pill bg-primary-subtle text-primary">FUTURO</span>
-                        {% endif %}
-                      </div>
+          {# Fallbacks só para exibir o nome do contrato #}
+          {% set contrato_txt =
+            e.contrato_nome
+            or (e.contrato.nome if e.contrato is defined and e.contrato and (e.contrato.nome is defined) else None)
+            or e.contrato_titulo
+            or e.contrato
+            or '' %}
 
-                      <div class="actions-inline">
-                        <button
-                          type="button"
-                          class="btn btn-xs btn-outline-primary"
-                          data-bs-toggle="modal"
-                          data-bs-target="#trocaModal"
-                          data-escala-id="{{ e.id }}"
-                          data-escala-desc="{{ (e.data or '') ~ ' • ' ~ (e.turno or '') ~ ' • ' ~ (e.horario or '') ~ ' • ' ~ (e.contrato or '') }}"
-                        >
-                          <i class="bi bi-arrow-left-right"></i> Trocar
-                        </button>
-                      </div>
-                    </td>
-                    <td>
-                      {% if has_multi and cs|length>1 %}
-                        <span class="pill" style="background:{{ cs[1] }};color:#111; border:1px solid #0001">{{ e.turno or '' }}</span>
-                      {% else %}
-                        {{ e.turno or '' }}
-                      {% endif %}
-                    </td>
-                    <td class="cell-horario">
-                      {% if has_multi and cs|length>2 %}
-                        <span class="pill" style="background:{{ cs[2] }};color:#111; border:1px solid #0001">{{ e.horario or '' }}</span>
-                      {% else %}
-                        {{ e.horario or '' }}
-                      {% endif %}
-                    </td>
-                    <td>
-                      {% if has_multi and cs|length>3 %}
-                        <span class="pill" style="background:{{ cs[3] }};color:#111; border:1px solid #0001">{{ e.contrato or '' }}</span>
-                      {% else %}
-                        {{ e.contrato or '' }}
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% endfor %}
+          <tr class="row-stripe esc-{{ e.status }}" style="border-left-color: {{ stripe }}">
+            <td>
+              <div class="date-wrap">
+                {% if has_multi %}
+                  <span class="pill" style="background:{{ cs[0] if cs|length>0 else '#fff' }};color:#111; border:1px solid #0001">{{ e.data or '' }}</span>
+                {% elif colors %}
+                  <span class="pill" style="background:{{ colors }};color:#111; border:1px solid #0001">{{ e.data or '' }}</span>
+                {% else %}
+                  <span class="pill" style="background:#fff;border:1px solid #0001">{{ e.data or '' }}</span>
+                {% endif %}
+
+                {% if e.status == 'today' %}
+                  <span class="badge rounded-pill bg-success-subtle text-success">HOJE</span>
+                {% elif e.status == 'tomorrow' %}
+                  <span class="badge rounded-pill bg-primary-subtle text-primary">AMANHÃ</span>
+                {% elif e.status == 'past' %}
+                  <span class="badge rounded-pill bg-danger-subtle text-danger">PASSADO</span>
+                {% else %}
+                  <span class="badge rounded-pill bg-primary-subtle text-primary">FUTURO</span>
+                {% endif %}
+              </div>
+
+              <div class="actions-inline">
+                <button
+                  type="button"
+                  class="btn btn-xs btn-outline-primary"
+                  data-bs-toggle="modal"
+                  data-bs-target="#trocaModal"
+                  data-escala-id="{{ e.id }}"
+                  data-escala-desc="{{ (e.data or '') ~ ' • ' ~ (e.turno or '') ~ ' • ' ~ (e.horario or '') ~ ' • ' ~ contrato_txt }}"
+                >
+                  <i class="bi bi-arrow-left-right"></i> Trocar
+                </button>
+              </div>
+            </td>
+            <td>
+              {% if has_multi and cs|length>1 %}
+                <span class="pill" style="background:{{ cs[1] }};color:#111; border:1px solid #0001">{{ e.turno or '' }}</span>
               {% else %}
-                <tr><td colspan="4" class="text-center muted">Nenhuma escala disponível.</td></tr>
+                {{ e.turno or '' }}
               {% endif %}
-            </tbody>
-          </table>
+            </td>
+            <td class="cell-horario">
+              {% if has_multi and cs|length>2 %}
+                <span class="pill" style="background:{{ cs[2] }};color:#111; border:1px solid #0001">{{ e.horario or '' }}</span>
+              {% else %}
+                {{ e.horario or '' }}
+              {% endif %}
+            </td>
+            <td>
+              {% if has_multi and cs|length>3 %}
+                <span class="pill" style="background:{{ cs[3] }};color:#111; border:1px solid #0001">{{ contrato_txt }}</span>
+              {% else %}
+                {{ contrato_txt }}
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="4" class="text-center muted">Nenhuma escala disponível.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
 
-          <div class="mt-1 small text-muted">
-            <i class="bi bi-info-circle"></i> As solicitações de troca ficam visíveis para o administrador.
-          </div>
-        </div>
-      </div> <!-- /tab escalas -->
+  <div class="mt-1 small text-muted">
+    <i class="bi bi-info-circle"></i> As solicitações de troca ficam visíveis para o administrador.
+  </div>
+</div>
+</div> <!-- /tab escalas -->
 
-      <!-- TROCAS -->
-      <div class="tab-pane fade" id="trocas" role="tabpanel">
-        <div class="card p-3 mb-3">
-          <div class="d-flex align-items-center justify-content-between">
-            <h6 class="mb-0"><i class="bi bi-inbox"></i> Solicitações recebidas</h6>
-            <span class="badge-soft">{{ trocas_recebidas_pendentes|length }}</span>
+<!-- TROCAS -->
+<div class="tab-pane fade" id="trocas" role="tabpanel">
+  <div class="card p-3 mb-3">
+    <div class="d-flex align-items-center justify-content-between">
+      <h6 class="mb-0"><i class="bi bi-inbox"></i> Solicitações recebidas</h6>
+      <span class="badge-soft">{{ trocas_recebidas_pendentes|length }}</span>
+    </div>
+    <div class="mt-2">
+      {% if trocas_recebidas_pendentes %}
+        {% for t in trocas_recebidas_pendentes %}
+          <div class="border rounded p-2 mb-2 no-x-scroll">
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="me-2">
+                <div class="fw-semibold">{{ t.solicitante.nome }}</div>
+                <div class="small text-muted">{{ t.origem_desc }}</div>
+                {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
+                <div class="small text-muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
+              </div>
+              <div class="text-end">
+                <button
+                  class="btn btn-sm btn-success mb-1"
+                  data-bs-toggle="modal"
+                  data-bs-target="#aceitarTrocaModal"
+                  data-troca-id="{{ t.id }}"
+                  data-origem-desc="{{ t.origem_desc }}"
+                  data-origem-weekday="{{ t.origem_weekday }}"
+                  data-origem-bucket="{{ t.origem_turno_bucket }}"
+                ><i class="bi bi-check2"></i> Aceitar</button>
+                <form class="d-inline" method="POST" action="{{ url_for('recusar_troca', troca_id=t.id) }}">
+                  <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i> Recusar</button>
+                </form>
+              </div>
+            </div>
           </div>
-          <div class="mt-2">
-            {% if trocas_recebidas_pendentes %}
-              {% for t in trocas_recebidas_pendentes %}
-                <div class="border rounded p-2 mb-2 no-x-scroll">
-                  <div class="d-flex align-items-center justify-content-between">
-                    <div class="me-2">
-                      <div class="fw-semibold">{{ t.solicitante.nome }}</div>
-                      <div class="small text-muted">{{ t.origem_desc }}</div>
-                      {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
-                      <div class="small text-muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
-                    </div>
-                    <div class="text-end">
-                      <button
-                        class="btn btn-sm btn-success mb-1"
-                        data-bs-toggle="modal"
-                        data-bs-target="#aceitarTrocaModal"
-                        data-troca-id="{{ t.id }}"
-                        data-origem-desc="{{ t.origem_desc }}"
-                        data-origem-weekday="{{ t.origem_weekday }}"
-                        data-origem-bucket="{{ t.origem_turno_bucket }}"
-                      ><i class="bi bi-check2"></i> Aceitar</button>
-                      <form class="d-inline" method="POST" action="{{ url_for('recusar_troca', troca_id=t.id) }}">
-                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i> Recusar</button>
-                      </form>
-                    </div>
-                  </div>
-                </div>
-              {% endfor %}
-            {% else %}
-              <div class="text-center text-muted">Nenhuma solicitação recebida.</div>
-            {% endif %}
-          </div>
-        </div>
+        {% endfor %}
+      {% else %}
+        <div class="text-center text-muted">Nenhuma solicitação recebida.</div>
+      {% endif %}
+    </div>
+  </div>
 
-        <div class="card p-3">
-          <div class="d-flex align-items-center justify-content-between">
-            <h6 class="mb-0"><i class="bi bi-send"></i> Minhas solicitações enviadas</h6>
-            <span class="badge-soft">{{ trocas_enviadas|length }}</span>
-          </div>
+  <div class="card p-3">
+    <div class="d-flex align-items-center justify-content-between">
+      <h6 class="mb-0"><i class="bi bi-send"></i> Minhas solicitações enviadas</h6>
+      <span class="badge-soft">{{ trocas_enviadas|length }}</span>
+    </div>
 
-          <div class="mt-2">
-            {% if trocas_enviadas %}
-              {% for t in trocas_enviadas %}
-                <div class="border rounded p-2 mb-2 no-x-scroll">
-                  <div class="d-flex align-items-center justify-content-between">
-                    <div class="me-2">
-                      <div class="fw-semibold">Para: {{ t.destino.nome }}</div>
-                      <div class="small text-muted">{{ t.origem_desc }}</div>
-                      {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
-                      <div class="small text-muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
-                    </div>
-                    <div class="text-end">
-                      {% if t.status == 'pendente' %}
-                        <span class="badge-status bg-warning-subtle text-warning">Pendente</span>
-                      {% elif t.status == 'aprovada' %}
-                        <span class="badge-status bg-success-subtle text-success">Aprovada</span>
-                      {% else %}
-                        <span class="badge-status bg-danger-subtle text-danger">Recusada</span>
-                      {% endif %}
-                    </div>
-                  </div>
-                </div>
-              {% endfor %}
-            {% else %}
-              <div class="text-center text-muted">Nenhuma solicitação enviada.</div>
-            {% endif %}
+    <div class="mt-2">
+      {% if trocas_enviadas %}
+        {% for t in trocas_enviadas %}
+          <div class="border rounded p-2 mb-2 no-x-scroll">
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="me-2">
+                <div class="fw-semibold">Para: {{ t.destino.nome }}</div>
+                <div class="small text-muted">{{ t.origem_desc }}</div>
+                {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
+                <div class="small text-muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
+              </div>
+              <div class="text-end">
+                {% if t.status == 'pendente' %}
+                  <span class="badge-status bg-warning-subtle text-warning">Pendente</span>
+                {% elif t.status == 'aprovada' %}
+                  <span class="badge-status bg-success-subtle text-success">Aprovada</span>
+                {% else %}
+                  <span class="badge-status bg-danger-subtle text-danger">Recusada</span>
+                {% endif %}
+              </div>
+            </div>
           </div>
-        </div>
-      </div> <!-- /tab trocas -->
+        {% endfor %}
+      {% else %}
+        <div class="text-center text-muted">Nenhuma solicitação enviada.</div>
+      {% endif %}
+    </div>
+  </div>
+</div> <!-- /tab trocas -->
 
     </div>
 
