@@ -237,7 +237,7 @@ class TrocaSolicitacao(db.Model):
 class Config(db.Model):
     __tablename__ = "config"
     id = db.Column(db.Integer, primary_key=True)
-    salario_minimo = db.Column(db.Float, default=0.0)
+    salario_minimo = db.Column(db.Float, default=0.0
 
 
 class Documento(db.Model):
@@ -330,75 +330,38 @@ def init_db():
     except Exception:
         db.session.rollback()
 
+   # =========================
+# Helpers
+# =========================
+def init_db():
+    db.create_all()
+
+    # --- qtd_entregas em lancamentos ---
+    try:
+        cols = db.session.execute(sa_text("PRAGMA table_info(lancamentos);")).fetchall()
+        colnames = {row[1] for row in cols}
+        if "qtd_entregas" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE lancamentos ADD COLUMN qtd_entregas INTEGER"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
     # --- cooperado_nome em escalas ---
     try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "cooperado_nome" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
-                db.session.commit()
-        else:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS escalas ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"))
+        cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+        colnames = {row[1] for row in cols}
+        if "cooperado_nome" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
     # --- restaurante_id em escalas ---
     try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "restaurante_id" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
-                db.session.commit()
-        else:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS escalas ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
-
-    # --- fotos no banco (cooperados/restaurantes) ---
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "foto_bytes" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_bytes BLOB"))
-            if "foto_mime" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_mime VARCHAR(100)"))
-            if "foto_filename" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_filename VARCHAR(255)"))
-            if "foto_url" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_url VARCHAR(255)"))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
-
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "foto_bytes" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_bytes BLOB"))
-            if "foto_mime" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_mime VARCHAR(100)"))
-            if "foto_filename" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_filename VARCHAR(255)"))
-            if "foto_url" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_url VARCHAR(255)"))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+        cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+        colnames = {row[1] for row in cols}
+        if "restaurante_id" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
             db.session.commit()
     except Exception:
         db.session.rollback()
@@ -519,7 +482,6 @@ def _build_docinfo(c: Cooperado) -> dict:
 
 
 def _save_upload(file_storage) -> str | None:
-    # Mantido para compatibilidade com outras partes do app (ex.: uploads de xlsx)
     if not file_storage:
         return None
     fname = secure_filename(file_storage.filename or "")
@@ -528,6 +490,183 @@ def _save_upload(file_storage) -> str | None:
     path = os.path.join(UPLOAD_DIR, fname)
     file_storage.save(path)
     return f"/static/uploads/{fname}"
+
+
+def _prox_ocorrencia_anual(dt: date | None) -> date | None:
+    if not dt:
+        return None
+    hoje = date.today()
+    alvo = date(hoje.year, dt.month, dt.day)
+    if alvo < hoje:
+        alvo = date(hoje.year + 1, dt.month, dt.day)
+    return alvo
+
+
+def _parse_date(s: str | None) -> date | None:
+    if not s:
+        return None
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except Exception:
+            pass
+    return None
+
+
+def _dow(dt: date) -> str:
+    return str((dt.weekday() % 7) + 1)
+
+# ======== Helpers p/ troca: data/weekday/turno ========
+def _parse_data_escala_str(s: str) -> date | None:
+    m = re.search(r'(\d{1,2})/(\d{1,2})/(\d{2,4})', str(s or ''))
+    if not m:
+        return None
+    d_, mth, y = map(int, m.groups())
+    if y < 100:
+        y += 2000
+    try:
+        return date(y, mth, d_)
+    except Exception:
+        return None
+
+def _weekday_from_data_str(s: str) -> int | None:
+    dt = _parse_data_escala_str(s)
+    if dt:
+        return (dt.weekday() % 7) + 1
+    txt = unicodedata.normalize("NFD", str(s or "").lower())
+    txt = "".join(ch for ch in txt if unicodedata.category(ch) != "Mn")
+    M = re.search(
+        r"\b(seg|segunda|ter|terca|terça|qua|quarta|qui|quinta|sex|sexta|sab|sabado|sábado|dom|domingo)\b",
+        txt
+    )
+    if not M:
+        M = re.search(r"\b(seg|ter|qua|qui|sex|sab|dom)\b", txt)
+        if not M:
+            return None
+    token = M.group(1)
+    mapa = {
+        "seg":1,"segunda":1,
+        "ter":2,"terca":2,"terça":2,
+        "qua":3,"quarta":3,
+        "qui":4,"quinta":4,
+        "sex":5,"sexta":5,
+        "sab":6,"sabado":6,"sábado":6,
+        "dom":7,"domingo":7,
+    }
+    return mapa.get(token)
+
+def _weekday_abbr(num: int | None) -> str:
+    return {1:"SEG",2:"TER",3:"QUA",4:"QUI",5:"SEX",6:"SÁB",7:"DOM"}.get(num or 0, "")
+
+def _turno_bucket(turno: str | None, horario: str | None) -> str:
+    t = (turno or "").lower()
+    t = unicodedata.normalize("NFD", t)
+    t = "".join(ch for ch in t if unicodedata.category(ch) != "Mn")
+    if "noite" in t or "noturn" in t:
+        return "noite"
+    if any(x in t for x in ["dia", "diurn", "manha", "manhã", "tarde"]):
+        return "dia"
+    m = re.search(r'(\d{1,2}):(\d{2})', str(horario or ""))
+    if m:
+        h = int(m.group(1))
+        return "noite" if (h >= 17 or h <= 6) else "dia"
+    return "dia"
+
+def _escala_label(e: Escala | None) -> str:
+    if not e:
+        return "—"
+    wd = _weekday_from_data_str(e.data)
+    wd_abbr = _weekday_abbr(wd)
+    dt = _parse_data_escala_str(e.data)
+    if dt:
+        data_txt = dt.strftime("%d/%m/%y") + (f"-{wd_abbr}" if wd_abbr else "")
+    else:
+        data_txt = (str(e.data or "").strip() or wd_abbr)
+    turno_txt = (e.turno or "").strip() or _turno_bucket(e.turno, e.horario).upper()
+    horario_txt = (e.horario or "").strip()
+    contrato_txt = (e.contrato or "").strip()
+    parts = [x for x in [data_txt, turno_txt, horario_txt, contrato_txt] if x]
+    return " • ".join(parts)
+
+def _carry_forward_contrato(escalas: list[Escala]) -> dict[int, str]:
+    eff = {}
+    atual = ""
+    for e in escalas:
+        raw = (e.contrato or "").strip()
+        if raw:
+            atual = raw
+        eff[e.id] = atual
+    return eff
+
+def _parse_linhas_from_msg(msg: str | None) -> list[dict]:
+    if not msg:
+        return []
+    blobs = re.findall(r"__AFETACAO_JSON__\s*[:=]\s*(\{.*?\})\s*$", str(msg), flags=re.DOTALL)
+    if not blobs:
+        return []
+    raw = blobs[-1]
+    try:
+        payload = json.loads(raw)
+    except Exception:
+        try:
+            payload = json.loads(raw.replace("'", '"'))
+        except Exception:
+            return []
+    linhas = payload.get("linhas") or payload.get("rows") or []
+    out = []
+    for r in (linhas if isinstance(linhas, list) else []):
+        turno = str(r.get("turno") or "").strip()
+        horario = str(r.get("horario") or "").strip()
+        turno_horario = (r.get("turno_horario") or " • ".join(x for x in [turno, horario] if x)).strip()
+        out.append({
+            "dia": str(r.get("dia") or ""),
+            "turno_horario": turno_horario,
+            "contrato": str(r.get("contrato") or ""),
+            "saiu": str(r.get("saiu") or ""),
+            "entrou": str(r.get("entrou") or ""),
+        })
+    return out
+
+def _strip_afetacao_blob(msg: str | None) -> str:
+    if not msg:
+        return ""
+    return re.sub(r"__AFETACAO_JSON__\s*[:=]\s*\{.*\}\s*$", "", str(msg), flags=re.DOTALL).strip()
+
+def _norm(s: str) -> str:
+    s = unicodedata.normalize("NFD", str(s or "").strip().lower())
+    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+    s = re.sub(r"[^a-z0-9]+", " ", s).strip()
+    return s
+
+def to_css_color(v: str) -> str:
+    t = str(v or "").strip()
+    if not t:
+        return ""
+    t_low = t.lower().strip()
+    if re.fullmatch(r"[0-9a-fA-F]{8}", t):
+        return f"#{t[2:8]}"
+    if re.fullmatch(r"[0-9a-fA-F]{6}", t):
+        return f"#{t}"
+    if re.fullmatch(r"#?[0-9a-fA-F]{6,8}", t):
+        if not t.startswith("#"):
+            t = f"#{t}"
+        if len(t) == 9:
+            a = int(t[1:3], 16) / 255.0
+            r = int(t[3:5], 16)
+            g = int(t[5:7], 16)
+            b = int(t[7:9], 16)
+            return f"rgba({r},{g},{b},{a:.3f})"
+        return t
+    m = re.fullmatch(r"\s*(\d{1,3})\s*[,;]\s*(\d{1,3})\s*[,;]\s*(\d{1,3})\s*", t)
+    if m:
+        r, g, b = [max(0, min(255, int(x))) for x in m.groups()]
+        return f"rgb({r},{g},{b})"
+    mapa = {
+        "azul": "blue", "vermelho": "red", "verde": "green",
+        "amarelo": "yellow", "cinza": "gray", "preto": "black",
+        "branco": "white", "laranja": "orange", "roxo": "purple",
+    }
+    return mapa.get(t_low, t)
     
 
     # --- fotos no banco (cooperados/restaurantes) ---
@@ -1501,7 +1640,7 @@ def admin_dashboard():
             "recebedores": recs,
         })
 
-    # ======== Trocas no admin ========
+   # ======== Trocas no admin ========
     def _escala_desc(e: Escala | None) -> str:
         return _escala_label(e)
 
@@ -1635,6 +1774,7 @@ def admin_dashboard():
         trocas_historico=trocas_historico,
         trocas_historico_flat=trocas_historico_flat,
     )
+
 
 # =========================
 # Navegação/Export util
@@ -2728,7 +2868,7 @@ def upload_escala():
         if isinstance(v, date):
             return v.strftime("%d/%m/%Y")
         s = str(v).strip()
-        m = re.fullmatch(r"(\d{4})[-/](\d{1,2})[-/](\d{1,2})", s)
+        m = _re.fullmatch(r"(\d{4})[-/](\d{1,2})[-/](\d{1,2})", s)
         if m:
             y, mth, d = map(int, m.groups())
             try:
@@ -2737,11 +2877,8 @@ def upload_escala():
                 return s
         return s
 
-    # ---------------- NOVO: coletores para sobrescrever corretamente ----------------
     linhas_novas: list[dict] = []
     coops_na_planilha: set[int] = set()
-    rest_ids_in_plan: set[int] = set()
-    contratos_in_plan: set[str] = set()
     total_linhas_planilha = 0
 
     for i in range(2, ws.max_row + 1):
@@ -2765,12 +2902,6 @@ def upload_escala():
         cor_txt      = to_css_color_local(cor_v)
         rest_id      = match_restaurante_id(contrato_txt)
 
-        # guarda quem aparece na planilha para limpar antes de inserir
-        if rest_id:
-            rest_ids_in_plan.add(int(rest_id))
-        if contrato_txt:
-            contratos_in_plan.add(contrato_txt)
-
         match = _match_cooperado_by_name(nome, cooperados)
         payload = {
             "cooperado_id":   (match.id if match else None),
@@ -2790,51 +2921,30 @@ def upload_escala():
         flash("Nada importado: nenhum registro válido encontrado.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    # ---------------- sobrescrever: apagar antigas e inserir novas ----------------
     try:
-        deletados = 0
-
-        # 1) apaga escalas antigas por restaurante_id que estão nesta planilha
-        if rest_ids_in_plan:
-            res = db.session.execute(
-                sa_delete(Escala).where(Escala.restaurante_id.in_(list(rest_ids_in_plan)))
-            )
-            deletados += (res.rowcount or 0)
-
-        # 2) apaga escalas antigas por contrato textual que estão nesta planilha
-        if contratos_in_plan:
-            res2 = db.session.execute(
-                sa_delete(Escala).where(Escala.contrato.in_(list(contratos_in_plan)))
-            )
-            deletados += (res2.rowcount or 0)
-
-        # 3) (mantém) apaga escalas antigas por cooperado_id reconhecido (compatível com comportamento anterior)
+        deleted = 0
         if coops_na_planilha:
-            res3 = db.session.execute(
+            res = db.session.execute(
                 sa_delete(Escala).where(Escala.cooperado_id.in_(list(coops_na_planilha)))
             )
-            deletados += (res3.rowcount or 0)
+            deleted = res.rowcount or 0
 
-        # 4) insere as novas linhas
         for row in linhas_novas:
             db.session.add(Escala(**row))
 
-        # 5) marca atualização dos cooperados encontrados
         for cid in coops_na_planilha:
             c = Cooperado.query.get(cid)
             if c:
                 c.ultima_atualizacao = datetime.now()
 
         db.session.commit()
-
         msg = (
             f"Escala importada. {len(linhas_novas)} linha(s) adicionada(s). "
-            f"{deletados} registro(s) antigo(s) removido(s) para os mesmos restaurantes/contratos/cooperados."
+            f"{deleted} escala(s) antigas removidas para {len(coops_na_planilha)} cooperado(s) reconhecido(s)."
         )
         if total_linhas_planilha > 0 and len(linhas_novas) < total_linhas_planilha:
             msg += f" (Linhas processadas: {total_linhas_planilha})"
         flash(msg, "success")
-
     except Exception as e:
         db.session.rollback()
         flash(f"Erro ao importar a escala: {e}", "danger")
@@ -3561,13 +3671,7 @@ def portal_restaurante():
     escalas_all = Escala.query.order_by(Escala.id.asc()).all()
     eff_map = _carry_forward_contrato(escalas_all)
 
-    # AJUSTE: incluir restaurante_id no filtro da escala (prioridade),
-    # além do match por nome de contrato.
-    escalas_rest = [
-        e for e in escalas_all
-        if (e.restaurante_id == rest.id)  # <- bateu pelo ID do restaurante
-        or contrato_bate_restaurante(eff_map.get(e.id, e.contrato or ""), rest.nome)  # <- bateu pelo nome
-    ]
+    escalas_rest = [e for e in escalas_all if contrato_bate_restaurante(eff_map.get(e.id, e.contrato or ""), rest.nome)]
     if not escalas_rest:
         escalas_rest = [e for e in escalas_all if (e.contrato or "").strip() == rest.nome.strip()]
 
