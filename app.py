@@ -328,7 +328,7 @@ def init_db():
     except Exception:
         db.session.rollback()
 
-     # --- cooperado_nome em escalas ---
+    # --- cooperado_nome em escalas ---
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
@@ -355,6 +355,178 @@ def init_db():
             db.session.commit()
     except Exception:
         db.session.rollback()
+
+    # --- fotos no banco (cooperados/restaurantes) ---
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "foto_bytes" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_bytes BLOB"))
+            if "foto_mime" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_mime VARCHAR(100)"))
+            if "foto_filename" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_filename VARCHAR(255)"))
+            if "foto_url" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_url VARCHAR(255)"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "foto_bytes" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_bytes BLOB"))
+            if "foto_mime" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_mime VARCHAR(100)"))
+            if "foto_filename" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_filename VARCHAR(255)"))
+            if "foto_url" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_url VARCHAR(255)"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # --- usuário admin + config padrão ---
+    if not Usuario.query.filter_by(tipo="admin").first():
+        admin = Usuario(usuario="coopex", tipo="admin", senha_hash="")
+        admin.set_password("coopex05289")
+        db.session.add(admin)
+        db.session.commit()
+
+    if not Config.query.get(1):
+        db.session.add(Config(id=1, salario_minimo=0.0))
+        db.session.commit()
+
+
+def get_config() -> Config:
+    cfg = Config.query.get(1)
+    if not cfg:
+        cfg = Config(id=1, salario_minimo=0.0)
+        db.session.add(cfg)
+        db.session.commit()
+    return cfg
+
+
+def role_required(role: str):
+    def deco(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if session.get("user_tipo") != role:
+                return redirect(url_for("login"))
+            return fn(*args, **kwargs)
+        return wrapper
+    return deco
+
+
+def admin_required(fn):
+    return role_required("admin")(fn)
+
+
+def _normalize_name(s: str) -> list[str]:
+    s = unicodedata.normalize("NFD", s or "")
+    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+    s = re.sub(r"[^a-zA-Z0-9\s]", " ", s)
+    parts = [p.lower() for p in s.split() if p.strip()]
+    return parts
+
+
+def _match_restaurante_id(contrato_txt: str) -> int | None:
+    alvo = " ".join(_normalize_name(contrato_txt or ""))
+    if not alvo:
+        return None
+    restaurantes = Restaurante.query.order_by(Restaurante.nome.asc()).all()
+
+    for r in restaurantes:
+        rn = " ".join(_normalize_name(r.nome))
+        if alvo == rn or alvo in rn or rn in alvo:
+            return r.id
+
+    try:
+        nomes_norm = [" ".join(_normalize_name(r.nome)) for r in restaurantes]
+        close = difflib.get_close_matches(alvo, nomes_norm, n=1, cutoff=0.85)
+        if close:
+            alvo_norm = close[0]
+            for r in restaurantes:
+                if " ".join(_normalize_name(r.nome)) == alvo_norm:
+                    return r.id
+    except Exception:
+        pass
+    return None
+
+
+def _match_cooperado_by_name(nome_planilha: str, cooperados: list[Cooperado]) -> Cooperado | None:
+    def norm_join(s: str) -> str:
+        return " ".join(_normalize_name(s))
+
+    sheet_tokens = _normalize_name(nome_planilha)
+    sheet_norm = " ".join(sheet_tokens)
+    if not sheet_norm:
+        return None
+
+    for c in cooperados:
+        c_norm = norm_join(c.nome)
+        if sheet_norm == c_norm or sheet_norm in c_norm or c_norm in sheet_norm:
+            return c
+
+    parts_sheet = set(sheet_tokens)
+    best, best_count = None, 0
+    for c in cooperados:
+        parts_c = set(_normalize_name(c.nome))
+        inter = parts_sheet & parts_c
+        if len(inter) > best_count:
+            best, best_count = c, len(inter)
+    if best and best_count >= 2:
+        return best
+
+    if len(sheet_tokens) == 1 and len(sheet_tokens[0]) >= 3:
+        token = sheet_tokens[0]
+        hits = [c for c in cooperados if token in set(_normalize_name(c.nome))]
+        if len(hits) == 1:
+            return hits[0]
+
+    names_norm = [norm_join(c.nome) for c in cooperados]
+    close = difflib.get_close_matches(sheet_norm, names_norm, n=1, cutoff=0.85)
+    if close:
+        target = close[0]
+        for c in cooperados:
+            if norm_join(c.nome) == target:
+                return c
+    return None
+
+
+def _build_docinfo(c: Cooperado) -> dict:
+    today = date.today()
+    cnh_ok = (c.cnh_validade is not None and c.cnh_validade >= today)
+    placa_ok = (c.placa_validade is not None and c.placa_validade >= today)
+    return {"cnh": {"ok": cnh_ok}, "placa": {"ok": placa_ok}}
+
+
+def _save_upload(file_storage) -> str | None:
+    # Mantido para compatibilidade com outras partes do app (ex.: uploads de xlsx)
+    if not file_storage:
+        return None
+    fname = secure_filename(file_storage.filename or "")
+    if not fname:
+        return None
+    path = os.path.join(UPLOAD_DIR, fname)
+    file_storage.save(path)
+    return f"/static/uploads/{fname}"
+    
 
     # --- fotos no banco (cooperados/restaurantes) ---
     try:
