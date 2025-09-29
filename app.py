@@ -3346,7 +3346,13 @@ def portal_restaurante():
     escalas_all = Escala.query.order_by(Escala.id.asc()).all()
     eff_map = _carry_forward_contrato(escalas_all)
 
-    escalas_rest = [e for e in escalas_all if contrato_bate_restaurante(eff_map.get(e.id, e.contrato or ""), rest.nome)]
+    # AJUSTE: incluir restaurante_id no filtro da escala (prioridade),
+    # além do match por nome de contrato.
+    escalas_rest = [
+        e for e in escalas_all
+        if (e.restaurante_id == rest.id)  # <- bateu pelo ID do restaurante
+        or contrato_bate_restaurante(eff_map.get(e.id, e.contrato or ""), rest.nome)  # <- bateu pelo nome
+    ]
     if not escalas_rest:
         escalas_rest = [e for e in escalas_all if (e.contrato or "").strip() == rest.nome.strip()]
 
@@ -3510,7 +3516,7 @@ def excluir_lancamento(id):
     db.session.commit()
     flash("Lançamento excluído.", "success")
     return redirect(url_for("portal_restaurante"))
-
+    
 
 # =========================
 # Documentos (Admin + Público)
