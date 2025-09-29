@@ -328,7 +328,7 @@ def init_db():
     except Exception:
         db.session.rollback()
 
-    # --- cooperado_nome em escalas ---
+     # --- cooperado_nome em escalas ---
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
