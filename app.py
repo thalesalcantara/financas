@@ -34,6 +34,7 @@ DOCS_DIR = os.path.join(UPLOAD_DIR, "docs")
 os.makedirs(DOCS_DIR, exist_ok=True)
 TABELAS_DIR = os.path.join(UPLOAD_DIR, "tabelas")
 os.makedirs(TABELAS_DIR, exist_ok=True)
+
 def _build_db_uri() -> str:
     """
     Usa SQLite local se não houver DATABASE_URL.
