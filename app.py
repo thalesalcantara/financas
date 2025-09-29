@@ -3638,85 +3638,115 @@ def recusar_troca(troca_id):
     return redirect(url_for("portal_cooperado"))
 
 # =========================
-# PORTAL RESTAURANTE (completo)
+# Helpers locais
 # =========================
 from datetime import date, timedelta
 from collections import defaultdict
-from flask import request, render_template, session, abort, flash, redirect, url_for
-from sqlalchemy import and_
+from sqlalchemy import select, text as sa_text
 
-# Models e db (ajuste os imports conforme seu projeto)
-# from app import db
-# from models import Restaurante, Cooperado, Lancamento, Escala, AvaliacaoCooperado
-
-# --- helper já existente no seu código ---
 def _parse_date(s):
     try:
         return date.fromisoformat(s) if s else None
     except Exception:
         return None
 
+def _dow(d: date) -> str:
+    """Retorna '1'..'7' (1=seg, 7=dom) para facilitar os mapas de período."""
+    return str((d.weekday() % 7) + 1)
 
+def _normalize_name(s: str) -> str:
+    s = (s or "").strip().lower()
+    repl = {"á":"a","à":"a","ã":"a","â":"a","é":"e","ê":"e","í":"i","ó":"o","ô":"o","õ":"o","ú":"u","ç":"c"}
+    return "".join(repl.get(c, c) for c in s if c.isalnum() or c.isspace())
+
+def _norm(s: str) -> str:
+    return _normalize_name(s)
+
+
+# =========================
+# PORTAL RESTAURANTE
+# =========================
 @app.route("/portal/restaurante")
 @role_required("restaurante")
 def portal_restaurante():
-    # restaurante logado
     u_id = session.get("user_id")
     rest = Restaurante.query.filter_by(usuario_id=u_id).first()
     if not rest:
         return "<p style='font-family:Arial;margin:40px'>Seu usuário não está vinculado a um estabelecimento. Avise o administrador.</p>"
 
+    # -------------------- VIEW escolhida --------------------
     view = request.args.get("view", "lancar")  # 'lancar' | 'escalas' | 'config' | 'avisos'
 
-    # -------------------- PERÍODO PARA LANÇAMENTOS --------------------
-    di = _parse_date(request.args.get("data_inicio"))
-    df = _parse_date(request.args.get("data_fim"))
-    if not di or not df:
-        # período padrão baseado na configuração do restaurante
-        wd_map = {"seg-dom": 0, "sab-sex": 5, "sex-qui": 4}  # seg=0 ... dom=6
-        start_wd = wd_map.get(getattr(rest, "periodo", "seg-dom"), 0)
+    # -------------------- Período (datas) --------------------
+    data_inicio = _parse_date(request.args.get("data_inicio"))
+    data_fim    = _parse_date(request.args.get("data_fim"))
+
+    # Se não vierem datas, usa janela semanal baseada no período do restaurante
+    if not data_inicio or not data_fim:
+        wd_map = {"seg-dom": 0, "sab-sex": 5, "sex-qui": 4}  # seg=0..dom=6
+        start_wd = wd_map.get(rest.periodo, 0)
         hoje = date.today()
         delta = (hoje.weekday() - start_wd) % 7
         di_auto = hoje - timedelta(days=delta)
         df_auto = di_auto + timedelta(days=6)
-        di = di or di_auto
-        df = df or df_auto
+        data_inicio = data_inicio or di_auto
+        data_fim    = data_fim or df_auto
+        periodo_desc = rest.periodo
+    else:
+        periodo_desc = "personalizado"
 
-    # -------------------- COOPERADOS DO RESTAURANTE --------------------
-    cooperados = (Cooperado.query
-                  .filter_by(restaurante_id=rest.id)
-                  .order_by(Cooperado.nome)
-                  .all())
+    # -------------------- Filtros extras --------------------
+    cooperado_id    = request.args.get("cooperado_id", type=int)
+    considerar_per  = request.args.get("considerar_periodo", default="0") in ("1","true","True","on")
+    dows_param      = request.args.get("dows", "")  # ex.: "1,2,3" (seg,ter,qua)
+    dows            = {x for x in dows_param.split(",") if x.strip()} if dows_param else set()
 
-    # -------------------- LANÇAMENTOS (TODOS no período) --------------------
-    # Carrega todos de uma vez para performance e agrupa em memória
-    lancs = (Lancamento.query
-             .filter(
-                 Lancamento.restaurante_id == rest.id,
-                 Lancamento.data >= di,
-                 Lancamento.data <= df
-             )
-             .order_by(Lancamento.data.desc(), Lancamento.id.desc())
-             .all())
+    # -------------------- Lançamentos (com filtros + DOW) --------------------
+    q = Lancamento.query.filter(Lancamento.restaurante_id == rest.id)
+    if cooperado_id:
+        q = q.filter(Lancamento.cooperado_id == cooperado_id)
+    if data_inicio:
+        q = q.filter(Lancamento.data >= data_inicio)
+    if data_fim:
+        q = q.filter(Lancamento.data <= data_fim)
 
+    lanc_base = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
+
+    if dows:
+        lancamentos = [l for l in lanc_base if l.data and _dow(l.data) in dows]
+    else:
+        lancamentos = lanc_base
+
+    # Se marcar "considerar_periodo", só mantemos dias do período do restaurante
+    if considerar_per:
+        mapa = {
+            "seg-dom": {"1","2","3","4","5","6","7"},
+            "sab-sex": {"6","7","1","2","3","4","5"},
+            "sex-qui": {"5","6","7","1","2","3","4"},
+        }
+        permitidos = mapa.get(rest.periodo, {"1","2","3","4","5","6","7"})
+        lancamentos = [l for l in lancamentos if l.data and _dow(l.data) in permitidos]
+
+    # Totais de lançamentos no período (para cards)
+    total_bruto      = sum((l.valor or 0.0) for l in lancamentos)
+    total_qtd        = len(lancamentos)
+    total_entregas   = sum((l.qtd_entregas or 0) for l in lancamentos)
+    total_inss       = total_bruto * 0.045
+    total_liquido    = total_bruto - total_inss
+
+    # -------------------- Cooperados para a listagem (SEM filtrar por restaurante_id)
+    # opção simples: todos cooperados (permite lançar para qualquer um)
+    cooperados = Cooperado.query.order_by(Cooperado.nome).all()
+
+    # injeta lançamentos por cooperado (para o HTML existente)
     por_coop = defaultdict(list)
-    for l in lancs:
+    for l in lancamentos:
         por_coop[l.cooperado_id].append(l)
-
-    total_bruto = 0.0
-    total_qtd = len(lancs)
-    total_entregas = sum((l.qtd_entregas or 0) for l in lancs)
-
     for c in cooperados:
         c.lancamentos = por_coop.get(c.id, [])
-        c.total_periodo = sum((l.valor or 0.0) for l in c.lancamentos)
-        total_bruto += c.total_periodo
+        c.total_periodo = sum((lx.valor or 0.0) for lx in c.lancamentos)
 
-    total_inss = total_bruto * 0.045
-    total_liquido = total_bruto - total_inss
-
-    # -------------------- ESCALA (Quem trabalha) --------------------
-    # As helpers abaixo devem existir no seu projeto.
+    # -------------------- Escala (quem trabalha) --------------------
     def contrato_bate_restaurante(contrato: str, rest_nome: str) -> bool:
         a = " ".join(_normalize_name(contrato or ""))
         b = " ".join(_normalize_name(rest_nome or ""))
@@ -3732,73 +3762,143 @@ def portal_restaurante():
         semana_inicio = ref - timedelta(days=ref.weekday())
         dias_list = [semana_inicio + timedelta(days=i) for i in range(7)]
 
+    escalas_all = Escala.query.order_by(Escala.id.asc()).all()
+
+    # Se você tiver uma função que propaga contrato (carry-forward), use-a; senão, mapeia direto:
+    def _carry_forward_contrato(escalas):
+        # placeholder simples: não altera contrato
+        return {e.id: (e.contrato or "") for e in escalas}
+    eff_map = _carry_forward_contrato(escalas_all)
+
+    escalas_rest = [e for e in escalas_all
+                    if contrato_bate_restaurante(eff_map.get(e.id, e.contrato or ""), rest.nome)] \
+                   or [e for e in escalas_all if (e.contrato or "").strip() == rest.nome.strip()]
+
     agenda = {d: [] for d in dias_list}
-    if view == "escalas":
-        escalas_all = Escala.query.order_by(Escala.id.asc()).all()
-        eff_map = _carry_forward_contrato(escalas_all)
+    seen = {d: set() for d in dias_list}
 
-        # Primeiro por "contrato efetivo" equivalente ao nome do restaurante,
-        # senão tenta match exato do texto original.
-        escalas_rest = [e for e in escalas_all if contrato_bate_restaurante(eff_map.get(e.id, e.contrato or ""), rest.nome)]
-        if not escalas_rest:
-            escalas_rest = [e for e in escalas_all if (e.contrato or "").strip() == rest.nome.strip()]
+    # Você pode ter helpers para converter e.data (string) em date e weekday
+    def _parse_data_escala_str(s):
+        # aceite "YYYY-MM-DD" ou vazio; ajuste se seu formato for diferente
+        return _parse_date(s)
 
-        seen = {d: set() for d in dias_list}  # evita duplicados no mesmo dia
-        for e in escalas_rest:
-            dt = _parse_data_escala_str(e.data)       # date | None
-            wd = _weekday_from_data_str(e.data)       # 1..7 | None
-            for d in dias_list:
-                hit = (dt and dt == d) or (wd and wd == ((d.weekday() % 7) + 1))
-                if not hit:
-                    continue
+    def _weekday_from_data_str(s):
+        # se sua planilha usa 1..7 para dias fixos, retorne aqui; senão, None
+        return None
 
-                coop = Cooperado.query.get(e.cooperado_id) if e.cooperado_id else None
-                nome_fallback = (e.cooperado_nome or "").strip()
-                nome_show = (coop.nome if coop else nome_fallback) or "—"
-                contrato_eff = (eff_map.get(e.id, e.contrato or "") or "").strip()
-
-                key = (
-                    (coop.id if coop else _norm(nome_show)),
-                    _norm(e.turno),
-                    _norm(e.horario),
-                    _norm(contrato_eff),
-                )
-                if key in seen[d]:
-                    break
-                seen[d].add(key)
-
-                agenda[d].append({
-                    "coop": coop,
-                    "cooperado_nome": nome_fallback or None,
-                    "nome_planilha": nome_show,
-                    "turno": (e.turno or "").strip(),
-                    "horario": (e.horario or "").strip(),
-                    "contrato": contrato_eff,
-                    "cor": (e.cor or "").strip(),
-                })
-                break
-
+    for e in escalas_rest:
+        dt = _parse_data_escala_str(e.data)         # date | None
+        wd = _weekday_from_data_str(e.data)         # 1..7 | None
         for d in dias_list:
-            agenda[d].sort(key=lambda x: ((x["contrato"] or "").lower(),
-                                          (x.get("nome_planilha") or (x["coop"].nome if x["coop"] else "")).lower()))
+            hit = (dt and dt == d) or (wd and wd == ((d.weekday() % 7) + 1))
+            if not hit:
+                continue
 
-    # -------------------- RENDER --------------------
+            coop = Cooperado.query.get(e.cooperado_id) if e.cooperado_id else None
+            nome_fallback = (e.cooperado_nome or "").strip()
+            nome_show = (coop.nome if coop else nome_fallback) or "—"
+            contrato_eff = (eff_map.get(e.id, e.contrato or "") or "").strip()
+
+            key = (
+                (coop.id if coop else _norm(nome_show)),
+                _norm(e.turno or ""),
+                _norm(e.horario or ""),
+                _norm(contrato_eff),
+            )
+            if key in seen[d]:
+                break
+            seen[d].add(key)
+
+            agenda[d].append({
+                "coop": coop,
+                "cooperado_nome": nome_fallback or None,
+                "nome_planilha": nome_show,
+                "turno": (e.turno or "").strip(),
+                "horario": (e.horario or "").strip(),
+                "contrato": contrato_eff,
+                "cor": (e.cor or "").strip(),
+            })
+            break
+
+    for d in dias_list:
+        agenda[d].sort(key=lambda x: ((x["contrato"] or "").lower(),
+                                      (x.get("nome_planilha") or (x["coop"].nome if x["coop"] else "")).lower()))
+
+    # -------------------- (Opcional) Blocos financeiros globais do seu dashboard --------------------
+    # Mantenho aqui caso seu template use:
+    rq  = ReceitaCooperativa.query
+    dq  = DespesaCooperativa.query
+    if data_inicio:
+        rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
+        dq = dq.filter(DespesaCooperativa.data >= data_inicio)
+    if data_fim:
+        rq = rq.filter(ReceitaCooperativa.data <= data_fim)
+        dq = dq.filter(DespesaCooperativa.data <= data_fim)
+    receitas  = rq.order_by(ReceitaCooperativa.data.desc().nullslast(),
+                            ReceitaCooperativa.id.desc()).all()
+    despesas  = dq.order_by(DespesaCooperativa.data.desc(),
+                            DespesaCooperativa.id.desc()).all()
+    total_receitas = sum((r.valor_total or 0.0) for r in receitas)
+    total_despesas = sum((d.valor or 0.0) for d in despesas)
+
+    rq2 = ReceitaCooperado.query
+    dq2 = DespesaCooperado.query
+    if data_inicio:
+        rq2 = rq2.filter(ReceitaCooperado.data >= data_inicio)
+        dq2 = dq2.filter(DespesaCooperado.data >= data_inicio)
+    if data_fim:
+        rq2 = rq2.filter(ReceitaCooperado.data <= data_fim)
+        dq2 = dq2.filter(DespesaCooperado.data <= data_fim)
+    receitas_coop      = rq2.order_by(ReceitaCooperado.data.desc(),
+                                      ReceitaCooperado.id.desc()).all()
+    despesas_coop      = dq2.order_by(DespesaCooperado.data.desc(),
+                                      DespesaCooperado.id.desc()).all()
+    total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
+    total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop)
+
+    cfg = get_config()
+    historico_beneficios = BeneficioRegistro.query.order_by(BeneficioRegistro.id.desc()).all()
+    restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
+
+    # -------------------- Render --------------------
     return render_template(
-        "portal_restaurante.html",   # <-- usa o MESMO HTML que você enviou
+        "restaurante_dashboard.html",  # ou "portal_restaurante.html" se for seu nome
         rest=rest,
+        view=view,
+
+        # filtros/periodo
+        filtro_inicio=data_inicio,
+        filtro_fim=data_fim,
+        periodo_desc=periodo_desc,
+
+        # cooperados + lançamentos por cooperado
         cooperados=cooperados,
-        filtro_inicio=di,
-        filtro_fim=df,
+
+        # cards de totais
         total_bruto=total_bruto,
         total_inss=total_inss,
         total_liquido=total_liquido,
         total_qtd=total_qtd,
         total_entregas=total_entregas,
-        view=view,
+
+        # escala
         agenda=agenda,
         dias_list=dias_list,
         ref_data=ref,
         modo=modo,
+
+        # blocos financeiros (se seu template usar)
+        receitas=receitas,
+        despesas=despesas,
+        total_receitas=total_receitas,
+        total_despesas=total_despesas,
+        receitas_coop=receitas_coop,
+        despesas_coop=despesas_coop,
+        total_receitas_coop=total_receitas_coop,
+        total_despesas_coop=total_despesas_coop,
+        cfg=cfg,
+        historico_beneficios=historico_beneficios,
+        restaurantes=restaurantes,
     )
 
 
@@ -3814,7 +3914,6 @@ def lancar_producao():
         abort(403)
     f = request.form
 
-    # 1) cria o lançamento
     l = Lancamento(
         restaurante_id=rest.id,
         cooperado_id=f.get("cooperado_id", type=int),
@@ -3828,48 +3927,49 @@ def lancar_producao():
     db.session.add(l)
     db.session.flush()  # garante l.id
 
-    # 2) (opcional) avaliação — funciona com seu HTML (toggle e modal)
-    try:
-        g_ = _clamp_star(f.get("av_geral"))
-        p_ = _clamp_star(f.get("av_pontualidade"))
-        ed_ = _clamp_star(f.get("av_educacao"))
-        ef_ = _clamp_star(f.get("av_eficiencia"))
-        ap_ = _clamp_star(f.get("av_apresentacao"))
-        txt = (f.get("av_comentario") or "").strip()
+    # leitura opcional da avaliação
+    def _to_star(s):
+        try:
+            v = int(s) if s else None
+            return v if v and 1 <= v <= 5 else None
+        except Exception:
+            return None
 
-        tem_avaliacao = any(x is not None for x in (g_, p_, ed_, ef_, ap_)) or bool(txt)
-        if tem_avaliacao:
-            media = _media_ponderada(g_, p_, ed_, ef_, ap_)
-            senti = _analise_sentimento(txt)
-            temas = _identifica_temas(txt)
-            crise = _sinaliza_crise(g_, txt)
-            feed  = _gerar_feedback(p_, ed_, ef_, ap_, txt, senti)
+    g  = _to_star(f.get("av_geral"))
+    p  = _to_star(f.get("av_pontualidade"))
+    ed = _to_star(f.get("av_educacao"))
+    ef = _to_star(f.get("av_eficiencia"))
+    ap = _to_star(f.get("av_apresentacao"))
+    txt = (f.get("av_comentario") or "").strip()
 
+    tem_avaliacao = any(x is not None for x in (g,p,ed,ef,ap)) or bool(txt)
+    if tem_avaliacao:
+        # Se tiver seu pipeline de sentimento/temas, chame aqui. Abaixo salvo “cru”.
+        try:
             av = AvaliacaoCooperado(
                 restaurante_id=rest.id,
                 cooperado_id=l.cooperado_id,
                 lancamento_id=l.id,
-                estrelas_geral=g_,
-                estrelas_pontualidade=p_,
-                estrelas_educacao=ed_,
-                estrelas_eficiencia=ef_,
-                estrelas_apresentacao=ap_,
+                estrelas_geral=g,
+                estrelas_pontualidade=p,
+                estrelas_educacao=ed,
+                estrelas_eficiencia=ef,
+                estrelas_apresentacao=ap,
                 comentario=txt,
-                media_ponderada=media,
-                sentimento=senti,
-                temas="; ".join(temas),
-                alerta_crise=crise,
-                feedback_motoboy=feed,
             )
             db.session.add(av)
-            if crise:
-                flash("⚠️ Avaliação crítica registrada (1★ + termo de risco). A gerência deve revisar.", "danger")
-    except NameError:
-        # se as helpers de avaliação não existirem, apenas segue sem avaliação
-        pass
+        except NameError:
+            # Caso o modelo tenha outro nome/tabela:
+            db.session.execute(sa_text("""
+                INSERT INTO avaliacoes_restaurante
+                    (restaurante_id, cooperado_id, lancamento_id, estrelas_geral, estrelas_pontualidade,
+                     estrelas_educacao, estrelas_eficiencia, estrelas_apresentacao, comentario)
+                VALUES
+                    (:rid, :cid, :lid, :g, :p, :ed, :ef, :ap, :txt)
+            """), dict(rid=rest.id, cid=l.cooperado_id, lid=l.id, g=g, p=p, ed=ed, ef=ef, ap=ap, txt=txt))
 
     db.session.commit()
-    flash("Produção lançada.", "success")
+    flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
     return redirect(url_for("portal_restaurante"))
 
 
@@ -3900,7 +4000,7 @@ def editar_lancamento(id):
 
 
 # =========================
-# Excluir lançamento
+# Excluir lançamento (corrigindo FK)
 # =========================
 @app.get("/lancamentos/<int:id>/excluir")
 @role_required("restaurante")
@@ -3911,52 +4011,29 @@ def excluir_lancamento(id):
     if not rest or l.restaurante_id != rest.id:
         abort(403)
 
-    # Apaga avaliações filhas na tabela avaliacoes_restaurante
-    # (se você tiver um modelo ORM, pode usá-lo; aqui vai via SQL para ser à prova de nomes)
-    from sqlalchemy import text as sa_text
-    db.session.execute(sa_text(
-        "DELETE FROM avaliacoes_restaurante WHERE lancamento_id = :lid AND restaurante_id = :rid"
-    ), {"lid": id, "rid": rest.id})
+    # 1) Tenta apagar via ORM (se o modelo de avaliação existir)
+    deleted_by_orm = False
+    try:
+        # ajuste o nome do modelo abaixo caso seja diferente
+        AvaliacaoCooperado.query.filter_by(
+            lancamento_id=id, restaurante_id=rest.id
+        ).delete(synchronize_session=False)
+        deleted_by_orm = True
+    except NameError:
+        pass
 
+    # 2) Como fallback, apaga via SQL bruto (tabela do log: "avaliacoes_restaurante")
+    if not deleted_by_orm:
+        db.session.execute(sa_text(
+            "DELETE FROM avaliacoes_restaurante WHERE lancamento_id = :lid AND restaurante_id = :rid"
+        ), {"lid": id, "rid": rest.id})
+
+    # 3) Agora pode remover o lançamento
     db.session.delete(l)
     db.session.commit()
     flash("Lançamento excluído.", "success")
     return redirect(url_for("portal_restaurante"))
     
-# =========================
-# Documentos (Admin + Público)
-# =========================
-@app.route("/admin/documentos")
-@admin_required
-def admin_documentos():
-    documentos = Documento.query.order_by(Documento.enviado_em.desc()).all()
-    return render_template("admin_documentos.html", documentos=documentos)
-
-@app.post("/admin/documentos/upload")
-@admin_required
-def admin_upload_documento():
-    f = request.form
-    titulo = (f.get("titulo") or "").strip()
-    categoria = (f.get("categoria") or "outro").strip()
-    descricao = (f.get("descricao") or "").strip()
-    arquivo = request.files.get("arquivo")
-    if not titulo or not (arquivo and arquivo.filename):
-        flash("Preencha o título e selecione o arquivo.", "warning")
-        return redirect(url_for("admin_documentos"))
-    from werkzeug.utils import secure_filename
-    fname = secure_filename(arquivo.filename)
-    base, ext = os.path.splitext(fname)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    fname_final = f"{re.sub(r'[^A-Za-z0-9_-]+','-', base)}_{ts}{ext}"
-    path = os.path.join(DOCS_DIR, fname_final)
-    arquivo.save(path)
-    url = f"/static/uploads/docs/{fname_final}"
-    d = Documento(titulo=titulo, categoria=categoria, descricao=descricao,
-                  arquivo_url=url, arquivo_nome=arquivo.filename, enviado_em=datetime.utcnow())
-    db.session.add(d)
-    db.session.commit()
-    flash("Documento publicado.", "success")
-    return redirect(url_for("admin_documentos"))
 
 @app.get("/admin/documentos/<int:doc_id>/delete")
 @admin_required
