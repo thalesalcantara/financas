@@ -231,30 +231,36 @@
   </div>
 
   <div class="mobile-wrap">
-    <!-- TOPO COM MENU -->
-    <nav class="navbar navbar-dark">
-      <div class="container-fluid d-flex justify-content-between align-items-center">
-        <button class="btn btn-link text-white fs-3 px-1" id="abrirMenu" style="margin-right:8px" title="Menu" aria-label="Menu">
-          <i class="bi bi-list"></i>
-        </button>
+  <!-- TOPO COM MENU -->
+  <nav class="navbar navbar-dark">
+    <div class="container-fluid d-flex align-items-center flex-nowrap">
+      <!-- Botão do menu (não encolhe) -->
+      <button class="btn btn-link text-white fs-3 px-1 me-2 flex-shrink-0"
+              id="abrirMenu" title="Menu" aria-label="Menu">
+        <i class="bi bi-list"></i>
+      </button>
 
-        <span class="navbar-brand m-0 flex-fill" style="text-align:center; letter-spacing:1px;">
-          Painel do Cooperado
-          {% if unread > 0 %}
-            <span class="unread-dot" title="Novos avisos" aria-label="Novos avisos"></span>
-          {% endif %}
+      <!-- Título central (pode encurtar com … quando faltar espaço) -->
+      <span class="navbar-brand m-0 text-truncate"
+            style="min-width:0; flex:1 1 auto; text-align:center; letter-spacing:1px;">
+        Painel do Cooperado
+        {% if unread > 0 %}
+          <span class="unread-dot" title="Novos avisos" aria-label="Novos avisos"></span>
+        {% endif %}
+      </span>
+
+      <!-- Ações à direita (não encolhem) -->
+      <div class="d-flex align-items-center gap-2 flex-shrink-0">
+        {% set _score = cooperado_score|default(5.0) %}
+        <span class="score-pill" title="Sua pontuação como cooperado">
+          <i class="bi bi-star-fill" aria-hidden="true"></i>
+          <span class="mono">{{ ("%.1f"|format(_score)).replace('.',',') }}</span>
         </span>
-
-        <div class="d-flex align-items-center gap-2">
-          {% set _score = cooperado_score|default(5.0) %}
-          <span class="score-pill" title="Sua pontuação como cooperado">
-            <i class="bi bi-star-fill" aria-hidden="true"></i>
-            <span class="mono">{{ ("%.1f"|format(_score)).replace('.',',') }}</span>
-          </span>
-          <a href="{{ url_for('logout') }}" class="btn btn-sm btn-light">Sair</a>
-        </div>
+        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-light">Sair</a>
       </div>
-    </nav>
+    </div>
+  </nav>
+</div>
 
     <!-- BANNER: novos avisos -->
     {% if unread > 0 %}
