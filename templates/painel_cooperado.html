@@ -497,7 +497,59 @@
       </div>
 
       
-<!-- Minha escala -->
+ <!-- ESCALAS -->
+      <div class="tab-pane fade" id="escalas">
+        <div class="card p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0"><i class="bi bi-file-earmark-check"></i> Documentos</h6>
+            <span class="badge-soft">Prazo Final: 31 de Dez · faltam <span class="countdown">{{ doc_cnh.dias_para_prazo }}</span> dias</span>
+          </div>
+
+          {% set cnh_ok = doc_cnh.ok %}
+          {% set placa_ok = doc_placa.ok %}
+
+          <div class="p-3 rounded mb-2 {{ 'doc-ok' if cnh_ok else 'doc-bad' }}">
+            <div class="d-flex align-items-start">
+              <div class="me-2" style="font-size:1.25rem">
+                {% if cnh_ok %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
+              </div>
+              <div class="flex-fill">
+                <div class="fw-bold mb-1">CNH — {{ 'Em dia' if cnh_ok else 'Vencida ou pendente' }}</div>
+                <div class="small muted">
+                  Nº: <b>{{ doc_cnh.numero or '—' }}</b> ·
+                  Validade: <b>{{ doc_cnh.vencimento.strftime('%d/%m/%Y') if doc_cnh.vencimento else '—' }}</b>
+                </div>
+                {% if not cnh_ok %}
+                  <div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle-fill"></i> Regularize para não travar repasses.</div>
+                {% else %}
+                  <div class="small text-success mt-1"><i class="bi bi-shield-check"></i> Tudo certo com a CNH.</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div class="p-3 rounded {{ 'doc-ok' if placa_ok else 'doc-bad' }}">
+            <div class="d-flex align-items-start">
+              <div class="me-2" style="font-size:1.25rem">
+                {% if placa_ok %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
+              </div>
+              <div class="flex-fill">
+                <div class="fw-bold mb-1">Placa — {{ 'Em dia' if placa_ok else 'Vencida ou pendente' }}</div>
+                <div class="small muted">
+                  Nº: <b>{{ doc_placa.numero or '—' }}</b> ·
+                  Validade: <b>{{ doc_placa.vencimento.strftime('%d/%m/%Y') if doc_placa.vencimento else '—' }}</b>
+                </div>
+                {% if not placa_ok %}
+                  <div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle-fill"></i> Atualize a placa/validade para evitar bloqueios.</div>
+                {% else %}
+                  <div class="small text-success mt-1"><i class="bi bi-shield-check"></i> Tudo certo com a placa.</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Minha escala -->
         <div class="card p-3">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <h6 class="mb-0"><i class="bi bi-calendar2-week"></i> Minha Escala</h6>
@@ -623,7 +675,7 @@
         </div>
       </div>
     </div>
-  
+
     <!-- Rodapé -->
     <div class="text-center py-3 muted">
       <small>© {{ current_year|default('') }} Coopex</small>
