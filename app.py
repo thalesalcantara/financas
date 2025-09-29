@@ -315,36 +315,70 @@ def _is_sqlite() -> bool:
 
 def init_db():
     db.create_all()
-
-    # --- qtd_entregas em lancamentos ---
     try:
         if _is_sqlite():
+            # lancamentos.qtd_entregas
             cols = db.session.execute(sa_text("PRAGMA table_info(lancamentos);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "qtd_entregas" not in colnames:
+            names = {r[1] for r in cols}
+            if "qtd_entregas" not in names:
                 db.session.execute(sa_text("ALTER TABLE lancamentos ADD COLUMN qtd_entregas INTEGER"))
-                db.session.commit()
+
+            # escalas.cooperado_nome / restaurante_id
+            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+            names = {r[1] for r in cols}
+            if "cooperado_nome" not in names:
+                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
+            if "restaurante_id" not in names:
+                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
+
+            # fotos em cooperados
+            cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
+            names = {r[1] for r in cols}
+            if "foto_bytes" not in names:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_bytes BLOB"))
+            if "foto_mime" not in names:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_mime VARCHAR(100)"))
+            if "foto_filename" not in names:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_filename VARCHAR(255)"))
+            if "foto_url" not in names:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_url VARCHAR(255)"))
+
+            # fotos em restaurantes
+            cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
+            names = {r[1] for r in cols}
+            if "foto_bytes" not in names:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_bytes BLOB"))
+            if "foto_mime" not in names:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_mime VARCHAR(100)"))
+            if "foto_filename" not in names:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_filename VARCHAR(255)"))
+            if "foto_url" not in names:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_url VARCHAR(255)"))
         else:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS lancamentos ADD COLUMN IF NOT EXISTS qtd_entregas INTEGER"))
-            db.session.commit()
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS lancamentos  ADD COLUMN IF NOT EXISTS qtd_entregas INTEGER"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS escalas      ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS escalas      ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados   ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados   ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados   ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados   ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+        db.session.commit()
     except Exception:
         db.session.rollback()
 
-   # =========================
-# Helpers
-# =========================
-def init_db():
-    db.create_all()
-
-    # --- qtd_entregas em lancamentos ---
-    try:
-        cols = db.session.execute(sa_text("PRAGMA table_info(lancamentos);")).fetchall()
-        colnames = {row[1] for row in cols}
-        if "qtd_entregas" not in colnames:
-            db.session.execute(sa_text("ALTER TABLE lancamentos ADD COLUMN qtd_entregas INTEGER"))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
+    # seeds
+    if not Usuario.query.filter_by(tipo="admin").first():
+        admin = Usuario(usuario="coopex", tipo="admin", senha_hash="")
+        admin.set_password("coopex05289")
+        db.session.add(admin)
+        db.session.commit()
+    if not Config.query.get(1):
+        db.session.add(Config(id=1, salario_minimo=0.0))
+        db.session.commit()
 
     # --- cooperado_nome em escalas ---
     try:
@@ -1510,7 +1544,6 @@ def admin_dashboard():
     if data_fim:
         rq = rq.filter(ReceitaCooperativa.data <= data_fim)
         dq = dq.filter(DespesaCooperativa.data <= data_fim)
-
     receitas = rq.order_by(ReceitaCooperativa.data.desc().nullslast(), ReceitaCooperativa.id.desc()).all()
     despesas = dq.order_by(DespesaCooperativa.data.desc(), DespesaCooperativa.id.desc()).all()
     total_receitas = sum((r.valor_total or 0.0) for r in receitas)
@@ -3740,16 +3773,15 @@ def portal_restaurante():
 @role_required("restaurante")
 def lancar_producao():
     u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first()
-    if not rest:
-        abort(403)
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+
     f = request.form
 
-    # 1) cria o lançamento normalmente
+    # 1) cria o lançamento
     l = Lancamento(
         restaurante_id=rest.id,
         cooperado_id=f.get("cooperado_id", type=int),
-        descricao="produção",
+        descricao=(f.get("descricao") or "produção").strip(),
         valor=f.get("valor", type=float),
         data=_parse_date(f.get("data")) or date.today(),
         hora_inicio=f.get("hora_inicio"),
@@ -3757,25 +3789,18 @@ def lancar_producao():
         qtd_entregas=f.get("qtd_entregas", type=int),
     )
     db.session.add(l)
-    db.session.flush()  # garante l.id para amarrar avaliação
+    db.session.flush()  # garante l.id
 
-    # 2) (OPCIONAL) lê os campos de avaliação se vieram do form
-    g   = _clamp_star(f.get("av_geral"))
-    p   = _clamp_star(f.get("av_pontualidade"))
-    ed  = _clamp_star(f.get("av_educacao"))
-    ef  = _clamp_star(f.get("av_eficiencia"))
-    ap  = _clamp_star(f.get("av_apresentacao"))
-    txt = (f.get("av_comentario") or "").strip()
+    # 2) Avaliação (OPCIONAL). Se você NÃO quiser salvar avaliação aqui, pode apagar todo este bloco.
+    g  = _clamp_star(f.get("av_geral"))
+    p  = _clamp_star(f.get("av_pontualidade"))
+    ed = _clamp_star(f.get("av_educacao"))
+    ef = _clamp_star(f.get("av_eficiencia"))
+    ap = _clamp_star(f.get("av_apresentacao"))
+    tx = (f.get("av_comentario") or "").strip()
 
-    tem_avaliacao = any(x is not None for x in (g, p, ed, ef, ap)) or bool(txt)
-    if tem_avaliacao:
-        media = _media_ponderada(g, p, ed, ef, ap)
-        senti = _analise_sentimento(txt)
-        temas = _identifica_temas(txt)
-        crise = _sinaliza_crise(g, txt)
-        feed  = _gerar_feedback(p, ed, ef, ap, txt, senti)
-
-        av = AvaliacaoCooperado(
+    if g:
+        a = AvaliacaoCooperado(
             restaurante_id=rest.id,
             cooperado_id=l.cooperado_id,
             lancamento_id=l.id,
@@ -3784,21 +3809,17 @@ def lancar_producao():
             estrelas_educacao=ed,
             estrelas_eficiencia=ef,
             estrelas_apresentacao=ap,
-            comentario=txt,
-            media_ponderada=media,
-            sentimento=senti,
-            temas="; ".join(temas),
-            alerta_crise=crise,
-            feedback_motoboy=feed,
+            comentario=tx,
+            media_ponderada=_media_ponderada(g, p, ed, ef, ap),
+            sentimento=_analise_sentimento(tx),
+            temas="; ".join(_identifica_temas(tx)),
+            alerta_crise=_sinaliza_crise(g, tx),
+            criado_em=datetime.utcnow(),
         )
-        db.session.add(av)
-
-        # Alerta visível imediato (opcional)
-        if crise:
-            flash("⚠️ Avaliação crítica registrada (1★ + termo de risco). A gerência deve revisar.", "danger")
+        db.session.add(a)
 
     db.session.commit()
-    flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
+    flash("Produção lançada.", "success")
     return redirect(url_for("portal_restaurante"))
 
 @app.route("/lancamentos/<int:id>/editar", methods=["GET", "POST"])
