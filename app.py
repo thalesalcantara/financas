@@ -237,7 +237,7 @@ class TrocaSolicitacao(db.Model):
 class Config(db.Model):
     __tablename__ = "config"
     id = db.Column(db.Integer, primary_key=True)
-    salario_minimo = db.Column(db.Float, default=0.0
+    salario_minimo = db.Column(db.Float, default=0.0)
 
 
 class Documento(db.Model):
