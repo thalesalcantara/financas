@@ -3911,6 +3911,13 @@ def excluir_lancamento(id):
     if not rest or l.restaurante_id != rest.id:
         abort(403)
 
+    # Apaga avaliações filhas na tabela avaliacoes_restaurante
+    # (se você tiver um modelo ORM, pode usá-lo; aqui vai via SQL para ser à prova de nomes)
+    from sqlalchemy import text as sa_text
+    db.session.execute(sa_text(
+        "DELETE FROM avaliacoes_restaurante WHERE lancamento_id = :lid AND restaurante_id = :rid"
+    ), {"lid": id, "rid": rest.id})
+
     db.session.delete(l)
     db.session.commit()
     flash("Lançamento excluído.", "success")
