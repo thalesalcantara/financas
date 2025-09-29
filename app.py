@@ -21,6 +21,8 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import delete as sa_delete, text as sa_text, func
+from sqlalchemy import delete as sa_delete, func
+
 
 # =========================
 # App / DB
@@ -2735,8 +2737,11 @@ def upload_escala():
                 return s
         return s
 
+    # ---------------- NOVO: coletores para sobrescrever corretamente ----------------
     linhas_novas: list[dict] = []
     coops_na_planilha: set[int] = set()
+    rest_ids_in_plan: set[int] = set()
+    contratos_in_plan: set[str] = set()
     total_linhas_planilha = 0
 
     for i in range(2, ws.max_row + 1):
@@ -2760,6 +2765,12 @@ def upload_escala():
         cor_txt      = to_css_color_local(cor_v)
         rest_id      = match_restaurante_id(contrato_txt)
 
+        # guarda quem aparece na planilha para limpar antes de inserir
+        if rest_id:
+            rest_ids_in_plan.add(int(rest_id))
+        if contrato_txt:
+            contratos_in_plan.add(contrato_txt)
+
         match = _match_cooperado_by_name(nome, cooperados)
         payload = {
             "cooperado_id":   (match.id if match else None),
@@ -2779,30 +2790,51 @@ def upload_escala():
         flash("Nada importado: nenhum registro válido encontrado.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
+    # ---------------- sobrescrever: apagar antigas e inserir novas ----------------
     try:
-        deleted = 0
-        if coops_na_planilha:
+        deletados = 0
+
+        # 1) apaga escalas antigas por restaurante_id que estão nesta planilha
+        if rest_ids_in_plan:
             res = db.session.execute(
+                sa_delete(Escala).where(Escala.restaurante_id.in_(list(rest_ids_in_plan)))
+            )
+            deletados += (res.rowcount or 0)
+
+        # 2) apaga escalas antigas por contrato textual que estão nesta planilha
+        if contratos_in_plan:
+            res2 = db.session.execute(
+                sa_delete(Escala).where(Escala.contrato.in_(list(contratos_in_plan)))
+            )
+            deletados += (res2.rowcount or 0)
+
+        # 3) (mantém) apaga escalas antigas por cooperado_id reconhecido (compatível com comportamento anterior)
+        if coops_na_planilha:
+            res3 = db.session.execute(
                 sa_delete(Escala).where(Escala.cooperado_id.in_(list(coops_na_planilha)))
             )
-            deleted = res.rowcount or 0
+            deletados += (res3.rowcount or 0)
 
+        # 4) insere as novas linhas
         for row in linhas_novas:
             db.session.add(Escala(**row))
 
+        # 5) marca atualização dos cooperados encontrados
         for cid in coops_na_planilha:
             c = Cooperado.query.get(cid)
             if c:
                 c.ultima_atualizacao = datetime.now()
 
         db.session.commit()
+
         msg = (
             f"Escala importada. {len(linhas_novas)} linha(s) adicionada(s). "
-            f"{deleted} escala(s) antigas removidas para {len(coops_na_planilha)} cooperado(s) reconhecido(s)."
+            f"{deletados} registro(s) antigo(s) removido(s) para os mesmos restaurantes/contratos/cooperados."
         )
         if total_linhas_planilha > 0 and len(linhas_novas) < total_linhas_planilha:
             msg += f" (Linhas processadas: {total_linhas_planilha})"
         flash(msg, "success")
+
     except Exception as e:
         db.session.rollback()
         flash(f"Erro ao importar a escala: {e}", "danger")
@@ -3033,7 +3065,7 @@ def portal_cooperado():
     ql = in_range(Lancamento.query.filter_by(cooperado_id=coop.id), Lancamento.data)
     producoes = ql.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
     
-        # --- Marca se o cooperado já avaliou cada produção ---
+    # --- Marca se o cooperado já avaliou cada produção ---
     ids = [l.id for l in producoes]
     minhas = {}
     if ids:
@@ -3089,16 +3121,27 @@ def portal_cooperado():
         "dias_para_prazo": dias_para_3112(),
     }
 
-    raw_escala = (Escala.query
-                  .filter_by(cooperado_id=coop.id)
-                  .order_by(Escala.id.asc())
-                  .all())
+    # ====== AJUSTE AQUI: considerar também escalas sem cooperado_id cujo nome bate com o cooperado ======
+    raw_escala = Escala.query.order_by(Escala.id.asc()).all()
 
     import unicodedata as _u, re as _re
     def _norm_c(s: str) -> str:
         s = _u.normalize("NFD", str(s or "").lower())
         s = "".join(ch for ch in s if _u.category(ch) != "Mn")
         return _re.sub(r"[^a-z0-9]+", " ", s).strip()
+
+    def _names_match(a: str, b: str) -> bool:
+        if not a or not b:
+            return False
+        na, nb = _norm_c(a), _norm_c(b)
+        return (na == nb) or (na in nb) or (nb in na)
+
+    # Filtra: é meu por ID OU (sem ID e o nome da planilha bate com meu nome)
+    raw_escala = [
+        e for e in raw_escala
+        if (e.cooperado_id == coop.id) or (not e.cooperado_id and _names_match(e.cooperado_nome, coop.nome))
+    ]
+    # ====== FIM DO AJUSTE ======
 
     def _score(e):
         h = (e.horario or "").strip()
