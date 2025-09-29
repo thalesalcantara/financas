@@ -3916,6 +3916,14 @@ def excluir_lancamento(id):
     return redirect(url_for("portal_restaurante"))
     
 
+# Listar / enviar documentos (placeholder simples)
+@app.get("/admin/documentos", endpoint="admin_documentos")
+@admin_required
+def admin_documentos():
+    docs = Documento.query.order_by(Documento.criado_em.desc()).all() if hasattr(Documento, "criado_em") else Documento.query.all()
+    return render_template("admin_documentos.html", documentos=docs)
+
+
 @app.get("/admin/documentos/<int:doc_id>/delete")
 @admin_required
 def admin_delete_documento(doc_id):
