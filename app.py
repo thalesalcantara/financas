@@ -3745,16 +3745,6 @@ def marcar_todos_avisos_lidos_restaurante():
     db.session.commit()
     return redirect(url_for("portal_restaurante_avisos"))
 
-# =========================
-# Main
-# =========================
-if __name__ == "__main__":
-app = Flask(__name__, static_folder="static", template_folder="templates")
-app.secret_key = ...
-app.config["SQLALCHEMY_DATABASE_URI"] = _build_db_uri()
-...
-db = SQLAlchemy(app)
-
 # >>> cole aqui (ou abaixo da seção "Rota raiz")
 @app.get("/_debug/db")
 def debug_db():
@@ -3764,7 +3754,11 @@ def debug_db():
         "url": str(eng.url)[:80] + "...",
         "has_dburl_env": bool(os.environ.get("DATABASE_URL")),
     }
-
+    
+# =========================
+# Main
+# =========================
+if __name__ == "__main__":
     with app.app_context():
         init_db()
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
