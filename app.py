@@ -1005,7 +1005,7 @@ def _prox_ocorrencia_anual(dt: date | None) -> date | None:
     return alvo
 
 
-def _parse_date(s: str | None) -> date | None:
+def _parse_date_liso(s: str | None) -> date | None:
     if not s:
         return None
     for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
@@ -3354,42 +3354,34 @@ def portal_cooperado():
     raw_escala = Escala.query.order_by(Escala.id.asc()).all()
 
     def _norm_c(s: str) -> str:
+    s = _u.normalize("NFD", str(s or "").lower())
+    s = "".join(ch for ch in s if _u.category(ch) != "Mn")
+    return _re.sub(r"[^a-z0-9]+", " ", s).strip()
+
+def _names_match(a: str, b: str) -> bool:
+    if not a or not b:
+        return False
+
+    def toks(s: str) -> list[str]:
         s = _u.normalize("NFD", str(s or "").lower())
         s = "".join(ch for ch in s if _u.category(ch) != "Mn")
-        return _re.sub(r"[^a-z0-9]+", " ", s).strip()
+        s = _re.sub(r"[^a-z0-9]+", " ", s).strip()
+        return [t for t in s.split() if t]
 
-  def painel_cooperado():  # sua view
-    def _norm_c(s: str) -> str:
-        s = _u.normalize("NFD", str(s or "").lower())
-        s = "".join(ch for ch in s if _u.category(ch) != "Mn")
-        return _re.sub(r"[^a-z0-9]+", " ", s).strip()
+    def bigrams(ts: list[str]) -> set[str]:
+        return {" ".join(ts[i:i+2]) for i in range(len(ts)-1)} if len(ts) >= 2 else set()
 
-    def _names_match(a: str, b: str) -> bool:
-        # casa somente se houver pelo menos 1 bigrama (duas palavras consecutivas) em comum
-        if not a or not b:
-            return False
+    ta, tb = toks(a), toks(b)
+    if len(ta) < 2 or len(tb) < 2:
+        return " ".join(ta) == " ".join(tb)
+    return len(bigrams(ta) & bigrams(tb)) > 0
 
-        def toks(s: str) -> list[str]:
-            s = _u.normalize("NFD", str(s or "").lower())
-            s = "".join(ch for ch in s if _u.category(ch) != "Mn")
-            s = _re.sub(r"[^a-z0-9]+", " ", s).strip()
-            return [t for t in s.split() if t]
+# Filtra: é meu por ID OU (sem ID e o nome da planilha bate com meu nome)
+raw_escala = [
+    e for e in raw_escala
+    if (e.cooperado_id == coop.id) or (not e.cooperado_id and _names_match(e.cooperado_nome, coop.nome))
+]
 
-        def bigrams(ts: list[str]) -> set[str]:
-            return {" ".join(ts[i:i+2]) for i in range(len(ts)-1)} if len(ts) >= 2 else set()
-
-        ta, tb = toks(a), toks(b)
-        if len(ta) < 2 or len(tb) < 2:
-            # opcional: fallback de igualdade exata
-            return " ".join(ta) == " ".join(tb)
-
-        return len(bigrams(ta) & bigrams(tb)) > 0
-
-    # Filtra: é meu por ID OU (sem ID e o nome da planilha bate com meu nome)
-    raw_escala = [
-        e for e in raw_escala
-        if (e.cooperado_id == coop.id) or (not e.cooperado_id and _names_match(e.cooperado_nome, coop.nome))
-    ]
     # ====== FIM DO AJUSTE ======
 
     def _score(e):
@@ -4296,6 +4288,8 @@ def rest_tabelas():
     )
 
     tabelas = Tabela.query.order_by(Tabela.enviado_em.desc()).all()
+
+    from flask_login import login_required, current_user
 
     def _norm(s: str) -> str:
         s = unicodedata.normalize("NFD", (s or "").strip())
