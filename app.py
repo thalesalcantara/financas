@@ -237,7 +237,6 @@ class Config(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     salario_minimo = db.Column(db.Float, default=0.0)
 
-
 class Documento(db.Model):
     __tablename__ = "documentos"
     id = db.Column(db.Integer, primary_key=True)
@@ -722,137 +721,6 @@ def _gerar_feedback(pont, educ, efic, apres, comentario, sentimento):
         txt += " 👏"
     return txt[:1000]
 
-from datetime import datetime, date
-from sqlalchemy import or_, and_
-
-# routes_avisos.py
-from datetime import datetime
-from flask import Blueprint, render_template, redirect, request, url_for, abort
-from flask_login import login_required, current_user
-
-
-# opcional: se você já tem outro blueprint de "portal", use o mesmo
-portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
-
-def _cooperado_atual() -> Cooperado:
-    # ajuste de acordo com seu auth:
-    #   - se current_user JÁ é um Cooperado, retorne current_user
-    #   - se current_user tem .cooperado_id, busque o Cooperado
-    coop = getattr(current_user, "cooperado", None)
-    if isinstance(coop, Cooperado):
-        return coop
-    coop_id = getattr(current_user, "cooperado_id", None)
-    if coop_id:
-        return Cooperado.query.get(coop_id)
-    return None
-
-@portal_bp.get("/avisos", endpoint="portal_cooperado_avisos")
-@login_required
-def avisos_list():
-    coop = _cooperado_atual()
-    if not coop:
-        abort(403)
-
-    # pega todos os avisos que se aplicam ao cooperado (seu helper)
-    avisos = get_avisos_for_cooperado(coop)
-
-    # busca leituras de uma vez (evita N+1)
-    lidos_ids = {
-        r.aviso_id
-        for r in AvisoLeitura.query.filter_by(cooperado_id=coop.id).all()
-    }
-
-    # injeta flag lido para o template (sem tocar no banco)
-    for a in avisos:
-        a.lido = (a.id in lidos_ids)
-
-    avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
-    current_year = datetime.now().year
-
-    return render_template(
-        "portal_cooperado_avisos.html",
-        avisos=avisos,
-        avisos_nao_lidos_count=avisos_nao_lidos_count,
-        current_year=current_year
-    )
-
-# === AVALIAÇÕES: Cooperado -> Restaurante (NOVO) =============================
-class AvaliacaoRestaurante(db.Model):
-    __tablename__ = "avaliacoes_restaurante"
-    id = db.Column(db.Integer, primary_key=True)
-
-    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False, index=True)
-    cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),   nullable=False, index=True)
-    lancamento_id  = db.Column(db.Integer, db.ForeignKey("lancamentos.id"),  unique=True, index=True)
-
-    # mesmas métricas 1..5
-    estrelas_geral        = db.Column(db.Integer)
-    estrelas_pontualidade = db.Column(db.Integer)
-    estrelas_educacao     = db.Column(db.Integer)
-    estrelas_eficiencia   = db.Column(db.Integer)
-    estrelas_apresentacao = db.Column(db.Integer)
-
-    comentario      = db.Column(db.Text)
-    media_ponderada = db.Column(db.Float)
-    sentimento      = db.Column(db.String(12))
-    temas           = db.Column(db.String(255))
-    alerta_crise    = db.Column(db.Boolean, default=False)
-
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-
-@portal_bp.post("/avisos/<int:aviso_id>/lido", endpoint="marcar_aviso_lido")
-@login_required
-def avisos_marcar_lido(aviso_id: int):
-    coop = _cooperado_atual()
-    if not coop:
-        abort(403)
-
-    aviso = Aviso.query.get_or_404(aviso_id)
-
-    # idempotente: só cria se ainda não houver leitura
-    ja_leu = AvisoLeitura.query.filter_by(
-        cooperado_id=coop.id,
-        aviso_id=aviso.id
-    ).first()
-
-    if not ja_leu:
-        db.session.add(AvisoLeitura(
-            cooperado_id=coop.id,
-            aviso_id=aviso.id,
-            lido_em=datetime.utcnow()
-        ))
-        db.session.commit()
-
-    next_url = request.form.get("next") or (url_for("portal_cooperado_avisos") + f"#aviso-{aviso.id}")
-    return redirect(next_url)
-
-@portal_bp.post("/avisos/marcar-todos", endpoint="marcar_todos_avisos_lidos")
-@login_required
-def avisos_marcar_todos():
-    coop = _cooperado_atual()
-    if not coop:
-        abort(403)
-
-    avisos = get_avisos_for_cooperado(coop)
-    if not avisos:
-        return redirect(url_for("portal_cooperado_avisos"))
-
-    ids_todos = {a.id for a in avisos}
-    ids_ja_lidos = {
-        r.aviso_id
-        for r in AvisoLeitura.query.filter_by(cooperado_id=coop.id).all()
-    }
-    ids_pendentes = list(ids_todos - ids_ja_lidos)
-
-    if ids_pendentes:
-        db.session.bulk_save_objects([
-            AvisoLeitura(cooperado_id=coop.id, aviso_id=aid, lido_em=datetime.utcnow())
-            for aid in ids_pendentes
-        ])
-        db.session.commit()
-
-    return redirect(url_for("portal_cooperado_avisos"))
-
 # ======== Helpers p/ troca: data/weekday/turno ========
 def _parse_data_escala_str(s: str) -> date | None:
     m = re.search(r'(\d{1,2})/(\d{1,2})/(\d{2,4})', str(s or ''))
@@ -1005,74 +873,6 @@ def to_css_color(v: str) -> str:
     }
     return mapa.get(t_low, t)
 
-# ---------- AVISOS: helpers ----------
-def _avisos_base_query(now=None):
-    if now is None:
-        now = datetime.utcnow()
-    return (Aviso.query
-        .filter(Aviso.ativo.is_(True))
-        .filter((Aviso.inicio_em.is_(None)) | (Aviso.inicio_em <= now))
-        .filter((Aviso.fim_em.is_(None)) | (Aviso.fim_em >= now)))
-
-def get_avisos_for_cooperado(coop: Cooperado):
-    """
-    Mostra:
-      - global
-      - cooperado destinado para mim OU broadcast (destino_cooperado_id IS NULL)
-      - restaurante destinado a um dos meus restaurantes OU broadcast (sem restaurantes ligados)
-    """
-    rest_ids = {
-        e.restaurante_id for e in Escala.query.filter_by(cooperado_id=coop.id).all()
-        if e.restaurante_id
-    }
-
-    q = _avisos_base_query().filter(
-        (Aviso.tipo == "global")
-        |
-        ((Aviso.tipo == "cooperado") & (
-            (Aviso.destino_cooperado_id == coop.id) | (Aviso.destino_cooperado_id.is_(None))
-        ))
-        |
-        ((Aviso.tipo == "restaurante") & (
-            (~Aviso.restaurantes.any()) |  # lista vazia = broadcast para todos restaurantes
-            Aviso.restaurantes.any(Restaurante.id.in_(rest_ids))
-        ))
-    )
-
-    avisos = list(q.all())
-    avisos.sort(
-        key=lambda a: (not a.fixado, str(a.prioridade or "").lower() != "alta",
-                       -(a.criado_em.timestamp() if a.criado_em else 0))
-    )
-    return avisos
-
-# =========================
-# Rotas de mídia (fotos armazenadas no banco)
-# =========================
-@app.get("/media/coop/<int:coop_id>")
-def media_coop(coop_id: int):
-    c = Cooperado.query.get_or_404(coop_id)
-    if c.foto_bytes:
-        return send_file(
-            io.BytesIO(c.foto_bytes),
-            mimetype=(c.foto_mime or "application/octet-stream"),
-            as_attachment=False,
-            download_name=(c.foto_filename or f"coop_{coop_id}.bin"),
-        )
-    abort(404)
-
-@app.get("/media/rest/<int:rest_id>")
-def media_rest(rest_id: int):
-    r = Restaurante.query.get_or_404(rest_id)
-    if r.foto_bytes:
-        return send_file(
-            io.BytesIO(r.foto_bytes),
-            mimetype=(r.foto_mime or "application/octet-stream"),
-            as_attachment=False,
-            download_name=(r.foto_filename or f"rest_{rest_id}.bin"),
-        )
-    abort(404)
-
 # =========================
 # Rota raiz
 # =========================
@@ -1140,6 +940,205 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+from datetime import datetime, date
+from sqlalchemy import or_, and_
+
+# routes_avisos.py
+from datetime import datetime
+from flask import Blueprint, render_template, redirect, request, url_for, abort
+from flask_login import login_required, current_user
+
+
+# opcional: se você já tem outro blueprint de "portal", use o mesmo
+portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
+
+def _cooperado_atual() -> Cooperado:
+    # ajuste de acordo com seu auth:
+    #   - se current_user JÁ é um Cooperado, retorne current_user
+    #   - se current_user tem .cooperado_id, busque o Cooperado
+    coop = getattr(current_user, "cooperado", None)
+    if isinstance(coop, Cooperado):
+        return coop
+    coop_id = getattr(current_user, "cooperado_id", None)
+    if coop_id:
+        return Cooperado.query.get(coop_id)
+    return None
+
+@portal_bp.get("/avisos", endpoint="portal_cooperado_avisos")
+@login_required
+def avisos_list():
+    coop = _cooperado_atual()
+    if not coop:
+        abort(403)
+
+    # pega todos os avisos que se aplicam ao cooperado (seu helper)
+    avisos = get_avisos_for_cooperado(coop)
+
+    # busca leituras de uma vez (evita N+1)
+    lidos_ids = {
+        r.aviso_id
+        for r in AvisoLeitura.query.filter_by(cooperado_id=coop.id).all()
+    }
+
+    # injeta flag lido para o template (sem tocar no banco)
+    for a in avisos:
+        a.lido = (a.id in lidos_ids)
+
+    avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
+    current_year = datetime.now().year
+
+    return render_template(
+        "portal_cooperado_avisos.html",
+        avisos=avisos,
+        avisos_nao_lidos_count=avisos_nao_lidos_count,
+        current_year=current_year
+    )
+
+# === AVALIAÇÕES: Cooperado -> Restaurante (NOVO) =============================
+class AvaliacaoRestaurante(db.Model):
+    __tablename__ = "avaliacoes_restaurante"
+    id = db.Column(db.Integer, primary_key=True)
+
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False, index=True)
+    cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),   nullable=False, index=True)
+    lancamento_id  = db.Column(db.Integer, db.ForeignKey("lancamentos.id"),  unique=True, index=True)
+
+    # mesmas métricas 1..5
+    estrelas_geral        = db.Column(db.Integer)
+    estrelas_pontualidade = db.Column(db.Integer)
+    estrelas_educacao     = db.Column(db.Integer)
+    estrelas_eficiencia   = db.Column(db.Integer)
+    estrelas_apresentacao = db.Column(db.Integer)
+
+    comentario      = db.Column(db.Text)
+    media_ponderada = db.Column(db.Float)
+    sentimento      = db.Column(db.String(12))
+    temas           = db.Column(db.String(255))
+    alerta_crise    = db.Column(db.Boolean, default=False)
+
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+@portal_bp.post("/avisos/<int:aviso_id>/lido", endpoint="marcar_aviso_lido")
+@login_required
+def avisos_marcar_lido(aviso_id: int):
+    coop = _cooperado_atual()
+    if not coop:
+        abort(403)
+
+    aviso = Aviso.query.get_or_404(aviso_id)
+
+    # idempotente: só cria se ainda não houver leitura
+    ja_leu = AvisoLeitura.query.filter_by(
+        cooperado_id=coop.id,
+        aviso_id=aviso.id
+    ).first()
+
+    if not ja_leu:
+        db.session.add(AvisoLeitura(
+            cooperado_id=coop.id,
+            aviso_id=aviso.id,
+            lido_em=datetime.utcnow()
+        ))
+        db.session.commit()
+
+    next_url = request.form.get("next") or (url_for("portal_cooperado_avisos") + f"#aviso-{aviso.id}")
+    return redirect(next_url)
+
+@portal_bp.post("/avisos/marcar-todos", endpoint="marcar_todos_avisos_lidos")
+@login_required
+def avisos_marcar_todos():
+    coop = _cooperado_atual()
+    if not coop:
+        abort(403)
+
+    avisos = get_avisos_for_cooperado(coop)
+    if not avisos:
+        return redirect(url_for("portal_cooperado_avisos"))
+
+    ids_todos = {a.id for a in avisos}
+    ids_ja_lidos = {
+        r.aviso_id
+        for r in AvisoLeitura.query.filter_by(cooperado_id=coop.id).all()
+    }
+    ids_pendentes = list(ids_todos - ids_ja_lidos)
+
+    if ids_pendentes:
+        db.session.bulk_save_objects([
+            AvisoLeitura(cooperado_id=coop.id, aviso_id=aid, lido_em=datetime.utcnow())
+            for aid in ids_pendentes
+        ])
+        db.session.commit()
+
+    return redirect(url_for("portal_cooperado_avisos"))
+
+# ---------- AVISOS: helpers ----------
+def _avisos_base_query(now=None):
+    if now is None:
+        now = datetime.utcnow()
+    return (Aviso.query
+        .filter(Aviso.ativo.is_(True))
+        .filter((Aviso.inicio_em.is_(None)) | (Aviso.inicio_em <= now))
+        .filter((Aviso.fim_em.is_(None)) | (Aviso.fim_em >= now)))
+
+def get_avisos_for_cooperado(coop: Cooperado):
+    """
+    Mostra:
+      - global
+      - cooperado destinado para mim OU broadcast (destino_cooperado_id IS NULL)
+      - restaurante destinado a um dos meus restaurantes OU broadcast (sem restaurantes ligados)
+    """
+    rest_ids = {
+        e.restaurante_id for e in Escala.query.filter_by(cooperado_id=coop.id).all()
+        if e.restaurante_id
+    }
+
+    q = _avisos_base_query().filter(
+        (Aviso.tipo == "global")
+        |
+        ((Aviso.tipo == "cooperado") & (
+            (Aviso.destino_cooperado_id == coop.id) | (Aviso.destino_cooperado_id.is_(None))
+        ))
+        |
+        ((Aviso.tipo == "restaurante") & (
+            (~Aviso.restaurantes.any()) |  # lista vazia = broadcast para todos restaurantes
+            Aviso.restaurantes.any(Restaurante.id.in_(rest_ids))
+        ))
+    )
+
+    avisos = list(q.all())
+    avisos.sort(
+        key=lambda a: (not a.fixado, str(a.prioridade or "").lower() != "alta",
+                       -(a.criado_em.timestamp() if a.criado_em else 0))
+    )
+    return avisos
+
+# =========================
+# Rotas de mídia (fotos armazenadas no banco)
+# =========================
+@app.get("/media/coop/<int:coop_id>")
+def media_coop(coop_id: int):
+    c = Cooperado.query.get_or_404(coop_id)
+    if c.foto_bytes:
+        return send_file(
+            io.BytesIO(c.foto_bytes),
+            mimetype=(c.foto_mime or "application/octet-stream"),
+            as_attachment=False,
+            download_name=(c.foto_filename or f"coop_{coop_id}.bin"),
+        )
+    abort(404)
+
+@app.get("/media/rest/<int:rest_id>")
+def media_rest(rest_id: int):
+    r = Restaurante.query.get_or_404(rest_id)
+    if r.foto_bytes:
+        return send_file(
+            io.BytesIO(r.foto_bytes),
+            mimetype=(r.foto_mime or "application/octet-stream"),
+            as_attachment=False,
+            download_name=(r.foto_filename or f"rest_{rest_id}.bin"),
+        )
+    abort(404)
 
 # =========================
 # Admin Dashboard
