@@ -3717,7 +3717,8 @@ def aceitar_troca(troca_id):
     ]
     afetacao_json = {"linhas": linhas}
 
-        solicitante_id = orig_e.cooperado_id
+    # >>> ESSAS DUAS LINHAS PRECISAM ESTAR ALINHADAS AQUI (sem indent extra)
+    solicitante_id = orig_e.cooperado_id
     destino_id = dest_e.cooperado_id
 
     # Faz a troca de fato
