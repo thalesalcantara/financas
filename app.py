@@ -3360,13 +3360,16 @@ def portal_cooperado():
         "dias_para_prazo": dias_para_3112(),
     }
 
-        # ====== AJUSTE AQUI: considerar também escalas sem cooperado_id cujo nome bate com o cooperado ======
+            # ====== AJUSTE AQUI: considerar também escalas sem cooperado_id cujo nome bate com o cooperado ======
     raw_escala = Escala.query.order_by(Escala.id.asc()).all()
+
+    import unicodedata as _u
+    import re as _re
 
     def _norm_c(s: str) -> str:
         s = _u.normalize("NFD", str(s or "").lower())
         s = "".join(ch for ch in s if _u.category(ch) != "Mn")
-        return re.sub(r"[^a-z0-9]+", " ", s).strip()
+        return _re.sub(r"[^a-z0-9]+", " ", s).strip()
 
     def _names_match(a: str, b: str) -> bool:
         if not a or not b:
@@ -3374,8 +3377,8 @@ def portal_cooperado():
 
         def toks(s: str) -> list[str]:
             s = _u.normalize("NFD", str(s or "").lower())
-            s = "".join(ch for ch in s if _u.category(ch) != "Mn")
-            s = re.sub(r"[^a-z0-9]+", " ", s).strip()
+            s = "".join(ch for ch in s if _u.category(c) != "Mn" for c in s)  # remove acentos
+            s = _re.sub(r"[^a-z0-9]+", " ", s).strip()
             return [t for t in s.split() if t]
 
         def bigrams(ts: list[str]) -> set[str]:
@@ -3391,14 +3394,6 @@ def portal_cooperado():
         e for e in raw_escala
         if (e.cooperado_id == coop.id) or (not e.cooperado_id and _names_match(e.cooperado_nome, coop.nome))
     ]
-
-# Filtra: é meu por ID OU (sem ID e o nome da planilha bate com meu nome)
-raw_escala = [
-    e for e in raw_escala
-    if (e.cooperado_id == coop.id) or (not e.cooperado_id and _names_match(e.cooperado_nome, coop.nome))
-]
-
-    # ====== FIM DO AJUSTE ======
 
     def _score(e):
         h = (e.horario or "").strip()
@@ -3718,17 +3713,21 @@ def aceitar_troca(troca_id):
     ]
     afetacao_json = {"linhas": linhas}
 
-    solicitante_id = orig_e.cooperado_id
+        solicitante_id = orig_e.cooperado_id
     destino_id = dest_e.cooperado_id
-    orig_e.cooperado_id, dest_e.cooperado_id = destino_id, solicitante_id
 
+    # Faz a troca de fato
+    orig_e.cooperado_id = destino_id
+    dest_e.cooperado_id = solicitante_id
+
+    # Marca como aprovada e anexa o JSON de afetação na mensagem
     t.status = "aprovada"
     t.aplicada_em = datetime.utcnow()
     prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
-    t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps(afetacao_json, ensure_ascii=False)
+    t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps({"linhas": linhas}, ensure_ascii=False)
 
     db.session.commit()
-    flash("Troca aplicada com sucesso!", "success")
+    flash("Troca realizada com sucesso!", "success")
     return redirect(url_for("portal_cooperado"))
 
 @app.post("/trocas/<int:troca_id>/recusar")
