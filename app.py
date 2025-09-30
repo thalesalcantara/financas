@@ -3018,6 +3018,96 @@ def editar_documentos(coop_id):
     </div>
     """
 
+    # =========================
+# Admin • Documentos públicos (envio p/ cooperado)
+# =========================
+ALLOWED_DOC_EXTS = {".pdf", ".doc", ".docx", ".odt", ".rtf"}
+os.makedirs(DOCS_DIR, exist_ok=True)  # já existe acima, mas garante
+
+def _doc_ext_ok(filename: str) -> bool:
+    _, ext = os.path.splitext((filename or "").lower())
+    return ext in ALLOWED_DOC_EXTS
+
+@app.get("/admin/documentos", endpoint="admin_documentos")
+@admin_required
+def admin_documentos():
+    docs = Documento.query.order_by(Documento.enviado_em.desc()).all()
+    return render_template("admin_documentos.html", documentos=docs)
+
+@app.post("/admin/documentos/upload", endpoint="admin_upload_documento")
+@admin_required
+def admin_upload_documento():
+    f = request.form
+    titulo    = (f.get("titulo") or "").strip()
+    categoria = (f.get("categoria") or "outro").strip()
+    descricao = (f.get("descricao") or "").strip()
+    arquivo   = request.files.get("arquivo")
+
+    if not titulo:
+        flash("Informe o título.", "warning")
+        return redirect(url_for("admin_documentos"))
+    if not arquivo or not arquivo.filename:
+        flash("Envie um arquivo.", "warning")
+        return redirect(url_for("admin_documentos"))
+    if not _doc_ext_ok(arquivo.filename):
+        flash("Extensão não permitida. Use PDF/DOC/DOCX/ODT/RTF.", "danger")
+        return redirect(url_for("admin_documentos"))
+
+    # salva com nome único na pasta static/uploads/docs
+    raw = secure_filename(arquivo.filename)
+    base, ext = os.path.splitext(raw)
+    ts = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+    stored_name = f"{base}-{ts}{ext}"
+    full_path = os.path.join(DOCS_DIR, stored_name)
+    arquivo.save(full_path)
+
+    doc = Documento(
+        titulo=titulo,
+        categoria=categoria,
+        descricao=descricao or None,
+        arquivo_nome=raw,
+        # URL pública servida pelo static do Flask:
+        arquivo_url=f"/static/uploads/docs/{stored_name}",
+        enviado_em=datetime.utcnow(),
+    )
+    db.session.add(doc)
+    db.session.commit()
+    flash("Documento publicado.", "success")
+    return redirect(url_for("admin_documentos"))
+
+@app.get("/admin/documentos/<int:doc_id>/delete", endpoint="admin_delete_documento")
+@admin_required
+def admin_delete_documento(doc_id: int):
+    d = Documento.query.get_or_404(doc_id)
+
+    # remove arquivo físico se for local
+    if d.arquivo_url and d.arquivo_url.startswith("/static/uploads/docs/"):
+        try:
+            stored = d.arquivo_url.split("/static/uploads/docs/", 1)[-1]
+            path = os.path.join(DOCS_DIR, stored)
+            if os.path.isfile(path):
+                os.remove(path)
+        except Exception:
+            pass
+
+    db.session.delete(d)
+    db.session.commit()
+    flash("Documento removido.", "info")
+    return redirect(url_for("admin_documentos"))
+
+# ===== Cooperado / público: listagem e abrir =====
+@app.get("/documentos", endpoint="documentos_publicos")
+def documentos_publicos():
+    # se quiser exigir login do cooperado, adicione @role_required("cooperado")
+    docs = Documento.query.order_by(Documento.enviado_em.desc()).all()
+    return render_template("documentos_publicos.html", documentos=docs)
+
+@app.get("/documentos/<int:doc_id>/download", endpoint="baixar_documento")
+def baixar_documento(doc_id: int):
+    d = Documento.query.get_or_404(doc_id)
+    # se a URL for absoluta (S3/Drive), redireciona pra lá; se for local (/static/...), também redireciona
+    return redirect(d.arquivo_url)
+
 # =========================
 # PORTAL COOPERADO
 # =========================
