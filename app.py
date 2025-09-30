@@ -3360,31 +3360,37 @@ def portal_cooperado():
         "dias_para_prazo": dias_para_3112(),
     }
 
-    # ====== AJUSTE AQUI: considerar também escalas sem cooperado_id cujo nome bate com o cooperado ======
+        # ====== AJUSTE AQUI: considerar também escalas sem cooperado_id cujo nome bate com o cooperado ======
     raw_escala = Escala.query.order_by(Escala.id.asc()).all()
 
     def _norm_c(s: str) -> str:
-    s = _u.normalize("NFD", str(s or "").lower())
-    s = "".join(ch for ch in s if _u.category(ch) != "Mn")
-    return _re.sub(r"[^a-z0-9]+", " ", s).strip()
-
-def _names_match(a: str, b: str) -> bool:
-    if not a or not b:
-        return False
-
-    def toks(s: str) -> list[str]:
         s = _u.normalize("NFD", str(s or "").lower())
         s = "".join(ch for ch in s if _u.category(ch) != "Mn")
-        s = _re.sub(r"[^a-z0-9]+", " ", s).strip()
-        return [t for t in s.split() if t]
+        return re.sub(r"[^a-z0-9]+", " ", s).strip()
 
-    def bigrams(ts: list[str]) -> set[str]:
-        return {" ".join(ts[i:i+2]) for i in range(len(ts)-1)} if len(ts) >= 2 else set()
+    def _names_match(a: str, b: str) -> bool:
+        if not a or not b:
+            return False
 
-    ta, tb = toks(a), toks(b)
-    if len(ta) < 2 or len(tb) < 2:
-        return " ".join(ta) == " ".join(tb)
-    return len(bigrams(ta) & bigrams(tb)) > 0
+        def toks(s: str) -> list[str]:
+            s = _u.normalize("NFD", str(s or "").lower())
+            s = "".join(ch for ch in s if _u.category(ch) != "Mn")
+            s = re.sub(r"[^a-z0-9]+", " ", s).strip()
+            return [t for t in s.split() if t]
+
+        def bigrams(ts: list[str]) -> set[str]:
+            return {" ".join(ts[i:i+2]) for i in range(len(ts)-1)} if len(ts) >= 2 else set()
+
+        ta, tb = toks(a), toks(b)
+        if len(ta) < 2 or len(tb) < 2:
+            return " ".join(ta) == " ".join(tb)
+        return len(bigrams(ta) & bigrams(tb)) > 0
+
+    # Filtra: é meu por ID OU (sem ID e o nome da planilha bate com meu nome)
+    raw_escala = [
+        e for e in raw_escala
+        if (e.cooperado_id == coop.id) or (not e.cooperado_id and _names_match(e.cooperado_nome, coop.nome))
+    ]
 
 # Filtra: é meu por ID OU (sem ID e o nome da planilha bate com meu nome)
 raw_escala = [
