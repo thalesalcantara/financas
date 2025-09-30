@@ -3095,19 +3095,6 @@ def admin_delete_documento(doc_id: int):
     flash("Documento removido.", "info")
     return redirect(url_for("admin_documentos"))
 
-# ===== Cooperado / público: listagem e abrir =====
-@app.get("/documentos", endpoint="documentos_publicos")
-def documentos_publicos():
-    # se quiser exigir login do cooperado, adicione @role_required("cooperado")
-    docs = Documento.query.order_by(Documento.enviado_em.desc()).all()
-    return render_template("documentos_publicos.html", documentos=docs)
-
-@app.get("/documentos/<int:doc_id>/download", endpoint="baixar_documento")
-def baixar_documento(doc_id: int):
-    d = Documento.query.get_or_404(doc_id)
-    # se a URL for absoluta (S3/Drive), redireciona pra lá; se for local (/static/...), também redireciona
-    return redirect(d.arquivo_url)
-
 # =========================
 # PORTAL COOPERADO
 # =========================
