@@ -327,126 +327,12 @@ def init_db():
     except Exception:
         db.session.rollback()
 
-    # --- cooperado_nome em escalas ---
+   # --- restaurante_id em escalas ---
     try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "cooperado_nome" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
-                db.session.commit()
-        else:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS escalas ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
-
-    # --- restaurante_id em escalas ---
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "restaurante_id" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
-                db.session.commit()
-        else:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS escalas ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
-
-    # --- fotos no banco (cooperados/restaurantes) ---
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "foto_bytes" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_bytes BLOB"))
-            if "foto_mime" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_mime VARCHAR(100)"))
-            if "foto_filename" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_filename VARCHAR(255)"))
-            if "foto_url" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_url VARCHAR(255)"))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
-   
-        # --- tabela avaliacoes_restaurante (se não existir) ---
-    try:
-        if _is_sqlite():
-            db.session.execute(sa_text("""
-                CREATE TABLE IF NOT EXISTS avaliacoes_restaurante (
-                  id INTEGER PRIMARY KEY,
-                  restaurante_id INTEGER NOT NULL,
-                  cooperado_id   INTEGER NOT NULL,
-                  lancamento_id  INTEGER UNIQUE,
-                  estrelas_geral INTEGER,
-                  estrelas_pontualidade INTEGER,
-                  estrelas_educacao INTEGER,
-                  estrelas_eficiencia INTEGER,
-                  estrelas_apresentacao INTEGER,
-                  comentario TEXT,
-                  media_ponderada REAL,
-                  sentimento TEXT,
-                  temas TEXT,
-                  alerta_crise INTEGER DEFAULT 0,
-                  criado_em TIMESTAMP
-                );
-            """))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text("""
-                CREATE TABLE IF NOT EXISTS avaliacoes_restaurante (
-                  id SERIAL PRIMARY KEY,
-                  restaurante_id INTEGER NOT NULL,
-                  cooperado_id   INTEGER NOT NULL,
-                  lancamento_id  INTEGER UNIQUE,
-                  estrelas_geral INTEGER,
-                  estrelas_pontualidade INTEGER,
-                  estrelas_educacao INTEGER,
-                  estrelas_eficiencia INTEGER,
-                  estrelas_apresentacao INTEGER,
-                  comentario TEXT,
-                  media_ponderada DOUBLE PRECISION,
-                  sentimento VARCHAR(12),
-                  temas VARCHAR(255),
-                  alerta_crise BOOLEAN DEFAULT FALSE,
-                  criado_em TIMESTAMP
-                );
-            """))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
-
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "foto_bytes" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_bytes BLOB"))
-            if "foto_mime" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_mime VARCHAR(100)"))
-            if "foto_filename" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_filename VARCHAR(255)"))
-            if "foto_url" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_url VARCHAR(255)"))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+        cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+        colnames = {row[1] for row in cols}
+        if "restaurante_id" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
             db.session.commit()
     except Exception:
         db.session.rollback()
@@ -567,7 +453,6 @@ def _build_docinfo(c: Cooperado) -> dict:
 
 
 def _save_upload(file_storage) -> str | None:
-    # Mantido para compatibilidade com outras partes do app (ex.: uploads de xlsx)
     if not file_storage:
         return None
     fname = secure_filename(file_storage.filename or "")
@@ -577,27 +462,6 @@ def _save_upload(file_storage) -> str | None:
     file_storage.save(path)
     return f"/static/uploads/{fname}"
 
-def _save_foto_to_db(entidade, file_storage, *, is_cooperado: bool) -> str | None:
-    """
-    Salva o arquivo enviado diretamente no banco (bytea/Blob) e
-    retorna uma URL interna (/media/coop/<id> ou /media/rest/<id>).
-    """
-    if not file_storage or not file_storage.filename:
-        return getattr(entidade, "foto_url", None)
-    data = file_storage.read()
-    if not data:
-        return getattr(entidade, "foto_url", None)
-    entidade.foto_bytes = data
-    entidade.foto_mime = (file_storage.mimetype or "application/octet-stream")
-    entidade.foto_filename = secure_filename(file_storage.filename)
-    # garante que temos ID
-    db.session.flush()
-    if is_cooperado:
-        url = url_for("media_coop", coop_id=entidade.id)
-    else:
-        url = url_for("media_rest", rest_id=entidade.id)
-    entidade.foto_url = f"{url}?v={int(datetime.utcnow().timestamp())}"
-    return entidade.foto_url
 
 def _prox_ocorrencia_anual(dt: date | None) -> date | None:
     if not dt:
@@ -622,104 +486,6 @@ def _parse_date(s: str | None) -> date | None:
 
 def _dow(dt: date) -> str:
     return str((dt.weekday() % 7) + 1)
-
-
-# === Helpers de Avaliação (NLP leve + métricas) =============================
-def _clamp_star(v):
-    try:
-        v = int(v)
-    except Exception:
-        return None
-    return min(5, max(1, v))
-
-def _media_ponderada(geral, pont, educ, efic, apres):
-    """
-    Ponderação (soma=1.0):
-      Geral 0.40 + Pontualidade 0.15 + Educação 0.15 + Eficiência 0.15 + Bem Apresentado 0.15
-    Calcula só com os campos presentes (ignora None) e renormaliza pesos.
-    """
-    pares = [
-        (geral, 0.40),
-        (pont,  0.15),
-        (educ,  0.15),
-        (efic,  0.15),
-        (apres, 0.15),
-    ]
-    num = 0.0
-    den = 0.0
-    for nota, w in pares:
-        if nota is not None:
-            num += float(nota) * w
-            den += w
-    return round(num / den, 2) if den > 0 else None
-
-_POS = set("""
-bom ótima otimo excelente parabéns educado gentil atencioso cordial limpo cheiroso organizado rápido rapida rapido pontual
-""".split())
-_NEG = set("""
-ruim péssimo pessimo horrível horrivel sujo atrasado grosseiro mal educado agressivo impaciente amassado quebrado frio derramou
-""".split())
-
-def _analise_sentimento(txt: str | None) -> str:
-    if not txt:
-        return "neutro"
-    t = (txt or "").lower()
-    # contagem bem simples
-    pos = sum(1 for w in _POS if w in t)
-    neg = sum(1 for w in _NEG if w in t)
-    if neg > pos + 0: return "negativo"
-    if pos > neg + 0: return "positivo"
-    return "neutro"
-
-# mapeia temas por palavras-chave simples
-_TEMAS = {
-    "Pontualidade":  ["pontual", "atras", "horario", "horário", "demor", "rápido", "rapido", "lent"],
-    "Educação":      ["educad", "grosseir", "simpat", "antipatic", "mal trat", "sem paciencia", "sem paciência", "atencios"],
-    "Eficiência":    ["amass", "vazou", "quebrad", "frio", "bagunça", "bagunca", "cuidado", "eficien", "desorgan"],
-    "Bem apresentado": ["uniform", "higien", "apresenta", "limpo", "cheiroso", "aparencia", "aparência"],
-}
-
-def _identifica_temas(txt: str | None) -> list[str]:
-    if not txt:
-        return []
-    t = (txt or "").lower()
-    hits = []
-    for tema, keys in _TEMAS.items():
-        if any(k in t for k in keys):
-            hits.append(tema)
-    return hits[:4]
-
-_RISCO = ["ameaça","ameaca","acidente","quebrado","agress","roubo","violên","violenc","lesão","lesao","sangue","caiu","bateu","droga","alcool","álcool"]
-
-def _sinaliza_crise(nota_geral: int | None, txt: str | None) -> bool:
-    if nota_geral == 1 and txt:
-        low = txt.lower()
-        return any(k in low for k in _RISCO)
-    return False
-
-def _gerar_feedback(pont, educ, efic, apres, comentario, sentimento):
-    partes = []
-    def badge(nome, nota):
-        return f"{nome}: {nota} ★" if nota is not None else None
-
-    for nome, nota in (("Pontualidade", pont), ("Educação", educ), ("Eficiência", efic), ("Apresentação", apres)):
-        b = badge(nome, nota)
-        if b: partes.append(b)
-
-    dicas = []
-    if educ is not None and educ <= 2: dicas.append("melhore a abordagem/educação ao falar com o cliente")
-    if pont is not None and pont <= 2: dicas.append("tente chegar no horário combinado")
-    if efic is not None and efic <= 2: dicas.append("redobre o cuidado com o pedido durante o transporte")
-    if apres is not None and apres <= 2: dicas.append("capriche na apresentação pessoal (higiene/uniforme)")
-
-    txt = f"Notas — " + " | ".join(partes) if partes else "Obrigado pelo trabalho!"
-    if comentario:
-        txt += f". Cliente comentou: \"{comentario.strip()}\""
-    if dicas:
-        txt += ". Dica: " + "; ".join(dicas) + "."
-    if sentimento == "positivo":
-        txt += " 👏"
-    return txt[:1000]
 
 # ======== Helpers p/ troca: data/weekday/turno ========
 def _parse_data_escala_str(s: str) -> date | None:
@@ -814,7 +580,7 @@ def _parse_linhas_from_msg(msg: str | None) -> list[dict]:
         payload = json.loads(raw)
     except Exception:
         try:
-            payload = json.loads(raw.replace("'", '\"'))
+            payload = json.loads(raw.replace("'", '"'))
         except Exception:
             return []
     linhas = payload.get("linhas") or payload.get("rows") or []
@@ -1228,7 +994,7 @@ def admin_dashboard():
         for c in cooperados
     }
 
-    # -------- Escalas agrupadas e contagem por cooperado ----------
+     # -------- Escalas agrupadas e contagem por cooperado ----------
     escalas_all = Escala.query.order_by(Escala.id.asc()).all()
 
     esc_by_int: dict[int, list] = defaultdict(list)
@@ -2553,7 +2319,7 @@ def upload_escala():
         if isinstance(v, date):
             return v.strftime("%d/%m/%Y")
         s = str(v).strip()
-        m = re.fullmatch(r"(\d{4})[-/](\d{1,2})[-/](\d{1,2})", s)
+        m = _re.fullmatch(r"(\d{4})[-/](\d{1,2})[-/](\d{1,2})", s)
         if m:
             y, mth, d = map(int, m.groups())
             try:
@@ -3291,7 +3057,7 @@ def portal_restaurante():
 
     view = request.args.get("view", "lancar")  # 'lancar' ou 'escalas'
 
-    # -------------------- LANÇAMENTOS --------------------
+     # -------------------- LANÇAMENTOS --------------------
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
     if not di or not df:
@@ -3326,7 +3092,7 @@ def portal_restaurante():
     total_inss = total_bruto * 0.045
     total_liquido = total_bruto - total_inss
 
-    # -------------------- ESCALA (Quem trabalha) --------------------
+     # -------------------- ESCALA (Quem trabalha) --------------------
     def contrato_bate_restaurante(contrato: str, rest_nome: str) -> bool:
         a = " ".join(_normalize_name(contrato or ""))
         b = " ".join(_normalize_name(rest_nome or ""))
@@ -3418,8 +3184,6 @@ def lancar_producao():
     if not rest:
         abort(403)
     f = request.form
-
-    # 1) cria o lançamento normalmente
     l = Lancamento(
         restaurante_id=rest.id,
         cooperado_id=f.get("cooperado_id", type=int),
@@ -3431,48 +3195,8 @@ def lancar_producao():
         qtd_entregas=f.get("qtd_entregas", type=int),
     )
     db.session.add(l)
-    db.session.flush()  # garante l.id para amarrar avaliação
-
-    # 2) (OPCIONAL) lê os campos de avaliação se vieram do form
-    g   = _clamp_star(f.get("av_geral"))
-    p   = _clamp_star(f.get("av_pontualidade"))
-    ed  = _clamp_star(f.get("av_educacao"))
-    ef  = _clamp_star(f.get("av_eficiencia"))
-    ap  = _clamp_star(f.get("av_apresentacao"))
-    txt = (f.get("av_comentario") or "").strip()
-
-    tem_avaliacao = any(x is not None for x in (g, p, ed, ef, ap)) or bool(txt)
-    if tem_avaliacao:
-        media = _media_ponderada(g, p, ed, ef, ap)
-        senti = _analise_sentimento(txt)
-        temas = _identifica_temas(txt)
-        crise = _sinaliza_crise(g, txt)
-        feed  = _gerar_feedback(p, ed, ef, ap, txt, senti)
-
-        av = AvaliacaoCooperado(
-            restaurante_id=rest.id,
-            cooperado_id=l.cooperado_id,
-            lancamento_id=l.id,
-            estrelas_geral=g,
-            estrelas_pontualidade=p,
-            estrelas_educacao=ed,
-            estrelas_eficiencia=ef,
-            estrelas_apresentacao=ap,
-            comentario=txt,
-            media_ponderada=media,
-            sentimento=senti,
-            temas="; ".join(temas),
-            alerta_crise=crise,
-            feedback_motoboy=feed,
-        )
-        db.session.add(av)
-
-        # Alerta visível imediato (opcional)
-        if crise:
-            flash("⚠️ Avaliação crítica registrada (1★ + termo de risco). A gerência deve revisar.", "danger")
-
     db.session.commit()
-    flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
+    flash("Produção lançada.", "success")
     return redirect(url_for("portal_restaurante"))
 
 @app.route("/lancamentos/<int:id>/editar", methods=["GET", "POST"])
@@ -3509,7 +3233,6 @@ def excluir_lancamento(id):
     db.session.commit()
     flash("Lançamento excluído.", "success")
     return redirect(url_for("portal_restaurante"))
-
 
 # =========================
 # Documentos (Admin + Público)
