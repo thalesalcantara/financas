@@ -2900,29 +2900,23 @@ def admin_avisos():
 
     if request.method == "POST":
         f = request.form
-        alcance = f.get("destino_tipo")  # 'cooperados' | 'restaurantes' | 'ambos'
-        coop_alc = f.get("coop_alcance") or f.get("coop_alcance_ambos")
-        rest_alc = f.get("rest_alcance") or f.get("rest_alcance_ambos")
-        sel_coops = request.form.getlist("dest_cooperados[]") or request.form.getlist("dest_cooperados_ambos[]")
-                sel_rests = request.form.getlist("dest_restaurantes[]") or request.form.getlist("dest_restaurantes_ambos[]")
-        # ---------------------------------------------------------------------
-        # Criação de avisos
-        # ---------------------------------------------------------------------
-        titulo = (f.get("titulo") or "Aviso").strip()
-        corpo  = (f.get("corpo")  or "").strip()
-        prioridade = (f.get("prioridade") or "normal").strip().lower()  # normal | alta
-        fixado = bool(f.get("fixado"))
-        ativo  = bool(f.get("ativo", True))
 
-        def _parse_dt(txt):
-            s = (txt or "").strip()
+        # Campos básicos
+        titulo     = (f.get("titulo") or "Aviso").strip()
+        corpo      = (f.get("corpo_html") or f.get("corpo") or "").strip()
+        prioridade = (f.get("prioridade") or "normal").strip().lower()  # normal | alta
+        fixado     = bool(f.get("fixado"))
+        ativo      = True
+
+        # Período (opcionais)
+        def _parse_dt(s):
             if not s:
                 return None
-            for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+            for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d", "%d/%m/%Y %H:%M", "%d/%m/%Y"):
                 try:
-                    dt = datetime.strptime(s, fmt)
-                    if fmt == "%Y-%m-%d":
-                        return datetime(dt.year, dt.month, dt.day, 0, 0)
+                    dt = datetime.strptime(s.strip(), fmt)
+                    if fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+                        dt = datetime.combine(dt.date(), time(0, 0))
                     return dt
                 except Exception:
                     pass
@@ -2931,58 +2925,75 @@ def admin_avisos():
         inicio_em = _parse_dt(f.get("inicio_em"))
         fim_em    = _parse_dt(f.get("fim_em"))
 
-        created = 0
+        # Alcance
+        alcance = f.get("destino_tipo")  # 'cooperados' | 'restaurantes' | 'ambos' | (ou 'global')
+        coop_alc = f.get("coop_alcance") or f.get("coop_alcance_ambos")  # 'todos' | 'um' | 'lista'
+        rest_alc = f.get("rest_alcance") or f.get("rest_alcance_ambos")  # 'todos' | 'lista'
 
-        def _base_aviso(**kw):
+        sel_coops = request.form.getlist("dest_cooperados[]") or request.form.getlist("dest_cooperados_ambos[]")
+        sel_rests = request.form.getlist("dest_restaurantes[]") or request.form.getlist("dest_restaurantes_ambos[]")
+
+        # Helper: cria e persiste um Aviso
+        def _criar_aviso(tipo, destino_cooperado_id=None, restaurantes_ids=None):
             a = Aviso(
-                titulo=titulo or "Aviso",
+                titulo=titulo,
                 corpo=corpo,
-                prioridade=(prioridade if prioridade in {"normal", "alta"} else "normal"),
+                tipo=tipo,  # 'global' | 'cooperado' | 'restaurante'
+                destino_cooperado_id=destino_cooperado_id,
+                prioridade=prioridade,
                 fixado=fixado,
                 ativo=ativo,
                 inicio_em=inicio_em,
                 fim_em=fim_em,
                 criado_por_id=session.get("user_id"),
-                **kw,
             )
+            if restaurantes_ids is not None:
+                if restaurantes_ids:
+                    a.restaurantes = Restaurante.query.filter(
+                        Restaurante.id.in_(restaurantes_ids)
+                    ).all()
+                else:
+                    # lista vazia -> sem vínculo explícito (vale p/ todos no get_avisos_for_cooperado)
+                    a.restaurantes = []
+            db.session.add(a)
             return a
 
-        # Alcance: cooperados, restaurantes ou ambos
-        if alcance == "cooperados" or alcance == "ambos":
-            # Se houver cooperados selecionados, cria 1 aviso direcionado para cada.
-            # Senão, cria 1 aviso para todos os cooperados (destino_cooperado_id=None).
-            if sel_coops:
-                for cid in [int(x) for x in sel_coops if str(x).isdigit()]:
-                    a = _base_aviso(tipo="cooperado", destino_cooperado_id=cid)
-                    db.session.add(a)
-                    created += 1
+        criados = 0
+
+        # Global (se a UI mandar)
+        if alcance == "global":
+            _criar_aviso("global"); criados += 1
+
+        # Restaurantes
+        if alcance in ("restaurantes", "ambos"):
+            if rest_alc == "todos":
+                _criar_aviso("restaurante", restaurantes_ids=[])  # sem vínculo = todos
+                criados += 1
             else:
-                a = _base_aviso(tipo="cooperado", destino_cooperado_id=None)
-                db.session.add(a)
-                created += 1
+                ids = [int(x) for x in sel_rests if str(x).isdigit()]
+                _criar_aviso("restaurante", restaurantes_ids=ids)
+                criados += 1
 
-        if alcance == "restaurantes" or alcance == "ambos":
-            # Para restaurantes usamos a relação many-to-many.
-            a = _base_aviso(tipo="restaurante")
-            if sel_rests:
-                a.restaurantes = Restaurante.query.filter(Restaurante.id.in_(
-                    [int(x) for x in sel_rests if str(x).isdigit()]
-                )).all()
-            # Se nenhum restaurante for associado, o aviso vale para todos (ver get_avisos_for_cooperado()).
-            db.session.add(a)
-            created += 1
-
-        if alcance not in {"cooperados", "restaurantes", "ambos"}:
-            # Fallback: aviso global
-            a = _base_aviso(tipo="global")
-            db.session.add(a)
-            created += 1
+        # Cooperados
+        if alcance in ("cooperados", "ambos"):
+            if coop_alc == "todos":
+                _criar_aviso("cooperado", destino_cooperado_id=None)  # todos
+                criados += 1
+            else:
+                ids = [int(x) for x in sel_coops if str(x).isdigit()]
+                if not ids and coop_alc == "um":
+                    cid = f.get("dest_cooperado_id")
+                    if cid and str(cid).isdigit():
+                        ids = [int(cid)]
+                for cid in ids:  # 1 aviso por cooperado (modelo é 1:1 no destino)
+                    _criar_aviso("cooperado", destino_cooperado_id=cid)
+                    criados += 1
 
         db.session.commit()
-        flash(f"{created} aviso(s) publicado(s).", "success")
+        flash(f"Aviso(s) publicado(s): {criados}.", "success")
         return redirect(url_for("admin_avisos"))
 
-    # GET: lista de avisos
+    # GET
     avisos = (Aviso.query
               .order_by(Aviso.fixado.desc(),
                         (Aviso.prioridade == "alta").desc(),
@@ -3063,15 +3074,36 @@ def admin_delete_aviso(aviso_id):
 @admin_required
 def admin_toggle_aviso(aviso_id):
     a = Aviso.query.get_or_404(aviso_id)
-    which = (request.form.get("which") or "").strip().lower()
-    if which == "fixar":
-        a.fixado = not a.fixado
-    elif which == "ativar":
-        a.ativo = not a.ativo
-    else:
-        a.ativo = not a.ativo
+    a.ativo = not bool(a.ativo)
     db.session.commit()
-    flash("Aviso atualizado.", "success")
+    flash("Status do aviso atualizado.", "success")
+    return redirect(url_for("admin_avisos"))
+
+@app.post("/admin/avisos/<int:aviso_id>/fixar")
+@admin_required
+def admin_fixar_aviso(aviso_id):
+    a = Aviso.query.get_or_404(aviso_id)
+    a.fixado = True
+    db.session.commit()
+    flash("Aviso fixado.", "success")
+    return redirect(url_for("admin_avisos"))
+
+@app.post("/admin/avisos/<int:aviso_id>/desfixar")
+@admin_required
+def admin_desfixar_aviso(aviso_id):
+    a = Aviso.query.get_or_404(aviso_id)
+    a.fixado = False
+    db.session.commit()
+    flash("Aviso desafixado.", "success")
+    return redirect(url_for("admin_avisos"))
+
+@app.get("/admin/avisos/<int:aviso_id>/delete")
+@admin_required
+def admin_delete_aviso(aviso_id):
+    a = Aviso.query.get_or_404(aviso_id)
+    db.session.delete(a)
+    db.session.commit()
+    flash("Aviso removido.", "success")
     return redirect(url_for("admin_avisos"))
 
 # =============================================================================
