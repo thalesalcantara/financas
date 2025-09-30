@@ -2755,29 +2755,20 @@ def ratear_beneficios():
 @app.post("/upload/escala")
 @admin_required
 def upload_escala():
-    """
-    Aceita .xlsx (openpyxl) e .csv.
-    Colunas reconhecidas (case-insensitive, nomes flexíveis):
-      - data (ou dt), dia_semana (1..7 ou seg..dom), turno, horario (ou hora),
-        contrato, estabelecimento (ou unidade/setor/local),
-        cooperado_id, cooperado_nome, cor.
-    """
     arq = request.files.get("arquivo")
     if not arq or not arq.filename:
         flash("Selecione um arquivo de escala (.xlsx ou .csv).", "warning")
-        return redirect(url_for("admin", tab="escalas"))
+        return redirect("/admin?tab=escalas")
 
     fname = arq.filename.lower()
-    ext_ok = fname.endswith(".xlsx") or fname.endswith(".csv")
-    if not ext_ok:
+    if not (fname.endswith(".xlsx") or fname.endswith(".csv")):
         flash("Formato inválido. Envie .xlsx ou .csv", "danger")
-        return redirect(url_for("admin", tab="escalas"))
+        return redirect("/admin?tab=escalas")
 
-    # Helpers de parsing
     import io, csv
     from openpyxl import load_workbook
 
-    def _norm(s):  # normaliza cabeçalhos
+    def _norm(s):
         import unicodedata, re
         s = (s or "").strip()
         s = unicodedata.normalize("NFD", s)
@@ -2786,7 +2777,6 @@ def upload_escala():
         s = re.sub(r"[^\w]+", "_", s)
         return s.strip("_")
 
-    # mapeia cabeçalhos conhecidos -> campo do modelo
     HEAD_MAP = {
         "data": "data", "dt": "data", "dia": "dia_semana", "dia_semana": "dia_semana", "dow": "dia_semana",
         "turno": "turno",
@@ -2798,21 +2788,19 @@ def upload_escala():
         "cor": "cor", "cor_linha": "cor",
     }
 
-    # lê linhas genéricas
     rows = []
     try:
         if fname.endswith(".xlsx"):
             wb = load_workbook(filename=io.BytesIO(arq.read()), data_only=True)
             ws = wb.active
-            headers = [ _norm(str(c.value)) for c in next(ws.iter_rows(min_row=1, max_row=1)) ]
+            headers = [_norm(str(c.value)) for c in next(ws.iter_rows(min_row=1, max_row=1))]
             idx = {i: HEAD_MAP.get(h, h) for i, h in enumerate(headers)}
             for r in ws.iter_rows(min_row=2, values_only=True):
                 row = {}
                 for i, v in enumerate(r):
                     k = idx.get(i)
-                    if not k: 
-                        continue
-                    row[k] = v if v is not None else ""
+                    if k:
+                        row[k] = v if v is not None else ""
                 rows.append(row)
         else:
             data = arq.read().decode("utf-8-sig", errors="ignore")
@@ -2824,23 +2812,23 @@ def upload_escala():
                 row = {}
                 for i, v in enumerate(r):
                     k = idx.get(i)
-                    if not k:
-                        continue
-                    row[k] = v
+                    if k:
+                        row[k] = v
                 rows.append(row)
     except Exception as e:
         flash(f"Falha ao ler o arquivo: {e}", "danger")
-        return redirect(url_for("admin", tab="escalas"))
+        return redirect("/admin?tab=escalas")
 
     if not rows:
         flash("Nenhuma linha encontrada na planilha.", "warning")
-        return redirect(url_for("admin", tab="escalas"))
+        return redirect("/admin?tab=escalas")
 
-    # Normaliza e grava
     import math
+    from datetime import datetime, date
+
     def _to_int(x):
         try:
-            if x is None or x == "": return None
+            if x in (None, ""): return None
             if isinstance(x, float) and math.isnan(x): return None
             return int(str(x).strip())
         except Exception:
@@ -2854,7 +2842,6 @@ def upload_escala():
         if isinstance(x, date): return x
         if isinstance(x, datetime): return x.date()
         sx = str(x).strip()
-        # tenta ISO e BR
         for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
             try:
                 return datetime.strptime(sx, fmt).date()
@@ -2863,7 +2850,7 @@ def upload_escala():
         return None
 
     def _weekday_from_any(v):
-        if v is None or v == "": return None
+        if v in (None, ""): return None
         sx = str(v).strip().lower()
         MAP = {
             "1":0,"2":1,"3":2,"4":3,"5":4,"6":5,"7":6,
@@ -2881,13 +2868,12 @@ def upload_escala():
     for r in rows:
         data_val = _to_date_any(r.get("data"))
         dow_val  = _weekday_from_any(r.get("dia_semana"))
-        # precisa ter ao menos data ou dia-da-semana
         if not data_val and dow_val is None:
             continue
 
         esc = Escala(
-            data=data_val,                        # pode ser None se só tiver dia_semana
-            dia_semana=dow_val,                   # 0..6 opcional
+            data=data_val,
+            dia_semana=dow_val,  # certifique-se que existe esta coluna no modelo (Integer, nullable=True)
             turno=_to_str(r.get("turno")),
             horario=_to_str(r.get("horario")),
             contrato=_to_str(r.get("contrato")),
@@ -2904,81 +2890,10 @@ def upload_escala():
     except Exception as e:
         db.session.rollback()
         flash(f"Erro ao gravar a escala no banco: {e}", "danger")
-        return redirect(url_for("admin", tab="escalas"))
+        return redirect("/admin?tab=escalas")
 
     flash(f"Escala importada com sucesso ({inseridos} linhas).", "success")
-    return redirect(url_for("admin", tab="escalas"))
-
-# =========================
-# Trocas (Admin aprovar/recusar)
-# =========================
-@app.post("/admin/trocas/<int:id>/aprovar")
-@admin_required
-def admin_aprovar_troca(id):
-    t = TrocaSolicitacao.query.get_or_404(id)
-    if t.status != "pendente":
-        flash("Esta solicitação já foi tratada.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
-    orig_e = Escala.query.get(t.origem_escala_id)
-    if not orig_e:
-        flash("Plantão de origem inválido.", "danger")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
-    solicitante = Cooperado.query.get(t.solicitante_id)
-    destinatario = Cooperado.query.get(t.destino_id)
-    if not solicitante or not destinatario:
-        flash("Cooperado(s) inválido(s) na solicitação.", "danger")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
-    wd_o = _weekday_from_data_str(orig_e.data)
-    buck_o = _turno_bucket(orig_e.turno, orig_e.horario)
-    minhas = (Escala.query
-              .filter_by(cooperado_id=destinatario.id)
-              .order_by(Escala.id.asc()).all())
-    candidatas = [e for e in minhas
-                  if _weekday_from_data_str(e.data) == wd_o
-                  and _turno_bucket(e.turno, e.horario) == buck_o]
-
-    if len(candidatas) != 1:
-        if len(candidatas) == 0:
-            flash("Destino não possui plantões compatíveis (mesmo dia da semana e mesmo turno).", "danger")
-        else:
-            flash("Mais de um plantão compatível encontrado para o destino. Aprove pelo portal do cooperado (onde é possível escolher).", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
-    dest_e = candidatas[0]
-
-    linhas = [
-        {
-            "dia": _escala_label(orig_e).split(" • ")[0],
-            "turno_horario": " • ".join([x for x in [(orig_e.turno or "").strip(), (orig_e.horario or "").strip()] if x]),
-            "contrato": (orig_e.contrato or "").strip(),
-            "saiu": solicitante.nome,
-            "entrou": destinatario.nome,
-        },
-        {
-            "dia": _escala_label(dest_e).split(" • ")[0],
-            "turno_horario": " • ".join([x for x in [(dest_e.turno or "").strip(), (dest_e.horario or "").strip()] if x]),
-            "contrato": (dest_e.contrato or "").strip(),
-            "saiu": destinatario.nome,
-            "entrou": solicitante.nome,
-        }
-    ]
-    afetacao_json = {"linhas": linhas}
-
-    solicitante_id = orig_e.cooperado_id
-    destino_id = dest_e.cooperado_id
-    orig_e.cooperado_id, dest_e.cooperado_id = destino_id, solicitante_id
-
-    t.status = "aprovada"
-    t.aplicada_em = datetime.utcnow()
-    prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
-    t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps(afetacao_json, ensure_ascii=False)
-
-    db.session.commit()
-    flash("Troca aprovada e aplicada com sucesso!", "success")
-    return redirect(url_for("admin_dashboard", tab="escalas"))
+    return redirect("/admin?tab=escalas")
 
 @app.post("/admin/trocas/<int:id>/recusar")
 @admin_required
