@@ -117,74 +117,47 @@ class Restaurante(db.Model):
     foto_url = db.Column(db.String(255))
 
 
-# models.py
-from datetime import datetime
-from app import db
-
 class Lancamento(db.Model):
     __tablename__ = "lancamentos"
     id = db.Column(db.Integer, primary_key=True)
     restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False)
-    cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),   nullable=False)
-
+    cooperado_id = db.Column(db.Integer, db.ForeignKey("cooperados.id"), nullable=False)
     restaurante = db.relationship("Restaurante")
-    cooperado   = db.relationship("Cooperado")
-
-    descricao   = db.Column(db.String(200))
-    valor       = db.Column(db.Float, default=0.0)
-    data        = db.Column(db.Date)
+    cooperado = db.relationship("Cooperado")
+    descricao = db.Column(db.String(200))
+    valor = db.Column(db.Float, default=0.0)
+    data = db.Column(db.Date)
     hora_inicio = db.Column(db.String(10))
-    hora_fim    = db.Column(db.String(10))
+    hora_fim = db.Column(db.String(10))
+    # opcional: quantidade de entregas
     qtd_entregas = db.Column(db.Integer)
 
-    # Relacionamentos para permitir cascade no ORM:
-    avaliacoes_cooperado = db.relationship(
-        "AvaliacaoCooperado",
-        backref="lancamento",
-        cascade="all, delete-orphan",
-        passive_deletes=True,   # respeita ON DELETE CASCADE no banco
-    )
-
-    # Se você também tem AvaliacaoRestaurante (pelos logs, tem):
-    avaliacoes_restaurante = db.relationship(
-        "AvaliacaoRestaurante",
-        backref="lancamento",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
-    )
-
-
+# === AVALIAÇÕES DE COOPERADO (NOVO) =========================================
 class AvaliacaoCooperado(db.Model):
-    __tablename__ = "avaliacoes"   # sua tabela atual
+    __tablename__ = "avaliacoes"
     id = db.Column(db.Integer, primary_key=True)
 
     restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False)
-    cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),  nullable=False)
-
-    # >>> CASCADE na FK para lancamentos <<<
-    lancamento_id  = db.Column(
-        db.Integer,
-        db.ForeignKey("lancamentos.id", ondelete="CASCADE"),
-        index=True
-    )
+    cooperado_id    = db.Column(db.Integer, db.ForeignKey("cooperados.id"),  nullable=False)
+    lancamento_id   = db.Column(db.Integer, db.ForeignKey("lancamentos.id"))
 
     # notas 1..5
     estrelas_geral         = db.Column(db.Integer)
     estrelas_pontualidade  = db.Column(db.Integer)
     estrelas_educacao      = db.Column(db.Integer)
     estrelas_eficiencia    = db.Column(db.Integer)
-    estrelas_apresentacao  = db.Column(db.Integer)
+    estrelas_apresentacao  = db.Column(db.Integer)  # "Bem apresentado"
 
     comentario       = db.Column(db.Text)
 
     # IA/heurísticas
     media_ponderada  = db.Column(db.Float)
     sentimento       = db.Column(db.String(12))     # positivo | neutro | negativo
-    temas            = db.Column(db.String(255))
+    temas            = db.Column(db.String(255))    # palavras-chave resumidas
     alerta_crise     = db.Column(db.Boolean, default=False)
     feedback_motoboy = db.Column(db.Text)
 
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow
 
 
 class ReceitaCooperativa(db.Model):
