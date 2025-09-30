@@ -480,6 +480,7 @@ def _build_docinfo(c: Cooperado) -> dict:
 
 
 def _save_upload(file_storage) -> str | None:
+    # Mantido para compatibilidade com outras partes do app (ex.: uploads de xlsx)
     if not file_storage:
         return None
     fname = secure_filename(file_storage.filename or "")
@@ -2750,150 +2751,273 @@ def ratear_beneficios():
     return redirect(url_for("admin_dashboard", tab="beneficios"))
 
 # =========================
-# Upload de Escala (Admin)
+# Escalas — Upload
 # =========================
-@app.post("/upload/escala")
+@app.route("/escalas/upload", methods=["POST"])
 @admin_required
 def upload_escala():
-    arq = request.files.get("arquivo")
-    if not arq or not arq.filename:
-        flash("Selecione um arquivo de escala (.xlsx ou .csv).", "warning")
-        return redirect("/admin?tab=escalas")
+    file = request.files.get("file")
+    if not file or not file.filename.lower().endswith(".xlsx"):
+        flash("Envie um arquivo .xlsx válido.", "warning")
+        return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    fname = arq.filename.lower()
-    if not (fname.endswith(".xlsx") or fname.endswith(".csv")):
-        flash("Formato inválido. Envie .xlsx ou .csv", "danger")
-        return redirect("/admin?tab=escalas")
+    path = os.path.join(UPLOAD_DIR, secure_filename(file.filename))
+    file.save(path)
 
-    import io, csv
-    from openpyxl import load_workbook
-
-    def _norm(s):
-        import unicodedata, re
-        s = (s or "").strip()
-        s = unicodedata.normalize("NFD", s)
-        s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
-        s = s.lower()
-        s = re.sub(r"[^\w]+", "_", s)
-        return s.strip("_")
-
-    HEAD_MAP = {
-        "data": "data", "dt": "data", "dia": "dia_semana", "dia_semana": "dia_semana", "dow": "dia_semana",
-        "turno": "turno",
-        "horario": "horario", "hora": "horario", "hora_inicio_fim": "horario",
-        "contrato": "contrato",
-        "estabelecimento": "estabelecimento", "unidade": "estabelecimento", "setor": "estabelecimento", "local":"estabelecimento",
-        "cooperado_id": "cooperado_id", "id_cooperado": "cooperado_id",
-        "cooperado": "cooperado_nome", "cooperado_nome": "cooperado_nome", "nome": "cooperado_nome",
-        "cor": "cor", "cor_linha": "cor",
-    }
-
-    rows = []
     try:
-        if fname.endswith(".xlsx"):
-            wb = load_workbook(filename=io.BytesIO(arq.read()), data_only=True)
-            ws = wb.active
-            headers = [_norm(str(c.value)) for c in next(ws.iter_rows(min_row=1, max_row=1))]
-            idx = {i: HEAD_MAP.get(h, h) for i, h in enumerate(headers)}
-            for r in ws.iter_rows(min_row=2, values_only=True):
-                row = {}
-                for i, v in enumerate(r):
-                    k = idx.get(i)
-                    if k:
-                        row[k] = v if v is not None else ""
-                rows.append(row)
-        else:
-            data = arq.read().decode("utf-8-sig", errors="ignore")
-            reader = csv.reader(io.StringIO(data))
-            raw_headers = next(reader, [])
-            headers = [_norm(h) for h in raw_headers]
-            idx = {i: HEAD_MAP.get(h, h) for i, h in enumerate(headers)}
-            for r in reader:
-                row = {}
-                for i, v in enumerate(r):
-                    k = idx.get(i)
-                    if k:
-                        row[k] = v
-                rows.append(row)
-    except Exception as e:
-        flash(f"Falha ao ler o arquivo: {e}", "danger")
-        return redirect("/admin?tab=escalas")
+        import openpyxl
+    except Exception:
+        flash("Arquivo salvo, mas falta a biblioteca 'openpyxl' (pip install openpyxl).", "warning")
+        return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    if not rows:
-        flash("Nenhuma linha encontrada na planilha.", "warning")
-        return redirect("/admin?tab=escalas")
+    wb = openpyxl.load_workbook(path, data_only=True)
+    ws = wb.active
 
-    import math
-    from datetime import datetime, date
+    import unicodedata as _u, re as _re
 
-    def _to_int(x):
-        try:
-            if x in (None, ""): return None
-            if isinstance(x, float) and math.isnan(x): return None
-            return int(str(x).strip())
-        except Exception:
-            return None
+    def _norm_local(s: str) -> str:
+        s = _u.normalize("NFD", str(s or "").strip().lower())
+        s = "".join(ch for ch in s if _u.category(ch) != "Mn")
+        return _re.sub(r"[^a-z0-9]+", " ", s).strip()
 
-    def _to_str(x):
-        return (str(x).strip() if x is not None else "")
+    def to_css_color_local(v: str) -> str:
+        t = str(v or "").strip()
+        if not t:
+            return ""
+        t_low = t.lower().strip()
+        if _re.fullmatch(r"[0-9a-fA-F]{8}", t):
+            a = int(t[0:2], 16) / 255.0
+            r = int(t[2:4], 16); g = int(t[4:6], 16); b = int(t[6:8], 16)
+            return f"rgba({r},{g},{b},{a:.3f})"
+        if _re.fullmatch(r"[0-9a-fA-F]{6}", t):
+            return f"#{t}"
+        if _re.fullmatch(r"#?[0-9a-fA-F]{6,8}", t):
+            if not t.startswith("#"):
+                t = f"#{t}"
+            if len(t) == 9:
+                a = int(t[1:3], 16) / 255.0
+                r = int(t[3:5], 16); g = int(t[5:7], 16); b = int(t[7:9], 16)
+                return f"rgba({r},{g},{b},{a:.3f})"
+            return t
+        m = _re.fullmatch(r"\s*(\d{1,3})\s*[,;]\s*(\d{1,3})\s*[,;]\s*(\d{1,3})\s*", t)
+        if m:
+            r, g, b = [max(0, min(255, int(x))) for x in m.groups()]
+            return f"rgb({r},{g},{b})"
+        mapa = {"azul":"blue","vermelho":"red","verde":"green","amarelo":"yellow",
+                "cinza":"gray","preto":"black","branco":"white","laranja":"orange","roxo":"purple"}
+        return mapa.get(t_low, t)
 
-    def _to_date_any(x):
-        if not x: return None
-        if isinstance(x, date): return x
-        if isinstance(x, datetime): return x.date()
-        sx = str(x).strip()
-        for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
-            try:
-                return datetime.strptime(sx, fmt).date()
-            except Exception:
-                pass
+    headers_norm = { _norm_local(str(cell.value or "")) : j for j, cell in enumerate(ws[1], start=1) }
+
+    def find_col(*aliases):
+        n_aliases = [_norm_local(a) for a in aliases]
+        for a in n_aliases:
+            if a in headers_norm:
+                return headers_norm[a]
+        for k_norm, j in headers_norm.items():
+            for a in n_aliases:
+                if a and a in k_norm:
+                    return j
         return None
 
-    def _weekday_from_any(v):
-        if v in (None, ""): return None
-        sx = str(v).strip().lower()
-        MAP = {
-            "1":0,"2":1,"3":2,"4":3,"5":4,"6":5,"7":6,
-            "seg":0,"segunda":0,
-            "ter":1,"terça":1,"terca":1,
-            "qua":2,"quarta":2,
-            "qui":3,"quinta":3,
-            "sex":4,"sexta":4,
-            "sab":5,"sábado":5,"sabado":5,
-            "dom":6,"domingo":6
-        }
-        return MAP.get(sx)
+    # Data | QTD | Turno | Horário | Contrato | NOME DO COOPERADO | [Cor]
+    col_data     = find_col("data", "dia", "data do plantao")
+    col_qtd      = find_col("qtd", "quantidade")  # opcional
+    col_turno    = find_col("turno")
+    col_horario  = find_col("horario", "horário", "hora", "periodo", "período")
+    col_contrato = find_col("contrato", "restaurante", "unidade")
+    col_nome     = find_col("nome do cooperado", "cooperado", "nome", "colaborador")
+    col_cor      = find_col("cor", "cores", "cor da celula", "cor celula")
 
-    inseridos = 0
-    for r in rows:
-        data_val = _to_date_any(r.get("data"))
-        dow_val  = _weekday_from_any(r.get("dia_semana"))
-        if not data_val and dow_val is None:
+    if not col_nome:
+        flash("Não encontrei a coluna de nome do cooperado na planilha.", "danger")
+        return redirect(url_for("admin_dashboard", tab="escalas"))
+
+    restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
+    def match_restaurante_id(contrato_txt: str) -> int | None:
+        a = _norm_local(contrato_txt)
+        if not a:
+            return None
+        for r in restaurantes:
+            b = _norm_local(r.nome)
+            if a == b or a in b or b in a:
+                return r.id
+        try:
+            import difflib as _dif
+            nomes_norm = [_norm_local(r.nome) for r in restaurantes]
+            close = _dif.get_close_matches(a, nomes_norm, n=1, cutoff=0.87)
+            if close:
+                alvo = close[0]
+                for r in restaurantes:
+                    if _norm_local(r.nome) == alvo:
+                        return r.id
+        except Exception:
+            pass
+        return None
+
+    cooperados = Cooperado.query.order_by(Cooperado.nome).all()
+
+    def fmt_data_cell(v) -> str:
+        if v is None or str(v).strip() == "":
+            return ""
+        if isinstance(v, datetime):
+            return v.date().strftime("%d/%m/%Y")
+        if isinstance(v, date):
+            return v.strftime("%d/%m/%Y")
+        s = str(v).strip()
+        m = re.fullmatch(r"(\d{4})[-/](\d{1,2})[-/](\d{1,2})", s)
+        if m:
+            y, mth, d = map(int, m.groups())
+            try:
+                return date(y, mth, d).strftime("%d/%m/%Y")
+            except Exception:
+                return s
+        return s
+
+    linhas_novas: list[dict] = []
+    coops_na_planilha: set[int] = set()
+    total_linhas_planilha = 0
+
+    for i in range(2, ws.max_row + 1):
+        nome_raw = ws.cell(i, col_nome).value if col_nome else None
+        nome = (str(nome_raw).strip() if nome_raw is not None else "")
+        if not nome:
             continue
+        total_linhas_planilha += 1
 
-        esc = Escala(
-            data=data_val,
-            dia_semana=dow_val,  # certifique-se que existe esta coluna no modelo (Integer, nullable=True)
-            turno=_to_str(r.get("turno")),
-            horario=_to_str(r.get("horario")),
-            contrato=_to_str(r.get("contrato")),
-            estabelecimento=_to_str(r.get("estabelecimento")),
-            cooperado_id=_to_int(r.get("cooperado_id")),
-            cooperado_nome=_to_str(r.get("cooperado_nome")),
-            cor=_to_str(r.get("cor")),
-        )
-        db.session.add(esc)
-        inseridos += 1
+        data_v     = ws.cell(i, col_data).value     if col_data     else None
+        turno_v    = ws.cell(i, col_turno).value    if col_turno    else None
+        horario_v  = ws.cell(i, col_horario).value  if col_horario  else None
+        contrato_v = ws.cell(i, col_contrato).value if col_contrato else None
+        cor_v      = ws.cell(i, col_cor).value      if col_cor      else None
+        _qtd       = ws.cell(i, col_qtd).value      if col_qtd      else None  # ignorado
+
+        contrato_txt = (str(contrato_v).strip() if contrato_v is not None else "")
+        data_txt     = fmt_data_cell(data_v)
+        turno_txt    = (str(turno_v).strip() if turno_v is not None else "")
+        horario_txt  = (str(horario_v).strip() if horario_v is not None else "")
+        cor_txt      = to_css_color_local(cor_v)
+        rest_id      = match_restaurante_id(contrato_txt)
+
+        match = _match_cooperado_by_name(nome, cooperados)
+        payload = {
+            "cooperado_id":   (match.id if match else None),
+            "cooperado_nome": (None if match else nome),
+            "data":           data_txt,
+            "turno":          turno_txt,
+            "horario":        horario_txt,
+            "contrato":       contrato_txt,
+            "cor":            cor_txt,
+            "restaurante_id": rest_id,
+        }
+        if match:
+            coops_na_planilha.add(match.id)
+        linhas_novas.append(payload)
+
+    if not linhas_novas:
+        flash("Nada importado: nenhum registro válido encontrado.", "warning")
+        return redirect(url_for("admin_dashboard", tab="escalas"))
 
     try:
+        deleted = 0
+        if coops_na_planilha:
+            res = db.session.execute(
+                sa_delete(Escala).where(Escala.cooperado_id.in_(list(coops_na_planilha)))
+            )
+            deleted = res.rowcount or 0
+
+        for row in linhas_novas:
+            db.session.add(Escala(**row))
+
+        for cid in coops_na_planilha:
+            c = Cooperado.query.get(cid)
+            if c:
+                c.ultima_atualizacao = datetime.now()
+
         db.session.commit()
+        msg = (
+            f"Escala importada. {len(linhas_novas)} linha(s) adicionada(s). "
+            f"{deleted} escala(s) antigas removidas para {len(coops_na_planilha)} cooperado(s) reconhecido(s)."
+        )
+        if total_linhas_planilha > 0 and len(linhas_novas) < total_linhas_planilha:
+            msg += f" (Linhas processadas: {total_linhas_planilha})"
+        flash(msg, "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erro ao gravar a escala no banco: {e}", "danger")
-        return redirect("/admin?tab=escalas")
+        flash(f"Erro ao importar a escala: {e}", "danger")
 
-    flash(f"Escala importada com sucesso ({inseridos} linhas).", "success")
-    return redirect("/admin?tab=escalas")
+    return redirect(url_for("admin_dashboard", tab="escalas"))
+
+# =========================
+# Trocas (Admin aprovar/recusar)
+# =========================
+@app.post("/admin/trocas/<int:id>/aprovar")
+@admin_required
+def admin_aprovar_troca(id):
+    t = TrocaSolicitacao.query.get_or_404(id)
+    if t.status != "pendente":
+        flash("Esta solicitação já foi tratada.", "warning")
+        return redirect(url_for("admin_dashboard", tab="escalas"))
+
+    orig_e = Escala.query.get(t.origem_escala_id)
+    if not orig_e:
+        flash("Plantão de origem inválido.", "danger")
+        return redirect(url_for("admin_dashboard", tab="escalas"))
+
+    solicitante = Cooperado.query.get(t.solicitante_id)
+    destinatario = Cooperado.query.get(t.destino_id)
+    if not solicitante or not destinatario:
+        flash("Cooperado(s) inválido(s) na solicitação.", "danger")
+        return redirect(url_for("admin_dashboard", tab="escalas"))
+
+    wd_o = _weekday_from_data_str(orig_e.data)
+    buck_o = _turno_bucket(orig_e.turno, orig_e.horario)
+    minhas = (Escala.query
+              .filter_by(cooperado_id=destinatario.id)
+              .order_by(Escala.id.asc()).all())
+    candidatas = [e for e in minhas
+                  if _weekday_from_data_str(e.data) == wd_o
+                  and _turno_bucket(e.turno, e.horario) == buck_o]
+
+    if len(candidatas) != 1:
+        if len(candidatas) == 0:
+            flash("Destino não possui plantões compatíveis (mesmo dia da semana e mesmo turno).", "danger")
+        else:
+            flash("Mais de um plantão compatível encontrado para o destino. Aprove pelo portal do cooperado (onde é possível escolher).", "warning")
+        return redirect(url_for("admin_dashboard", tab="escalas"))
+
+    dest_e = candidatas[0]
+
+    linhas = [
+        {
+            "dia": _escala_label(orig_e).split(" • ")[0],
+            "turno_horario": " • ".join([x for x in [(orig_e.turno or "").strip(), (orig_e.horario or "").strip()] if x]),
+            "contrato": (orig_e.contrato or "").strip(),
+            "saiu": solicitante.nome,
+            "entrou": destinatario.nome,
+        },
+        {
+            "dia": _escala_label(dest_e).split(" • ")[0],
+            "turno_horario": " • ".join([x for x in [(dest_e.turno or "").strip(), (dest_e.horario or "").strip()] if x]),
+            "contrato": (dest_e.contrato or "").strip(),
+            "saiu": destinatario.nome,
+            "entrou": solicitante.nome,
+        }
+    ]
+    afetacao_json = {"linhas": linhas}
+
+    solicitante_id = orig_e.cooperado_id
+    destino_id = dest_e.cooperado_id
+    orig_e.cooperado_id, dest_e.cooperado_id = destino_id, solicitante_id
+
+    t.status = "aprovada"
+    t.aplicada_em = datetime.utcnow()
+    prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
+    t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps(afetacao_json, ensure_ascii=False)
+
+    db.session.commit()
+    flash("Troca aprovada e aplicada com sucesso!", "success")
+    return redirect(url_for("admin_dashboard", tab="escalas"))
 
 @app.post("/admin/trocas/<int:id>/recusar")
 @admin_required
