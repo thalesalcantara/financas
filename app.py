@@ -3980,19 +3980,21 @@ def excluir_lancamento(id):
     return redirect(url_for("portal_restaurante"))
 
 
-@app.get("/admin/documentos/<int:doc_id>/delete")
+@app.get("/admin/documentos/<int:doc_id>/excluir", endpoint="admin_documento_excluir")
 @admin_required
-def admin_delete_documento(doc_id):
+def admin_documento_excluir(doc_id: int):
     d = Documento.query.get_or_404(doc_id)
-    try:
-        local_path = os.path.join(BASE_DIR, d.arquivo_url.lstrip("/"))
-        if os.path.exists(local_path):
-            os.remove(local_path)
-    except Exception:
-        pass
+    if d.arquivo_url and d.arquivo_url.startswith("/static/uploads/docs/"):
+        try:
+            stored = d.arquivo_url.split("/static/uploads/docs/", 1)[-1]
+            path = os.path.join(DOCS_DIR, stored)
+            if os.path.isfile(path):
+                os.remove(path)
+        except Exception:
+            pass
     db.session.delete(d)
     db.session.commit()
-    flash("Documento removido.", "success")
+    flash("Documento removido.", "info")
     return redirect(url_for("admin_documentos"))
 
 @app.route("/documentos")
