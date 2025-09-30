@@ -2892,6 +2892,9 @@ def excluir_lancamento(id):
 # =============================================================================
 # Admin Avisos (CRUD)
 # =============================================================================
+# =============================================================================
+# Admin Avisos (CRUD) — ÚNICA VERSÃO
+# =============================================================================
 @app.route("/admin/avisos", methods=["GET", "POST"])
 @admin_required
 def admin_avisos():
@@ -2906,15 +2909,16 @@ def admin_avisos():
         corpo      = (f.get("corpo_html") or f.get("corpo") or "").strip()
         prioridade = (f.get("prioridade") or "normal").strip().lower()  # normal | alta
         fixado     = bool(f.get("fixado"))
-        ativo      = True
+        ativo      = True  # criando ativo por padrão
 
-        # Período (opcional)
+        # Período (opcionais)
         def _parse_dt(s):
             if not s:
                 return None
             for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d", "%d/%m/%Y %H:%M", "%d/%m/%Y"):
                 try:
                     dt = datetime.strptime(s.strip(), fmt)
+                    # se veio só data, padroniza para 00:00
                     if fmt in ("%Y-%m-%d", "%d/%m/%Y"):
                         dt = datetime.combine(dt.date(), time(0, 0))
                     return dt
@@ -2925,15 +2929,15 @@ def admin_avisos():
         inicio_em = _parse_dt(f.get("inicio_em"))
         fim_em    = _parse_dt(f.get("fim_em"))
 
-        # Alcance e seleções vindas do form
-        alcance  = f.get("destino_tipo")  # 'cooperados' | 'restaurantes' | 'ambos' | (ou 'global' se sua UI usar)
+        # Alcance
+        alcance = f.get("destino_tipo")  # 'cooperados' | 'restaurantes' | 'ambos' | (pode vir 'global')
         coop_alc = f.get("coop_alcance") or f.get("coop_alcance_ambos")  # 'todos' | 'um' | 'lista'
         rest_alc = f.get("rest_alcance") or f.get("rest_alcance_ambos")  # 'todos' | 'lista'
 
         sel_coops = request.form.getlist("dest_cooperados[]") or request.form.getlist("dest_cooperados_ambos[]")
         sel_rests = request.form.getlist("dest_restaurantes[]") or request.form.getlist("dest_restaurantes_ambos[]")
 
-        # Helper de criação
+        # Helper para criar um aviso
         def _criar_aviso(tipo, destino_cooperado_id=None, restaurantes_ids=None):
             a = Aviso(
                 titulo=titulo,
@@ -2947,18 +2951,18 @@ def admin_avisos():
                 fim_em=fim_em,
                 criado_por_id=session.get("user_id"),
             )
-            # Para restaurantes: se restaurantes_ids vier vazio/None, não vincula a nenhum
-            # -> no filtro de exibição isso significa "vale para todos".
-            if restaurantes_ids:
-                a.restaurantes = Restaurante.query.filter(
-                    Restaurante.id.in_(restaurantes_ids)
-                ).all()
+            if restaurantes_ids is not None:
+                if restaurantes_ids:
+                    a.restaurantes = Restaurante.query.filter(Restaurante.id.in_(restaurantes_ids)).all()
+                else:
+                    # lista vazia => "vale para todos" (vide get_avisos_for_cooperado)
+                    a.restaurantes = []
             db.session.add(a)
             return a
 
         criados = 0
 
-        # 'global' direto (se a UI enviar esse valor)
+        # Global (se sua UI enviar explícito)
         if alcance == "global":
             _criar_aviso("global")
             criados += 1
@@ -2966,7 +2970,7 @@ def admin_avisos():
         # Restaurantes
         if alcance in ("restaurantes", "ambos"):
             if rest_alc == "todos":
-                _criar_aviso("restaurante", restaurantes_ids=[])
+                _criar_aviso("restaurante", restaurantes_ids=[])  # [] = todos
                 criados += 1
             else:
                 ids = [int(x) for x in sel_rests if str(x).isdigit()]
@@ -2976,7 +2980,7 @@ def admin_avisos():
         # Cooperados
         if alcance in ("cooperados", "ambos"):
             if coop_alc == "todos":
-                _criar_aviso("cooperado", destino_cooperado_id=None)
+                _criar_aviso("cooperado", destino_cooperado_id=None)  # None = todos cooperados
                 criados += 1
             else:
                 ids = [int(x) for x in sel_coops if str(x).isdigit()]
@@ -2984,6 +2988,7 @@ def admin_avisos():
                     cid = f.get("dest_cooperado_id")
                     if cid and str(cid).isdigit():
                         ids = [int(cid)]
+                # 1 aviso por cooperado (campo é 1-para-1)
                 for cid in ids:
                     _criar_aviso("cooperado", destino_cooperado_id=cid)
                     criados += 1
@@ -2992,72 +2997,16 @@ def admin_avisos():
         flash(f"Aviso(s) publicado(s): {criados}.", "success")
         return redirect(url_for("admin_avisos"))
 
-    # GET: lista
+    # GET
     avisos = (Aviso.query
-              .order_by(
-                  Aviso.fixado.desc(),
-                  (Aviso.prioridade == "alta").desc(),
-                  Aviso.criado_em.desc()
-              ).all())
+              .order_by(Aviso.fixado.desc(),
+                        (Aviso.prioridade == "alta").desc(),
+                        Aviso.criado_em.desc())
+              .all())
     return render_template("admin_avisos.html",
                            avisos=avisos,
                            cooperados=cooperados,
                            restaurantes=restaurantes)
-
-@app.post("/admin/avisos/<int:aviso_id>/edit")
-@admin_required
-def admin_editar_aviso(aviso_id):
-    a = Aviso.query.get_or_404(aviso_id)
-    f = request.form
-    a.titulo = (f.get("titulo") or a.titulo or "Aviso").strip()
-    a.corpo  = (f.get("corpo")  or a.corpo or "").strip()
-    a.prioridade = (f.get("prioridade") or a.prioridade or "normal").strip().lower()
-    a.fixado = bool(f.get("fixado")) if "fixado" in f else a.fixado
-    a.ativo  = bool(f.get("ativo"))  if "ativo"  in f else a.ativo
-
-    def _parse_dt(txt):
-        s = (txt or "").strip()
-        if not s:
-            return None
-        for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
-            try:
-                dt = datetime.strptime(s, fmt)
-                if fmt == "%Y-%m-%d":
-                    return datetime(dt.year, dt.month, dt.day, 0, 0)
-                return dt
-            except Exception:
-                pass
-        return None
-
-    ini = _parse_dt(f.get("inicio_em"))
-    fim = _parse_dt(f.get("fim_em"))
-    if ini is not None: a.inicio_em = ini
-    if fim is not None: a.fim_em = fim
-
-    # Atualizar escopo (opcional)
-    novo_tipo = (f.get("tipo") or a.tipo or "global").strip().lower()
-    if novo_tipo in {"global", "cooperado", "restaurante"}:
-        a.tipo = novo_tipo
-
-    if a.tipo == "cooperado":
-        # se enviar destino_cooperado_id vazio, vira aviso para todos cooperados
-        dest = f.get("destino_cooperado_id")
-        a.destino_cooperado_id = int(dest) if (dest and dest.isdigit()) else None
-        # limpar relação restaurantes por segurança
-        a.restaurantes = []
-    elif a.tipo == "restaurante":
-        # atualizar lista de restaurantes associados
-        ids = [int(x) for x in (f.getlist("dest_restaurantes[]") or []) if str(x).isdigit()]
-        a.restaurantes = Restaurante.query.filter(Restaurante.id.in_(ids)).all() if ids else []
-        a.destino_cooperado_id = None
-    else:
-        # global
-        a.destino_cooperado_id = None
-        a.restaurantes = []
-
-    db.session.commit()
-    flash("Aviso atualizado.", "success")
-    return redirect(url_for("admin_avisos"))
 
 @app.get("/admin/avisos/<int:aviso_id>/delete")
 @admin_required
