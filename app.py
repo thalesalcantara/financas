@@ -1403,25 +1403,6 @@ def media_rest(rest_id: int):
     abort(404)
 
 # =========================
-# Rota raiz
-# =========================
-@app.route("/")
-def index():
-    uid = session.get("user_id")
-    if not uid:
-        return redirect(url_for("login"))
-    u = Usuario.query.get(uid)
-    if not u:
-        return redirect(url_for("login"))
-    if u.tipo == "admin":
-        return redirect(url_for("admin_dashboard"))
-    if u.tipo == "cooperado":
-        return redirect(url_for("portal_cooperado"))
-    if u.tipo == "restaurante":
-        return redirect(url_for("portal_restaurante"))
-    return redirect(url_for("login"))
-
-# =========================
 # Auth
 # =========================
 @app.route("/login", methods=["GET", "POST"])
