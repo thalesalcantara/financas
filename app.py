@@ -3063,16 +3063,20 @@ def admin_aprovar_troca(id):
 
     solicitante_id = orig_e.cooperado_id
     destino_id = dest_e.cooperado_id
-    orig_e.cooperado_id, dest_e.cooperado_id = destino_id, solicitante_id
 
+    # Faz a troca de fato
+    orig_e.cooperado_id = destino_id
+    dest_e.cooperado_id = solicitante_id
+
+    # Marca como aprovada e anexa o JSON de afetação na mensagem
     t.status = "aprovada"
     t.aplicada_em = datetime.utcnow()
     prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
-    t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps(afetacao_json, ensure_ascii=False)
+    t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps({"linhas": linhas}, ensure_ascii=False)
 
     db.session.commit()
-    flash("Troca aprovada e aplicada com sucesso!", "success")
-    return redirect(url_for("admin_dashboard", tab="escalas"))
+    flash("Troca realizada com sucesso!", "success")
+    return redirect(url_for("portal_cooperado"))
 
 @app.post("/admin/trocas/<int:id>/recusar")
 @admin_required
