@@ -3358,8 +3358,9 @@ def portal_cooperado():
         s = "".join(ch for ch in s if _u.category(ch) != "Mn")
         return _re.sub(r"[^a-z0-9]+", " ", s).strip()
 
-    def _names_match(a: str, b: str) -> bool:
+   def _names_match(a: str, b: str) -> bool:
     # casa somente se houver pelo menos 1 bigrama (duas palavras consecutivas) em comum
+    # fallback: se os nomes normalizados forem idênticos (1 palavra), também casa
     if not a or not b:
         return False
 
@@ -3370,13 +3371,20 @@ def portal_cooperado():
         return [t for t in s.split() if t]
 
     def bigrams(ts: list[str]) -> set[str]:
-        return {" ".join(ts[i:i+2]) for i in range(len(ts)-1)} if len(ts) >= 2 else set()
+        return {" ".join(ts[i:i+2]) for i in range(len(ts) - 1)} if len(ts) >= 2 else set()
 
     ta, tb = toks(a), toks(b)
-    if len(ta) < 2 or len(tb) < 2:
-        return False
+    na, nb = " ".join(ta), " ".join(tb)
 
-    return len(bigrams(ta) & bigrams(tb)) > 0
+    # fallback para nomes de 1 palavra exatamente iguais (após normalização)
+    if na == nb:
+        return True
+
+    # regra principal: exige pelo menos um bigrama em comum
+    if len(ta) >= 2 and len(tb) >= 2:
+        return len(bigrams(ta) & bigrams(tb)) > 0
+
+    return False
 
     # Filtra: é meu por ID OU (sem ID e o nome da planilha bate com meu nome)
     raw_escala = [
