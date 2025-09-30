@@ -3095,15 +3095,6 @@ def admin_desfixar_aviso(aviso_id):
     flash("Aviso desafixado.", "success")
     return redirect(url_for("admin_avisos"))
 
-@app.get("/admin/avisos/<int:aviso_id>/delete")
-@admin_required
-def admin_delete_aviso(aviso_id):
-    a = Aviso.query.get_or_404(aviso_id)
-    db.session.delete(a)
-    db.session.commit()
-    flash("Aviso removido.", "success")
-    return redirect(url_for("admin_avisos"))
-
 # =============================================================================
 # Boot
 # =============================================================================
