@@ -1,83 +1,2031 @@
-@app.post("/trocas/<int:troca_id>/aceitar")
-@role_required("cooperado")
-def aceitar_troca(troca_id):
-    u_id = session.get("user_id")
-    me = Cooperado.query.filter_by(usuario_id=u_id).first()
-    t = TrocaSolicitacao.query.get_or_404(troca_id)
-    if not me or t.destino_id != me.id:
-        abort(403)
-    if t.status != "pendente":
-        flash("Esta solicitação já foi tratada.", "warning")
-        return redirect(url_for("portal_cooperado"))
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Meu Painel - Coopex</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <style>
+    :root { --royal-blue:#2747d9; --hover-blue:#3b61e3; --bg:#f7f9fc; }
+    html,body{height:100%; overflow-x:hidden;}
+    body { background: var(--bg); font-family: 'Roboto', sans-serif; color:#1a1f2b; }
+    .navbar { background: var(--royal-blue); }
+    .navbar-brand { font-family:'Orbitron',sans-serif; font-size:1.2rem; color:#fff; letter-spacing:1px; display:inline-flex; align-items:center; gap:.35rem;}
+    .unread-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#dc3545;box-shadow:0 0 0 2px #fff}
+    .btn-royal { background: var(--royal-blue); color:#fff; }
+    .btn-royal:hover { background: var(--hover-blue); color:#fff; }
+    .card { border-radius:14px; box-shadow:0 2px 10px #0001; border:0; }
+    .summary .label { color:#556; font-weight:600; }
+    .chip { display:inline-block; font-size:.75rem; padding:.2rem .55rem; border-radius:20px; background:#eef2ff; color:#223; }
+    .list-item-title { font-weight:600; }
+    .value { font-weight:700; }
+    .muted { color:#6c757d; }
+    .sticky-tabs { position:sticky; top:0; z-index:10; background:var(--bg); }
+    .nav-tabs .nav-link{ color:#39465e; font-weight:600; border:0; }
+    .nav-tabs .nav-link.active{ background: var(--royal-blue); color:#fff; border-radius:10px 10px 0 0; }
+    .kpi{display:flex;justify-content:space-between;align-items:center;padding:.35rem 0}
+    .kpi .label{font-size:.95rem}
+    .kpi .value{font-size:1.05rem}
+    .mono{font-variant-numeric: tabular-nums;}
+    .mobile-wrap{ max-width:520px; margin:0 auto; }
+    .desktop-warning { display:none; }
+    @media (min-width: 992px){ .desktop-warning { display:block; } }
+    .card-list .card + .card{ margin-top:.6rem; }
+    .doc-ok{background:#e8fff1;border:1px solid #bff0d1}
+    .doc-bad{background:#ffecec;border:1px solid #ffb3b3}
+    .badge-soft{background:#eef2ff;color:#223;border-radius:999px;padding:.15rem .5rem}
+    .countdown{font-weight:700}
+    .table-escala{ table-layout: fixed; width:100%; }
+    .table-escala thead{ background:#eef2ff }
+    .table-escala th, .table-escala td{ word-break:break-word; vertical-align:middle; }
+    .pill{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:.85rem; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+    .cell-horario{ font-variant-numeric: tabular-nums; white-space: normal; }
+    .row-stripe{ border-left:10px solid transparent; }
+    .btn-xs{ padding:2px 8px; font-size:.75rem; line-height:1.2; border-radius:8px; }
+    .date-wrap{ display:flex; align-items:center; gap:.35rem; flex-wrap:wrap; }
+    .actions-inline{ margin-top:.35rem; }
+    img, video, iframe { max-width:100%; height:auto; }
+    .esc-past{background:rgba(239,68,68,.07)}
+    .esc-today{background:rgba(34,197,94,.10)}
+    .esc-tomorrow,.esc-future{background:rgba(59,130,246,.08)}
+    .badge-status{font-size:.75rem;padding:.2rem .5rem;border-radius:999px}
+    .no-x-scroll{overflow-x:hidden}
 
-    destino_escala_id = request.form.get("destino_escala_id", type=int)
-    orig_e = Escala.query.get(t.origem_escala_id)
-    if not orig_e:
-        flash("Plantão de origem inválido.", "danger")
-        return redirect(url_for("portal_cooperado"))
+    /* MENU LATERAL */
+    #menuLateral { display:none; position:fixed; top:0;left:0; width:250px; height:100vh; background:#fff; box-shadow:2px 0 16px #0002; z-index:200; transition:transform .23s cubic-bezier(.4,0,.2,1); transform:translateX(-100%); }
+    #menuLateral.aberto { display:block; transform:translateX(0);}
+    #fundoMenu { display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0006;z-index:199;}
+    #fundoMenu.aberto { display:block;}
+    #menuLateral a {color:#2747d9; font-weight:500;}
+    #menuLateral a:hover {color:#3b61e3; text-decoration:underline;}
 
-    if not destino_escala_id:
-        minhas = Escala.query.filter_by(cooperado_id=me.id).order_by(Escala.id.asc()).all()
-        wd_o = _weekday_from_data_str(orig_e.data)
-        buck_o = _turno_bucket(orig_e.turno, orig_e.horario)
-        candidatas = [e for e in minhas
-                      if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o]
-        if len(candidatas) == 1:
-            destino_escala_id = candidatas[0].id
-        elif len(candidatas) == 0:
-            flash("Você não tem plantões compatíveis (mesmo dia da semana e turno).", "danger")
-            return redirect(url_for("portal_cooperado"))
-        else:
-            flash("Selecione no modal qual dos seus plantões compatíveis deseja usar.", "warning")
-            return redirect(url_for("portal_cooperado"))
+    /* AVISOS – estilos */
+    .aviso-icon { width:42px;height:42px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#eef2ff }
+    .aviso-chip { background:#ffecec;color:#b42318;border-radius:999px;padding:.15rem .55rem;font-weight:600; }
+    .aviso-title { font-weight:700; }
+    .aviso-box { background:#fff; border:1px solid #00000012; border-radius:12px; padding:12px; }
+    .modal-avisos .modal-content { border-radius:16px; }
+    .modal-avisos .modal-header, .modal-avisos .modal-footer { border:0; }
 
-    dest_e = Escala.query.get(destino_escala_id)
-    if not dest_e or dest_e.cooperado_id != me.id:
-        flash("Seleção de escala inválida.", "danger")
-        return redirect(url_for("portal_cooperado"))
+    /* PÍLULA DE PONTUAÇÃO (NAVBAR) */
+    .score-pill{
+      display:inline-flex; align-items:center; gap:.35rem;
+      background:#ffffff; color:#111; border-radius:999px; padding:.2rem .55rem;
+      font-weight:700; box-shadow:0 1px 6px #00000026; border:1px solid #ffffff55;
+    }
+    .score-pill .bi-star-fill{ color:#f5c518; }
 
-    wd_orig = _weekday_from_data_str(orig_e.data)
-    wd_dest = _weekday_from_data_str(dest_e.data)
-    buck_orig = _turno_bucket(orig_e.turno, orig_e.horario)
-    buck_dest = _turno_bucket(dest_e.turno, dest_e.horario)
-    if wd_orig is None or wd_dest is None or wd_orig != wd_dest or buck_orig != buck_dest:
-        flash("Troca incompatível: precisa ser mesmo dia da semana e mesmo turno (dia/noite).", "danger")
-        return redirect(url_for("portal_cooperado"))
+    /* AVALIAÇÃO (PRODUÇÕES) */
+    .rating-wrap{ margin-top:.35rem; }
+    .rating-stars{ display:flex; align-items:center; gap:.25rem; }
+    .rating-stars .bi-star, .rating-stars .bi-star-fill{ font-size:1.2rem; }
+    .rating-stars .bi-star-fill{ color:#f5c518; }
+    .rating-stars .bi-star{ color:#d0d4dc; }
+    .rating-stars.selectable .star-btn{
+      background:transparent; border:0; padding:0; margin:0; line-height:1; cursor:pointer;
+    }
+    .rating-note{ margin-left:.25rem; font-weight:600; }
+    .rating-grid{ display:block; }
+    @media (min-width:480px){
+      .rating-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.25rem .75rem; }
+    }
+    .rating-stars button{ line-height:1; }
 
-    solicitante = Cooperado.query.get(t.solicitante_id)
-    destinatario = me
-    linhas = [
-        {
-            "dia": _escala_label(orig_e).split(" • ")[0],
-            "turno_horario": " • ".join([x for x in [(orig_e.turno or "").strip(), (orig_e.horario or "").strip()] if x]),
-            "contrato": (orig_e.contrato or "").strip(),
-            "saiu": solicitante.nome,
-            "entrou": destinatario.nome,
-        },
-        {
-            "dia": _escala_label(dest_e).split(" • ")[0],
-            "turno_horario": " • ".join([x for x in [(dest_e.turno or "").strip(), (dest_e.horario or "").strip()] if x]),
-            "contrato": (dest_e.contrato or "").strip(),
-            "saiu": destinatario.nome,
-            "entrou": solicitante.nome,
+    /* ****** ACRESCÍMOS VISUAIS ****** */
+    .modal-narrow .modal-dialog{ max-width:420px }
+    .soft-card{background:#fff;border:1px solid #00000010;border-radius:14px;box-shadow:0 6px 22px #0000000d}
+    .title-muted{font-size:.8rem;color:#6b7280;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
+
+    /* CALCULADORA */
+    .calc-wrap{background:#000;border-radius:24px;overflow:hidden;box-shadow:0 12px 30px #0007}
+    .calc-status{color:#9aa0a6;text-align:right;padding:10px 16px;font-size:.9rem;min-height:24px}
+    .calc-display{color:#fff;text-align:right;font-weight:300;padding:0 16px 18px 16px;font-size:2.4rem;min-height:64px}
+    .calc-keys{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px}
+    .calc-btn{border:0;border-radius:32px;padding:16px 0;font-size:1.3rem;font-weight:600;cursor:pointer;user-select:none}
+    .k-gray{background:#a5a5a5;color:#000}
+    .k-dark{background:#333333;color:#fff}
+    .k-orange{background:#fe9505;color:#fff}
+    .k-zero{grid-column:span 2;text-align:left;padding-left:24px}
+    .k-active{filter:brightness(1.15)}
+    .k-ghost{background:#4f4f4f;color:#fff}
+
+    /* FITA (HISTÓRICO) DA CALCULADORA */
+    .calc-tape{max-height:220px; overflow:auto;}
+    .calc-tape .item{display:flex;justify-content:space-between;align-items:center;border-bottom:1px dashed #e5e7eb;padding:.35rem 0}
+    .calc-tape .expr{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+    .calc-tape .btn-del{border:0;background:transparent;color:#dc3545}
+    .calc-toolbar{display:flex;justify-content:space-between;align-items:center}
+
+    /* CxB */
+    .cxbox .form-label{font-weight:600}
+    .cxbox .result-badge{display:inline-block;background:#eef2ff;border-radius:10px;padding:.25rem .5rem;font-weight:700}
+    .cx-history-item{cursor:pointer}
+    .cx-history-item:hover{background:#f3f6ff}
+
+    /* Notas */
+    .notes-wrap{display:flex; gap:.5rem; height:60vh; min-height:420px}
+    .notes-list{width:38%; max-width:260px; background:#fff; border:1px solid #0001; border-radius:12px; overflow:auto}
+    .notes-editor{flex:1; background:#fff; border:1px solid #0001; border-radius:12px; display:flex; flex-direction:column; overflow:hidden}
+    .notes-toolbar{display:flex; gap:.4rem; padding:.5rem; border-bottom:1px solid #0001; background:#f8f9fe; align-items:center}
+    .notes-toolbar .btn{border-radius:999px}
+    .notes-title{border:0; outline:none; font-size:1.05rem; font-weight:700; padding:.6rem .8rem; border-bottom:1px solid #0001}
+    .notes-content{flex:1; border:0; outline:none; padding:.8rem; resize:none; overflow:auto}
+    .note-card{padding:.55rem .65rem; border-bottom:1px solid #00000010}
+    .note-card.active{background:#eef2ff}
+    .note-card .title{font-weight:700}
+    .note-card .preview{font-size:.85rem; color:#555}
+    .note-card .time{font-size:.75rem; color:#888}
+    .note-pin{color:#f5c518}
+    @media (max-width: 575px){
+      .notes-wrap{flex-direction:column}
+      .notes-list{width:100%; max-width:none; height:180px}
+      .notes-editor{height:calc(60vh - 190px)}
+    }
+  </style>
+</head>
+<body>
+  {% set unread = avisos_nao_lidos_count or avisos_unread_count or 0 %}
+
+  <!-- MENU LATERAL -->
+  <div id="menuLateral">
+    <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+      <strong>Menu</strong>
+      <button class="btn-close" id="fecharMenu" style="font-size:1.1rem;" aria-label="Fechar"></button>
+    </div>
+
+    <ul class="list-unstyled m-0 p-2">
+      <li class="my-3">
+        <a href="{{ url_for('documentos_publicos') }}"
+           class="btn btn-royal w-100 d-flex align-items-center gap-2 text-white"
+           style="font-weight:600; font-size:1.1rem; border-radius:12px; box-shadow:0 2px 12px #2747d918;">
+          <i class="bi bi-folder-symlink-fill" style="font-size:1.4rem"></i>
+          <span class="text-white">Documentos</span>
+        </a>
+      </li>
+
+      <li class="my-3">
+        <a href="{{ url_for('tabelas_publicas') }}"
+           class="btn btn-royal w-100 d-flex align-items-center gap-2 text-white"
+           style="font-weight:600; font-size:1.1rem; border-radius:12px; box-shadow:0 2px 12px #2747d918;">
+          <i class="bi bi-table" style="font-size:1.4rem"></i>
+          <span class="text-white">Tabelas</span>
+        </a>
+      </li>
+
+      <li class="my-3">
+        <a href="{{ url_for('portal_cooperado_avisos') }}"
+           class="btn btn-royal w-100 d-flex align-items-center gap-2 text-white"
+           style="font-weight:600; font-size:1.1rem; border-radius:12px; box-shadow:0 2px 12px #2747d918;">
+          <i class="bi bi-megaphone-fill" style="font-size:1.4rem"></i>
+          <span class="text-white">Avisos</span>
+          {% if unread > 0 %}
+            <span class="badge rounded-pill bg-danger ms-auto">{{ unread }}</span>
+          {% endif %}
+        </a>
+      </li>
+
+      <!-- Atalhos (modais) -->
+      <li class="my-3">
+        <a href="#" data-bs-toggle="modal" data-bs-target="#calcModal"
+           class="btn btn-royal w-100 d-flex align-items-center gap-2 text-white"
+           style="font-weight:600; font-size:1.1rem; border-radius:12px; box-shadow:0 2px 12px #2747d918;">
+          <i class="bi bi-calculator" style="font-size:1.4rem"></i>
+          <span class="text-white">Calculadora</span>
+        </a>
+      </li>
+      
+      <li class="my-3">
+  <a href="#" class="btn btn-royal w-100 d-flex align-items-center gap-2 text-white"
+     data-bs-toggle="offcanvas" data-bs-target="#financasSheet"
+     style="font-weight:600; font-size:1.1rem; border-radius:12px; box-shadow:0 2px 12px #2747d918;">
+    <i class="bi bi-wallet2" style="font-size:1.4rem"></i>
+    <span class="text-white">Finanças</span>
+  </a>
+</li>
+
+      <li class="my-3">
+        <a href="#" data-bs-toggle="modal" data-bs-target="#cxbModal"
+           class="btn btn-royal w-100 d-flex align-items-center gap-2 text-white"
+           style="font-weight:600; font-size:1.1rem; border-radius:12px; box-shadow:0 2px 12px #2747d918;">
+          <i class="bi bi-cash-coin" style="font-size:1.4rem"></i>
+          <span class="text-white">Custo x Benefício</span>
+        </a>
+      </li>
+
+      <li class="my-3">
+        <a href="#" data-bs-toggle="modal" data-bs-target="#notesModal"
+           class="btn btn-royal w-100 d-flex align-items-center gap-2 text-white"
+           style="font-weight:600; font-size:1.1rem; border-radius:12px; box-shadow:0 2px 12px #2747d918;">
+          <i class="bi bi-sticky" style="font-size:1.4rem"></i>
+          <span class="text-white">Bloco de Notas</span>
+        </a>
+      </li>
+    </ul>
+  </div>
+  <div id="fundoMenu"></div>
+
+  <div class="desktop-warning text-center p-2" style="background:#fff4d6;border-bottom:1px solid #ffe6a3">
+    <small><i class="bi bi-phone"></i> Painel otimizado para celular.</small>
+  </div>
+
+  <div class="mobile-wrap">
+  <!-- TOPO COM MENU -->
+  <nav class="navbar navbar-dark">
+    <div class="container-fluid d-flex align-items-center flex-nowrap">
+      <!-- Botão do menu (não encolhe) -->
+      <button class="btn btn-link text-white fs-3 px-1 me-2 flex-shrink-0"
+              id="abrirMenu" title="Menu" aria-label="Menu">
+        <i class="bi bi-list"></i>
+      </button>
+
+      <!-- Título central (pode encurtar com … quando faltar espaço) -->
+      <span class="navbar-brand m-0 text-truncate"
+            style="min-width:0; flex:1 1 auto; text-align:center; letter-spacing:1px;">
+        Cooperado
+        {% if unread > 0 %}
+          <span class="unread-dot" title="Novos avisos" aria-label="Novos avisos"></span>
+        {% endif %}
+      </span>
+
+      <!-- Ações à direita (não encolhem) -->
+      <div class="d-flex align-items-center gap-2 flex-shrink-0">
+        {% set _score = cooperado_score|default(5.0) %}
+        <span class="score-pill" title="Sua pontuação como cooperado">
+          <i class="bi bi-star-fill" aria-hidden="true"></i>
+          <span class="mono">{{ ("%.1f"|format(_score)).replace('.',',') }}</span>
+        </span>
+        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-light">Sair</a>
+      </div>
+    </div>
+  </nav>
+</div>
+
+    <!-- BANNER: novos avisos -->
+    {% if unread > 0 %}
+    <div class="p-2 pt-3">
+      <div class="alert alert-warning d-flex align-items-center justify-content-between mb-2" role="alert" style="border-radius:12px;">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-megaphone-fill"></i>
+          <span>Você tem <strong>{{ unread }}</strong> novo(s) aviso(s).</span>
+        </div>
+        <a href="{{ url_for('portal_cooperado_avisos') }}" class="btn btn-sm btn-warning">
+          <i class="bi bi-eye"></i> Ver avisos
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Filtro por período -->
+    <form class="card p-3 m-2 mt-3" method="GET" action="{{ url_for('coop_dashboard') }}">
+      <div class="row g-2 align-items-end">
+        <div class="col-6">
+          <label class="form-label mb-0">Início</label>
+          <input type="date" class="form-control" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+        </div>
+        <div class="col-6">
+          <label class="form-label mb-0">Fim</label>
+          <input type="date" class="form-control" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+        </div>
+        <div class="col-12 d-grid">
+          <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar Período</button>
+        </div>
+      </div>
+      <small class="muted">Os totais abaixo consideram o período filtrado.</small>
+    </form>
+
+    <!-- Abas -->
+    <div class="sticky-tabs px-2">
+      <ul class="nav nav-tabs nav-fill" id="painelTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#resumo">Resumo</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#producoes">Produções</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ajustes">Ajustes Coop</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#escalas">Escalas</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#trocas">Trocas</button></li>
+      </ul>
+    </div>
+
+    <div class="tab-content p-2 pb-4">
+      <!-- RESUMO -->
+      <div class="tab-pane fade show active" id="resumo" role="tabpanel">
+        <div class="card p-3 summary">
+          <div class="d-flex align-items-center mb-2">
+            <img src="{{ cooperado.foto_url or url_for('static', filename='img/default.png') }}"
+                 style="width:46px;height:46px;border-radius:50%;object-fit:cover;border:3px solid var(--royal-blue);margin-right:10px" alt="">
+            <div>
+              <div class="fw-bold">{{ cooperado.nome }}</div>
+              <small class="muted">{{ cooperado.usuario }}</small>
+            </div>
+          </div>
+
+          <div class="kpi"><span class="label">Total Bruto</span><span class="value mono">R$ {{ "%.2f"|format(total_bruto|default(0)) }}</span></div>
+          <div class="kpi"><span class="label">Total Descontos Individuais</span><span class="value mono">R$ {{ "%.2f"|format(total_descontos|default(0)) }}</span></div>
+          <hr class="my-2">
+          <div class="kpi"><span class="label">INSS (4,5%)</span><span class="value mono">R$ {{ "%.2f"|format(inss_valor|default(0)) }}</span></div>
+          <div class="kpi"><span class="label">Complemento INSS (meta)</span><span class="value mono">R$ {{ "%.2f"|format(inss_complemento|default(0)) }}</span></div>
+          <hr class="my-2">
+          <div class="kpi"><span class="label">Total Líquido</span><span class="value mono text-success">R$ {{ "%.2f"|format(total_liquido|default(0)) }}</span></div>
+        </div>
+      </div>
+
+      <!-- PRODUÇÕES -->
+      <div class="tab-pane fade" id="producoes" role="tabpanel">
+        <div class="card p-3 mb-2">
+          <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Produções no período</h6>
+            <span class="chip mono">Total: R$ {{ "%.2f"|format(total_bruto|default(0)) }}</span>
+          </div>
+        </div>
+
+        <div class="card-list">
+          {% for lanc in producoes %}
+          <div class="card p-3">
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="list-item-title">{{ lanc.descricao }}</div>
+                <div class="muted">
+                  <i class="bi bi-shop"></i> {{ lanc.restaurante.nome }}
+                  &nbsp;·&nbsp; <i class="bi bi-calendar-event"></i> {{ lanc.data.strftime('%d/%m/%Y') }}
+                </div>
+                {% if lanc.hora_inicio or lanc.hora_fim %}
+                <small class="muted"><i class="bi bi-clock"></i> {{ lanc.hora_inicio }}{% if lanc.hora_fim %} às {{ lanc.hora_fim }}{% endif %}</small>
+                {% endif %}
+
+                <!-- AVALIAÇÃO DO RESTAURANTE -->
+                <div class="rating-wrap">
+                  {% set minha = lanc.minha_avaliacao %}
+                  {% if minha is not none %}
+                    <div class="small text-muted mb-1">Sua avaliação</div>
+                    <div class="rating-stars" aria-label="Sua avaliação: {{ minha }} de 5">
+                      {% for i in range(1,6) %}
+                        <i class="bi {{ 'bi-star-fill' if i <= minha else 'bi-star' }}"></i>
+                      {% endfor %}
+                      <span class="rating-note">{{ ("%.1f"|format(minha)).replace('.',',') }}</span>
+                    </div>
+                  {% else %}
+                    <form method="post"
+                          action="{{ url_for('producoes_avaliar', lanc_id=lanc.id) }}"
+                          class="avaliar-form" aria-label="Formulário de avaliação do restaurante">
+                      <input type="hidden" name="nota" value="">
+                      <input type="hidden" name="av_geral" value="">
+                      <input type="hidden" name="av_apresentacao" value="">
+                      <input type="hidden" name="av_educacao" value="">
+                      <input type="hidden" name="av_eficiencia" value="">
+                      <input type="hidden" name="av_pontualidade" value="">
+
+                      <div class="rating-grid">
+                        <div class="mb-1">
+                          <div class="small fw-semibold text-muted">Geral</div>
+                          <div class="rating-stars stars-group" data-field="av_geral" data-readonly="true" aria-label="Média Geral">
+                            {% for i in range(1,6) %}
+                              <button type="button" class="star-btn" data-value="{{ i }}" disabled aria-hidden="true">
+                                <i class="bi bi-star"></i>
+                              </button>
+                            {% endfor %}
+                          </div>
+                        </div>
+
+                        <div class="mb-1">
+                          <div class="small fw-semibold text-muted">Ambiente</div>
+                          <div class="rating-stars selectable stars-group" data-field="av_apresentacao" role="radiogroup"
+                               aria-label="Avaliar Ambiente de 1 a 5">
+                            {% for i in range(1,6) %}
+                              <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} estrela{% if i>1 %}s{% endif %}">
+                                <i class="bi bi-star"></i>
+                              </button>
+                            {% endfor %}
+                          </div>
+                        </div>
+
+                        <div class="mb-1">
+                          <div class="small fw-semibold text-muted">Tratamento</div>
+                          <div class="rating-stars selectable stars-group" data-field="av_educacao" role="radiogroup"
+                               aria-label="Avaliar Tratamento de 1 a 5">
+                            {% for i in range(1,6) %}
+                              <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} estrela{% if i>1 %}s{% endif %}">
+                                <i class="bi bi-star"></i>
+                              </button>
+                            {% endfor %}
+                          </div>
+                        </div>
+
+                        <div class="mb-2">
+                          <div class="small fw-semibold text-muted">Suporte</div>
+                          <div class="rating-stars selectable stars-group" data-field="av_eficiencia" role="radiogroup"
+                               aria-label="Avaliar Suporte de 1 a 5">
+                            {% for i in range(1,6) %}
+                              <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} estrela{% if i>1 %}s{% endif %}">
+                                <i class="bi bi-star"></i>
+                              </button>
+                            {% endfor %}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="mb-2">
+                        <textarea name="av_comentario" class="form-control form-control-sm" rows="2"
+                                  placeholder="Comentário (opcional)"></textarea>
+                      </div>
+
+                      <div class="d-flex align-items-center gap-2">
+                        <button type="submit" class="btn btn-xs btn-outline-primary" disabled>Enviar</button>
+                        <small class="text-muted">Você só pode avaliar uma vez.</small>
+                      </div>
+                    </form>
+                  {% endif %}
+                </div>
+                <!-- /AVALIAÇÃO -->
+              </div>
+              <div class="text-end">
+                <div class="value mono">R$ {{ "%.2f"|format(lanc.valor) }}</div>
+                <small class="muted">INSS (4,5%): R$ {{ "%.2f"|format((lanc.valor or 0)*0.045) }}</small>
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <div class="card p-3 text-center muted">Nenhuma produção neste período.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- AJUSTES -->
+      <div class="tab-pane fade" id="ajustes" role="tabpanel">
+        <div class="card p-3 mb-2">
+          <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Créditos da Cooperativa</h6>
+            <span class="chip mono">Total: R$ {{ "%.2f"|format((receitas_coop|sum(attribute='valor'))|default(0)) }}</span>
+          </div>
+        </div>
+        <div class="card-list mb-3">
+          {% for rc in receitas_coop %}
+          <div class="card p-3">
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="list-item-title"><i class="bi bi-plus-circle"></i> {{ rc.descricao }}</div>
+                {% if rc.data %}<small class="muted"><i class="bi bi-calendar-event"></i> {{ rc.data.strftime('%d/%m/%Y') }}</small>{% endif %}
+              </div>
+              <div class="text-end value mono text-success">+ R$ {{ "%.2f"|format(rc.valor) }}</div>
+            </div>
+          </div>
+          {% else %}
+          <div class="card p-3 text-center muted">Nenhum crédito lançado para você.</div>
+          {% endfor %}
+        </div>
+
+        <div class="card p-3 mb-2">
+          <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Descontos / Despesas da Cooperativa</h6>
+            <span class="chip mono">Total: R$ {{ "%.2f"|format((despesas_coop|sum(attribute='valor'))|default(0)) }}</span>
+          </div>
+        </div>
+        <div class="card-list">
+          {% for d in despesas_coop %}
+          <div class="card p-3">
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="list-item-title"><i class="bi bi-dash-circle"></i> {{ d.descricao }}</div>
+                {% if d.data %}<small class="muted"><i class="bi bi-calendar-event"></i> {{ d.data.strftime('%d/%m/%Y') }}</small>{% endif %}
+              </div>
+              <div class="text-end value mono text-danger">− R$ {{ "%.2f"|format(d.valor) }}</div>
+            </div>
+          </div>
+          {% else %}
+          <div class="card p-3 text-center muted">Nenhum desconto aplicado no período.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      
+ <!-- ESCALAS -->
+      <div class="tab-pane fade" id="escalas">
+        <div class="card p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0"><i class="bi bi-file-earmark-check"></i> Documentos</h6>
+            <span class="badge-soft">Prazo Final: 31 de Dez · faltam <span class="countdown">{{ doc_cnh.dias_para_prazo }}</span> dias</span>
+          </div>
+
+          {% set cnh_ok = doc_cnh.ok %}
+          {% set placa_ok = doc_placa.ok %}
+
+          <div class="p-3 rounded mb-2 {{ 'doc-ok' if cnh_ok else 'doc-bad' }}">
+            <div class="d-flex align-items-start">
+              <div class="me-2" style="font-size:1.25rem">
+                {% if cnh_ok %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
+              </div>
+              <div class="flex-fill">
+                <div class="fw-bold mb-1">CNH — {{ 'Em dia' if cnh_ok else 'Vencida ou pendente' }}</div>
+                <div class="small muted">
+                  Nº: <b>{{ doc_cnh.numero or '—' }}</b> ·
+                  Validade: <b>{{ doc_cnh.vencimento.strftime('%d/%m/%Y') if doc_cnh.vencimento else '—' }}</b>
+                </div>
+                {% if not cnh_ok %}
+                  <div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle-fill"></i> Regularize para não travar repasses.</div>
+                {% else %}
+                  <div class="small text-success mt-1"><i class="bi bi-shield-check"></i> Tudo certo com a CNH.</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div class="p-3 rounded {{ 'doc-ok' if placa_ok else 'doc-bad' }}">
+            <div class="d-flex align-items-start">
+              <div class="me-2" style="font-size:1.25rem">
+                {% if placa_ok %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
+              </div>
+              <div class="flex-fill">
+                <div class="fw-bold mb-1">Placa — {{ 'Em dia' if placa_ok else 'Vencida ou pendente' }}</div>
+                <div class="small muted">
+                  Nº: <b>{{ doc_placa.numero or '—' }}</b> ·
+                  Validade: <b>{{ doc_placa.vencimento.strftime('%d/%m/%Y') if doc_placa.vencimento else '—' }}</b>
+                </div>
+                {% if not placa_ok %}
+                  <div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle-fill"></i> Atualize a placa/validade para evitar bloqueios.</div>
+                {% else %}
+                  <div class="small text-success mt-1"><i class="bi bi-shield-check"></i> Tudo certo com a placa.</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Minha escala -->
+        <div class="card p-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0"><i class="bi bi-calendar2-week"></i> Minha Escala</h6>
+            <span class="badge-soft">{{ (minha_escala|length) if minha_escala else 0 }} itens</span>
+          </div>
+
+          <table class="table table-bordered table-escala align-middle">
+            <thead>
+              <tr><th style="min-width:96px">Data</th><th>Turno</th><th>Horário</th><th>Contrato</th></tr>
+            </thead>
+            <tbody>
+              {% if minha_escala %}
+                {% for e in minha_escala %}
+                  {% set colors = (e.cor or '')|string %}
+                  {% set has_multi = '|' in colors %}
+                  {% set cs = colors.split('|') if has_multi else [] %}
+                  {% set stripe = (colors if not has_multi else (cs[0] if cs|length>0 else '')) or e.status_color %}
+                  <tr class="row-stripe esc-{{ e.status }}" style="border-left-color: {{ stripe }}">
+                    <td>
+                      <div class="date-wrap">
+                        {% if has_multi %}
+                          <span class="pill" style="background:{{ cs[0] if cs|length>0 else '#fff' }};color:#111; border:1px solid #0001">{{ e.data or '' }}</span>
+                        {% elif colors %}
+                          <span class="pill" style="background:{{ colors }};color:#111; border:1px solid #0001">{{ e.data or '' }}</span>
+                        {% else %}
+                          <span class="pill" style="background:#fff;border:1px solid #0001">{{ e.data or '' }}</span>
+                        {% endif %}
+                        {% if e.status == 'today' %}
+                          <span class="badge rounded-pill bg-success-subtle text-success">HOJE</span>
+                        {% elif e.status == 'tomorrow' %}
+                          <span class="badge rounded-pill bg-primary-subtle text-primary">AMANHÃ</span>
+                        {% elif e.status == 'past' %}
+                          <span class="badge rounded-pill bg-danger-subtle text-danger">PASSADO</span>
+                        {% else %}
+                          <span class="badge rounded-pill bg-primary-subtle text-primary">FUTURO</span>
+                        {% endif %}
+                      </div>
+                      <div class="actions-inline">
+                        <button type="button" class="btn btn-xs btn-outline-royal" data-bs-toggle="modal" data-bs-target="#trocaModal" data-escala-id="{{ e.id }}" data-escala-desc="{{ (e.data or '') ~ ' • ' ~ (e.turno or '') ~ ' • ' ~ (e.horario or '') ~ ' • ' ~ (e.contrato or '') }}">
+                          🔁 Trocar
+                        </button>
+                      </div>
+                    </td>
+                    <td>{% if has_multi and cs|length>1 %}<span class="pill" style="background:{{ cs[1] }};color:#111; border:1px solid #0001">{{ e.turno or '' }}</span>{% else %}{{ e.turno or '' }}{% endif %}</td>
+                    <td class="cell-horario">{% if has_multi and cs|length>2 %}<span class="pill" style="background:{{ cs[2] }};color:#111; border:1px solid #0001">{{ e.horario or '' }}</span>{% else %}{{ e.horario or '' }}{% endif %}</td>
+                    <td>{% if has_multi and cs|length>3 %}<span class="pill" style="background:{{ cs[3] }};color:#111; border:1px solid #0001">{{ e.contrato or '' }}</span>{% else %}{{ e.contrato or '' }}{% endif %}</td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr><td colspan="4" class="text-center muted">Nenhuma escala disponível.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+          <div class="mt-1 small text-muted"><i class="bi bi-info-circle"></i> As solicitações de troca ficam visíveis para o administrador.</div>
+        </div>
+      </div>
+
+      <!-- TROCAS -->
+      <div class="tab-pane fade" id="trocas">
+        <div class="card p-3 mb-3">
+          <div class="d-flex align-items-center justify-content-between">
+            <h6 class="mb-0"><i class="bi bi-inbox"></i> Solicitações recebidas</h6>
+            <span class="badge-soft">{{ trocas_recebidas_pendentes|length }} pendente(s)</span>
+          </div>
+          <div class="mt-2">
+            {% if trocas_recebidas_pendentes %}
+              {% for t in trocas_recebidas_pendentes %}
+              <div class="border rounded p-2 mb-2 no-x-scroll">
+                <div class="d-flex align-items-center justify-content-between">
+                  <div class="me-2">
+                    <div class="fw-semibold">{{ t.solicitante.nome }}</div>
+                    <div class="small text-muted">{{ t.origem_desc }}</div>
+                    {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
+                    <div class="small text-muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
+                  </div>
+                  <div class="text-end">
+                    <button class="btn btn-sm btn-royal mb-1" data-bs-toggle="modal" data-bs-target="#aceitarTrocaModal" data-troca-id="{{ t.id }}" data-origem-desc="{{ t.origem_desc }}" data-origem-weekday="{{ t.origem_weekday }}" data-origem-bucket="{{ t.origem_turno_bucket }}">✅ Aceitar</button>
+                    <form class="d-inline" method="POST" action="{{ url_for('recusar_troca', troca_id=t.id) }}">
+                      <button class="btn btn-sm btn-outline-danger">❌ Recusar</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            {% else %}
+              <div class="text-center text-muted">Nenhuma solicitação recebida.</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="card p-3">
+          <div class="d-flex align-items-center justify-content-between">
+            <h6 class="mb-0"><i class="bi bi-send"></i> Minhas solicitações enviadas</h6>
+            <span class="badge-soft">{{ trocas_enviadas|length }}</span>
+          </div>
+          <div class="mt-2">
+            {% if trocas_enviadas %}
+              {% for t in trocas_enviadas %}
+              <div class="border rounded p-2 mb-2 no-x-scroll">
+                <div class="d-flex align-items-center justify-content-between">
+                  <div class="me-2">
+                    <div class="fw-semibold">Para: {{ t.destino.nome }}</div>
+                    <div class="small text-muted">{{ t.origem_desc }}</div>
+                    {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
+                    <div class="small text-muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
+                  </div>
+                  <div class="text-end">
+                    {% if t.status == 'pendente' %}
+                      <span class="badge-status bg-warning-subtle text-warning">⏳ Pendente</span>
+                    {% elif t.status == 'aprovada' %}
+                      <span class="badge-status bg-success-subtle text-success">✅ Aprovada</span>
+                    {% else %}
+                      <span class="badge-status bg-danger-subtle text-danger">❌ Recusada</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            {% else %}
+              <div class="text-center text-muted">Nenhuma solicitação enviada.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rodapé -->
+    <div class="text-center py-3 muted">
+      <small>© {{ current_year|default('') }} Coopex</small>
+    </div>
+  </div>
+
+  <!-- OFFCANVAS: FINANÇAS (flutuante e completo) -->
+<div class="offcanvas offcanvas-bottom" tabindex="-1" id="financasSheet" aria-labelledby="financasSheetLabel" style="height:92vh">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="financasSheetLabel">
+      <i class="bi bi-wallet2 me-1"></i> Finanças
+    </h5>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary" id="finExport"><i class="bi bi-filetype-csv"></i> CSV</button>
+      <button class="btn btn-sm btn-outline-secondary" id="finDicasBtn"><i class="bi bi-lightbulb"></i> Dicas</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="offcanvas">
+        <i class="bi bi-x-lg"></i> Fechar
+      </button>
+    </div>
+  </div>
+
+  <div class="offcanvas-body" style="background:#f7f9fc; overflow:auto">
+    <div class="container">
+
+      <!-- CONTROLES DO MÊS + RESUMO -->
+      <section class="soft-card p-3 mb-3">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div>
+            <div class="title-muted mb-1">Mês de referência</div>
+            <input type="month" id="finMes" class="form-control form-control-sm" style="width:160px">
+          </div>
+          <div class="text-end">
+            <div class="small text-muted">Receitas</div>
+            <div class="fw-bold mono" id="finRecSum">R$ 0,00</div>
+          </div>
+          <div class="text-end">
+            <div class="small text-muted">Despesas</div>
+            <div class="fw-bold mono" id="finDespSum">R$ 0,00</div>
+          </div>
+          <div class="text-end">
+            <div class="small text-muted">Saldo</div>
+            <div class="fw-bold mono" id="finSaldo">R$ 0,00</div>
+          </div>
+        </div>
+        <hr class="my-3">
+        <div class="row g-2 align-items-end">
+          <div class="col-6">
+            <label class="form-label mb-1">Meta (valor)</label>
+            <input type="number" min="0" step="0.01" id="finMetaValor" class="form-control" placeholder="Ex.: 500,00">
+          </div>
+          <div class="col-6">
+            <label class="form-label mb-1">Meta (% do ganho)</label>
+            <div class="input-group">
+              <input type="number" min="0" step="1" id="finMetaPct" class="form-control" placeholder="Ex.: 10">
+              <span class="input-group-text">%</span>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="small text-muted">Alvo do mês: <b id="finMetaAlvo">R$ 0,00</b> · Guardado: <b id="finGuardado">R$ 0,00</b></div>
+            <div class="progress mt-1" role="progressbar" aria-label="Progresso da meta" style="height:10px">
+              <div id="finMetaProg" class="progress-bar" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FORM DE LANÇAMENTO -->
+      <section class="soft-card p-3 mb-3">
+        <h6 class="mb-2">Novo lançamento</h6>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label mb-1">Tipo</label>
+            <select id="finTipo" class="form-select">
+              <option value="receita">Receita</option>
+              <option value="despesa" selected>Despesa</option>
+              <option value="poupanca">Guardar (poupança)</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label mb-1">Data</label>
+            <input type="date" id="finData" class="form-control">
+          </div>
+          <div class="col-7">
+            <label class="form-label mb-1">Categoria</label>
+            <input type="text" id="finCat" class="form-control" placeholder="Ex.: Combustível, Alimentação, Moradia">
+          </div>
+          <div class="col-5">
+            <label class="form-label mb-1">Valor</label>
+            <input type="number" step="0.01" min="0" id="finValor" class="form-control" placeholder="0,00">
+          </div>
+          <div class="col-12">
+            <label class="form-label mb-1">Descrição (opcional)</label>
+            <input type="text" id="finDesc" class="form-control" placeholder="Observações">
+          </div>
+
+          <div class="col-12">
+            <div class="form-check form-switch mt-2">
+              <input class="form-check-input" type="checkbox" role="switch" id="finParcSw">
+              <label class="form-check-label" for="finParcSw">Parcelar</label>
+            </div>
+          </div>
+
+          <div class="col-12" id="finParcWrap" style="display:none">
+            <div class="soft-card p-2">
+              <div class="row g-2">
+                <div class="col-12">
+                  <label class="form-label mb-1">Modo do parcelamento</label>
+                  <div class="d-grid gap-2">
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="finParcModo" id="finParcModoValor" value="valor" checked>
+                      <label class="form-check-label" for="finParcModoValor">
+                        Informar <b>valor da parcela</b> e repetir por N meses
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="finParcModo" id="finParcModoTotal" value="total">
+                      <label class="form-check-label" for="finParcModoTotal">
+                        Informar <b>valor total</b> e dividir em N parcelas iguais
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-4">
+                  <label class="form-label mb-1">Nº parcelas</label>
+                  <input type="number" id="finParcN" class="form-control" min="2" max="120" value="10">
+                </div>
+                <div class="col-8">
+                  <label class="form-label mb-1">Início</label>
+                  <input type="month" id="finParcIni" class="form-control">
+                </div>
+                <div class="col-12">
+                  <div class="small text-muted" id="finParcPreview">—</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 d-grid mt-2">
+            <button class="btn btn-royal" id="finAdd"><i class="bi bi-plus-circle"></i> Salvar lançamento</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- LISTA DO MÊS + ANALÍTICOS -->
+      <section class="soft-card p-3 mb-3">
+        <div class="d-flex align-items-center justify-content-between">
+          <h6 class="mb-2">Lançamentos do mês</h6>
+          <button class="btn btn-sm btn-outline-danger" id="finClearMes"><i class="bi bi-trash"></i> Limpar mês</button>
+        </div>
+        <div id="finLista"></div>
+      </section>
+
+      <section class="soft-card p-3">
+        <h6 class="mb-2">Onde você gasta mais</h6>
+        <div id="finTopCats" class="small"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Dicas de economia -->
+<div class="modal fade" id="finDicasModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-narrow">
+    <div class="modal-content soft-card p-2">
+      <div class="modal-header border-0">
+        <h6 class="m-0"><i class="bi bi-lightbulb me-1"></i> Dicas de economia</h6>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <ul class="m-0 ps-3">
+          <li>Corte silencioso: cancele assinaturas que você quase não usa (streaming, apps).</li>
+          <li>Combustível: agrupe entregas/rotas e evite picos de trânsito; calibre pneus mensalmente.</li>
+          <li>Alimentação: troque refeição fora por marmita 3x por semana — impacto grande no mês.</li>
+          <li>Meta automática: cadastre “poupança” recorrente no 1º dia útil (priorize você antes de gastar).</li>
+          <li>Telecom: renegocie plano a cada 6-12 meses; operadoras dão desconto para “fidelizar”.</li>
+          <li>Compras: use a regra 24h para evitar impulso; se ainda quiser, compre.</li>
+        </ul>
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-royal" data-bs-dismiss="modal">Ok, entendi</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- ******** MODAIS ******** -->
+
+  <!-- MODAL: Calculadora (com status e histórico) -->
+  <div class="modal fade modal-narrow" id="calcModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content p-2" style="border:0;background:transparent">
+        <div class="calc-wrap">
+          <div class="calc-status" id="calcStatus">&nbsp;</div>
+          <div class="calc-display" id="calcDisplay">0</div>
+          <div class="calc-keys">
+            <button class="calc-btn k-gray" data-act="ac">AC</button>
+            <button class="calc-btn k-gray" data-act="back"><i class="bi bi-backspace"></i></button>
+            <button class="calc-btn k-gray" data-act="percent">%</button>
+            <button class="calc-btn k-orange" data-op="divide">÷</button>
+
+            <button class="calc-btn k-dark" data-num="7">7</button>
+            <button class="calc-btn k-dark" data-num="8">8</button>
+            <button class="calc-btn k-dark" data-num="9">9</button>
+            <button class="calc-btn k-orange" data-op="multiply">×</button>
+
+            <button class="calc-btn k-dark" data-num="4">4</button>
+            <button class="calc-btn k-dark" data-num="5">5</button>
+            <button class="calc-btn k-dark" data-num="6">6</button>
+            <button class="calc-btn k-orange" data-op="minus">−</button>
+
+            <button class="calc-btn k-dark" data-num="1">1</button>
+            <button class="calc-btn k-dark" data-num="2">2</button>
+            <button class="calc-btn k-dark" data-num="3">3</button>
+            <button class="calc-btn k-orange" data-op="plus">+</button>
+
+            <button class="calc-btn k-dark k-zero" data-num="0">0</button>
+            <button class="calc-btn k-dark" data-dot=".">.</button>
+            <button class="calc-btn k-orange" data-act="equal">=</button>
+          </div>
+        </div>
+
+        <!-- Fita de histórico da calculadora -->
+        <div class="soft-card mt-2 p-2">
+          <div class="calc-toolbar">
+            <div class="title-muted">Histórico</div>
+            <div>
+              <button class="btn btn-sm btn-outline-danger" id="calcTapeClear"><i class="bi bi-trash"></i> Limpar</button>
+            </div>
+          </div>
+          <div id="calcTape" class="calc-tape mt-2"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Custo x Benefício -->
+  <div class="modal fade" id="cxbModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content soft-card p-2">
+        <div class="card p-3 cxbox mb-2">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0"><i class="bi bi-cash-coin"></i> Custo x Benefício</h6>
+            <div class="d-flex gap-1">
+              <button class="btn btn-sm btn-outline-secondary" id="cxExportCSV"><i class="bi bi-filetype-csv"></i> CSV</button>
+              <button class="btn btn-sm btn-outline-secondary" id="cxShareSum"><i class="bi bi-share"></i> Compartilhar</button>
+            </div>
+          </div>
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label">Preço gasolina (R$/L)</label>
+              <input type="number" step="0.01" min="0" id="cxPreco" class="form-control" placeholder="Ex.: 5,99">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Consumo (km/L)</label>
+              <input type="number" step="0.1" min="0" id="cxKmPorLitro" class="form-control" placeholder="Ex.: 35">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Km rodados</label>
+              <input type="number" step="0.1" min="0" id="cxKmFeitos" class="form-control" placeholder="Ex.: 120">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Quanto ganhou (R$)</label>
+              <input type="number" step="0.01" min="0" id="cxGanho" class="form-control" placeholder="Ex.: 180,00">
+            </div>
+          </div>
+          <hr class="my-2">
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="small text-muted">Custo com combustível</div>
+              <div class="result-badge mono" id="cxCusto">R$ 0,00</div>
+            </div>
+            <div class="col-6">
+              <div class="small text-muted">Custo por km</div>
+              <div class="result-badge mono" id="cxCustoKm">R$ 0,00/km</div>
+            </div>
+            <div class="col-6">
+              <div class="small text-muted">Lucro (ganho − custo)</div>
+              <div class="result-badge mono text-success" id="cxLucro">R$ 0,00</div>
+            </div>
+            <div class="col-6">
+              <div class="small text-muted">Lucro por km</div>
+              <div class="result-badge mono text-success" id="cxLucroKm">R$ 0,00/km</div>
+            </div>
+            <div class="col-12">
+              <div class="small text-muted">Margem (lucro / ganho)</div>
+              <div class="result-badge mono" id="cxMargem">0%</div>
+            </div>
+          </div>
+          <div class="d-grid mt-3">
+            <button class="btn btn-royal" id="cxSalvar"><i class="bi bi-save"></i> Salvar resultado</button>
+          </div>
+        </div>
+
+        <div class="card p-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0"><i class="bi bi-clock-history"></i> Histórico</h6>
+            <button class="btn btn-sm btn-outline-danger" id="cxLimpar"><i class="bi bi-trash"></i> Limpar</button>
+          </div>
+          <div id="cxHistorico" class="mt-2"></div>
+          <hr class="my-2">
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="small text-muted">Total km</div>
+              <div class="result-badge mono" id="cxTotKm">0</div>
+            </div>
+            <div class="col-6">
+              <div class="small text-muted">Total ganho</div>
+              <div class="result-badge mono" id="cxTotGanho">R$ 0,00</div>
+            </div>
+            <div class="col-6">
+              <div class="small text-muted">Total custo</div>
+              <div class="result-badge mono" id="cxTotCusto">R$ 0,00</div>
+            </div>
+            <div class="col-6">
+              <div class="small text-muted">Total lucro</div>
+              <div class="result-badge mono text-success" id="cxTotLucro">R$ 0,00</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Bloco de Notas -->
+  <div class="modal fade" id="notesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+      <div class="modal-content soft-card p-2">
+        <div class="notes-wrap">
+          <div class="notes-list" id="notesList"></div>
+          <div class="notes-editor">
+            <div class="notes-toolbar">
+              <button class="btn btn-sm btn-outline-primary" id="ntNew"><i class="bi bi-file-earmark-plus"></i> Nova</button>
+              <button class="btn btn-sm btn-outline-secondary" id="ntDuplicate" title="Duplicar"><i class="bi bi-files"></i></button>
+              <button class="btn btn-sm btn-outline-warning" id="ntPin" title="Fixar/Desfixar"><i class="bi bi-pin-angle"></i></button>
+              <button class="btn btn-sm btn-outline-danger" id="ntDelete" title="Apagar"><i class="bi bi-trash"></i></button>
+              <span class="vr"></span>
+              <button class="btn btn-sm btn-outline-secondary" data-cmd="bold" title="Negrito"><i class="bi bi-type-bold"></i></button>
+              <button class="btn btn-sm btn-outline-secondary" data-cmd="italic" title="Itálico"><i class="bi bi-type-italic"></i></button>
+              <button class="btn btn-sm btn-outline-secondary" data-cmd="underline" title="Sublinhado"><i class="bi bi-type-underline"></i></button>
+              <button class="btn btn-sm btn-outline-secondary" id="ntH1" title="Título"><i class="bi bi-type-h1"></i></button>
+              <button class="btn btn-sm btn-outline-secondary" id="ntBullets" title="Lista"><i class="bi bi-list-ul"></i></button>
+              <button class="btn btn-sm btn-outline-secondary" id="ntChecklist" title="Checklist"><i class="bi bi-square-check"></i></button>
+              <span class="vr"></span>
+              <button class="btn btn-sm btn-outline-secondary" id="ntShare" title="Compartilhar"><i class="bi bi-share"></i></button>
+              <button class="btn btn-sm btn-outline-secondary" id="ntExport" title="Exportar JSON"><i class="bi bi-download"></i></button>
+              <label class="btn btn-sm btn-outline-secondary mb-0" title="Importar JSON">
+                <i class="bi bi-upload"></i> <input type="file" id="ntImport" accept="application/json" hidden>
+              </label>
+              <button class="btn btn-sm btn-outline-secondary" id="ntPrint" title="Imprimir"><i class="bi bi-printer"></i></button>
+            </div>
+            <input class="notes-title" id="ntTitle" placeholder="Título">
+            <div class="notes-content" id="ntContent" contenteditable="true" spellcheck="true"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST de novos avisos -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+    <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
+         data-bs-autohide="true" data-bs-delay="8000">
+      <div class="toast-header">
+        <i class="bi bi-megaphone-fill me-2"></i>
+        <strong class="me-auto">Novos avisos</strong>
+        <small>agora</small>
+        <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
+      </div>
+      <div class="toast-body">
+        Você tem {{ unread }} aviso(s) não lido(s).
+        <a href="{{ url_for('portal_cooperado_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- MENU lateral + TOAST avisos -->
+  <script>
+    (function(){
+      const menuLateral = document.getElementById('menuLateral');
+      const fundoMenu = document.getElementById('fundoMenu');
+      const abrir = document.getElementById('abrirMenu');
+      const fechar = document.getElementById('fecharMenu');
+
+      abrir?.addEventListener('click', () => {
+        menuLateral.classList.add('aberto');
+        fundoMenu.classList.add('aberto');
+      });
+      fechar?.addEventListener('click', () => {
+        menuLateral.classList.remove('aberto');
+        fundoMenu.classList.remove('aberto');
+      });
+      fundoMenu?.addEventListener('click', () => {
+        menuLateral.classList.remove('aberto');
+        fundoMenu.classList.remove('aberto');
+      });
+    })();
+
+    document.addEventListener('DOMContentLoaded', function () {
+      const unread = Number('{{ unread }}');
+      if (unread > 0) {
+        const el = document.getElementById('toastAvisos');
+        if (el && window.bootstrap?.Toast) new bootstrap.Toast(el).show();
+      }
+    });
+  </script>
+
+   <!-- MODAL: Solicitar troca -->
+  <div class="modal fade" id="trocaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form id="trocaForm" method="POST" action="{{ url_for('solicitar_troca') }}">
+          <div class="modal-header">
+            <h5 class="modal-title">🔁 Solicitar troca de escala</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" name="from_escala_id" id="fromEscalaId">
+            <input type="hidden" name="to_cooperado_id" id="toCooperadoId">
+            <div class="mb-2">
+              <div class="small text-muted">Seu plantão</div>
+              <div class="fw-semibold" id="fromEscalaDesc">—</div>
+            </div>
+            <hr>
+            <div class="mb-2">
+              <label class="form-label mb-1">Escolha o cooperado para propor a troca</label>
+              <input type="text" class="form-control form-control-sm" id="coopSearch" placeholder="Buscar por nome...">
+              <div class="border rounded mt-2" style="max-height: 220px; overflow:auto">
+                <ul class="list-group list-group-flush" id="coopList"></ul>
+              </div>
+              <small class="text-muted">A pessoa selecionada receberá esta proposta.</small>
+            </div>
+            <div class="mb-2">
+              <label class="form-label mb-1">Mensagem (opcional)</label>
+              <textarea name="mensagem" class="form-control" rows="2" placeholder="Ex.: posso assumir seu turno e você assume o meu?"></textarea>
+            </div>
+          </div>
+          <div class="modal-footer d-flex justify-content-between">
+            <small class="text-muted">👀 O admin visualiza as solicitações.</small>
+            <div>
+              <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+              <button type="submit" class="btn btn-royal" id="btnEnviarTroca" disabled>📨 Enviar solicitação</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Aceitar troca -->
+  <div class="modal fade" id="aceitarTrocaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form id="aceitarTrocaForm" method="POST">
+          <div class="modal-header">
+            <h5 class="modal-title">✅ Aceitar troca</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" name="destino_escala_id" id="destinoEscalaId">
+            <div class="mb-2 small text-muted">Plantão do solicitante</div>
+            <div class="fw-semibold" id="origemTrocaDesc">—</div>
+            <hr>
+            <div class="mb-2">
+              <div class="form-label mb-1">Escolha um <b>plantão seu compatível</b> (mesmo dia da semana e mesmo turno)</div>
+              <div class="border rounded" style="max-height:260px; overflow:auto; overflow-x:hidden;">
+                <ul class="list-group list-group-flush" id="minhaEscalaCompatList"></ul>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-royal" id="btnConfirmarAceite" disabled>👍 Confirmar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+ <!-- Script MENU lateral -->
+  <script>
+    const menuLateral = document.getElementById('menuLateral');
+    const fundoMenu = document.getElementById('fundoMenu');
+    document.getElementById('abrirMenu').onclick = () => { menuLateral.classList.add('aberto'); fundoMenu.classList.add('aberto'); };
+    document.getElementById('fecharMenu').onclick = () => { menuLateral.classList.remove('aberto'); fundoMenu.classList.remove('aberto'); };
+    fundoMenu.onclick = () => { menuLateral.classList.remove('aberto'); fundoMenu.classList.remove('aberto'); };
+  </script>
+
+  <!-- Script: Solicitar troca -->
+  <script>
+    const COOPS_FINAL = {{ cooperados_json | default('[]') | safe }};
+    const MY_ESCALA = {{ minha_escala_json | default('[]') | safe }};
+
+    const coopListEl = document.getElementById('coopList');
+    const coopSearchEl = document.getElementById('coopSearch');
+    const fromEscalaIdEl = document.getElementById('fromEscalaId');
+    const fromEscalaDescEl = document.getElementById('fromEscalaDesc');
+    const toCooperadoIdEl = document.getElementById('toCooperadoId');
+    const btnEnviarTroca = document.getElementById('btnEnviarTroca');
+
+    function renderCoops(filter = '') {
+      const q = (filter || '').trim().toLowerCase();
+      coopListEl.innerHTML = '';
+      const base = Array.isArray(COOPS_FINAL) ? COOPS_FINAL : [];
+      if (!base.length) {
+        coopListEl.innerHTML = '<li class="list-group-item text-muted">Nenhum cooperado disponível para troca.</li>';
+        return;
+      }
+      const filtered = base.filter(c => !q || (String(c.nome || '').toLowerCase().includes(q))).slice(0, 200);
+      if (!filtered.length) {
+        coopListEl.innerHTML = '<li class="list-group-item text-muted">Nenhum resultado.</li>';
+        return;
+      }
+      filtered.forEach(c => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex align-items-center justify-content-between gap-2';
+        li.style.cursor = 'pointer';
+        li.innerHTML = `
+          <div class="d-flex align-items-center gap-2">
+            <img src="${c.foto_url || '{{ url_for("static", filename="img/default.png") }}'}" style="width:28px;height:28px;object-fit:cover;border-radius:50%;border:1px solid #0001" alt="">
+            <div class="fw-semibold">${c.nome || '—'}</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-royal">👤 Selecionar</button>
+        `;
+        li.querySelector('button').addEventListener('click', () => {
+          const escala = fromEscalaDescEl.textContent || '';
+          const msg = `Deseja solicitar a troca deste plantão:\n\n${escala}\n\ncom o cooperado "${c.nome}"?`;
+          if (confirm(msg)) {
+            toCooperadoIdEl.value = c.id;
+            btnEnviarTroca.disabled = false;
+            [...coopListEl.querySelectorAll('.list-group-item')].forEach(x => x.classList.remove('active'));
+            li.classList.add('active');
+          }
+        });
+        coopListEl.appendChild(li);
+      });
+    }
+    coopSearchEl?.addEventListener('input', () => renderCoops(coopSearchEl.value));
+    const trocaModalEl = document.getElementById('trocaModal');
+    trocaModalEl.addEventListener('show.bs.modal', (ev) => {
+      const btn = ev.relatedTarget;
+      const escalaId = btn?.getAttribute('data-escala-id') || '';
+      const escalaDesc = btn?.getAttribute('data-escala-desc') || '';
+      fromEscalaIdEl.value = escalaId; fromEscalaDescEl.textContent = escalaDesc;
+      toCooperadoIdEl.value = ''; btnEnviarTroca.disabled = true; coopSearchEl.value = ''; renderCoops('');
+    });
+    document.getElementById('trocaForm').addEventListener('submit', (e) => {
+      if (!fromEscalaIdEl.value || !toCooperadoIdEl.value) { e.preventDefault(); alert('Selecione um cooperado para enviar a solicitação.'); }
+    });
+  </script>
+  
+  <!-- Aceitar troca -->
+  <script>
+    const aceitarModalEl = document.getElementById('aceitarTrocaModal');
+    const origemTrocaDescEl = document.getElementById('origemTrocaDesc');
+    const minhaEscalaCompatListEl = document.getElementById('minhaEscalaCompatList');
+    const destinoEscalaIdEl = document.getElementById('destinoEscalaId');
+    const btnConfirmarAceite = document.getElementById('btnConfirmarAceite');
+    const aceitarForm = document.getElementById('aceitarTrocaForm');
+
+    aceitarModalEl?.addEventListener('show.bs.modal', (ev) => {
+      const btn = ev.relatedTarget;
+      const trocaId = btn?.getAttribute('data-troca-id');
+      const origemDesc = btn?.getAttribute('data-origem-desc') || '—';
+      const origemWeekday = parseInt(btn?.getAttribute('data-origem-weekday'));
+      const origemBucket = btn?.getAttribute('data-origem-bucket');
+
+      origemTrocaDescEl.textContent = origemDesc;
+      aceitarForm.action = `/trocas/${trocaId}/aceitar`;
+      destinoEscalaIdEl.value = '';
+      btnConfirmarAceite.disabled = true;
+
+      const base = Array.isArray(MY_ESCALA) ? MY_ESCALA : [];
+      const compativeis = base.filter(e => {
+        const bucket = e.turno_bucket || turnoBucket(e.turno, e.horario);
+        return e.weekday === origemWeekday && bucket === origemBucket;
+      });
+
+      minhaEscalaCompatListEl.innerHTML = '';
+      if (!compativeis.length) {
+        minhaEscalaCompatListEl.innerHTML = '<li class="list-group-item text-muted">Você não tem plantões compatíveis (mesmo dia da semana e turno).</li>';
+        return;
+      }
+
+      compativeis.forEach(e => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex align-items-center justify-content-between';
+        li.innerHTML = `
+          <div class="me-2">
+            <div class="fw-semibold">${e.data} • ${e.turno || ''} • ${e.horario || ''} • ${e.contrato || ''}</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary">Trocar com este</button>
+        `;
+        li.querySelector('button').addEventListener('click', () => {
+          destinoEscalaIdEl.value = e.id;
+          btnConfirmarAceite.disabled = false;
+          [...minhaEscalaCompatListEl.querySelectorAll('.list-group-item')].forEach(x => x.classList.remove('active'));
+          li.classList.add('active');
+        });
+        minhaEscalaCompatListEl.appendChild(li);
+      });
+    });
+
+    aceitarForm?.addEventListener('submit', (e) => {
+      if (!destinoEscalaIdEl.value) {
+        e.preventDefault();
+        alert('Escolha um plantão seu compatível para concluir a troca.');
+      }
+    });
+  </script>
+
+  <!-- JS: Avaliação (legado simples) -->
+  <script>
+    document.querySelectorAll('.avaliar-form').forEach(form => {
+      if (form.querySelector('.stars-group')) return;
+      const stars = Array.from(form.querySelectorAll('.star-btn'));
+      const input = form.querySelector('input[name="nota"]');
+      const submit = form.querySelector('button[type="submit"]');
+      stars.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const val = Number(btn.dataset.value);
+          input.value = val;
+          submit.disabled = false;
+          stars.forEach(b => {
+            const i = Number(b.dataset.value);
+            const icon = b.querySelector('i');
+            icon.className = 'bi ' + (i <= val ? 'bi-star-fill' : 'bi-star');
+          });
+        });
+      });
+      form.addEventListener('submit', (e) => {
+        if (!input.value) {
+          e.preventDefault();
+          alert('Selecione uma nota de 1 a 5.');
         }
-    ]
-    afetacao_json = {"linhas": linhas}
+      });
+    });
+  </script>
 
-    # estas duas linhas DEVEM ficar alinhadas aqui (sem indent extra)
-    solicitante_id = orig_e.cooperado_id
-    destino_id = dest_e.cooperado_id
+  <!-- JS: Avaliação (4 categorias) -->
+  <script>
+    document.querySelectorAll('.avaliar-form').forEach(form => {
+      if (!form.querySelector('.stars-group')) return;
+      const submitBtn = form.querySelector('button[type="submit"]');
 
-    # Faz a troca de fato
-    orig_e.cooperado_id = destino_id
-    dest_e.cooperado_id = solicitante_id
+      function setHidden(name, val){
+        const inp = form.querySelector(`input[name="${name}"]`);
+        if (inp) inp.value = String(val ?? '');
+      }
+      function getHidden(name){
+        const v = Number(form.querySelector(`input[name="${name}"]`)?.value || 0);
+        return Number.isFinite(v) ? v : 0;
+      }
+      function paintGroup(groupEl, val){
+        groupEl.querySelectorAll('button').forEach(btn=>{
+          const n = Number(btn.dataset.value);
+          const i = btn.querySelector('i');
+          i.className = 'bi ' + (n <= val ? 'bi-star-fill' : 'bi-star');
+        });
+      }
+      function roundHalf(x){ return Math.round(x*2)/2; }
+      function recalcGeral(){
+        const a = getHidden('av_apresentacao');
+        const b = getHidden('av_educacao');
+        const c = getHidden('av_eficiencia');
+        const filled = a && b && c;
+        const geral = filled ? roundHalf((a+b+c)/3) : 0;
+        const geralGroup = form.querySelector('.stars-group[data-field="av_geral"]');
+        if (geralGroup) paintGroup(geralGroup, geral);
+        setHidden('av_geral', geral ? geral.toFixed(1) : '');
+        setHidden('nota', geral ? String(Math.round(geral)) : '');
+        setHidden('av_pontualidade', geral ? String(Math.round(geral)) : '');
+        submitBtn.disabled = !filled;
+      }
 
-    # Marca como aprovada e anexa o JSON de afetação na mensagem
-    t.status = "aprovada"
-    t.aplicada_em = datetime.utcnow()
-    prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
-    t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps({"linhas": linhas}, ensure_ascii=False)
+      form.querySelectorAll('.stars-group').forEach(group => {
+        const readonly = group.getAttribute('data-readonly') === 'true';
+        const field = group.getAttribute('data-field');
+        if (readonly) return;
+        group.querySelectorAll('button').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const val = Number(btn.dataset.value);
+            paintGroup(group, val);
+            setHidden(field, val);
+            recalcGeral();
+          });
+        });
+      });
 
-    db.session.commit()
-    flash("Troca realizada com sucesso!", "success")
-    return redirect(url_for("portal_cooperado"))
+      submitBtn.disabled = true;
+    });
+  </script>
+
+  <!-- Lógica da CALCULADORA (com sinais visíveis e histórico apgável) -->
+  <script>
+    (function(){
+      const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
+      const LS_TAPE = `COOPEX_CALC_TAPE_${UID}`;
+
+      const statusEl = document.getElementById('calcStatus');
+      const display = document.getElementById('calcDisplay');
+      const tapeEl = document.getElementById('calcTape');
+      const btnTapeClear = document.getElementById('calcTapeClear');
+
+      const symbol = { plus: '+', minus: '−', multiply: '×', divide: '÷' };
+
+      let first = null, operator = null, waitingSecond = false, lastOp = null;
+
+      function fmt(n){
+        if (!Number.isFinite(n)) return 'Erro';
+        const s = String(n);
+        // evita "1.23000000001"
+        const num = Math.round(n * 1e12) / 1e12;
+        return (Number.isInteger(num) ? num.toString() : num.toString());
+      }
+      function updateDisplay(v){ display.textContent = (typeof v === 'string') ? v : fmt(v); }
+      function updateStatus(){
+        if (first !== null && operator){
+          statusEl.textContent = `${fmt(first)} ${symbol[operator]}`;
+        } else {
+          statusEl.innerHTML = '&nbsp;';
+        }
+      }
+      function getValue(){ return parseFloat(display.textContent.replace(',','.')) || 0; }
+
+      function inputDigit(d){
+        if (waitingSecond){ updateDisplay(d); waitingSecond=false; return; }
+        const cur = display.textContent;
+        updateDisplay(cur==='0' ? d : (cur + d));
+      }
+      function inputDot(){
+        if (waitingSecond){ updateDisplay('0.'); waitingSecond=false; return; }
+        if (!display.textContent.includes('.')) updateDisplay(display.textContent + '.');
+      }
+      function toggleSign(){ updateDisplay(-getValue()); }
+      function percent(){ updateDisplay(getValue() / 100); }
+      function backspace(){
+        if (waitingSecond) return;
+        const s = display.textContent;
+        if (s.length <= 1){ updateDisplay(0); return; }
+        updateDisplay(s.slice(0,-1));
+      }
+      function clearAll(){
+        first=null; operator=null; waitingSecond=false; lastOp=null;
+        updateDisplay(0); updateStatus();
+        document.querySelectorAll('#calcModal [data-op]').forEach(btn=>btn.classList.remove('k-active'));
+      }
+      function compute(a,b,op){
+        switch(op){
+          case 'plus': return a+b;
+          case 'minus': return a-b;
+          case 'multiply': return a*b;
+          case 'divide': return (b===0? NaN : a/b);
+          default: return b;
+        }
+      }
+      function setOperator(op){
+        const current = getValue();
+        if (first===null){ first = current; }
+        else if (!waitingSecond){
+          first = compute(first, current, operator);
+          updateDisplay(first);
+        }
+        operator = op; waitingSecond = true; lastOp = {op, b:null};
+        document.querySelectorAll('#calcModal [data-op]').forEach(btn=>btn.classList.toggle('k-active', btn.getAttribute('data-op')===op));
+        updateStatus();
+      }
+      function equal(){
+        const current = getValue();
+        if (!operator && lastOp && lastOp.op){
+          const resRepeat = compute(getValue(), lastOp.b ?? 0, lastOp.op);
+          addTape(getValue(), lastOp.op, lastOp.b ?? 0, resRepeat);
+          updateDisplay(resRepeat);
+          updateStatus();
+          return;
+        }
+        if (first!==null && operator){
+          if (lastOp) lastOp.b = current;
+          const res = compute(first, current, operator);
+          addTape(first, operator, current, res);
+          updateDisplay(res);
+          first = res; waitingSecond = true; operator=null;
+          document.querySelectorAll('#calcModal [data-op]').forEach(btn=>btn.classList.remove('k-active'));
+          updateStatus();
+        }
+      }
+
+      // Fita (histórico)
+      function loadTape(){ try{ const raw = localStorage.getItem(LS_TAPE); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr : []; }catch(_){ return []; } }
+      function saveTape(arr){ localStorage.setItem(LS_TAPE, JSON.stringify(arr)); }
+      function addTape(a,op,b,res){
+        const item = { ts: Date.now(), a, op, b, res };
+        const arr = loadTape(); arr.push(item); saveTape(arr); renderTape();
+      }
+      function renderTape(){
+        const arr = loadTape();
+        if (!tapeEl) return;
+        if (!arr.length){ tapeEl.innerHTML = '<div class="text-muted">Sem histórico.</div>'; return; }
+        tapeEl.innerHTML = '';
+        arr.slice().reverse().forEach((it, idxRev)=>{
+          const idx = arr.length - 1 - idxRev;
+          const row = document.createElement('div');
+          row.className = 'item';
+          row.innerHTML = `
+            <div class="expr">
+              ${fmt(it.a)} ${symbol[it.op]||'?'} ${fmt(it.b)} = <strong>${fmt(it.res)}</strong>
+            </div>
+            <div>
+              <button class="btn-del" title="Apagar" data-idx="${idx}">
+                <i class="bi bi-x-circle"></i>
+              </button>
+            </div>
+          `;
+          row.querySelector('.btn-del').addEventListener('click', ()=>{
+            const arr2 = loadTape(); arr2.splice(idx,1); saveTape(arr2); renderTape();
+          });
+          tapeEl.appendChild(row);
+        });
+      }
+      btnTapeClear?.addEventListener('click', ()=>{
+        if (confirm('Limpar todo o histórico da calculadora?')){
+          saveTape([]); renderTape();
+        }
+      });
+
+      // Bind dos botões
+      document.querySelectorAll('#calcModal .calc-btn').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const n=btn.getAttribute('data-num'), dot=btn.getAttribute('data-dot'), act=btn.getAttribute('data-act'), op=btn.getAttribute('data-op');
+          if (n) inputDigit(n);
+          else if (dot) inputDot();
+          else if (act==='ac') clearAll();
+          else if (act==='back') backspace();
+          else if (act==='sign') toggleSign();
+          else if (act==='percent') percent();
+          else if (act==='equal') equal();
+          else if (op) setOperator(op);
+        });
+      });
+
+      // Boot
+      updateDisplay(0); updateStatus(); renderTape();
+    })();
+  </script>
+
+  <script>
+(function(){
+  const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
+  const LS_KEY = `COOPEX_FIN_${UID}`;
+  const el = id => document.getElementById(id);
+  const monthFmt = (d)=> d.toISOString().slice(0,7);
+  const money = n => 'R$ ' + (Number(n)||0).toFixed(2).replace('.',',');
+  const parseNum = v => { const n=parseFloat(String(v).replace(',','.')); return Number.isFinite(n)?n:0; };
+
+  // UI refs
+  const mesEl = el('finMes');
+  const recSumEl = el('finRecSum'), despSumEl = el('finDespSum'), saldoEl = el('finSaldo');
+  const metaValorEl = el('finMetaValor'), metaPctEl = el('finMetaPct'), metaAlvoEl = el('finMetaAlvo'), guardadoEl = el('finGuardado'), metaProgEl = el('finMetaProg');
+  const tipoEl = el('finTipo'), dataEl = el('finData'), catEl = el('finCat'), valEl = el('finValor'), descEl = el('finDesc');
+  const parcSw = el('finParcSw'), parcWrap = el('finParcWrap'), parcIniEl = el('finParcIni'), parcNEl = el('finParcN'), parcPrevEl = el('finParcPreview');
+  const btnAdd = el('finAdd'), listaEl = el('finLista'), topCatsEl = el('finTopCats');
+  const btnClearMes = el('finClearMes'), btnExport = el('finExport'), btnDicas = el('finDicasBtn');
+
+  // Estado
+  let items = load();
+  let currentMonth = (()=>{
+    const today = new Date();
+    return monthFmt(today);
+  })();
+
+  // Storage
+  function load(){ try{ const raw = localStorage.getItem(LS_KEY); const arr = raw? JSON.parse(raw): []; return Array.isArray(arr)?arr:[]; }catch(_){ return []; } }
+  function save(){ localStorage.setItem(LS_KEY, JSON.stringify(items)); }
+
+  // Helpers
+  function nextMonth(ym, plus=1){ // ym: "YYYY-MM"
+    const [y,m]=ym.split('-').map(x=>parseInt(x,10));
+    const dt=new Date(y, m-1+plus, 1);
+    return dt.toISOString().slice(0,7);
+  }
+  function endOfMonth(ym){
+    const [y,m]=ym.split('-').map(x=>parseInt(x,10));
+    return new Date(y, m, 0).getDate();
+  }
+  function toDateStr(ym, day=1){
+    const [y,m]=ym.split('-').map(x=>parseInt(x,10));
+    const d = Math.min(day, endOfMonth(ym));
+    return new Date(y, m-1, d).toISOString().slice(0,10);
+  }
+  function uid(){ return Math.random().toString(36).slice(2)+Date.now().toString(36); }
+
+  // Boot inputs
+  mesEl.value = currentMonth;
+  dataEl.value = new Date().toISOString().slice(0,10);
+  parcIniEl.value = currentMonth;
+
+  // Parcelamento preview
+  function renderParcPreview(){
+    const n = Math.max(2, parseInt(parcNEl.value||'10',10));
+    const modo = document.querySelector('input[name="finParcModo"]:checked')?.value || 'valor';
+    const baseVal = parseNum(valEl.value);
+    const start = parcIniEl.value || currentMonth;
+    if (modo==='valor') {
+      parcPrevEl.textContent = `Serão ${n} parcelas de ${money(baseVal)} de ${start} até ${nextMonth(start, n-1)}.`;
+    } else {
+      parcPrevEl.textContent = `Valor total ${money(baseVal)} dividido em ${n} parcelas iguais — primeira em ${start}, última em ${nextMonth(start, n-1)}.`;
+    }
+  }
+
+  // Toggle parcelamento
+  parcSw.addEventListener('change', ()=> { parcWrap.style.display = parcSw.checked ? '' : 'none'; renderParcPreview(); });
+  ['input','change'].forEach(ev=>{
+    parcNEl.addEventListener(ev, renderParcPreview);
+    parcIniEl.addEventListener(ev, renderParcPreview);
+    valEl.addEventListener(ev, renderParcPreview);
+    document.querySelectorAll('input[name="finParcModo"]').forEach(r=> r.addEventListener(ev, renderParcPreview));
+  });
+
+  // CRUD
+  function addItem(obj){ items.push(obj); save(); refresh(); }
+  function removeItem(id){ items = items.filter(x=>x.id!==id); save(); refresh(); }
+
+  // Adicionar (simples ou parcelado)
+  btnAdd.addEventListener('click', ()=>{
+    const tipo = String(tipoEl.value||'despesa');
+    const data = String(dataEl.value||new Date().toISOString().slice(0,10));
+    const cat  = (catEl.value||'Geral').trim();
+    const val  = parseNum(valEl.value);
+    const desc = (descEl.value||'').trim();
+    if (!val || val<=0){ alert('Informe um valor válido.'); return; }
+
+    if (!parcSw.checked){
+      addItem({id:uid(), tipo, data, cat, val, desc, origem:'manual'});
+      clearForm(); return;
+    }
+
+    // Parcelado
+    const n = Math.max(2, parseInt(parcNEl.value||'10',10));
+    const modo = document.querySelector('input[name="finParcModo"]:checked')?.value || 'valor';
+    const startMonth = parcIniEl.value || currentMonth;
+    const day = parseInt(data.slice(-2),10) || 1;
+
+    if (modo==='valor'){
+      // baseVal = valor da parcela
+      const parcela = val;
+      for (let i=0;i<n;i++){
+        const ym = nextMonth(startMonth, i);
+        addItem({id:uid(), tipo, data: toDateStr(ym, day), cat, val: parcela, desc: `${desc} (parc ${i+1}/${n})`, origem:'parc_valor'});
+      }
+    } else {
+      // total dividido por N
+      const total = val;
+      const base = Math.floor((total/n)*100)/100; // 2 casas
+      const resto = +(total - base*n).toFixed(2);
+      for (let i=0;i<n;i++){
+        const ym = nextMonth(startMonth, i);
+        const parcVal = +(base + (i===n-1? resto:0)).toFixed(2);
+        addItem({id:uid(), tipo, data: toDateStr(ym, day), cat, val: parcVal, desc: `${desc} (parc ${i+1}/${n})`, origem:'parc_total'});
+      }
+    }
+    clearForm();
+  });
+
+  function clearForm(){
+    // Mantém tipo/categoria, zera valor/desc
+    valEl.value = '';
+    descEl.value = '';
+    parcSw.checked = false;
+    parcWrap.style.display = 'none';
+    renderParcPreview();
+  }
+
+  // Filtro por mês
+  mesEl.addEventListener('change', ()=>{ currentMonth = mesEl.value || currentMonth; refresh(); });
+
+  // Limpar mês
+  btnClearMes.addEventListener('click', ()=>{
+    if (!confirm('Remover todos os lançamentos deste mês?')) return;
+    const prefix = currentMonth + '-';
+    items = items.filter(x=> !String(x.data||'').startsWith(prefix));
+    save(); refresh();
+  });
+
+  // Export CSV (todos os meses)
+  btnExport.addEventListener('click', ()=>{
+    const header = ['id','tipo','data','categoria','valor','descricao','origem'];
+    const rows = items.map(x=>[
+      x.id, x.tipo, x.data, (x.cat||''), (Number(x.val)||0).toFixed(2).replace('.',','), (x.desc||'').replace(/[\r\n]+/g,' '), x.origem||''
+    ]);
+    const csv = [header.join(';'), ...rows.map(r=>r.join(';'))].join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'financas_coopex.csv';
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+
+  // Dicas
+  btnDicas?.addEventListener('click', ()=>{
+    const modal = new bootstrap.Modal(document.getElementById('finDicasModal'));
+    modal.show();
+  });
+
+  // Render geral
+  function refresh(){
+    // mês atual
+    const prefix = currentMonth + '-';
+    const mesItems = items.filter(x=> String(x.data||'').startsWith(prefix))
+                          .sort((a,b)=> a.data.localeCompare(b.data));
+
+    // Somas
+    const sum = (arr, pred)=> arr.filter(pred).reduce((s,x)=> s + Number(x.val||0), 0);
+    const rec = sum(mesItems, x=>x.tipo==='receita');
+    const desp = sum(mesItems, x=>x.tipo==='despesa');
+    const guardado = sum(mesItems, x=>x.tipo==='poupanca');
+    const saldo = rec - desp - guardado;
+
+    recSumEl.textContent = money(rec);
+    despSumEl.textContent = money(desp);
+    saldoEl.textContent = money(saldo);
+
+    // Meta (alvo = max(metaValor, metaPct de RECEITAS))
+    const alvoByValor = parseNum(metaValorEl.value);
+    const pct = Math.max(0, parseNum(metaPctEl.value));
+    const alvoByPct = rec * (pct/100);
+    const alvo = Math.max(alvoByValor, alvoByPct);
+    metaAlvoEl.textContent = money(alvo);
+    guardadoEl.textContent = money(guardado);
+    const prog = alvo>0 ? Math.min(100, Math.round((guardado/alvo)*100)) : 0;
+    metaProgEl.style.width = prog + '%';
+    metaProgEl.className = 'progress-bar ' + (prog>=100?'bg-success':'');
+    metaProgEl.setAttribute('aria-valuenow', prog);
+
+    // Lista do mês
+    renderList(mesItems);
+
+    // Top categorias (despesa)
+    const byCat = {};
+    mesItems.filter(x=>x.tipo==='despesa').forEach(x=>{
+      const c = (x.cat||'Geral').trim() || 'Geral';
+      byCat[c] = (byCat[c]||0) + Number(x.val||0);
+    });
+    const totalDesp = Object.values(byCat).reduce((a,b)=>a+b,0);
+    const top = Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    if (!top.length){ topCatsEl.innerHTML = '<div class="text-muted">Sem despesas neste mês.</div>'; }
+    else {
+      topCatsEl.innerHTML = top.map(([c,v])=>{
+        const p = totalDesp>0 ? Math.round((v/totalDesp)*100) : 0;
+        return `
+          <div class="mb-1">
+            <div class="d-flex justify-content-between">
+              <div>${c}</div><div class="mono">${money(v)} · ${p}%</div>
+            </div>
+            <div class="progress" style="height:8px"><div class="progress-bar" style="width:${p}%"></div></div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  function renderList(arr){
+    if (!arr.length){ listaEl.innerHTML = '<div class="text-muted">Sem lançamentos neste mês.</div>'; return; }
+    // Agrupa por dia
+    const groups = {};
+    arr.forEach(x=>{
+      const d = x.data;
+      (groups[d] ||= []).push(x);
+    });
+    const days = Object.keys(groups).sort();
+    listaEl.innerHTML = '';
+    days.forEach(d=>{
+      const items = groups[d];
+      const sumDia = items.reduce((s,x)=> s + (x.tipo==='receita'? x.val : x.tipo==='despesa'? -x.val : -x.val), 0);
+      const dayCard = document.createElement('div');
+      dayCard.className = 'border rounded p-2 mb-2';
+      dayCard.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <div class="fw-semibold">${d.split('-').reverse().join('/')}</div>
+          <div class="mono ${sumDia>=0?'text-success':'text-danger'}">${money(sumDia)}</div>
+        </div>
+        <div></div>
+      `;
+      const body = dayCard.children[1];
+      items.forEach(it=>{
+        const cls = it.tipo==='receita' ? 'text-success' : (it.tipo==='despesa' ? 'text-danger' : 'text-primary');
+        const sinal = it.tipo==='receita' ? '+' : '−';
+        const chip = it.tipo==='poupanca' ? '<span class="badge text-bg-primary ms-2">Poupança</span>' : '';
+        const row = document.createElement('div');
+        row.className = 'd-flex align-items-center justify-content-between py-1 border-bottom';
+        row.innerHTML = `
+          <div class="me-2">
+            <div class="fw-semibold">${(it.cat||'Geral')} ${chip}</div>
+            <div class="small text-muted">${(it.desc||'')}</div>
+          </div>
+          <div class="text-end">
+            <div class="mono ${cls}">${sinal} ${money(it.val)}</div>
+            <button class="btn btn-sm btn-outline-danger mt-1"><i class="bi bi-trash"></i></button>
+          </div>
+        `;
+        row.querySelector('button').addEventListener('click', ()=> removeItem(it.id));
+        body.appendChild(row);
+      });
+      listaEl.appendChild(dayCard);
+    });
+  }
+
+  // Listeners que alteram meta
+  [metaValorEl, metaPctEl].forEach(inp => inp.addEventListener('input', refresh));
+
+  // Primeira renderização
+  refresh();
+})();
+</script>
+
+  <!-- Lógica do CUSTO x BENEFÍCIO -->
+  <script>
+    (function(){
+      const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
+      const LS_KEY = `COOPEX_CXB_${UID}`;
+      const el = id => document.getElementById(id);
+      const preco = el('cxPreco'), kpl = el('cxKmPorLitro'), km = el('cxKmFeitos'), ganho = el('cxGanho');
+      const outCusto = el('cxCusto'), outCustoKm = el('cxCustoKm'), outLucro = el('cxLucro'), outLucroKm = el('cxLucroKm'), outMargem = el('cxMargem');
+      const btnSalvar = el('cxSalvar'), btnLimpar = el('cxLimpar'), divHist = el('cxHistorico');
+      const totKm = el('cxTotKm'), totGanho = el('cxTotGanho'), totCusto = el('cxTotCusto'), totLucro = el('cxTotLucro');
+      const btnCSV = el('cxExportCSV'), btnShare = el('cxShareSum');
+
+      function parseNum(v){ const n = parseFloat(String(v).replace(',','.')); return Number.isFinite(n) ? n : 0; }
+      function fmtMoney(n){ return 'R$ ' + (Number(n)||0).toFixed(2).replace('.',','); }
+      function fmtKm(n){ return String(Number(n)||0); }
+
+      function calc(){
+        const p = parseNum(preco.value), c = parseNum(kpl.value), k = parseNum(km.value), g = parseNum(ganho.value);
+        const litros = c>0 ? (k / c) : 0, custo = p * litros, custoKm = k>0 ? (custo / k) : 0;
+        const lucro = g - custo, lucroKm = k>0 ? (lucro / k) : 0, margem = g>0 ? (lucro / g) * 100 : 0;
+        outCusto.textContent = fmtMoney(custo);
+        outCustoKm.textContent = fmtMoney(custoKm) + '/km';
+        outLucro.textContent = fmtMoney(lucro);
+        outLucroKm.textContent = fmtMoney(lucroKm) + '/km';
+        outMargem.textContent = `${margem.toFixed(1).replace('.',',')}%`;
+        return {p, c, k, g, litros, custo, custoKm, lucro, lucroKm, margem};
+      }
+      [preco, kpl, km, ganho].forEach(inp => inp?.addEventListener('input', calc));
+
+      function loadHist(){ try{ const raw = localStorage.getItem(LS_KEY); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr : []; }catch(_){ return []; } }
+      function saveHist(arr){ localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
+
+      function renderHist(){
+        const arr = loadHist();
+        if (!arr.length){ divHist.innerHTML = '<div class="text-muted">Sem registros salvos.</div>'; setTotals(arr); return; }
+        divHist.innerHTML = '';
+        arr.slice().reverse().forEach((it, idxRev)=>{
+          const idx = arr.length - 1 - idxRev;
+          const card = document.createElement('div');
+          card.className = 'border rounded p-2 mb-2 cx-history-item';
+          card.setAttribute('data-idx', idx);
+          card.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <div class="fw-semibold">${new Date(it.ts).toLocaleString()}</div>
+                <div class="small text-muted">Gas: ${fmtMoney(it.p)} · Consumo: ${it.c} km/L · Km: ${it.k} · Ganhou: ${fmtMoney(it.g)}</div>
+              </div>
+              <div class="text-end">
+                <div><span class="badge text-bg-light">Lucro</span> <b class="mono">${fmtMoney(it.lucro)}</b></div>
+                <div class="small text-muted">Custo: ${fmtMoney(it.custo)} · Margem: ${it.margem.toFixed(1).replace('.',',')}%</div>
+                <div class="mt-1">
+                  <button class="btn btn-sm btn-outline-secondary me-1" data-act="fill"><i class="bi bi-box-arrow-in-down-left"></i></button>
+                  <button class="btn btn-sm btn-outline-danger" data-act="del"><i class="bi bi-trash"></i></button>
+                </div>
+              </div>
+            </div>
+          `;
+          card.addEventListener('click', (e)=>{
+            const act = e.target.closest('button')?.getAttribute('data-act');
+            if (act === 'fill'){ preco.value = it.p; kpl.value = it.c; km.value = it.k; ganho.value = it.g; calc(); }
+            else if (act === 'del'){ const arr2 = loadHist(); arr2.splice(idx,1); saveHist(arr2); renderHist(); }
+          });
+          divHist.appendChild(card);
+        });
+        setTotals(arr);
+      }
+      function setTotals(arr){
+        const sum = (a,f)=>a.reduce((s,x)=>s+Number(x[f]||0),0);
+        totKm.textContent = fmtKm(sum(arr,'k'));
+        totGanho.textContent = fmtMoney(sum(arr,'g'));
+        totCusto.textContent = fmtMoney(sum(arr,'custo'));
+        totLucro.textContent = fmtMoney(sum(arr,'lucro'));
+      }
+
+      btnSalvar?.addEventListener('click', ()=>{
+        const r = calc();
+        const item = { ts: Date.now(), p:r.p, c:r.c, k:r.k, g:r.g, litros:r.litros, custo:r.custo, custoKm:r.custoKm, lucro:r.lucro, lucroKm:r.lucroKm, margem:r.margem };
+        const arr = loadHist(); arr.push(item); saveHist(arr); renderHist();
+      });
+      btnLimpar?.addEventListener('click', ()=>{ if (confirm('Limpar todo o histórico?')){ saveHist([]); renderHist(); } });
+      btnCSV?.addEventListener('click', ()=>{
+        const arr = loadHist();
+        const header = ['data','preco','consumo_km_l','km','ganho','litros','custo','custo_km','lucro','lucro_km','margem_%'];
+        const rows = arr.map(x=>[ new Date(x.ts).toISOString(), x.p, x.c, x.k, x.g, x.litros, x.custo, x.custoKm, x.lucro, x.lucroKm, x.margem ]);
+        const csv = [header.join(','), ...rows.map(r=>r.join(','))].join('\n');
+        const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'}); const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'custo_beneficio.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      });
+      btnShare?.addEventListener('click', async ()=>{
+        const r = calc();
+        const text = `Custo x Benefício\nGasolina: ${fmtMoney(r.p)}\nConsumo: ${r.c} km/L\nKm: ${r.k}\nGanhou: ${fmtMoney(r.g)}\nCusto: ${fmtMoney(r.custo)}\nLucro: ${fmtMoney(r.lucro)}\nMargem: ${r.margem.toFixed(1).replace('.',',')}%`;
+        if (navigator.share){ try{ await navigator.share({title:'Custo x Benefício', text}); }catch(_){ } }
+        else { navigator.clipboard?.writeText(text); alert('Resumo copiado para a área de transferência.'); }
+      });
+
+      calc(); renderHist();
+    })();
+  </script>
+
+  <!-- Lógica do BLOCO DE NOTAS -->
+  <script>
+    (function(){
+      const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
+      const LS_NOTES = `COOPEX_NOTES_${UID}`;
+
+      const listEl = document.getElementById('notesList');
+      const titleEl = document.getElementById('ntTitle');
+      const contentEl = document.getElementById('ntContent');
+
+      const btnNew = document.getElementById('ntNew');
+      const btnDup = document.getElementById('ntDuplicate');
+      const btnPin = document.getElementById('ntPin');
+      const btnDel = document.getElementById('ntDelete');
+      const btnH1 = document.getElementById('ntH1');
+      const btnBullets = document.getElementById('ntBullets');
+      const btnChecklist = document.getElementById('ntChecklist');
+      const btnShare = document.getElementById('ntShare');
+      const btnExport = document.getElementById('ntExport');
+      const inpImport = document.getElementById('ntImport');
+      const btnPrint = document.getElementById('ntPrint');
+
+      let notes = [];
+      let currentId = null;
+
+      function uid(){ return Math.random().toString(36).slice(2)+Date.now().toString(36); }
+      function loadNotes(){ try{ const raw = localStorage.getItem(LS_NOTES); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr : []; }catch(_){ return []; } }
+      function saveNotes(){ localStorage.setItem(LS_NOTES, JSON.stringify(notes)); }
+      function noteIndex(id){ return notes.findIndex(n=>n.id===id); }
+      function now(){ return new Date().toISOString(); }
+      function humanTime(ts){ try{ return new Date(ts).toLocaleString(); }catch(_){ return ts || ''; } }
+      function firstText(html){ const tmp=document.createElement('div'); tmp.innerHTML=html||''; return (tmp.textContent||tmp.innerText||'').trim().replace(/\s+/g,' ').slice(0,120); }
+
+      function renderList(){
+        const ordered = notes.slice().sort((a,b)=>{ if ((b.pinned?1:0)!==(a.pinned?1:0)) return (b.pinned?1:0)-(a.pinned?1:0); return new Date(b.updated_at) - new Date(a.updated_at); });
+        listEl.innerHTML = '';
+        if (!ordered.length){ listEl.innerHTML = `<div class="p-3 text-muted">Nenhuma nota.</div>`; return; }
+        ordered.forEach(n=>{
+          const card = document.createElement('div');
+          card.className = 'note-card';
+          if (n.id===currentId) card.classList.add('active');
+          card.innerHTML = `
+            <div class="d-flex align-items-start justify-content-between">
+              <div class="me-2 flex-fill">
+                <div class="title">${n.title ? n.title : '(sem título)'} ${n.pinned?'<i class="bi bi-pin-angle-fill note-pin" title="Fixada"></i>':''}</div>
+                <div class="preview">${firstText(n.content)}</div>
+                <div class="time">${humanTime(n.updated_at)}</div>
+              </div>
+              <button class="btn btn-sm btn-light" data-open="${n.id}"><i class="bi bi-box-arrow-in-right"></i></button>
+            </div>
+          `;
+          card.addEventListener('click', (e)=>{ const id = e.target.closest('button')?.getAttribute('data-open') || n.id; setCurrent(id); });
+          listEl.appendChild(card);
+        });
+      }
+
+      function blankNote(){ return { id: uid(), title: '', content: '', pinned: false, created_at: now(), updated_at: now() }; }
+      function setCurrent(id){ const idx = noteIndex(id); if (idx<0) return; currentId=id; const n=notes[idx]; titleEl.value=n.title||''; contentEl.innerHTML=n.content||''; renderList(); }
+      function addNote(copyOfId=null){
+        let n = blankNote();
+        if (copyOfId){ const i = noteIndex(copyOfId); if (i>=0){ const src=notes[i]; n.title=(src.title||'')+' (cópia)'; n.content=src.content||''; } }
+        notes.push(n); saveNotes(); setCurrent(n.id); renderList(); titleEl.focus();
+      }
+      function deleteCurrent(){ if (!currentId) return; const idx = noteIndex(currentId); if (idx<0) return; notes.splice(idx,1); saveNotes(); currentId = notes[0]?.id || null; if (currentId){ setCurrent(currentId); } else { titleEl.value=''; contentEl.innerHTML=''; renderList(); } }
+      function togglePin(){ if (!currentId) return; const idx = noteIndex(currentId); if (idx<0) return; notes[idx].pinned=!notes[idx].pinned; notes[idx].updated_at=now(); saveNotes(); renderList(); }
+      function updateCurrent({title, content}){ if (!currentId) return; const idx = noteIndex(currentId); if (idx<0) return; if (typeof title==='string') notes[idx].title=title; if (typeof content==='string') notes[idx].content=content; notes[idx].updated_at=now(); saveNotes(); renderList(); }
+
+      // Toolbar helpers
+      function exec(cmd, val=null){ document.execCommand(cmd, false, val); contentEl.focus(); }
+      function makeH1(){ document.execCommand('formatBlock', false, 'h5'); contentEl.focus(); }
+      function makeBullets(){ exec('insertUnorderedList'); }
+      function makeChecklist(){
+        const sel = window.getSelection(); if (!sel || sel.rangeCount===0) return;
+        const range = sel.getRangeAt(0); const line = document.createElement('div'); line.textContent = '[ ] ';
+        range.insertNode(line); sel.removeAllRanges(); const r=document.createRange(); r.setStart(line, 1); r.collapse(true); sel.addRange(r); contentEl.focus();
+      }
+
+      function shareCurrent(){
+        const idx = noteIndex(currentId); if (idx<0) return; const n=notes[idx];
+        const text = `${n.title}\n\n${firstText(n.content)}\n\n— ${humanTime(n.updated_at)}`;
+        if (navigator.share){ navigator.share({title:n.title||'Nota', text}).catch(()=>{}); }
+        else { navigator.clipboard?.writeText(text); alert('Nota copiada para a área de transferência.'); }
+      }
+      function exportAll(){ const blob=new Blob([JSON.stringify(notes,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='coopex_notas.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
+      function importFromFile(file){
+        const reader=new FileReader();
+        reader.onload=()=>{ try{ const data=JSON.parse(reader.result); if(!Array.isArray(data)) throw new Error('formato inválido');
+          const byId=Object.fromEntries(notes.map(n=>[n.id,n])); data.forEach(n=>{ if(!n.id) n.id=uid(); byId[n.id]=n; });
+          notes=Object.values(byId); saveNotes(); currentId=notes[0]?.id||null; if(currentId) setCurrent(currentId); renderList(); alert('Importação concluída!');
+        }catch(e){ alert('Falha ao importar: arquivo inválido.'); } };
+        reader.readAsText(file);
+      }
+      function printCurrent(){
+        const idx = noteIndex(currentId); if (idx<0) return; const n=notes[idx]; const w=window.open('', '_blank', 'noopener'); if (!w) return;
+        w.document.write(`
+          <html><head><title>${n.title||'Nota'}</title>
+          <meta charset="utf-8">
+          <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+          </head><body class="p-4">
+            <h3>${n.title||'(sem título)'}</h3>
+            <div>${n.content||''}</div>
+            <hr><small class="text-muted">Atualizada: ${humanTime(n.updated_at)}</small>
+            <script>window.onload=()=>window.print();<\/script>
+          </body></html>
+        `); w.document.close();
+      }
+
+      // Eventos UI
+      const deb = (fn,ms=300)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; };
+      titleEl.addEventListener('input', deb(()=> updateCurrent({title:titleEl.value}), 200));
+      contentEl.addEventListener('input', deb(()=> updateCurrent({content:contentEl.innerHTML}), 200));
+
+      btnNew.addEventListener('click', ()=> addNote());
+      btnDup.addEventListener('click', ()=> currentId && addNote(currentId));
+      btnPin.addEventListener('click', togglePin);
+      btnDel.addEventListener('click', ()=>{ if (confirm('Apagar esta nota?')) deleteCurrent(); });
+
+      document.querySelectorAll('.notes-toolbar [data-cmd]').forEach(b=> b.addEventListener('click', ()=> exec(b.getAttribute('data-cmd'))));
+      btnH1.addEventListener('click', makeH1);
+      btnBullets.addEventListener('click', makeBullets);
+      btnChecklist.addEventListener('click', makeChecklist);
+
+      btnShare.addEventListener('click', shareCurrent);
+      btnExport.addEventListener('click', exportAll);
+      inpImport.addEventListener('change', ()=>{ const f=inpImport.files?.[0]; if (f) importFromFile(f); inpImport.value=''; });
+      btnPrint.addEventListener('click', printCurrent);
+
+      // Boot
+      notes = loadNotes();
+      if (!notes.length){ addNote(); }
+      else { currentId = notes[0].id; setCurrent(currentId); renderList(); }
+    })();
+  </script>
+</body>
+</html>
