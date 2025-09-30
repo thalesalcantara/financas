@@ -2368,6 +2368,13 @@ def upload_escala():
             coops_na_planilha.add(match.id)
         linhas_novas.append(payload)
 
+    
+    app.logger.info(
+        f"[UPLOAD ESCALA] linhas={len(linhas_novas)} "
+        f"sem_dono={sum(1 for r in linhas_novas if r['cooperado_id'] is None)} "
+        f"cooperados_reconhecidos={len(coops_na_planilha)}"
+    )
+    
     if not linhas_novas:
         flash("Nada importado: nenhum registro válido encontrado.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
@@ -2389,6 +2396,11 @@ def upload_escala():
                 c.ultima_atualizacao = datetime.now()
 
         db.session.commit()
+
+        # <-- Depois do commit: conta total e loga
+        total = db.session.query(func.count(Escala.id)).scalar()
+        app.logger.info(f"[UPLOAD ESCALA] commit OK. total_escalas={total} deleted={deleted}")
+    
         msg = (
             f"Escala importada. {len(linhas_novas)} linha(s) adicionada(s). "
             f"{deleted} escala(s) antigas removidas para {len(coops_na_planilha)} cooperado(s) reconhecido(s)."
@@ -2396,6 +2408,7 @@ def upload_escala():
         if total_linhas_planilha > 0 and len(linhas_novas) < total_linhas_planilha:
             msg += f" (Linhas processadas: {total_linhas_planilha})"
         flash(msg, "success")
+
     except Exception as e:
         db.session.rollback()
         flash(f"Erro ao importar a escala: {e}", "danger")
@@ -3736,6 +3749,22 @@ def marcar_todos_avisos_lidos_restaurante():
 # Main
 # =========================
 if __name__ == "__main__":
+app = Flask(__name__, static_folder="static", template_folder="templates")
+app.secret_key = ...
+app.config["SQLALCHEMY_DATABASE_URI"] = _build_db_uri()
+...
+db = SQLAlchemy(app)
+
+# >>> cole aqui (ou abaixo da seção "Rota raiz")
+@app.get("/_debug/db")
+def debug_db():
+    eng = db.session.get_bind()
+    return {
+        "dialect": eng.dialect.name,
+        "url": str(eng.url)[:80] + "...",
+        "has_dburl_env": bool(os.environ.get("DATABASE_URL")),
+    }
+
     with app.app_context():
         init_db()
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
