@@ -157,7 +157,7 @@ class AvaliacaoCooperado(db.Model):
     alerta_crise     = db.Column(db.Boolean, default=False)
     feedback_motoboy = db.Column(db.Text)
 
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
 
 class ReceitaCooperativa(db.Model):
