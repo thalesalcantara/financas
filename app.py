@@ -2908,7 +2908,7 @@ def admin_avisos():
         fixado     = bool(f.get("fixado"))
         ativo      = True
 
-        # Período (opcionais)
+        # Período (opcional)
         def _parse_dt(s):
             if not s:
                 return None
@@ -2925,49 +2925,48 @@ def admin_avisos():
         inicio_em = _parse_dt(f.get("inicio_em"))
         fim_em    = _parse_dt(f.get("fim_em"))
 
-        # Alcance
-        alcance = f.get("destino_tipo")  # 'cooperados' | 'restaurantes' | 'ambos' | (ou 'global')
+        # Alcance e seleções vindas do form
+        alcance  = f.get("destino_tipo")  # 'cooperados' | 'restaurantes' | 'ambos' | (ou 'global' se sua UI usar)
         coop_alc = f.get("coop_alcance") or f.get("coop_alcance_ambos")  # 'todos' | 'um' | 'lista'
         rest_alc = f.get("rest_alcance") or f.get("rest_alcance_ambos")  # 'todos' | 'lista'
 
         sel_coops = request.form.getlist("dest_cooperados[]") or request.form.getlist("dest_cooperados_ambos[]")
         sel_rests = request.form.getlist("dest_restaurantes[]") or request.form.getlist("dest_restaurantes_ambos[]")
 
-        # Helper: cria e persiste um Aviso
+        # Helper de criação
         def _criar_aviso(tipo, destino_cooperado_id=None, restaurantes_ids=None):
             a = Aviso(
                 titulo=titulo,
                 corpo=corpo,
                 tipo=tipo,  # 'global' | 'cooperado' | 'restaurante'
                 destino_cooperado_id=destino_cooperado_id,
-                prioridade=prioridade,
+                prioridade=("alta" if prioridade == "alta" else "normal"),
                 fixado=fixado,
                 ativo=ativo,
                 inicio_em=inicio_em,
                 fim_em=fim_em,
                 criado_por_id=session.get("user_id"),
             )
-            if restaurantes_ids is not None:
-                if restaurantes_ids:
-                    a.restaurantes = Restaurante.query.filter(
-                        Restaurante.id.in_(restaurantes_ids)
-                    ).all()
-                else:
-                    # lista vazia -> sem vínculo explícito (vale p/ todos no get_avisos_for_cooperado)
-                    a.restaurantes = []
+            # Para restaurantes: se restaurantes_ids vier vazio/None, não vincula a nenhum
+            # -> no filtro de exibição isso significa "vale para todos".
+            if restaurantes_ids:
+                a.restaurantes = Restaurante.query.filter(
+                    Restaurante.id.in_(restaurantes_ids)
+                ).all()
             db.session.add(a)
             return a
 
         criados = 0
 
-        # Global (se a UI mandar)
+        # 'global' direto (se a UI enviar esse valor)
         if alcance == "global":
-            _criar_aviso("global"); criados += 1
+            _criar_aviso("global")
+            criados += 1
 
         # Restaurantes
         if alcance in ("restaurantes", "ambos"):
             if rest_alc == "todos":
-                _criar_aviso("restaurante", restaurantes_ids=[])  # sem vínculo = todos
+                _criar_aviso("restaurante", restaurantes_ids=[])
                 criados += 1
             else:
                 ids = [int(x) for x in sel_rests if str(x).isdigit()]
@@ -2977,15 +2976,15 @@ def admin_avisos():
         # Cooperados
         if alcance in ("cooperados", "ambos"):
             if coop_alc == "todos":
-                _criar_aviso("cooperado", destino_cooperado_id=None)  # todos
+                _criar_aviso("cooperado", destino_cooperado_id=None)
                 criados += 1
             else:
                 ids = [int(x) for x in sel_coops if str(x).isdigit()]
-                if not ids and coop_alc == "um":
+                if not ids and (coop_alc == "um"):
                     cid = f.get("dest_cooperado_id")
                     if cid and str(cid).isdigit():
                         ids = [int(cid)]
-                for cid in ids:  # 1 aviso por cooperado (modelo é 1:1 no destino)
+                for cid in ids:
                     _criar_aviso("cooperado", destino_cooperado_id=cid)
                     criados += 1
 
@@ -2993,12 +2992,13 @@ def admin_avisos():
         flash(f"Aviso(s) publicado(s): {criados}.", "success")
         return redirect(url_for("admin_avisos"))
 
-    # GET
+    # GET: lista
     avisos = (Aviso.query
-              .order_by(Aviso.fixado.desc(),
-                        (Aviso.prioridade == "alta").desc(),
-                        Aviso.criado_em.desc())
-              .all())
+              .order_by(
+                  Aviso.fixado.desc(),
+                  (Aviso.prioridade == "alta").desc(),
+                  Aviso.criado_em.desc()
+              ).all())
     return render_template("admin_avisos.html",
                            avisos=avisos,
                            cooperados=cooperados,
