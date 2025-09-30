@@ -3063,8 +3063,6 @@ def admin_editar_aviso(aviso_id):
 @admin_required
 def admin_delete_aviso(aviso_id):
     a = Aviso.query.get_or_404(aviso_id)
-    # Apaga leituras associadas para manter integridade
-    AvisoLeitura.query.filter_by(aviso_id=aviso_id).delete()
     db.session.delete(a)
     db.session.commit()
     flash("Aviso removido.", "success")
