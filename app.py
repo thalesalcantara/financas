@@ -344,39 +344,220 @@ def init_db():
     except Exception:
         db.session.rollback()
 
+    # =========================
+# Helpers
+# =========================
+import os, re, json, unicodedata, difflib
+from datetime import date, datetime
+from functools import wraps
+from werkzeug.utils import secure_filename
+from flask import session, redirect, url_for
+from sqlalchemy import text as sa_text
+
+# (pressupõe que `app`, `db` e os Models abaixo já estejam definidos em outro lugar do arquivo)
+# Models usados aqui: Usuario, Config, Cooperado, Restaurante, Escala
+
+def _is_sqlite() -> bool:
+    try:
+        return db.session.get_bind().dialect.name == "sqlite"
+    except Exception:
+        return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
+
+def init_db():
+    """Executa migrações idempotentes na inicialização da aplicação."""
+    db.create_all()
+
+    # --- qtd_entregas em lancamentos ---
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(lancamentos);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "qtd_entregas" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE lancamentos ADD COLUMN qtd_entregas INTEGER"))
+                db.session.commit()
+        else:
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS lancamentos "
+                "ADD COLUMN IF NOT EXISTS qtd_entregas INTEGER"
+            ))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
     # --- cooperado_nome em escalas ---
     try:
-        cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-        colnames = {row[1] for row in cols}
-        if "cooperado_nome" not in colnames:
-            db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "cooperado_nome" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
+                db.session.commit()
+        else:
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS escalas "
+                "ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"
+            ))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
     # --- restaurante_id em escalas ---
     try:
-        cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-        colnames = {row[1] for row in cols}
-        if "restaurante_id" not in colnames:
-            db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "restaurante_id" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
+                db.session.commit()
+        else:
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS escalas "
+                "ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"
+            ))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # --- fotos em cooperados ---
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "foto_bytes" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_bytes BLOB"))
+            if "foto_mime" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_mime VARCHAR(100)"))
+            if "foto_filename" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_filename VARCHAR(255)"))
+            if "foto_url" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_url VARCHAR(255)"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"
+            ))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"
+            ))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"
+            ))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"
+            ))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # --- fotos em restaurantes ---
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "foto_bytes" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_bytes BLOB"))
+            if "foto_mime" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_mime VARCHAR(100)"))
+            if "foto_filename" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_filename VARCHAR(255)"))
+            if "foto_url" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_url VARCHAR(255)"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"
+            ))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"
+            ))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"
+            ))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"
+            ))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # --- tabela avaliacoes_restaurante (centralizado aqui) ---
+    try:
+        if _is_sqlite():
+            db.session.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS avaliacoes_restaurante (
+                  id INTEGER PRIMARY KEY,
+                  restaurante_id INTEGER NOT NULL,
+                  cooperado_id   INTEGER NOT NULL,
+                  lancamento_id  INTEGER UNIQUE,
+                  estrelas_geral INTEGER,
+                  estrelas_pontualidade INTEGER,
+                  estrelas_educacao INTEGER,
+                  estrelas_eficiencia INTEGER,
+                  estrelas_apresentacao INTEGER,
+                  comentario TEXT,
+                  media_ponderada REAL,
+                  sentimento TEXT,
+                  temas TEXT,
+                  alerta_crise INTEGER DEFAULT 0,
+                  criado_em TIMESTAMP
+                );
+            """))
+            db.session.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"
+            ))
+            db.session.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"
+            ))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS avaliacoes_restaurante (
+                  id SERIAL PRIMARY KEY,
+                  restaurante_id INTEGER NOT NULL,
+                  cooperado_id   INTEGER NOT NULL,
+                  lancamento_id  INTEGER UNIQUE,
+                  estrelas_geral INTEGER,
+                  estrelas_pontualidade INTEGER,
+                  estrelas_educacao INTEGER,
+                  estrelas_eficiencia INTEGER,
+                  estrelas_apresentacao INTEGER,
+                  comentario TEXT,
+                  media_ponderada DOUBLE PRECISION,
+                  sentimento VARCHAR(12),
+                  temas VARCHAR(255),
+                  alerta_crise BOOLEAN DEFAULT FALSE,
+                  criado_em TIMESTAMP
+                );
+            """))
+            db.session.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"
+            ))
+            db.session.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"
+            ))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
     # --- usuário admin + config padrão ---
-    if not Usuario.query.filter_by(tipo="admin").first():
-        admin = Usuario(usuario="coopex", tipo="admin", senha_hash="")
-        admin.set_password("coopex05289")
-        db.session.add(admin)
-        db.session.commit()
+    try:
+        if not Usuario.query.filter_by(tipo="admin").first():
+            admin = Usuario(usuario="coopex", tipo="admin", senha_hash="")
+            admin.set_password("coopex05289")
+            db.session.add(admin)
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
-    if not Config.query.get(1):
-        db.session.add(Config(id=1, salario_minimo=0.0))
-        db.session.commit()
+    try:
+        if not Config.query.get(1):
+            db.session.add(Config(id=1, salario_minimo=0.0))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
-def get_config() -> Config:
+def get_config() -> "Config":
     cfg = Config.query.get(1)
     if not cfg:
         cfg = Config(id=1, salario_minimo=0.0)
@@ -395,7 +576,6 @@ def role_required(role: str):
         return wrapper
     return deco
 
-
 def admin_required(fn):
     return role_required("admin")(fn)
 
@@ -406,7 +586,6 @@ def _normalize_name(s: str) -> list[str]:
     s = re.sub(r"[^a-zA-Z0-9\s]", " ", s)
     parts = [p.lower() for p in s.split() if p.strip()]
     return parts
-
 
 def _match_restaurante_id(contrato_txt: str) -> int | None:
     alvo = " ".join(_normalize_name(contrato_txt or ""))
@@ -431,8 +610,7 @@ def _match_restaurante_id(contrato_txt: str) -> int | None:
         pass
     return None
 
-
-def _match_cooperado_by_name(nome_planilha: str, cooperados: list[Cooperado]) -> Cooperado | None:
+def _match_cooperado_by_name(nome_planilha: str, cooperados: list["Cooperado"]) -> "Cooperado | None":
     def norm_join(s: str) -> str:
         return " ".join(_normalize_name(s))
 
@@ -471,13 +649,11 @@ def _match_cooperado_by_name(nome_planilha: str, cooperados: list[Cooperado]) ->
                 return c
     return None
 
-
-def _build_docinfo(c: Cooperado) -> dict:
+def _build_docinfo(c: "Cooperado") -> dict:
     today = date.today()
     cnh_ok = (c.cnh_validade is not None and c.cnh_validade >= today)
     placa_ok = (c.placa_validade is not None and c.placa_validade >= today)
     return {"cnh": {"ok": cnh_ok}, "placa": {"ok": placa_ok}}
-
 
 def _save_upload(file_storage) -> str | None:
     # Mantido para compatibilidade com outras partes do app (ex.: uploads de xlsx)
@@ -490,6 +666,26 @@ def _save_upload(file_storage) -> str | None:
     file_storage.save(path)
     return f"/static/uploads/{fname}"
 
+def _save_foto_to_db(entidade, file_storage, *, is_cooperado: bool) -> str | None:
+    """
+    Salva o arquivo no banco (bytea/Blob) e retorna URL interna (/media/coop/<id> ou /media/rest/<id>)
+    já com versionamento (?v=timestamp) para bust de cache.
+    """
+    if not file_storage or not file_storage.filename:
+        return getattr(entidade, "foto_url", None)
+    data = file_storage.read()
+    if not data:
+        return getattr(entidade, "foto_url", None)
+    entidade.foto_bytes = data
+    entidade.foto_mime = (file_storage.mimetype or "application/octet-stream")
+    entidade.foto_filename = secure_filename(file_storage.filename)
+    db.session.flush()  # garante ID
+    if is_cooperado:
+        url = url_for("media_coop", coop_id=entidade.id)
+    else:
+        url = url_for("media_rest", rest_id=entidade.id)
+    entidade.foto_url = f"{url}?v={int(datetime.utcnow().timestamp())}"
+    return entidade.foto_url
 
 def _prox_ocorrencia_anual(dt: date | None) -> date | None:
     if not dt:
@@ -500,7 +696,6 @@ def _prox_ocorrencia_anual(dt: date | None) -> date | None:
         alvo = date(hoje.year + 1, dt.month, dt.day)
     return alvo
 
-
 def _parse_date(s: str | None) -> date | None:
     if not s:
         return None
@@ -510,7 +705,6 @@ def _parse_date(s: str | None) -> date | None:
         except Exception:
             pass
     return None
-
 
 def _dow(dt: date) -> str:
     return str((dt.weekday() % 7) + 1)
@@ -571,7 +765,7 @@ def _turno_bucket(turno: str | None, horario: str | None) -> str:
         return "noite" if (h >= 17 or h <= 6) else "dia"
     return "dia"
 
-def _escala_label(e: Escala | None) -> str:
+def _escala_label(e: "Escala | None") -> str:
     if not e:
         return "—"
     wd = _weekday_from_data_str(e.data)
@@ -587,7 +781,7 @@ def _escala_label(e: Escala | None) -> str:
     parts = [x for x in [data_txt, turno_txt, horario_txt, contrato_txt] if x]
     return " • ".join(parts)
 
-def _carry_forward_contrato(escalas: list[Escala]) -> dict[int, str]:
+def _carry_forward_contrato(escalas: list["Escala"]) -> dict[int, str]:
     eff = {}
     atual = ""
     for e in escalas:
@@ -608,7 +802,7 @@ def _parse_linhas_from_msg(msg: str | None) -> list[dict]:
         payload = json.loads(raw)
     except Exception:
         try:
-            payload = json.loads(raw.replace("'", '"'))
+            payload = json.loads(raw.replace("'", '\"'))
         except Exception:
             return []
     linhas = payload.get("linhas") or payload.get("rows") or []
@@ -667,8 +861,9 @@ def to_css_color(v: str) -> str:
     }
     return mapa.get(t_low, t)
 
+
 # =========================
-# Rota raiz
+# Rota raiz (SEM migração aqui!)
 # =========================
 @app.route("/")
 def index():
@@ -685,113 +880,13 @@ def index():
     if u.tipo == "restaurante":
         return redirect(url_for("portal_restaurante"))
     return redirect(url_for("login"))
-    
-    # --- fotos no banco (cooperados/restaurantes) ---
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "foto_bytes" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_bytes BLOB"))
-            if "foto_mime" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_mime VARCHAR(100)"))
-            if "foto_filename" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_filename VARCHAR(255)"))
-            if "foto_url" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_url VARCHAR(255)"))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
-   
-        # --- tabela avaliacoes_restaurante (se não existir) ---
-    try:
-        if _is_sqlite():
-            db.session.execute(sa_text("""
-                CREATE TABLE IF NOT EXISTS avaliacoes_restaurante (
-                  id INTEGER PRIMARY KEY,
-                  restaurante_id INTEGER NOT NULL,
-                  cooperado_id   INTEGER NOT NULL,
-                  lancamento_id  INTEGER UNIQUE,
-                  estrelas_geral INTEGER,
-                  estrelas_pontualidade INTEGER,
-                  estrelas_educacao INTEGER,
-                  estrelas_eficiencia INTEGER,
-                  estrelas_apresentacao INTEGER,
-                  comentario TEXT,
-                  media_ponderada REAL,
-                  sentimento TEXT,
-                  temas TEXT,
-                  alerta_crise INTEGER DEFAULT 0,
-                  criado_em TIMESTAMP
-                );
-            """))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text("""
-                CREATE TABLE IF NOT EXISTS avaliacoes_restaurante (
-                  id SERIAL PRIMARY KEY,
-                  restaurante_id INTEGER NOT NULL,
-                  cooperado_id   INTEGER NOT NULL,
-                  lancamento_id  INTEGER UNIQUE,
-                  estrelas_geral INTEGER,
-                  estrelas_pontualidade INTEGER,
-                  estrelas_educacao INTEGER,
-                  estrelas_eficiencia INTEGER,
-                  estrelas_apresentacao INTEGER,
-                  comentario TEXT,
-                  media_ponderada DOUBLE PRECISION,
-                  sentimento VARCHAR(12),
-                  temas VARCHAR(255),
-                  alerta_crise BOOLEAN DEFAULT FALSE,
-                  criado_em TIMESTAMP
-                );
-            """))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
 
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "foto_bytes" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_bytes BLOB"))
-            if "foto_mime" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_mime VARCHAR(100)"))
-            if "foto_filename" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_filename VARCHAR(255)"))
-            if "foto_url" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_url VARCHAR(255)"))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
 
-    # --- usuário admin + config padrão ---
-    if not Usuario.query.filter_by(tipo="admin").first():
-        admin = Usuario(usuario="coopex", tipo="admin", senha_hash="")
-        admin.set_password("coopex05289")
-        db.session.add(admin)
-        db.session.commit()
-
-    if not Config.query.get(1):
-        db.session.add(Config(id=1, salario_minimo=0.0))
-        db.session.commit()
+# =========================
+# Inicialização de banco na importação do módulo
+# =========================
+with app.app_context():
+    init_db()
 
 
 def get_config() -> Config:
