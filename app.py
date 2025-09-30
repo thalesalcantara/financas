@@ -117,48 +117,103 @@ class Restaurante(db.Model):
     foto_url = db.Column(db.String(255))
 
 
+# models.py
+from datetime import datetime
+from app import db
+
 class Lancamento(db.Model):
     __tablename__ = "lancamentos"
     id = db.Column(db.Integer, primary_key=True)
     restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False)
-    cooperado_id = db.Column(db.Integer, db.ForeignKey("cooperados.id"), nullable=False)
+    cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),   nullable=False)
+
     restaurante = db.relationship("Restaurante")
-    cooperado = db.relationship("Cooperado")
-    descricao = db.Column(db.String(200))
-    valor = db.Column(db.Float, default=0.0)
-    data = db.Column(db.Date)
+    cooperado   = db.relationship("Cooperado")
+
+    descricao   = db.Column(db.String(200))
+    valor       = db.Column(db.Float, default=0.0)
+    data        = db.Column(db.Date)
     hora_inicio = db.Column(db.String(10))
-    hora_fim = db.Column(db.String(10))
-    # opcional: quantidade de entregas
+    hora_fim    = db.Column(db.String(10))
     qtd_entregas = db.Column(db.Integer)
 
-# === AVALIAÇÕES DE COOPERADO (NOVO) =========================================
+    # Relacionamentos para permitir cascade no ORM:
+    avaliacoes_cooperado = db.relationship(
+        "AvaliacaoCooperado",
+        backref="lancamento",
+        cascade="all, delete-orphan",
+        passive_deletes=True,   # respeita ON DELETE CASCADE no banco
+    )
+
+    # Se você também tem AvaliacaoRestaurante (pelos logs, tem):
+    avaliacoes_restaurante = db.relationship(
+        "AvaliacaoRestaurante",
+        backref="lancamento",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
 class AvaliacaoCooperado(db.Model):
-    __tablename__ = "avaliacoes"
+    __tablename__ = "avaliacoes"   # sua tabela atual
     id = db.Column(db.Integer, primary_key=True)
 
     restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False)
-    cooperado_id    = db.Column(db.Integer, db.ForeignKey("cooperados.id"),  nullable=False)
-    lancamento_id   = db.Column(db.Integer, db.ForeignKey("lancamentos.id"))
+    cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),  nullable=False)
+
+    # >>> CASCADE na FK para lancamentos <<<
+    lancamento_id  = db.Column(
+        db.Integer,
+        db.ForeignKey("lancamentos.id", ondelete="CASCADE"),
+        index=True
+    )
 
     # notas 1..5
     estrelas_geral         = db.Column(db.Integer)
     estrelas_pontualidade  = db.Column(db.Integer)
     estrelas_educacao      = db.Column(db.Integer)
     estrelas_eficiencia    = db.Column(db.Integer)
-    estrelas_apresentacao  = db.Column(db.Integer)  # "Bem apresentado"
+    estrelas_apresentacao  = db.Column(db.Integer)
 
     comentario       = db.Column(db.Text)
 
     # IA/heurísticas
     media_ponderada  = db.Column(db.Float)
     sentimento       = db.Column(db.String(12))     # positivo | neutro | negativo
-    temas            = db.Column(db.String(255))    # palavras-chave resumidas
+    temas            = db.Column(db.String(255))
     alerta_crise     = db.Column(db.Boolean, default=False)
     feedback_motoboy = db.Column(db.Text)
 
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
+
+# Se o seu projeto também usa essa tabela (apareceu no log do erro):
+class AvaliacaoRestaurante(db.Model):
+    __tablename__ = "avaliacoes_restaurante"
+    id = db.Column(db.Integer, primary_key=True)
+
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False)
+    cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),  nullable=False)
+
+    # >>> CASCADE aqui também, é ela que quebrou no log <<<
+    lancamento_id  = db.Column(
+        db.Integer,
+        db.ForeignKey("lancamentos.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    estrelas_geral        = db.Column(db.Integer)
+    estrelas_pontualidade = db.Column(db.Integer)
+    estrelas_educacao     = db.Column(db.Integer)
+    estrelas_eficiencia   = db.Column(db.Integer)
+    estrelas_apresentacao = db.Column(db.Integer)
+    comentario            = db.Column(db.Text)
+    media_ponderada       = db.Column(db.Float)
+    sentimento            = db.Column(db.String(50))
+    temas                 = db.Column(db.String(255))
+    alerta_crise          = db.Column(db.Boolean, default=False)
+    criado_em             = db.Column(db.DateTime, default=datetime.utcnow)
 
 class ReceitaCooperativa(db.Model):
     __tablename__ = "receitas_coop"
@@ -304,81 +359,18 @@ class AvisoLeitura(db.Model):
     __table_args__ = (db.UniqueConstraint("aviso_id", "cooperado_id", "restaurante_id", name="uq_aviso_dest"), )
 
 
-# =========================
-# Helpers
-# =========================
-def _is_sqlite() -> bool:
-    try:
-        return db.session.get_bind().dialect.name == "sqlite"
-    except Exception:
-        return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
-
 def init_db():
     db.create_all()
+
+    # --- qtd_entregas em lancamentos ---
     try:
-        if _is_sqlite():
-            # lancamentos.qtd_entregas
-            cols = db.session.execute(sa_text("PRAGMA table_info(lancamentos);")).fetchall()
-            names = {r[1] for r in cols}
-            if "qtd_entregas" not in names:
-                db.session.execute(sa_text("ALTER TABLE lancamentos ADD COLUMN qtd_entregas INTEGER"))
-
-            # escalas.cooperado_nome / restaurante_id
-            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-            names = {r[1] for r in cols}
-            if "cooperado_nome" not in names:
-                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
-            if "restaurante_id" not in names:
-                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
-
-            # fotos em cooperados
-            cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
-            names = {r[1] for r in cols}
-            if "foto_bytes" not in names:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_bytes BLOB"))
-            if "foto_mime" not in names:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_mime VARCHAR(100)"))
-            if "foto_filename" not in names:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_filename VARCHAR(255)"))
-            if "foto_url" not in names:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_url VARCHAR(255)"))
-
-            # fotos em restaurantes
-            cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
-            names = {r[1] for r in cols}
-            if "foto_bytes" not in names:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_bytes BLOB"))
-            if "foto_mime" not in names:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_mime VARCHAR(100)"))
-            if "foto_filename" not in names:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_filename VARCHAR(255)"))
-            if "foto_url" not in names:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_url VARCHAR(255)"))
-        else:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS lancamentos  ADD COLUMN IF NOT EXISTS qtd_entregas INTEGER"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS escalas      ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS escalas      ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados   ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados   ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados   ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS cooperados   ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
-        db.session.commit()
+        cols = db.session.execute(sa_text("PRAGMA table_info(lancamentos);")).fetchall()
+        colnames = {row[1] for row in cols}
+        if "qtd_entregas" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE lancamentos ADD COLUMN qtd_entregas INTEGER"))
+            db.session.commit()
     except Exception:
         db.session.rollback()
-
-    # seeds
-    if not Usuario.query.filter_by(tipo="admin").first():
-        admin = Usuario(usuario="coopex", tipo="admin", senha_hash="")
-        admin.set_password("coopex05289")
-        db.session.add(admin)
-        db.session.commit()
-    if not Config.query.get(1):
-        db.session.add(Config(id=1, salario_minimo=0.0))
-        db.session.commit()
 
     # --- cooperado_nome em escalas ---
     try:
@@ -701,8 +693,26 @@ def to_css_color(v: str) -> str:
         "branco": "white", "laranja": "orange", "roxo": "purple",
     }
     return mapa.get(t_low, t)
-    
 
+# =========================
+# Rota raiz
+# =========================
+@app.route("/")
+def index():
+    uid = session.get("user_id")
+    if not uid:
+        return redirect(url_for("login"))
+    u = Usuario.query.get(uid)
+    if not u:
+        return redirect(url_for("login"))
+    if u.tipo == "admin":
+        return redirect(url_for("admin_dashboard"))
+    if u.tipo == "cooperado":
+        return redirect(url_for("portal_cooperado"))
+    if u.tipo == "restaurante":
+        return redirect(url_for("portal_restaurante"))
+    return redirect(url_for("login"))
+    
     # --- fotos no banco (cooperados/restaurantes) ---
     try:
         if _is_sqlite():
@@ -3883,45 +3893,48 @@ def editar_lancamento(id):
 # =========================
 # Excluir lançamento (corrigindo FK)
 # =========================
+# app.py (imports no topo)
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text as sa_text
+from flask import current_app, flash, redirect, url_for, abort, session
+
 @app.get("/lancamentos/<int:id>/excluir")
 @role_required("restaurante")
 def excluir_lancamento(id):
     u_id = session.get("user_id")
     rest = Restaurante.query.filter_by(usuario_id=u_id).first()
     l = Lancamento.query.get_or_404(id)
+
     if not rest or l.restaurante_id != rest.id:
         abort(403)
 
-    # 1) Tenta apagar via ORM (se o modelo de avaliação existir)
-    deleted_by_orm = False
     try:
-        # ajuste o nome do modelo abaixo caso seja diferente
-        AvaliacaoCooperado.query.filter_by(
-            lancamento_id=id, restaurante_id=rest.id
-        ).delete(synchronize_session=False)
-        deleted_by_orm = True
-    except NameError:
-        pass
+        # 1) Tenta apagar avaliações via ORM se os modelos existirem
+        try:
+            AvaliacaoCooperado.query.filter_by(lancamento_id=id).delete(synchronize_session=False)
+        except NameError:
+            pass
 
-    # 2) Como fallback, apaga via SQL bruto (tabela do log: "avaliacoes_restaurante")
-    if not deleted_by_orm:
-        db.session.execute(sa_text(
-            "DELETE FROM avaliacoes_restaurante WHERE lancamento_id = :lid AND restaurante_id = :rid"
-        ), {"lid": id, "rid": rest.id})
+        try:
+            AvaliacaoRestaurante.query.filter_by(lancamento_id=id).delete(synchronize_session=False)
+        except NameError:
+            pass
 
-    # 3) Agora pode remover o lançamento
-    db.session.delete(l)
-    db.session.commit()
-    flash("Lançamento excluído.", "success")
+        # 2) Fallback por SQL bruto (caso os modelos não existam no código atual)
+        db.session.execute(sa_text("DELETE FROM avaliacoes WHERE lancamento_id = :lid"), {"lid": id})
+        db.session.execute(sa_text("DELETE FROM avaliacoes_restaurante WHERE lancamento_id = :lid"), {"lid": id})
+
+        # 3) Agora remove o lançamento
+        db.session.delete(l)
+        db.session.commit()
+        flash("Lançamento excluído.", "success")
+
+    except IntegrityError as e:
+        db.session.rollback()
+        current_app.logger.exception(e)
+        flash("Não foi possível excluir: há vínculos que impedem a remoção.", "danger")
+
     return redirect(url_for("portal_restaurante"))
-    
-
-# Listar / enviar documentos (placeholder simples)
-@app.get("/admin/documentos", endpoint="admin_documentos")
-@admin_required
-def admin_documentos():
-    docs = Documento.query.order_by(Documento.criado_em.desc()).all() if hasattr(Documento, "criado_em") else Documento.query.all()
-    return render_template("admin_documentos.html", documentos=docs)
 
 
 @app.get("/admin/documentos/<int:doc_id>/delete")
