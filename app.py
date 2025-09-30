@@ -794,12 +794,22 @@ def _strip_afetacao_blob(msg: str | None) -> str:
     if not msg:
         return ""
     return re.sub(r"__AFETACAO_JSON__\s*[:=]\s*\{.*\}\s*$", "", str(msg), flags=re.DOTALL).strip()
+# --- Helpers de normalização (usados no portal_restaurante) ---
+import unicodedata as _u  # deixe junto dos outros imports
+import re
 
 def _norm(s: str) -> str:
-    s = unicodedata.normalize("NFD", str(s or "").strip().lower())
-    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
-    s = re.sub(r"[^a-z0-9]+", " ", s).strip()
+    """Normaliza para comparação: minúsculas, sem acento e com espaços colapsados."""
+    s = _u.normalize("NFD", str(s or "").lower())
+    s = "".join(c for c in s if _u.category(c) != "Mn")  # remove acentos
+    s = re.sub(r"\s+", " ", s).strip()
     return s
+
+def _normalize_name(s: str):
+    """Quebra em tokens normalizados (usado no match de contrato/estabelecimento)."""
+    base = _norm(s)
+    return [t for t in re.split(r"[^\w]+", base) if t]
+
 
 def to_css_color(v: str) -> str:
     t = str(v or "").strip()
