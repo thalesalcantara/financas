@@ -2750,83 +2750,164 @@ def ratear_beneficios():
     return redirect(url_for("admin_dashboard", tab="beneficios"))
 
 # =========================
-# Escalas — Upload
+# Upload de Escala (Admin)
 # =========================
 @app.post("/upload/escala")
-@role_required("admin")
+@admin_required
 def upload_escala():
+    """
+    Aceita .xlsx (openpyxl) e .csv.
+    Colunas reconhecidas (case-insensitive, nomes flexíveis):
+      - data (ou dt), dia_semana (1..7 ou seg..dom), turno, horario (ou hora),
+        contrato, estabelecimento (ou unidade/setor/local),
+        cooperado_id, cooperado_nome, cor.
+    """
+    arq = request.files.get("arquivo")
+    if not arq or not arq.filename:
+        flash("Selecione um arquivo de escala (.xlsx ou .csv).", "warning")
+        return redirect(url_for("admin", tab="escalas"))
+
+    fname = arq.filename.lower()
+    ext_ok = fname.endswith(".xlsx") or fname.endswith(".csv")
+    if not ext_ok:
+        flash("Formato inválido. Envie .xlsx ou .csv", "danger")
+        return redirect(url_for("admin", tab="escalas"))
+
+    # Helpers de parsing
+    import io, csv
     from openpyxl import load_workbook
-    file = request.files.get("file")
-    if not file:
-        flash("Selecione um .xlsx", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    def _norm(s):
+    def _norm(s):  # normaliza cabeçalhos
         import unicodedata, re
-        s = (s or "").strip().lower()
-        s = "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
-        return re.sub(r"\s+", " ", s)
+        s = (s or "").strip()
+        s = unicodedata.normalize("NFD", s)
+        s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+        s = s.lower()
+        s = re.sub(r"[^\w]+", "_", s)
+        return s.strip("_")
 
-    # cache p/ match rápido
-    coops = { _norm(c.nome): c for c in Cooperado.query.all() }
-    rests = { _norm(r.nome): r for r in Restaurante.query.all() }
+    # mapeia cabeçalhos conhecidos -> campo do modelo
+    HEAD_MAP = {
+        "data": "data", "dt": "data", "dia": "dia_semana", "dia_semana": "dia_semana", "dow": "dia_semana",
+        "turno": "turno",
+        "horario": "horario", "hora": "horario", "hora_inicio_fim": "horario",
+        "contrato": "contrato",
+        "estabelecimento": "estabelecimento", "unidade": "estabelecimento", "setor": "estabelecimento", "local":"estabelecimento",
+        "cooperado_id": "cooperado_id", "id_cooperado": "cooperado_id",
+        "cooperado": "cooperado_nome", "cooperado_nome": "cooperado_nome", "nome": "cooperado_nome",
+        "cor": "cor", "cor_linha": "cor",
+    }
 
-    wb = load_workbook(file, data_only=True)
-    ws = wb.active
+    # lê linhas genéricas
+    rows = []
+    try:
+        if fname.endswith(".xlsx"):
+            wb = load_workbook(filename=io.BytesIO(arq.read()), data_only=True)
+            ws = wb.active
+            headers = [ _norm(str(c.value)) for c in next(ws.iter_rows(min_row=1, max_row=1)) ]
+            idx = {i: HEAD_MAP.get(h, h) for i, h in enumerate(headers)}
+            for r in ws.iter_rows(min_row=2, values_only=True):
+                row = {}
+                for i, v in enumerate(r):
+                    k = idx.get(i)
+                    if not k: 
+                        continue
+                    row[k] = v if v is not None else ""
+                rows.append(row)
+        else:
+            data = arq.read().decode("utf-8-sig", errors="ignore")
+            reader = csv.reader(io.StringIO(data))
+            raw_headers = next(reader, [])
+            headers = [_norm(h) for h in raw_headers]
+            idx = {i: HEAD_MAP.get(h, h) for i, h in enumerate(headers)}
+            for r in reader:
+                row = {}
+                for i, v in enumerate(r):
+                    k = idx.get(i)
+                    if not k:
+                        continue
+                    row[k] = v
+                rows.append(row)
+    except Exception as e:
+        flash(f"Falha ao ler o arquivo: {e}", "danger")
+        return redirect(url_for("admin", tab="escalas"))
 
-    # tenta header por nome; aceita variações
-    header = [str(c.value or "").strip() for c in next(ws.iter_rows(min_row=1, max_row=1))]
-    idx = { _norm(h): i for i, h in enumerate(header) }
-    def col(*alts):
-        for a in alts:
-            k = _norm(a)
-            if k in idx: return idx[k]
+    if not rows:
+        flash("Nenhuma linha encontrada na planilha.", "warning")
+        return redirect(url_for("admin", tab="escalas"))
+
+    # Normaliza e grava
+    import math
+    def _to_int(x):
+        try:
+            if x is None or x == "": return None
+            if isinstance(x, float) and math.isnan(x): return None
+            return int(str(x).strip())
+        except Exception:
+            return None
+
+    def _to_str(x):
+        return (str(x).strip() if x is not None else "")
+
+    def _to_date_any(x):
+        if not x: return None
+        if isinstance(x, date): return x
+        if isinstance(x, datetime): return x.date()
+        sx = str(x).strip()
+        # tenta ISO e BR
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+            try:
+                return datetime.strptime(sx, fmt).date()
+            except Exception:
+                pass
         return None
 
-    ci_contrato = col("contrato","restaurante","unidade","setor")
-    ci_data     = col("data","dia","date")
-    ci_turno    = col("turno","periodo","shift")
-    ci_horario  = col("horario","horário","hora")
-    ci_nome     = col("cooperado","nome","motorista")
-    ci_cor      = col("cor","color","bg")
+    def _weekday_from_any(v):
+        if v is None or v == "": return None
+        sx = str(v).strip().lower()
+        MAP = {
+            "1":0,"2":1,"3":2,"4":3,"5":4,"6":5,"7":6,
+            "seg":0,"segunda":0,
+            "ter":1,"terça":1,"terca":1,
+            "qua":2,"quarta":2,
+            "qui":3,"quinta":3,
+            "sex":4,"sexta":4,
+            "sab":5,"sábado":5,"sabado":5,
+            "dom":6,"domingo":6
+        }
+        return MAP.get(sx)
 
     inseridos = 0
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        contrato = (row[ci_contrato] if ci_contrato is not None else "") or ""
-        data_raw = (row[ci_data]     if ci_data     is not None else "") or ""
-        turno    = (row[ci_turno]    if ci_turno    is not None else "") or ""
-        horario  = (row[ci_horario]  if ci_horario  is not None else "") or ""
-        nome     = (row[ci_nome]     if ci_nome     is not None else "") or ""
-        cor      = (row[ci_cor]      if ci_cor      is not None else "") or ""
+    for r in rows:
+        data_val = _to_date_any(r.get("data"))
+        dow_val  = _weekday_from_any(r.get("dia_semana"))
+        # precisa ter ao menos data ou dia-da-semana
+        if not data_val and dow_val is None:
+            continue
 
-        # vincula cooperado/restaurante
-        coop_hit = coops.get(_norm(nome))
-        rest_hit = None
-        if contrato:
-            # match flexível (igual ou contido)
-            key = _norm(contrato)
-            if key in rests:
-                rest_hit = rests[key]
-            else:
-                for k,r in rests.items():
-                    if key in k or k in key:
-                        rest_hit = r; break
-
-        e = Escala(
-            contrato=contrato.strip(),
-            data=str(data_raw).strip(),  # pode ser “YYYY-MM-DD” ou “SEG..DOM”
-            turno=(turno or "").strip(),
-            horario=(horario or "").strip(),
-            cor=(cor or "").strip() or None,
-            cooperado_nome=(nome or "").strip() or None,
-            cooperado_id=coop_hit.id if coop_hit else None,
-            restaurante_id=rest_hit.id if rest_hit else None,
+        esc = Escala(
+            data=data_val,                        # pode ser None se só tiver dia_semana
+            dia_semana=dow_val,                   # 0..6 opcional
+            turno=_to_str(r.get("turno")),
+            horario=_to_str(r.get("horario")),
+            contrato=_to_str(r.get("contrato")),
+            estabelecimento=_to_str(r.get("estabelecimento")),
+            cooperado_id=_to_int(r.get("cooperado_id")),
+            cooperado_nome=_to_str(r.get("cooperado_nome")),
+            cor=_to_str(r.get("cor")),
         )
-        db.session.add(e); inseridos += 1
+        db.session.add(esc)
+        inseridos += 1
 
-    db.session.commit()
-    flash(f"Escala importada: {inseridos} linhas.", "success")
-    return redirect(url_for("admin_dashboard", tab="escalas"))
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Erro ao gravar a escala no banco: {e}", "danger")
+        return redirect(url_for("admin", tab="escalas"))
+
+    flash(f"Escala importada com sucesso ({inseridos} linhas).", "success")
+    return redirect(url_for("admin", tab="escalas"))
 
 # =========================
 # Trocas (Admin aprovar/recusar)
