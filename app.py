@@ -187,34 +187,6 @@ class AvaliacaoCooperado(db.Model):
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-# Se o seu projeto também usa essa tabela (apareceu no log do erro):
-class AvaliacaoRestaurante(db.Model):
-    __tablename__ = "avaliacoes_restaurante"
-    id = db.Column(db.Integer, primary_key=True)
-
-    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False)
-    cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),  nullable=False)
-
-    # >>> CASCADE aqui também, é ela que quebrou no log <<<
-    lancamento_id  = db.Column(
-        db.Integer,
-        db.ForeignKey("lancamentos.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
-    )
-
-    estrelas_geral        = db.Column(db.Integer)
-    estrelas_pontualidade = db.Column(db.Integer)
-    estrelas_educacao     = db.Column(db.Integer)
-    estrelas_eficiencia   = db.Column(db.Integer)
-    estrelas_apresentacao = db.Column(db.Integer)
-    comentario            = db.Column(db.Text)
-    media_ponderada       = db.Column(db.Float)
-    sentimento            = db.Column(db.String(50))
-    temas                 = db.Column(db.String(255))
-    alerta_crise          = db.Column(db.Boolean, default=False)
-    criado_em             = db.Column(db.DateTime, default=datetime.utcnow)
-
 class ReceitaCooperativa(db.Model):
     __tablename__ = "receitas_coop"
     id = db.Column(db.Integer, primary_key=True)
