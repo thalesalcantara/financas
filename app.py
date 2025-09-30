@@ -1,26 +1,21 @@
 from __future__ import annotations
 
-import os
-import csv
-import io
-import re
-import json
-import difflib
-import unicodedata
-import re
-from sqlalchemy.inspection import inspect as sa_inspect
+import os, io, csv, re, json, difflib, unicodedata
 from datetime import datetime, date, timedelta, time
 from functools import wraps
 from collections import defaultdict, namedtuple
 from types import SimpleNamespace
+
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    session, flash, send_file, abort
+    session, flash, send_file, abort, Blueprint
 )
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from sqlalchemy import delete as sa_delete, text as sa_text, func
+
+from sqlalchemy import delete as sa_delete, text as sa_text, func, or_, and_, literal
+from sqlalchemy.inspection import inspect as sa_inspect
 
 
 # =========================
@@ -320,12 +315,6 @@ def init_db():
     # =========================
 # Helpers
 # =========================
-import os, re, json, unicodedata, difflib
-from datetime import date, datetime
-from functools import wraps
-from werkzeug.utils import secure_filename
-from flask import session, redirect, url_for
-from sqlalchemy import text as sa_text
 
 # (pressupõe que `app`, `db` e os Models abaixo já estejam definidos em outro lugar do arquivo)
 # Models usados aqui: Usuario, Config, Cooperado, Restaurante, Escala
@@ -584,43 +573,51 @@ def _match_restaurante_id(contrato_txt: str) -> int | None:
     return None
 
 def _match_cooperado_by_name(nome_planilha: str, cooperados: list["Cooperado"]) -> "Cooperado | None":
-    def norm_join(s: str) -> str:
-        return " ".join(_normalize_name(s))
+    import unicodedata, re
 
-    sheet_tokens = _normalize_name(nome_planilha)
-    sheet_norm = " ".join(sheet_tokens)
-    if not sheet_norm:
+    def norm_tokens(s: str) -> list[str]:
+        s = unicodedata.normalize("NFD", s or "")
+        s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+        s = re.sub(r"[^a-zA-Z0-9\s]", " ", s).lower()
+        return [t for t in s.split() if t.strip()]
+
+    def ngrams(tokens: list[str], n: int) -> set[str]:
+        if len(tokens) < n: return set()
+        return {" ".join(tokens[i:i+n]) for i in range(len(tokens)-n+1)}
+
+    stoks = norm_tokens(nome_planilha)
+    if len(stoks) < 2:
+        return None  # exige pelo menos 2 tokens no nome da planilha
+
+    sbis = ngrams(stoks, 2)  # bigramas da planilha
+    stris = ngrams(stoks, 3) # trigramas da planilha (p/ desempate)
+
+    scores = []  # (qtd_bigrama, qtd_trigrama, len_nome, cooperado)
+    for c in cooperados:
+        ctoks = norm_tokens(c.nome)
+        if len(ctoks) < 2:
+            continue
+        cbis = ngrams(ctoks, 2)
+        ctris = ngrams(ctoks, 3)
+        score2 = len(sbis & cbis)
+        score3 = len(stris & ctris)
+        if score2 > 0 or score3 > 0:
+            scores.append((score2, score3, len(ctoks), c))
+
+    if not scores:
         return None
 
-    for c in cooperados:
-        c_norm = norm_join(c.nome)
-        if sheet_norm == c_norm or sheet_norm in c_norm or c_norm in sheet_norm:
-            return c
+    # Ordena: mais bigramas > mais trigramas > nome mais longo
+    scores.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
+    best = scores[0]
 
-    parts_sheet = set(sheet_tokens)
-    best, best_count = None, 0
-    for c in cooperados:
-        parts_c = set(_normalize_name(c.nome))
-        inter = parts_sheet & parts_c
-        if len(inter) > best_count:
-            best, best_count = c, len(inter)
-    if best and best_count >= 2:
-        return best
+    # Se houver empate PERFECTO no critério, considera ambíguo e não casa
+    tie_key = (best[0], best[1], best[2])
+    empatados = [s for s in scores if (s[0], s[1], s[2]) == tie_key]
+    if len(empatados) > 1:
+        return None
 
-    if len(sheet_tokens) == 1 and len(sheet_tokens[0]) >= 3:
-        token = sheet_tokens[0]
-        hits = [c for c in cooperados if token in set(_normalize_name(c.nome))]
-        if len(hits) == 1:
-            return hits[0]
-
-    names_norm = [norm_join(c.nome) for c in cooperados]
-    close = difflib.get_close_matches(sheet_norm, names_norm, n=1, cutoff=0.85)
-    if close:
-        target = close[0]
-        for c in cooperados:
-            if norm_join(c.nome) == target:
-                return c
-    return None
+    return best[3]
 
 def _build_docinfo(c: "Cooperado") -> dict:
     today = date.today()
@@ -1119,15 +1116,6 @@ def _gerar_feedback(pont, educ, efic, apres, comentario, sentimento):
     if sentimento == "positivo":
         txt += " 👏"
     return txt[:1000]
-
-from datetime import datetime, date
-from sqlalchemy import or_, and_
-
-# routes_avisos.py
-from datetime import datetime
-from flask import Blueprint, render_template, redirect, request, url_for, abort
-from flask_login import login_required, current_user
-
 
 # opcional: se você já tem outro blueprint de "portal", use o mesmo
 portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
@@ -1939,12 +1927,6 @@ def admin_delete_lancamento(id):
     flash("Lançamento excluído.", "success")
     return redirect(url_for("admin_dashboard", tab="lancamentos"))
 
-# ===== IMPORTS =====
-from flask import request, render_template, send_file, url_for
-from sqlalchemy import func, literal, and_
-from types import SimpleNamespace
-import io, csv
-
 # =========================
 # /admin/avaliacoes — Lista + KPIs + Ranking (sempre na aba "Avaliações")
 # =========================
@@ -2314,9 +2296,6 @@ def avisos_publicos():
     return redirect(url_for("login"))
 
 # admin_avisos.py (ou onde ficam suas rotas de admin)
-import re
-from datetime import datetime, time
-from flask import request, session, render_template, redirect, url_for, flash
 
 # se seu projeto já tiver essa função, pode remover esta versão
 def _parse_date(s: str | None):
@@ -2625,8 +2604,6 @@ def reset_senha_restaurante(id):
     flash("Senha do restaurante atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
 # app.py (ou onde ficam suas rotas)
-from flask import request, redirect, url_for, flash, session
-from werkzeug.security import check_password_hash, generate_password_hash
 @app.route("/rest/alterar-senha", methods=["POST"], endpoint="rest_alterar_senha")
 @role_required("restaurante")
 def alterar_senha_rest():
@@ -3376,17 +3353,30 @@ def portal_cooperado():
     # ====== AJUSTE AQUI: considerar também escalas sem cooperado_id cujo nome bate com o cooperado ======
     raw_escala = Escala.query.order_by(Escala.id.asc()).all()
 
-    import unicodedata as _u, re as _re
     def _norm_c(s: str) -> str:
         s = _u.normalize("NFD", str(s or "").lower())
         s = "".join(ch for ch in s if _u.category(ch) != "Mn")
         return _re.sub(r"[^a-z0-9]+", " ", s).strip()
 
     def _names_match(a: str, b: str) -> bool:
-        if not a or not b:
-            return False
-        na, nb = _norm_c(a), _norm_c(b)
-        return (na == nb) or (na in nb) or (nb in na)
+    # casa somente se houver pelo menos 1 bigrama (duas palavras consecutivas) em comum
+    if not a or not b:
+        return False
+
+    def toks(s: str) -> list[str]:
+        s = _u.normalize("NFD", str(s or "").lower())
+        s = "".join(ch for ch in s if _u.category(ch) != "Mn")
+        s = _re.sub(r"[^a-z0-9]+", " ", s).strip()
+        return [t for t in s.split() if t]
+
+    def bigrams(ts: list[str]) -> set[str]:
+        return {" ".join(ts[i:i+2]) for i in range(len(ts)-1)} if len(ts) >= 2 else set()
+
+    ta, tb = toks(a), toks(b)
+    if len(ta) < 2 or len(tb) < 2:
+        return False
+
+    return len(bigrams(ta) & bigrams(tb)) > 0
 
     # Filtra: é meu por ID OU (sem ID e o nome da planilha bate com meu nome)
     raw_escala = [
@@ -3540,9 +3530,6 @@ def portal_cooperado():
         trocas_recebidas_historico=trocas_recebidas_historico,
         trocas_enviadas=trocas_enviadas,
     )
-
-from datetime import datetime
-from flask import request, redirect, url_for, flash, abort, session
 
 @app.post("/coop/avaliar/restaurante/<int:lanc_id>")
 @role_required("cooperado")
@@ -3749,9 +3736,6 @@ def recusar_troca(troca_id):
 # =========================
 # Helpers locais
 # =========================
-from datetime import date, timedelta
-from collections import defaultdict
-from sqlalchemy import select, text as sa_text
 
 def _parse_date(s):
     try:
@@ -4112,9 +4096,6 @@ def editar_lancamento(id):
 # Excluir lançamento (corrigindo FK)
 # =========================
 # app.py (imports no topo)
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy import text as sa_text
-from flask import current_app, flash, redirect, url_for, abort, session
 
 @app.get("/lancamentos/<int:id>/excluir")
 @role_required("restaurante")
@@ -4219,12 +4200,6 @@ except Exception as _e:
 # =========================
 # TABELAS
 # =========================
-
-# imports que podem já existir — deixe somente 1 vez no arquivo
-from flask import render_template, request, redirect, url_for, flash, session, send_file, abort
-from werkzeug.utils import secure_filename
-from datetime import datetime
-import os, re, unicodedata
 
 # ---------------- TABELAS (Admin) ----------------
 @app.route("/admin/tabelas")
@@ -4363,11 +4338,6 @@ def baixar_tabela(tab_id):
 # =========================
 # AVISOS — Portais (cooperado)
 # =========================
-# === IMPORTS (garanta que já existam) ===
-from flask import g, session, url_for
-from datetime import datetime
-from sqlalchemy import or_
-
 # ---------- helper: conta avisos não lidos p/ usuário logado ----------
 def _avisos_nao_lidos_para_usuario():
     if "user_id" not in session:
@@ -4432,13 +4402,6 @@ def inject_avisos_banner():
         "avisos_unread_url": link
     }
 
-from datetime import datetime
-from flask import render_template, request, redirect, url_for, session
-# (pressupõe que você já tenha: db, app, role_required, Cooperado, AvisoLeitura, get_avisos_for_cooperado)
-
-from sqlalchemy.inspection import inspect as sa_inspect
-from datetime import datetime
-from flask import render_template
 
 @app.get("/portal/cooperado/avisos")
 @role_required("cooperado")
