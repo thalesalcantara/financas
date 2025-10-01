@@ -63,6 +63,19 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JSON_SORT_KEYS"] = False  # evita comparar None com int ao serializar |tojson
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32MB
 db = SQLAlchemy(app)
+# --- habilita foreign_keys no SQLite (para ON DELETE CASCADE funcionar) ---
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+
+@event.listens_for(Engine, "connect")
+def _set_sqlite_pragma(dbapi_con, con_record):
+    try:
+        if app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"):
+            cur = dbapi_con.cursor()
+            cur.execute("PRAGMA foreign_keys=ON")
+            cur.close()
+    except Exception:
+        pass
 
 # =========================
 # Models
@@ -460,10 +473,12 @@ def init_db():
 
     # --- usuário admin + config padrão ---
     if not Usuario.query.filter_by(tipo="admin").first():
-        admin = Usuario(usuario="coopex", tipo="admin", senha_hash="")
-        admin.set_password("coopex05289")
-        db.session.add(admin)
-        db.session.commit()
+    admin_user = os.environ.get("ADMIN_USER", "admin")
+    admin_pass = os.environ.get("ADMIN_PASS", os.urandom(8).hex())
+    admin = Usuario(usuario=admin_user, tipo="admin", senha_hash="")
+    admin.set_password(admin_pass)
+    db.session.add(admin)
+    db.session.commit()
 
     if not Config.query.get(1):
         db.session.add(Config(id=1, salario_minimo=0.0))
@@ -734,26 +749,23 @@ from sqlalchemy import or_, and_
 # routes_avisos.py
 from datetime import datetime
 from flask import Blueprint, render_template, redirect, request, url_for, abort
-from flask_login import login_required, current_user
+from flask_login import current_user
 
 
 # opcional: se você já tem outro blueprint de "portal", use o mesmo
 portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
 
-def _cooperado_atual() -> Cooperado:
-    # ajuste de acordo com seu auth:
-    #   - se current_user JÁ é um Cooperado, retorne current_user
-    #   - se current_user tem .cooperado_id, busque o Cooperado
-    coop = getattr(current_user, "cooperado", None)
-    if isinstance(coop, Cooperado):
-        return coop
-    coop_id = getattr(current_user, "cooperado_id", None)
-    if coop_id:
-        return Cooperado.query.get(coop_id)
-    return None
+def _cooperado_atual() -> Cooperado | None:
+    """
+    Retorna o Cooperado do usuário logado, usando a sessão da aplicação.
+    """
+    uid = session.get("user_id")
+    if not uid:
+        return None
+    return Cooperado.query.filter_by(usuario_id=uid).first()
 
 @portal_bp.get("/avisos", endpoint="portal_cooperado_avisos")
-@login_required
+@role_required("cooperado")
 def avisos_list():
     coop = _cooperado_atual()
     if not coop:
@@ -815,7 +827,7 @@ class AvaliacaoRestaurante(db.Model):
     criado_em = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
 @portal_bp.post("/avisos/<int:aviso_id>/lido", endpoint="marcar_aviso_lido")
-@login_required
+@role_required("cooperado")
 def avisos_marcar_lido(aviso_id: int):
     coop = _cooperado_atual()
     if not coop:
@@ -841,7 +853,7 @@ def avisos_marcar_lido(aviso_id: int):
     return redirect(next_url)
 
 @portal_bp.post("/avisos/marcar-todos", endpoint="marcar_todos_avisos_lidos")
-@login_required
+@role_required("cooperado")
 def avisos_marcar_todos():
     coop = _cooperado_atual()
     if not coop:
@@ -850,7 +862,7 @@ def avisos_marcar_todos():
     avisos = get_avisos_for_cooperado(coop)
     if not avisos:
         return redirect(url_for("portal_cooperado_avisos"))
-
+    app.register_blueprint(portal_bp)
     ids_todos = {a.id for a in avisos}
     ids_ja_lidos = {
         r.aviso_id
@@ -1945,22 +1957,13 @@ def avisos_publicos():
     if t == "cooperado":
         return redirect(url_for("portal_cooperado_avisos"))
     if t == "restaurante":
-        return redirect(url_for("portal_restaurante_avisos"))
+            return redirect(url_for("portal_restaurante"))
     return redirect(url_for("login"))
 
 # admin_avisos.py (ou onde ficam suas rotas de admin)
 import re
 from datetime import datetime, time
 from flask import request, session, render_template, redirect, url_for, flash
-
-# se seu projeto já tiver essa função, pode remover esta versão
-def _parse_date(s: str | None):
-    if not s:
-        return None
-    try:
-        return datetime.strptime(s, "%Y-%m-%d").date()
-    except Exception:
-        return None
 
 @app.route("/admin/avisos", methods=["GET", "POST"])
 @admin_required
@@ -3587,7 +3590,7 @@ def admin_documentos():
 @app.post("/admin/documentos/upload")
 @admin_required
 def admin_upload_documento():
-    f = request.form
+        f = request.form
     titulo = (f.get("titulo") or "").strip()
     categoria = (f.get("categoria") or "outro").strip()
     descricao = (f.get("descricao") or "").strip()
@@ -3595,19 +3598,27 @@ def admin_upload_documento():
     if not titulo or not (arquivo and arquivo.filename):
         flash("Preencha o título e selecione o arquivo.", "warning")
         return redirect(url_for("admin_documentos"))
-    from werkzeug.utils import secure_filename
+
     fname = secure_filename(arquivo.filename)
     base, ext = os.path.splitext(fname)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    fname_final = f"{re.sub(r'[^A-Za-z0-9_-]+','-', base)}_{ts}{ext}"
+    safe_base = re.sub(r"[^A-Za-z0-9_-]+", "-", base)
+    fname_final = f"{safe_base}_{ts}{ext}"
     path = os.path.join(DOCS_DIR, fname_final)
     arquivo.save(path)
-    url = f"/static/uploads/docs/{fname_final}"
-    d = Documento(titulo=titulo, categoria=categoria, descricao=descricao,
-                  arquivo_url=url, arquivo_nome=arquivo.filename, enviado_em=datetime.utcnow())
-    db.session.add(d)
+
+    url_publica = f"/static/uploads/docs/{fname_final}"
+
+    doc = Documento(
+        titulo=titulo,
+        categoria=categoria,
+        descricao=descricao,
+        arquivo_url=url_publica,
+        arquivo_nome=fname
+    )
+    db.session.add(doc)
     db.session.commit()
-    flash("Documento publicado.", "success")
+    flash("Documento enviado.", "success")
     return redirect(url_for("admin_documentos"))
 
 @app.get("/admin/documentos/<int:doc_id>/delete")
