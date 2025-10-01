@@ -3591,34 +3591,38 @@ def admin_documentos():
 @app.post("/admin/documentos/upload")
 @admin_required
 def admin_upload_documento():
-        f = request.form
+    f = request.form
     titulo = (f.get("titulo") or "").strip()
     categoria = (f.get("categoria") or "outro").strip()
     descricao = (f.get("descricao") or "").strip()
     arquivo = request.files.get("arquivo")
+
     if not titulo or not (arquivo and arquivo.filename):
         flash("Preencha o título e selecione o arquivo.", "warning")
         return redirect(url_for("admin_documentos"))
 
+    # salva arquivo no diretório DOCS_DIR e cria URL estática
     fname = secure_filename(arquivo.filename)
     base, ext = os.path.splitext(fname)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_base = re.sub(r"[^A-Za-z0-9_-]+", "-", base)
-    fname_final = f"{safe_base}_{ts}{ext}"
-    path = os.path.join(DOCS_DIR, fname_final)
-    arquivo.save(path)
+    safe_base = re.sub(r"[^A-Za-z0-9_-]+", "_", base).strip("_") or "arquivo"
+    final_name = f"{safe_base}_{ts}{ext}"
+    full_path = os.path.join(DOCS_DIR, final_name)
+    arquivo.save(full_path)
 
-    url_publica = f"/static/uploads/docs/{fname_final}"
+    doc_url = f"/static/uploads/docs/{final_name}"
 
-    doc = Documento(
+    d = Documento(
         titulo=titulo,
         categoria=categoria,
         descricao=descricao,
-        arquivo_url=url_publica,
-        arquivo_nome=fname
+        arquivo_url=doc_url,
+        arquivo_nome=fname,
+        enviado_em=datetime.utcnow(),
     )
-    db.session.add(doc)
+    db.session.add(d)
     db.session.commit()
+
     flash("Documento enviado.", "success")
     return redirect(url_for("admin_documentos"))
 
