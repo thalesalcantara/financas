@@ -472,7 +472,6 @@ def init_db():
         db.session.rollback()
 
     # --- usuário admin + config padrão ---
-    # --- usuário admin + config padrão ---
 if not Usuario.query.filter_by(tipo="admin").first():
     admin_user = os.environ.get("ADMIN_USER", "admin")
     admin_pass = os.environ.get("ADMIN_PASS", os.urandom(8).hex())
