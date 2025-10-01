@@ -2331,6 +2331,22 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         btn.innerHTML = isPwd ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
       });
     })();
+
+    // confirmação de exclusão (somente dentro desta aba)
+    (function(){
+      const section = document.getElementById('restaurantes');
+      section?.addEventListener('click', function(e){
+        const del = e.target.closest('.btn-del');
+        if (!del) return;
+        if (!confirm('Tem certeza que deseja excluir?')) {
+          e.preventDefault();
+          return;
+        }
+        // evita cliques repetidos após confirmar
+        del.classList.add('disabled');
+        del.setAttribute('aria-disabled','true');
+      });
+    })();
   </script>
 </section>
 
