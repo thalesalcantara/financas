@@ -472,7 +472,8 @@ def init_db():
         db.session.rollback()
 
     # --- usuário admin + config padrão ---
-    if not Usuario.query.filter_by(tipo="admin").first():
+    # --- usuário admin + config padrão ---
+if not Usuario.query.filter_by(tipo="admin").first():
     admin_user = os.environ.get("ADMIN_USER", "admin")
     admin_pass = os.environ.get("ADMIN_PASS", os.urandom(8).hex())
     admin = Usuario(usuario=admin_user, tipo="admin", senha_hash="")
@@ -480,9 +481,9 @@ def init_db():
     db.session.add(admin)
     db.session.commit()
 
-    if not Config.query.get(1):
-        db.session.add(Config(id=1, salario_minimo=0.0))
-        db.session.commit()
+if not Config.query.get(1):
+    db.session.add(Config(id=1, salario_minimo=0.0))
+    db.session.commit()
 
 
 def get_config() -> Config:
@@ -754,6 +755,7 @@ from flask_login import current_user
 
 # opcional: se você já tem outro blueprint de "portal", use o mesmo
 portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
+app.register_blueprint(portal_bp)
 
 def _cooperado_atual() -> Cooperado | None:
     """
@@ -862,7 +864,6 @@ def avisos_marcar_todos():
     avisos = get_avisos_for_cooperado(coop)
     if not avisos:
         return redirect(url_for("portal_cooperado_avisos"))
-    app.register_blueprint(portal_bp)
     ids_todos = {a.id for a in avisos}
     ids_ja_lidos = {
         r.aviso_id
@@ -1957,7 +1958,7 @@ def avisos_publicos():
     if t == "cooperado":
         return redirect(url_for("portal_cooperado_avisos"))
     if t == "restaurante":
-            return redirect(url_for("portal_restaurante"))
+        return redirect(url_for("portal_restaurante"))
     return redirect(url_for("login"))
 
 # admin_avisos.py (ou onde ficam suas rotas de admin)
