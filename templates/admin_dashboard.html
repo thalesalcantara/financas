@@ -2099,9 +2099,17 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                             data-id="{{ coop.id }}" data-url="{{ url_for('reset_senha_cooperado', id=coop.id) }}" title="Redefinir senha">
                       <i class="bi bi-key"></i>
                     </button>
-                    <a class="btn btn-danger btn-del" href="{{ url_for('delete_cooperado', id=coop.id) }}" title="Excluir">
-                      <i class="bi bi-trash"></i>
-                    </a>
+                   <form action="{{ url_for('delete_cooperado', id=coop.id) }}"
+      method="POST"
+      class="d-inline"
+      onsubmit="return confirm('Excluir {{ coop.nome }}? Esta ação não pode ser desfeita.');">
+  {% if csrf_token is defined %}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% endif %}
+  <button type="submit" class="btn btn-danger btn-del" title="Excluir">
+    <i class="bi bi-trash"></i>
+  </button>
+</form>
                   </div>
                 </td>
               </tr>
@@ -2276,9 +2284,17 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                             data-id="{{ r.id }}" data-url="{{ url_for('reset_senha_restaurante', id=r.id) }}" title="Redefinir senha">
                       <i class="bi bi-key"></i>
                     </button>
-                    <a class="btn btn-danger btn-del" href="{{ url_for('delete_restaurante', id=r.id) }}" title="Excluir">
-                      <i class="bi bi-trash"></i>
-                    </a>
+                    <form action="{{ url_for('delete_restaurante', id=r.id) }}"
+      method="POST"
+      class="d-inline"
+      onsubmit="return confirm('Excluir {{ r.nome }}? Esta ação não pode ser desfeita.');">
+  {% if csrf_token is defined %}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% endif %}
+  <button type="submit" class="btn btn-danger btn-sm" title="Excluir">
+    <i class="bi bi-trash"></i>
+  </button>
+</form>
                   </div>
                 </td>
               </tr>
