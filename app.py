@@ -1600,6 +1600,11 @@ def admin_edit_lancamento(id):
 @admin_required
 def admin_delete_lancamento(id):
     l = Lancamento.query.get_or_404(id)
+
+    # 👇 LIMPEZA MANUAL: apaga avaliações amarradas a este lançamento
+    db.session.execute(sa_delete(AvaliacaoCooperado).where(AvaliacaoCooperado.lancamento_id == id))
+    db.session.execute(sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.lancamento_id == id))
+
     db.session.delete(l)
     db.session.commit()
     flash("Lançamento excluído.", "success")
@@ -3591,6 +3596,11 @@ def excluir_lancamento(id):
     l = Lancamento.query.get_or_404(id)
     if not rest or l.restaurante_id != rest.id:
         abort(403)
+
+    # 👇 LIMPEZA MANUAL: apaga avaliações amarradas a este lançamento
+    db.session.execute(sa_delete(AvaliacaoCooperado).where(AvaliacaoCooperado.lancamento_id == id))
+    db.session.execute(sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.lancamento_id == id))
+
     db.session.delete(l)
     db.session.commit()
     flash("Lançamento excluído.", "success")
