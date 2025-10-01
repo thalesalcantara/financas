@@ -2153,13 +2153,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         btn.innerHTML = isPwd ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
       });
     })();
-
-    // confirmar exclusão
-    document.addEventListener('click', function(e){
-      if(e.target.closest('.btn-del')){
-        if(!confirm('Excluir este cooperado?')) e.preventDefault();
-      }
-    });
   </script>
 </section>
 
@@ -2338,13 +2331,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         btn.innerHTML = isPwd ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
       });
     })();
-
-    // confirmar exclusão
-    document.addEventListener('click', function(e){
-      if(e.target.closest('.btn-del')){
-        if(!confirm('Excluir este estabelecimento?')) e.preventDefault();
-      }
-    });
   </script>
 </section>
 
@@ -2912,7 +2898,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     // Confirmar exclusão
     document.addEventListener('click', function(e){
       if(e.target.closest('.btn-del')){
-        if(!confirm('Tem certeza que deseja excluir este registro?')) e.preventDefault();
+        if(!confirm('Tem certeza que deseja excluir?')) e.preventDefault();
       }
     });
 
