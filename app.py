@@ -228,8 +228,16 @@ class BeneficioRegistro(db.Model):
 class Escala(db.Model):
     __tablename__ = "escalas"
     id = db.Column(db.Integer, primary_key=True)
-    cooperado_id = db.Column(db.Integer, db.ForeignKey("cooperados.id"), nullable=True)  # pode não ter cadastro
-    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=True)
+    cooperado_id = db.Column(
+        db.Integer,
+        db.ForeignKey("cooperados.id", ondelete="CASCADE"),
+        nullable=True  # pode não ter cadastro
+    )
+    restaurante_id = db.Column(
+        db.Integer,
+        db.ForeignKey("restaurantes.id", ondelete="CASCADE"),
+        nullable=True
+    )
 
     data = db.Column(db.String(40))
     turno = db.Column(db.String(50))
@@ -242,11 +250,23 @@ class Escala(db.Model):
 class TrocaSolicitacao(db.Model):
     __tablename__ = "trocas"
     id = db.Column(db.Integer, primary_key=True)
-    solicitante_id = db.Column(db.Integer, db.ForeignKey("cooperados.id"), nullable=False)
-    destino_id = db.Column(db.Integer, db.ForeignKey("cooperados.id"), nullable=False)
-    origem_escala_id = db.Column(db.Integer, db.ForeignKey("escalas.id"), nullable=False)
-    mensagem = db.Column(db.Text)  # guarda texto e, quando aprovada, um sufixo __AFETACAO_JSON__:{...}
-    status = db.Column(db.String(20), default="pendente")  # pendente | aprovada | recusada
+    solicitante_id = db.Column(
+        db.Integer,
+        db.ForeignKey("cooperados.id", ondelete="CASCADE"),
+        nullable=False
+    )
+    destino_id = db.Column(
+        db.Integer,
+        db.ForeignKey("cooperados.id", ondelete="CASCADE"),
+        nullable=False
+    )
+    origem_escala_id = db.Column(
+        db.Integer,
+        db.ForeignKey("escalas.id", ondelete="CASCADE"),
+        nullable=False
+    )
+    mensagem = db.Column(db.Text)
+    status = db.Column(db.String(20), default="pendente")
     criada_em = db.Column(db.DateTime, default=datetime.utcnow)
     aplicada_em = db.Column(db.DateTime)
 
@@ -2193,16 +2213,33 @@ def edit_cooperado(id):
     flash("Cooperado atualizado.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
-@app.route("/cooperados/<int:id>/delete")
+from sqlalchemy import delete as sa_delete
+from sqlalchemy.exc import IntegrityError
+
+@app.route("/cooperados/<int:id>/delete", methods=["POST"])  # evite GET para delete
 @admin_required
 def delete_cooperado(id):
     c = Cooperado.query.get_or_404(id)
     u = c.usuario_ref
-    db.session.delete(c)
-    if u:
-        db.session.delete(u)
-    db.session.commit()
-    flash("Cooperado excluído.", "success")
+
+    try:
+        # Apaga registros filhos que referenciam o cooperado
+        db.session.execute(sa_delete(Escala).where(Escala.cooperado_id == id))
+        db.session.execute(sa_delete(Lancamento).where(Lancamento.cooperado_id == id))
+        # Se houver outras tabelas com FK para cooperado_id, inclua mais deletes aqui.
+
+        # Agora pode apagar o cooperado e o usuário vinculado
+        db.session.delete(c)
+        if u:
+            db.session.delete(u)
+
+        db.session.commit()
+        flash("Cooperado excluído.", "success")
+    except IntegrityError as e:
+        db.session.rollback()
+        current_app.logger.exception(e)
+        flash("Não foi possível excluir: existem vínculos ativos.", "danger")
+
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
 @app.route("/cooperados/<int:id>/reset_senha", methods=["POST"])
@@ -2261,16 +2298,34 @@ def edit_restaurante(id):
     flash("Estabelecimento atualizado.", "success")
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
 
-@app.route("/restaurantes/<int:id>/delete")
+from sqlalchemy import delete as sa_delete
+from sqlalchemy.exc import IntegrityError
+from flask import current_app
+
+@app.route("/restaurantes/<int:id>/delete", methods=["POST"])  # evite GET p/ delete
 @admin_required
 def delete_restaurante(id):
     r = Restaurante.query.get_or_404(id)
     u = r.usuario_ref
-    db.session.delete(r)
-    if u:
-        db.session.delete(u)
-    db.session.commit()
-    flash("Estabelecimento excluído.", "success")
+
+    try:
+        # Apaga registros filhos que referenciam o restaurante
+        db.session.execute(sa_delete(Escala).where(Escala.restaurante_id == id))
+        db.session.execute(sa_delete(Lancamento).where(Lancamento.restaurante_id == id))
+        # Se houver outras tabelas com FK para restaurante_id, inclua mais deletes aqui.
+
+        # Agora apaga o restaurante e o usuário vinculado
+        db.session.delete(r)
+        if u:
+            db.session.delete(u)
+
+        db.session.commit()
+        flash("Estabelecimento excluído.", "success")
+    except IntegrityError as e:
+        db.session.rollback()
+        current_app.logger.exception(e)
+        flash("Não foi possível excluir: existem vínculos ativos.", "danger")
+
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
 
 @app.route("/restaurantes/<int:id>/reset_senha", methods=["POST"])
@@ -2807,37 +2862,100 @@ def backfill_trocas_afetacao():
 @admin_required
 def apply_fk_cascade():
     sql = """
-    BEGIN;
+BEGIN;
 
-    -- ajusta FK de avaliacoes.lancamento_id
-    ALTER TABLE public.avaliacoes
-      DROP CONSTRAINT IF EXISTS avaliacoes_lancamento_id_fkey;
+-- =========================
+-- AVALIAÇÕES (já existia)
+-- =========================
+-- ajusta FK de avaliacoes.lancamento_id
+ALTER TABLE public.avaliacoes
+  DROP CONSTRAINT IF EXISTS avaliacoes_lancamento_id_fkey;
+ALTER TABLE public.avaliacoes
+  ADD CONSTRAINT avaliacoes_lancamento_id_fkey
+  FOREIGN KEY (lancamento_id)
+  REFERENCES public.lancamentos (id)
+  ON DELETE CASCADE;
 
-    ALTER TABLE public.avaliacoes
-      ADD CONSTRAINT avaliacoes_lancamento_id_fkey
-      FOREIGN KEY (lancamento_id)
-      REFERENCES public.lancamentos (id)
-      ON DELETE CASCADE;
+-- cria (se faltar) FK de avaliacoes_restaurante.lancamento_id
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'av_rest_lancamento_id_fkey'
+          AND table_name = 'avaliacoes_restaurante'
+    ) THEN
+        ALTER TABLE public.avaliacoes_restaurante
+          ADD CONSTRAINT av_rest_lancamento_id_fkey
+          FOREIGN KEY (lancamento_id)
+          REFERENCES public.lancamentos (id)
+          ON DELETE CASCADE;
+    ELSE
+        -- se já existir, garante o CASCADE (drop/add)
+        EXECUTE 'ALTER TABLE public.avaliacoes_restaurante
+                 DROP CONSTRAINT IF EXISTS av_rest_lancamento_id_fkey';
+        EXECUTE 'ALTER TABLE public.avaliacoes_restaurante
+                 ADD CONSTRAINT av_rest_lancamento_id_fkey
+                 FOREIGN KEY (lancamento_id)
+                 REFERENCES public.lancamentos (id)
+                 ON DELETE CASCADE';
+    END IF;
+END $$;
 
-    -- cria (se faltar) FK de avaliacoes_restaurante.lancamento_id
-    DO $$
-    BEGIN
-        IF NOT EXISTS (
-            SELECT 1
-            FROM information_schema.table_constraints
-            WHERE constraint_name = 'av_rest_lancamento_id_fkey'
-              AND table_name = 'avaliacoes_restaurante'
-        ) THEN
-            ALTER TABLE public.avaliacoes_restaurante
-              ADD CONSTRAINT av_rest_lancamento_id_fkey
-              FOREIGN KEY (lancamento_id)
-              REFERENCES public.lancamentos (id)
-              ON DELETE CASCADE;
-        END IF;
-    END $$;
+-- =========================
+-- ESCALAS
+-- =========================
+-- cooperado_id -> cooperados(id) ON DELETE CASCADE
+ALTER TABLE public.escalas
+  DROP CONSTRAINT IF EXISTS escalas_cooperado_id_fkey;
+ALTER TABLE public.escalas
+  ADD CONSTRAINT escalas_cooperado_id_fkey
+  FOREIGN KEY (cooperado_id)
+  REFERENCES public.cooperados (id)
+  ON DELETE CASCADE;
 
-    COMMIT;
-    """
+-- restaurante_id -> restaurantes(id) ON DELETE CASCADE
+ALTER TABLE public.escalas
+  DROP CONSTRAINT IF EXISTS escalas_restaurante_id_fkey;
+ALTER TABLE public.escalas
+  ADD CONSTRAINT escalas_restaurante_id_fkey
+  FOREIGN KEY (restaurante_id)
+  REFERENCES public.restaurantes (id)
+  ON DELETE CASCADE;
+
+-- =========================
+-- TROCAS
+-- =========================
+-- solicitante_id -> cooperados(id) ON DELETE CASCADE
+ALTER TABLE public.trocas
+  DROP CONSTRAINT IF EXISTS trocas_solicitante_id_fkey;
+ALTER TABLE public.trocas
+  ADD CONSTRAINT trocas_solicitante_id_fkey
+  FOREIGN KEY (solicitante_id)
+  REFERENCES public.cooperados (id)
+  ON DELETE CASCADE;
+
+-- destino_id -> cooperados(id) ON DELETE CASCADE
+ALTER TABLE public.trocas
+  DROP CONSTRAINT IF EXISTS trocas_destino_id_fkey;
+ALTER TABLE public.trocas
+  ADD CONSTRAINT trocas_destino_id_fkey
+  FOREIGN KEY (destino_id)
+  REFERENCES public.cooperados (id)
+  ON DELETE CASCADE;
+
+-- origem_escala_id -> escalas(id) ON DELETE CASCADE
+ALTER TABLE public.trocas
+  DROP CONSTRAINT IF EXISTS trocas_origem_escala_id_fkey;
+ALTER TABLE public.trocas
+  ADD CONSTRAINT trocas_origem_escala_id_fkey
+  FOREIGN KEY (origem_escala_id)
+  REFERENCES public.escalas (id)
+  ON DELETE CASCADE;
+
+COMMIT;
+"""
+    
     try:
         if _is_sqlite():
             flash("SQLite local: esta operação é específica de Postgres (sem efeito aqui).", "warning")
