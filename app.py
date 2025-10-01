@@ -765,10 +765,6 @@ from flask import Blueprint, render_template, redirect, request, url_for, abort
 from flask_login import current_user
 
 
-# opcional: se você já tem outro blueprint de "portal", use o mesmo
-portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
-app.register_blueprint(portal_bp)
-
 def _cooperado_atual() -> Cooperado | None:
     """
     Retorna o Cooperado do usuário logado, usando a sessão da aplicação.
@@ -777,6 +773,9 @@ def _cooperado_atual() -> Cooperado | None:
     if not uid:
         return None
     return Cooperado.query.filter_by(usuario_id=uid).first()
+
+    # --- Blueprint Portal (topo do arquivo, depois de criar `app`) ---
+portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
 
 @portal_bp.get("/avisos", endpoint="portal_cooperado_avisos")
 @role_required("cooperado")
@@ -863,7 +862,7 @@ def avisos_marcar_lido(aviso_id: int):
         ))
         db.session.commit()
 
-    next_url = request.form.get("next") or (url_for("portal_cooperado_avisos") + f"#aviso-{aviso.id}")
+    next_url = request.form.get("next") or (url_for("portal.portal_cooperado_avisos") + f"#aviso-{aviso.id}")
     return redirect(next_url)
 
 @portal_bp.post("/avisos/marcar-todos", endpoint="marcar_todos_avisos_lidos")
@@ -875,7 +874,7 @@ def avisos_marcar_todos():
 
     avisos = get_avisos_for_cooperado(coop)
     if not avisos:
-        return redirect(url_for("portal_cooperado_avisos"))
+        return redirect(url_for("portal.portal_cooperado_avisos"))
     ids_todos = {a.id for a in avisos}
     ids_ja_lidos = {
         r.aviso_id
@@ -890,7 +889,14 @@ def avisos_marcar_todos():
         ])
         db.session.commit()
 
-    return redirect(url_for("portal_cooperado_avisos"))
+    return redirect(url_for("portal.portal_cooperado_avisos"))
+
+  # --- Registro do blueprint 'portal' (uma única vez, após definir TODAS as rotas dele)
+def register_blueprints_once(app):
+    if "portal" not in app.blueprints:
+        app.register_blueprint(portal_bp)
+
+register_blueprints_once(app)
 
 # ======== Helpers p/ troca: data/weekday/turno ========
 def _parse_data_escala_str(s: str) -> date | None:
