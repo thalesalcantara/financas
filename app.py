@@ -2213,28 +2213,75 @@ def edit_cooperado(id):
     flash("Cooperado atualizado.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
-from sqlalchemy import delete as sa_delete
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 
-@app.route("/cooperados/<int:id>/delete", methods=["POST"])  # evite GET para delete
+@app.route("/cooperados/<int:id>/delete", methods=["POST"])
 @admin_required
 def delete_cooperado(id):
     c = Cooperado.query.get_or_404(id)
     u = c.usuario_ref
 
     try:
-        # Apaga registros filhos que referenciam o cooperado
-        db.session.execute(sa_delete(Escala).where(Escala.cooperado_id == id))
-        db.session.execute(sa_delete(Lancamento).where(Lancamento.cooperado_id == id))
-        # Se houver outras tabelas com FK para cooperado_id, inclua mais deletes aqui.
+        # --- 1) Escalas do cooperado (e trocas ligadas a essas escalas) ---
+        escala_ids = [eid for (eid,) in db.session.query(Escala.id)
+                      .filter(Escala.cooperado_id == id).all()]
 
-        # Agora pode apagar o cooperado e o usuário vinculado
+        if escala_ids:
+            # Trocas que apontam para essas escalas
+            db.session.execute(
+                sa_delete(TrocaSolicitacao)
+                .where(TrocaSolicitacao.origem_escala_id.in_(escala_ids))
+            )
+            # As próprias escalas
+            db.session.execute(
+                sa_delete(Escala)
+                .where(Escala.id.in_(escala_ids))
+            )
+
+        # --- 2) Trocas onde o cooperado é solicitante ou destino ---
+        db.session.execute(
+            sa_delete(TrocaSolicitacao)
+            .where(or_(
+                TrocaSolicitacao.solicitante_id == id,
+                TrocaSolicitacao.destino_id == id
+            ))
+        )
+
+        # --- 3) Avaliações que guardam o cooperado_id ---
+        db.session.execute(
+            sa_delete(AvaliacaoCooperado).where(AvaliacaoCooperado.cooperado_id == id)
+        )
+        db.session.execute(
+            sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.cooperado_id == id)
+        )
+
+        # --- 4) Lançamentos desse cooperado (se o CASCADE por lancamento_id não estiver ativo) ---
+        db.session.execute(
+            sa_delete(Lancamento).where(Lancamento.cooperado_id == id)
+        )
+
+        # --- 5) Movimentações financeiras do cooperado ---
+        db.session.execute(
+            sa_delete(ReceitaCooperado).where(ReceitaCooperado.cooperado_id == id)
+        )
+        db.session.execute(
+            sa_delete(DespesaCooperado).where(DespesaCooperado.cooperado_id == id)
+        )
+
+        # --- 6) Leituras de avisos atreladas ao cooperado ---
+        db.session.execute(
+            sa_delete(AvisoLeitura).where(AvisoLeitura.cooperado_id == id)
+        )
+
+        # --- 7) Finalmente, o Cooperado e o Usuario vinculado ---
         db.session.delete(c)
         if u:
             db.session.delete(u)
 
         db.session.commit()
         flash("Cooperado excluído.", "success")
+
     except IntegrityError as e:
         db.session.rollback()
         current_app.logger.exception(e)
@@ -2302,19 +2349,29 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy.exc import IntegrityError
 from flask import current_app
 
-@app.route("/restaurantes/<int:id>/delete", methods=["POST"])  # evite GET p/ delete
+@app.route("/restaurantes/<int:id>/delete", methods=["POST"])
 @admin_required
 def delete_restaurante(id):
     r = Restaurante.query.get_or_404(id)
     u = r.usuario_ref
-
     try:
-        # Apaga registros filhos que referenciam o restaurante
-        db.session.execute(sa_delete(Escala).where(Escala.restaurante_id == id))
-        db.session.execute(sa_delete(Lancamento).where(Lancamento.restaurante_id == id))
-        # Se houver outras tabelas com FK para restaurante_id, inclua mais deletes aqui.
+        # 1) Coletar IDs das escalas do restaurante
+        escala_ids = [e.id for e in Escala.query.with_entities(Escala.id)
+                      .filter(Escala.restaurante_id == id).all()]
 
-        # Agora apaga o restaurante e o usuário vinculado
+        if escala_ids:
+            # 2) Apagar trocas que referenciam essas escalas
+            db.session.execute(sa_delete(TrocaSolicitacao)
+                               .where(TrocaSolicitacao.origem_escala_id.in_(escala_ids)))
+            # 3) Apagar as escalas
+            db.session.execute(sa_delete(Escala)
+                               .where(Escala.restaurante_id == id))
+
+        # 4) Apagar lançamentos do restaurante
+        db.session.execute(sa_delete(Lancamento)
+                           .where(Lancamento.restaurante_id == id))
+
+        # 5) Agora apaga o restaurante e o usuário vinculado
         db.session.delete(r)
         if u:
             db.session.delete(u)
@@ -2325,7 +2382,6 @@ def delete_restaurante(id):
         db.session.rollback()
         current_app.logger.exception(e)
         flash("Não foi possível excluir: existem vínculos ativos.", "danger")
-
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
 
 @app.route("/restaurantes/<int:id>/reset_senha", methods=["POST"])
