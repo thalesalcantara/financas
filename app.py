@@ -381,19 +381,83 @@ def init_db():
     except Exception:
         db.session.rollback()
 
-    # --- restaurante_id em escalas ---
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "restaurante_id" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
-                db.session.commit()
-        else:
-            db.session.execute(sa_text("ALTER TABLE public.escalas ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"))
+    # --- restaurante_id em escalas + backfill + índice/FK ---
+try:
+    if _is_sqlite():
+        # 1) cria coluna se faltar
+        cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+        colnames = {row[1] for row in cols}
+        if "restaurante_id" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
             db.session.commit()
-    except Exception:
-        db.session.rollback()
+
+        # 2) backfill (igualando contrato ao nome do restaurante, case-insensitive, com trim)
+        #    OBS: SQLite permite subquery correlacionada no SET.
+        db.session.execute(sa_text("""
+            UPDATE escalas AS e
+            SET restaurante_id = (
+                SELECT r.id
+                FROM restaurantes r
+                WHERE lower(trim(e.contrato)) = lower(trim(r.nome))
+                LIMIT 1
+            )
+            WHERE e.restaurante_id IS NULL
+              AND e.contrato IS NOT NULL
+              AND trim(e.contrato) <> '';
+        """))
+        db.session.commit()
+
+        # 3) índice (ajuda nas remoções/consultas por restaurante_id)
+        db.session.execute(sa_text("""
+            CREATE INDEX IF NOT EXISTS idx_escalas_restaurante_id ON escalas(restaurante_id);
+        """))
+        db.session.commit()
+
+        # 4) (opcional) FK no SQLite exigiria recriar tabela; então pulamos para evitar quebra.
+
+    else:
+        # 1) cria coluna no Postgres
+        db.session.execute(sa_text("""
+            ALTER TABLE public.escalas
+            ADD COLUMN IF NOT EXISTS restaurante_id INTEGER
+        """))
+        db.session.commit()
+
+        # 2) backfill (join por contrato ~ nome)
+        db.session.execute(sa_text("""
+            UPDATE public.escalas e
+            SET restaurante_id = r.id
+            FROM public.restaurantes r
+            WHERE e.restaurante_id IS NULL
+              AND e.contrato IS NOT NULL
+              AND btrim(e.contrato) <> ''
+              AND lower(btrim(e.contrato)) = lower(btrim(r.nome));
+        """))
+        db.session.commit()
+
+        # 3) índice
+        db.session.execute(sa_text("""
+            CREATE INDEX IF NOT EXISTS idx_escalas_restaurante_id
+            ON public.escalas(restaurante_id)
+        """))
+        db.session.commit()
+
+        # 4) FK (ignora erro se já existir)
+        try:
+            db.session.execute(sa_text("""
+                ALTER TABLE public.escalas
+                ADD CONSTRAINT fk_escalas_restaurante
+                FOREIGN KEY (restaurante_id)
+                REFERENCES public.restaurantes(id)
+                ON DELETE SET NULL
+            """))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            # se a constraint já existir, seguimos em frente
+
+except Exception:
+    db.session.rollback()
 
     # --- fotos no banco (cooperados) ---
     try:
@@ -2760,33 +2824,41 @@ def upload_escala():
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
     try:
-        # ====== INÍCIO: BLOCO DE TROCA AJUSTADO (por restaurante/contrato) ======
-        from sqlalchemy import func, or_
+        # ====== INÍCIO: BLOCO DE TROCA AJUSTADO (pega legados NULL e por contrato) ======
+        from sqlalchemy import func, and_
         deleted = 0
 
-        # Quais estabelecimentos/contratos vieram na planilha?
+        # IDs de restaurantes presentes
         rest_ids_present = {row["restaurante_id"] for row in linhas_novas if row.get("restaurante_id")}
-        contratos_present = { (row.get("contrato") or "").strip() for row in linhas_novas if (row.get("contrato") or "").strip() }
+        # Contratos (texto) presentes
+        contratos_present = {(row.get("contrato") or "").strip() for row in linhas_novas if (row.get("contrato") or "").strip()}
+        contratos_lower = [c.lower() for c in contratos_present]
 
-        conds = []
         if rest_ids_present:
-            conds.append(Escala.restaurante_id.in_(list(rest_ids_present)))
-        if contratos_present:
-            contratos_lower = [c.lower() for c in contratos_present]
-            conds.append(func.lower(Escala.contrato).in_(contratos_lower))
+            # 1) apaga tudo que tem restaurante_id nos restaurantes presentes
+            res1 = db.session.execute(sa_delete(Escala).where(Escala.restaurante_id.in_(list(rest_ids_present))))
+            deleted += res1.rowcount or 0
 
-        if conds:
-            # Apaga todas as escalas do(s) estabelecimento(s)/contrato(s) citados na planilha
-            res = db.session.execute(sa_delete(Escala).where(or_(*conds)))
-            deleted = res.rowcount or 0
-        else:
-            # fallback (caso extremo): se não deu pra identificar nenhum restaurante/contrato,
-            # mantém comportamento antigo (apagar por cooperado reconhecido)
-            if coops_na_planilha:
-                res = db.session.execute(
-                    sa_delete(Escala).where(Escala.cooperado_id.in_(list(coops_na_planilha)))
+            # 2) apaga legados: onde restaurante_id é NULL mas o contrato bate com o nome do restaurante
+            nomes_por_id = {r.id: r.nome for r in restaurantes if r.id in rest_ids_present}
+            nomes_lower = [ (nomes_por_id[rid] or "").strip().lower() for rid in rest_ids_present if rid in nomes_por_id ]
+            if nomes_lower:
+                res2 = db.session.execute(
+                    sa_delete(Escala).where(
+                        and_(
+                            Escala.restaurante_id.is_(None),
+                            func.lower(Escala.contrato).in_(nomes_lower)
+                        )
+                    )
                 )
-                deleted = res.rowcount or 0
+                deleted += res2.rowcount or 0
+
+        elif contratos_present:
+            # Sem restaurante_id: apaga por contrato (case-insensitive)
+            res3 = db.session.execute(
+                sa_delete(Escala).where(func.lower(Escala.contrato).in_(contratos_lower))
+            )
+            deleted += res3.rowcount or 0
 
         # Insere as novas linhas
         for row in linhas_novas:
@@ -2801,21 +2873,8 @@ def upload_escala():
         db.session.commit()
         msg = (
             f"Escala importada. {len(linhas_novas)} linha(s) adicionada(s). "
-            f"{deleted} escala(s) antigas removidas"
+            f"{deleted} escala(s) antigas removidas."
         )
-        if rest_ids_present or contratos_present:
-            alvos = []
-            if rest_ids_present:
-                alvos.append(f"{len(rest_ids_present)} estabelecimento(s)")
-            if contratos_present:
-                alvos.append(f"{len(contratos_present)} contrato(s)")
-            if alvos:
-                msg += " para " + " e ".join(alvos) + "."
-            else:
-                msg += "."
-        else:
-            msg += f" para {len(coops_na_planilha)} cooperado(s) reconhecido(s)."
-
         if total_linhas_planilha > 0 and len(linhas_novas) < total_linhas_planilha:
             msg += f" (Linhas processadas: {total_linhas_planilha})"
         flash(msg, "success")
