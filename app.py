@@ -2760,15 +2760,38 @@ def upload_escala():
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
     try:
+        # ====== INÍCIO: BLOCO DE TROCA AJUSTADO (por restaurante/contrato) ======
+        from sqlalchemy import func, or_
         deleted = 0
-        if coops_na_planilha:
-            res = db.session.execute(
-                sa_delete(Escala).where(Escala.cooperado_id.in_(list(coops_na_planilha)))
-            )
-            deleted = res.rowcount or 0
 
+        # Quais estabelecimentos/contratos vieram na planilha?
+        rest_ids_present = {row["restaurante_id"] for row in linhas_novas if row.get("restaurante_id")}
+        contratos_present = { (row.get("contrato") or "").strip() for row in linhas_novas if (row.get("contrato") or "").strip() }
+
+        conds = []
+        if rest_ids_present:
+            conds.append(Escala.restaurante_id.in_(list(rest_ids_present)))
+        if contratos_present:
+            contratos_lower = [c.lower() for c in contratos_present]
+            conds.append(func.lower(Escala.contrato).in_(contratos_lower))
+
+        if conds:
+            # Apaga todas as escalas do(s) estabelecimento(s)/contrato(s) citados na planilha
+            res = db.session.execute(sa_delete(Escala).where(or_(*conds)))
+            deleted = res.rowcount or 0
+        else:
+            # fallback (caso extremo): se não deu pra identificar nenhum restaurante/contrato,
+            # mantém comportamento antigo (apagar por cooperado reconhecido)
+            if coops_na_planilha:
+                res = db.session.execute(
+                    sa_delete(Escala).where(Escala.cooperado_id.in_(list(coops_na_planilha)))
+                )
+                deleted = res.rowcount or 0
+
+        # Insere as novas linhas
         for row in linhas_novas:
             db.session.add(Escala(**row))
+        # ====== FIM: BLOCO DE TROCA AJUSTADO ======
 
         for cid in coops_na_planilha:
             c = Cooperado.query.get(cid)
@@ -2778,11 +2801,25 @@ def upload_escala():
         db.session.commit()
         msg = (
             f"Escala importada. {len(linhas_novas)} linha(s) adicionada(s). "
-            f"{deleted} escala(s) antigas removidas para {len(coops_na_planilha)} cooperado(s) reconhecido(s)."
+            f"{deleted} escala(s) antigas removidas"
         )
+        if rest_ids_present or contratos_present:
+            alvos = []
+            if rest_ids_present:
+                alvos.append(f"{len(rest_ids_present)} estabelecimento(s)")
+            if contratos_present:
+                alvos.append(f"{len(contratos_present)} contrato(s)")
+            if alvos:
+                msg += " para " + " e ".join(alvos) + "."
+            else:
+                msg += "."
+        else:
+            msg += f" para {len(coops_na_planilha)} cooperado(s) reconhecido(s)."
+
         if total_linhas_planilha > 0 and len(linhas_novas) < total_linhas_planilha:
             msg += f" (Linhas processadas: {total_linhas_planilha})"
         flash(msg, "success")
+
     except Exception as e:
         db.session.rollback()
         flash(f"Erro ao importar a escala: {e}", "danger")
