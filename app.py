@@ -381,19 +381,26 @@ def init_db():
     except Exception:
         db.session.rollback()
 
-   # --- restaurante_id em escalas ---
-with app.app_context():
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "restaurante_id" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
-        else:
-            db.session.execute(sa_text("ALTER TABLE public.escalas ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
+   # --- restaurante_id em escalas (migração defensiva no startup) ---
+def ensure_restaurante_id_column():
+    with app.app_context():
+        try:
+            if _is_sqlite():
+                cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+                colnames = {row[1] for row in cols}
+                if "restaurante_id" not in colnames:
+                    db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
+            else:
+                db.session.execute(sa_text(
+                    "ALTER TABLE public.escalas ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"
+                ))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            app.logger.exception("Falha ao assegurar restaurante_id em escalas: %s", e)
+
+# Chama no import para garantir a coluna antes de usar
+ensure_restaurante_id_column()
 
         # 2) backfill (igualando contrato ao nome do restaurante, case-insensitive, com trim)
         #    OBS: SQLite permite subquery correlacionada no SET.
