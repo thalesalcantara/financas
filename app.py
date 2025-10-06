@@ -381,15 +381,19 @@ def init_db():
     except Exception:
         db.session.rollback()
 
-    # --- restaurante_id em escalas + backfill + índice/FK ---
-try:
-    if _is_sqlite():
-        # 1) cria coluna se faltar
-        cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-        colnames = {row[1] for row in cols}
-        if "restaurante_id" not in colnames:
-            db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
-            db.session.commit()
+   # --- restaurante_id em escalas ---
+with app.app_context():
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "restaurante_id" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
+        else:
+            db.session.execute(sa_text("ALTER TABLE public.escalas ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
         # 2) backfill (igualando contrato ao nome do restaurante, case-insensitive, com trim)
         #    OBS: SQLite permite subquery correlacionada no SET.
