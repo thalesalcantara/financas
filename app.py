@@ -3617,90 +3617,90 @@ def portal_restaurante():
     agenda = {d: [] for d in dias_list}
     seen = {d: set() for d in dias_list}  # evita duplicar (mesmo nome/turno/horario/contrato no mesmo dia)
 
-    # --- filtro de turno (dia/noite/todos) vindo da querystring ---
-bucket = (request.args.get("bucket") or "todos").strip().lower()
-if bucket not in {"dia", "noite", "todos"}:
-    bucket = "todos"
+     # --- filtro de turno (dia/noite/todos) vindo da querystring ---
+    bucket = (request.args.get("bucket") or "todos").strip().lower()
+    if bucket not in {"dia", "noite", "todos"}:
+        bucket = "todos"
 
-# --- monta agenda (SEM 'break' pra não perder dias compatíveis) ---
-for e in escalas_rest:
-    dt = _parse_data_escala_str(e.data)       # date | None
-    wd = _weekday_from_data_str(e.data)       # 1..7 | None
+    # --- monta agenda (SEM 'break' pra não perder dias compatíveis) ---
+    for e in escalas_rest:
+        dt = _parse_data_escala_str(e.data)       # date | None
+        wd = _weekday_from_data_str(e.data)       # 1..7 | None
+        for d in dias_list:
+            hit = (dt and dt == d) or (wd and wd == ((d.weekday() % 7) + 1))
+            if not hit:
+                continue
+
+            coop = Cooperado.query.get(e.cooperado_id) if e.cooperado_id else None
+            nome_fallback = (e.cooperado_nome or "").strip()
+            nome_show = (coop.nome if coop else nome_fallback) or "—"
+            contrato_eff = (eff_map.get(e.id, e.contrato or "") or "").strip()
+
+            # chave de dedupe por dia
+            key = (
+                (coop.id if coop else _norm(nome_show)),
+                _norm(e.turno),
+                _norm(e.horario),
+                _norm(contrato_eff),
+            )
+            if key in seen[d]:
+                continue  # ← apenas pula este dia, não sai do loop dos dias
+
+            seen[d].add(key)
+            agenda[d].append({
+                "coop": coop,
+                "cooperado_nome": nome_fallback or None,
+                "nome_planilha": nome_show,
+                "turno": (e.turno or "").strip(),
+                "horario": (e.horario or "").strip(),
+                "contrato": contrato_eff,
+                "cor": (e.cor or "").strip(),
+            })
+            # (sem break) ← permite que a mesma escala preencha outros dias compatíveis
+
+    # --- aplica filtro de turno (dia/noite) se solicitado ---
+    def _bucket_of(item):
+        return _turno_bucket(item.get("turno"), item.get("horario"))
+
+    if bucket != "todos":
+        for d in dias_list:
+            agenda[d] = [it for it in agenda[d] if _bucket_of(it) == bucket]
+
+    # --- ordena por contrato e nome ---
     for d in dias_list:
-        hit = (dt and dt == d) or (wd and wd == ((d.weekday() % 7) + 1))
-        if not hit:
-            continue
-
-        coop = Cooperado.query.get(e.cooperado_id) if e.cooperado_id else None
-        nome_fallback = (e.cooperado_nome or "").strip()
-        nome_show = (coop.nome if coop else nome_fallback) or "—"
-        contrato_eff = (eff_map.get(e.id, e.contrato or "") or "").strip()
-
-        # chave de dedupe por dia
-        key = (
-            (coop.id if coop else _norm(nome_show)),
-            _norm(e.turno),
-            _norm(e.horario),
-            _norm(contrato_eff),
+        agenda[d].sort(
+            key=lambda x: (
+                (x["contrato"] or "").lower(),
+                (x.get("nome_planilha") or (x["coop"].nome if x["coop"] else "")).lower()
+            )
         )
-        if key in seen[d]:
-            continue  # ← apenas pula este dia, não sai do loop dos dias
 
-        seen[d].add(key)
-        agenda[d].append({
-            "coop": coop,
-            "cooperado_nome": nome_fallback or None,
-            "nome_planilha": nome_show,
-            "turno": (e.turno or "").strip(),
-            "horario": (e.horario or "").strip(),
-            "contrato": contrato_eff,
-            "cor": (e.cor or "").strip(),
-        })
-        # (sem break) ← permite que a mesma escala preencha outros dias compatíveis
+    # --- contadores por turno (útil pra exibir no topo) ---
+    cont_dia = sum(1 for d in dias_list for it in agenda[d] if _turno_bucket(it["turno"], it["horario"]) == "dia")
+    cont_noite = sum(1 for d in dias_list for it in agenda[d] if _turno_bucket(it["turno"], it["horario"]) == "noite")
 
-# --- aplica filtro de turno (dia/noite) se solicitado ---
-def _bucket_of(item):
-    return _turno_bucket(item.get("turno"), item.get("horario"))
-
-if bucket != "todos":
-    for d in dias_list:
-        agenda[d] = [it for it in agenda[d] if _bucket_of(it) == bucket]
-
-# --- ordena por contrato e nome ---
-for d in dias_list:
-    agenda[d].sort(
-        key=lambda x: (
-            (x["contrato"] or "").lower(),
-            (x.get("nome_planilha") or (x["coop"].nome if x["coop"] else "")).lower()
-        )
+    return render_template(
+        "restaurante_dashboard.html",
+        rest=rest,
+        cooperados=cooperados,
+        filtro_inicio=di,
+        filtro_fim=df,
+        periodo_desc=periodo_desc,
+        total_bruto=total_bruto,
+        total_inss=total_inss,
+        total_liquido=total_liquido,
+        total_qtd=total_qtd,
+        total_entregas=total_entregas,
+        view=view,
+        agenda=agenda,
+        dias_list=dias_list,
+        ref_data=ref,
+        modo=modo,
+        # ↓ novos contextos pro template
+        bucket=bucket,
+        cont_dia=cont_dia,
+        cont_noite=cont_noite,
     )
-
-# --- contadores por turno (útil pra exibir no topo) ---
-cont_dia = sum(1 for d in dias_list for it in agenda[d] if _turno_bucket(it["turno"], it["horario"]) == "dia")
-cont_noite = sum(1 for d in dias_list for it in agenda[d] if _turno_bucket(it["turno"], it["horario"]) == "noite")
-
-return render_template(
-    "restaurante_dashboard.html",
-    rest=rest,
-    cooperados=cooperados,
-    filtro_inicio=di,
-    filtro_fim=df,
-    periodo_desc=periodo_desc,
-    total_bruto=total_bruto,
-    total_inss=total_inss,
-    total_liquido=total_liquido,
-    total_qtd=total_qtd,
-    total_entregas=total_entregas,
-    view=view,
-    agenda=agenda,
-    dias_list=dias_list,
-    ref_data=ref,
-    modo=modo,
-    # ↓ novos contextos pro template
-    bucket=bucket,
-    cont_dia=cont_dia,
-    cont_noite=cont_noite,
-)
 
 @app.post("/restaurante/lancar_producao")
 @role_required("restaurante")
