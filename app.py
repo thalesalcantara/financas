@@ -2774,121 +2774,119 @@ def upload_escala():
         flash("Nada importado: nenhum registro válido encontrado.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-   # ------- substituir -------
-try:
-    deleted_total = 0
+# ------- substituir -------
+    try:
+        deleted_total = 0
 
-    if wipe_total:
-        # MODO 1: apaga tudo
-        res = db.session.execute(sa_delete(Escala))
-        deleted_total += (res.rowcount or 0)
+        if wipe_total:
+            # MODO 1: apaga tudo
+            res = db.session.execute(sa_delete(Escala))
+            deleted_total += (res.rowcount or 0)
 
-    else:
-        # MODO 2: SUBSTITUIÇÃO POR ESCOPO (cooperados / restaurantes / nomes / contratos)
-        # Observação: "contrato" aqui é o texto que representa o restaurante/unidade.
-        import unicodedata as _u, re as _re
+        else:
+            # MODO 2: SUBSTITUIÇÃO POR ESCOPO (cooperados / restaurantes / nomes / contratos)
+            import unicodedata as _u, re as _re
 
-        def _norm_del(s: str) -> str:
-            s = _u.normalize("NFD", str(s or "").strip().lower())
-            s = "".join(ch for ch in s if _u.category(ch) != "Mn")
-            return _re.sub(r"[^a-z0-9]+", " ", s).strip()
+            def _norm_del(s: str) -> str:
+                s = _u.normalize("NFD", str(s or "").strip().lower())
+                s = "".join(ch for ch in s if _u.category(ch) != "Mn")
+                return _re.sub(r"[^a-z0-9]+", " ", s).strip()
 
-        # Conjuntos de escopo presentes no ARQUIVO NOVO
-        plan_coop_ids: set[int] = set()      # IDs de cooperados reconhecidos na planilha nova
-        plan_rest_ids: set[int] = set()      # IDs de restaurantes reconhecidos na planilha nova
-        plan_names_norm: set[str] = set()    # nomes normalizados vindos da planilha (quando não achou ID do cooperado)
-        plan_contratos_norm: set[str] = set()# contratos/unidades normalizados da planilha
+            # Conjuntos de escopo presentes no ARQUIVO NOVO
+            plan_coop_ids: set[int] = set()
+            plan_rest_ids: set[int] = set()
+            plan_names_norm: set[str] = set()
+            plan_contratos_norm: set[str] = set()
 
+            for row in linhas_novas:
+                # cooperado
+                if row.get("cooperado_id"):
+                    plan_coop_ids.add(int(row["cooperado_id"]))
+                else:
+                    nm = _norm_del(row.get("cooperado_nome") or "")
+                    if nm:
+                        plan_names_norm.add(nm)
+
+                # restaurante/contrato
+                if row.get("restaurante_id"):
+                    plan_rest_ids.add(int(row["restaurante_id"]))
+                ct_norm = _norm_del(row.get("contrato") or "")
+                if ct_norm:
+                    plan_contratos_norm.add(ct_norm)
+
+            # 1) apaga tudo dos cooperados reconhecidos
+            if plan_coop_ids:
+                res = db.session.execute(
+                    sa_delete(Escala).where(Escala.cooperado_id.in_(list(plan_coop_ids)))
+                )
+                deleted_total += (res.rowcount or 0)
+
+            # 2) apaga tudo dos restaurantes reconhecidos
+            if plan_rest_ids:
+                res = db.session.execute(
+                    sa_delete(Escala).where(Escala.restaurante_id.in_(list(plan_rest_ids)))
+                )
+                deleted_total += (res.rowcount or 0)
+
+            # 3) apaga por NOME (quando não houve ID de cooperado)
+            if plan_names_norm:
+                # 3a) com cooperado_id
+                coop_rows = db.session.query(Cooperado.id, Cooperado.nome).all()
+                ids_por_nome_match = {cid for cid, nome in coop_rows if _norm_del(nome) in plan_names_norm}
+                if ids_por_nome_match:
+                    res = db.session.execute(
+                        sa_delete(Escala).where(Escala.cooperado_id.in_(list(ids_por_nome_match)))
+                    )
+                    deleted_total += (res.rowcount or 0)
+
+                # 3b) sem cooperado_id (apenas cooperado_nome)
+                ids_escalas_sem_id = set()
+                q = Escala.query.with_entities(Escala.id, Escala.cooperado_id, Escala.cooperado_nome)
+                for _id, _cid, _nome in q:
+                    if _cid is None and _nome and _norm_del(_nome) in plan_names_norm:
+                        ids_escalas_sem_id.add(_id)
+                if ids_escalas_sem_id:
+                    res = db.session.execute(
+                        sa_delete(Escala).where(Escala.id.in_(list(ids_escalas_sem_id)))
+                    )
+                    deleted_total += (res.rowcount or 0)
+
+            # 4) apaga por CONTRATO/RESTAURANTE (texto), independente de ter restaurante_id
+            if plan_contratos_norm:
+                ids_por_contrato = set()
+                q = Escala.query.with_entities(Escala.id, Escala.contrato)
+                for _id, _contrato in q:
+                    if _contrato and _norm_del(_contrato) in plan_contratos_norm:
+                        ids_por_contrato.add(_id)
+                if ids_por_contrato:
+                    res = db.session.execute(
+                        sa_delete(Escala).where(Escala.id.in_(list(ids_por_contrato)))
+                    )
+                    deleted_total += (res.rowcount or 0)
+
+        # 5) insere novas
         for row in linhas_novas:
-            # cooperado
-            if row.get("cooperado_id"):
-                plan_coop_ids.add(int(row["cooperado_id"]))
-            else:
-                nm = _norm_del(row.get("cooperado_nome") or "")
-                if nm:
-                    plan_names_norm.add(nm)
+            db.session.add(Escala(**row))
 
-            # restaurante/contrato
-            if row.get("restaurante_id"):
-                plan_rest_ids.add(int(row["restaurante_id"]))
-            ct_norm = _norm_del(row.get("contrato") or "")
-            if ct_norm:
-                plan_contratos_norm.add(ct_norm)
+        # 6) atualiza ultima_atualizacao dos cooperados reconhecidos
+        ids_reconhecidos = {int(r["cooperado_id"]) for r in linhas_novas if r.get("cooperado_id")}
+        for cid in ids_reconhecidos:
+            c = Cooperado.query.get(cid)
+            if c:
+                c.ultima_atualizacao = datetime.now()
 
-        # 1) APAGA todas as escalas antigas de cooperados reconhecidos (por ID)
-        if plan_coop_ids:
-            res = db.session.execute(
-                sa_delete(Escala).where(Escala.cooperado_id.in_(list(plan_coop_ids)))
-            )
-            deleted_total += (res.rowcount or 0)
+        db.session.commit()
 
-        # 2) APAGA todas as escalas antigas de restaurantes reconhecidos (por ID)
-        if plan_rest_ids:
-            res = db.session.execute(
-                sa_delete(Escala).where(Escala.restaurante_id.in_(list(plan_rest_ids)))
-            )
-            deleted_total += (res.rowcount or 0)
+        modo_txt = "Substituição TOTAL" if wipe_total else "Substituição por ESCOPO (cooperados/restaurantes/nomes/contratos)"
+        flash(f"{modo_txt} aplicada. {len(linhas_novas)} linha(s) adicionada(s); {deleted_total} escala(s) removida(s).", "success")
 
-        # 3) APAGA por NOME de cooperado (quando a planilha nova não trouxe ID)
-        if plan_names_norm:
-            # 3a) apaga escalas de QUALQUER registro antigo cujo cooperado_id
-            #     seja de alguém cujo nome normalizado bate com a planilha
-            coop_rows = db.session.query(Cooperado.id, Cooperado.nome).all()
-            ids_por_nome_match = {cid for cid, nome in coop_rows if _norm_del(nome) in plan_names_norm}
-            if ids_por_nome_match:
-                res = db.session.execute(
-                    sa_delete(Escala).where(Escala.cooperado_id.in_(list(ids_por_nome_match)))
-                )
-                deleted_total += (res.rowcount or 0)
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception("Erro ao importar a escala")
+        flash(f"Erro ao importar a escala: {e}", "danger")
 
-            # 3b) apaga escalas antigas SEM cooperado_id cujo cooperado_nome bate
-            ids_escalas_sem_id = set()
-            q = Escala.query.with_entities(Escala.id, Escala.cooperado_id, Escala.cooperado_nome)
-            for _id, _cid, _nome in q:
-                if _cid is None and _nome and _norm_del(_nome) in plan_names_norm:
-                    ids_escalas_sem_id.add(_id)
-            if ids_escalas_sem_id:
-                res = db.session.execute(
-                    sa_delete(Escala).where(Escala.id.in_(list(ids_escalas_sem_id)))
-                )
-                deleted_total += (res.rowcount or 0)
+    return redirect(url_for("admin_dashboard", tab="escalas"))
 
-        # 4) APAGA por CONTRATO/RESTAURANTE (texto) — SEMPRE
-        #    (independente de o registro antigo ter restaurante_id ou não)
-        if plan_contratos_norm:
-            ids_por_contrato = set()
-            q = Escala.query.with_entities(Escala.id, Escala.contrato)
-            for _id, _contrato in q:
-                if _contrato and _norm_del(_contrato) in plan_contratos_norm:
-                    ids_por_contrato.add(_id)
-            if ids_por_contrato:
-                res = db.session.execute(
-                    sa_delete(Escala).where(Escala.id.in_(list(ids_por_contrato)))
-                )
-                deleted_total += (res.rowcount or 0)
-
-    # 5) INSERE as novas linhas da planilha
-    for row in linhas_novas:
-        db.session.add(Escala(**row))
-
-    # 6) Atualiza "ultima_atualizacao" para cooperados reconhecidos
-    ids_reconhecidos = {int(r["cooperado_id"]) for r in linhas_novas if r.get("cooperado_id")}
-    for cid in ids_reconhecidos:
-        c = Cooperado.query.get(cid)
-        if c:
-            c.ultima_atualizacao = datetime.now()
-
-    db.session.commit()
-
-    modo_txt = "Substituição TOTAL" if wipe_total else "Substituição por ESCOPO (cooperados/restaurantes/nomes/contratos)"
-    flash(f"{modo_txt} aplicada. {len(linhas_novas)} linha(s) adicionada(s); {deleted_total} escala(s) removida(s).", "success")
-
-except Exception as e:
-    db.session.rollback()
-    app.logger.exception("Erro ao importar a escala")
-    flash(f"Erro ao importar a escala: {e}", "danger")
-
-return redirect(url_for("admin_dashboard", tab="escalas"))
 
 # =========================
 # Ações de exclusão de escalas
