@@ -362,7 +362,7 @@ def init_db():
                 db.session.execute(sa_text("ALTER TABLE lancamentos ADD COLUMN qtd_entregas INTEGER"))
                 db.session.commit()
         else:
-            db.session.execute(sa_text("ALTER TABLE public.lancamentos ADD COLUMN IF NOT EXISTS qtd_entregas INTEGER"))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS lancamentos ADD COLUMN IF NOT EXISTS qtd_entregas INTEGER"))
             db.session.commit()
     except Exception:
         db.session.rollback()
@@ -376,99 +376,24 @@ def init_db():
                 db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
                 db.session.commit()
         else:
-            db.session.execute(sa_text("ALTER TABLE public.escalas ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS escalas ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-   # --- restaurante_id em escalas (migração defensiva no startup) ---
-def ensure_restaurante_id_column():
-    with app.app_context():
-        try:
-            if _is_sqlite():
-                cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-                colnames = {row[1] for row in cols}
-                if "restaurante_id" not in colnames:
-                    db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
-            else:
-                db.session.execute(sa_text(
-                    "ALTER TABLE public.escalas ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"
-                ))
+    # --- restaurante_id em escalas ---
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "restaurante_id" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
+                db.session.commit()
+        else:
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS escalas ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"))
             db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            app.logger.exception("Falha ao assegurar restaurante_id em escalas: %s", e)
-
-# Chama no import para garantir a coluna antes de usar
-ensure_restaurante_id_column()
-
-        # 2) backfill (igualando contrato ao nome do restaurante, case-insensitive, com trim)
-        #    OBS: SQLite permite subquery correlacionada no SET.
-        db.session.execute(sa_text("""
-            UPDATE escalas AS e
-            SET restaurante_id = (
-                SELECT r.id
-                FROM restaurantes r
-                WHERE lower(trim(e.contrato)) = lower(trim(r.nome))
-                LIMIT 1
-            )
-            WHERE e.restaurante_id IS NULL
-              AND e.contrato IS NOT NULL
-              AND trim(e.contrato) <> '';
-        """))
-        db.session.commit()
-
-        # 3) índice (ajuda nas remoções/consultas por restaurante_id)
-        db.session.execute(sa_text("""
-            CREATE INDEX IF NOT EXISTS idx_escalas_restaurante_id ON escalas(restaurante_id);
-        """))
-        db.session.commit()
-
-        # 4) (opcional) FK no SQLite exigiria recriar tabela; então pulamos para evitar quebra.
-
-    else:
-        # 1) cria coluna no Postgres
-        db.session.execute(sa_text("""
-            ALTER TABLE public.escalas
-            ADD COLUMN IF NOT EXISTS restaurante_id INTEGER
-        """))
-        db.session.commit()
-
-        # 2) backfill (join por contrato ~ nome)
-        db.session.execute(sa_text("""
-            UPDATE public.escalas e
-            SET restaurante_id = r.id
-            FROM public.restaurantes r
-            WHERE e.restaurante_id IS NULL
-              AND e.contrato IS NOT NULL
-              AND btrim(e.contrato) <> ''
-              AND lower(btrim(e.contrato)) = lower(btrim(r.nome));
-        """))
-        db.session.commit()
-
-        # 3) índice
-        db.session.execute(sa_text("""
-            CREATE INDEX IF NOT EXISTS idx_escalas_restaurante_id
-            ON public.escalas(restaurante_id)
-        """))
-        db.session.commit()
-
-        # 4) FK (ignora erro se já existir)
-        try:
-            db.session.execute(sa_text("""
-                ALTER TABLE public.escalas
-                ADD CONSTRAINT fk_escalas_restaurante
-                FOREIGN KEY (restaurante_id)
-                REFERENCES public.restaurantes(id)
-                ON DELETE SET NULL
-            """))
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            # se a constraint já existir, seguimos em frente
-
-except Exception:
-    db.session.rollback()
+    except Exception:
+        db.session.rollback()
 
     # --- fotos no banco (cooperados) ---
     try:
@@ -485,11 +410,11 @@ except Exception:
                 db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_url VARCHAR(255)"))
             db.session.commit()
         else:
-            db.session.execute(sa_text("ALTER TABLE public.cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-        db.session.execute(sa_text("ALTER TABLE public.cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-        db.session.execute(sa_text("ALTER TABLE public.cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-        db.session.execute(sa_text("ALTER TABLE public.cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
-        db.session.commit()
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+            db.session.commit()
     except Exception:
         db.session.rollback()
 
@@ -559,11 +484,11 @@ except Exception:
                 db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_url VARCHAR(255)"))
             db.session.commit()
         else:
-            db.session.execute(sa_text("ALTER TABLE public.restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-        db.session.execute(sa_text("ALTER TABLE public.restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-        db.session.execute(sa_text("ALTER TABLE public.restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-        db.session.execute(sa_text("ALTER TABLE public.restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
-        db.session.commit()
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+            db.session.commit()
     except Exception:
         db.session.rollback()
 
@@ -2835,46 +2760,15 @@ def upload_escala():
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
     try:
-        # ====== INÍCIO: BLOCO DE TROCA AJUSTADO (pega legados NULL e por contrato) ======
-        from sqlalchemy import func, and_
         deleted = 0
-
-        # IDs de restaurantes presentes
-        rest_ids_present = {row["restaurante_id"] for row in linhas_novas if row.get("restaurante_id")}
-        # Contratos (texto) presentes
-        contratos_present = {(row.get("contrato") or "").strip() for row in linhas_novas if (row.get("contrato") or "").strip()}
-        contratos_lower = [c.lower() for c in contratos_present]
-
-        if rest_ids_present:
-            # 1) apaga tudo que tem restaurante_id nos restaurantes presentes
-            res1 = db.session.execute(sa_delete(Escala).where(Escala.restaurante_id.in_(list(rest_ids_present))))
-            deleted += res1.rowcount or 0
-
-            # 2) apaga legados: onde restaurante_id é NULL mas o contrato bate com o nome do restaurante
-            nomes_por_id = {r.id: r.nome for r in restaurantes if r.id in rest_ids_present}
-            nomes_lower = [ (nomes_por_id[rid] or "").strip().lower() for rid in rest_ids_present if rid in nomes_por_id ]
-            if nomes_lower:
-                res2 = db.session.execute(
-                    sa_delete(Escala).where(
-                        and_(
-                            Escala.restaurante_id.is_(None),
-                            func.lower(Escala.contrato).in_(nomes_lower)
-                        )
-                    )
-                )
-                deleted += res2.rowcount or 0
-
-        elif contratos_present:
-            # Sem restaurante_id: apaga por contrato (case-insensitive)
-            res3 = db.session.execute(
-                sa_delete(Escala).where(func.lower(Escala.contrato).in_(contratos_lower))
+        if coops_na_planilha:
+            res = db.session.execute(
+                sa_delete(Escala).where(Escala.cooperado_id.in_(list(coops_na_planilha)))
             )
-            deleted += res3.rowcount or 0
+            deleted = res.rowcount or 0
 
-        # Insere as novas linhas
         for row in linhas_novas:
             db.session.add(Escala(**row))
-        # ====== FIM: BLOCO DE TROCA AJUSTADO ======
 
         for cid in coops_na_planilha:
             c = Cooperado.query.get(cid)
@@ -2884,12 +2778,11 @@ def upload_escala():
         db.session.commit()
         msg = (
             f"Escala importada. {len(linhas_novas)} linha(s) adicionada(s). "
-            f"{deleted} escala(s) antigas removidas."
+            f"{deleted} escala(s) antigas removidas para {len(coops_na_planilha)} cooperado(s) reconhecido(s)."
         )
         if total_linhas_planilha > 0 and len(linhas_novas) < total_linhas_planilha:
             msg += f" (Linhas processadas: {total_linhas_planilha})"
         flash(msg, "success")
-
     except Exception as e:
         db.session.rollback()
         flash(f"Erro ao importar a escala: {e}", "danger")
@@ -3724,12 +3617,6 @@ def portal_restaurante():
     agenda = {d: [] for d in dias_list}
     seen = {d: set() for d in dias_list}  # evita duplicar (mesmo nome/turno/horario/contrato no mesmo dia)
 
-     # --- filtro de turno (dia/noite/todos) vindo da querystring ---
-    bucket = (request.args.get("bucket") or "todos").strip().lower()
-    if bucket not in {"dia", "noite", "todos"}:
-        bucket = "todos"
-
-    # --- monta agenda (SEM 'break' pra não perder dias compatíveis) ---
     for e in escalas_rest:
         dt = _parse_data_escala_str(e.data)       # date | None
         wd = _weekday_from_data_str(e.data)       # 1..7 | None
@@ -3751,9 +3638,9 @@ def portal_restaurante():
                 _norm(contrato_eff),
             )
             if key in seen[d]:
-                continue  # ← apenas pula este dia, não sai do loop dos dias
-
+                break
             seen[d].add(key)
+
             agenda[d].append({
                 "coop": coop,
                 "cooperado_nome": nome_fallback or None,
@@ -3763,28 +3650,11 @@ def portal_restaurante():
                 "contrato": contrato_eff,
                 "cor": (e.cor or "").strip(),
             })
-            # (sem break) ← permite que a mesma escala preencha outros dias compatíveis
+            break
 
-    # --- aplica filtro de turno (dia/noite) se solicitado ---
-    def _bucket_of(item):
-        return _turno_bucket(item.get("turno"), item.get("horario"))
-
-    if bucket != "todos":
-        for d in dias_list:
-            agenda[d] = [it for it in agenda[d] if _bucket_of(it) == bucket]
-
-    # --- ordena por contrato e nome ---
     for d in dias_list:
-        agenda[d].sort(
-            key=lambda x: (
-                (x["contrato"] or "").lower(),
-                (x.get("nome_planilha") or (x["coop"].nome if x["coop"] else "")).lower()
-            )
-        )
-
-    # --- contadores por turno (útil pra exibir no topo) ---
-    cont_dia = sum(1 for d in dias_list for it in agenda[d] if _turno_bucket(it["turno"], it["horario"]) == "dia")
-    cont_noite = sum(1 for d in dias_list for it in agenda[d] if _turno_bucket(it["turno"], it["horario"]) == "noite")
+        agenda[d].sort(key=lambda x: ((x["contrato"] or "").lower(),
+                                      (x.get("nome_planilha") or (x["coop"].nome if x["coop"] else "")).lower()))
 
     return render_template(
         "restaurante_dashboard.html",
@@ -3803,10 +3673,6 @@ def portal_restaurante():
         dias_list=dias_list,
         ref_data=ref,
         modo=modo,
-        # ↓ novos contextos pro template
-        bucket=bucket,
-        cont_dia=cont_dia,
-        cont_noite=cont_noite,
     )
 
 @app.post("/restaurante/lancar_producao")
