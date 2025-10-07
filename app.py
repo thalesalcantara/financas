@@ -2613,7 +2613,7 @@ def ratear_beneficios():
     return redirect(url_for("admin_dashboard", tab="beneficios"))
 
 # =========================
-# Escalas — Upload (CASA PELO LOGIN DO COOPERADO) com substituição por escopo ou total
+# Escalas — Upload (LOGIN do cooperado) + substituição total/por escopo
 # =========================
 @app.route("/escalas/upload", methods=["POST"])
 @admin_required
@@ -2623,7 +2623,8 @@ def upload_escala():
         flash("Envie um arquivo .xlsx válido.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    wipe_total = request.form.get("wipe_total") == "1"  # checkbox opcional no form
+    # checkbox (no formulário, name="wipe_total" value="1")
+    wipe_total = request.form.get("wipe_total") == "1"
 
     path = os.path.join(UPLOAD_DIR, secure_filename(file.filename))
     file.save(path)
@@ -2699,12 +2700,13 @@ def upload_escala():
     col_data     = find_col("data", "dia", "data do plantao")
     col_turno    = find_col("turno")
     col_horario  = find_col("horario", "horário", "hora", "periodo", "período")
-    col_contrato = find_col("contrato", "restaurante", "unidade")
+    col_contrato = find_col("contrato", "restaurante", "unidade", "local")
     col_login    = find_col("login", "usuario", "usuário", "username", "user", "nome de usuario", "nome de usuário")
     col_cor      = find_col("cor", "cores", "cor da celula", "cor celula")
 
     if not col_login:
         flash("Não encontrei a coluna de LOGIN do cooperado na planilha (ex.: 'login' ou 'usuario').", "danger")
+        app.logger.warning(f"Headers normalizados lidos: {headers_norm}")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
     # ------- cache entidades -------
@@ -2719,7 +2721,7 @@ def upload_escala():
             if a == b or a in b or b in a: return r.id
         try:
             nomes_norm = [_norm_local(r.nome) for r in restaurantes]
-            close = _dif.get_close_matches(a, nomes_norm, n=1, cutoff=0.87)
+            close = difflib.get_close_matches(a, nomes_norm, n=1, cutoff=0.87)
             if close:
                 alvo = close[0]
                 for r in restaurantes:
@@ -2732,8 +2734,9 @@ def upload_escala():
         key = _norm_login(login_txt)
         if not key: return None
         for c in cooperados:
-            login = getattr(c.usuario_ref, "usuario", "") or ""
-            if _norm_login(login) == key:
+            login = getattr(c, "usuario_ref", None)
+            login_val = getattr(login, "usuario", "") if login else ""
+            if _norm_login(login_val) == key:
                 return c
         return None
 
@@ -2771,18 +2774,20 @@ def upload_escala():
         flash("Nada importado: nenhum registro válido encontrado.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    # ------- SUBSTITUIR -------
+    # ------- substituir -------
     try:
-        if wipe_total:
-            # --- MODO TOTAL: Admin pediu troca completa ---
-            deleted_total = db.session.execute(sa_delete(Escala)).rowcount or 0
+        deleted_total = 0
 
+        if wipe_total:
+            # apaga tudo
+            res = db.session.execute(sa_delete(Escala))
+            deleted_total += (res.rowcount or 0)
         else:
-            # --- MODO ESCOPO: substitui POR RESTAURANTE / POR COOPERADO / fallback por nome/contrato ---
+            # substitui por ESCOPO: restaurantes / cooperados / nomes sem ID / contratos sem restaurante
             def _norm_del(s: str) -> str:
-                s = _u.normalize("NFD", str(s or "").strip().lower())
-                s = "".join(ch for ch in s if _u.category(ch) != "Mn")
-                return _re.sub(r"[^a-z0-9]+", " ", s).strip()
+                s = unicodedata.normalize("NFD", str(s or "").strip().lower())
+                s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+                return re.sub(r"[^a-z0-9]+", " ", s).strip()
 
             plan_coop_ids: set[int] = set()
             plan_rest_ids: set[int] = set()
@@ -2801,14 +2806,16 @@ def upload_escala():
                 ct_norm = _norm_del(row.get("contrato") or "")
                 if ct_norm: plan_contratos_norm.add(ct_norm)
 
-            deleted_total = 0
-
             if plan_coop_ids:
-                res = db.session.execute(sa_delete(Escala).where(Escala.cooperado_id.in_(list(plan_coop_ids))))
+                res = db.session.execute(
+                    sa_delete(Escala).where(Escala.cooperado_id.in_(list(plan_coop_ids)))
+                )
                 deleted_total += (res.rowcount or 0)
 
             if plan_rest_ids:
-                res = db.session.execute(sa_delete(Escala).where(Escala.restaurante_id.in_(list(plan_rest_ids))))
+                res = db.session.execute(
+                    sa_delete(Escala).where(Escala.restaurante_id.in_(list(plan_rest_ids)))
+                )
                 deleted_total += (res.rowcount or 0)
 
             ids_por_nome = set()
@@ -2828,11 +2835,11 @@ def upload_escala():
                 res = db.session.execute(sa_delete(Escala).where(Escala.id.in_(list(ids_por_nome))))
                 deleted_total += (res.rowcount or 0)
 
-        # Insere as novas linhas
+        # insere novas
         for row in linhas_novas:
             db.session.add(Escala(**row))
 
-        # Marca ultima_atualizacao
+        # atualiza ultima_atualizacao dos reconhecidos
         ids_reconhecidos = {int(r["cooperado_id"]) for r in linhas_novas if r.get("cooperado_id")}
         for cid in ids_reconhecidos:
             c = Cooperado.query.get(cid)
@@ -2842,12 +2849,11 @@ def upload_escala():
         db.session.commit()
 
         modo_txt = "Substituição TOTAL" if wipe_total else "Substituição por ESCOPO (restaurantes/cooperados/nomes/contratos)"
-        msg = (f"{modo_txt} aplicada. {len(linhas_novas)} linha(s) adicionada(s); "
-               f"{deleted_total} escala(s) antiga(s) removida(s).")
-        flash(msg, "success")
+        flash(f"{modo_txt} aplicada. {len(linhas_novas)} linha(s) adicionada(s); {deleted_total} escala(s) removida(s).", "success")
 
     except Exception as e:
         db.session.rollback()
+        app.logger.exception("Erro ao importar a escala")
         flash(f"Erro ao importar a escala: {e}", "danger")
 
     return redirect(url_for("admin_dashboard", tab="escalas"))
@@ -2954,6 +2960,33 @@ def upload_escala():
         db.session.rollback()
         flash(f"Erro ao importar a escala: {e}", "danger")
 
+    return redirect(url_for("admin_dashboard", tab="escalas"))
+
+# =========================
+# Ações de exclusão de escalas
+# =========================
+@app.post("/escalas/purge_all")
+@admin_required
+def escalas_purge_all():
+    res = db.session.execute(sa_delete(Escala))
+    db.session.commit()
+    flash(f"Todas as escalas foram excluídas ({res.rowcount or 0}).", "info")
+    return redirect(url_for("admin_dashboard", tab="escalas"))
+
+@app.post("/escalas/purge_cooperado/<int:coop_id>")
+@admin_required
+def escalas_purge_cooperado(coop_id):
+    res = db.session.execute(sa_delete(Escala).where(Escala.cooperado_id == coop_id))
+    db.session.commit()
+    flash(f"Escalas do cooperado #{coop_id} excluídas ({res.rowcount or 0}).", "info")
+    return redirect(url_for("admin_dashboard", tab="escalas"))
+
+@app.post("/escalas/purge_restaurante/<int:rest_id>")
+@admin_required
+def escalas_purge_restaurante(rest_id):
+    res = db.session.execute(sa_delete(Escala).where(Escala.restaurante_id == rest_id))
+    db.session.commit()
+    flash(f"Escalas do restaurante #{rest_id} excluídas ({res.rowcount or 0}).", "info")
     return redirect(url_for("admin_dashboard", tab="escalas"))
 
 # =========================
