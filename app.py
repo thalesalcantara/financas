@@ -4041,54 +4041,50 @@ def tabelas_publicas():
 
 
 # ---------------- TABELAS (Restaurante) ----------------
+# ---------------- TABELAS (Restaurante) ----------------
+from flask import render_template, session
+import unicodedata, re
+
 @app.route("/rest/tabelas")
 @role_required("restaurante")
 def rest_tabelas():
     """
     Página do restaurante para abrir/baixar SOMENTE a tabela cujo título
-    coincide (ou contém) o login do restaurante. Se não achar, mostra a mais recente.
+    é exatamente igual (ignorando acentos/maiúsculas/espaços múltiplos)
+    ao nome/login do restaurante. Sem match parcial e sem fallback.
     """
     u_id = session.get("user_id")
     restaurante = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
 
-    # login do restaurante (prioriza o login de usuário)
+    # login/nome que será usado como referência de título
     login_nome = (
         getattr(getattr(restaurante, "usuario_ref", None), "usuario", None)
         or getattr(restaurante, "usuario", None)
         or (restaurante.nome or "")
     )
 
-    tabelas = Tabela.query.order_by(Tabela.enviado_em.desc()).all()
-
     def _norm(s: str) -> str:
         s = unicodedata.normalize("NFD", (s or "").strip())
-        s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
-        s = re.sub(r"\s+", " ", s)
+        s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")  # remove acentos
+        s = re.sub(r"\s+", " ", s)  # colapsa espaços
         return s.lower()
 
-    ln = _norm(login_nome)
-    match_exato = None
-    match_parcial = None
+    alvo_norm = _norm(login_nome)
 
-    for t in tabelas:
-        tt = _norm(t.titulo)
-        if not tt or not ln:
-            continue
-        if tt == ln:
-            match_exato = t
-            break
-        if (ln in tt) or (tt in ln):
-            if not match_parcial:
-                match_parcial = t
+    # Buscamos por candidatos (opcionalmente reduz a lista) e validamos igualdade exata após normalização
+    candidatos = (Tabela.query
+                  .filter(Tabela.titulo.ilike(f"%{login_nome}%"))  # facilita, mas validamos exato em Python
+                  .order_by(Tabela.enviado_em.desc())
+                  .all())
 
-    # Fallback: se não achou por nome, usa a mais recente (se houver)
-    tabela_alvo = match_exato or match_parcial or (tabelas[0] if tabelas else None)
+    tabela_exata = next((t for t in candidatos if _norm(t.titulo) == alvo_norm), None)
 
+    # Não há match exato? Não mostra tabela (template exibe alerta orientando a publicar com o título correto)
     return render_template(
-        "restaurantes_tabelas.html",  # crie esse template simples de visualização
+        "restaurantes_tabelas.html",
         restaurante=restaurante,
         login_nome=login_nome,
-        tabela=tabela_alvo
+        tabela=tabela_exata
     )
 
 # ---------------- Download compartilhado ----------------
