@@ -550,6 +550,27 @@ def _normalize_name(s: str) -> list[str]:
     return parts
 
 
+def _norm_login(s: str) -> str:
+    # remove acento, minúsculo e sem espaços
+    s = unicodedata.normalize("NFD", s or "")
+    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+    s = s.lower().strip()
+    s = re.sub(r"\s+", "", s)
+    return s
+
+def _match_cooperado_by_login(login_planilha: str, cooperados: list[Cooperado]) -> Cooperado | None:
+    """Casa EXATAMENTE com Usuario.usuario após normalização."""
+    key = _norm_login(login_planilha)
+    if not key:
+        return None
+    for c in cooperados:
+        # c.usuario_ref.usuario é o login usado no sistema
+        login = getattr(c.usuario_ref, "usuario", "") or ""
+        if _norm_login(login) == key:
+            return c
+    return None
+
+
 def _match_restaurante_id(contrato_txt: str) -> int | None:
     alvo = " ".join(_normalize_name(contrato_txt or ""))
     if not alvo:
@@ -2667,12 +2688,12 @@ def upload_escala():
     col_turno    = find_col("turno")
     col_horario  = find_col("horario", "horário", "hora", "periodo", "período")
     col_contrato = find_col("contrato", "restaurante", "unidade")
-    col_nome     = find_col("nome do cooperado", "cooperado", "nome", "colaborador")
+    col_login    = find_col("login", "usuario", "usuário", "username", "user", "nome de usuário")
     col_cor      = find_col("cor", "cores", "cor da celula", "cor celula")
 
-    if not col_nome:
-        flash("Não encontrei a coluna de nome do cooperado na planilha.", "danger")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
+    if not col_login:
+    flash("Não encontrei a coluna de LOGIN do cooperado na planilha (ex.: 'login' ou 'usuario').", "danger")
+    return redirect(url_for("admin_dashboard", tab="escalas"))
 
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
     def match_restaurante_id(contrato_txt: str) -> int | None:
@@ -2720,40 +2741,43 @@ def upload_escala():
     total_linhas_planilha = 0
 
     for i in range(2, ws.max_row + 1):
-        nome_raw = ws.cell(i, col_nome).value if col_nome else None
-        nome = (str(nome_raw).strip() if nome_raw is not None else "")
-        if not nome:
-            continue
-        total_linhas_planilha += 1
+    login_raw = ws.cell(i, col_login).value if col_login else None
+    login_txt = (str(login_raw).strip() if login_raw is not None else "")
+    if not login_txt:
+        continue  # sem login, ignora a linha
 
-        data_v     = ws.cell(i, col_data).value     if col_data     else None
-        turno_v    = ws.cell(i, col_turno).value    if col_turno    else None
-        horario_v  = ws.cell(i, col_horario).value  if col_horario  else None
-        contrato_v = ws.cell(i, col_contrato).value if col_contrato else None
-        cor_v      = ws.cell(i, col_cor).value      if col_cor      else None
-        _qtd       = ws.cell(i, col_qtd).value      if col_qtd      else None  # ignorado
+    total_linhas_planilha += 1
 
-        contrato_txt = (str(contrato_v).strip() if contrato_v is not None else "")
-        data_txt     = fmt_data_cell(data_v)
-        turno_txt    = (str(turno_v).strip() if turno_v is not None else "")
-        horario_txt  = (str(horario_v).strip() if horario_v is not None else "")
-        cor_txt      = to_css_color_local(cor_v)
-        rest_id      = match_restaurante_id(contrato_txt)
+    data_v     = ws.cell(i, col_data).value     if col_data     else None
+    turno_v    = ws.cell(i, col_turno).value    if col_turno    else None
+    horario_v  = ws.cell(i, col_horario).value  if col_horario  else None
+    contrato_v = ws.cell(i, col_contrato).value if col_contrato else None
+    cor_v      = ws.cell(i, col_cor).value      if col_cor      else None
+    _qtd       = ws.cell(i, col_qtd).value      if col_qtd      else None  # ignorado
 
-        match = _match_cooperado_by_name(nome, cooperados)
-        payload = {
-            "cooperado_id":   (match.id if match else None),
-            "cooperado_nome": (None if match else nome),
-            "data":           data_txt,
-            "turno":          turno_txt,
-            "horario":        horario_txt,
-            "contrato":       contrato_txt,
-            "cor":            cor_txt,
-            "restaurante_id": rest_id,
-        }
-        if match:
-            coops_na_planilha.add(match.id)
-        linhas_novas.append(payload)
+    contrato_txt = (str(contrato_v).strip() if contrato_v is not None else "")
+    data_txt     = fmt_data_cell(data_v)
+    turno_txt    = (str(turno_v).strip() if turno_v is not None else "")
+    horario_txt  = (str(horario_v).strip() if horario_v is not None else "")
+    cor_txt      = to_css_color_local(cor_v)
+    rest_id      = match_restaurante_id(contrato_txt)
+
+    match = _match_cooperado_by_login(login_txt, cooperados)
+
+    payload = {
+        "cooperado_id":   (match.id if match else None),
+        # se não achou cadastro, salva o LOGIN como nome visível de fallback
+        "cooperado_nome": (None if match else login_txt),
+        "data":           data_txt,
+        "turno":          turno_txt,
+        "horario":        horario_txt,
+        "contrato":       contrato_txt,
+        "cor":            cor_txt,
+        "restaurante_id": rest_id,
+    }
+    if match:
+        coops_na_planilha.add(match.id)
+    linhas_novas.append(payload)
 
     if not linhas_novas:
         flash("Nada importado: nenhum registro válido encontrado.", "warning")
