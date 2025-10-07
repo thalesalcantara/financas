@@ -549,23 +549,6 @@ def _normalize_name(s: str) -> list[str]:
     parts = [p.lower() for p in s.split() if p.strip()]
     return parts
 
-def _norm_login(s: str) -> str:
-    s = unicodedata.normalize("NFD", s or "")
-    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
-    s = s.lower().strip()
-    s = re.sub(r"\s+", "", s)
-    return s
-
-def _match_cooperado_by_login(login_planilha: str, cooperados: list[Cooperado]) -> Cooperado | None:
-    key = _norm_login(login_planilha)
-    if not key:
-        return None
-    for c in cooperados:
-        login = getattr(c.usuario_ref, "usuario", "") or ""
-        if _norm_login(login) == key:
-            return c
-    return None
-
 
 def _match_restaurante_id(contrato_txt: str) -> int | None:
     alvo = " ".join(_normalize_name(contrato_txt or ""))
@@ -2684,10 +2667,12 @@ def upload_escala():
     col_turno    = find_col("turno")
     col_horario  = find_col("horario", "horário", "hora", "periodo", "período")
     col_contrato = find_col("contrato", "restaurante", "unidade")
-    col_login = find_col("login", "usuario", "usuário", "username", "user", "nome de usuário")
-if not col_login:
-    flash("Não encontrei a coluna de LOGIN do cooperado na planilha (ex.: 'login' ou 'usuario').", "danger")
-    return redirect(url_for("admin_dashboard", tab="escalas"))
+    col_nome     = find_col("nome do cooperado", "cooperado", "nome", "colaborador")
+    col_cor      = find_col("cor", "cores", "cor da celula", "cor celula")
+
+    if not col_nome:
+        flash("Não encontrei a coluna de nome do cooperado na planilha.", "danger")
+        return redirect(url_for("admin_dashboard", tab="escalas"))
 
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
     def match_restaurante_id(contrato_txt: str) -> int | None:
@@ -2735,11 +2720,11 @@ if not col_login:
     total_linhas_planilha = 0
 
     for i in range(2, ws.max_row + 1):
-    login_raw = ws.cell(i, col_login).value if col_login else None
-    login_txt = (str(login_raw).strip() if login_raw is not None else "")
-    if not login_txt:
-        continue
-    total_linhas_planilha += 1
+        nome_raw = ws.cell(i, col_nome).value if col_nome else None
+        nome = (str(nome_raw).strip() if nome_raw is not None else "")
+        if not nome:
+            continue
+        total_linhas_planilha += 1
 
         data_v     = ws.cell(i, col_data).value     if col_data     else None
         turno_v    = ws.cell(i, col_turno).value    if col_turno    else None
@@ -2755,11 +2740,10 @@ if not col_login:
         cor_txt      = to_css_color_local(cor_v)
         rest_id      = match_restaurante_id(contrato_txt)
 
-        match = _match_cooperado_by_login(login_txt, cooperados)
-payload = {
-    "cooperado_id":   (match.id if match else None),
-    # se não achou, guardamos o texto do login da planilha em cooperado_nome (fallback)
-    "cooperado_nome": (None if match else login_txt),
+        match = _match_cooperado_by_name(nome, cooperados)
+        payload = {
+            "cooperado_id":   (match.id if match else None),
+            "cooperado_nome": (None if match else nome),
             "data":           data_txt,
             "turno":          turno_txt,
             "horario":        horario_txt,
