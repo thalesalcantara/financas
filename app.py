@@ -2645,7 +2645,7 @@ def upload_escala():
         s = "".join(ch for ch in s if _u.category(ch) != "Mn")
         return _re.sub(r"[^a-z0-9]+", " ", s).strip()
 
-    def _norm_login(s: str) -> str:
+    def _norm_login_local(s: str) -> str:
         s = _u.normalize("NFD", s or "")
         s = "".join(ch for ch in s if _u.category(ch) != "Mn")
         return _re.sub(r"\s+", "", s.lower().strip())
@@ -2688,6 +2688,7 @@ def upload_escala():
 
     # ------- colunas -------
     headers_norm = { _norm_local(str(c.value or "")) : j for j, c in enumerate(ws[1], start=1) }
+
     def find_col(*aliases):
         al = [_norm_local(a) for a in aliases]
         for a in al:
@@ -2702,13 +2703,13 @@ def upload_escala():
     col_horario  = find_col("horario", "horário", "hora", "periodo", "período")
     col_contrato = find_col("contrato", "restaurante", "unidade", "local")
     col_login    = find_col("login", "usuario", "usuário", "username", "user", "nome de usuario", "nome de usuário")
-    col_nome  = find_col("nome","nome do cooperado","cooperado","motoboy","entregador")
-    col_cor      = find_col("cor", "cores", "cor da celula", "cor celula")
+    col_nome     = find_col("nome", "nome do cooperado", "cooperado", "motoboy", "entregador")
 
+    # ✅ agora aceitamos login OU nome; se ambos ausentes, aborta
     if not col_login and not col_nome:
-    flash("Não encontrei a coluna de LOGIN nem a de NOME do cooperado na planilha.", "danger")
-    app.logger.warning(f"Headers normalizados lidos: {headers_norm}")
-    return redirect(url_for("admin_dashboard", tab="escalas"))
+        flash("Não encontrei a coluna de LOGIN nem a de NOME do cooperado na planilha.", "danger")
+        app.logger.warning(f"Headers normalizados lidos: {headers_norm}")
+        return redirect(url_for("admin_dashboard", tab="escalas"))
 
     # ------- cache entidades -------
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
@@ -2732,21 +2733,26 @@ def upload_escala():
         return None
 
     def match_cooperado_by_login(login_txt: str) -> Cooperado | None:
-        key = _norm_login(login_txt)
+        key = _norm_login_local(login_txt)
         if not key: return None
         for c in cooperados:
             login = getattr(c, "usuario_ref", None)
             login_val = getattr(login, "usuario", "") if login else ""
-            if _norm_login(login_val) == key:
+            if _norm_login_local(login_val) == key:
                 return c
         return None
+
+    # vamos reaproveitar o helper global já definido no arquivo
+    from_here_match_by_name = _match_cooperado_by_name
 
     # ------- parse linhas -------
     linhas_novas, total_linhas_planilha = [], 0
     for i in range(2, ws.max_row + 1):
-        login_raw = ws.cell(i, col_login).value if col_login else None
-        login_txt = (str(login_raw).strip() if login_raw is not None else "")
-        if not login_txt:
+        login_txt = str(ws.cell(i, col_login).value).strip() if col_login else ""
+        nome_txt  = str(ws.cell(i, col_nome ).value).strip() if col_nome  else ""
+
+        # se linha não traz nem login nem nome, ignora
+        if not login_txt and not nome_txt:
             continue
         total_linhas_planilha += 1
 
@@ -2754,15 +2760,22 @@ def upload_escala():
         turno_v    = ws.cell(i, col_turno).value    if col_turno    else None
         horario_v  = ws.cell(i, col_horario).value  if col_horario  else None
         contrato_v = ws.cell(i, col_contrato).value if col_contrato else None
-        cor_v      = ws.cell(i, col_cor).value      if col_cor      else None
+        cor_v      = ws.cell(i, col_cor := find_col("cor","cores","cor da celula","cor celula")).value if col_cor else None
 
         contrato_txt = (str(contrato_v).strip() if contrato_v is not None else "")
         rest_id      = match_restaurante_id(contrato_txt)
-        coop_match   = match_cooperado_by_login(login_txt)
+
+        # tenta casar cooperado por login; se não houver login, tenta por nome
+        if login_txt:
+            coop_match = match_cooperado_by_login(login_txt)
+        else:
+            coop_match = from_here_match_by_name(nome_txt, cooperados)
+
+        nome_fallback = (nome_txt or login_txt)  # o que aparecer para "sem cadastro"
 
         linhas_novas.append({
             "cooperado_id":   (coop_match.id if coop_match else None),
-            "cooperado_nome": (None if coop_match else login_txt),  # fallback visível
+            "cooperado_nome": (None if coop_match else nome_fallback),
             "data":           fmt_data_cell(data_v),
             "turno":          (str(turno_v).strip() if turno_v is not None else ""),
             "horario":        (str(horario_v).strip() if horario_v is not None else ""),
@@ -2775,7 +2788,7 @@ def upload_escala():
         flash("Nada importado: nenhum registro válido encontrado.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-# ------- substituir -------
+    # ------- substituir -------
     try:
         deleted_total = 0
 
@@ -2786,12 +2799,12 @@ def upload_escala():
 
         else:
             # MODO 2: SUBSTITUIÇÃO POR ESCOPO (cooperados / restaurantes / nomes / contratos)
-            import unicodedata as _u, re as _re
+            import unicodedata as _u2, re as _re2
 
             def _norm_del(s: str) -> str:
-                s = _u.normalize("NFD", str(s or "").strip().lower())
-                s = "".join(ch for ch in s if _u.category(ch) != "Mn")
-                return _re.sub(r"[^a-z0-9]+", " ", s).strip()
+                s = _u2.normalize("NFD", str(s or "").strip().lower())
+                s = "".join(ch for ch in s if _u2.category(ch) != "Mn")
+                return _re2.sub(r"[^a-z0-9]+", " ", s).strip()
 
             # Conjuntos de escopo presentes no ARQUIVO NOVO
             plan_coop_ids: set[int] = set()
@@ -2887,7 +2900,6 @@ def upload_escala():
         flash(f"Erro ao importar a escala: {e}", "danger")
 
     return redirect(url_for("admin_dashboard", tab="escalas"))
-
 
 # =========================
 # Ações de exclusão de escalas
