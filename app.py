@@ -2702,12 +2702,13 @@ def upload_escala():
     col_horario  = find_col("horario", "horário", "hora", "periodo", "período")
     col_contrato = find_col("contrato", "restaurante", "unidade", "local")
     col_login    = find_col("login", "usuario", "usuário", "username", "user", "nome de usuario", "nome de usuário")
+    col_nome  = find_col("nome","nome do cooperado","cooperado","motoboy","entregador")
     col_cor      = find_col("cor", "cores", "cor da celula", "cor celula")
 
-    if not col_login:
-        flash("Não encontrei a coluna de LOGIN do cooperado na planilha (ex.: 'login' ou 'usuario').", "danger")
-        app.logger.warning(f"Headers normalizados lidos: {headers_norm}")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
+    if not col_login and not col_nome:
+    flash("Não encontrei a coluna de LOGIN nem a de NOME do cooperado na planilha.", "danger")
+    app.logger.warning(f"Headers normalizados lidos: {headers_norm}")
+    return redirect(url_for("admin_dashboard", tab="escalas"))
 
     # ------- cache entidades -------
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
@@ -3949,8 +3950,7 @@ def admin_upload_documento():
         enviado_em=datetime.utcnow(),
     )
     db.session.add(d)
-    db.session.commit()
-
+    db.session.commit()    
     flash("Documento enviado.", "success")
     return redirect(url_for("admin_documentos"))
 
