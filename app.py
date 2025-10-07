@@ -2613,7 +2613,7 @@ def ratear_beneficios():
     return redirect(url_for("admin_dashboard", tab="beneficios"))
 
 # =========================
-# Escalas — Upload (CASA PELO LOGIN DO COOPERADO)
+# Escalas — Upload (CASA PELO LOGIN DO COOPERADO) com substituição por escopo ou total
 # =========================
 @app.route("/escalas/upload", methods=["POST"])
 @admin_required
@@ -2623,7 +2623,8 @@ def upload_escala():
         flash("Envie um arquivo .xlsx válido.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    # salva temporariamente
+    wipe_total = request.form.get("wipe_total") == "1"  # checkbox opcional no form
+
     path = os.path.join(UPLOAD_DIR, secure_filename(file.filename))
     file.save(path)
 
@@ -2636,17 +2637,21 @@ def upload_escala():
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb.active
 
-    # ------- helpers locais -------
+    # ------- helpers -------
     import unicodedata as _u, re as _re, difflib as _dif
     def _norm_local(s: str) -> str:
         s = _u.normalize("NFD", str(s or "").strip().lower())
         s = "".join(ch for ch in s if _u.category(ch) != "Mn")
         return _re.sub(r"[^a-z0-9]+", " ", s).strip()
 
+    def _norm_login(s: str) -> str:
+        s = _u.normalize("NFD", s or "")
+        s = "".join(ch for ch in s if _u.category(ch) != "Mn")
+        return _re.sub(r"\s+", "", s.lower().strip())
+
     def to_css_color_local(v: str) -> str:
         t = str(v or "").strip()
         if not t: return ""
-        t_low = t.lower().strip()
         if _re.fullmatch(r"[0-9a-fA-F]{8}", t):
             a = int(t[0:2], 16) / 255.0
             r = int(t[2:4], 16); g = int(t[4:6], 16); b = int(t[6:8], 16)
@@ -2654,8 +2659,7 @@ def upload_escala():
         if _re.fullmatch(r"[0-9a-fA-F]{6}", t):
             return f"#{t}"
         if _re.fullmatch(r"#?[0-9a-fA-F]{6,8}", t):
-            if not t.startswith("#"):
-                t = f"#{t}"
+            if not t.startswith("#"): t = f"#{t}"
             if len(t) == 9:
                 a = int(t[1:3], 16) / 255.0
                 r = int(t[3:5], 16); g = int(t[5:7], 16); b = int(t[7:9], 16)
@@ -2667,39 +2671,31 @@ def upload_escala():
             return f"rgb({r},{g},{b})"
         mapa = {"azul":"blue","vermelho":"red","verde":"green","amarelo":"yellow",
                 "cinza":"gray","preto":"black","branco":"white","laranja":"orange","roxo":"purple"}
-        return mapa.get(t_low, t)
+        return mapa.get(t.lower(), t)
 
     def fmt_data_cell(v) -> str:
-        if v is None or str(v).strip() == "":
-            return ""
-        if isinstance(v, datetime):
-            return v.date().strftime("%d/%m/%Y")
-        if isinstance(v, date):
-            return v.strftime("%d/%m/%Y")
+        if v is None or str(v).strip() == "": return ""
+        if isinstance(v, datetime): return v.date().strftime("%d/%m/%Y")
+        if isinstance(v, date):     return v.strftime("%d/%m/%Y")
         s = str(v).strip()
         m = re.fullmatch(r"(\d{4})[-/](\d{1,2})[-/](\d{1,2})", s)
         if m:
             y, mth, d = map(int, m.groups())
-            try:
-                return date(y, mth, d).strftime("%d/%m/%Y")
-            except Exception:
-                return s
+            try: return date(y, mth, d).strftime("%d/%m/%Y")
+            except Exception: return s
         return s
 
-    # ------- mapa de colunas -------
-    headers_norm = { _norm_local(str(cell.value or "")) : j for j, cell in enumerate(ws[1], start=1) }
+    # ------- colunas -------
+    headers_norm = { _norm_local(str(c.value or "")) : j for j, c in enumerate(ws[1], start=1) }
     def find_col(*aliases):
-        n_aliases = [_norm_local(a) for a in aliases]
-        for a in n_aliases:
-            if a in headers_norm:
-                return headers_norm[a]
+        al = [_norm_local(a) for a in aliases]
+        for a in al:
+            if a in headers_norm: return headers_norm[a]
         for k_norm, j in headers_norm.items():
-            for a in n_aliases:
-                if a and a in k_norm:
-                    return j
+            for a in al:
+                if a and a in k_norm: return j
         return None
 
-    # Data | Turno | Horário | Contrato | LOGIN | [Cor]
     col_data     = find_col("data", "dia", "data do plantao")
     col_turno    = find_col("turno")
     col_horario  = find_col("horario", "horário", "hora", "periodo", "período")
@@ -2711,58 +2707,43 @@ def upload_escala():
         flash("Não encontrei a coluna de LOGIN do cooperado na planilha (ex.: 'login' ou 'usuario').", "danger")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    # ------- cache de entidades -------
+    # ------- cache entidades -------
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
     cooperados   = Cooperado.query.order_by(Cooperado.nome).all()
 
     def match_restaurante_id(contrato_txt: str) -> int | None:
         a = _norm_local(contrato_txt)
-        if not a:
-            return None
+        if not a: return None
         for r in restaurantes:
             b = _norm_local(r.nome)
-            if a == b or a in b or b in a:
-                return r.id
+            if a == b or a in b or b in a: return r.id
         try:
             nomes_norm = [_norm_local(r.nome) for r in restaurantes]
             close = _dif.get_close_matches(a, nomes_norm, n=1, cutoff=0.87)
             if close:
                 alvo = close[0]
                 for r in restaurantes:
-                    if _norm_local(r.nome) == alvo:
-                        return r.id
+                    if _norm_local(r.nome) == alvo: return r.id
         except Exception:
             pass
         return None
 
-    # CASAMENTO PELO LOGIN (exato, com normalização igual do app)
-    def _norm_login(s: str) -> str:
-        s = _u.normalize("NFD", s or "")
-        s = "".join(ch for ch in s if _u.category(ch) != "Mn")
-        s = s.lower().strip()
-        s = _re.sub(r"\s+", "", s)
-        return s
-
-    def _match_cooperado_by_login(login_planilha: str, cooperados: list[Cooperado]) -> Cooperado | None:
-        key = _norm_login(login_planilha)
-        if not key:
-            return None
+    def match_cooperado_by_login(login_txt: str) -> Cooperado | None:
+        key = _norm_login(login_txt)
+        if not key: return None
         for c in cooperados:
             login = getattr(c.usuario_ref, "usuario", "") or ""
             if _norm_login(login) == key:
                 return c
         return None
 
-    # ------- varredura das linhas -------
-    linhas_novas: list[dict] = []
-    total_linhas_planilha = 0
-
+    # ------- parse linhas -------
+    linhas_novas, total_linhas_planilha = [], 0
     for i in range(2, ws.max_row + 1):
         login_raw = ws.cell(i, col_login).value if col_login else None
         login_txt = (str(login_raw).strip() if login_raw is not None else "")
         if not login_txt:
-            continue  # sem login, ignora a linha
-
+            continue
         total_linhas_planilha += 1
 
         data_v     = ws.cell(i, col_data).value     if col_data     else None
@@ -2772,127 +2753,97 @@ def upload_escala():
         cor_v      = ws.cell(i, col_cor).value      if col_cor      else None
 
         contrato_txt = (str(contrato_v).strip() if contrato_v is not None else "")
-        data_txt     = fmt_data_cell(data_v)
-        turno_txt    = (str(turno_v).strip() if turno_v is not None else "")
-        horario_txt  = (str(horario_v).strip() if horario_v is not None else "")
-        cor_txt      = to_css_color_local(cor_v)
         rest_id      = match_restaurante_id(contrato_txt)
+        coop_match   = match_cooperado_by_login(login_txt)
 
-        match = _match_cooperado_by_login(login_txt, cooperados)
-
-        payload = {
-            "cooperado_id":   (match.id if match else None),
-            # se não achou cadastro, salva o LOGIN como nome visível de fallback
-            "cooperado_nome": (None if match else login_txt),
-            "data":           data_txt,
-            "turno":          turno_txt,
-            "horario":        horario_txt,
+        linhas_novas.append({
+            "cooperado_id":   (coop_match.id if coop_match else None),
+            "cooperado_nome": (None if coop_match else login_txt),  # fallback visível
+            "data":           fmt_data_cell(data_v),
+            "turno":          (str(turno_v).strip() if turno_v is not None else ""),
+            "horario":        (str(horario_v).strip() if horario_v is not None else ""),
             "contrato":       contrato_txt,
-            "cor":            cor_txt,
+            "cor":            to_css_color_local(cor_v),
             "restaurante_id": rest_id,
-        }
-        linhas_novas.append(payload)
+        })
 
     if not linhas_novas:
         flash("Nada importado: nenhum registro válido encontrado.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    # =========================
-    # SUBSTITUIÇÃO COMPLETA do escopo coberto pelo arquivo
-    # =========================
+    # ------- SUBSTITUIR -------
     try:
-        # definimos o "escopo" pelos cooperados reconhecidos e restaurantes encontrados
-        def _norm_del(s: str) -> str:
-            s = _u.normalize("NFD", str(s or "").strip().lower())
-            s = "".join(ch for ch in s if _u.category(ch) != "Mn")
-            return _re.sub(r"[^a-z0-9]+", " ", s).strip()
+        if wipe_total:
+            # --- MODO TOTAL: Admin pediu troca completa ---
+            deleted_total = db.session.execute(sa_delete(Escala)).rowcount or 0
 
-        plan_coop_ids: set[int] = set()
-        plan_rest_ids: set[int] = set()
-        plan_names_norm: set[str] = set()       # nomes (na verdade login) dos não-cadastrados
-        plan_contratos_norm: set[str] = set()   # textos de contrato sem id de restaurante
+        else:
+            # --- MODO ESCOPO: substitui POR RESTAURANTE / POR COOPERADO / fallback por nome/contrato ---
+            def _norm_del(s: str) -> str:
+                s = _u.normalize("NFD", str(s or "").strip().lower())
+                s = "".join(ch for ch in s if _u.category(ch) != "Mn")
+                return _re.sub(r"[^a-z0-9]+", " ", s).strip()
 
-        for row in linhas_novas:
-            if row.get("cooperado_id"):
-                plan_coop_ids.add(int(row["cooperado_id"]))
-            else:
-                nm = _norm_del(row.get("cooperado_nome") or "")
-                if nm:
-                    plan_names_norm.add(nm)
+            plan_coop_ids: set[int] = set()
+            plan_rest_ids: set[int] = set()
+            plan_names_norm: set[str] = set()
+            plan_contratos_norm: set[str] = set()
 
-            if row.get("restaurante_id"):
-                plan_rest_ids.add(int(row["restaurante_id"]))
-            ct_norm = _norm_del(row.get("contrato") or "")
-            if ct_norm:
-                plan_contratos_norm.add(ct_norm)
+            for row in linhas_novas:
+                if row.get("cooperado_id"):
+                    plan_coop_ids.add(int(row["cooperado_id"]))
+                else:
+                    nm = _norm_del(row.get("cooperado_nome") or "")
+                    if nm: plan_names_norm.add(nm)
 
-        deleted_total = 0
+                if row.get("restaurante_id"):
+                    plan_rest_ids.add(int(row["restaurante_id"]))
+                ct_norm = _norm_del(row.get("contrato") or "")
+                if ct_norm: plan_contratos_norm.add(ct_norm)
 
-        # 1) apaga escalas antigas por cooperado_id (quando reconhecido)
-        if plan_coop_ids:
-            res = db.session.execute(
-                sa_delete(Escala).where(Escala.cooperado_id.in_(list(plan_coop_ids)))
-            )
-            deleted_total += (res.rowcount or 0)
+            deleted_total = 0
 
-        # 2) apaga escalas antigas por restaurante_id (substituição completa do estabelecimento)
-        if plan_rest_ids:
-            res = db.session.execute(
-                sa_delete(Escala).where(Escala.restaurante_id.in_(list(plan_rest_ids)))
-            )
-            deleted_total += (res.rowcount or 0)
+            if plan_coop_ids:
+                res = db.session.execute(sa_delete(Escala).where(Escala.cooperado_id.in_(list(plan_coop_ids))))
+                deleted_total += (res.rowcount or 0)
 
-        # 3) apaga escalas antigas por "nome" (aqui usamos o texto de fallback que salvamos quando não há cadastro)
-        ids_por_nome = set()
-        if plan_names_norm:
-            q = Escala.query.with_entities(Escala.id, Escala.cooperado_id, Escala.cooperado_nome)
-            for _id, _cid, _nome in q:
-                if _cid is None and _nome:
-                    if _norm_del(_nome) in plan_names_norm:
+            if plan_rest_ids:
+                res = db.session.execute(sa_delete(Escala).where(Escala.restaurante_id.in_(list(plan_rest_ids))))
+                deleted_total += (res.rowcount or 0)
+
+            ids_por_nome = set()
+            if plan_names_norm:
+                q = Escala.query.with_entities(Escala.id, Escala.cooperado_id, Escala.cooperado_nome)
+                for _id, _cid, _nome in q:
+                    if _cid is None and _nome and _norm_del(_nome) in plan_names_norm:
                         ids_por_nome.add(_id)
 
-        # 4) apaga por contrato/unidade (quando não há restaurante_id mapeado), comparando normalizado
-        if plan_contratos_norm:
-            q = Escala.query.with_entities(Escala.id, Escala.contrato)
-            for _id, _contrato in q:
-                if _contrato and _norm_del(_contrato) in plan_contratos_norm:
-                    ids_por_nome.add(_id)
+            if plan_contratos_norm:
+                q = Escala.query.with_entities(Escala.id, Escala.contrato, Escala.restaurante_id)
+                for _id, _contrato, _rid in q:
+                    if (_rid is None) and _contrato and _norm_del(_contrato) in plan_contratos_norm:
+                        ids_por_nome.add(_id)
 
-        if ids_por_nome:
-            res = db.session.execute(sa_delete(Escala).where(Escala.id.in_(list(ids_por_nome))))
-            deleted_total += (res.rowcount or 0)
+            if ids_por_nome:
+                res = db.session.execute(sa_delete(Escala).where(Escala.id.in_(list(ids_por_nome))))
+                deleted_total += (res.rowcount or 0)
 
-        # 5) insere as novas linhas
+        # Insere as novas linhas
         for row in linhas_novas:
             db.session.add(Escala(**row))
 
-        # 6) marca "ultima_atualizacao" dos cooperados reconhecidos
-        for cid in plan_coop_ids:
+        # Marca ultima_atualizacao
+        ids_reconhecidos = {int(r["cooperado_id"]) for r in linhas_novas if r.get("cooperado_id")}
+        for cid in ids_reconhecidos:
             c = Cooperado.query.get(cid)
             if c:
                 c.ultima_atualizacao = datetime.now()
 
         db.session.commit()
 
-        msg = (
-            f"Escala importada. {len(linhas_novas)} linha(s) adicionada(s). "
-            f"{deleted_total} escala(s) antiga(s) removida(s) no(s) escopo(s) do arquivo."
-        )
-        detalhes = []
-        if plan_rest_ids:
-            detalhes.append(f"{len(plan_rest_ids)} estabelecimento(s)")
-        if plan_coop_ids:
-            detalhes.append(f"{len(plan_coop_ids)} cooperado(s) com ID")
-        if plan_names_norm:
-            detalhes.append(f"{len(plan_names_norm)} cooperado(s) sem cadastro (via login-texto)")
-        if plan_contratos_norm:
-            detalhes.append(f"{len(plan_contratos_norm)} contrato(s) por texto")
-        if detalhes:
-            msg += " [" + "; ".join(detalhes) + "]"
-
-        if total_linhas_planilha > 0 and len(linhas_novas) < total_linhas_planilha:
-            msg += f" (Linhas processadas: {total_linhas_planilha})"
-
+        modo_txt = "Substituição TOTAL" if wipe_total else "Substituição por ESCOPO (restaurantes/cooperados/nomes/contratos)"
+        msg = (f"{modo_txt} aplicada. {len(linhas_novas)} linha(s) adicionada(s); "
+               f"{deleted_total} escala(s) antiga(s) removida(s).")
         flash(msg, "success")
 
     except Exception as e:
