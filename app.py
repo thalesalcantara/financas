@@ -4374,18 +4374,6 @@ def tabela_baixar(tab_id: int):
 
     return _serve_tabela_or_redirect(t, as_attachment=True)
 
-@app.get("/tabelas/<int:tab_id>/baixar", endpoint="baixar_tabela")
-def tabela_baixar(tab_id: int):
-    if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
-        return redirect(url_for("login"))
-    t = Tabela.query.get_or_404(tab_id)
-
-    if session.get("user_tipo") == "restaurante":
-        rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
-        _enforce_restaurante_titulo(t, rest)
-
-    return _serve_tabela_or_redirect(t, as_attachment=True)
-
 # --- RESTAURANTE: lista/abre/baixa SOMENTE a própria tabela -----------------
 @app.get("/rest/tabelas", endpoint="rest_tabelas")
 def rest_tabelas():
