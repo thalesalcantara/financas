@@ -4320,51 +4320,54 @@ def tabela_baixar(tab_id: int):
 
     return _serve_tabela_or_redirect(t, as_attachment=True)
 
-# ---------------- Restaurante: vê apenas a SUA tabela (título igual ao login) ----------------
-@app.route("/rest/tabelas", endpoint="rest_tabelas")
-@role_required("restaurante")
+# --- RESTAURANTE: lista/abre/baixa SOMENTE a própria tabela -----------------
+@app.get("/rest/tabelas", endpoint="rest_tabelas")
 def rest_tabelas():
+    # guarda de acesso sem depender de decorator
+    if session.get("user_tipo") != "restaurante":
+        return redirect(url_for("login"))
+
     u_id = session.get("user_id")
-    restaurante = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
 
     login_nome = (
-        getattr(getattr(restaurante, "usuario_ref", None), "usuario", None)
-        or getattr(restaurante, "usuario", None)
-        or (restaurante.nome or "")
+        getattr(getattr(rest, "usuario_ref", None), "usuario", None)
+        or getattr(rest, "usuario", None)
+        or (rest.nome or "")
     )
-    alvo_norm = _norm_txt(login_nome)
+    alvo = _norm_txt(login_nome)
 
     candidatos = (Tabela.query
                   .filter(Tabela.titulo.ilike(f"%{login_nome}%"))
                   .order_by(Tabela.enviado_em.desc())
                   .all())
-    tabela_exata = next((t for t in candidatos if _norm_txt(t.titulo) == alvo_norm), None)
+    tabela_exata = next((t for t in candidatos if _norm_txt(t.titulo) == alvo), None)
 
-    # HACK p/ teu template: ele usa "if 'portal_restaurante' in globals()"
-    # Passamos um dicionário "globals" contendo a key quando a rota existe,
-    # assim não dá UndefinedError no Jinja.
+    # evita erro no teu template que checa globals
     has_portal = "portal_restaurante" in current_app.view_functions
     globals_for_tpl = {"portal_restaurante": True} if has_portal else {}
 
     return render_template(
         "restaurantes_tabelas.html",
-        restaurante=restaurante,
+        restaurante=rest,
         login_nome=login_nome,
         tabela=tabela_exata,
-        globals=globals_for_tpl,   # <-- garante que o if do HTML funcione
+        globals=globals_for_tpl,
     )
 
 @app.get("/rest/tabelas/<int:tabela_id>/abrir", endpoint="rest_tabela_abrir")
-@role_required("restaurante")
 def rest_tabela_abrir(tabela_id: int):
+    if session.get("user_tipo") != "restaurante":
+        return redirect(url_for("login"))
     rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
     t = Tabela.query.get_or_404(tabela_id)
     _enforce_restaurante_titulo(t, rest)
     return _serve_tabela_or_redirect(t, as_attachment=False)
 
 @app.get("/rest/tabelas/<int:tabela_id>/download", endpoint="rest_tabela_download")
-@role_required("restaurante")
 def rest_tabela_download(tabela_id: int):
+    if session.get("user_tipo") != "restaurante":
+        return redirect(url_for("login"))
     rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
     t = Tabela.query.get_or_404(tabela_id)
     _enforce_restaurante_titulo(t, rest)
