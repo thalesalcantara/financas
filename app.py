@@ -77,12 +77,14 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=12) # ajuste conforme sua política
 )
 
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import QueuePool
 
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "poolclass": NullPool,       # deixa o pool para o PgBouncer
-    "pool_pre_ping": True,       # ajuda a detectar conexões quebradas
-    "pool_recycle": 1800,        # ok manter
+    "poolclass": QueuePool,   # usa pool local quando não houver PgBouncer
+    "pool_size": 5,
+    "max_overflow": 10,
+    "pool_pre_ping": True,
+    "pool_recycle": 1800,
 }
 
 db = SQLAlchemy(app)
@@ -667,7 +669,7 @@ def _match_cooperado_by_name(nome_planilha: str, cooperados: list[Cooperado]) ->
     if len(sheet_tokens) == 1 and len(sheet_tokens[0]) >= 3:
         token = sheet_tokens[0]
         hits = [c for c in cooperados if token in set(_normalize_name(c.nome))]
-        if len(hits) == 1:
+        if os.environ.get("INIT_DB_ON_START", "0") == "1":
             return hits[0]
 
     names_norm = [norm_join(c.nome) for c in cooperados]
