@@ -56,8 +56,12 @@
               <div class="mb-2"><span class="muted">Arquivo:</span><br>{{ tabela.arquivo_nome or '—' }}</div>
               <div class="mb-3"><span class="muted">Enviado em:</span><br>{{ tabela.enviado_em.strftime('%d/%m/%Y %H:%M') if tabela.enviado_em else '—' }}</div>
               <div class="d-grid gap-2">
-                <a class="btn btn-primary" href="{{ tabela.arquivo_url }}" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Abrir</a>
-                <a class="btn btn-success" href="{{ url_for('baixar_tabela', tab_id=tabela.id) }}"><i class="bi bi-download"></i> Baixar</a>
+                <a class="btn btn-primary" href="{{ url_for('tabela_abrir', tab_id=tabela.id) }}" target="_blank">
+  <i class="bi bi-box-arrow-up-right"></i> Abrir
+</a>
+<a class="btn btn-success" href="{{ url_for('rest_tabela_download', tabela_id=tabela.id) }}">
+  <i class="bi bi-download"></i> Baixar
+</a>
               </div>
             </div>
           </div>
