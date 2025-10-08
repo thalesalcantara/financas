@@ -1212,74 +1212,101 @@ def to_css_color(v: str) -> str:
     return mapa.get(t_low, t)
 
 # ---------- AVISOS: helpers ----------
-def _avisos_base_query(now=None):
-    if now is None:
-        now = datetime.utcnow()
-    return (Aviso.query
+from sqlalchemy import case, or_, and_, func
+from sqlalchemy.orm import selectinload
+
+def _avisos_base_query():
+    # usa o relógio do banco; evita divergência de TZ/UTC da app
+    now = func.now()
+    return (
+        Aviso.query
+        .options(selectinload(Aviso.restaurantes))  # evita N+1 no template
         .filter(Aviso.ativo.is_(True))
-        .filter((Aviso.inicio_em.is_(None)) | (Aviso.inicio_em <= now))
-        .filter((Aviso.fim_em.is_(None)) | (Aviso.fim_em >= now)))
+        .filter(or_(Aviso.inicio_em.is_(None), Aviso.inicio_em <= now))
+        .filter(or_(Aviso.fim_em.is_(None),    Aviso.fim_em    >= now))
+    )
+
+# PRIORIDADE: "alta" (0), "media"/"média" (1), outras/NULL (2)
+_PRIORD = case(
+    (func.lower(Aviso.prioridade) == "alta", 0),
+    (func.lower(Aviso.prioridade).in_(("media", "média")), 1),
+    else_=2,
+)
 
 def get_avisos_for_cooperado(coop: Cooperado):
     """
-    Mostra para COOPERADO:
+    COOPERADO vê:
       - global
-      - cooperado destinado para mim OU broadcast (destino_cooperado_id IS NULL)
-      - restaurante destinado a um dos meus restaurantes OU broadcast (sem restaurantes ligados)
+      - cooperado (destino = mim OU broadcast)
+      - restaurante (broadcast OU ligado a QUALQUER restaurante onde tenho escala)
     """
-    rest_ids = {
-        e.restaurante_id for e in Escala.query.filter_by(cooperado_id=coop.id).all()
-        if e.restaurante_id
-    }
+    # busca os restaurantes do cooperado sem trazer objetos inteiros
+    rest_ids = [
+        rid for (rid,) in (
+            db.session.query(Escala.restaurante_id)
+            .filter(Escala.cooperado_id == coop.id, Escala.restaurante_id.isnot(None))
+            .distinct()
+            .all()
+        )
+    ]
 
-    q = _avisos_base_query().filter(
-        (Aviso.tipo == "global")
-        |
-        ((Aviso.tipo == "cooperado") & (
-            (Aviso.destino_cooperado_id == coop.id) | (Aviso.destino_cooperado_id.is_(None))
-        ))
-        |
-        ((Aviso.tipo == "restaurante") & (
-            (~Aviso.restaurantes.any()) |  # lista vazia = broadcast para todos restaurantes
-            Aviso.restaurantes.any(Restaurante.id.in_(rest_ids))
-        ))
-    )
+    cond_rest = or_(~Aviso.restaurantes.any())
+    if rest_ids:  # só usa IN se houver IDs
+        cond_rest = or_(cond_rest, Aviso.restaurantes.any(Restaurante.id.in_(rest_ids)))
 
-    avisos = list(q.all())
-    avisos.sort(
-        key=lambda a: (
-            not a.fixado,
-            str(a.prioridade or "").lower() != "alta",
-            -(a.criado_em.timestamp() if a.criado_em else 0)
+    q = (
+        _avisos_base_query()
+        .filter(
+            or_(
+                (Aviso.tipo == "global"),
+                and_(
+                    Aviso.tipo == "cooperado",
+                    or_(Aviso.destino_cooperado_id == coop.id,
+                        Aviso.destino_cooperado_id.is_(None)),
+                ),
+                and_(
+                    Aviso.tipo == "restaurante",
+                    cond_rest,
+                ),
+            )
+        )
+        .order_by(
+            Aviso.fixado.desc(),
+            _PRIORD.asc(),
+            Aviso.criado_em.desc(),
         )
     )
-    return avisos
+
+    return q.all()
 
 def get_avisos_for_restaurante(rest: Restaurante):
     """
-    Mostra para RESTAURANTE:
+    RESTAURANTE vê:
       - global
-      - restaurante destinado para mim (m2m contém este restaurante)
-      - restaurante broadcast (sem restaurantes ligados)
+      - restaurante (broadcast ou destinado a ESTE restaurante)
     """
-    q = _avisos_base_query().filter(
-        (Aviso.tipo == "global")
-        |
-        ((Aviso.tipo == "restaurante") & (
-            (~Aviso.restaurantes.any()) |              # broadcast para todos
-            Aviso.restaurantes.any(Restaurante.id == rest.id)  # específico para mim
-        ))
-    )
-
-    avisos = list(q.all())
-    avisos.sort(
-        key=lambda a: (
-            not a.fixado,
-            str(a.prioridade or "").lower() != "alta",
-            -(a.criado_em.timestamp() if a.criado_em else 0)
+    q = (
+        _avisos_base_query()
+        .filter(
+            or_(
+                (Aviso.tipo == "global"),
+                and_(
+                    Aviso.tipo == "restaurante",
+                    or_(
+                        ~Aviso.restaurantes.any(),                  # broadcast
+                        Aviso.restaurantes.any(Restaurante.id == rest.id),  # específico
+                    ),
+                ),
+            )
+        )
+        .order_by(
+            Aviso.fixado.desc(),
+            _PRIORD.asc(),
+            Aviso.criado_em.desc(),
         )
     )
-    return avisos
+
+    return q.all()
 
 # =========================
 # Rotas de mídia (fotos armazenadas no banco)
