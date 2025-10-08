@@ -389,6 +389,45 @@ def init_db():
 
     db.create_all()
 
+def init_db():
+    # --- PERF (SQLite): liga WAL e ajusta synchronous ---
+    try:
+        if _is_sqlite():
+            db.session.execute(sa_text("PRAGMA journal_mode=WAL;"))
+            db.session.execute(sa_text("PRAGMA synchronous=NORMAL;"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # Cria tabelas/mapeamentos
+    db.create_all()
+
+    # --- índices de performance p/ avaliações (restaurante_id, cooperado_id, criado_em) ---
+    try:
+        if _is_sqlite():
+            db.session.execute(sa_text("""
+            CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON avaliacoes (criado_em);
+            CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON avaliacoes (restaurante_id, criado_em);
+            CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON avaliacoes (cooperado_id,  criado_em);
+
+            CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em           ON avaliacoes_restaurante (criado_em);
+            CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado         ON avaliacoes_restaurante (restaurante_id, criado_em);
+            CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado         ON avaliacoes_restaurante (cooperado_id,  criado_em);
+            """))
+        else:
+            db.session.execute(sa_text("""
+            CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON public.avaliacoes (criado_em);
+            CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON public.avaliacoes (restaurante_id, criado_em);
+            CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON public.avaliacoes (cooperado_id,  criado_em);
+
+            CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em           ON public.avaliacoes_restaurante (criado_em);
+            CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado         ON public.avaliacoes_restaurante (restaurante_id, criado_em);
+            CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado         ON public.avaliacoes_restaurante (cooperado_id,  criado_em);
+            """))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
     # --- qtd_entregas em lancamentos ---
     try:
         if _is_sqlite():
@@ -1814,14 +1853,51 @@ def admin_avaliacoes():
             .join(Restaurante, Model.restaurante_id == Restaurante.id)
             .join(Cooperado,   Model.cooperado_id   == Cooperado.id))
 
-    filtros = []
-    if restaurante_id: filtros.append(Model.restaurante_id == restaurante_id)
-    if cooperado_id:   filtros.append(Model.cooperado_id   == cooperado_id)
-    if data_inicio:    filtros.append(func.date(Model.criado_em) >= data_inicio)
-    if data_fim:       filtros.append(func.date(Model.criado_em) <= data_fim)
-    if filtros:        base = base.filter(and_(*filtros))
+  # ----- Filtros (otimizados para usar índice) -----
+filtros = []
+if restaurante_id:
+    filtros.append(Model.restaurante_id == restaurante_id)
+if cooperado_id:
+    filtros.append(Model.cooperado_id == cooperado_id)
 
-    rows = base.order_by(Model.criado_em.desc()).all()
+# data_inicio / data_fim chegam como 'YYYY-MM-DD'
+# Usamos intervalo [>= di, < df+1dia] para aproveitar índice de datetime
+di = datetime.strptime(data_inicio, "%Y-%m-%d") if data_inicio else None
+df = (datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)) if data_fim else None
+
+if di:
+    filtros.append(Model.criado_em >= di)
+if df:
+    filtros.append(Model.criado_em < df)
+
+base_filtered = base
+if filtros:
+    base_filtered = base_filtered.filter(and_(*filtros))
+
+# ----- Paginação eficiente -----
+page = max(1, request.args.get("page", type=int) or 1)
+per_page = min(200, max(1, request.args.get("per_page", type=int) or 50))
+offset = (page - 1) * per_page
+
+# Ordena por criado_em (desc) e pagina
+q_ordered = base_filtered.order_by(Model.criado_em.desc())
+rows = q_ordered.limit(per_page).offset(offset).all()
+
+# Total para paginação (usa os MESMOS filtros)
+cnt_q = db.session.query(func.count(Model.id))
+if filtros:
+    cnt_q = cnt_q.filter(and_(*filtros))
+total = int(cnt_q.scalar() or 0)
+pages = max(1, (total + per_page - 1) // per_page)
+
+pager = SimpleNamespace(
+    page=page,
+    per_page=per_page,
+    total=total,
+    pages=pages,
+    has_prev=(page > 1),
+    has_next=(page < pages),
+)
 
     # ===== Achata nos nomes que o SEU TEMPLATE usa
     avaliacoes = []
