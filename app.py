@@ -4291,14 +4291,13 @@ def admin_upload_tabela():
     arquivo.save(str(dst))
 
     t = Tabela(
-        titulo=titulo,
-        categoria=categoria,
-        descricao=descricao,
-        arquivo_path=str(dst),          # chave para servir
-        arquivo=fname_final,            # nome dentro de tabelas_dir
-        arquivo_nome=arquivo.filename,  # nome original
-        enviado_em=datetime.utcnow(),
-    )
+    titulo=titulo,
+    categoria=categoria,
+    descricao=descricao,
+    arquivo_url=fname_final,        # <-- USE esta chave
+    arquivo_nome=arquivo.filename,  # mantém o nome original
+    enviado_em=datetime.utcnow(),
+)
     db.session.add(t)
     db.session.commit()
 
