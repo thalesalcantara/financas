@@ -4265,8 +4265,61 @@ def admin_delete_tabela(tab_id):
     flash("Tabela removida.", "success")
     return redirect(url_for("admin_tabelas"))
 
-# ---------------- TABELAS (Cooperado/Admin - lista autenticada) ----------------
+# =========================
+# TABELAS (Cooperado/Admin/Restaurante)
+# =========================
 
+from flask import (
+    render_template, request, redirect, url_for, flash, session,
+    send_file, abort
+)
+import os, re, unicodedata, mimetypes
+
+# ---------- Helpers locais ----------
+def _norm_txt(s: str) -> str:
+    """Normaliza acentos, espaços e caixa para comparações de título/login."""
+    s = unicodedata.normalize("NFD", (s or "").strip())
+    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")  # remove acentos
+    s = re.sub(r"\s+", " ", s)  # colapsa espaços múltiplos
+    return s.lower()
+
+def _guess_mimetype_from_path(path: str) -> str:
+    mime, _ = mimetypes.guess_type(path)
+    return mime or "application/octet-stream"
+
+def _tabela_fs_path(t) -> str | None:
+    """
+    Resolve um caminho de arquivo no disco para a tabela t.
+    Suporta:
+      - t.arquivo_path (absoluto)
+      - t.arquivo (nome dentro de TABELAS_DIR)
+      - t.arquivo_url relativo (ex.: /static/uploads/tabelas/XYZ.pdf)
+      - Se for http(s), retorna None (para o caller redirecionar)
+    """
+    # 1) Caminho absoluto salvo
+    if getattr(t, "arquivo_path", None):
+        if os.path.isfile(t.arquivo_path):
+            return t.arquivo_path
+
+    # 2) Nome salvo dentro do diretório padrão
+    if getattr(t, "arquivo", None):
+        p = os.path.join(TABELAS_DIR, t.arquivo)
+        if os.path.isfile(p):
+            return p
+
+    # 3) URL relativa (armazenada no upload padrão)
+    if getattr(t, "arquivo_url", None):
+        url = t.arquivo_url
+        if url.startswith("http://") or url.startswith("https://"):
+            return None  # caller deve redirecionar
+        p = os.path.join(BASE_DIR, url.lstrip("/"))
+        if os.path.isfile(p):
+            return p
+
+    return None
+
+
+# ---------------- TABELAS (Cooperado/Admin - lista autenticada) ----------------
 @app.route("/tabelas")
 def tabelas_publicas():
     # permite cooperado OU admin (ajuste se quiser incluir restaurante)
@@ -4279,32 +4332,79 @@ def tabelas_publicas():
         viewer_tipo=session.get("user_tipo")
     )
 
+
 # Visualizar inline (iframe ou botão "Abrir") — compartilhado
-@app.get("/tabelas/<int:tab_id>/abrir")
+@app.get("/tabelas/<int:tab_id>/abrir", endpoint="tabela_abrir")
 def tabela_abrir(tab_id: int):
+    # precisa estar autenticado (cooperado, restaurante ou admin)
     if session.get("user_tipo") not in {"cooperado", "restaurante", "admin"}:
         return redirect(url_for("login"))
+
     t = Tabela.query.get_or_404(tab_id)
+
+    # Se restaurante, checa autorização: só pode abrir a SUA tabela (título == login/nome)
+    if session.get("user_tipo") == "restaurante":
+        rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+        login_nome = (
+            getattr(getattr(rest, "usuario_ref", None), "usuario", None)
+            or getattr(rest, "usuario", None)
+            or (rest.nome or "")
+        )
+        if _norm_txt(t.titulo) != _norm_txt(login_nome):
+            abort(403)
+
+    # Se for URL remota (S3, Drive etc.), redireciona
+    if getattr(t, "arquivo_url", None) and (
+        t.arquivo_url.startswith("http://") or t.arquivo_url.startswith("https://")
+    ):
+        return redirect(t.arquivo_url)
+
+    # Caso local: resolve o path e serve inline
     p = _tabela_fs_path(t)
     if not p or not os.path.isfile(p):
         abort(404)
-    # stream inline
     return send_file(p, as_attachment=False, mimetype=_guess_mimetype_from_path(p))
 
+
 # Download compartilhado (cooperado/restaurante/admin)
-@app.get("/tabelas/<int:tab_id>/baixar")
+@app.get("/tabelas/<int:tab_id>/baixar", endpoint="baixar_tabela")
 def baixar_tabela(tab_id: int):
     if session.get("user_tipo") not in {"cooperado", "restaurante", "admin"}:
         return redirect(url_for("login"))
+
     t = Tabela.query.get_or_404(tab_id)
+
+    # Segurança extra: restaurante só baixa a sua própria tabela
+    if session.get("user_tipo") == "restaurante":
+        rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+        login_nome = (
+            getattr(getattr(rest, "usuario_ref", None), "usuario", None)
+            or getattr(rest, "usuario", None)
+            or (rest.nome or "")
+        )
+        if _norm_txt(t.titulo) != _norm_txt(login_nome):
+            abort(403)
+
+    # Se for remota, redireciona para download direto
+    if getattr(t, "arquivo_url", None) and (
+        t.arquivo_url.startswith("http://") or t.arquivo_url.startswith("https://")
+    ):
+        return redirect(t.arquivo_url)
+
     p = _tabela_fs_path(t)
     if not p or not os.path.isfile(p):
         abort(404)
-    return send_file(p, as_attachment=True, download_name=(t.arquivo_nome or os.path.basename(p)))
+
+    return send_file(
+        p,
+        as_attachment=True,
+        download_name=(t.arquivo_nome or os.path.basename(p)),
+        mimetype=_guess_mimetype_from_path(p),
+    )
+
 
 # ---------------- TABELAS (Restaurante) ----------------
-
-@app.route("/rest/tabelas")
+@app.route("/rest/tabelas", endpoint="rest_tabelas")
 @role_required("restaurante")
 def rest_tabelas():
     """
@@ -4321,6 +4421,7 @@ def rest_tabelas():
     )
     alvo_norm = _norm_txt(login_nome)
 
+    # reduz universo e depois valida igualdade normalizada
     candidatos = (Tabela.query
                   .filter(Tabela.titulo.ilike(f"%{login_nome}%"))
                   .order_by(Tabela.enviado_em.desc())
@@ -4335,7 +4436,8 @@ def rest_tabelas():
         tabela=tabela_exata
     )
 
-@app.route("/rest/tabelas/<int:tabela_id>/download")
+
+@app.route("/rest/tabelas/<int:tabela_id>/download", endpoint="rest_tabela_download")
 @role_required("restaurante")
 def rest_tabela_download(tabela_id: int):
     """
@@ -4355,12 +4457,23 @@ def rest_tabela_download(tabela_id: int):
     if _norm_txt(t.titulo) != _norm_txt(login_nome):
         abort(403)  # tentando baixar tabela de outro restaurante
 
+    # Se for remota, redireciona
+    if getattr(t, "arquivo_url", None) and (
+        t.arquivo_url.startswith("http://") or t.arquivo_url.startswith("https://")
+    ):
+        return redirect(t.arquivo_url)
+
     p = _tabela_fs_path(t)
     if not p or not os.path.isfile(p):
         flash("Arquivo não encontrado.", "warning")
         return redirect(url_for("rest_tabelas"))
 
-    return send_file(p, as_attachment=True, download_name=(t.arquivo_nome or os.path.basename(p)))
+    return send_file(
+        p,
+        as_attachment=True,
+        download_name=(t.arquivo_nome or os.path.basename(p)),
+        mimetype=_guess_mimetype_from_path(p),
+    )
 
 # =========================
 # AVISOS — Portais (cooperado)
