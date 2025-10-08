@@ -4193,13 +4193,28 @@ from datetime import datetime
 from pathlib import Path
 import os, re, unicodedata, mimetypes
 
-# pressupõe: db, modelos Tabela/Restaurante e decorators admin_required / role_required já definidos
-# pressupõe: BASE_DIR e TABELAS_DIR definidos no app (ex.: BASE_DIR = Path(__file__).resolve().parent)
+# ---------------------------------------------------------------------------
+# Fallbacks para BASE_DIR e TABELAS_DIR (evita NameError se não houver no app)
+# Se já existirem no seu app, esses try/except não sobrescrevem.
+# ---------------------------------------------------------------------------
+try:
+    BASE_DIR  # type: ignore[name-defined]
+except NameError:
+    BASE_DIR = Path(__file__).resolve().parent
 
+try:
+    TABELAS_DIR  # type: ignore[name-defined]
+except NameError:
+    TABELAS_DIR = str(Path(BASE_DIR) / "uploads" / "tabelas")
+
+# Requer no app principal:
+# - db (SQLAlchemy)
+# - modelos: Tabela(id, titulo, descricao?, arquivo_url, arquivo_nome?, enviado_em)
+# - modelo: Restaurante(usuario_id, nome?, usuario?, usuario_ref?.usuario?)
+# - decorators: admin_required (seu padrão)
 
 # ---------------------------------------------------------------------------
-# CONFIG DE DIRETÓRIO (usa TABELAS_DIR já configurado no topo do app)
-# Ex.: TABELAS_DIR = os.path.join(UPLOAD_DIR, "tabelas")
+# Helpers
 # ---------------------------------------------------------------------------
 def _tabelas_base_dir() -> Path:
     p = Path(TABELAS_DIR)
@@ -4218,9 +4233,8 @@ def _guess_mimetype_from_path(path: str) -> str:
 
 def _enforce_restaurante_titulo(tabela, restaurante):
     """
-    Regra: restaurante só acessa a tabela cujo TÍTULO == NOME do restaurante (normalizado).
+    Regra: restaurante só acessa a tabela cujo TÍTULO == NOME/LOGIN do restaurante (normalizado).
     """
-    # tenta: usuario_ref.usuario -> usuario -> nome
     login_nome = (
         getattr(getattr(restaurante, "usuario_ref", None), "usuario", None)
         or getattr(restaurante, "usuario", None)
@@ -4235,7 +4249,7 @@ def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
     - http(s) => redirect
     - /static/uploads/... => BASE_DIR/<raw>
     - absoluto => usa direto
-    - relativo => tenta BASE_DIR/<raw>
+    - relativo => BASE_DIR/<raw>
     - somente nome => TABELAS_DIR/<nome>
     """
     url = (tabela.arquivo_url or "").strip()
@@ -4260,7 +4274,7 @@ def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
     if p.is_absolute():
         candidates.append(p)
 
-    # relativo como veio
+    # relativo a BASE_DIR
     candidates.append(base_dir / raw)
 
     # somente nome do arquivo em TABELAS_DIR
@@ -4268,7 +4282,7 @@ def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
     if fname:
         candidates.append(tabelas_dir / fname)
 
-    # fallback adicional: último segmento sob TABELAS_DIR
+    # fallback: último segmento sob TABELAS_DIR
     if "/" in raw:
         candidates.append(tabelas_dir / raw.split("/")[-1])
 
@@ -4283,7 +4297,9 @@ def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
         mimetype=_guess_mimetype_from_path(str(file_path)),
     )
 
-# ---------------- Admin ----------------
+# ---------------------------------------------------------------------------
+# Admin: listar / upload / delete
+# ---------------------------------------------------------------------------
 @app.get("/admin/tabelas")
 @admin_required
 def admin_tabelas():
@@ -4297,7 +4313,7 @@ def admin_upload_tabela():
     titulo    = (f.get("titulo") or "").strip()
     descricao = (f.get("descricao") or "").strip() or None
 
-    # aceita vários nomes possíveis do input file (mantém teu HTML: name="arquivo")
+    # aceita vários nomes possíveis do input file
     arquivo = (
         request.files.get("arquivo")
         or request.files.get("file")
@@ -4320,12 +4336,11 @@ def admin_upload_tabela():
     dest = base_dir / final_name
     arquivo.save(str(dest))
 
-    # grava nos campos EXISTENTES no teu model
     t = Tabela(
         titulo=titulo,
         descricao=descricao,
-        arquivo_url=final_name,        # chave que vamos usar pra servir
-        arquivo_nome=arquivo.filename, # nome original pro download
+        arquivo_url=final_name,        # chave p/ servir
+        arquivo_nome=arquivo.filename, # nome original p/ download
         enviado_em=datetime.utcnow(),
     )
     db.session.add(t)
@@ -4338,10 +4353,9 @@ def admin_upload_tabela():
 @admin_required
 def admin_delete_tabela(tab_id: int):
     t = Tabela.query.get_or_404(tab_id)
-    # tenta remover o arquivo local se for local
     try:
         url = (t.arquivo_url or "").strip()
-        if url and not (url.startswith("http://") or url.startswith("https://")):
+        if url and not url.startswith(("http://", "https://")):
             path = _tabelas_base_dir() / (url.split("/")[-1])
             if path.exists():
                 path.unlink()
@@ -4352,17 +4366,16 @@ def admin_delete_tabela(tab_id: int):
     flash("Tabela excluída.", "success")
     return redirect(url_for("admin_tabelas"))
 
-# ---------------- Lista Cooperado/Admin/Restaurante ----------------
+# ---------------------------------------------------------------------------
+# Cooperado/Admin/Restaurante: listagem (cooperado vê TODAS)
+# ---------------------------------------------------------------------------
 @app.get("/tabelas")
 def tabelas_publicas():
     if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
 
-    # COOPERADO vê TODAS; ADMIN também
-    # (Se quiser filtrar por restaurante aqui, use o bloco de 'restaurante' abaixo)
     tabs = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
 
-    # Alguns templates podem esperar 'items' com URLs prontas:
     items = [{
         "id": t.id,
         "titulo": t.titulo,
@@ -4373,21 +4386,21 @@ def tabelas_publicas():
         "baixar_url": url_for("tabela_baixar", tab_id=t.id),
     } for t in tabs]
 
-    # back_href para o cooperado (se existir o portal)
     back_href = url_for("portal_cooperado") if (
         session.get("user_tipo") == "cooperado" and "portal_cooperado" in current_app.view_functions
     ) else ""
 
     return render_template("tabelas_publicas.html", tabelas=tabs, items=items, back_href=back_href)
 
-# ---------------- Abrir / Baixar (compartilhado p/ cooperado/admin/restaurante) ----------------
+# ---------------------------------------------------------------------------
+# Abrir / Baixar compartilhado (cooperado/admin/restaurante)
+# ---------------------------------------------------------------------------
 @app.get("/tabelas/<int:tab_id>/abrir")
 def tabela_abrir(tab_id: int):
     if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
     t = Tabela.query.get_or_404(tab_id)
 
-    # Restaurante só abre se o título bater com o nome/login do restaurante
     if session.get("user_tipo") == "restaurante":
         rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
         _enforce_restaurante_titulo(t, rest)
@@ -4406,7 +4419,9 @@ def tabela_baixar(tab_id: int):
 
     return _serve_tabela_or_redirect(t, as_attachment=True)
 
-# --- RESTAURANTE: lista/abre/baixa SOMENTE a própria tabela -----------------
+# ---------------------------------------------------------------------------
+# Restaurante: vê/abre/baixa SOMENTE a própria tabela
+# ---------------------------------------------------------------------------
 @app.get("/rest/tabelas")
 def rest_tabelas():
     if session.get("user_tipo") != "restaurante":
@@ -4422,20 +4437,18 @@ def rest_tabelas():
     )
     alvo_norm = _norm_txt(login_nome)
 
-    # primeiro tenta match exato (normalizado); mantém condizente com a regra
     candidatos = (Tabela.query
                   .order_by(Tabela.enviado_em.desc())
                   .all())
     tabela_exata = next((t for t in candidatos if _norm_txt(t.titulo) == alvo_norm), None)
 
-    # Flag simples para o template decidir o link de "Voltar"
     has_portal_restaurante = ("portal_restaurante" in current_app.view_functions)
 
     return render_template(
         "restaurantes_tabelas.html",
         restaurante=rest,
         login_nome=login_nome,
-        tabela=tabela_exata,
+        tabela=tabela_exata,  # o template deve lidar com None (sem tabela)
         has_portal_restaurante=has_portal_restaurante,
         back_href=url_for("portal_restaurante") if has_portal_restaurante else url_for("rest_tabelas"),
         current_year=datetime.utcnow().year,
@@ -4459,7 +4472,9 @@ def rest_tabela_baixar(tabela_id: int):
     _enforce_restaurante_titulo(t, rest)
     return _serve_tabela_or_redirect(t, as_attachment=True)
 
-# ---------------- Diagnóstico rápido ----------------
+# ---------------------------------------------------------------------------
+# Diagnóstico rápido (admin)
+# ---------------------------------------------------------------------------
 @app.get("/admin/tabelas/scan")
 @admin_required
 def admin_tabelas_scan():
