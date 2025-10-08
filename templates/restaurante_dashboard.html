@@ -8,7 +8,10 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <style>
-    :root{ --royal-blue:#2747d9; --white:#fff; --danger:#e74c3c; --edit:#f1c40f; --sidebar-dark:#101218; --hover-blue:#3b61e3; --muted:#6b7280; }
+    :root{
+      --royal-blue:#2747d9; --white:#fff; --danger:#e74c3c; --edit:#f1c40f; --sidebar-dark:#101218;
+      --hover-blue:#3b61e3; --muted:#6b7280; --soft:#f5f7ff; --chip:#eef1ff; --ok:#16a34a;
+    }
     body{ background:#191c20; font-family:'Roboto',Arial,sans-serif; min-height:100vh; }
     .sidebar{ width:220px; height:100vh; position:fixed; top:0; left:0; background:linear-gradient(160deg, var(--royal-blue) 80%, var(--sidebar-dark) 100%); color:var(--white); z-index:10; }
     .logo-area{ display:flex; flex-direction:column; align-items:center; padding:22px 0 12px; }
@@ -21,25 +24,14 @@
     .main-content{ margin-left:230px; padding:25px 3vw 30px; min-height:100vh; }
     .section-title{ font-family:'Orbitron',Arial,sans-serif; color:var(--royal-blue); font-size:1.4rem; margin-bottom:15px; display:flex; align-items:center; gap:10px; }
     .card-white{ background:#fff; border-radius:12px; padding:10px; box-shadow:0 2px 8px 0 #0002; margin-bottom:30px; }
-    .cooperado-item{ display:flex; align-items:center; padding:9px 8px; border-bottom:1px solid #eee; cursor:pointer; transition:background .2s; }
-    .cooperado-item:hover{ background:#f1f6ff; } .cooperado-item.selected{ background:#e6edfc; }
-    .cooperado-item:last-child{ border-bottom:none; }
-    .cooperado-avatar{ width:42px; height:42px; border-radius:50%; object-fit:cover; margin-right:10px; border:2px solid var(--royal-blue); }
-    .cooperado-nome{ font-size:1rem; font-weight:600; color:#222; line-height:1.1; }
     .btn-royal{ background:var(--royal-blue); color:#fff; } .btn-royal:hover{ background:var(--hover-blue); color:#fff; }
     .btn-edit{ background:var(--edit); color:#191c20; } .btn-edit:hover{ background:#ffe566; color:#191c20; }
     .btn-delete{ background:var(--danger); color:#fff; } .btn-delete:hover{ background:#b93222; color:#fff; }
-    .table thead{ background:var(--royal-blue); color:#fff; }
+    .search-input{ background:#f8f9ff; border:1px solid #e6e8f5; }
+    .muted{ color:var(--muted); }
     .stat{ border-radius:12px; padding:14px; background:#fff; box-shadow:0 2px 8px 0 #0002; }
     .stat .label{ color:#6b7280; font-size:.9rem; }
     .stat .val{ font-weight:700; font-size:1.25rem; }
-    .contrato-header{ font-weight:700; color:#2747d9; margin-top:.5rem; margin-bottom:.25rem; }
-    .sticky-launch{ position:sticky; top:10px; z-index:5; }
-    .search-input{ background:#f8f9ff; border:1px solid #e6e8f5; }
-    .muted{ color:var(--muted); }
-
-    /* Config */
-    .form-password .toggle{ cursor:pointer; user-select:none; }
 
     /* Avisos */
     .aviso-card{ border-left:6px solid #3b82f6; }
@@ -47,6 +39,28 @@
     .aviso-card.prioridade{ border-left-color:#e74c3c; }
     .aviso-title{ font-weight:700; font-size:1.1rem; }
     .aviso-meta{ color:#6b7280; font-size:.9rem; }
+
+    /* Escalas — mantemos suas classes padrão */
+    .badge-soft{ background:var(--chip); border-radius:999px; padding:.25rem .6rem; font-weight:700; }
+    .pill{ display:inline-block; padding:.1rem .45rem; border-radius:14px; font-weight:800; }
+    .table-escala{ table-layout: fixed; }
+    .table-escala th{ text-align:center; font-weight:800; }
+    .row-stripe{ border-left:4px solid var(--stripe,#e5e7eb); }
+
+    /* Avaliação com estrelas */
+    .rating-group{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .stars{ display:inline-flex; gap:2px; font-size:1.4rem; cursor:pointer; }
+    .star{ color:#d1d5db; transition:transform .08s; }
+    .star.active, .star.hover{ color:#fbbf24; } /* amarelo */
+    .star:active{ transform:scale(.9); }
+    .rating-label{ min-width:130px; font-weight:600; color:#334155; }
+
+    /* Lançamentos (aba nova) */
+    .sticky-tools{ position:sticky; top:8px; z-index:5; }
+    .kpi{ background:#f8fafc; border:1px solid #e5e7eb; border-radius:12px; padding:10px 14px; }
+    .kpi .v{ font-weight:800; font-size:1.1rem; }
+    .chip{ background:var(--soft); border:1px solid #e6e8f5; border-radius:999px; padding:.15rem .6rem; font-weight:700; }
+    .table-compact th, .table-compact td{ padding:.45rem .55rem; }
 
     @media (max-width:800px){
       .sidebar{ width:70px; }
@@ -64,26 +78,37 @@
       <span class="logo-title">COOPEX</span>
     </div>
     <nav class="nav flex-column mt-4">
-      <a class="nav-link {{ 'active' if (view|default('lancar') not in ['escalas','config','avisos']) else '' }}"
+      <a class="nav-link {{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos']) else '' }}"
          href="{{ url_for('portal_restaurante', view='lancar', data_inicio=filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else None, data_fim=filtro_fim.strftime('%Y-%m-%d') if filtro_fim else None) }}">
         <i class="bi bi-person-lines-fill"></i> <span>Cooperados</span>
       </a>
+
+      <a class="nav-link {{ 'active' if view=='lancamentos' else '' }}"
+         href="{{ url_for('portal_restaurante', view='lancamentos', data_inicio=filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else None, data_fim=filtro_fim.strftime('%Y-%m-%d') if filtro_fim else None) }}">
+        <i class="bi bi-receipt"></i> <span>Lançamentos</span>
+      </a>
+
       <a class="nav-link {{ 'active' if view=='escalas' else '' }}" href="{{ url_for('portal_restaurante', view='escalas') }}">
         <i class="bi bi-calendar-week"></i> <span>Escala semanal</span>
       </a>
-     {% if session.get('user_tipo') == 'restaurante' %}
-<a class="nav-link {{ 'active' if request.endpoint=='rest_tabelas' else '' }}" href="{{ url_for('rest_tabelas') }}">
-  <i class="bi bi-table"></i> <span>Tabelas</span>
-</a>
-{% endif %}
+
+      {% if session.get('user_tipo') == 'restaurante' %}
+      <a class="nav-link {{ 'active' if request.endpoint=='rest_tabelas' else '' }}" href="{{ url_for('rest_tabelas') }}">
+        <i class="bi bi-table"></i> <span>Tabelas</span>
+      </a>
+      {% endif %}
+
       <a class="nav-link {{ 'active' if view=='config' else '' }}" href="{{ url_for('portal_restaurante', view='config') }}">
         <i class="bi bi-gear"></i> <span>Configuração</span>
       </a>
-      <a id="linkAvisos" class="nav-link {{ 'active' if request.endpoint=='portal_restaurante_avisos' else '' }}" href="{{ url_for('portal_restaurante_avisos') }}">
+
+      <a id="linkAvisos" class="nav-link {{ 'active' if request.endpoint=='portal_restaurante_avisos' or view=='avisos' else '' }}"
+         href="{{ url_for('portal_restaurante_avisos') }}">
         <i class="bi bi-megaphone"></i> <span>Avisos</span>
         {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
         {% if _cntAvisos > 0 %}<span class="badge text-bg-danger ms-auto">{{ _cntAvisos }}</span>{% endif %}
       </a>
+
       <a class="nav-link" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> <span>Sair</span></a>
     </nav>
   </div>
@@ -177,7 +202,7 @@
                     {% if lista %}
                       {% for grupo in (lista | groupby('contrato')) %}
                         {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                        <div class="contrato-header">{{ contrato_nome }}</div>
+                        <div class="fw-bold mt-2">{{ contrato_nome }}</div>
                         {% for item in grupo.list %}
                           <div class="py-2 border-bottom">
                             <div class="fw-bold">
@@ -207,7 +232,7 @@
               <i class="bi bi-calendar-day"></i>
             </div>
 
-            <table class="table table-bordered table-hover table-light align-middle">
+            <table class="table table-bordered table-hover table-light align-middle table-compact">
               <thead>
                 <tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr>
               </thead>
@@ -314,10 +339,107 @@
         <div class="card-white"><div class="text-muted"><i class="bi bi-inbox me-1"></i> Nenhum aviso disponível no momento.</div></div>
       {% endif %}
 
+    {% elif view == 'lancamentos' %}
+      <!-- ============== ABA NOVA: LANÇAMENTOS ============== -->
+      <div class="section-title"><i class="bi bi-receipt"></i> Lançamentos</div>
+
+      <div class="row g-3">
+        <div class="col-lg-3">
+          <div class="card-white sticky-tools">
+            <form id="formFiltroLanc" class="row g-2">
+              <div class="col-12">
+                <label class="form-label">Início</label>
+                <input type="date" class="form-control" name="data_inicio" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
+              </div>
+              <div class="col-12">
+                <label class="form-label">Fim</label>
+                <input type="date" class="form-control" name="data_fim" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
+              </div>
+              <div class="col-12">
+                <label class="form-label">Cooperado / Contrato</label>
+                <input type="text" class="form-control" name="q" placeholder="Filtrar por nome...">
+              </div>
+              <div class="col-12 d-grid">
+                <button class="btn btn-royal" type="button" id="btnAplicarLanc"><i class="bi bi-funnel"></i> Aplicar</button>
+              </div>
+              <div class="col-12 d-grid">
+                <button class="btn btn-outline-secondary" type="button" id="btnLimparLanc"><i class="bi bi-arrow-counterclockwise"></i> Limpar</button>
+              </div>
+              <hr>
+              <div class="kpi mb-2">
+                <div class="small text-muted">Total no período</div>
+                <div class="v">R$ <span id="kpiTotalValor">0,00</span></div>
+              </div>
+              <div class="kpi mb-2">
+                <div class="small text-muted">Entregas no período</div>
+                <div class="v"><span id="kpiTotalEntregas">0</span></div>
+              </div>
+              <div class="d-grid">
+                <button class="btn btn-outline-primary" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="col-lg-9">
+          <div class="card-white">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <div class="chip">
+                Período: <span id="txtPeriodo">{{ filtro_inicio.strftime('%d/%m/%Y') if filtro_inicio }}{% if filtro_inicio and filtro_fim %} a {% endif %}{{ filtro_fim.strftime('%d/%m/%Y') if filtro_fim }}</span>
+              </div>
+              <div class="small text-muted">Clique no nome do cooperado para destacar seus lançamentos.</div>
+            </div>
+
+            <table class="table table-bordered table-hover table-light align-middle table-compact" id="tblLanc">
+              <thead>
+                <tr>
+                  <th class="text-center" style="width:110px;">Data</th>
+                  <th>Cooperado</th>
+                  <th>Contrato</th>
+                  <th class="text-center" style="width:160px;">Horário</th>
+                  <th class="text-center" style="width:120px;">Entregas</th>
+                  <th class="text-end" style="width:140px;">Valor (R$)</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyLanc">
+                <!-- linhas via servidor (se quiser) -->
+                {% for x in lancamentos_periodo or [] %}
+                <tr data-coop="{{ x.cooperado_id or x.coop_id }}" data-coopnome="{{ x.cooperado_nome or x.coop_nome }}" data-contrato="{{ x.contrato_nome or x.contrato }}">
+                  <td class="text-center">{{ (x.data.strftime('%d/%m/%Y') if x.data) if x.data is not string else x.data }}</td>
+                  <td class="fw-semibold coop-name">{{ x.cooperado_nome or x.coop_nome }}</td>
+                  <td>{{ x.contrato_nome or x.contrato or '—' }}</td>
+                  <td class="text-center">
+                    {% if x.hora_inicio or x.hora_fim %}
+                      {{ x.hora_inicio or '' }}{% if x.hora_inicio or x.hora_fim %} às {% endif %}{{ x.hora_fim or '' }}
+                    {% else %}—{% endif %}
+                  </td>
+                  <td class="text-center">{{ x.qtd_entregas if x.qtd_entregas is not none else '-' }}</td>
+                  <td class="text-end">R$ {{ '%.2f'|format(x.valor or 0) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr class="table-secondary">
+                  <th colspan="4" class="text-end">Totais</th>
+                  <th class="text-center" id="ftEntregas">0</th>
+                  <th class="text-end" id="ftValor">R$ 0,00</th>
+                </tr>
+              </tfoot>
+            </table>
+
+            <hr class="my-3">
+            <h6 class="mb-2"><i class="bi bi-people"></i> Totais por cooperado</h6>
+            <div id="gridCoop" class="row g-2">
+              <!-- cartões gerados pelo JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+
     {% else %}
-      <!-- =================== COOPERADOS / LANÇAMENTOS =================== -->
+      <!-- =================== COOPERADOS / LANÇAMENTOS (LANÇAR) =================== -->
       <div class="section-title">Lançar Produção Diária</div>
-    
+
       <div class="card-white">
         <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
           <input type="hidden" name="view" value="lancar">
@@ -404,42 +526,72 @@
                 <input type="hidden" name="avaliar" id="inputAvaliar" value="0">
               </div>
 
-              <!-- Bloco de Avaliação -->
+              <!-- Avaliação com estrelas -->
               <div id="boxAval" class="row g-2" style="display:none;">
-                <div class="col-md-3">
-                  <label class="form-label">Geral</label>
-                  <select class="form-select" name="av_geral">
-                    <option value="">—</option>
-                    {% for n in range(1,6) %}<option value="{{n}}">{{n}} ★</option>{% endfor %}
-                  </select>
+                <div class="col-md-6">
+                  <div class="rating-group" data-name="av_geral">
+                    <div class="rating-label">Geral</div>
+                    <div class="stars">
+                      <i class="bi bi-star-fill star" data-v="1"></i>
+                      <i class="bi bi-star-fill star" data-v="2"></i>
+                      <i class="bi bi-star-fill star" data-v="3"></i>
+                      <i class="bi bi-star-fill star" data-v="4"></i>
+                      <i class="bi bi-star-fill star" data-v="5"></i>
+                    </div>
+                    <input type="hidden" name="av_geral" value="">
+                  </div>
                 </div>
-                <div class="col-md-3">
-                  <label class="form-label">Pontualidade</label>
-                  <select class="form-select" name="av_pontualidade">
-                    <option value="">—</option>
-                    {% for n in range(1,6) %}<option value="{{n}}">{{n}} ★</option>{% endfor %}
-                  </select>
+                <div class="col-md-6">
+                  <div class="rating-group" data-name="av_pontualidade">
+                    <div class="rating-label">Pontualidade</div>
+                    <div class="stars">
+                      <i class="bi bi-star-fill star" data-v="1"></i>
+                      <i class="bi bi-star-fill star" data-v="2"></i>
+                      <i class="bi bi-star-fill star" data-v="3"></i>
+                      <i class="bi bi-star-fill star" data-v="4"></i>
+                      <i class="bi bi-star-fill star" data-v="5"></i>
+                    </div>
+                    <input type="hidden" name="av_pontualidade" value="">
+                  </div>
                 </div>
-                <div class="col-md-3">
-                  <label class="form-label">Educação</label>
-                  <select class="form-select" name="av_educacao">
-                    <option value="">—</option>
-                    {% for n in range(1,6) %}<option value="{{n}}">{{n}} ★</option>{% endfor %}
-                  </select>
+                <div class="col-md-6">
+                  <div class="rating-group" data-name="av_educacao">
+                    <div class="rating-label">Educação</div>
+                    <div class="stars">
+                      <i class="bi bi-star-fill star" data-v="1"></i>
+                      <i class="bi bi-star-fill star" data-v="2"></i>
+                      <i class="bi bi-star-fill star" data-v="3"></i>
+                      <i class="bi bi-star-fill star" data-v="4"></i>
+                      <i class="bi bi-star-fill star" data-v="5"></i>
+                    </div>
+                    <input type="hidden" name="av_educacao" value="">
+                  </div>
                 </div>
-                <div class="col-md-3">
-                  <label class="form-label">Eficiência / Cuidado</label>
-                  <select class="form-select" name="av_eficiencia">
-                    <option value="">—</option>
-                    {% for n in range(1,6) %}<option value="{{n}}">{{n}} ★</option>{% endfor %}
-                  </select>
+                <div class="col-md-6">
+                  <div class="rating-group" data-name="av_eficiencia">
+                    <div class="rating-label">Eficiência / Cuidado</div>
+                    <div class="stars">
+                      <i class="bi bi-star-fill star" data-v="1"></i>
+                      <i class="bi bi-star-fill star" data-v="2"></i>
+                      <i class="bi bi-star-fill star" data-v="3"></i>
+                      <i class="bi bi-star-fill star" data-v="4"></i>
+                      <i class="bi bi-star-fill star" data-v="5"></i>
+                    </div>
+                    <input type="hidden" name="av_eficiencia" value="">
+                  </div>
                 </div>
-                <div class="col-md-3">
-                  <label class="form-label">Bem apresentado</label>
-                  <select class="form-select" name="av_apresentacao">
-                    <option value="">—</option>
-                    {% for n in range(1,6) %}<option value="{{n}}">{{n}} ★</option>{% endfor %}
-                  </select>
+                <div class="col-md-6">
+                  <div class="rating-group" data-name="av_apresentacao">
+                    <div class="rating-label">Bem Apresentado</div>
+                    <div class="stars">
+                      <i class="bi bi-star-fill star" data-v="1"></i>
+                      <i class="bi bi-star-fill star" data-v="2"></i>
+                      <i class="bi bi-star-fill star" data-v="3"></i>
+                      <i class="bi bi-star-fill star" data-v="4"></i>
+                      <i class="bi bi-star-fill star" data-v="5"></i>
+                    </div>
+                    <input type="hidden" name="av_apresentacao" value="">
+                  </div>
                 </div>
                 <div class="col-12">
                   <label class="form-label">Comentário (opcional)</label>
@@ -458,7 +610,7 @@
           <div id="blocoTabelas">
             {% for coop in cooperados %}
             <div id="tabela-{{ coop.id }}" class="card-white lancamentos-table" style="display:none;">
-              <table class="table table-bordered table-hover table-light align-middle">
+              <table class="table table-bordered table-hover table-light align-middle table-compact">
                 <thead><tr><th>Valor</th><th>Data</th><th>Horário</th><th>Entregas</th><th>Editar</th><th>Excluir</th></tr></thead>
                 <tbody>
                   {% for lanc in coop.lancamentos %}
@@ -535,18 +687,49 @@
 
   <script>
     function togglePwd(el){
-      const i = el.previousElementSibling;
-      if(!i) return;
+      const i = el.previousElementSibling; if(!i) return;
       i.type = i.type==='password'?'text':'password';
       el.querySelector('i').classList.toggle('bi-eye');
       el.querySelector('i').classList.toggle('bi-eye-slash');
     }
 
+    // ===== helpers =====
+    const brMoney = (n)=> (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+    const parseBRDate = (s)=>{ // 'dd/mm/yyyy' or 'yyyy-mm-dd'
+      if(!s) return null;
+      if(String(s).includes('/')){ const [d,m,y]=s.split('/'); return new Date(+y, +m-1, +d); }
+      const [y,m,d]=String(s).split('-'); return new Date(+y, +m-1, +d);
+    };
+    const fmtBR = (d)=> d?`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`:'';
+
     document.addEventListener('DOMContentLoaded', function () {
       const viewNow = "{{ view|default('lancar') }}";
 
+      // ===== Estrelas de avaliação (no "Lançar") =====
+      function wireStars(){
+        document.querySelectorAll('.rating-group').forEach(group=>{
+          const hidden = group.querySelector('input[type="hidden"]');
+          const stars  = group.querySelectorAll('.star');
+          function paint(v,hover=false){
+            stars.forEach(s=>{
+              const on = Number(s.dataset.v) <= v;
+              s.classList.toggle('active', on);
+              s.classList.toggle('hover', hover && on);
+            });
+          }
+          stars.forEach(s=>{
+            s.addEventListener('mouseenter',()=>paint(Number(s.dataset.v),true));
+            s.addEventListener('mouseleave',()=>paint(Number(hidden.value||0),false));
+            s.addEventListener('click',()=>{
+              hidden.value = Number(s.dataset.v); paint(hidden.value,false);
+            });
+          });
+          paint(Number(hidden.value||0),false);
+        });
+      }
+
       // ===== Lançamentos (UI local) =====
-      if (!['escalas','config','avisos'].includes(viewNow)) {
+      if (!['escalas','config','avisos','lancamentos'].includes(viewNow)) {
         const busca = document.getElementById('buscaCoop');
         const select = document.getElementById('selectCoop');
         const itens = Array.from(document.querySelectorAll('.cooperado-item'));
@@ -569,6 +752,7 @@
           document.querySelectorAll('.lancamentos-table').forEach(t => t.style.display = 'none');
           const tabela = document.getElementById('tabela-' + id); if (tabela) tabela.style.display = 'block';
           window.scrollTo({ top: 0, behavior: 'smooth' });
+          wireStars();
         }
         itens.forEach(el => el.addEventListener('click', () => mostrarCooperado(el)));
 
@@ -589,7 +773,7 @@
         select?.addEventListener('change', function(){ const el = getItemById(this.value); if (el) mostrarCooperado(el); });
         const primeiroVisivel = itens.find(el => el.style.display !== 'none'); if (primeiroVisivel) mostrarCooperado(primeiroVisivel);
 
-        // ===== Perguntar avaliação no submit =====
+        // Pergunta avaliação no submit (mesmo comportamento que você já tinha)
         const boxAval = document.getElementById('boxAval');
         const inputAvaliar = document.getElementById('inputAvaliar');
         const chkAvaliar = document.getElementById('chkAvaliar');
@@ -607,10 +791,9 @@
         if (form && modalAval) {
           let allowSubmit = false;
           form.addEventListener('submit', function(e) {
-            if (allowSubmit) return; // deixa passar na 2ª vez (pular)
+            if (allowSubmit) return;
             const jaMarcouAvaliar = inputAvaliar?.value === '1';
             const temAlgoPreenchido = algumCampoDeAvaliacaoPreenchido();
-            // Se não marcou avaliar e não preencheu nada, perguntar:
             if (!jaMarcouAvaliar && !temAlgoPreenchido) {
               e.preventDefault();
               modalAval.show();
@@ -630,9 +813,11 @@
           document.getElementById('btnPularAval')?.addEventListener('click', () => {
             modalAval.hide();
             allowSubmit = true;
-            form.submit(); // envia sem avaliação
+            form.submit();
           });
         }
+
+        wireStars();
       }
 
       // ===== Avisos (UI local) =====
@@ -693,6 +878,97 @@
         });
 
         refreshBadges();
+      }
+
+      // ===== ABA LANÇAMENTOS (totais, filtro e CSV) =====
+      if (viewNow === 'lancamentos') {
+        const tbody = document.getElementById('tbodyLanc');
+        const ftValor = document.getElementById('ftValor');
+        const ftEnt = document.getElementById('ftEntregas');
+        const kpiV = document.getElementById('kpiTotalValor');
+        const kpiE = document.getElementById('kpiTotalEntregas');
+        const grid = document.getElementById('gridCoop');
+
+        function getRows(){ return Array.from(tbody.querySelectorAll('tr')); }
+        function toNum(v){ const n = Number(String(v).replace(/[^\d,.-]/g,'').replace('.', '').replace(',', '.')); return isNaN(n)?0:n; }
+
+        function applyFilter(){
+          const f = document.getElementById('formFiltroLanc');
+          const di = parseBRDate(f.data_inicio.value);
+          const df = parseBRDate(f.data_fim.value);
+          const q  = (f.q.value||'').toLowerCase().trim();
+          let totV=0, totE=0;
+          const perCoop = {};
+          getRows().forEach(tr=>{
+            const dTxt = tr.cells[0].textContent.trim(); // dd/mm/yyyy
+            const d = parseBRDate(dTxt);
+            const coop = (tr.dataset.coopnome||'').toLowerCase();
+            const contrato = (tr.dataset.contrato||'').toLowerCase();
+            let show = true;
+            if (di && d && d < di) show=false;
+            if (df && d && d > df) show=false;
+            if (q && !(coop.includes(q) || contrato.includes(q))) show=false;
+            tr.style.display = show?'':'none';
+            if (show){
+              const v = toNum(tr.cells[5].textContent);
+              const e = toNum(tr.cells[4].textContent);
+              totV += v; totE += e;
+              const id = tr.dataset.coop, nm = tr.dataset.coopnome;
+              perCoop[id] = perCoop[id] || {nome:nm, valor:0, ent:0};
+              perCoop[id].valor += v; perCoop[id].ent += e;
+            }
+          });
+          ftValor.textContent = 'R$ ' + brMoney(totV);
+          ftEnt.textContent = String(totE);
+          kpiV.textContent = brMoney(totV);
+          kpiE.textContent = String(totE);
+          // cards por cooperado
+          grid.innerHTML = '';
+          Object.values(perCoop).sort((a,b)=>b.valor-a.valor).forEach(p=>{
+            const div = document.createElement('div'); div.className='col-sm-6 col-xl-4';
+            div.innerHTML = `
+              <div class="kpi h-100">
+                <div class="fw-bold">${p.nome}</div>
+                <div class="small text-muted">Entregas: <b>${p.ent||0}</b></div>
+                <div>Total: <b>R$ ${brMoney(p.valor)}</b></div>
+              </div>`;
+            grid.appendChild(div);
+          });
+        }
+
+        // destacar um cooperado ao clicar no nome
+        tbody.addEventListener('click', (e)=>{
+          const td = e.target.closest('.coop-name'); if(!td) return;
+          const nome = td.textContent.trim();
+          getRows().forEach(r=>{
+            r.classList.toggle('table-warning', r.querySelector('.coop-name')?.textContent.trim()===nome);
+          });
+        });
+
+        document.getElementById('btnAplicarLanc').addEventListener('click', applyFilter);
+        document.getElementById('btnLimparLanc').addEventListener('click', ()=>{
+          const f=document.getElementById('formFiltroLanc'); f.data_inicio.value=''; f.data_fim.value=''; f.q.value=''; applyFilter();
+          document.getElementById('txtPeriodo').textContent='—';
+        });
+
+        // Exportar CSV do que está visível
+        document.getElementById('btnExportCsv').addEventListener('click', ()=>{
+          const vis = getRows().filter(r=>r.style.display!=='none');
+          const linhas = [['Data','Cooperado','Contrato','Horário','Entregas','Valor (R$)']];
+          vis.forEach(r=>{
+            const arr = Array.from(r.cells).map(td=>td.textContent.trim());
+            linhas.push(arr);
+          });
+          const csv = '\uFEFF' + linhas.map(l=>l.map(x=>`"${x.replace(/"/g,'""')}"`).join(';')).join('\n');
+          const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'lancamentos.csv';
+          a.click();
+          URL.revokeObjectURL(a.href);
+        });
+
+        applyFilter();
       }
 
       // Toast de novos avisos (aparece em qualquer view)
