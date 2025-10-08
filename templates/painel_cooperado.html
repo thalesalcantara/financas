@@ -602,34 +602,105 @@
     </tr>
   </thead>
 
+  <style>
+  /* ——— Escala mobile compacta ——— */
+  .table-escala { table-layout: fixed; }
+  .table-escala th, .table-escala td {
+    vertical-align: middle;
+    padding: .42rem .48rem;
+    line-height: 1.12;
+  }
+  /* cabeçalhos centralizados e numa linha */
+  .table-escala th {
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  /* larguras (mais estreita para Data) */
+  .table-escala col.c-data     { width: 22%; }
+  .table-escala col.c-turno    { width: 18%; }
+  .table-escala col.c-horario  { width: 28%; }
+  .table-escala col.c-contrato { width: 32%; }
+
+  /* borda colorida da linha */
+  .row-stripe { border-left: 4px solid var(--stripe,#e5e7eb); }
+
+  /* “chip” de data compacto em duas linhas */
+  .date-chip{
+    display:inline-flex; flex-direction:column; align-items:center;
+    border:1px solid #0001; border-radius:14px; padding:.12rem .5rem;
+    min-width:3.6rem; background:#fff; font-weight:700;
+  }
+  .date-chip .d1{ font-size:.98rem; line-height:1.05; }   /* 08/10 */
+  .date-chip .d2{ font-size:.70rem; line-height:1.0; opacity:.75; } /* QUA */
+
+  .date-wrap .badge { margin-left:.35rem; padding:.15rem .5rem; font-size:.75rem; white-space:nowrap; }
+
+  /* textos que podem quebrar bonito */
+  .wrap-2{ overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; word-break:break-word; hyphens:auto; }
+  .wrap-3{ overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; word-break:break-word; hyphens:auto; }
+
+  /* Turno não quebra */
+  .nowrap { white-space: nowrap; }
+
+  /* Horário levemente menor para caber “MEIO EXPEDIENTE” */
+  .hora-tight { font-size:.95rem; }
+
+  /* botões menores */
+  .actions-inline .btn { padding:.22rem .5rem; font-size:.8rem; }
+
+  @media (max-width:420px){
+    .table-escala th{ font-size:.95rem; }
+    .table-escala td{ font-size:.95rem; }
+    .date-chip .d1{ font-size:.95rem; }
+  }
+</style>
+
+<table class="table table-bordered table-escala align-middle">
+  <colgroup>
+    <col class="c-data">
+    <col class="c-turno">
+    <col class="c-horario">
+    <col class="c-contrato">
+  </colgroup>
+
+  <thead>
+    <tr>
+      <th>Data</th>
+      <th>Turno</th>
+      <th>Horário</th>
+      <th>Contrato</th>
+    </tr>
+  </thead>
+
   <tbody>
     {% if minha_escala %}
       {% for e in minha_escala %}
-        {% set colors = (e.cor or '')|string %}
-        {% set has_multi = '|' in colors %}
-        {% set cs = colors.split('|') if has_multi else [] %}
-        {% set stripe = (colors if not has_multi else (cs[0] if cs|length>0 else '')) or e.status_color %}
+        {% set colors   = (e.cor or '')|string %}
+        {% set has_multi= '|' in colors %}
+        {% set cs       = colors.split('|') if has_multi else [] %}
+        {% set stripe   = (colors if not has_multi else (cs[0] if cs|length>0 else '')) or e.status_color %}
 
-        {# Data curta: preferir e.data_curta (ex: 08/10). Se não vier, corta os 5 primeiros de e.data_fmt/e.data #}
-        {% set data_curta =
-             e.data_curta
-             or (e.data_fmt[:5] if e.data_fmt else (e.data[:5] if e.data else '')) %}
-        {% set dow = e.dia_semana or e.dow or '' %}
+        {# Data curta: dd/mm + DOW em 2 linhas #}
+        {% set data_curta = e.data_curta
+                            or (e.data_fmt[:5] if e.data_fmt else (e.data[:5] if e.data else '')) %}
+        {% set dow        = (e.dia_semana or e.dow or '')|upper %}
 
         <tr class="row-stripe esc-{{ e.status }}" style="--stripe: {{ stripe }}">
-          <!-- DATA -->
+          <!-- DATA (estreita) -->
           <td>
-            <div class="date-wrap">
-              <span class="pill"
-                    style="background:{{ has_multi and cs|length>0 and cs[0] or (colors or '#fff') }};color:#111;">
-                {{ data_curta }}{% if dow %} - {{ dow|upper }}{% endif %}
+            <div class="d-flex align-items-center">
+              <span class="date-chip"
+                    style="background:{{ has_multi and cs|length>0 and cs[0] or (colors or '#fff') }}">
+                <span class="d1">{{ data_curta }}</span>
+                {% if dow %}<span class="d2">{{ dow }}</span>{% endif %}
               </span>
               {% if e.status == 'today' %}
-                <span class="badge rounded-pill bg-success-subtle text-success">HOJE</span>
+                <span class="badge rounded-pill bg-success-subtle text-success ms-2">HOJE</span>
               {% elif e.status == 'tomorrow' %}
-                <span class="badge rounded-pill bg-primary-subtle text-primary">AMANHÃ</span>
+                <span class="badge rounded-pill bg-primary-subtle text-primary ms-2">AMANHÃ</span>
               {% elif e.status == 'past' %}
-                <span class="badge rounded-pill bg-danger-subtle text-danger">PASSADO</span>
+                <span class="badge rounded-pill bg-danger-subtle text-danger ms-2">PASSADO</span>
               {% endif %}
             </div>
 
@@ -645,8 +716,8 @@
             </div>
           </td>
 
-          <!-- TURNO: não quebra (DIA/NOITE) -->
-          <td class="nowrap">
+          <!-- TURNO (centralizar e não quebrar) -->
+          <td class="text-center nowrap">
             {% if has_multi and cs|length>1 %}
               <span class="pill" style="background:{{ cs[1] }};color:#111;">{{ e.turno or '—' }}</span>
             {% else %}
@@ -654,8 +725,8 @@
             {% endif %}
           </td>
 
-          <!-- HORÁRIO -->
-          <td>
+          <!-- HORÁRIO (cabe “MEIO EXPEDIENTE”) -->
+          <td class="hora-tight">
             {% if has_multi and cs|length>2 %}
               <span class="pill" style="background:{{ cs[2] }};color:#111;">{{ e.horario_fmt or e.horario or '—' }}</span>
             {% else %}
@@ -663,7 +734,7 @@
             {% endif %}
           </td>
 
-          <!-- CONTRATO: aceita nomes grandes (máx 3 linhas) -->
+          <!-- CONTRATO (mostra completo, até 3 linhas) -->
           <td>
             {% if has_multi and cs|length>3 %}
               <span class="pill" style="background:{{ cs[3] }};color:#111;">{{ e.contrato or '—' }}</span>
