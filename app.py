@@ -4226,8 +4226,8 @@ def tabelas_publicas():
     )
 
 # ---------------- TABELAS (Restaurante) ----------------
-from flask import render_template, session
-import unicodedata, re
+from flask import render_template, session, redirect, url_for, abort, send_file, flash
+import unicodedata, re, os
 
 @app.route("/rest/tabelas")
 @role_required("restaurante")
@@ -4255,21 +4255,65 @@ def rest_tabelas():
 
     alvo_norm = _norm(login_nome)
 
-    # Buscamos por candidatos (opcionalmente reduz a lista) e validamos igualdade exata após normalização
+    # Busca candidatos só para reduzir varredura e depois valida com igualdade normalizada
     candidatos = (Tabela.query
-                  .filter(Tabela.titulo.ilike(f"%{login_nome}%"))  # facilita, mas validamos exato em Python
+                  .filter(Tabela.titulo.ilike(f"%{login_nome}%"))
                   .order_by(Tabela.enviado_em.desc())
                   .all())
 
+    # pega a MAIS RECENTE cujo título normalized == alvo_norm
     tabela_exata = next((t for t in candidatos if _norm(t.titulo) == alvo_norm), None)
 
-    # Não há match exato? Não mostra tabela (template exibe alerta orientando a publicar com o título correto)
     return render_template(
         "restaurantes_tabelas.html",
         restaurante=restaurante,
         login_nome=login_nome,
         tabela=tabela_exata
     )
+
+
+@app.route("/rest/tabelas/<int:tabela_id>/download")
+@role_required("restaurante")
+def rest_tabela_download(tabela_id: int):
+    """
+    Download seguro: só permite baixar a tabela se o título dela
+    for exatamente (normalizado) igual ao login/nome do restaurante logado.
+    """
+    u_id = session.get("user_id")
+    restaurante = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+    t = Tabela.query.get_or_404(tabela_id)
+
+    def _norm(s: str) -> str:
+        s = unicodedata.normalize("NFD", (s or "").strip())
+        s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+        s = re.sub(r"\s+", " ", s)
+        return s.lower()
+
+    login_nome = (
+        getattr(getattr(restaurante, "usuario_ref", None), "usuario", None)
+        or getattr(restaurante, "usuario", None)
+        or (restaurante.nome or "")
+    )
+
+    if _norm(t.titulo) != _norm(login_nome):
+        # bloqueia acesso a tabela de outro restaurante
+        abort(403)
+
+    # Resolve o caminho do arquivo (funciona com modelos que guardam 'arquivo_path' ou 'arquivo')
+    path = None
+    if hasattr(t, "arquivo_path") and t.arquivo_path:
+        path = t.arquivo_path
+    elif hasattr(t, "arquivo") and t.arquivo:
+        # TABELAS_DIR já definido no seu app
+        path = os.path.join(TABELAS_DIR, t.arquivo)
+
+    if not path or not os.path.isfile(path):
+        flash("Arquivo não encontrado.", "warning")
+        # volta para a página das tabelas do restaurante
+        return redirect(url_for("rest_tabelas"))
+
+    # Envia o arquivo
+    return send_file(path, as_attachment=True)
 
 # ---------------- Download compartilhado ----------------
 @app.route("/tabelas/<int:tab_id>/baixar")
