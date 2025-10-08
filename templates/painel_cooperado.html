@@ -550,58 +550,6 @@
           </div>
         </div>
 
-    <style>
-  /* ——— Escala mobile compacta ——— */
-  .table-escala { table-layout: fixed; }
-  .table-escala th, .table-escala td {
-    vertical-align: middle;
-    padding: .45rem .5rem;  /* mais baixinha */
-    line-height: 1.1;
-  }
-  .table-escala th { white-space: nowrap; } /* evita "T u r n o" */
-
-  /* controles de largura p/ 4 colunas (mobile) */
-  .table-escala col.c-data     { width: 34%; }
-  .table-escala col.c-turno    { width: 16%; }
-  .table-escala col.c-horario  { width: 22%; }
-  .table-escala col.c-contrato { width: 28%; }
-
-  .row-stripe { border-left: 4px solid var(--stripe,#e5e7eb); }
-  .pill { display:inline-block; padding:.08rem .45rem; border-radius:999px; font-weight:600; border:1px solid #0001; }
-  .date-wrap .badge { margin-left:.3rem; padding:.15rem .5rem; font-size:.75rem; }
-
-  /* textos que podem quebrar bonitinho (máx 3 linhas) */
-  .wrap-3 { overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; word-break:break-word; hyphens:auto; }
-
-  /* itens curtinhos ficam SEM quebra */
-  .nowrap { white-space: nowrap; }
-
-  @media (max-width: 420px) {
-    .table-escala th { font-size:.92rem; }
-    .table-escala td { font-size:.95rem; }
-    .pill { font-size:.85rem; }
-    .actions-inline .btn { padding:.2rem .45rem; font-size:.8rem; }
-  }
-</style>
-
-<table class="table table-bordered table-escala align-middle">
-  <!-- controla as larguras -->
-  <colgroup>
-    <col class="c-data">
-    <col class="c-turno">
-    <col class="c-horario">
-    <col class="c-contrato">
-  </colgroup>
-
-  <thead>
-    <tr>
-      <th>Data</th>
-      <th>Turno</th>
-      <th>Horário</th>
-      <th>Contrato</th>
-    </tr>
-  </thead>
-
  <style>
   /* ——— Escala mobile compacta e alinhada ——— */
   .table-escala { table-layout: fixed; }
