@@ -1147,7 +1147,7 @@ def _avisos_base_query(now=None):
 
 def get_avisos_for_cooperado(coop: Cooperado):
     """
-    Mostra:
+    Mostra para COOPERADO:
       - global
       - cooperado destinado para mim OU broadcast (destino_cooperado_id IS NULL)
       - restaurante destinado a um dos meus restaurantes OU broadcast (sem restaurantes ligados)
@@ -1172,8 +1172,37 @@ def get_avisos_for_cooperado(coop: Cooperado):
 
     avisos = list(q.all())
     avisos.sort(
-        key=lambda a: (not a.fixado, str(a.prioridade or "").lower() != "alta",
-                       -(a.criado_em.timestamp() if a.criado_em else 0))
+        key=lambda a: (
+            not a.fixado,
+            str(a.prioridade or "").lower() != "alta",
+            -(a.criado_em.timestamp() if a.criado_em else 0)
+        )
+    )
+    return avisos
+
+def get_avisos_for_restaurante(rest: Restaurante):
+    """
+    Mostra para RESTAURANTE:
+      - global
+      - restaurante destinado para mim (m2m contém este restaurante)
+      - restaurante broadcast (sem restaurantes ligados)
+    """
+    q = _avisos_base_query().filter(
+        (Aviso.tipo == "global")
+        |
+        ((Aviso.tipo == "restaurante") & (
+            (~Aviso.restaurantes.any()) |              # broadcast para todos
+            Aviso.restaurantes.any(Restaurante.id == rest.id)  # específico para mim
+        ))
+    )
+
+    avisos = list(q.all())
+    avisos.sort(
+        key=lambda a: (
+            not a.fixado,
+            str(a.prioridade or "").lower() != "alta",
+            -(a.criado_em.timestamp() if a.criado_em else 0)
+        )
     )
     return avisos
 
