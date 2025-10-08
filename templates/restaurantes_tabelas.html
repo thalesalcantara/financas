@@ -66,7 +66,8 @@
   <!-- TOPBAR -->
   <header class="topbar">
     <div class="wrap d-flex align-items-center justify-content-between px-3 py-2">
-      <a href="{{ url_for('portal_restaurante') if 'portal_restaurante' in globals() else url_for('rest_tabelas') }}"
+      {# Botão Voltar: usa flag enviada pelo backend; fallback para rest_tabelas #}
+      <a href="{{ url_for('portal_restaurante') if (has_portal_restaurante|default(false)) else url_for('rest_tabelas') }}"
          class="btn btn-outline-light btn-sm btn-top" id="btnVoltar">
         <i class="bi bi-arrow-left"></i> <span class="d-none d-sm-inline">Voltar</span>
       </a>
