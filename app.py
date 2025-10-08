@@ -4225,8 +4225,6 @@ def tabelas_publicas():
         viewer_tipo=session.get("user_tipo")  # "cooperado" ou "admin"
     )
 
-
-# ---------------- TABELAS (Restaurante) ----------------
 # ---------------- TABELAS (Restaurante) ----------------
 from flask import render_template, session
 import unicodedata, re
