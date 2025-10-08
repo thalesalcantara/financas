@@ -1053,11 +1053,27 @@ def avisos_marcar_todos():
     return redirect(url_for("portal.portal_cooperado_avisos"))
 
   # --- Registro do blueprint 'portal' (uma única vez, após definir TODAS as rotas dele)
+# --- Registro do blueprint 'portal' (depois de definir TODAS as rotas do blueprint)
 def register_blueprints_once(app):
     if "portal" not in app.blueprints:
         app.register_blueprint(portal_bp)
 
 register_blueprints_once(app)
+
+# --- Alias para compatibilidade com o template (endpoint esperado: 'portal_cooperado_avisos')
+from flask import redirect, url_for
+
+def _portal_cooperado_avisos_alias():
+    # redireciona para a rota real dentro do blueprint 'portal'
+    return redirect(url_for("portal.portal_cooperado_avisos"))
+
+# publica a URL "antiga" (ajuste o path se o seu antigo era outro)
+app.add_url_rule(
+    "/portal/cooperado/avisos",         # caminho acessado
+    endpoint="portal_cooperado_avisos", # nome que o template usa no url_for(...)
+    view_func=_portal_cooperado_avisos_alias,
+    methods=["GET"],
+)
 
 # ======== Helpers p/ troca: data/weekday/turno ========
 def _parse_data_escala_str(s: str) -> date | None:
