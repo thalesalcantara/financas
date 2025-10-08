@@ -4512,6 +4512,26 @@ def admin_tabelas_scan():
         })
     return jsonify({"tabelas_dir": str(base), "items": items})
 
+# ---------------------------------------------------------------------------
+# (Opcional) Normalizador: deixa arquivo_url só com o NOME do arquivo
+# Use se no seu banco ficaram caminhos tipo "static/uploads/tabelas/foo.pdf"
+# ---------------------------------------------------------------------------
+@app.post("/admin/tabelas/normalize-arquivo-url", endpoint="admin_tabelas_normalize_arquivo_url")
+@admin_required
+def admin_tabelas_normalize_arquivo_url():
+    alterados = 0
+    for t in Tabela.query.all():
+        url = (t.arquivo_url or "").strip()
+        if not url or url.startswith(("http://", "https://")):
+            continue
+        fname = url.split("?", 1)[0].split("#", 1)[0].split("/")[-1]
+        if fname and fname != url:
+            t.arquivo_url = fname
+            alterados += 1
+    if alterados:
+        db.session.commit()
+    return jsonify({"ok": True, "alterados": alterados})
+
 # =========================
 # AVISOS — Ações (cooperado)
 # =========================
