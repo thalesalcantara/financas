@@ -71,9 +71,11 @@
       <a class="nav-link {{ 'active' if view=='escalas' else '' }}" href="{{ url_for('portal_restaurante', view='escalas') }}">
         <i class="bi bi-calendar-week"></i> <span>Escala semanal</span>
       </a>
-      <a class="nav-link {{ 'active' if request.endpoint=='rest_tabelas' else '' }}" href="{{ url_for('rest_tabelas') }}">
-        <i class="bi bi-table"></i> <span>Tabelas</span>
-      </a>
+     {% if session.get('user_tipo') == 'restaurante' %}
+<a class="nav-link {{ 'active' if request.endpoint=='rest_tabelas' else '' }}" href="{{ url_for('rest_tabelas') }}">
+  <i class="bi bi-table"></i> <span>Tabelas</span>
+</a>
+{% endif %}
       <a class="nav-link {{ 'active' if view=='config' else '' }}" href="{{ url_for('portal_restaurante', view='config') }}">
         <i class="bi bi-gear"></i> <span>Configuração</span>
       </a>
