@@ -4147,278 +4147,154 @@ try:
 except Exception as _e:
     ...
 
-# =========================
-# TABELAS — usando FILES_DIR (persistente)
-# =========================
-from flask import (
-    render_template, request, redirect, url_for, flash, session,
-    send_file, abort, current_app, jsonify
-)
-from werkzeug.utils import secure_filename
-from datetime import datetime
+# ==== TABELAS (upload/abrir/baixar) =========================================
 from pathlib import Path
-import os, re, unicodedata, mimetypes
-# (pressupõe modelos Tabela, Restaurante e db, e decorators admin_required/role_required)
 
-# ---------- PATHS ----------
-def _paths():
-    """
-    Retorna:
-      root_dir: pasta do app
-      files_dir: diretório persistente (FILES_DIR) OU fallback em <root>/instance/files
-      tabelas_dir: <files_dir>/tabelas
-      using_disk: True se FILES_DIR veio do ambiente
-    """
-    root_dir = Path(current_app.root_path)
-    env_dir = os.getenv("FILES_DIR", "").strip()
-    if env_dir:
-        files_dir = Path(env_dir)
-        using_disk = True
-    else:
-        # fallback local (não persistente em Render, mas útil em dev)
-        files_dir = root_dir / "instance" / "files"
-        using_disk = False
+# Diretório base já criado no topo do app:
+# TABELAS_DIR = os.path.join(UPLOAD_DIR, "tabelas")
 
-    tabelas_dir = files_dir / "tabelas"
-    return root_dir, files_dir, tabelas_dir, using_disk
-
-def _norm_txt(s: str) -> str:
-    s = unicodedata.normalize("NFD", (s or "").strip())
-    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
-    s = re.sub(r"\s+", " ", s)
-    return s.lower()
-
-def _guess_mimetype_from_path(path: str) -> str:
-    mt, _ = mimetypes.guess_type(path)
-    return mt or "application/octet-stream"
-
-def _tabela_fs_path(t) -> str | None:
-    """
-    Resolve o arquivo para servir:
-      1) t.arquivo_path (absoluto) — preferido
-      2) t.arquivo dentro de <FILES_DIR>/tabelas
-      3) t.arquivo_url:
-         - http/https => None (caller redireciona)
-         - outros formatos => tenta resolver relativo ao app (LEGADO)
-    """
-    root_dir, files_dir, tabelas_dir, _ = _paths()
-
-    # 1) absoluto salvo
-    ap = getattr(t, "arquivo_path", None)
-    if ap and os.path.isfile(ap):
-        return ap
-
-    # 2) nome simples salvo dentro do diretório persistente
-    nm = getattr(t, "arquivo", None)
-    if nm:
-        p = tabelas_dir / nm
-        if p.is_file():
-            return str(p)
-
-    # 3) url legado
-    url = (getattr(t, "arquivo_url", "") or "").strip()
-    if url:
-        if url.startswith("http://") or url.startswith("https://"):
-            return None
-        # tenta relativo ao app (casos antigos)
-        rel = url.lstrip("/")
-        p = Path(current_app.root_path) / rel
-        if p.is_file():
-            return str(p)
-
-    return None
-
-def _enforce_restaurante_titulo(t, restaurante):
-    login_nome = (
-        getattr(getattr(restaurante, "usuario_ref", None), "usuario", None)
-        or getattr(restaurante, "usuario", None)
-        or (restaurante.nome or "")
-    )
-    if _norm_txt(t.titulo) != _norm_txt(login_nome):
-        abort(403)
-
-def _serve_tabela_or_redirect(t, as_attachment: bool = False):
-    # remoto?
-    url = (getattr(t, "arquivo_url", "") or "").strip()
-    if url and (url.startswith("http://") or url.startswith("https://")):
-        return redirect(url)
-
-    p = _tabela_fs_path(t)
-    current_app.logger.info(
-        f"[TABELA] id={getattr(t,'id',None)} titulo={t.titulo!r} "
-        f"url={url!r} resolved={p!r}"
-    )
-    if not p or not os.path.isfile(p):
-        abort(404)
-
-    return send_file(
-        p,
-        as_attachment=as_attachment,
-        download_name=(getattr(t, "arquivo_nome", None) or os.path.basename(p)),
-        mimetype=_guess_mimetype_from_path(p),
-    )
+def _tabelas_base_dir() -> Path:
+    p = Path(TABELAS_DIR)
+    p.mkdir(parents=True, exist_ok=True)
+    return p
 
 # ---------------- Admin ----------------
-@app.route("/admin/tabelas")
+@app.get("/admin/tabelas", endpoint="admin_tabelas")
 @admin_required
 def admin_tabelas():
-    tabelas = Tabela.query.order_by(Tabela.enviado_em.desc()).all()
+    tabelas = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
     return render_template("admin_tabelas.html", tabelas=tabelas)
 
-@app.post("/admin/tabelas/upload")
+@app.post("/admin/tabelas/upload", endpoint="admin_upload_tabela")
 @admin_required
 def admin_upload_tabela():
     f = request.form
     titulo    = (f.get("titulo") or "").strip()
-    categoria = (f.get("categoria") or "outro").strip()
-    descricao = (f.get("descricao") or "").strip()
-    arquivo   = request.files.get("arquivo")
+    categoria = (f.get("categoria") or "").strip() or None
+    descricao = (f.get("descricao") or "").strip() or None
+
+    # aceita vários nomes possíveis do input file
+    arquivo = (
+        request.files.get("arquivo")
+        or request.files.get("file")
+        or request.files.get("tabela")
+    )
 
     if not titulo or not (arquivo and arquivo.filename):
         flash("Preencha o título e selecione o arquivo.", "warning")
         return redirect(url_for("admin_tabelas"))
 
-    # salva em <FILES_DIR>/tabelas (persistente)
-    _, _, tabelas_dir, _ = _paths()
-    tabelas_dir.mkdir(parents=True, exist_ok=True)
+    base_dir = _tabelas_base_dir()
 
-    fname = secure_filename(arquivo.filename)
-    base, ext = os.path.splitext(fname)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_base = re.sub(r"[^A-Za-z0-9_.-]+", "-", base)
-    fname_final = f"{safe_base}_{ts}{ext}"
-    dst = tabelas_dir / fname_final
-    arquivo.save(str(dst))
+    # nome seguro + sufixo de timestamp para não colidir
+    raw = secure_filename(arquivo.filename)
+    stem, ext = os.path.splitext(raw)
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    safe_stem = re.sub(r"[^A-Za-z0-9_.-]+", "-", stem) or "arquivo"
+    final_name = f"{safe_stem}_{ts}{ext or ''}"
+
+    dest = base_dir / final_name
+    arquivo.save(str(dest))
 
     t = Tabela(
-    titulo=titulo,
-    categoria=categoria,
-    descricao=descricao,
-    arquivo_url=fname_final,        # <-- USE esta chave
-    arquivo_nome=arquivo.filename,  # mantém o nome original
-    enviado_em=datetime.utcnow(),
-)
+        titulo=titulo,
+        categoria=categoria,
+        descricao=descricao,
+        arquivo_url=final_name,            # << CAMPO QUE EXISTE NO MODEL
+        arquivo_nome=arquivo.filename,     # nome original para download_name
+        enviado_em=datetime.utcnow(),
+    )
     db.session.add(t)
     db.session.commit()
 
     flash("Tabela publicada.", "success")
     return redirect(url_for("admin_tabelas"))
 
-@app.get("/admin/tabelas/<int:tab_id>/delete")
+@app.get("/admin/tabelas/<int:tab_id>/delete", endpoint="admin_tabelas_delete")
 @admin_required
-def admin_delete_tabela(tab_id):
+def admin_tabelas_delete(tab_id: int):
     t = Tabela.query.get_or_404(tab_id)
+    # se for local, tenta remover do disco
     try:
-        p = _tabela_fs_path(t)
-        if p and os.path.exists(p):
-            os.remove(p)
+        url = (t.arquivo_url or "").strip()
+        if url and not (url.startswith("http://") or url.startswith("https://")):
+            path = _tabelas_base_dir() / (url.split("/")[-1])
+            if path.exists():
+                path.unlink()
     except Exception:
         pass
     db.session.delete(t)
     db.session.commit()
-    flash("Tabela removida.", "success")
+    flash("Tabela excluída.", "success")
     return redirect(url_for("admin_tabelas"))
 
-# ---------------- Lista Cooperado/Admin/Restaurante ----------------
-@app.route("/tabelas")
+# ---------------- Lista p/ usuários logados ----------------
+@app.get("/tabelas", endpoint="tabelas_publicas")
 def tabelas_publicas():
-    if session.get("user_tipo") not in {"cooperado", "admin", "restaurante"}:
+    if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
-    tabelas = Tabela.query.order_by(Tabela.enviado_em.desc()).all()
-    return render_template(
-        "tabelas_publicas.html",
-        tabelas=tabelas,
-        viewer_tipo=session.get("user_tipo")
-    )
+    tabs = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
+    return render_template("tabelas.html", tabelas=tabs)
 
 # ---------------- Abrir / Baixar (compartilhado) ----------------
+def _serve_tabela_or_redirect(t: Tabela, *, as_attachment: bool):
+    url = (t.arquivo_url or "").strip()
+    if not url:
+        abort(404)
+
+    # Link externo? redireciona
+    if url.startswith("http://") or url.startswith("https://"):
+        return redirect(url)
+
+    # Local: está salvo em static/uploads/tabelas/<arquivo>
+    base = _tabelas_base_dir()
+    fname = url.split("/")[-1]
+    path = base / fname
+    if not path.exists():
+        abort(404)
+
+    return send_file(
+        path.open("rb"),
+        as_attachment=as_attachment,
+        download_name=(t.arquivo_nome or fname)
+    )
+
 @app.get("/tabelas/<int:tab_id>/abrir", endpoint="tabela_abrir")
 def tabela_abrir(tab_id: int):
-    if session.get("user_tipo") not in {"cooperado", "restaurante", "admin"}:
+    if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
     t = Tabela.query.get_or_404(tab_id)
-    if session.get("user_tipo") == "restaurante":
-        rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
-        _enforce_restaurante_titulo(t, rest)
     return _serve_tabela_or_redirect(t, as_attachment=False)
 
-@app.get("/tabelas/<int:tab_id>/baixar", endpoint="baixar_tabela")
-def baixar_tabela(tab_id: int):
-    if session.get("user_tipo") not in {"cooperado", "restaurante", "admin"}:
+@app.get("/tabelas/<int:tab_id>/baixar", endpoint="tabela_baixar")
+def tabela_baixar(tab_id: int):
+    if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
     t = Tabela.query.get_or_404(tab_id)
-    if session.get("user_tipo") == "restaurante":
-        rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
-        _enforce_restaurante_titulo(t, rest)
     return _serve_tabela_or_redirect(t, as_attachment=True)
 
-# ---------------- Restaurante ----------------
-@app.route("/rest/tabelas", endpoint="rest_tabelas")
-@role_required("restaurante")
-def rest_tabelas():
-    u_id = session.get("user_id")
-    restaurante = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-
-    login_nome = (
-        getattr(getattr(restaurante, "usuario_ref", None), "usuario", None)
-        or getattr(restaurante, "usuario", None)
-        or (restaurante.nome or "")
-    )
-    alvo_norm = _norm_txt(login_nome)
-
-    candidatos = (Tabela.query
-                  .filter(Tabela.titulo.ilike(f"%{login_nome}%"))
-                  .order_by(Tabela.enviado_em.desc())
-                  .all())
-    tabela_exata = next((t for t in candidatos if _norm_txt(t.titulo) == alvo_norm), None)
-
-    return render_template(
-        "restaurantes_tabelas.html",
-        restaurante=restaurante,
-        login_nome=login_nome,
-        tabela=tabela_exata
-    )
-
-@app.get("/rest/tabelas/<int:tabela_id>/abrir", endpoint="rest_tabela_abrir")
-@role_required("restaurante")
-def rest_tabela_abrir(tabela_id: int):
-    rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
-    t = Tabela.query.get_or_404(tabela_id)
-    _enforce_restaurante_titulo(t, rest)
-    return _serve_tabela_or_redirect(t, as_attachment=False)
-
-@app.get("/rest/tabelas/<int:tabela_id>/download", endpoint="rest_tabela_download")
-@role_required("restaurante")
-def rest_tabela_download(tabela_id: int):
-    rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
-    t = Tabela.query.get_or_404(tabela_id)
-    _enforce_restaurante_titulo(t, rest)
-    return _serve_tabela_or_redirect(t, as_attachment=True)
-
-# ---------------- DIAGNÓSTICO RÁPIDO ----------------
-@app.get("/admin/tabelas/scan")
+# ---------------- Diagnóstico rápido ----------------
+@app.get("/admin/tabelas/scan", endpoint="admin_tabelas_scan")
 @admin_required
-def scan_tabelas():
-    out = []
+def admin_tabelas_scan():
+    base = _tabelas_base_dir()
+    items = []
     for t in Tabela.query.order_by(Tabela.enviado_em.desc()).all():
-        p = _tabela_fs_path(t)
-        out.append({
-            "id": getattr(t, "id", None),
+        url = (t.arquivo_url or "").strip()
+        resolved = (
+            str(base / url.split("/")[-1]) if (url and not url.startswith("http")) else url
+        )
+        exists = bool(url and not url.startswith("http") and (base / url.split("/")[-1]).is_file())
+        items.append({
+            "id": t.id,
             "titulo": t.titulo,
-            "arquivo_nome": getattr(t, "arquivo_nome", None),
-            "arquivo": getattr(t, "arquivo", None),
-            "arquivo_path": getattr(t, "arquivo_path", None),
-            "arquivo_url": getattr(t, "arquivo_url", None),
-            "resolved": p,
-            "exists": bool(p and os.path.isfile(p)),
+            "arquivo_nome": t.arquivo_nome,
+            "arquivo_url": t.arquivo_url,
+            "resolved": resolved,
+            "exists": exists,
         })
-    _, files_dir, tabelas_dir, using_disk = _paths()
-    return jsonify({
-        "FILES_DIR": str(files_dir),
-        "tabelas_dir": str(tabelas_dir),
-        "using_disk": bool(using_disk),
-        "items": out
-    })
+    from flask import jsonify
+    return jsonify({"tabelas_dir": str(base), "items": items})
 
 # =========================
 # AVISOS — Portais (cooperado)
