@@ -4194,8 +4194,7 @@ from pathlib import Path
 import os, re, unicodedata, mimetypes
 
 # ---------------------------------------------------------------------------
-# Fallbacks para BASE_DIR e TABELAS_DIR (evita NameError se não houver no app)
-# Se já existirem no seu app, esses try/except não sobrescrevem.
+# Fallbacks para BASE_DIR e TABELAS_DIR (caso não existam no app principal)
 # ---------------------------------------------------------------------------
 try:
     BASE_DIR  # type: ignore[name-defined]
@@ -4210,8 +4209,8 @@ except NameError:
 # Requer no app principal:
 # - db (SQLAlchemy)
 # - modelos: Tabela(id, titulo, descricao?, arquivo_url, arquivo_nome?, enviado_em)
-# - modelo: Restaurante(usuario_id, nome?, usuario?, usuario_ref?.usuario?)
-# - decorators: admin_required (seu padrão)
+#            Restaurante(usuario_id, nome?, usuario?, usuario_ref?.usuario?)
+# - decorators: admin_required
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -4300,13 +4299,13 @@ def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
 # ---------------------------------------------------------------------------
 # Admin: listar / upload / delete
 # ---------------------------------------------------------------------------
-@app.get("/admin/tabelas")
+@app.get("/admin/tabelas", endpoint="admin_tabelas")
 @admin_required
 def admin_tabelas():
     tabelas = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
     return render_template("admin_tabelas.html", tabelas=tabelas)
 
-@app.post("/admin/tabelas/upload")
+@app.post("/admin/tabelas/upload", endpoint="admin_upload_tabela")
 @admin_required
 def admin_upload_tabela():
     f = request.form
@@ -4349,7 +4348,7 @@ def admin_upload_tabela():
     flash("Tabela publicada.", "success")
     return redirect(url_for("admin_tabelas"))
 
-@app.get("/admin/tabelas/<int:tab_id>/delete")
+@app.get("/admin/tabelas/<int:tab_id>/delete", endpoint="admin_delete_tabela")
 @admin_required
 def admin_delete_tabela(tab_id: int):
     t = Tabela.query.get_or_404(tab_id)
@@ -4369,13 +4368,14 @@ def admin_delete_tabela(tab_id: int):
 # ---------------------------------------------------------------------------
 # Cooperado/Admin/Restaurante: listagem (cooperado vê TODAS)
 # ---------------------------------------------------------------------------
-@app.get("/tabelas")
+@app.get("/tabelas", endpoint="tabelas_publicas")
 def tabelas_publicas():
     if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
 
     tabs = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
 
+    # mantém os endpoints esperados pelo HTML existente
     items = [{
         "id": t.id,
         "titulo": t.titulo,
@@ -4383,7 +4383,7 @@ def tabelas_publicas():
         "enviado_em": t.enviado_em,
         "arquivo_nome": getattr(t, "arquivo_nome", None),
         "abrir_url":  url_for("tabela_abrir",  tab_id=t.id),
-        "baixar_url": url_for("tabela_baixar", tab_id=t.id),
+        "baixar_url": url_for("baixar_tabela", tab_id=t.id),
     } for t in tabs]
 
     back_href = url_for("portal_cooperado") if (
@@ -4394,8 +4394,11 @@ def tabelas_publicas():
 
 # ---------------------------------------------------------------------------
 # Abrir / Baixar compartilhado (cooperado/admin/restaurante)
+#   >>> ENDPOINTS compatíveis com o HTML existente:
+#   - 'tabela_abrir'
+#   - 'baixar_tabela'
 # ---------------------------------------------------------------------------
-@app.get("/tabelas/<int:tab_id>/abrir")
+@app.get("/tabelas/<int:tab_id>/abrir", endpoint="tabela_abrir")
 def tabela_abrir(tab_id: int):
     if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
@@ -4407,7 +4410,7 @@ def tabela_abrir(tab_id: int):
 
     return _serve_tabela_or_redirect(t, as_attachment=False)
 
-@app.get("/tabelas/<int:tab_id>/baixar")
+@app.get("/tabelas/<int:tab_id>/baixar", endpoint="baixar_tabela")
 def tabela_baixar(tab_id: int):
     if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
@@ -4421,8 +4424,11 @@ def tabela_baixar(tab_id: int):
 
 # ---------------------------------------------------------------------------
 # Restaurante: vê/abre/baixa SOMENTE a própria tabela
+#   >>> ENDPOINTS compatíveis com o HTML existente:
+#   - 'rest_tabela_abrir'
+#   - 'rest_tabela_download'
 # ---------------------------------------------------------------------------
-@app.get("/rest/tabelas")
+@app.get("/rest/tabelas", endpoint="rest_tabelas")
 def rest_tabelas():
     if session.get("user_tipo") != "restaurante":
         return redirect(url_for("login"))
@@ -4454,7 +4460,7 @@ def rest_tabelas():
         current_year=datetime.utcnow().year,
     )
 
-@app.get("/rest/tabelas/<int:tabela_id>/abrir")
+@app.get("/rest/tabelas/<int:tabela_id>/abrir", endpoint="rest_tabela_abrir")
 def rest_tabela_abrir(tabela_id: int):
     if session.get("user_tipo") != "restaurante":
         return redirect(url_for("login"))
@@ -4463,8 +4469,8 @@ def rest_tabela_abrir(tabela_id: int):
     _enforce_restaurante_titulo(t, rest)
     return _serve_tabela_or_redirect(t, as_attachment=False)
 
-@app.get("/rest/tabelas/<int:tabela_id>/baixar")
-def rest_tabela_baixar(tabela_id: int):
+@app.get("/rest/tabelas/<int:tabela_id>/download", endpoint="rest_tabela_download")
+def rest_tabela_download(tabela_id: int):
     if session.get("user_tipo") != "restaurante":
         return redirect(url_for("login"))
     rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
@@ -4475,7 +4481,7 @@ def rest_tabela_baixar(tabela_id: int):
 # ---------------------------------------------------------------------------
 # Diagnóstico rápido (admin)
 # ---------------------------------------------------------------------------
-@app.get("/admin/tabelas/scan")
+@app.get("/admin/tabelas/scan", endpoint="admin_tabelas_scan")
 @admin_required
 def admin_tabelas_scan():
     base = _tabelas_base_dir()
@@ -4492,70 +4498,6 @@ def admin_tabelas_scan():
             "exists": (bool(local and local.is_file())),
         })
     return jsonify({"tabelas_dir": str(base), "items": items})
-
-# ---------- helper: conta avisos não lidos p/ usuário logado ----------
-def _avisos_nao_lidos_para_usuario():
-    if "user_id" not in session:
-        return 0, None
-
-    u_id   = session.get("user_id")
-    u_tipo = session.get("user_tipo")
-
-    if u_tipo == "cooperado":
-        coop = Cooperado.query.filter_by(usuario_id=u_id).first()
-        if not coop:
-            return 0, None
-        try:
-            avisos = get_avisos_for_cooperado(coop)  # usa sua função existente
-        except NameError:
-            # fallback simples: global + cooperado específico
-            avisos = (Aviso.query
-                      .filter(Aviso.ativo.is_(True))
-                      .filter(or_(Aviso.tipo == "global",
-                                  Aviso.tipo == "cooperado"))
-                      .order_by(Aviso.criado_em.desc())
-                      .all())
-        lidos_ids = {
-            a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
-            .filter(AvisoLeitura.cooperado_id == coop.id).all()
-        }
-        unread = [a for a in avisos if a.id not in lidos_ids]
-        return len(unread), url_for("portal_cooperado_avisos")
-
-    if u_tipo == "restaurante":
-        rest = Restaurante.query.filter_by(usuario_id=u_id).first()
-        if not rest:
-            return 0, None
-        try:
-            avisos = get_avisos_for_restaurante(rest)  # se você já tiver
-        except NameError:
-            # fallback: global + restaurante (associado ou broadcast)
-            avisos = (Aviso.query
-                      .filter(Aviso.ativo.is_(True))
-                      .filter(or_(Aviso.tipo == "global",
-                                  Aviso.tipo == "restaurante"))
-                      .order_by(Aviso.criado_em.desc())
-                      .all())
-        lidos_ids = {
-            a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
-            .filter(AvisoLeitura.restaurante_id == rest.id).all()
-        }
-        unread = [a for a in avisos if a.id not in lidos_ids]
-        return len(unread), url_for("portal_restaurante_avisos")
-
-    return 0, None
-
-# ---------- context processor: disponível em TODOS os templates ----------
-@app.context_processor
-def inject_avisos_banner():
-    try:
-        qtd, link = _avisos_nao_lidos_para_usuario()
-    except Exception:
-        qtd, link = 0, None
-    return {
-        "avisos_unread_count": qtd,
-        "avisos_unread_url": link
-    }
 
 from datetime import datetime
 from flask import render_template, request, redirect, url_for, session
