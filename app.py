@@ -4323,7 +4323,6 @@ def tabela_baixar(tab_id: int):
 # --- RESTAURANTE: lista/abre/baixa SOMENTE a própria tabela -----------------
 @app.get("/rest/tabelas", endpoint="rest_tabelas")
 def rest_tabelas():
-    # guarda de acesso sem depender de decorator
     if session.get("user_tipo") != "restaurante":
         return redirect(url_for("login"))
 
@@ -4334,6 +4333,24 @@ def rest_tabelas():
         getattr(getattr(rest, "usuario_ref", None), "usuario", None)
         or getattr(rest, "usuario", None)
         or (rest.nome or "")
+    )
+    alvo = _norm_txt(login_nome)
+
+    candidatos = (Tabela.query
+                  .filter(Tabela.titulo.ilike(f"%{login_nome}%"))
+                  .order_by(Tabela.enviado_em.desc())
+                  .all())
+    tabela_exata = next((t for t in candidatos if _norm_txt(t.titulo) == alvo), None)
+
+    # <<<<<< AQUI: flag booleana pra usar no template
+    has_portal_restaurante = "portal_restaurante" in current_app.view_functions
+
+    return render_template(
+        "restaurantes_tabelas.html",
+        restaurante=rest,
+        login_nome=login_nome,
+        tabela=tabela_exata,
+        has_portal_restaurante=has_portal_restaurante,  # <<<<<<
     )
     alvo = _norm_txt(login_nome)
 
