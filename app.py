@@ -2061,6 +2061,13 @@ def delete_despesa(id):
     flash("Despesa excluída.", "success")
     return redirect(url_for("admin_dashboard", tab="despesas"))
 
+# =========================
+# Avisos (admin + públicos)
+# =========================
+import re
+from datetime import datetime, time
+from flask import request, session, render_template, redirect, url_for, flash
+
 @app.get("/avisos", endpoint="avisos_publicos")
 def avisos_publicos():
     t = session.get("user_tipo")
@@ -2070,10 +2077,6 @@ def avisos_publicos():
         return redirect(url_for("portal_restaurante"))
     return redirect(url_for("login"))
 
-# admin_avisos.py (ou onde ficam suas rotas de admin)
-import re
-from datetime import datetime, time
-from flask import request, session, render_template, redirect, url_for, flash
 
 @app.route("/admin/avisos", methods=["GET", "POST"])
 @admin_required
@@ -2086,11 +2089,8 @@ def admin_avisos():
 
         # ===== Alcance/destino vindos do form =====
         destino_tipo = (f.get("destino_tipo") or "").strip()  # 'cooperados' | 'restaurantes' | 'ambos'
-
-        # subalcances (considera a aba 'ambos' também)
         coop_alc = f.get("coop_alcance") or f.get("coop_alcance_ambos")   # 'todos' | 'selecionados'
         rest_alc = f.get("rest_alcance") or f.get("rest_alcance_ambos")   # 'todos' | 'selecionados'
-
         sel_coops = request.form.getlist("dest_cooperados[]") or request.form.getlist("dest_cooperados_ambos[]")
         sel_rests = request.form.getlist("dest_restaurantes[]") or request.form.getlist("dest_restaurantes_ambos[]")
 
@@ -2230,12 +2230,53 @@ def admin_avisos():
         restaurantes=restaurantes,
     )
 
-# marcar lido (aceita POST e GET)
+
+# --------- ROTAS QUE FALTAVAM (usadas no template) ---------
+
+# Toggle VISIBILIDADE/FIXAÇÃO (aceita GET e POST)
+@app.route("/admin/avisos/<int:aviso_id>/toggle", methods=["POST", "GET"], endpoint="admin_avisos_toggle")
+@admin_required
+def admin_avisos_toggle(aviso_id):
+    a = Aviso.query.get_or_404(aviso_id)
+    if hasattr(a, "ativo"):
+        a.ativo = not bool(a.ativo)
+    else:
+        a.fixado = not bool(a.fixado)
+    db.session.commit()
+    flash("Aviso atualizado.", "success")
+    return redirect(request.referrer or url_for("admin_avisos"))
+
+
+# Excluir aviso (limpando relações)
+@app.route("/admin/avisos/<int:aviso_id>/excluir", methods=["POST"], endpoint="admin_avisos_excluir")
+@admin_required
+def admin_avisos_excluir(aviso_id):
+    a = Aviso.query.get_or_404(aviso_id)
+
+    # apaga confirmações/leitorias
+    try:
+        AvisoLeitura.query.filter_by(aviso_id=aviso_id).delete(synchronize_session=False)
+    except Exception:
+        pass
+
+    # limpa M2M com restaurantes, se existir
+    try:
+        if hasattr(a, "restaurantes"):
+            a.restaurantes.clear()
+    except Exception:
+        pass
+
+    db.session.delete(a)
+    db.session.commit()
+    flash("Aviso excluído.", "success")
+    return redirect(url_for("admin_avisos"))
+
+
+# Marcar aviso como lido (funciona com GET e POST)
 @app.route("/avisos/<int:aviso_id>/lido", methods=["POST", "GET"])
 def marcar_aviso_lido_universal(aviso_id: int):
     # se não logado, bloqueia
     if "user_id" not in session:
-        # em GET, volta para login; em POST retorna 401
         return redirect(url_for("login")) if request.method == "GET" else ("", 401)
 
     user_id = session.get("user_id")
@@ -2243,10 +2284,8 @@ def marcar_aviso_lido_universal(aviso_id: int):
     Aviso.query.get_or_404(aviso_id)
 
     def _ok_response():
-        # POST -> 204 (para fetch/AJAX)
         if request.method == "POST":
-            return ("", 204)
-        # GET -> volta para a página de onde veio
+            return ("", 204)  # útil para fetch/AJAX
         return redirect(request.referrer or url_for("portal_cooperado_avisos"))
 
     if user_tipo == "cooperado":
