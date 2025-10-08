@@ -4206,14 +4206,11 @@ except NameError:
 # SEMPRE neste local:
 TABELAS_DIR = str(Path(BASE_DIR) / "static" / "uploads" / "tabelas")
 
-# ---------------------------------------------------------------------------
-# Requisitos de modelos/decorators (devem existir no app principal):
+# Requer no app principal:
 # - db (SQLAlchemy)
-# - Tabela(id, titulo, descricao?, arquivo_url, arquivo_nome?, enviado_em)
-# - Restaurante(usuario_id, nome?, usuario?, usuario_ref?.usuario?)
-# - Cooperado (usado em avisos), Aviso, AvisoLeitura, etc. (se aplicável)
-# - decorators: admin_required, role_required
-# ---------------------------------------------------------------------------
+# - modelos: Tabela(id, titulo, descricao?, arquivo_url, arquivo_nome?, enviado_em)
+#            Restaurante(usuario_id, nome?, usuario?, usuario_ref?.usuario?)
+# - decorators: admin_required, role_required (se usar avisos/portais)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -4235,7 +4232,7 @@ def _guess_mimetype_from_path(path: str) -> str:
 
 def _enforce_restaurante_titulo(tabela, restaurante):
     """
-    Restaurante só acessa a tabela cujo TÍTULO == NOME/LOGIN do restaurante (normalizado).
+    Regra: restaurante só acessa a tabela cujo TÍTULO == NOME/LOGIN do restaurante (normalizado).
     """
     login_nome = (
         getattr(getattr(restaurante, "usuario_ref", None), "usuario", None)
@@ -4245,65 +4242,58 @@ def _enforce_restaurante_titulo(tabela, restaurante):
     if _norm_txt(tabela.titulo) != _norm_txt(login_nome):
         abort(403)
 
-def _clean_url_piece(s: str) -> str:
-    s = (s or "").strip().lstrip("/")
-    s = s.split("?", 1)[0].split("#", 1)[0]
-    s = re.sub(r"/{2,}", "/", s)
-    return s
-
 def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
     """
     Resolve e serve o arquivo da Tabela:
     - http(s) => redirect
-    - /media/... => redirect (compat legado)
-    - só o nome => BASE_DIR/static/uploads/tabelas/<nome>
-    - caminhos legados 'static/uploads/tabelas/...' e 'uploads/tabelas/...'
+    - sempre tenta primeiro static/uploads/tabelas/<arquivo>
+    - aceita absoluto, relativo e só o nome
+    - ignora querystring/fragments (ex.: foo.pdf?v=123#x)
     """
-    url = (getattr(tabela, "arquivo_url", "") or "").strip()
+    url = (tabela.arquivo_url or "").strip()
     if not url:
         abort(404)
 
-    # Externas
+    # URL externa
     if url.startswith(("http://", "https://")):
         return redirect(url)
 
-    # Compatível com /media/...
-    if url.startswith("/media/"):
-        return redirect(url)
-
     base_dir    = Path(BASE_DIR)
-    tabelas_dir = Path(TABELAS_DIR)
+    tabelas_dir = _tabelas_base_dir()
 
-    raw   = _clean_url_piece(url)
-    fname = raw.split("/")[-1] if raw else ""
+    # normaliza: remove "/" inicial, query e fragment
+    raw = url.lstrip("/")
+    raw_no_q = raw.split("?", 1)[0].split("#", 1)[0]
+    fname = (raw_no_q.split("/")[-1] if raw_no_q else "").strip()
 
     candidates = []
-    # como veio (relativo ao projeto), ex.: static/uploads/tabelas/foo.pdf
-    if raw:
-        candidates.append(base_dir / raw)
 
-    # absoluto (se algum registro velho tiver)
+    # 1) SEMPRE prioriza nosso diretório oficial
+    if fname:
+        candidates.append(tabelas_dir / fname)
+
+    # 2) Como veio, relativo ao BASE_DIR (compat c/ legado: static/uploads/tabelas/...)
+    candidates.append(base_dir / raw_no_q)
+
+    # 3) Absoluto (se alguém gravou caminho completo por engano)
     p = Path(url)
     if p.is_absolute():
         candidates.append(p)
 
-    # apenas nome, nos diretórios padrão
+    # 4) Mais dois legados comuns
     if fname:
-        candidates.append(tabelas_dir / fname)                                   # padrão
-        candidates.append(base_dir / "static" / "uploads" / "tabelas" / fname)   # legado comum
-        candidates.append(base_dir / "uploads" / "tabelas" / fname)              # legado comum
-
-    # fallback: último segmento
-    if raw and "/" in raw:
-        candidates.append(tabelas_dir / raw.split("/")[-1])
+        candidates.append(base_dir / "uploads" / "tabelas" / fname)
+        candidates.append(base_dir / "static" / "uploads" / "tabelas" / fname)
 
     file_path = next((c for c in candidates if c.exists() and c.is_file()), None)
     if not file_path:
         try:
             log.warning(
-                "Arquivo de Tabela não encontrado. id=%s titulo=%r arquivo_url=%r tents=%s",
-                getattr(tabela, "id", None), getattr(tabela, "titulo", None), url,
-                [str(c) for c in candidates]
+                "Arquivo de Tabela não encontrado. id=%s titulo=%r arquivo_url=%r tents=%r",
+                getattr(tabela, "id", None),
+                getattr(tabela, "titulo", None),
+                tabela.arquivo_url,
+                [str(c) for c in candidates],
             )
         except Exception:
             pass
@@ -4312,7 +4302,7 @@ def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
     return send_file(
         str(file_path),
         as_attachment=as_attachment,
-        download_name=(getattr(tabela, "arquivo_nome", None) or file_path.name),
+        download_name=(tabela.arquivo_nome or file_path.name),
         mimetype=_guess_mimetype_from_path(str(file_path)),
     )
 
@@ -4332,6 +4322,7 @@ def admin_upload_tabela():
     titulo    = (f.get("titulo") or "").strip()
     descricao = (f.get("descricao") or "").strip() or None
 
+    # aceita vários nomes possíveis do input file
     arquivo = (
         request.files.get("arquivo")
         or request.files.get("file")
@@ -4354,12 +4345,13 @@ def admin_upload_tabela():
     dest = base_dir / final_name
     arquivo.save(str(dest))
 
-    # <<< IMPORTANTE: no banco salva só o nome >>>
     t = Tabela(
         titulo=titulo,
         descricao=descricao,
-        arquivo_url=final_name,        # só o nome
-        arquivo_nome=arquivo.filename, # nome original pro download
+        # Importante: gravar apenas o NOME, não o caminho.
+        # O _serve_tabela_or_redirect vai resolver para TABELAS_DIR.
+        arquivo_url=final_name,
+        arquivo_nome=arquivo.filename,
         enviado_em=datetime.utcnow(),
     )
     db.session.add(t)
@@ -4374,7 +4366,7 @@ def admin_delete_tabela(tab_id: int):
     t = Tabela.query.get_or_404(tab_id)
     try:
         url = (t.arquivo_url or "").strip()
-        if url and not url.startswith(("http://", "https://", "/media/")):
+        if url and not url.startswith(("http://", "https://")):
             path = _tabelas_base_dir() / (url.split("/")[-1])
             if path.exists():
                 path.unlink()
@@ -4387,6 +4379,7 @@ def admin_delete_tabela(tab_id: int):
 
 # ---------------------------------------------------------------------------
 # Cooperado/Admin/Restaurante: listagem (cooperado vê TODAS)
+# Mantém endpoints esperados pelo HTML: 'tabela_abrir' e 'baixar_tabela'
 # ---------------------------------------------------------------------------
 @app.get("/tabelas", endpoint="tabelas_publicas")
 def tabelas_publicas():
@@ -4395,7 +4388,6 @@ def tabelas_publicas():
 
     tabs = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
 
-    # mantém endpoints esperados
     items = [{
         "id": t.id,
         "titulo": t.titulo,
@@ -4413,7 +4405,10 @@ def tabelas_publicas():
     return render_template("tabelas_publicas.html", tabelas=tabs, items=items, back_href=back_href)
 
 # ---------------------------------------------------------------------------
-# Abrir / Baixar (compartilhado)
+# Abrir / Baixar compartilhado (cooperado/admin/restaurante)
+# Endpoints compatíveis com HTML existente:
+#   - 'tabela_abrir'
+#   - 'baixar_tabela'
 # ---------------------------------------------------------------------------
 @app.get("/tabelas/<int:tab_id>/abrir", endpoint="tabela_abrir")
 def tabela_abrir(tab_id: int):
@@ -4441,6 +4436,9 @@ def tabela_baixar(tab_id: int):
 
 # ---------------------------------------------------------------------------
 # Restaurante: vê/abre/baixa SOMENTE a própria tabela
+# Endpoints compatíveis com HTML existente:
+#   - 'rest_tabela_abrir'
+#   - 'rest_tabela_download'
 # ---------------------------------------------------------------------------
 @app.get("/rest/tabelas", endpoint="rest_tabelas")
 def rest_tabelas():
@@ -4457,7 +4455,7 @@ def rest_tabelas():
     )
     alvo_norm = _norm_txt(login_nome)
 
-    candidatos = (Tabela.query.order_by(Tabela.enviado_em.desc()).all())
+    candidatos = Tabela.query.order_by(Tabela.enviado_em.desc()).all()
     tabela_exata = next((t for t in candidatos if _norm_txt(t.titulo) == alvo_norm), None)
 
     has_portal_restaurante = ("portal_restaurante" in current_app.view_functions)
@@ -4466,7 +4464,7 @@ def rest_tabelas():
         "restaurantes_tabelas.html",
         restaurante=rest,
         login_nome=login_nome,
-        tabela=tabela_exata,  # template deve lidar com None
+        tabela=tabela_exata,  # o template deve lidar com None (sem tabela)
         has_portal_restaurante=has_portal_restaurante,
         back_href=url_for("portal_restaurante") if has_portal_restaurante else url_for("rest_tabelas"),
         current_year=datetime.utcnow().year,
@@ -4491,69 +4489,28 @@ def rest_tabela_download(tabela_id: int):
     return _serve_tabela_or_redirect(t, as_attachment=True)
 
 # ---------------------------------------------------------------------------
-# Diagnóstico/Normalização (admin)
+# Diagnóstico rápido (admin)
 # ---------------------------------------------------------------------------
-@app.get("/admin/tabelas/debug/<int:tab_id>", endpoint="admin_tabelas_debug")
+@app.get("/admin/tabelas/scan", endpoint="admin_tabelas_scan")
 @admin_required
-def admin_tabelas_debug(tab_id: int):
-    t = Tabela.query.get_or_404(tab_id)
-    base_dir    = Path(BASE_DIR)
-    tabelas_dir = Path(TABELAS_DIR)
-
-    url = (t.arquivo_url or "").strip()
-    raw = _clean_url_piece(url)
-    fname = raw.split("/")[-1] if raw else ""
-
-    if url.startswith(("http://", "https://", "/media/")):
-        return jsonify({"id": t.id, "titulo": t.titulo, "arquivo_url": url, "tipo": "redirect", "destino": url})
-
-    candidates = []
-    if raw:
-        candidates.append(str(base_dir / raw))
-    p = Path(url)
-    if p.is_absolute():
-        candidates.append(str(p))
-    if fname:
-        candidates.append(str(Path(TABELAS_DIR) / fname))
-        candidates.append(str(base_dir / "static" / "uploads" / "tabelas" / fname))
-        candidates.append(str(base_dir / "uploads" / "tabelas" / fname))
-    if raw and "/" in raw:
-        candidates.append(str(Path(TABELAS_DIR) / raw.split("/")[-1]))
-
-    exists = []
-    for c in candidates:
-        cp = Path(c)
-        exists.append({"path": c, "exists": cp.exists(), "is_file": cp.is_file()})
-
-    return jsonify({
-        "id": t.id,
-        "titulo": t.titulo,
-        "arquivo_url": t.arquivo_url,
-        "arquivo_nome": t.arquivo_nome,
-        "TABELAS_DIR": str(Path(TABELAS_DIR)),
-        "candidates": exists,
-    })
-
-@app.post("/admin/tabelas/normalize-arquivo-url", endpoint="admin_tabelas_normalize_arquivo_url")
-@admin_required
-def admin_tabelas_normalize_arquivo_url():
-    """
-    Conserta registros antigos: se arquivo_url tiver caminho (ex.: static/uploads/tabelas/foo.pdf),
-    reduz para apenas 'foo.pdf'. Isso simplifica e evita 404.
-    """
-    alterados = 0
-    for t in Tabela.query.all():
+def admin_tabelas_scan():
+    base = _tabelas_base_dir()
+    items = []
+    for t in Tabela.query.order_by(Tabela.enviado_em.desc()).all():
         url = (t.arquivo_url or "").strip()
-        if not url or url.startswith(("http://", "https://", "/media/")):
-            continue
-        raw = _clean_url_piece(url)
-        fname = raw.split("/")[-1] if raw else ""
-        if fname and fname != url:
-            t.arquivo_url = fname  # <— salva só o nome
-            alterados += 1
-    if alterados:
-        db.session.commit()
-    return jsonify({"ok": True, "alterados": alterados})
+        # sempre tentar resolver como gravamos hoje (fname dentro de static/uploads/tabelas)
+        fname = (url.split("?", 1)[0].split("#", 1)[0]).split("/")[-1] if url else ""
+        resolved = str(base / fname) if fname else url
+        exists = (Path(resolved).exists() if fname else False)
+        items.append({
+            "id": t.id,
+            "titulo": t.titulo,
+            "arquivo_nome": t.arquivo_nome,
+            "arquivo_url": t.arquivo_url,
+            "resolved": resolved,
+            "exists": bool(exists),
+        })
+    return jsonify({"tabelas_dir": str(base), "items": items})
 
 # =========================
 # AVISOS — Ações (cooperado)
