@@ -550,28 +550,49 @@
           </div>
         </div>
 
-       <style>
-  /* ——— Escala: legível no mobile, SEM ellipsis ——— */
-  .table-escala { table-layout: auto; }
-  .table-escala th, .table-escala td { vertical-align: middle; white-space: normal; }
-  .table-escala .pill { display:inline-block; padding:.15rem .5rem; border-radius:999px; font-weight:600; border:1px solid #0001; }
-  .row-stripe { border-left:4px solid var(--stripe,#e5e7eb); }
-  .date-wrap .badge { margin-left:.25rem; }
+    <style>
+  /* ——— Escala mobile compacta ——— */
+  .table-escala { table-layout: fixed; }
+  .table-escala th, .table-escala td {
+    vertical-align: middle;
+    padding: .45rem .5rem;  /* mais baixinha */
+    line-height: 1.1;
+  }
+  .table-escala th { white-space: nowrap; } /* evita "T u r n o" */
 
-  /* texto que pode quebrar em 2–3 linhas sem ficar feio */
-  .wrap { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
-          word-break: break-word; hyphens: auto; }
+  /* controles de largura p/ 4 colunas (mobile) */
+  .table-escala col.c-data     { width: 34%; }
+  .table-escala col.c-turno    { width: 16%; }
+  .table-escala col.c-horario  { width: 22%; }
+  .table-escala col.c-contrato { width: 28%; }
 
-  /* tamanhos para celular ~6" */
+  .row-stripe { border-left: 4px solid var(--stripe,#e5e7eb); }
+  .pill { display:inline-block; padding:.08rem .45rem; border-radius:999px; font-weight:600; border:1px solid #0001; }
+  .date-wrap .badge { margin-left:.3rem; padding:.15rem .5rem; font-size:.75rem; }
+
+  /* textos que podem quebrar bonitinho (máx 3 linhas) */
+  .wrap-3 { overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; word-break:break-word; hyphens:auto; }
+
+  /* itens curtinhos ficam SEM quebra */
+  .nowrap { white-space: nowrap; }
+
   @media (max-width: 420px) {
-    .table-escala th { font-size:.90rem; }
+    .table-escala th { font-size:.92rem; }
     .table-escala td { font-size:.95rem; }
-    .pill { font-size:.85rem; padding:.1rem .4rem; }
+    .pill { font-size:.85rem; }
     .actions-inline .btn { padding:.2rem .45rem; font-size:.8rem; }
   }
 </style>
 
 <table class="table table-bordered table-escala align-middle">
+  <!-- controla as larguras -->
+  <colgroup>
+    <col class="c-data">
+    <col class="c-turno">
+    <col class="c-horario">
+    <col class="c-contrato">
+  </colgroup>
+
   <thead>
     <tr>
       <th>Data</th>
@@ -580,6 +601,7 @@
       <th>Contrato</th>
     </tr>
   </thead>
+
   <tbody>
     {% if minha_escala %}
       {% for e in minha_escala %}
@@ -587,13 +609,20 @@
         {% set has_multi = '|' in colors %}
         {% set cs = colors.split('|') if has_multi else [] %}
         {% set stripe = (colors if not has_multi else (cs[0] if cs|length>0 else '')) or e.status_color %}
+
+        {# Data curta: preferir e.data_curta (ex: 08/10). Se não vier, corta os 5 primeiros de e.data_fmt/e.data #}
+        {% set data_curta =
+             e.data_curta
+             or (e.data_fmt[:5] if e.data_fmt else (e.data[:5] if e.data else '')) %}
+        {% set dow = e.dia_semana or e.dow or '' %}
+
         <tr class="row-stripe esc-{{ e.status }}" style="--stripe: {{ stripe }}">
           <!-- DATA -->
           <td>
             <div class="date-wrap">
               <span class="pill"
                     style="background:{{ has_multi and cs|length>0 and cs[0] or (colors or '#fff') }};color:#111;">
-                {{ e.data_fmt or e.data or '' }}
+                {{ data_curta }}{% if dow %} - {{ dow|upper }}{% endif %}
               </span>
               {% if e.status == 'today' %}
                 <span class="badge rounded-pill bg-success-subtle text-success">HOJE</span>
@@ -610,36 +639,36 @@
                       data-bs-toggle="modal"
                       data-bs-target="#trocaModal"
                       data-escala-id="{{ e.id }}"
-                      data-escala-desc="{{ (e.data_fmt or e.data or '') ~ ' • ' ~ (e.turno or '') ~ ' • ' ~ (e.horario_fmt or e.horario or '') ~ ' • ' ~ (e.contrato or '') }}">
+                      data-escala-desc="{{ (data_curta or '') ~ ((' - ' ~ dow) if dow else '') ~ ' • ' ~ (e.turno or '') ~ ' • ' ~ (e.horario_fmt or e.horario or '') ~ ' • ' ~ (e.contrato or '') }}">
                 <i class="bi bi-arrow-left-right"></i> Trocar
               </button>
             </div>
           </td>
 
-          <!-- TURNO (sempre mostra texto) -->
-          <td>
+          <!-- TURNO: não quebra (DIA/NOITE) -->
+          <td class="nowrap">
             {% if has_multi and cs|length>1 %}
               <span class="pill" style="background:{{ cs[1] }};color:#111;">{{ e.turno or '—' }}</span>
             {% else %}
-              <span class="wrap">{{ e.turno or '—' }}</span>
+              {{ e.turno or '—' }}
             {% endif %}
           </td>
 
-          <!-- HORÁRIO (já formatado no backend, fuso BR) -->
+          <!-- HORÁRIO -->
           <td>
             {% if has_multi and cs|length>2 %}
               <span class="pill" style="background:{{ cs[2] }};color:#111;">{{ e.horario_fmt or e.horario or '—' }}</span>
             {% else %}
-              <span class="wrap">{{ e.horario_fmt or e.horario or '—' }}</span>
+              <span class="wrap-3">{{ e.horario_fmt or e.horario or '—' }}</span>
             {% endif %}
           </td>
 
-          <!-- CONTRATO (aceita nomes grandes, 3 linhas máx.) -->
+          <!-- CONTRATO: aceita nomes grandes (máx 3 linhas) -->
           <td>
             {% if has_multi and cs|length>3 %}
               <span class="pill" style="background:{{ cs[3] }};color:#111;">{{ e.contrato or '—' }}</span>
             {% else %}
-              <span class="wrap">{{ e.contrato or '—' }}</span>
+              <span class="wrap-3">{{ e.contrato or '—' }}</span>
             {% endif %}
           </td>
         </tr>
