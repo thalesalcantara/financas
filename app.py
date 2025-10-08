@@ -77,13 +77,12 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=12) # ajuste conforme sua política
 )
 
-# Ajustes do engine do SQLAlchemy (melhora estabilidade/perf em produção)
+from sqlalchemy.pool import NullPool
+
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_pre_ping": True,          # valida conexões antes de usar (evita "server has gone away")
-    "pool_recycle": 1800,           # recicla conexões a cada 30min
-    # Descomente se precisar limitar pool (ex.: Render free tiers)
-    # "pool_size": 5,
-    # "max_overflow": 5,
+    "poolclass": NullPool,       # deixa o pool para o PgBouncer
+    "pool_pre_ping": True,       # ajuda a detectar conexões quebradas
+    "pool_recycle": 1800,        # ok manter
 }
 
 db = SQLAlchemy(app)
