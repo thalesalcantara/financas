@@ -333,14 +333,21 @@ def _ensure_dir(p: Path):
     p.mkdir(parents=True, exist_ok=True)
 
 @app.get("/tabelas")
-@role_required("cooperado")  # ajuste se quiser que admin/restaurante também vejam
 def listar_tabelas():
+    # ---- guarda de acesso: somente cooperado (ajuste se quiser liberar p/ outros perfis)
+    if session.get("user_tipo") != "cooperado":
+        return redirect(url_for("login"))
+
     tabs = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
     # se não tiver template dedicado, reaproveite um genérico:
     return render_template("tabelas.html", tabelas=tabs)
 
 @app.get("/tabelas/<int:tab_id>/abrir", endpoint="tabela_abrir")
 def tabela_abrir(tab_id: int):
+    # ---- acesso: cooperado logado (ajuste conforme sua regra)
+    if session.get("user_tipo") != "cooperado":
+        return redirect(url_for("login"))
+
     t = Tabela.query.get_or_404(tab_id)
     url = (t.arquivo_url or "").strip()
     # se for URL http(s), redireciona
@@ -357,6 +364,10 @@ def tabela_abrir(tab_id: int):
 
 @app.get("/tabelas/<int:tab_id>/baixar", endpoint="baixar_tabela")
 def tabela_baixar(tab_id: int):
+    # ---- acesso: cooperado logado (ajuste conforme sua regra)
+    if session.get("user_tipo") != "cooperado":
+        return redirect(url_for("login"))
+
     t = Tabela.query.get_or_404(tab_id)
     url = (t.arquivo_url or "").strip()
     if url.startswith("http://") or url.startswith("https://"):
@@ -371,14 +382,20 @@ def tabela_baixar(tab_id: int):
     return send_file(path.open("rb"), as_attachment=True, download_name=t.arquivo_nome or fname)
 
 @app.get("/admin/tabelas")
-@admin_required
 def admin_tabelas():
+    # ---- guarda de acesso: somente admin
+    if session.get("user_tipo") != "admin":
+        return redirect(url_for("login"))
+
     tabs = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
     return render_template("admin_tabelas.html", tabelas=tabs)
 
 @app.post("/admin/tabelas/upload")
-@admin_required
 def admin_tabelas_upload():
+    # ---- guarda de acesso: somente admin
+    if session.get("user_tipo") != "admin":
+        return redirect(url_for("login"))
+
     f = request.form
     arquivo = request.files.get("arquivo")
     titulo = (f.get("titulo") or "").strip()
@@ -418,8 +435,11 @@ def admin_tabelas_upload():
     return redirect(url_for("admin_tabelas"))
 
 @app.get("/admin/tabelas/<int:tab_id>/delete")
-@admin_required
 def admin_tabelas_delete(tab_id: int):
+    # ---- guarda de acesso: somente admin
+    if session.get("user_tipo") != "admin":
+        return redirect(url_for("login"))
+
     t = Tabela.query.get_or_404(tab_id)
     # tenta remover o arquivo local se for local
     url = (t.arquivo_url or "").strip()
@@ -434,7 +454,6 @@ def admin_tabelas_delete(tab_id: int):
     db.session.commit()
     flash("Tabela excluída.", "success")
     return redirect(url_for("admin_tabelas"))
-
 
 # ---------- AVISOS (NOVO) ----------
 aviso_restaurantes = db.Table(
