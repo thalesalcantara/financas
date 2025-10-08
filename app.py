@@ -33,6 +33,7 @@ DOCS_DIR = os.path.join(UPLOAD_DIR, "docs")
 os.makedirs(DOCS_DIR, exist_ok=True)
 TABELAS_DIR = os.path.join(UPLOAD_DIR, "tabelas")
 os.makedirs(TABELAS_DIR, exist_ok=True)
+
 def _build_db_uri() -> str:
     """
     Usa SQLite local se não houver DATABASE_URL.
@@ -57,12 +58,36 @@ def _build_db_uri() -> str:
     return url
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
+
+# chave da sessão
 app.secret_key = os.environ.get("SECRET_KEY", "coopex-secret")
+
+# Configs principais
 app.config["SQLALCHEMY_DATABASE_URI"] = _build_db_uri()
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JSON_SORT_KEYS"] = False  # evita comparar None com int ao serializar |tojson
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32MB
+
+# Sessão/cookies (mais seguro; deixe SECURE=True em produção com HTTPS)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    REMEMBER_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",                 # "Strict" pode quebrar logins vindos de links
+    SESSION_COOKIE_SECURE=os.environ.get("FLASK_SECURE_COOKIES", "1") == "1",
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=12) # ajuste conforme sua política
+)
+
+# Ajustes do engine do SQLAlchemy (melhora estabilidade/perf em produção)
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True,          # valida conexões antes de usar (evita "server has gone away")
+    "pool_recycle": 1800,           # recicla conexões a cada 30min
+    # Descomente se precisar limitar pool (ex.: Render free tiers)
+    # "pool_size": 5,
+    # "max_overflow": 5,
+}
+
 db = SQLAlchemy(app)
+
 # --- habilita foreign_keys no SQLite (para ON DELETE CASCADE funcionar) ---
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
@@ -351,6 +376,15 @@ def _is_sqlite() -> bool:
         return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
 
 def init_db():
+    # --- PERF (SQLite): liga WAL e ajusta synchronous ---
+    try:
+        if _is_sqlite():
+            db.session.execute(sa_text("PRAGMA journal_mode=WAL;"))
+            db.session.execute(sa_text("PRAGMA synchronous=NORMAL;"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
     db.create_all()
 
     # --- qtd_entregas em lancamentos ---
@@ -508,8 +542,20 @@ def init_db():
 
 # === Bootstrap do banco no start (Render/Gunicorn) ===
 try:
-    with app.app_context():
-        init_db()
+    # Opcional: controle por variável de ambiente para evitar lentidão no boot
+    if os.environ.get("INIT_DB_ON_START", "1") == "1":
+        _t0 = datetime.utcnow()
+        with app.app_context():
+            init_db()
+        try:
+            app.logger.info(f"init_db concluído em {(datetime.utcnow() - _t0).total_seconds():.2f}s")
+        except Exception:
+            pass
+    else:
+        try:
+            app.logger.info("INIT_DB_ON_START=0: pulando init_db no boot.")
+        except Exception:
+            pass
 except Exception as e:
     # Evita derrubar o serviço se a inicialização falhar por motivo não crítico
     try:
