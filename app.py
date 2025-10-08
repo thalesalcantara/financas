@@ -4226,28 +4226,57 @@ def _enforce_restaurante_titulo(tabela, restaurante):
 
 def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
     """
-    Serve arquivo local (TABELAS_DIR/<arquivo>) ou redireciona se arquivo_url for http(s)
+    Resolve e serve o arquivo da Tabela:
+    - http(s) => redirect
+    - /static/uploads/... => caminho absoluto no disco
+    - absoluto => usa direto
+    - relativo => tenta BASE_DIR/<rel> e TABELAS_DIR/<ultimo-segmento>
+    - apenas nome (foo.pdf) => TABELAS_DIR/foo.pdf
     """
     url = (tabela.arquivo_url or "").strip()
     if not url:
         abort(404)
 
-    # link externo?
-    if url.startswith("http://") or url.startswith("https://"):
+    if url.startswith(("http://", "https://")):
         return redirect(url)
 
-    # local
-    base = _tabelas_base_dir()
+    from pathlib import Path
+    raw = url.lstrip("/")
+    base_dir = Path(BASE_DIR)
+    tabelas_dir = Path(TABELAS_DIR)
+
+    candidates = []
+
+    # /static/uploads/...
+    if url.startswith("/static/uploads/"):
+        candidates.append(base_dir / raw)
+
+    # absoluto
+    p = Path(url)
+    if p.is_absolute():
+        candidates.append(p)
+
+    # relativo como veio
+    candidates.append(base_dir / raw)
+
+    # somente nome do arquivo em TABELAS_DIR
     fname = url.split("/")[-1]
-    path = base / fname
-    if not path.exists() or not path.is_file():
+    if fname:
+        candidates.append(tabelas_dir / fname)
+
+    # fallback adicional
+    if "/" in raw:
+        candidates.append(tabelas_dir / raw.split("/")[-1])
+
+    file_path = next((c for c in candidates if c.exists() and c.is_file()), None)
+    if not file_path:
         abort(404)
 
     return send_file(
-        str(path),
+        str(file_path),
         as_attachment=as_attachment,
-        download_name=(tabela.arquivo_nome or fname),
-        mimetype=_guess_mimetype_from_path(str(path)),
+        download_name=(tabela.arquivo_nome or file_path.name),
+        mimetype=_guess_mimetype_from_path(str(file_path)),
     )
 
 # ---------------- Admin ----------------
@@ -4362,7 +4391,7 @@ def tabela_abrir(tab_id: int):
 
     return _serve_tabela_or_redirect(t, as_attachment=False)
 
-@app.get("/tabelas/<int:tab_id>/baixar", endpoint="baixar_tabela")
+@app.get("/tabelas/<int:tab_id>/baixar", endpoint="tabelas_baixar")  # <— troque o nome do endpoint
 def tabela_baixar(tab_id: int):
     if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
