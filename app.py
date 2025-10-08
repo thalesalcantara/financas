@@ -2084,28 +2084,17 @@ def admin_avisos():
     if request.method == "POST":
         f = request.form
 
-        # ——— Alcance/destino ———
-        alcance = f.get("destino_tipo")  # 'cooperados' | 'restaurantes' | 'ambos'
-        # subalcances:
-        coop_alc = f.get("coop_alcance") or f.get("coop_alcance_ambos")  # 'todos' | 'selecionados'
-        rest_alc = f.get("rest_alcance") or f.get("rest_alcance_ambos")  # 'todos' | 'selecionados'
+        # ===== Alcance/destino vindos do form =====
+        destino_tipo = (f.get("destino_tipo") or "").strip()  # 'cooperados' | 'restaurantes' | 'ambos'
+
+        # subalcances (considera a aba 'ambos' também)
+        coop_alc = f.get("coop_alcance") or f.get("coop_alcance_ambos")   # 'todos' | 'selecionados'
+        rest_alc = f.get("rest_alcance") or f.get("rest_alcance_ambos")   # 'todos' | 'selecionados'
 
         sel_coops = request.form.getlist("dest_cooperados[]") or request.form.getlist("dest_cooperados_ambos[]")
         sel_rests = request.form.getlist("dest_restaurantes[]") or request.form.getlist("dest_restaurantes_ambos[]")
 
-        if alcance == "cooperados":
-            tipo = "cooperado"
-        elif alcance == "restaurantes":
-            tipo = "restaurante"
-        elif alcance == "ambos":
-            # se ambos têm seleção -> trata como global
-            tipo = "global" if ((coop_alc == "todos" or sel_coops) and (rest_alc == "todos" or sel_rests)) else \
-                   ("cooperado" if (coop_alc == "todos" or sel_coops) else "restaurante")
-        else:
-            # fallback: se não veio nada do template novo
-            tipo = (f.get("tipo") or "global").strip()
-
-        # ——— Conteúdo ——— (aceita vários names do form)
+        # ===== Conteúdo =====
         def _pick_msg(form):
             for key in (
                 "corpo_html", "html", "mensagem_html", "conteudo_html", "descricao_html", "texto_html",
@@ -2115,45 +2104,121 @@ def admin_avisos():
                 if v and v.strip():
                     return v.strip()
             return ""
-        msg = _pick_msg(f)
 
-        a = Aviso(
-            titulo=(f.get("titulo") or "").strip(),
-            corpo=msg,  # <- salvamos sempre em Aviso.corpo
-            tipo=tipo,  # 'global' | 'cooperado' | 'restaurante'
-            prioridade=(f.get("prioridade") or "normal"),
-            fixado=False,  # ajuste se quiser
-            criado_por_id=session.get("user_id"),
-            inicio_em=(lambda d=_parse_date(f.get("inicio_em")): datetime.combine(d, time()) if d else None)(),
-            fim_em=(lambda d=_parse_date(f.get("fim_em")): datetime.combine(d, time()) if d else None)(),
-        )
+        titulo = (f.get("titulo") or "").strip()
+        msg    = _pick_msg(f)
+        prioridade = (f.get("prioridade") or "normal")
+        ativo = bool(f.get("ativo"))
+        exigir_confirmacao = bool(f.get("exigir_confirmacao")) if hasattr(Aviso, "exigir_confirmacao") else False
 
-        # publica ativo se vier marcado
-        if hasattr(a, "ativo"):
-            a.ativo = bool(f.get("ativo"))
+        inicio_em = (lambda d=_parse_date(f.get("inicio_em")): datetime.combine(d, time()) if d else None)()
+        fim_em    = (lambda d=_parse_date(f.get("fim_em")):    datetime.combine(d, time()) if d else None)()
 
-        # confirmação de leitura se seu modelo tiver esse campo:
-        if hasattr(a, "exigir_confirmacao"):
-            a.exigir_confirmacao = bool(f.get("exigir_confirmacao"))
+        def _mk_aviso(tipo: str):
+            a = Aviso(
+                titulo=titulo,
+                corpo=msg,
+                tipo=tipo,  # 'global' | 'cooperado' | 'restaurante'
+                prioridade=prioridade,
+                fixado=False,
+                ativo=ativo if hasattr(Aviso, "ativo") else True,
+                criado_por_id=session.get("user_id"),
+                inicio_em=inicio_em,
+                fim_em=fim_em,
+            )
+            if hasattr(a, "exigir_confirmacao"):
+                a.exigir_confirmacao = exigir_confirmacao
+            return a
 
-        # Destinações
-        if tipo == "cooperado":
-            if coop_alc == "selecionados" and sel_coops:
+        # ===== Regras =====
+        avisos_para_criar = []
+
+        if destino_tipo == "cooperados":
+            # só cooperados
+            if coop_alc == "selecionados":
+                if not sel_coops:
+                    flash("Selecione ao menos um cooperado.", "warning")
+                    return redirect(url_for("admin_avisos"))
                 try:
-                    a.destino_cooperado_id = int(sel_coops[0])  # modelo atual aceita 1 cooperado
-                    if len(sel_coops) > 1:
-                        flash("Aviso individual aceita apenas 1 cooperado; usando o primeiro.", "warning")
+                    coop_id = int(sel_coops[0])  # modelo atual aceita 1 cooperado
                 except Exception:
-                    pass
+                    flash("Seleção de cooperado inválida.", "warning")
+                    return redirect(url_for("admin_avisos"))
+                a = _mk_aviso("cooperado")
+                a.destino_cooperado_id = coop_id
+                avisos_para_criar.append(a)
+            else:
+                # todos cooperados = broadcast (destino_cooperado_id NULL)
+                a = _mk_aviso("cooperado")
+                a.destino_cooperado_id = None
+                avisos_para_criar.append(a)
 
-        if tipo == "restaurante":
-            if rest_alc == "selecionados" and sel_rests:
-                ids = [int(x) for x in sel_rests]
+        elif destino_tipo == "restaurantes":
+            # só restaurantes
+            if rest_alc == "selecionados":
+                if not sel_rests:
+                    flash("Selecione ao menos um restaurante.", "warning")
+                    return redirect(url_for("admin_avisos"))
+                try:
+                    ids = [int(x) for x in sel_rests]
+                except Exception:
+                    flash("Seleção de restaurante inválida.", "warning")
+                    return redirect(url_for("admin_avisos"))
+                a = _mk_aviso("restaurante")
                 a.restaurantes = Restaurante.query.filter(Restaurante.id.in_(ids)).all()
+                avisos_para_criar.append(a)
+            else:
+                # todos restaurantes = broadcast (lista vazia)
+                a = _mk_aviso("restaurante")
+                a.restaurantes = []
+                avisos_para_criar.append(a)
 
-        db.session.add(a)
+        elif destino_tipo == "ambos":
+            # cria DOIS avisos: um para cooperados e outro para restaurantes
+
+            # Cooperados
+            if coop_alc == "selecionados":
+                if not sel_coops:
+                    flash("Selecione ao menos um cooperado para o aviso dos cooperados.", "warning")
+                    return redirect(url_for("admin_avisos"))
+                try:
+                    coop_id = int(sel_coops[0])
+                except Exception:
+                    flash("Seleção de cooperado inválida.", "warning")
+                    return redirect(url_for("admin_avisos"))
+                a_coop = _mk_aviso("cooperado")
+                a_coop.destino_cooperado_id = coop_id
+            else:
+                a_coop = _mk_aviso("cooperado")
+                a_coop.destino_cooperado_id = None  # broadcast cooperados
+            avisos_para_criar.append(a_coop)
+
+            # Restaurantes
+            if rest_alc == "selecionados":
+                if not sel_rests:
+                    flash("Selecione ao menos um restaurante para o aviso dos restaurantes.", "warning")
+                    return redirect(url_for("admin_avisos"))
+                try:
+                    ids = [int(x) for x in sel_rests]
+                except Exception:
+                    flash("Seleção de restaurante inválida.", "warning")
+                    return redirect(url_for("admin_avisos"))
+                a_rest = _mk_aviso("restaurante")
+                a_rest.restaurantes = Restaurante.query.filter(Restaurante.id.in_(ids)).all()
+            else:
+                a_rest = _mk_aviso("restaurante")
+                a_rest.restaurantes = []  # broadcast restaurantes
+            avisos_para_criar.append(a_rest)
+
+        else:
+            # fallback antigo: se nada veio, publica global
+            avisos_para_criar.append(_mk_aviso("global"))
+
+        for a in avisos_para_criar:
+            db.session.add(a)
         db.session.commit()
-        flash("Aviso publicado.", "success")
+
+        flash("Aviso(s) publicado(s).", "success")
         return redirect(url_for("admin_avisos"))
 
     # GET
@@ -2165,72 +2230,44 @@ def admin_avisos():
         restaurantes=restaurantes,
     )
 
-# Toggle VISIBILIDADE (aceita POST e GET para evitar 405 ao usar link)
-@app.route("/admin/avisos/<int:aviso_id>/toggle", methods=["POST", "GET"])
-@admin_required
-def admin_avisos_toggle(aviso_id):
-    a = Aviso.query.get_or_404(aviso_id)
-    if hasattr(a, "ativo"):
-        a.ativo = not bool(a.ativo)
-    else:
-        a.fixado = not bool(a.fixado)
-    db.session.commit()
-    flash("Aviso atualizado.", "success")
-    return redirect(url_for("admin_avisos"))
-
-# EXCLUIR aviso (com limpeza segura das relações/leitorias)
-@app.route("/admin/avisos/<int:aviso_id>/excluir", methods=["POST"])
-@admin_required
-def admin_avisos_excluir(aviso_id):
-    a = Aviso.query.get_or_404(aviso_id)
-
-    # apaga confirmações/leitorias
-    try:
-        AvisoLeitura.query.filter_by(aviso_id=aviso_id).delete(synchronize_session=False)
-    except Exception:
-        pass
-
-    # limpa m2m com restaurantes, se existir
-    try:
-        if hasattr(a, "restaurantes"):
-            a.restaurantes.clear()
-    except Exception:
-        pass
-
-    db.session.delete(a)
-    db.session.commit()
-    flash("Aviso excluído.", "success")
-    return redirect(url_for("admin_avisos"))
-
-# (opcional) marcar lido universal
-@app.post("/avisos/<int:aviso_id>/lido")
+# marcar lido (aceita POST e GET)
+@app.route("/avisos/<int:aviso_id>/lido", methods=["POST", "GET"])
 def marcar_aviso_lido_universal(aviso_id: int):
+    # se não logado, bloqueia
     if "user_id" not in session:
-        return ("", 401)
+        # em GET, volta para login; em POST retorna 401
+        return redirect(url_for("login")) if request.method == "GET" else ("", 401)
 
     user_id = session.get("user_id")
     user_tipo = session.get("user_tipo")
     Aviso.query.get_or_404(aviso_id)
 
+    def _ok_response():
+        # POST -> 204 (para fetch/AJAX)
+        if request.method == "POST":
+            return ("", 204)
+        # GET -> volta para a página de onde veio
+        return redirect(request.referrer or url_for("portal_cooperado_avisos"))
+
     if user_tipo == "cooperado":
         coop = Cooperado.query.filter_by(usuario_id=user_id).first()
         if not coop:
-            return ("", 403)
+            return ("", 403) if request.method == "POST" else redirect(url_for("login"))
         if not AvisoLeitura.query.filter_by(aviso_id=aviso_id, cooperado_id=coop.id).first():
             db.session.add(AvisoLeitura(aviso_id=aviso_id, cooperado_id=coop.id, lido_em=datetime.utcnow()))
             db.session.commit()
-        return ("", 204)
+        return _ok_response()
 
     if user_tipo == "restaurante":
         rest = Restaurante.query.filter_by(usuario_id=user_id).first()
         if not rest:
-            return ("", 403)
+            return ("", 403) if request.method == "POST" else redirect(url_for("login"))
         if not AvisoLeitura.query.filter_by(aviso_id=aviso_id, restaurante_id=rest.id).first():
             db.session.add(AvisoLeitura(aviso_id=aviso_id, restaurante_id=rest.id, lido_em=datetime.utcnow()))
             db.session.commit()
-        return ("", 204)
+        return _ok_response()
 
-    return ("", 403)
+    return ("", 403) if request.method == "POST" else redirect(url_for("login"))
 
 # =========================
 # CRUD Cooperados / Restaurantes / Senhas (Admin)
