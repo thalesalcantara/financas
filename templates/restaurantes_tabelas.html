@@ -67,7 +67,7 @@
           </div>
           <div class="col-12 col-lg-8">
             {% if is_pdf %}
-              <iframe class="pdf-frame" src="{{ tabela.arquivo_url }}"></iframe>
+              <iframe class="pdf-frame" src="{{ url_for('tabela_abrir', tab_id=tabela.id) }}"></iframe>
             {% else %}
               <div class="p-4 bg-light rounded-3 text-center">
                 <i class="bi bi-file-earmark-text" style="font-size:2.2rem;"></i>
