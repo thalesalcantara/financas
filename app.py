@@ -4517,8 +4517,12 @@ def inject_avisos_banner():
 def coop_tabelas():
     # lista completa para cooperado (todas as Tabela)
     tabs = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
-    # se seu template "tabelas.html" aceita um "back_href", mandamos o painel do cooperado
-    return render_template("tabelas.html", tabelas=tabs, back_href=url_for("portal_cooperado"))
+    # renderiza o template do cooperado
+    return render_template(
+        "tabelas_publicas.html",
+        tabelas=tabs,
+        back_href=url_for("portal_cooperado")
+    )
 
 # (Opcional) Cooperado abrir/baixar usando endpoints próprios.
 # Se preferir, pode continuar usando /tabelas/<id>/abrir e /tabelas/<id>/baixar já existentes.
