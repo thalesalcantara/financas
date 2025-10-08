@@ -4204,7 +4204,8 @@ except NameError:
 try:
     TABELAS_DIR  # type: ignore[name-defined]
 except NameError:
-    TABELAS_DIR = str(Path(BASE_DIR) / "uploads" / "tabelas")
+    # >>> seus arquivos estão em static/uploads/tabelas <<<
+    TABELAS_DIR = Path(BASE_DIR) / "static" / "uploads" / "tabelas"
 
 # Requer no app principal:
 # - db (SQLAlchemy)
@@ -4245,45 +4246,50 @@ def _enforce_restaurante_titulo(tabela, restaurante):
 def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
     """
     Resolve e serve o arquivo da Tabela:
-    - http(s) => redirect
-    - /static/uploads/... => BASE_DIR/<raw>
-    - absoluto => usa direto
-    - relativo => BASE_DIR/<raw>
-    - somente nome => TABELAS_DIR/<nome>
+    - http(s) -> redirect
+    - aceita caminhos antigos: uploads/tabelas, static/uploads/tabelas
+    - aceita absoluto, relativo e só o nome do arquivo
+    - ignora querystring/fragments (ex.: foo.pdf?v=123#x)
+    Diretório efetivo: BASE_DIR/static/uploads/tabelas
     """
     url = (tabela.arquivo_url or "").strip()
     if not url:
         abort(404)
 
+    # URL externa
     if url.startswith(("http://", "https://")):
         return redirect(url)
 
-    raw = url.lstrip("/")
-    base_dir = Path(BASE_DIR)
+    base_dir    = Path(BASE_DIR)
     tabelas_dir = Path(TABELAS_DIR)
+
+    # normaliza: remove "/" inicial, query e fragment
+    raw = url.lstrip("/")
+    raw_no_q = raw.split("?", 1)[0].split("#", 1)[0]
+    fname = raw_no_q.split("/")[-1] if raw_no_q else ""
 
     candidates = []
 
-    # /static/uploads/...
-    if url.startswith("/static/uploads/"):
-        candidates.append(base_dir / raw)
+    # 1) como veio, relativo ao BASE_DIR (ex.: "static/uploads/tabelas/arquivo.pdf")
+    if raw_no_q:
+        candidates.append(base_dir / raw_no_q)
 
-    # absoluto
+    # 2) absoluto (se alguém salvou caminho absoluto)
     p = Path(url)
     if p.is_absolute():
         candidates.append(p)
 
-    # relativo a BASE_DIR
-    candidates.append(base_dir / raw)
-
-    # somente nome do arquivo em TABELAS_DIR
-    fname = url.split("/")[-1]
+    # 3) somente nome do arquivo em TABELAS_DIR
     if fname:
         candidates.append(tabelas_dir / fname)
 
-    # fallback: último segmento sob TABELAS_DIR
-    if "/" in raw:
-        candidates.append(tabelas_dir / raw.split("/")[-1])
+        # 3a) caminhos legados comuns
+        candidates.append(base_dir / "static" / "uploads" / "tabelas" / fname)
+        candidates.append(base_dir / "uploads" / "tabelas" / fname)
+
+    # 4) fallback: último segmento sob TABELAS_DIR (se veio com subpastas)
+    if "/" in raw_no_q:
+        candidates.append(tabelas_dir / raw_no_q.split("/")[-1])
 
     file_path = next((c for c in candidates if c.exists() and c.is_file()), None)
     if not file_path:
@@ -4292,7 +4298,7 @@ def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
     return send_file(
         str(file_path),
         as_attachment=as_attachment,
-        download_name=(tabela.arquivo_nome or file_path.name),
+        download_name=(getattr(tabela, "arquivo_nome", None) or file_path.name),
         mimetype=_guess_mimetype_from_path(str(file_path)),
     )
 
@@ -4338,7 +4344,7 @@ def admin_upload_tabela():
     t = Tabela(
         titulo=titulo,
         descricao=descricao,
-        arquivo_url=final_name,        # chave p/ servir
+        arquivo_url=final_name,        # só o nome; servimos de static/uploads/tabelas
         arquivo_nome=arquivo.filename, # nome original p/ download
         enviado_em=datetime.utcnow(),
     )
@@ -4488,7 +4494,7 @@ def admin_tabelas_scan():
     items = []
     for t in Tabela.query.order_by(Tabela.enviado_em.desc()).all():
         url = (t.arquivo_url or "").strip()
-        local = (base / url.split("/")[-1]) if (url and not url.startswith("http")) else None
+        local = (base / url.split("?", 1)[0].split("#", 1)[0].split("/")[-1]) if (url and not url.startswith("http")) else None
         items.append({
             "id": t.id,
             "titulo": t.titulo,
@@ -4498,63 +4504,6 @@ def admin_tabelas_scan():
             "exists": (bool(local and local.is_file())),
         })
     return jsonify({"tabelas_dir": str(base), "items": items})
-
-from datetime import datetime
-from flask import render_template, request, redirect, url_for, session
-# (pressupõe que você já tenha: db, app, role_required, Cooperado, AvisoLeitura, get_avisos_for_cooperado)
-
-from sqlalchemy.inspection import inspect as sa_inspect
-from datetime import datetime
-from flask import render_template
-
-@app.get("/portal/cooperado/avisos")
-@role_required("cooperado")
-def portal_cooperado_avisos():
-    u_id = session.get("user_id")
-    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
-
-    # Avisos aplicáveis ao cooperado
-    avisos_db = get_avisos_for_cooperado(coop)
-
-    # Quais avisos este cooperado já leu
-    lidos_ids = {
-        a_id
-        for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
-        .filter(AvisoLeitura.cooperado_id == coop.id)
-        .all()
-    }
-
-    # Pega o texto do aviso (aceita vários nomes de campo)
-    def corpo_do_aviso(a: Aviso) -> str:
-        for k in (
-            "corpo_html", "html", "conteudo_html", "mensagem_html", "descricao_html", "texto_html",
-            "corpo", "mensagem", "conteudo", "descricao", "texto", "resumo", "body", "content"
-        ):
-            v = getattr(a, k, None)
-            if isinstance(v, str) and v.strip():
-                return v
-        return ""
-
-    # Monta os itens para o template
-    avisos = []
-    for a in avisos_db:
-        avisos.append({
-            "id": a.id,
-            "titulo": a.titulo or "Aviso",
-            "criado_em": a.criado_em,
-            "lido": (a.id in lidos_ids),
-            "prioridade_alta": (str(a.prioridade or "").lower() == "alta"),
-            "corpo_html": corpo_do_aviso(a),
-        })
-
-    avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
-
-    return render_template(
-        "portal_cooperado_avisos.html",
-        avisos=avisos,
-        avisos_nao_lidos_count=avisos_nao_lidos_count,
-        current_year=datetime.now().year,
-    )
 
 # =========================
 # AVISOS — Ações (cooperado)
