@@ -4324,9 +4324,34 @@ def admin_delete_tabela(tab_id: int):
 def tabelas_publicas():
     if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
+
     tabs = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
-    # o HTML do cooperado espera 'back_href' opcional; passamos vazio e ele faz fallback
-    return render_template("tabelas.html", tabelas=tabs, back_href="")
+
+    # alguns templates podem esperar 'items' com URLs prontas
+    items = [{
+        "id": t.id,
+        "titulo": t.titulo,
+        "descricao": getattr(t, "descricao", None),
+        "enviado_em": t.enviado_em,
+        "arquivo_nome": getattr(t, "arquivo_nome", None),
+        "abrir_url":  url_for("tabela_abrir",  tab_id=t.id),
+        "baixar_url": url_for("baixar_tabela", tab_id=t.id),
+    } for t in tabs]
+
+    # o HTML do cooperado aceita 'back_href'; se não houver portal, manda vazio
+    back_href = ""
+    if session.get("user_tipo") == "cooperado" and "portal_cooperado" in current_app.view_functions:
+        back_href = url_for("portal_cooperado")
+    elif session.get("user_tipo") == "admin" and "admin_tabelas" in current_app.view_functions:
+        back_href = url_for("admin_tabelas")
+
+    # IMPORTANTE: renderiza o template que você já tem para cooperado
+    return render_template(
+        "tabelas_publicas.html",
+        tabelas=tabs,
+        items=items,
+        back_href=back_href
+    )
 
 # ---------------- Abrir / Baixar (compartilhado para cooperado/admin/restaurante) ----------------
 @app.get("/tabelas/<int:tab_id>/abrir", endpoint="tabela_abrir")
@@ -4387,25 +4412,6 @@ def rest_tabelas():
         has_portal_restaurante=has_portal_restaurante,
         back_href=url_for("portal_restaurante") if has_portal_restaurante else url_for("rest_tabelas"),
         current_year=datetime.utcnow().year,
-    )
-    alvo = _norm_txt(login_nome)
-
-    candidatos = (Tabela.query
-                  .filter(Tabela.titulo.ilike(f"%{login_nome}%"))
-                  .order_by(Tabela.enviado_em.desc())
-                  .all())
-    tabela_exata = next((t for t in candidatos if _norm_txt(t.titulo) == alvo), None)
-
-    # evita erro no teu template que checa globals
-    has_portal = "portal_restaurante" in current_app.view_functions
-    globals_for_tpl = {"portal_restaurante": True} if has_portal else {}
-
-    return render_template(
-        "restaurantes_tabelas.html",
-        restaurante=rest,
-        login_nome=login_nome,
-        tabela=tabela_exata,
-        globals=globals_for_tpl,
     )
 
 @app.get("/rest/tabelas/<int:tabela_id>/abrir", endpoint="rest_tabela_abrir")
@@ -4508,7 +4514,6 @@ def inject_avisos_banner():
         "avisos_unread_count": qtd,
         "avisos_unread_url": link
     }
-
 
 from datetime import datetime
 from flask import render_template, request, redirect, url_for, session
