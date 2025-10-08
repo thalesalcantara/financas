@@ -551,110 +551,104 @@
         </div>
 
        <style>
-  /* Tabela amigável ao mobile */
-  .table-escala { table-layout: fixed; }
-  .table-escala th, .table-escala td { white-space: nowrap; vertical-align: middle; }
-  .table-escala .truncate { overflow: hidden; text-overflow: ellipsis; display: block; }
-  .table-escala .pill { display:inline-block; padding:.15rem .5rem; border-radius: 999px; font-weight:600; }
-  .table-escala .badge-soft { background:#eef3ff; color:#1b3ea3; border-radius:999px; padding:.15rem .5rem; }
-  .table-escala .row-stripe { border-left:4px solid var(--stripe,#e5e7eb); }
-  .table-escala .actions-inline .btn { padding:.2rem .45rem; font-size:.8rem; }
-  .cell-horario { width: 34vw; }
-  .cell-con { width: 28vw; }
-  /* evita quebrar “ADMINISTRAÇÃO” no meio das letras */
-  .no-break { word-break: keep-all; }
+  /* ——— Escala: legível no mobile, SEM ellipsis ——— */
+  .table-escala { table-layout: auto; }
+  .table-escala th, .table-escala td { vertical-align: middle; white-space: normal; }
+  .table-escala .pill { display:inline-block; padding:.15rem .5rem; border-radius:999px; font-weight:600; border:1px solid #0001; }
+  .row-stripe { border-left:4px solid var(--stripe,#e5e7eb); }
+  .date-wrap .badge { margin-left:.25rem; }
+
+  /* texto que pode quebrar em 2–3 linhas sem ficar feio */
+  .wrap { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+          word-break: break-word; hyphens: auto; }
+
+  /* tamanhos para celular ~6" */
   @media (max-width: 420px) {
-    .table-escala th { font-size:.9rem; }
+    .table-escala th { font-size:.90rem; }
     .table-escala td { font-size:.95rem; }
-    .col-data   { width: 32vw; }
-    .col-turno  { width: 20vw; }
-    .cell-horario { width: 28vw; }
-    .cell-con { width: 20vw; }
-    .date-wrap .badge { margin-top:.25rem; }
+    .pill { font-size:.85rem; padding:.1rem .4rem; }
+    .actions-inline .btn { padding:.2rem .45rem; font-size:.8rem; }
   }
 </style>
 
-<div class="card p-3">
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <h6 class="mb-0"><i class="bi bi-calendar2-week"></i> Minha Escala</h6>
-    <span class="badge-soft">{{ (minha_escala|length) if minha_escala else 0 }} itens</span>
-  </div>
+<table class="table table-bordered table-escala align-middle">
+  <thead>
+    <tr>
+      <th>Data</th>
+      <th>Turno</th>
+      <th>Horário</th>
+      <th>Contrato</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% if minha_escala %}
+      {% for e in minha_escala %}
+        {% set colors = (e.cor or '')|string %}
+        {% set has_multi = '|' in colors %}
+        {% set cs = colors.split('|') if has_multi else [] %}
+        {% set stripe = (colors if not has_multi else (cs[0] if cs|length>0 else '')) or e.status_color %}
+        <tr class="row-stripe esc-{{ e.status }}" style="--stripe: {{ stripe }}">
+          <!-- DATA -->
+          <td>
+            <div class="date-wrap">
+              <span class="pill"
+                    style="background:{{ has_multi and cs|length>0 and cs[0] or (colors or '#fff') }};color:#111;">
+                {{ e.data_fmt or e.data or '' }}
+              </span>
+              {% if e.status == 'today' %}
+                <span class="badge rounded-pill bg-success-subtle text-success">HOJE</span>
+              {% elif e.status == 'tomorrow' %}
+                <span class="badge rounded-pill bg-primary-subtle text-primary">AMANHÃ</span>
+              {% elif e.status == 'past' %}
+                <span class="badge rounded-pill bg-danger-subtle text-danger">PASSADO</span>
+              {% endif %}
+            </div>
 
-  <table class="table table-bordered table-escala align-middle">
-    <thead>
-      <tr>
-        <th class="col-data">Data</th>
-        <th>Turno</th>
-        <th class="cell-horario">Horário</th>
-        <th class="cell-con">Contrato</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% if minha_escala %}
-        {% for e in minha_escala %}
-          {% set colors = (e.cor or '')|string %}
-          {% set has_multi = '|' in colors %}
-          {% set cs = colors.split('|') if has_multi else [] %}
-          {% set stripe = (colors if not has_multi else (cs[0] if cs|length>0 else '')) or e.status_color %}
-          <tr class="row-stripe esc-{{ e.status }}" style="--stripe: {{ stripe }}">
-            <td>
-              <div class="date-wrap">
-                <span class="pill" style="background:{{ has_multi and cs|length>0 and cs[0] or (colors or '#fff') }};color:#111; border:1px solid #0001">
-                  {{ e.data_fmt or e.data or '' }}
-                </span>
-                {% if e.status == 'today' %}
-                  <span class="badge rounded-pill bg-success-subtle text-success">HOJE</span>
-                {% elif e.status == 'tomorrow' %}
-                  <span class="badge rounded-pill bg-primary-subtle text-primary">AMANHÃ</span>
-                {% elif e.status == 'past' %}
-                  <span class="badge rounded-pill bg-danger-subtle text-danger">PASSADO</span>
-                {% else %}
-                  <span class="badge rounded-pill bg-primary-subtle text-primary">FUTURO</span>
-                {% endif %}
-              </div>
+            <div class="actions-inline mt-1">
+              <button type="button"
+                      class="btn btn-xs btn-outline-primary"
+                      data-bs-toggle="modal"
+                      data-bs-target="#trocaModal"
+                      data-escala-id="{{ e.id }}"
+                      data-escala-desc="{{ (e.data_fmt or e.data or '') ~ ' • ' ~ (e.turno or '') ~ ' • ' ~ (e.horario_fmt or e.horario or '') ~ ' • ' ~ (e.contrato or '') }}">
+                <i class="bi bi-arrow-left-right"></i> Trocar
+              </button>
+            </div>
+          </td>
 
-              <div class="actions-inline mt-1">
-                <button
-                  type="button"
-                  class="btn btn-xs btn-outline-primary"
-                  data-bs-toggle="modal"
-                  data-bs-target="#trocaModal"
-                  data-escala-id="{{ e.id }}"
-                  data-escala-desc="{{ (e.data_fmt or e.data or '') ~ ' • ' ~ (e.turno or '') ~ ' • ' ~ (e.horario_fmt or e.horario or '') ~ ' • ' ~ (e.contrato or '') }}"
-                >
-                  <i class="bi bi-arrow-left-right"></i> Trocar
-                </button>
-              </div>
-            </td>
-            <td>
-              {% if has_multi and cs|length>1 %}
-                <span class="pill" style="background:{{ cs[1] }};color:#111; border:1px solid #0001">{{ e.turno or '' }}</span>
-              {% else %}
-                <span class="truncate">{{ e.turno or '' }}</span>
-              {% endif %}
-            </td>
-            <td class="cell-horario">
-              {% if has_multi and cs|length>2 %}
-                <span class="pill" style="background:{{ cs[2] }};color:#111; border:1px solid #0001">{{ e.horario_fmt or e.horario or '' }}</span>
-              {% else %}
-                <span class="truncate">{{ e.horario_fmt or e.horario or '' }}</span>
-              {% endif %}
-            </td>
-            <td class="cell-con">
-              {% if has_multi and cs|length>3 %}
-                <span class="pill no-break" style="background:{{ cs[3] }};color:#111; border:1px solid #0001">{{ e.contrato or '' }}</span>
-              {% else %}
-                <span class="truncate no-break">{{ e.contrato or '' }}</span>
-              {% endif %}
-            </td>
-          </tr>
-        {% endfor %}
-      {% else %}
-        <tr><td colspan="4" class="text-center muted">Nenhuma escala disponível.</td></tr>
-      {% endif %}
-    </tbody>
-  </table>
-</div>
+          <!-- TURNO (sempre mostra texto) -->
+          <td>
+            {% if has_multi and cs|length>1 %}
+              <span class="pill" style="background:{{ cs[1] }};color:#111;">{{ e.turno or '—' }}</span>
+            {% else %}
+              <span class="wrap">{{ e.turno or '—' }}</span>
+            {% endif %}
+          </td>
+
+          <!-- HORÁRIO (já formatado no backend, fuso BR) -->
+          <td>
+            {% if has_multi and cs|length>2 %}
+              <span class="pill" style="background:{{ cs[2] }};color:#111;">{{ e.horario_fmt or e.horario or '—' }}</span>
+            {% else %}
+              <span class="wrap">{{ e.horario_fmt or e.horario or '—' }}</span>
+            {% endif %}
+          </td>
+
+          <!-- CONTRATO (aceita nomes grandes, 3 linhas máx.) -->
+          <td>
+            {% if has_multi and cs|length>3 %}
+              <span class="pill" style="background:{{ cs[3] }};color:#111;">{{ e.contrato or '—' }}</span>
+            {% else %}
+              <span class="wrap">{{ e.contrato or '—' }}</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    {% else %}
+      <tr><td colspan="4" class="text-center muted">Nenhuma escala disponível.</td></tr>
+    {% endif %}
+  </tbody>
+</table>
 
           <div class="mt-1 small text-muted">
             <i class="bi bi-info-circle"></i> As solicitações de troca ficam visíveis para o administrador.
