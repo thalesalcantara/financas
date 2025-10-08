@@ -322,6 +322,119 @@ class Tabela(db.Model):
     arquivo_nome = db.Column(db.String(255))
     enviado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
+# ==== TABELAS (upload/abrir/baixar) =========================================
+from pathlib import Path
+
+def _tabelas_base_dir() -> Path:
+    # usa os diretórios já criados no topo do arquivo
+    return Path(TABELAS_DIR)
+
+def _ensure_dir(p: Path):
+    p.mkdir(parents=True, exist_ok=True)
+
+@app.get("/tabelas")
+@role_required("cooperado")  # ajuste se quiser que admin/restaurante também vejam
+def listar_tabelas():
+    tabs = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
+    # se não tiver template dedicado, reaproveite um genérico:
+    return render_template("tabelas.html", tabelas=tabs)
+
+@app.get("/tabelas/<int:tab_id>/abrir", endpoint="tabela_abrir")
+def tabela_abrir(tab_id: int):
+    t = Tabela.query.get_or_404(tab_id)
+    url = (t.arquivo_url or "").strip()
+    # se for URL http(s), redireciona
+    if url.startswith("http://") or url.startswith("https://"):
+        return redirect(url)
+    # caso contrário, serve do disco em static/uploads/tabelas
+    base = _tabelas_base_dir()
+    _ensure_dir(base)
+    fname = url.split("/")[-1] if "/" in url else url
+    path = base / fname
+    if not path.exists():
+        abort(404)
+    return send_file(path.open("rb"), as_attachment=False, download_name=t.arquivo_nome or fname)
+
+@app.get("/tabelas/<int:tab_id>/baixar", endpoint="baixar_tabela")
+def tabela_baixar(tab_id: int):
+    t = Tabela.query.get_or_404(tab_id)
+    url = (t.arquivo_url or "").strip()
+    if url.startswith("http://") or url.startswith("https://"):
+        # se armazenar como link externo, só redireciona
+        return redirect(url)
+    base = _tabelas_base_dir()
+    _ensure_dir(base)
+    fname = url.split("/")[-1] if "/" in url else url
+    path = base / fname
+    if not path.exists():
+        abort(404)
+    return send_file(path.open("rb"), as_attachment=True, download_name=t.arquivo_nome or fname)
+
+@app.get("/admin/tabelas")
+@admin_required
+def admin_tabelas():
+    tabs = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
+    return render_template("admin_tabelas.html", tabelas=tabs)
+
+@app.post("/admin/tabelas/upload")
+@admin_required
+def admin_tabelas_upload():
+    f = request.form
+    arquivo = request.files.get("arquivo")
+    titulo = (f.get("titulo") or "").strip()
+    descricao = (f.get("descricao") or "").strip()
+    categoria = (f.get("categoria") or "").strip()
+
+    if not titulo or not (arquivo and arquivo.filename):
+        flash("Preencha o título e selecione o arquivo.", "warning")
+        return redirect(url_for("admin_tabelas"))
+
+    # salva no disco efêmero (Render): static/uploads/tabelas
+    base = _tabelas_base_dir()
+    _ensure_dir(base)
+
+    from werkzeug.utils import secure_filename
+    raw = secure_filename(arquivo.filename)
+    stem, ext = os.path.splitext(raw)
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    safe_stem = re.sub(r"[^A-Za-z0-9_-]+", "-", stem)
+    final_name = f"{safe_stem}_{ts}{ext or ''}"
+    dest = base / final_name
+    arquivo.save(str(dest))
+
+    # guarde uma URL relativa (servida pelas rotas abrir/baixar)
+    t = Tabela(
+        titulo=titulo,
+        categoria=categoria or None,
+        descricao=descricao or None,
+        arquivo_url=final_name,          # << gravamos só o nome; as rotas resolvem o caminho
+        arquivo_nome=arquivo.filename,
+        enviado_em=datetime.utcnow(),
+    )
+    db.session.add(t)
+    db.session.commit()
+
+    flash("Tabela publicada.", "success")
+    return redirect(url_for("admin_tabelas"))
+
+@app.get("/admin/tabelas/<int:tab_id>/delete")
+@admin_required
+def admin_tabelas_delete(tab_id: int):
+    t = Tabela.query.get_or_404(tab_id)
+    # tenta remover o arquivo local se for local
+    url = (t.arquivo_url or "").strip()
+    if url and not (url.startswith("http://") or url.startswith("https://")):
+        p = _tabelas_base_dir() / (url.split("/")[-1])
+        try:
+            if p.exists():
+                p.unlink()
+        except Exception:
+            pass
+    db.session.delete(t)
+    db.session.commit()
+    flash("Tabela excluída.", "success")
+    return redirect(url_for("admin_tabelas"))
+
 
 # ---------- AVISOS (NOVO) ----------
 aviso_restaurantes = db.Table(
