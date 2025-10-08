@@ -4508,37 +4508,6 @@ def inject_avisos_banner():
         "avisos_unread_count": qtd,
         "avisos_unread_url": link
     }
-# =========================
-# COOPERADO — ver TODAS as tabelas
-# (ADITIVO; não altera nada do que você já tem)
-# =========================
-@app.get("/coop/tabelas", endpoint="coop_tabelas")
-@role_required("cooperado")
-def coop_tabelas():
-    # lista completa para cooperado (todas as Tabela)
-    tabs = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
-    # renderiza o template do cooperado
-    return render_template(
-        "tabelas_publicas.html",
-        tabelas=tabs,
-        back_href=url_for("portal_cooperado")
-    )
-
-# (Opcional) Cooperado abrir/baixar usando endpoints próprios.
-# Se preferir, pode continuar usando /tabelas/<id>/abrir e /tabelas/<id>/baixar já existentes.
-@app.get("/coop/tabelas/<int:tab_id>/abrir", endpoint="coop_tabela_abrir")
-@role_required("cooperado")
-def coop_tabela_abrir(tab_id: int):
-    t = Tabela.query.get_or_404(tab_id)
-    # cooperado pode abrir qualquer tabela
-    return _serve_tabela_or_redirect(t, as_attachment=False)
-
-@app.get("/coop/tabelas/<int:tab_id>/baixar", endpoint="coop_tabela_baixar")
-@role_required("cooperado")
-def coop_tabela_baixar(tab_id: int):
-    t = Tabela.query.get_or_404(tab_id)
-    # cooperado pode baixar qualquer tabela
-    return _serve_tabela_or_redirect(t, as_attachment=True)
 
 
 from datetime import datetime
