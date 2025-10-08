@@ -4325,9 +4325,10 @@ def tabelas_publicas():
     if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
 
+    # Cooperado vê TODAS as tabelas (mais recentes primeiro)
     tabs = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
 
-    # alguns templates podem esperar 'items' com URLs prontas
+    # Alguns templates podem esperar 'items' com URLs prontas
     items = [{
         "id": t.id,
         "titulo": t.titulo,
@@ -4338,34 +4339,40 @@ def tabelas_publicas():
         "baixar_url": url_for("baixar_tabela", tab_id=t.id),
     } for t in tabs]
 
-    # o HTML do cooperado aceita 'back_href'; se não houver portal, manda vazio
-    back_href = ""
-    if session.get("user_tipo") == "cooperado" and "portal_cooperado" in current_app.view_functions:
-        back_href = url_for("portal_cooperado")
-    elif session.get("user_tipo") == "admin" and "admin_tabelas" in current_app.view_functions:
-        back_href = url_for("admin_tabelas")
+    # back_href para o cooperado (se existir o portal)
+    back_href = url_for("portal_cooperado") if (
+        session.get("user_tipo") == "cooperado" and "portal_cooperado" in current_app.view_functions
+    ) else ""
 
-    # IMPORTANTE: renderiza o template que você já tem para cooperado
-    return render_template(
-        "tabelas_publicas.html",
-        tabelas=tabs,
-        items=items,
-        back_href=back_href
-    )
+    # IMPORTANTE: renderiza o template do cooperado
+    return render_template("tabelas_publicas.html", tabelas=tabs, items=items, back_href=back_href)
 
-# ---------------- Abrir / Baixar (compartilhado para cooperado/admin/restaurante) ----------------
+
+# ---------------- Abrir / Baixar (compartilhado p/ cooperado/admin/restaurante) ----------------
 @app.get("/tabelas/<int:tab_id>/abrir", endpoint="tabela_abrir")
 def tabela_abrir(tab_id: int):
     if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
     t = Tabela.query.get_or_404(tab_id)
 
-    # se for restaurante, bloqueia caso título não bata com login do restaurante
+    # Restaurante só abre se o título bater com o login do restaurante
     if session.get("user_tipo") == "restaurante":
         rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
         _enforce_restaurante_titulo(t, rest)
 
     return _serve_tabela_or_redirect(t, as_attachment=False)
+
+@app.get("/tabelas/<int:tab_id>/baixar", endpoint="baixar_tabela")
+def tabela_baixar(tab_id: int):
+    if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
+        return redirect(url_for("login"))
+    t = Tabela.query.get_or_404(tab_id)
+
+    if session.get("user_tipo") == "restaurante":
+        rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+        _enforce_restaurante_titulo(t, rest)
+
+    return _serve_tabela_or_redirect(t, as_attachment=True)
 
 @app.get("/tabelas/<int:tab_id>/baixar", endpoint="baixar_tabela")
 def tabela_baixar(tab_id: int):
