@@ -4151,13 +4151,60 @@ except Exception as _e:
 # TABELAS
 # =========================
 
-# imports que podem já existir — deixe somente 1 vez no arquivo
-from flask import render_template, request, redirect, url_for, flash, session, send_file, abort
+# imports (evite duplicar se já existirem no arquivo)
+from flask import (
+    render_template, request, redirect, url_for, flash, session,
+    send_file, abort
+)
 from werkzeug.utils import secure_filename
 from datetime import datetime
-import os, re, unicodedata
+import os, re, unicodedata, mimetypes
+
+# --- Helpers locais ---
+
+def _norm_txt(s: str) -> str:
+    s = unicodedata.normalize("NFD", (s or "").strip())
+    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")  # remove acento
+    s = re.sub(r"\s+", " ", s)  # colapsa espaços múltiplos
+    return s.lower()
+
+def _tabela_fs_path(t) -> str | None:
+    """
+    Resolve o caminho real do arquivo no filesystem a partir dos campos do modelo.
+    Suporta:
+      - t.arquivo_path (cheio)
+      - t.arquivo (nome dentro de TABELAS_DIR)
+      - t.arquivo_url (/static/uploads/tabelas/xxx.pdf)
+    """
+    # 1) caminho absoluto salvo
+    if getattr(t, "arquivo_path", None):
+        p = t.arquivo_path
+        if os.path.isfile(p):
+            return p
+
+    # 2) nome simples salvo dentro de TABELAS_DIR
+    if getattr(t, "arquivo", None):
+        p = os.path.join(TABELAS_DIR, t.arquivo)
+        if os.path.isfile(p):
+            return p
+
+    # 3) URL estática salva (ex.: /static/uploads/tabelas/xxx.pdf)
+    url = getattr(t, "arquivo_url", "") or ""
+    if url:
+        # aceita tanto "/static/..." quanto "static/..."
+        rel = url.lstrip("/")
+        p = os.path.join(BASE_DIR, rel)
+        if os.path.isfile(p):
+            return p
+
+    return None
+
+def _guess_mimetype_from_path(path: str) -> str:
+    mt, _ = mimetypes.guess_type(path)
+    return mt or "application/octet-stream"
 
 # ---------------- TABELAS (Admin) ----------------
+
 @app.route("/admin/tabelas")
 @admin_required
 def admin_tabelas():
@@ -4168,27 +4215,34 @@ def admin_tabelas():
 @admin_required
 def admin_upload_tabela():
     f = request.form
-    titulo = (f.get("titulo") or "").strip()
+    titulo    = (f.get("titulo") or "").strip()
     categoria = (f.get("categoria") or "outro").strip()
     descricao = (f.get("descricao") or "").strip()
-    arquivo = request.files.get("arquivo")
+    arquivo   = request.files.get("arquivo")
 
     if not titulo or not (arquivo and arquivo.filename):
         flash("Preencha o título e selecione o arquivo.", "warning")
         return redirect(url_for("admin_tabelas"))
 
+    # salva em /static/uploads/tabelas/
     fname = secure_filename(arquivo.filename)
     base, ext = os.path.splitext(fname)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_base = re.sub(r"[^A-Za-z0-9_-]+", "-", base)
     fname_final = f"{safe_base}_{ts}{ext}"
+    os.makedirs(TABELAS_DIR, exist_ok=True)
     path = os.path.join(TABELAS_DIR, fname_final)
     arquivo.save(path)
 
+    # armazena URL pública (servida pelo Flask static)
     url = f"/static/uploads/tabelas/{fname_final}"
     t = Tabela(
-        titulo=titulo, categoria=categoria, descricao=descricao,
-        arquivo_url=url, arquivo_nome=arquivo.filename, enviado_em=datetime.utcnow()
+        titulo=titulo,
+        categoria=categoria,
+        descricao=descricao,
+        arquivo_url=url,
+        arquivo_nome=arquivo.filename,
+        enviado_em=datetime.utcnow(),
     )
     db.session.add(t)
     db.session.commit()
@@ -4201,9 +4255,9 @@ def admin_upload_tabela():
 def admin_delete_tabela(tab_id):
     t = Tabela.query.get_or_404(tab_id)
     try:
-        local_path = os.path.join(BASE_DIR, t.arquivo_url.lstrip("/"))
-        if os.path.exists(local_path):
-            os.remove(local_path)
+        p = _tabela_fs_path(t)
+        if p and os.path.exists(p):
+            os.remove(p)
     except Exception:
         pass
     db.session.delete(t)
@@ -4211,58 +4265,68 @@ def admin_delete_tabela(tab_id):
     flash("Tabela removida.", "success")
     return redirect(url_for("admin_tabelas"))
 
+# ---------------- TABELAS (Cooperado/Admin - lista autenticada) ----------------
 
-# ---------------- TABELAS (Cooperado - lista autenticada) ----------------
 @app.route("/tabelas")
 def tabelas_publicas():
-    # Permite cooperado OU admin (usa seu modelo de sessão atual)
+    # permite cooperado OU admin (ajuste se quiser incluir restaurante)
     if session.get("user_tipo") not in {"cooperado", "admin"}:
         return redirect(url_for("login"))
     tabelas = Tabela.query.order_by(Tabela.enviado_em.desc()).all()
     return render_template(
         "tabelas_publicas.html",
         tabelas=tabelas,
-        viewer_tipo=session.get("user_tipo")  # "cooperado" ou "admin"
+        viewer_tipo=session.get("user_tipo")
     )
 
+# Visualizar inline (iframe ou botão "Abrir") — compartilhado
+@app.get("/tabelas/<int:tab_id>/abrir")
+def tabela_abrir(tab_id: int):
+    if session.get("user_tipo") not in {"cooperado", "restaurante", "admin"}:
+        return redirect(url_for("login"))
+    t = Tabela.query.get_or_404(tab_id)
+    p = _tabela_fs_path(t)
+    if not p or not os.path.isfile(p):
+        abort(404)
+    # stream inline
+    return send_file(p, as_attachment=False, mimetype=_guess_mimetype_from_path(p))
+
+# Download compartilhado (cooperado/restaurante/admin)
+@app.get("/tabelas/<int:tab_id>/baixar")
+def baixar_tabela(tab_id: int):
+    if session.get("user_tipo") not in {"cooperado", "restaurante", "admin"}:
+        return redirect(url_for("login"))
+    t = Tabela.query.get_or_404(tab_id)
+    p = _tabela_fs_path(t)
+    if not p or not os.path.isfile(p):
+        abort(404)
+    return send_file(p, as_attachment=True, download_name=(t.arquivo_nome or os.path.basename(p)))
+
 # ---------------- TABELAS (Restaurante) ----------------
-from flask import render_template, session, redirect, url_for, abort, send_file, flash
-import unicodedata, re, os
 
 @app.route("/rest/tabelas")
 @role_required("restaurante")
 def rest_tabelas():
     """
-    Página do restaurante para abrir/baixar SOMENTE a tabela cujo título
-    é exatamente igual (ignorando acentos/maiúsculas/espaços múltiplos)
-    ao nome/login do restaurante. Sem match parcial e sem fallback.
+    Restaurante só enxerga a tabela cujo TÍTULO (normalizado) é exatamente igual
+    ao seu login/nome. Sem match parcial nem fallback.
     """
     u_id = session.get("user_id")
     restaurante = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
 
-    # login/nome que será usado como referência de título
     login_nome = (
         getattr(getattr(restaurante, "usuario_ref", None), "usuario", None)
         or getattr(restaurante, "usuario", None)
         or (restaurante.nome or "")
     )
+    alvo_norm = _norm_txt(login_nome)
 
-    def _norm(s: str) -> str:
-        s = unicodedata.normalize("NFD", (s or "").strip())
-        s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")  # remove acentos
-        s = re.sub(r"\s+", " ", s)  # colapsa espaços
-        return s.lower()
-
-    alvo_norm = _norm(login_nome)
-
-    # Busca candidatos só para reduzir varredura e depois valida com igualdade normalizada
     candidatos = (Tabela.query
                   .filter(Tabela.titulo.ilike(f"%{login_nome}%"))
                   .order_by(Tabela.enviado_em.desc())
                   .all())
 
-    # pega a MAIS RECENTE cujo título normalized == alvo_norm
-    tabela_exata = next((t for t in candidatos if _norm(t.titulo) == alvo_norm), None)
+    tabela_exata = next((t for t in candidatos if _norm_txt(t.titulo) == alvo_norm), None)
 
     return render_template(
         "restaurantes_tabelas.html",
@@ -4271,23 +4335,16 @@ def rest_tabelas():
         tabela=tabela_exata
     )
 
-
 @app.route("/rest/tabelas/<int:tabela_id>/download")
 @role_required("restaurante")
 def rest_tabela_download(tabela_id: int):
     """
-    Download seguro: só permite baixar a tabela se o título dela
-    for exatamente (normalizado) igual ao login/nome do restaurante logado.
+    Download autorizado somente se o TÍTULO (normalizado) for igual
+    ao login/nome do restaurante logado.
     """
     u_id = session.get("user_id")
     restaurante = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
     t = Tabela.query.get_or_404(tabela_id)
-
-    def _norm(s: str) -> str:
-        s = unicodedata.normalize("NFD", (s or "").strip())
-        s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
-        s = re.sub(r"\s+", " ", s)
-        return s.lower()
 
     login_nome = (
         getattr(getattr(restaurante, "usuario_ref", None), "usuario", None)
@@ -4295,39 +4352,15 @@ def rest_tabela_download(tabela_id: int):
         or (restaurante.nome or "")
     )
 
-    if _norm(t.titulo) != _norm(login_nome):
-        # bloqueia acesso a tabela de outro restaurante
-        abort(403)
+    if _norm_txt(t.titulo) != _norm_txt(login_nome):
+        abort(403)  # tentando baixar tabela de outro restaurante
 
-    # Resolve o caminho do arquivo (funciona com modelos que guardam 'arquivo_path' ou 'arquivo')
-    path = None
-    if hasattr(t, "arquivo_path") and t.arquivo_path:
-        path = t.arquivo_path
-    elif hasattr(t, "arquivo") and t.arquivo:
-        # TABELAS_DIR já definido no seu app
-        path = os.path.join(TABELAS_DIR, t.arquivo)
-
-    if not path or not os.path.isfile(path):
+    p = _tabela_fs_path(t)
+    if not p or not os.path.isfile(p):
         flash("Arquivo não encontrado.", "warning")
-        # volta para a página das tabelas do restaurante
         return redirect(url_for("rest_tabelas"))
 
-    # Envia o arquivo
-    return send_file(path, as_attachment=True)
-
-# ---------------- Download compartilhado ----------------
-@app.route("/tabelas/<int:tab_id>/baixar")
-def baixar_tabela(tab_id):
-    # Permite qualquer usuário autenticado (cooperado, restaurante ou admin)
-    if session.get("user_tipo") not in {"cooperado", "restaurante", "admin"}:
-        return redirect(url_for("login"))
-
-    t = Tabela.query.get_or_404(tab_id)
-    path = os.path.join(BASE_DIR, t.arquivo_url.lstrip("/"))
-    if not os.path.exists(path):
-        abort(404)
-    return send_file(path, as_attachment=True, download_name=t.arquivo_nome)
-
+    return send_file(p, as_attachment=True, download_name=(t.arquivo_nome or os.path.basename(p)))
 
 # =========================
 # AVISOS — Portais (cooperado)
