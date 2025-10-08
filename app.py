@@ -4342,15 +4342,17 @@ def rest_tabelas():
                   .all())
     tabela_exata = next((t for t in candidatos if _norm_txt(t.titulo) == alvo), None)
 
-    # <<<<<< AQUI: flag booleana pra usar no template
-    has_portal_restaurante = "portal_restaurante" in current_app.view_functions
+    # Flag simples para o template decidir o link de "Voltar"
+    has_portal_restaurante = ("portal_restaurante" in current_app.view_functions)
 
     return render_template(
         "restaurantes_tabelas.html",
         restaurante=rest,
         login_nome=login_nome,
         tabela=tabela_exata,
-        has_portal_restaurante=has_portal_restaurante,  # <<<<<<
+        has_portal_restaurante=has_portal_restaurante,
+        back_href=url_for("portal_restaurante") if has_portal_restaurante else url_for("rest_tabelas"),
+        current_year=datetime.utcnow().year,
     )
     alvo = _norm_txt(login_nome)
 
