@@ -8,6 +8,7 @@ import json
 import difflib
 import unicodedata
 import re
+import mimetypes
 from sqlalchemy.inspection import inspect as sa_inspect
 from datetime import datetime, date, timedelta, time
 from functools import wraps
@@ -721,6 +722,39 @@ def _save_foto_to_db(entidade, file_storage, *, is_cooperado: bool) -> str | Non
         url = url_for("media_rest", rest_id=entidade.id)
     entidade.foto_url = f"{url}?v={int(datetime.utcnow().timestamp())}"
     return entidade.foto_url
+
+def _abs_path_from_url(rel_url: str) -> str:
+    """
+    Converte '/static/uploads/arquivo.pdf' para o caminho absoluto no disco.
+    """
+    if not rel_url:
+        return ""
+    # caminho padrão: /static/uploads/...
+    if rel_url.startswith("/"):
+        rel_url = rel_url.lstrip("/")
+    return os.path.join(BASE_DIR, rel_url.replace("/", os.sep))
+
+def _serve_uploaded(rel_url: str, *, download_name: str | None = None, force_download: bool = False):
+    """
+    Entrega um arquivo salvo em /static/uploads com mimetype correto.
+    - PDFs abrem inline (no navegador) por padrão.
+    - Se quiser forçar download, passe force_download=True.
+    """
+    if not rel_url:
+        abort(404)
+    abs_path = _abs_path_from_url(rel_url)
+    if not os.path.exists(abs_path):
+        abort(404)
+
+    mime, _ = mimetypes.guess_type(abs_path)
+    is_pdf = (mime == "application/pdf") or abs_path.lower().endswith(".pdf")
+    return send_file(
+        abs_path,
+        mimetype=mime or "application/octet-stream",
+        as_attachment=(force_download or not is_pdf),
+        download_name=(download_name or os.path.basename(abs_path)),
+        conditional=True,     # ajuda visualização/retomar download
+    )
 
 def _prox_ocorrencia_anual(dt: date | None) -> date | None:
     if not dt:
@@ -4474,6 +4508,34 @@ def inject_avisos_banner():
         "avisos_unread_count": qtd,
         "avisos_unread_url": link
     }
+# =========================
+# COOPERADO — ver TODAS as tabelas
+# (ADITIVO; não altera nada do que você já tem)
+# =========================
+@app.get("/coop/tabelas", endpoint="coop_tabelas")
+@role_required("cooperado")
+def coop_tabelas():
+    # lista completa para cooperado (todas as Tabela)
+    tabs = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
+    # se seu template "tabelas.html" aceita um "back_href", mandamos o painel do cooperado
+    return render_template("tabelas.html", tabelas=tabs, back_href=url_for("portal_cooperado"))
+
+# (Opcional) Cooperado abrir/baixar usando endpoints próprios.
+# Se preferir, pode continuar usando /tabelas/<id>/abrir e /tabelas/<id>/baixar já existentes.
+@app.get("/coop/tabelas/<int:tab_id>/abrir", endpoint="coop_tabela_abrir")
+@role_required("cooperado")
+def coop_tabela_abrir(tab_id: int):
+    t = Tabela.query.get_or_404(tab_id)
+    # cooperado pode abrir qualquer tabela
+    return _serve_tabela_or_redirect(t, as_attachment=False)
+
+@app.get("/coop/tabelas/<int:tab_id>/baixar", endpoint="coop_tabela_baixar")
+@role_required("cooperado")
+def coop_tabela_baixar(tab_id: int):
+    t = Tabela.query.get_or_404(tab_id)
+    # cooperado pode baixar qualquer tabela
+    return _serve_tabela_or_redirect(t, as_attachment=True)
+
 
 from datetime import datetime
 from flask import render_template, request, redirect, url_for, session
