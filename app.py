@@ -4150,15 +4150,71 @@ except Exception as _e:
     ...
 
 # ==== TABELAS (upload/abrir/baixar) =========================================
+from flask import (
+    render_template, request, redirect, url_for, flash, session,
+    send_file, abort, current_app, jsonify
+)
+from werkzeug.utils import secure_filename
+from datetime import datetime
 from pathlib import Path
+import os, re, unicodedata, mimetypes
 
-# Diretório base já criado no topo do app:
-# TABELAS_DIR = os.path.join(UPLOAD_DIR, "tabelas")
+# pressupõe: db, modelos Tabela/Restaurante e decorators admin_required / role_required já definidos
 
+# ---------------------------------------------------------------------------
+# CONFIG DE DIRETÓRIO (usa TABELAS_DIR já configurado no topo do app)
+# Ex.: TABELAS_DIR = os.path.join(UPLOAD_DIR, "tabelas")
+# ---------------------------------------------------------------------------
 def _tabelas_base_dir() -> Path:
     p = Path(TABELAS_DIR)
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+def _norm_txt(s: str) -> str:
+    s = unicodedata.normalize("NFD", (s or "").strip())
+    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+    s = re.sub(r"\s+", " ", s)
+    return s.lower()
+
+def _guess_mimetype_from_path(path: str) -> str:
+    mt, _ = mimetypes.guess_type(path)
+    return mt or "application/octet-stream"
+
+def _enforce_restaurante_titulo(tabela, restaurante):
+    # nome de login do restaurante (usuario_ref.usuario -> usuario; fallback nome)
+    login_nome = (
+        getattr(getattr(restaurante, "usuario_ref", None), "usuario", None)
+        or getattr(restaurante, "usuario", None)
+        or (restaurante.nome or "")
+    )
+    if _norm_txt(tabela.titulo) != _norm_txt(login_nome):
+        abort(403)
+
+def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
+    """
+    Serve arquivo local (TABELAS_DIR/<arquivo>) ou redireciona se arquivo_url for http(s)
+    """
+    url = (tabela.arquivo_url or "").strip()
+    if not url:
+        abort(404)
+
+    # link externo?
+    if url.startswith("http://") or url.startswith("https://"):
+        return redirect(url)
+
+    # local
+    base = _tabelas_base_dir()
+    fname = url.split("/")[-1]
+    path = base / fname
+    if not path.exists() or not path.is_file():
+        abort(404)
+
+    return send_file(
+        str(path),
+        as_attachment=as_attachment,
+        download_name=(tabela.arquivo_nome or fname),
+        mimetype=_guess_mimetype_from_path(str(path)),
+    )
 
 # ---------------- Admin ----------------
 @app.get("/admin/tabelas", endpoint="admin_tabelas")
@@ -4172,10 +4228,9 @@ def admin_tabelas():
 def admin_upload_tabela():
     f = request.form
     titulo    = (f.get("titulo") or "").strip()
-    categoria = (f.get("categoria") or "").strip() or None
     descricao = (f.get("descricao") or "").strip() or None
 
-    # aceita vários nomes possíveis do input file
+    # aceita vários nomes possíveis do input file (mantém teu HTML: name="arquivo")
     arquivo = (
         request.files.get("arquivo")
         or request.files.get("file")
@@ -4188,7 +4243,7 @@ def admin_upload_tabela():
 
     base_dir = _tabelas_base_dir()
 
-    # nome seguro + sufixo de timestamp para não colidir
+    # nome seguro + timestamp pra não colidir
     raw = secure_filename(arquivo.filename)
     stem, ext = os.path.splitext(raw)
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -4198,12 +4253,12 @@ def admin_upload_tabela():
     dest = base_dir / final_name
     arquivo.save(str(dest))
 
+    # grava nos campos EXISTENTES no teu model
     t = Tabela(
         titulo=titulo,
-        categoria=categoria,
         descricao=descricao,
-        arquivo_url=final_name,            # << CAMPO QUE EXISTE NO MODEL
-        arquivo_nome=arquivo.filename,     # nome original para download_name
+        arquivo_url=final_name,        # chave única que vamos usar pra servir
+        arquivo_nome=arquivo.filename, # nome original, pra download_name bonito
         enviado_em=datetime.utcnow(),
     )
     db.session.add(t)
@@ -4212,11 +4267,11 @@ def admin_upload_tabela():
     flash("Tabela publicada.", "success")
     return redirect(url_for("admin_tabelas"))
 
-@app.get("/admin/tabelas/<int:tab_id>/delete", endpoint="admin_tabelas_delete")
+@app.get("/admin/tabelas/<int:tab_id>/delete", endpoint="admin_delete_tabela")
 @admin_required
-def admin_tabelas_delete(tab_id: int):
+def admin_delete_tabela(tab_id: int):
     t = Tabela.query.get_or_404(tab_id)
-    # se for local, tenta remover do disco
+    # tenta remover o arquivo local se for local
     try:
         url = (t.arquivo_url or "").strip()
         if url and not (url.startswith("http://") or url.startswith("https://")):
@@ -4230,49 +4285,89 @@ def admin_tabelas_delete(tab_id: int):
     flash("Tabela excluída.", "success")
     return redirect(url_for("admin_tabelas"))
 
-# ---------------- Lista p/ usuários logados ----------------
+# ---------------- Lista Cooperado/Admin/Restaurante ----------------
 @app.get("/tabelas", endpoint="tabelas_publicas")
 def tabelas_publicas():
     if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
     tabs = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
-    return render_template("tabelas.html", tabelas=tabs)
+    # o HTML do cooperado espera 'back_href' opcional; passamos vazio e ele faz fallback
+    return render_template("tabelas.html", tabelas=tabs, back_href="")
 
-# ---------------- Abrir / Baixar (compartilhado) ----------------
-def _serve_tabela_or_redirect(t: Tabela, *, as_attachment: bool):
-    url = (t.arquivo_url or "").strip()
-    if not url:
-        abort(404)
-
-    # Link externo? redireciona
-    if url.startswith("http://") or url.startswith("https://"):
-        return redirect(url)
-
-    # Local: está salvo em static/uploads/tabelas/<arquivo>
-    base = _tabelas_base_dir()
-    fname = url.split("/")[-1]
-    path = base / fname
-    if not path.exists():
-        abort(404)
-
-    return send_file(
-        path.open("rb"),
-        as_attachment=as_attachment,
-        download_name=(t.arquivo_nome or fname)
-    )
-
+# ---------------- Abrir / Baixar (compartilhado para cooperado/admin/restaurante) ----------------
 @app.get("/tabelas/<int:tab_id>/abrir", endpoint="tabela_abrir")
 def tabela_abrir(tab_id: int):
     if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
     t = Tabela.query.get_or_404(tab_id)
+
+    # se for restaurante, bloqueia caso título não bata com login do restaurante
+    if session.get("user_tipo") == "restaurante":
+        rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+        _enforce_restaurante_titulo(t, rest)
+
     return _serve_tabela_or_redirect(t, as_attachment=False)
 
-@app.get("/tabelas/<int:tab_id>/baixar", endpoint="tabela_baixar")
+@app.get("/tabelas/<int:tab_id>/baixar", endpoint="baixar_tabela")
 def tabela_baixar(tab_id: int):
     if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
     t = Tabela.query.get_or_404(tab_id)
+
+    if session.get("user_tipo") == "restaurante":
+        rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+        _enforce_restaurante_titulo(t, rest)
+
+    return _serve_tabela_or_redirect(t, as_attachment=True)
+
+# ---------------- Restaurante: vê apenas a SUA tabela (título igual ao login) ----------------
+@app.route("/rest/tabelas", endpoint="rest_tabelas")
+@role_required("restaurante")
+def rest_tabelas():
+    u_id = session.get("user_id")
+    restaurante = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+
+    login_nome = (
+        getattr(getattr(restaurante, "usuario_ref", None), "usuario", None)
+        or getattr(restaurante, "usuario", None)
+        or (restaurante.nome or "")
+    )
+    alvo_norm = _norm_txt(login_nome)
+
+    candidatos = (Tabela.query
+                  .filter(Tabela.titulo.ilike(f"%{login_nome}%"))
+                  .order_by(Tabela.enviado_em.desc())
+                  .all())
+    tabela_exata = next((t for t in candidatos if _norm_txt(t.titulo) == alvo_norm), None)
+
+    # HACK p/ teu template: ele usa "if 'portal_restaurante' in globals()"
+    # Passamos um dicionário "globals" contendo a key quando a rota existe,
+    # assim não dá UndefinedError no Jinja.
+    has_portal = "portal_restaurante" in current_app.view_functions
+    globals_for_tpl = {"portal_restaurante": True} if has_portal else {}
+
+    return render_template(
+        "restaurantes_tabelas.html",
+        restaurante=restaurante,
+        login_nome=login_nome,
+        tabela=tabela_exata,
+        globals=globals_for_tpl,   # <-- garante que o if do HTML funcione
+    )
+
+@app.get("/rest/tabelas/<int:tabela_id>/abrir", endpoint="rest_tabela_abrir")
+@role_required("restaurante")
+def rest_tabela_abrir(tabela_id: int):
+    rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+    t = Tabela.query.get_or_404(tabela_id)
+    _enforce_restaurante_titulo(t, rest)
+    return _serve_tabela_or_redirect(t, as_attachment=False)
+
+@app.get("/rest/tabelas/<int:tabela_id>/download", endpoint="rest_tabela_download")
+@role_required("restaurante")
+def rest_tabela_download(tabela_id: int):
+    rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+    t = Tabela.query.get_or_404(tabela_id)
+    _enforce_restaurante_titulo(t, rest)
     return _serve_tabela_or_redirect(t, as_attachment=True)
 
 # ---------------- Diagnóstico rápido ----------------
@@ -4283,28 +4378,16 @@ def admin_tabelas_scan():
     items = []
     for t in Tabela.query.order_by(Tabela.enviado_em.desc()).all():
         url = (t.arquivo_url or "").strip()
-        resolved = (
-            str(base / url.split("/")[-1]) if (url and not url.startswith("http")) else url
-        )
-        exists = bool(url and not url.startswith("http") and (base / url.split("/")[-1]).is_file())
+        local = (base / url.split("/")[-1]) if (url and not url.startswith("http")) else None
         items.append({
             "id": t.id,
             "titulo": t.titulo,
             "arquivo_nome": t.arquivo_nome,
             "arquivo_url": t.arquivo_url,
-            "resolved": resolved,
-            "exists": exists,
+            "resolved": (str(local) if local else url),
+            "exists": (bool(local and local.is_file())),
         })
-    from flask import jsonify
     return jsonify({"tabelas_dir": str(base), "items": items})
-
-# =========================
-# AVISOS — Portais (cooperado)
-# =========================
-# === IMPORTS (garanta que já existam) ===
-from flask import g, session, url_for
-from datetime import datetime
-from sqlalchemy import or_
 
 # ---------- helper: conta avisos não lidos p/ usuário logado ----------
 def _avisos_nao_lidos_para_usuario():
