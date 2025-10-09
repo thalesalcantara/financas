@@ -854,7 +854,7 @@
         });
 
         // exporta somente o visível
-        document.getElementById('btnExportCsv').addEventListener('click', ()=>{
+        document.getElementById('btnExportar').addEventListener('click', ()=>{
           const vis = getRows().filter(r=>r.style.display!=='none');
           const linhas = [['Data','Cooperado','Contrato','Horário','Entregas','Valor (R$)']];
           vis.forEach(r=>{ linhas.push(Array.from(r.cells).map(td=>td.textContent.trim())); });
