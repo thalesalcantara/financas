@@ -4337,7 +4337,6 @@ def portal_restaurante():
     except BuildError:
         url_lancar_producao = "/restaurante/lancar_producao"
 
-    # -------------------- Render --------------------
    # -------------------- Render --------------------
 return render_template(
     "restaurante_dashboard.html",
