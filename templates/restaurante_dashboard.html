@@ -82,12 +82,19 @@
     .avatar{width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 1px 0 #0001}
     .avatar-big{width:180px; height:180px; border-radius:50%; object-fit:cover; border:6px solid var(--royal); box-shadow:0 8px 22px #0004}
 
-    /* Ratings */
+    /* Ratings (compacto em linha) */
     .stars{display:inline-flex; gap:8px; font-size:1.6rem; cursor:pointer; vertical-align:middle}
     .star{color:#cbd5e1; transition:transform .06s}
     .star.active,.star.hover{color:#fbbf24}
     .star:active{transform:scale(.92)}
-    .stars.readonly{pointer-events:none; opacity:.85} /* Geral não clicável */
+    .stars.readonly{pointer-events:none; opacity:.85}
+
+    .ratings-line{display:flex; flex-wrap:wrap; align-items:center; gap:14px 22px}
+    .crit{display:flex; align-items:center; gap:8px; white-space:nowrap}
+    .crit .lbl{font-weight:800; margin:0}
+    @media (max-width:600px){ .crit{white-space:normal} }
+
+    .textarea-wide{min-height:220px}
 
     /* Toasts simples */
     .toast{position:fixed; right:16px; bottom:16px; background:var(--card); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); padding:12px 14px; display:none}
@@ -125,21 +132,16 @@
     <!-- Sidebar -->
     <aside class="aside">
       <div class="brand"><div class="title"><i class="bi bi-building"></i> <span>Portal do Estabelecimento</span></div></div>
-      <div class="toolbar">
-        <button id="btnTheme" class="btn-ghost" type="button"><i id="iconTheme" class="bi bi-moon-stars"></i><span id="txtTheme">Escuro</span></button>
-      </div>
+      <div class="toolbar"><button id="btnTheme" class="btn-ghost" type="button"><i id="iconTheme" class="bi bi-moon-stars"></i><span id="txtTheme">Escuro</span></button></div>
       <nav class="navmenu">
-        <a class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos']) else '' }}"
-           href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-person-lines-fill"></i><span>Cooperados</span></a>
-        <a class="{{ 'active' if view=='lancamentos' else '' }}"
-           href="{{ url_for('portal_restaurante', view='lancamentos') }}"><i class="bi bi-receipt"></i><span>Lançamentos</span></a>
+        <a class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos']) else '' }}" href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-person-lines-fill"></i><span>Cooperados</span></a>
+        <a class="{{ 'active' if view=='lancamentos' else '' }}" href="{{ url_for('portal_restaurante', view='lancamentos') }}"><i class="bi bi-receipt"></i><span>Lançamentos</span></a>
         <a class="{{ 'active' if view=='escalas' else '' }}" href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-calendar-week"></i><span>Escala</span></a>
         {% if session.get('user_tipo') == 'restaurante' %}
         <a class="{{ 'active' if request.endpoint=='rest_tabelas' else '' }}" href="{{ url_for('rest_tabelas') }}"><i class="bi bi-table"></i><span>Tabelas</span></a>
         {% endif %}
         <a class="{{ 'active' if view=='config' else '' }}" href="{{ url_for('portal_restaurante', view='config') }}"><i class="bi bi-gear"></i><span>Configuração</span></a>
-        <a id="linkAvisos" class="{{ 'active' if request.endpoint=='portal_restaurante_avisos' or view=='avisos' else '' }}"
-           href="{{ url_for('portal_restaurante_avisos') }}"><i class="bi bi-megaphone"></i><span>Avisos</span>
+        <a id="linkAvisos" class="{{ 'active' if request.endpoint=='portal_restaurante_avisos' or view=='avisos' else '' }}" href="{{ url_for('portal_restaurante_avisos') }}"><i class="bi bi-megaphone"></i><span>Avisos</span>
           {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
           {% if _cntAvisos > 0 %}<span class="badge">{{ _cntAvisos }}</span>{% endif %}
         </a>
@@ -165,28 +167,9 @@
       <div class="section-title"><i class="bi bi-shield-lock"></i> Configuração</div>
       <div class="card">
         <form class="row" method="POST" action="{{ url_for('rest_alterar_senha') }}">
-          <div class="col-4">
-            <label>Senha atual</label>
-            <div style="display:flex; gap:8px">
-              <input type="password" class="input" name="senha_atual" required />
-              <button class="btn btn-outline" type="button" onclick="togglePwd(this)"><i class="bi bi-eye"></i></button>
-            </div>
-          </div>
-          <div class="col-4">
-            <label>Nova senha</label>
-            <div style="display:flex; gap:8px">
-              <input type="password" class="input" name="senha_nova" minlength="6" required />
-              <button class="btn btn-outline" type="button" onclick="togglePwd(this)"><i class="bi bi-eye"></i></button>
-            </div>
-            <div class="hint">Mínimo de 6 caracteres.</div>
-          </div>
-          <div class="col-4">
-            <label>Confirmar nova senha</label>
-            <div style="display:flex; gap:8px">
-              <input type="password" class="input" name="senha_conf" minlength="6" required />
-              <button class="btn btn-outline" type="button" onclick="togglePwd(this)"><i class="bi bi-eye"></i></button>
-            </div>
-          </div>
+          <div class="col-4"><label>Senha atual</label><div style="display:flex; gap:8px"><input type="password" class="input" name="senha_atual" required><button class="btn btn-outline" type="button" onclick="togglePwd(this)"><i class="bi bi-eye"></i></button></div></div>
+          <div class="col-4"><label>Nova senha</label><div style="display:flex; gap:8px"><input type="password" class="input" name="senha_nova" minlength="6" required><button class="btn btn-outline" type="button" onclick="togglePwd(this)"><i class="bi bi-eye"></i></button></div><div class="hint">Mínimo de 6 caracteres.</div></div>
+          <div class="col-4"><label>Confirmar nova senha</label><div style="display:flex; gap:8px"><input type="password" class="input" name="senha_conf" minlength="6" required><button class="btn btn-outline" type="button" onclick="togglePwd(this)"><i class="bi bi-eye"></i></button></div></div>
           <div class="col-12" style="text-align:right"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
         </form>
       </div>
@@ -206,16 +189,8 @@
             </div>
             <div class="hint">Padrão abre o dia atual; troque para ver a semana.</div>
           </div>
-          <div class="col-3">
-            <label>Data de referência</label>
-            <input type="date" name="ref" class="input" value="{{ ref_data.strftime('%Y-%m-%d') }}" />
-            <div class="hint">Dia exibido (modo dia) • Semana base (modo semana).</div>
-          </div>
-          <div class="col-3" style="text-align:right">
-            <div style="height:10px"></div>
-            <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
-            <a class="btn btn-outline" href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-arrow-counterclockwise"></i> Hoje</a>
-          </div>
+          <div class="col-3"><label>Data de referência</label><input type="date" name="ref" class="input" value="{{ ref_data.strftime('%Y-%m-%d') }}" /><div class="hint">Dia exibido (modo dia) • Semana base (modo semana).</div></div>
+          <div class="col-3" style="text-align:right"><div style="height:10px"></div><button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button><a class="btn btn-outline" href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-arrow-counterclockwise"></i> Hoje</a></div>
         </form>
 
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px">
@@ -294,7 +269,7 @@
       </div>
 
       {% elif view == 'avisos' %}
-      <!-- AVISOS (inalterado) -->
+      <!-- AVISOS -->
       {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
       {% set _unread_from_list = (_avisos | selectattr('lido','equalto',False) | list | length) %}
       {% set _unread_from_ctx = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
@@ -304,7 +279,7 @@
           <form method="POST" action="{{ url_for('marcar_todos_avisos_lidos_restaurante') }}">
             <button class="btn btn-royal" type="submit" {% if (_unread_from_list or _unread_from_ctx) == 0 %}disabled{% endif %}><i class="bi bi-check2-circle"></i> Marcar todos como lidos</button>
           </form>
-          <label class="right" style="display:flex; gap:8px; align-items:center"><input type="checkbox" id="toggleNaoLidos" /> Mostrar apenas não lidos</label>
+          <label class="right" style="display:flex; gap:8px; align-items:center"><input type="checkbox" id="toggleNaoLidos"> Mostrar apenas não lidos</label>
           <span id="badgeTitulo" class="btn-chip">{{ (_unread_from_list or _unread_from_ctx) > 0 and ((_unread_from_list or _unread_from_ctx) ~ ' não lido(s)') or 'Tudo lido' }}</span>
         </div>
       </div>
@@ -330,14 +305,14 @@
       {% endif %}
 
       {% elif view == 'lancamentos' %}
-      <!-- LANÇAMENTOS agrupados (permanecem iguais) -->
+      <!-- LANÇAMENTOS agrupados -->
       <div class="section-title"><i class="bi bi-receipt"></i> Lançamentos</div>
       <div class="lan-shell">
         <aside class="lan-aside card">
           <form id="lanFiltro" class="row">
-            <div class="col-12"><label>Início</label><input type="date" class="input" name="data_inicio" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}" /></div>
-            <div class="col-12"><label>Fim</label><input type="date" class="input" name="data_fim" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}" /></div>
-            <div class="col-12"><label>Digite o nome do cooperado</label><input type="text" class="input" name="q" placeholder="Filtrar por nome/contrato..." /></div>
+            <div class="col-12"><label>Início</label><input type="date" class="input" name="data_inicio" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}"></div>
+            <div class="col-12"><label>Fim</label><input type="date" class="input" name="data_fim" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}"></div>
+            <div class="col-12"><label>Digite o nome do cooperado</label><input type="text" class="input" name="q" placeholder="Filtrar por nome/contrato..."></div>
             <div class="col-12" style="display:flex; gap:8px; margin-top:6px">
               <button class="btn btn-royal" type="button" id="btnLanAplicar"><i class="bi bi-funnel"></i> Aplicar</button>
               <button class="btn btn-outline" type="button" id="btnLanLimpar"><i class="bi bi-arrow-counterclockwise"></i> Limpar</button>
@@ -369,22 +344,17 @@
       </div>
 
       {% else %}
-      <!-- LANÇAR (Cooperados) — sem filtro de período -->
+      <!-- LANÇAR (Cooperados) -->
       <div class="section-title"><i class="bi bi-plus-circle"></i> Lançar Produção Diária</div>
       <div class="row mt-2">
         <div class="col-4">
           <div class="card">
             <label>Buscar cooperado</label>
-            <div style="display:flex; gap:8px; align-items:center">
-              <i class="bi bi-search"></i>
-              <input id="buscaCoop" type="text" class="input" placeholder="Digite para listar..." list="cooperadosList" />
-            </div>
+            <div style="display:flex; gap:8px; align-items:center"><i class="bi bi-search"></i><input id="buscaCoop" type="text" class="input" placeholder="Digite para listar..." list="cooperadosList"></div>
             <datalist id="cooperadosList">{% for coop in cooperados %}<option value="{{ coop.nome }}"></option>{% endfor %}</datalist>
             <div id="listaCooperados" class="coop-list mt-2">
               {% for coop in cooperados %}
-              <div class="coop-item" data-id="{{ coop.id }}" data-nome="{{ coop.nome }}"
-                   data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
-                   data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}">
+              <div class="coop-item" data-id="{{ coop.id }}" data-nome="{{ coop.nome }}" data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}" data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}">
                 <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}" class="avatar" alt="">
                 <div><strong>{{ coop.nome }}</strong><br><span class="text-muted small">No período: R$ {{ '%.2f'|format(coop.total_periodo or 0) }}</span></div>
               </div>
@@ -418,44 +388,48 @@
                 <input type="hidden" name="avaliar" id="inputAvaliar" value="0">
               </div>
 
-              <!-- Avaliação: organizado; “Geral” automático e NÃO clicável -->
+              <!-- Avaliação compacta: em linha; “Geral” automático -->
               <div id="boxAval" class="row hidden">
-                <div class="col-6">
-                  <label style="font-weight:800">Geral (automático)</label>
-                  <div class="stars readonly" data-name="av_geral" data-auto="true" title="Calculado pela média das demais notas">
-                    <i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i>
-                  </div>
-                  <input type="hidden" name="av_geral" value="">
-                  <div class="hint">Média de Pontualidade, Educação e Eficiência/Apresentação.</div>
-                </div>
+                <div class="col-12">
+                  <div class="ratings-line">
+                    <div class="crit">
+                      <span class="lbl">Geral (automático)</span>
+                      <div class="stars readonly" data-name="av_geral" data-auto="true" title="Calculado pela média das demais notas">
+                        <i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i>
+                      </div>
+                      <input type="hidden" name="av_geral" value="">
+                    </div>
 
-                <div class="col-6">
-                  <label style="font-weight:800">Pontualidade</label>
-                  <div class="stars" data-name="av_pontualidade">
-                    <i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i>
-                  </div>
-                  <input type="hidden" name="av_pontualidade" value="">
-                </div>
+                    <div class="crit">
+                      <span class="lbl">Pontualidade</span>
+                      <div class="stars" data-name="av_pontualidade">
+                        <i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i>
+                      </div>
+                      <input type="hidden" name="av_pontualidade" value="">
+                    </div>
 
-                <div class="col-6">
-                  <label style="font-weight:800">Educação</label>
-                  <div class="stars" data-name="av_educacao">
-                    <i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i>
-                  </div>
-                  <input type="hidden" name="av_educacao" value="">
-                </div>
+                    <div class="crit">
+                      <span class="lbl">Educação</span>
+                      <div class="stars" data-name="av_educacao">
+                        <i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i>
+                      </div>
+                      <input type="hidden" name="av_educacao" value="">
+                    </div>
 
-                <div class="col-6">
-                  <label style="font-weight:800">Eficiência / Cuidado</label>
-                  <div class="stars" data-name="av_eficiencia">
-                    <i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i>
+                    <div class="crit">
+                      <span class="lbl">Eficiência/Cuidado</span>
+                      <div class="stars" data-name="av_eficiencia">
+                        <i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i>
+                      </div>
+                      <input type="hidden" name="av_eficiencia" value="">
+                    </div>
                   </div>
-                  <input type="hidden" name="av_eficiencia" value="">
+                  <div class="hint">A nota geral é a média arredondada das demais.</div>
                 </div>
 
                 <div class="col-12">
                   <label>Comentário (opcional)</label>
-                  <textarea class="textarea" name="av_comentario" rows="8" placeholder="Escreva à vontade... (sem limite de caracteres)"></textarea>
+                  <textarea class="textarea textarea-wide" name="av_comentario" rows="10" placeholder="Escreva à vontade... (sem limite de caracteres)"></textarea>
                 </div>
               </div>
 
@@ -498,17 +472,8 @@
   {% set _unread_from_list_t = (_avisos_for_toast | selectattr('lido','equalto',False) | list | length) %}
   {% set _unread_from_ctx_t = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
   {% set _toast_unread = _unread_from_list_t if _unread_from_list_t>0 else _unread_from_ctx_t %}
-  <div id="toastAvisos" class="toast">
-    <div style="display:flex; gap:8px"><i class="bi bi-megaphone-fill"></i><strong>Novos avisos</strong><span class="right text-muted">agora</span></div>
-    <div style="height:8px"></div>
-    Você tem {{ _toast_unread }} aviso(s) não lido(s).
-    <a href="{{ url_for('portal_restaurante_avisos') }}" class="btn btn-outline mt-2"><i class="bi bi-arrow-right"></i> Ver agora</a>
-  </div>
-  <div id="toastOK" class="toast">
-    <div style="display:flex; gap:8px"><i class="bi bi-check2-circle" style="color:var(--ok)"></i><strong>Pronto</strong><span class="right text-muted">agora</span></div>
-    <div style="height:8px"></div>
-    <div>Aviso marcado como lido.</div>
-  </div>
+  <div id="toastAvisos" class="toast"><div style="display:flex; gap:8px"><i class="bi bi-megaphone-fill"></i><strong>Novos avisos</strong><span class="right text-muted">agora</span></div><div style="height:8px"></div>Você tem {{ _toast_unread }} aviso(s) não lido(s). <a href="{{ url_for('portal_restaurante_avisos') }}" class="btn btn-outline mt-2"><i class="bi bi-arrow-right"></i> Ver agora</a></div>
+  <div id="toastOK" class="toast"><div style="display:flex; gap:8px"><i class="bi bi-check2-circle" style="color:var(--ok)"></i><strong>Pronto</strong><span class="right text-muted">agora</span></div><div style="height:8px"></div><div>Aviso marcado como lido.</div></div>
 
   <!-- JS -->
   <script>
@@ -606,7 +571,6 @@
 
         function aplicar(){
           const di=filtroForm.data_inicio.value, df=filtroForm.data_fim.value, q=(filtroForm.q.value||'').toLowerCase().trim();
-          // Apenas formata por string para evitar fuso
           const fmt = s => s? s.split('-').reverse().join('/') : '';
           document.getElementById('txtLanPeriodo').textContent = (fmt(di)) + (di&&df?' a ':'') + (fmt(df));
 
@@ -677,7 +641,7 @@
         aplicar();
       }
 
-      /* LANÇAR (seleção + avaliação com Geral automática) */
+      /* LANÇAR: seleção + avaliação (Geral automática) */
       if(!['escalas','config','avisos','lancamentos'].includes(viewNow)){
         const busca=document.getElementById('buscaCoop');
         const itens=[...document.querySelectorAll('.coop-item')];
@@ -693,7 +657,7 @@
           header.classList.remove('hidden'); form.classList.remove('hidden'); hint.classList.add('hidden');
           document.querySelectorAll('#blocoTabelas > .card').forEach(t=>t.classList.add('hidden'));
           const tb=document.getElementById('tabela-'+el.dataset.id); if(tb) tb.classList.remove('hidden');
-          wireStars(); autoGeral(); // garante cálculo na abertura
+          wireStars(); autoGeral();
         }
         itens.forEach(el=> el.addEventListener('click', ()=>mostrarCoop(el)));
         busca?.addEventListener('input', function(){ const q=this.value.toLowerCase().trim(); itens.forEach(el=>{ el.style.display=(el.dataset.nome||'').toLowerCase().includes(q)?'':'none'; }); });
@@ -713,7 +677,6 @@
             if(!hidden){ hidden=document.createElement('input'); hidden.type='hidden'; hidden.name=name; st.parentElement.appendChild(hidden); }
             const stars=st.querySelectorAll('.star');
 
-            // “Geral” é somente leitura: sem eventos de clique
             if(!isGeral){
               stars.forEach(s=>{
                 s.addEventListener('mouseenter',()=>paintStars(stars, Number(s.dataset.v), true));
@@ -725,7 +688,6 @@
           });
         }
 
-        // Calcula a média e pinta o "Geral" sempre que outra nota mudar
         function autoGeral(){
           const names=['av_pontualidade','av_educacao','av_eficiencia'];
           const vals = names.map(n=>Number((document.querySelector(`input[name="${n}"]`)||{}).value||0)).filter(v=>v>0);
