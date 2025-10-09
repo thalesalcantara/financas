@@ -4155,39 +4155,29 @@ def portal_restaurante():
     # 'lancar' (form para lançar produção), 'escalas' (agenda) e 'lancamentos' (lista por período)
     view = (request.args.get("view", "lancar") or "lancar").strip().lower()
 
-    # Para o helper local vamos precisar de 're'
-    import re
-
-    # Helper local para 'YYYY-MM' -> (primeiro_dia, ultimo_dia)
-    def _parse_yyyy_mm_local(s: str):
-        if not s:
-            return None, None
-        m = re.fullmatch(r"(\d{4})-(\d{2})", s.strip())
-        if not m:
-            return None, None
-        y = int(m.group(1)); mth = int(m.group(2))
-        try:
-            di_ = date(y, mth, 1)
-            if mth == 12:
-                df_ = date(y + 1, 1, 1) - timedelta(days=1)
-            else:
-                df_ = date(y, mth + 1, 1) - timedelta(days=1)
-            return di_, df_
-        except Exception:
-            return None, None
-
     # -------------------- LANÇAMENTOS (totais por período) --------------------
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
 
-    # NOVO: filtro por mês (?mes=YYYY-MM)
+    # NOVO: também aceitar ?mes=YYYY-MM
     mes = (request.args.get("mes") or "").strip()
-    periodo_desc = None
-    if mes:
-        di_mes, df_mes = _parse_yyyy_mm_local(mes)
-        if di_mes and df_mes:
-            di, df = di_mes, df_mes
+    if mes and (not di or not df):
+        # converte YYYY-MM para primeiro e último dia do mês
+        try:
+            ano, mes_num = mes.split("-")
+            ano = int(ano); mes_num = int(mes_num)
+            di = date(ano, mes_num, 1)
+            if mes_num == 12:
+                df = date(ano + 1, 1, 1) - timedelta(days=1)
+            else:
+                df = date(ano, mes_num + 1, 1) - timedelta(days=1)
             periodo_desc = "mês"
+        except Exception:
+            di = di or None
+            df = df or None
+            periodo_desc = None
+    else:
+        periodo_desc = None
 
     if not di or not df:
         # Sem filtro completo => janela semanal baseada no período do restaurante
@@ -4339,9 +4329,6 @@ def portal_restaurante():
     except BuildError:
         url_lancar_producao = "/restaurante/lancar_producao"
 
-    # Flag útil para proteger link 'editar' no template (opcional)
-    has_editar_lanc = ('editar_lancamento' in app.view_functions)
-
     # -------------------- Render --------------------
     return render_template(
         "restaurante_dashboard.html",
@@ -4356,7 +4343,6 @@ def portal_restaurante():
         total_qtd=total_qtd,
         total_entregas=total_entregas,
         view=view,
-        filtro_mes=(mes or ""),   # útil para <input type="month" value="{{ filtro_mes }}">
         agenda=agenda,
         dias_list=dias_list,
         ref_data=ref,
@@ -4365,8 +4351,118 @@ def portal_restaurante():
         total_lanc_valor=total_lanc_valor,
         total_lanc_entregas=total_lanc_entregas,
         url_lancar_producao=url_lancar_producao,  # usado no action do form
-        has_editar_lanc=has_editar_lanc,          # opcional para o botão editar
+        filtro_mes=(mes or ""),                    # opcional p/ <input type="month">
     )
+
+
+# =========================
+# Rotas de CRUD de lançamento
+# =========================
+@app.route("/restaurante/lancar_producao", methods=["POST"])  # <-- clássico pra evitar 404
+@role_required("restaurante")
+def lancar_producao():
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first()
+    if not rest:
+        abort(403)
+    f = request.form
+
+    # 1) cria o lançamento normalmente
+    l = Lancamento(
+        restaurante_id=rest.id,
+        cooperado_id=f.get("cooperado_id", type=int),
+        descricao="produção",
+        valor=f.get("valor", type=float),
+        data=_parse_date(f.get("data")) or date.today(),
+        hora_inicio=f.get("hora_inicio"),
+        hora_fim=f.get("hora_fim"),
+        qtd_entregas=f.get("qtd_entregas", type=int),
+    )
+    db.session.add(l)
+    db.session.flush()  # garante l.id para amarrar avaliação
+
+    # 2) (OPCIONAL) avaliação
+    g   = _clamp_star(f.get("av_geral"))
+    p   = _clamp_star(f.get("av_pontualidade"))
+    ed  = _clamp_star(f.get("av_educacao"))
+    ef  = _clamp_star(f.get("av_eficiencia"))
+    ap  = _clamp_star(f.get("av_apresentacao"))
+    txt = (f.get("av_comentario") or "").strip()
+
+    tem_avaliacao = any(x is not None for x in (g, p, ed, ef, ap)) or bool(txt)
+    if tem_avaliacao:
+        media = _media_ponderada(g, p, ed, ef, ap)
+        senti = _analise_sentimento(txt)
+        temas = _identifica_temas(txt)
+        crise = _sinaliza_crise(g, txt)
+        feed  = _gerar_feedback(p, ed, ef, ap, txt, senti)
+
+        av = AvaliacaoCooperado(
+            restaurante_id=rest.id,
+            cooperado_id=l.cooperado_id,
+            lancamento_id=l.id,
+            estrelas_geral=g,
+            estrelas_pontualidade=p,
+            estrelas_educacao=ed,
+            estrelas_eficiencia=ef,
+            estrelas_apresentacao=ap,
+            comentario=txt,
+            media_ponderada=media,
+            sentimento=senti,
+            temas="; ".join(temas),
+            alerta_crise=crise,
+            feedback_motoboy=feed,
+        )
+        db.session.add(av)
+
+        if crise:
+            flash("⚠️ Avaliação crítica registrada (1★ + termo de risco). A gerência deve revisar.", "danger")
+
+    db.session.commit()
+    flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
+    return redirect(url_for("portal_restaurante"))
+
+
+@app.route("/lancamentos/<int:id>/editar", methods=["GET", "POST"])
+@role_required("restaurante")
+def editar_lancamento(id):
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first()
+    l = Lancamento.query.get_or_404(id)
+    if not rest or l.restaurante_id != rest.id:
+        abort(403)
+
+    if request.method == "POST":
+        f = request.form
+        l.valor = f.get("valor", type=float)
+        l.data = _parse_date(f.get("data")) or l.data
+        l.hora_inicio = f.get("hora_inicio")
+        l.hora_fim = f.get("hora_fim")
+        l.qtd_entregas = f.get("qtd_entregas", type=int)
+        db.session.commit()
+        flash("Lançamento atualizado.", "success")
+        return redirect(url_for("portal_restaurante"))
+
+    return render_template("editar_lancamento.html", lanc=l)
+
+
+@app.get("/lancamentos/<int:id>/excluir")
+@role_required("restaurante")
+def excluir_lancamento(id):
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first()
+    l = Lancamento.query.get_or_404(id)
+    if not rest or l.restaurante_id != rest.id:
+        abort(403)
+
+    # Apaga avaliações amarradas a este lançamento
+    db.session.execute(sa_delete(AvaliacaoCooperado).where(AvaliacaoCooperado.lancamento_id == id))
+    db.session.execute(sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.lancamento_id == id))
+
+    db.session.delete(l)
+    db.session.commit()
+    flash("Lançamento excluído.", "success")
+    return redirect(url_for("portal_restaurante"))
 
 # =========================
 # Documentos (Admin + Público)
