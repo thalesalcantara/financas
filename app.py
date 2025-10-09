@@ -3100,9 +3100,7 @@ def ratear_beneficios():
     return redirect(url_for("admin_dashboard", tab="beneficios"))
 
 
-
--- =========================
--- AVALIAÇÕES (já existia)# =========================
+# =========================
 # Escalas — Upload (substituição TOTAL sempre)
 # =========================
 @app.route("/escalas/upload", methods=["POST"])
@@ -3416,43 +3414,19 @@ def admin_recusar_troca(id):
     flash("Solicitação recusada.", "info")
     return redirect(url_for("admin_dashboard", tab="escalas"))
 
-# --- Admin tool: aplicar ON DELETE CASCADE nas FKs de avaliacoes* ---
-# --- Admin tool: aplicar ON DELETE CASCADE nas FKs de avaliacoes* ---
+
+# --- Admin tool: aplicar ON DELETE CASCADE nas FKs (Postgres) ---
 @app.get("/admin/tools/apply_fk_cascade")
 @admin_required
 def apply_fk_cascade():
     """
-    Mantém a rota viva sem quebrar o deploy.
-    Quando quiser aplicar seus ALTER TABLE, troque a lista `stmts`.
+    Aplica/garante ON DELETE CASCADE nas FKs relevantes (Postgres).
+    Tudo está dentro de uma string SQL, evitando SyntaxError no deploy.
     """
     from sqlalchemy import text as sa_text
 
-    # Coloque aqui seus ALTER TABLE, um por item, como strings Python.
-    # Exemplo (comentado para segurança):
-    stmts = [
-        # "ALTER TABLE public.avaliacoes_restaurante DROP CONSTRAINT IF EXISTS avaliacoes_restaurante_restaurante_id_fkey;",
-        # "ALTER TABLE public.avaliacoes_restaurante ADD CONSTRAINT avaliacoes_restaurante_restaurante_id_fkey FOREIGN KEY (restaurante_id) REFERENCES restaurantes(id) ON DELETE CASCADE;",
-        # "ALTER TABLE public.avaliacoes_cooperado DROP CONSTRAINT IF EXISTS avaliacoes_cooperado_cooperado_id_fkey;",
-        # "ALTER TABLE public.avaliacoes_cooperado ADD CONSTRAINT avaliacoes_cooperado_cooperado_id_fkey FOREIGN KEY (cooperado_id) REFERENCES cooperados(id) ON DELETE CASCADE;",
-    ]
-
-    try:
-        if not stmts:
-            db.session.execute(sa_text("SELECT 1;"))  # no-op seguro
-        else:
-            for s in stmts:
-                db.session.execute(sa_text(s))
-        db.session.commit()
-        msg = "Ferramenta de FK executada."
-        if not stmts:
-            msg += " (no-op)"
-        flash(msg, "info")
-    except Exception as e:
-        db.session.rollback()
-        flash(f"Falha ao executar ferramenta de FK: {e}", "danger")
-
-    return redirect(url_for("admin_dashboard", tab="escalas"))
-
+    sql = """
+BEGIN;
 
 -- =========================
 -- AVALIAÇÕES (já existia)
@@ -3546,118 +3520,8 @@ ALTER TABLE public.trocas
   ON DELETE CASCADE;
 
 COMMIT;
-    try:
-        if _is_sqlite():
-            flash("SQLite local: esta operação é específica de Postgres (sem efeito aqui).", "warning")
-            return redirect(url_for("admin_dashboard", tab="config"))
-
-        db.session.execute(sa_text(sql))
-        db.session.commit()
-        flash("FKs com ON DELETE CASCADE aplicadas com sucesso.", "success")
-    except Exception as e:
-        db.session.rollback()
-        flash(f"Erro ao aplicar FKs: {e}", "danger")
-    return redirect(url_for("admin_dashboard", tab="config"))
-
-
-# --- Admin tool: aplicar ON DELETE CASCADE nas FKs de avaliacoes* ---
-@app.get("/admin/tools/apply_fk_cascade")
-@admin_required
-def apply_fk_cascade():
-    sql = """
-BEGIN;
-
--- =========================
--- AVALIAÇÕES (já existia)
--- =========================
--- ajusta FK de avaliacoes.lancamento_id
-ALTER TABLE public.avaliacoes
-  DROP CONSTRAINT IF EXISTS avaliacoes_lancamento_id_fkey;
-ALTER TABLE public.avaliacoes
-  ADD CONSTRAINT avaliacoes_lancamento_id_fkey
-  FOREIGN KEY (lancamento_id)
-  REFERENCES public.lancamentos (id)
-  ON DELETE CASCADE;
-
--- cria (se faltar) FK de avaliacoes_restaurante.lancamento_id
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM information_schema.table_constraints
-        WHERE constraint_name = 'av_rest_lancamento_id_fkey'
-          AND table_name = 'avaliacoes_restaurante'
-    ) THEN
-        ALTER TABLE public.avaliacoes_restaurante
-          ADD CONSTRAINT av_rest_lancamento_id_fkey
-          FOREIGN KEY (lancamento_id)
-          REFERENCES public.lancamentos (id)
-          ON DELETE CASCADE;
-    ELSE
-        -- se já existir, garante o CASCADE (drop/add)
-        EXECUTE 'ALTER TABLE public.avaliacoes_restaurante
-                 DROP CONSTRAINT IF EXISTS av_rest_lancamento_id_fkey';
-        EXECUTE 'ALTER TABLE public.avaliacoes_restaurante
-                 ADD CONSTRAINT av_rest_lancamento_id_fkey
-                 FOREIGN KEY (lancamento_id)
-                 REFERENCES public.lancamentos (id)
-                 ON DELETE CASCADE';
-    END IF;
-END $$;
-
--- =========================
--- ESCALAS
--- =========================
--- cooperado_id -> cooperados(id) ON DELETE CASCADE
-ALTER TABLE public.escalas
-  DROP CONSTRAINT IF EXISTS escalas_cooperado_id_fkey;
-ALTER TABLE public.escalas
-  ADD CONSTRAINT escalas_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id)
-  REFERENCES public.cooperados (id)
-  ON DELETE CASCADE;
-
--- restaurante_id -> restaurantes(id) ON DELETE CASCADE
-ALTER TABLE public.escalas
-  DROP CONSTRAINT IF EXISTS escalas_restaurante_id_fkey;
-ALTER TABLE public.escalas
-  ADD CONSTRAINT escalas_restaurante_id_fkey
-  FOREIGN KEY (restaurante_id)
-  REFERENCES public.restaurantes (id)
-  ON DELETE CASCADE;
-
--- =========================
--- TROCAS
--- =========================
--- solicitante_id -> cooperados(id) ON DELETE CASCADE
-ALTER TABLE public.trocas
-  DROP CONSTRAINT IF EXISTS trocas_solicitante_id_fkey;
-ALTER TABLE public.trocas
-  ADD CONSTRAINT trocas_solicitante_id_fkey
-  FOREIGN KEY (solicitante_id)
-  REFERENCES public.cooperados (id)
-  ON DELETE CASCADE;
-
--- destino_id -> cooperados(id) ON DELETE CASCADE
-ALTER TABLE public.trocas
-  DROP CONSTRAINT IF EXISTS trocas_destino_id_fkey;
-ALTER TABLE public.trocas
-  ADD CONSTRAINT trocas_destino_id_fkey
-  FOREIGN KEY (destino_id)
-  REFERENCES public.cooperados (id)
-  ON DELETE CASCADE;
-
--- origem_escala_id -> escalas(id) ON DELETE CASCADE
-ALTER TABLE public.trocas
-  DROP CONSTRAINT IF EXISTS trocas_origem_escala_id_fkey;
-ALTER TABLE public.trocas
-  ADD CONSTRAINT trocas_origem_escala_id_fkey
-  FOREIGN KEY (origem_escala_id)
-  REFERENCES public.escalas (id)
-  ON DELETE CASCADE;
-
-COMMIT;
 """
+
     try:
         if _is_sqlite():
             flash("SQLite local: esta operação é específica de Postgres (sem efeito aqui).", "warning")
@@ -3671,108 +3535,6 @@ COMMIT;
         flash(f"Erro ao aplicar FKs: {e}", "danger")
     return redirect(url_for("admin_dashboard", tab="config"))
 
--- =========================
--- ajusta FK de avaliacoes.lancamento_id
-ALTER TABLE public.avaliacoes
-  DROP CONSTRAINT IF EXISTS avaliacoes_lancamento_id_fkey;
-ALTER TABLE public.avaliacoes
-  ADD CONSTRAINT avaliacoes_lancamento_id_fkey
-  FOREIGN KEY (lancamento_id)
-  REFERENCES public.lancamentos (id)
-  ON DELETE CASCADE;
-
--- cria (se faltar) FK de avaliacoes_restaurante.lancamento_id
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM information_schema.table_constraints
-        WHERE constraint_name = 'av_rest_lancamento_id_fkey'
-          AND table_name = 'avaliacoes_restaurante'
-    ) THEN
-        ALTER TABLE public.avaliacoes_restaurante
-          ADD CONSTRAINT av_rest_lancamento_id_fkey
-          FOREIGN KEY (lancamento_id)
-          REFERENCES public.lancamentos (id)
-          ON DELETE CASCADE;
-    ELSE
-        -- se já existir, garante o CASCADE (drop/add)
-        EXECUTE 'ALTER TABLE public.avaliacoes_restaurante
-                 DROP CONSTRAINT IF EXISTS av_rest_lancamento_id_fkey';
-        EXECUTE 'ALTER TABLE public.avaliacoes_restaurante
-                 ADD CONSTRAINT av_rest_lancamento_id_fkey
-                 FOREIGN KEY (lancamento_id)
-                 REFERENCES public.lancamentos (id)
-                 ON DELETE CASCADE';
-    END IF;
-END $$;
-
--- =========================
--- ESCALAS
--- =========================
--- cooperado_id -> cooperados(id) ON DELETE CASCADE
-ALTER TABLE public.escalas
-  DROP CONSTRAINT IF EXISTS escalas_cooperado_id_fkey;
-ALTER TABLE public.escalas
-  ADD CONSTRAINT escalas_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id)
-  REFERENCES public.cooperados (id)
-  ON DELETE CASCADE;
-
--- restaurante_id -> restaurantes(id) ON DELETE CASCADE
-ALTER TABLE public.escalas
-  DROP CONSTRAINT IF EXISTS escalas_restaurante_id_fkey;
-ALTER TABLE public.escalas
-  ADD CONSTRAINT escalas_restaurante_id_fkey
-  FOREIGN KEY (restaurante_id)
-  REFERENCES public.restaurantes (id)
-  ON DELETE CASCADE;
-
--- =========================
--- TROCAS
--- =========================
--- solicitante_id -> cooperados(id) ON DELETE CASCADE
-ALTER TABLE public.trocas
-  DROP CONSTRAINT IF EXISTS trocas_solicitante_id_fkey;
-ALTER TABLE public.trocas
-  ADD CONSTRAINT trocas_solicitante_id_fkey
-  FOREIGN KEY (solicitante_id)
-  REFERENCES public.cooperados (id)
-  ON DELETE CASCADE;
-
--- destino_id -> cooperados(id) ON DELETE CASCADE
-ALTER TABLE public.trocas
-  DROP CONSTRAINT IF EXISTS trocas_destino_id_fkey;
-ALTER TABLE public.trocas
-  ADD CONSTRAINT trocas_destino_id_fkey
-  FOREIGN KEY (destino_id)
-  REFERENCES public.cooperados (id)
-  ON DELETE CASCADE;
-
--- origem_escala_id -> escalas(id) ON DELETE CASCADE
-ALTER TABLE public.trocas
-  DROP CONSTRAINT IF EXISTS trocas_origem_escala_id_fkey;
-ALTER TABLE public.trocas
-  ADD CONSTRAINT trocas_origem_escala_id_fkey
-  FOREIGN KEY (origem_escala_id)
-  REFERENCES public.escalas (id)
-  ON DELETE CASCADE;
-
-COMMIT;
-"""
-    
-    try:
-        if _is_sqlite():
-            flash("SQLite local: esta operação é específica de Postgres (sem efeito aqui).", "warning")
-            return redirect(url_for("admin_dashboard", tab="config"))
-
-        db.session.execute(sa_text(sql))
-        db.session.commit()
-        flash("FKs com ON DELETE CASCADE aplicadas com sucesso.", "success")
-    except Exception as e:
-        db.session.rollback()
-        flash(f"Erro ao aplicar FKs: {e}", "danger")
-    return redirect(url_for("admin_dashboard", tab="config"))
 
 # =========================
 # Documentos (Admin)
