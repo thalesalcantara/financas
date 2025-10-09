@@ -814,6 +814,21 @@ def _parse_date(s: str | None) -> date | None:
         except Exception:
             pass
     return None
+
+from dateutil.relativedelta import relativedelta
+
+def _parse_ymd(s):
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+def _bounds_mes(yyyy_mm: str):
+    # "2025-06" -> [2025-06-01, 2025-07-01)
+    y, m = map(int, yyyy_mm.split("-"))
+    ini = date(y, m, 1)
+    fim = (ini + relativedelta(months=1))
+    return ini, fim
     
 
 def _parse_data_ymd(s):
@@ -4141,9 +4156,37 @@ def portal_restaurante():
     # 'lancar' (form para lançar produção), 'escalas' (agenda) e 'lancamentos' (lista por período)
     view = (request.args.get("view", "lancar") or "lancar").strip().lower()
 
+    # Helper local para 'YYYY-MM' -> (primeiro_dia, ultimo_dia)
+    def _parse_yyyy_mm_local(s: str):
+        if not s:
+            return None, None
+        m = re.fullmatch(r"(\d{4})-(\d{2})", s.strip())
+        if not m:
+            return None, None
+        y = int(m.group(1)); mth = int(m.group(2))
+        try:
+            di_ = date(y, mth, 1)
+            if mth == 12:
+                df_ = date(y + 1, 1, 1) - timedelta(days=1)
+            else:
+                df_ = date(y, mth + 1, 1) - timedelta(days=1)
+            return di_, df_
+        except Exception:
+            return None, None
+
     # -------------------- LANÇAMENTOS (totais por período) --------------------
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
+
+    # NOVO: filtro por mês (?mes=YYYY-MM)
+    mes = (request.args.get("mes") or "").strip()
+    periodo_desc = None
+    if mes:
+        di_mes, df_mes = _parse_yyyy_mm_local(mes)
+        if di_mes and df_mes:
+            di, df = di_mes, df_mes
+            periodo_desc = "mês"
+
     if not di or not df:
         # Sem filtro completo => janela semanal baseada no período do restaurante
         wd_map = {"seg-dom": 0, "sab-sex": 5, "sex-qui": 4}  # seg=0 ... dom=6
@@ -4154,9 +4197,9 @@ def portal_restaurante():
         df_auto = di_auto + timedelta(days=6)
         di = di or di_auto
         df = df or df_auto
-        periodo_desc = rest.periodo
+        periodo_desc = periodo_desc or rest.periodo
     else:
-        periodo_desc = "personalizado"
+        periodo_desc = periodo_desc or "personalizado"
 
     cooperados = Cooperado.query.order_by(Cooperado.nome).all()
 
@@ -4295,28 +4338,30 @@ def portal_restaurante():
         url_lancar_producao = "/restaurante/lancar_producao"
 
     # -------------------- Render --------------------
-    return render_template(
-        "restaurante_dashboard.html",
-        rest=rest,
-        cooperados=cooperados,
-        filtro_inicio=di,
-        filtro_fim=df,
-        periodo_desc=periodo_desc,
-        total_bruto=total_bruto,
-        total_inss=total_inss,
-        total_liquido=total_liquido,
-        total_qtd=total_qtd,
-        total_entregas=total_entregas,
-        view=view,
-        agenda=agenda,
-        dias_list=dias_list,
-        ref_data=ref,
-        modo=modo,
-        lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
-        total_lanc_valor=total_lanc_valor,
-        total_lanc_entregas=total_lanc_entregas,
-        url_lancar_producao=url_lancar_producao,  # usado no action do form
-    )
+   # -------------------- Render --------------------
+return render_template(
+    "restaurante_dashboard.html",
+    rest=rest,
+    cooperados=cooperados,
+    filtro_inicio=di,
+    filtro_fim=df,
+    periodo_desc=periodo_desc,
+    total_bruto=total_bruto,
+    total_inss=total_inss,
+    total_liquido=total_liquido,
+    total_qtd=total_qtd,
+    total_entregas=total_entregas,
+    view=view,
+    filtro_mes=(mes or ""),   # <-- NOVO (esta linha)
+    agenda=agenda,
+    dias_list=dias_list,
+    ref_data=ref,
+    modo=modo,
+    lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
+    total_lanc_valor=total_lanc_valor,
+    total_lanc_entregas=total_lanc_entregas,
+    url_lancar_producao=url_lancar_producao,  # usado no action do form
+)
 
 
 # =========================
