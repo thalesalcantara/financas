@@ -3099,8 +3099,11 @@ def ratear_beneficios():
     flash("Rateios aplicados.", "success")
     return redirect(url_for("admin_dashboard", tab="beneficios"))
 
-# =========================
-# Escalas — Upload (LOGIN do cooperado) + substituição total/por escopo
+
+
+-- =========================
+-- AVALIAÇÕES (já existia)# =========================
+# Escalas — Upload (substituição TOTAL sempre)
 # =========================
 @app.route("/escalas/upload", methods=["POST"])
 @admin_required
@@ -3113,19 +3116,23 @@ def upload_escala():
         flash("Envie um arquivo .xlsx válido.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    wipe_total = request.form.get("wipe_total") == "1"
-
+    # salva o arquivo (o nome não influencia a lógica)
     path = os.path.join(UPLOAD_DIR, secure_filename(file.filename))
     file.save(path)
 
+    # abre com openpyxl
     try:
         import openpyxl
     except Exception:
         flash("Arquivo salvo, mas falta a biblioteca 'openpyxl' (pip install openpyxl).", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    wb = openpyxl.load_workbook(path, data_only=True)
-    ws = wb.active
+    try:
+        wb = openpyxl.load_workbook(path, data_only=True)
+        ws = wb.active
+    except Exception as e:
+        flash(f"Erro ao abrir a planilha: {e}", "danger")
+        return redirect(url_for("admin_dashboard", tab="escalas"))
 
     # ------- helpers -------
     def _norm_local(s: str) -> str:
@@ -3174,7 +3181,7 @@ def upload_escala():
             except Exception: return s
         return s
 
-    # ------- colunas -------
+    # ------- cabeçalhos -------
     headers_norm = { _norm_local(str(c.value or "")) : j for j, c in enumerate(ws[1], start=1) }
 
     def find_col(*aliases):
@@ -3192,11 +3199,10 @@ def upload_escala():
     col_contrato = find_col("contrato", "restaurante", "unidade", "local")
     col_login    = find_col("login", "usuario", "usuário", "username", "user", "nome de usuario", "nome de usuário")
     col_nome     = find_col("nome", "nome do cooperado", "cooperado", "motoboy", "entregador")
-    col_cor      = find_col("cor","cores","cor da celula","cor celula")  # <-- definir ANTES do loop
+    col_cor      = find_col("cor","cores","cor da celula","cor celula")
 
     if not col_login and not col_nome:
         flash("Não encontrei a coluna de LOGIN nem a de NOME do cooperado na planilha.", "danger")
-        app.logger.warning(f"Headers normalizados lidos: {headers_norm}")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
     # ------- cache entidades -------
@@ -3230,14 +3236,14 @@ def upload_escala():
                 return c
         return None
 
-    from_here_match_by_name = _match_cooperado_by_name  # helper global
+    # helper global por nome (já existe no seu arquivo)
+    from_here_match_by_name = _match_cooperado_by_name
 
     # ------- parse linhas -------
     linhas_novas, total_linhas_planilha = [], 0
     for i in range(2, ws.max_row + 1):
         login_txt = str(ws.cell(i, col_login).value).strip() if col_login else ""
         nome_txt  = str(ws.cell(i, col_nome ).value).strip() if col_nome  else ""
-
         if not login_txt and not nome_txt:
             continue
         total_linhas_planilha += 1
@@ -3251,9 +3257,8 @@ def upload_escala():
         contrato_txt = (str(contrato_v).strip() if contrato_v is not None else "")
         rest_id      = match_restaurante_id(contrato_txt)
 
-        if login_txt:
-            coop_match = match_cooperado_by_login(login_txt)
-        else:
+        coop_match = match_cooperado_by_login(login_txt) if login_txt else None
+        if not coop_match and nome_txt:
             coop_match = from_here_match_by_name(nome_txt, cooperados)
 
         nome_fallback = (nome_txt or login_txt)
@@ -3273,75 +3278,16 @@ def upload_escala():
         flash("Nada importado: nenhum registro válido encontrado.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    # ------- substituir -------
+    # ------- SUBSTITUIÇÃO TOTAL -------
     try:
-        deleted_total = 0
+        # apaga todas as escalas antigas
+        db.session.execute(sa_delete(Escala))
 
-        if wipe_total:
-            res = db.session.execute(sa_delete(Escala))
-            deleted_total += (res.rowcount or 0)
-        else:
-            import unicodedata as _u2, re as _re2
-
-            def _norm_del(s: str) -> str:
-                s = _u2.normalize("NFD", str(s or "").strip().lower())
-                s = "".join(ch for ch in s if _u2.category(ch) != "Mn")
-                return _re2.sub(r"[^a-z0-9]+", " ", s).strip()
-
-            plan_coop_ids: set[int] = set()
-            plan_rest_ids: set[int] = set()
-            plan_names_norm: set[str] = set()
-            plan_contratos_norm: set[str] = set()
-
-            for row in linhas_novas:
-                if row.get("cooperado_id"):
-                    plan_coop_ids.add(int(row["cooperado_id"]))
-                else:
-                    nm = _norm_del(row.get("cooperado_nome") or "")
-                    if nm: plan_names_norm.add(nm)
-
-                if row.get("restaurante_id"):
-                    plan_rest_ids.add(int(row["restaurante_id"]))
-                ct_norm = _norm_del(row.get("contrato") or "")
-                if ct_norm: plan_contratos_norm.add(ct_norm)
-
-            if plan_coop_ids:
-                res = db.session.execute(sa_delete(Escala).where(Escala.cooperado_id.in_(list(plan_coop_ids))))
-                deleted_total += (res.rowcount or 0)
-
-            if plan_rest_ids:
-                res = db.session.execute(sa_delete(Escala).where(Escala.restaurante_id.in_(list(plan_rest_ids))))
-                deleted_total += (res.rowcount or 0)
-
-            if plan_names_norm:
-                coop_rows = db.session.query(Cooperado.id, Cooperado.nome).all()
-                ids_por_nome_match = {cid for cid, nome in coop_rows if _norm_del(nome) in plan_names_norm}
-                if ids_por_nome_match:
-                    res = db.session.execute(sa_delete(Escala).where(Escala.cooperado_id.in_(list(ids_por_nome_match))))
-                    deleted_total += (res.rowcount or 0)
-
-                ids_escalas_sem_id = set()
-                q = Escala.query.with_entities(Escala.id, Escala.cooperado_id, Escala.cooperado_nome)
-                for _id, _cid, _nome in q:
-                    if _cid is None and _nome and _norm_del(_nome) in plan_names_norm:
-                        ids_escalas_sem_id.add(_id)
-                if ids_escalas_sem_id:
-                    res = db.session.execute(sa_delete(Escala).where(Escala.id.in_(list(ids_escalas_sem_id))))
-                    deleted_total += (res.rowcount or 0)
-
-            if plan_contratos_norm:
-                ids_por_contrato = set()
-                q = Escala.query.with_entities(Escala.id, Escala.contrato)
-                for _id, _contrato in q:
-                    if _contrato and _norm_del(_contrato) in plan_contratos_norm:
-                        ids_por_contrato.add(_id)
-                if ids_por_contrato:
-                    res = db.session.execute(sa_delete(Escala).where(Escala.id.in_(list(ids_por_contrato))))
-                    deleted_total += (res.rowcount or 0)
-
+        # insere novas linhas
         for row in linhas_novas:
             db.session.add(Escala(**row))
 
+        # marca atualização para cooperados reconhecidos
         ids_reconhecidos = {int(r["cooperado_id"]) for r in linhas_novas if r.get("cooperado_id")}
         for cid in ids_reconhecidos:
             c = Cooperado.query.get(cid)
@@ -3349,9 +3295,7 @@ def upload_escala():
                 c.ultima_atualizacao = datetime.now()
 
         db.session.commit()
-
-        modo_txt = "Substituição TOTAL" if wipe_total else "Substituição por ESCOPO (cooperados/restaurantes/nomes/contratos)"
-        flash(f"{modo_txt} aplicada. {len(linhas_novas)} linha(s) adicionada(s); {deleted_total} escala(s) removida(s).", "success")
+        flash(f"Escala substituída com sucesso. {len(linhas_novas)} linha(s) importada(s) (de {total_linhas_planilha}).", "success")
 
     except Exception as e:
         db.session.rollback()
@@ -3359,6 +3303,7 @@ def upload_escala():
         flash(f"Erro ao importar a escala: {e}", "danger")
 
     return redirect(url_for("admin_dashboard", tab="escalas"))
+
 
 # =========================
 # Ações de exclusão de escalas
@@ -3386,6 +3331,7 @@ def escalas_purge_restaurante(rest_id):
     db.session.commit()
     flash(f"Escalas do restaurante #{rest_id} excluídas ({res.rowcount or 0}).", "info")
     return redirect(url_for("admin_dashboard", tab="escalas"))
+
 
 # =========================
 # Trocas (Admin aprovar/recusar)
@@ -3511,7 +3457,8 @@ def backfill_trocas_afetacao():
     flash(f"Backfill concluído: {alteradas} troca(s) atualizada(s).", "success")
     return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    # --- Admin tool: aplicar ON DELETE CASCADE nas FKs de avaliacoes* ---
+
+# --- Admin tool: aplicar ON DELETE CASCADE nas FKs de avaliacoes* ---
 @app.get("/admin/tools/apply_fk_cascade")
 @admin_required
 def apply_fk_cascade():
@@ -3520,6 +3467,108 @@ BEGIN;
 
 -- =========================
 -- AVALIAÇÕES (já existia)
+-- =========================
+-- ajusta FK de avaliacoes.lancamento_id
+ALTER TABLE public.avaliacoes
+  DROP CONSTRAINT IF EXISTS avaliacoes_lancamento_id_fkey;
+ALTER TABLE public.avaliacoes
+  ADD CONSTRAINT avaliacoes_lancamento_id_fkey
+  FOREIGN KEY (lancamento_id)
+  REFERENCES public.lancamentos (id)
+  ON DELETE CASCADE;
+
+-- cria (se faltar) FK de avaliacoes_restaurante.lancamento_id
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'av_rest_lancamento_id_fkey'
+          AND table_name = 'avaliacoes_restaurante'
+    ) THEN
+        ALTER TABLE public.avaliacoes_restaurante
+          ADD CONSTRAINT av_rest_lancamento_id_fkey
+          FOREIGN KEY (lancamento_id)
+          REFERENCES public.lancamentos (id)
+          ON DELETE CASCADE;
+    ELSE
+        -- se já existir, garante o CASCADE (drop/add)
+        EXECUTE 'ALTER TABLE public.avaliacoes_restaurante
+                 DROP CONSTRAINT IF EXISTS av_rest_lancamento_id_fkey';
+        EXECUTE 'ALTER TABLE public.avaliacoes_restaurante
+                 ADD CONSTRAINT av_rest_lancamento_id_fkey
+                 FOREIGN KEY (lancamento_id)
+                 REFERENCES public.lancamentos (id)
+                 ON DELETE CASCADE';
+    END IF;
+END $$;
+
+-- =========================
+-- ESCALAS
+-- =========================
+-- cooperado_id -> cooperados(id) ON DELETE CASCADE
+ALTER TABLE public.escalas
+  DROP CONSTRAINT IF EXISTS escalas_cooperado_id_fkey;
+ALTER TABLE public.escalas
+  ADD CONSTRAINT escalas_cooperado_id_fkey
+  FOREIGN KEY (cooperado_id)
+  REFERENCES public.cooperados (id)
+  ON DELETE CASCADE;
+
+-- restaurante_id -> restaurantes(id) ON DELETE CASCADE
+ALTER TABLE public.escalas
+  DROP CONSTRAINT IF EXISTS escalas_restaurante_id_fkey;
+ALTER TABLE public.escalas
+  ADD CONSTRAINT escalas_restaurante_id_fkey
+  FOREIGN KEY (restaurante_id)
+  REFERENCES public.restaurantes (id)
+  ON DELETE CASCADE;
+
+-- =========================
+-- TROCAS
+-- =========================
+-- solicitante_id -> cooperados(id) ON DELETE CASCADE
+ALTER TABLE public.trocas
+  DROP CONSTRAINT IF EXISTS trocas_solicitante_id_fkey;
+ALTER TABLE public.trocas
+  ADD CONSTRAINT trocas_solicitante_id_fkey
+  FOREIGN KEY (solicitante_id)
+  REFERENCES public.cooperados (id)
+  ON DELETE CASCADE;
+
+-- destino_id -> cooperados(id) ON DELETE CASCADE
+ALTER TABLE public.trocas
+  DROP CONSTRAINT IF EXISTS trocas_destino_id_fkey;
+ALTER TABLE public.trocas
+  ADD CONSTRAINT trocas_destino_id_fkey
+  FOREIGN KEY (destino_id)
+  REFERENCES public.cooperados (id)
+  ON DELETE CASCADE;
+
+-- origem_escala_id -> escalas(id) ON DELETE CASCADE
+ALTER TABLE public.trocas
+  DROP CONSTRAINT IF EXISTS trocas_origem_escala_id_fkey;
+ALTER TABLE public.trocas
+  ADD CONSTRAINT trocas_origem_escala_id_fkey
+  FOREIGN KEY (origem_escala_id)
+  REFERENCES public.escalas (id)
+  ON DELETE CASCADE;
+
+COMMIT;
+"""
+    try:
+        if _is_sqlite():
+            flash("SQLite local: esta operação é específica de Postgres (sem efeito aqui).", "warning")
+            return redirect(url_for("admin_dashboard", tab="config"))
+
+        db.session.execute(sa_text(sql))
+        db.session.commit()
+        flash("FKs com ON DELETE CASCADE aplicadas com sucesso.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Erro ao aplicar FKs: {e}", "danger")
+    return redirect(url_for("admin_dashboard", tab="config"))
+
 -- =========================
 -- ajusta FK de avaliacoes.lancamento_id
 ALTER TABLE public.avaliacoes
