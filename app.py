@@ -3417,6 +3417,7 @@ def admin_recusar_troca(id):
     return redirect(url_for("admin_dashboard", tab="escalas"))
 
 # --- Admin tool: aplicar ON DELETE CASCADE nas FKs de avaliacoes* ---
+# --- Admin tool: aplicar ON DELETE CASCADE nas FKs de avaliacoes* ---
 @app.get("/admin/tools/apply_fk_cascade")
 @admin_required
 def apply_fk_cascade():
@@ -3426,8 +3427,8 @@ def apply_fk_cascade():
     """
     from sqlalchemy import text as sa_text
 
-    # Coloque aqui seus ALTER TABLE, um por item, SEM aspas triplas.
-    # Exemplo de como ficaria (comentei para não rodar nada perigoso):
+    # Coloque aqui seus ALTER TABLE, um por item, como strings Python.
+    # Exemplo (comentado para segurança):
     stmts = [
         # "ALTER TABLE public.avaliacoes_restaurante DROP CONSTRAINT IF EXISTS avaliacoes_restaurante_restaurante_id_fkey;",
         # "ALTER TABLE public.avaliacoes_restaurante ADD CONSTRAINT avaliacoes_restaurante_restaurante_id_fkey FOREIGN KEY (restaurante_id) REFERENCES restaurantes(id) ON DELETE CASCADE;",
@@ -3437,8 +3438,7 @@ def apply_fk_cascade():
 
     try:
         if not stmts:
-            # no-op seguro para não falhar o deploy
-            db.session.execute(sa_text("SELECT 1;"))
+            db.session.execute(sa_text("SELECT 1;"))  # no-op seguro
         else:
             for s in stmts:
                 db.session.execute(sa_text(s))
@@ -3452,6 +3452,7 @@ def apply_fk_cascade():
         flash(f"Falha ao executar ferramenta de FK: {e}", "danger")
 
     return redirect(url_for("admin_dashboard", tab="escalas"))
+
 
 -- =========================
 -- AVALIAÇÕES (já existia)
