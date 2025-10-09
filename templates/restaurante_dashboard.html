@@ -34,7 +34,7 @@
     .table-compact th,.table-compact td{ padding:.5rem .6rem; }
     .btn-royal{ background:var(--royal); color:#fff; border:none; }
     .btn-royal:hover{ background:var(--royal-2); color:#fff; }
-    .btn-outline-royal{ border:1px solid var(--royal); color:var(--royal); }
+    .btn-outline-royal{ border:1px solid var(--royal); color:#royal; }
     .btn-outline-royal:hover{ background:var(--royal); color:#fff; }
     .cooperado-avatar{ width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 1px 0 #0001; }
     .cooperado-item{ display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; cursor:pointer; }
@@ -357,7 +357,9 @@
               <hr class="my-2">
               <div class="kpi mb-2"><div class="small text-muted">Total no período</div><div class="v">R$ <span id="kpiTotalValor">0,00</span></div></div>
               <div class="kpi mb-2"><div class="small text-muted">Entregas no período</div><div class="v"><span id="kpiTotalEntregas">0</span></div></div>
-              <div class="d-grid"><button class="btn btn-outline-royal" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV</button></div>
+
+              <!-- Exporta SOMENTE somas (visíveis) -->
+              <div class="d-grid"><button class="btn btn-outline-royal" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV (Totais)</button></div>
             </form>
           </div>
         </div>
@@ -400,6 +402,7 @@
                     {% else %}—{% endif %}
                   </td>
                   <td class="text-center">{{ x.qtd_entregas if x.qtd_entregas is not none else '-' }}</td>
+                  <!-- data-valor = número puro para soma -->
                   <td class="text-end valor" data-valor="{{ '%.2f'|format(x.valor or 0) }}">R$ {{ '%.2f'|format(x.valor or 0) }}</td>
                 </tr>
                 {% endfor %}
@@ -620,7 +623,7 @@
     <div id="toastOK" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="2200">
       <div class="toast-header">
         <i class="bi bi-check2-circle text-success me-2"></i><strong class="me-auto">Pronto</strong><small>agora</small>
-        <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Fechar"></button>
       </div>
       <div class="toast-body">Aviso marcado como lido.</div>
     </div>
@@ -656,6 +659,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       const viewNow = "{{ view|default('lancar') }}";
 
+      // ===== Estrelas
       function paintStars(stars, v, hover=false){
         stars.forEach(s=>{
           const on = Number(s.dataset.v) <= v;
@@ -695,7 +699,7 @@
         }
       }
 
-      // ===== Lançar (lista de cooperados + form)
+      // ===== Lançar
       if (!['escalas','config','avisos','lancamentos'].includes(viewNow)) {
         const busca = document.getElementById('buscaCoop');
         const select = document.getElementById('selectCoop');
@@ -812,7 +816,8 @@
           getRows().forEach(tr=>{
             if (tr.style.display==='none') return;
             const v = Number(tr.querySelector('.valor')?.dataset.valor || 0);
-            const e = Number(tr.cells[4].textContent.replace(/\D+/g,'') || 0);
+            const eTxt = tr.cells[4].textContent.trim();
+            const e = eTxt==='-' ? 0 : Number(eTxt.replace(/\D+/g,''));
             totV += v; totE += e;
             const id = tr.dataset.coop, nm = tr.dataset.coopnome;
             perCoop[id] = perCoop[id] || {nome:nm, valor:0, ent:0};
@@ -831,6 +836,8 @@
               <div>Total: <b>R$ ${brMoney(p.valor)}</b></div></div>`;
             grid.appendChild(div);
           });
+
+          return {totV, totE};
         }
 
         // filtro de texto local (não envia ao back)
@@ -853,14 +860,19 @@
           });
         });
 
-        // exporta somente o visível
-        document.getElementById('btnExportar').addEventListener('click', ()=>{
-          const vis = getRows().filter(r=>r.style.display!=='none');
-          const linhas = [['Data','Cooperado','Contrato','Horário','Entregas','Valor (R$)']];
-          vis.forEach(r=>{ linhas.push(Array.from(r.cells).map(td=>td.textContent.trim())); });
-          const csv = '\uFEFF' + linhas.map(l=>l.map(x=>`"${x.replace(/"/g,'""')}"`).join(';')).join('\n');
-          const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'}); const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob); a.download = 'lancamentos.csv'; a.click(); URL.revokeObjectURL(a.href);
+        // Exporta SOMENTE os totais (visíveis) em CSV simples (sem R$, só números)
+        document.getElementById('btnExportCsv').addEventListener('click', ()=>{
+          const {totV, totE} = recomputeTotals();
+          // CSV usando ; como separador e vírgula como decimal (pt-BR). Sem aspas, para Excel reconhecer número.
+          const linhaCab = 'total_entregas;total_valor\n';
+          const linhaVal = `${totE};${totV.toFixed(2).replace('.', ',')}\n`;
+          const csv = '\uFEFF' + linhaCab + linhaVal;
+          const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'totais_lancamentos.csv';
+          a.click();
+          URL.revokeObjectURL(a.href);
         });
 
         // totais iniciais (com período que o back já aplicou)
