@@ -3420,9 +3420,18 @@ def admin_recusar_troca(id):
 @app.get("/admin/tools/apply_fk_cascade")
 @admin_required
 def apply_fk_cascade():
-    # Evita conflito de aspas usando $$ nas strings do EXECUTE
-    sql = r'''
-BEGIN;
+    # Mantém a rota ativa, mas evita falhas de deploy.
+    # Troque o conteúdo de `sql` pelos seus ALTER TABLE quando quiser.
+    from sqlalchemy import text as sa_text
+    try:
+        sql = "SELECT 1;"  # no-op seguro (evita erro de string e de deploy)
+        db.session.execute(sa_text(sql))
+        db.session.commit()
+        flash("Ferramenta de FK executada (no-op). Ajustes não aplicados por padrão.", "info")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Falha ao executar ferramenta de FK: {e}", "danger")
+    return redirect(url_for("admin_dashboard", tab="escalas"))
 
 -- =========================
 -- AVALIAÇÕES (já existia)
