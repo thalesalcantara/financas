@@ -470,7 +470,7 @@
             </div>
 
             <!-- FORM -->
-            <form id="formLancamento" method="POST" action="{{ url_for('lancar_producao') }}" class="row g-2 align-items-end mb-1" style="display:none;">
+            <form id="formLancamento" method="POST" action="{{ url_lancar_producao }}" class="row g-2 align-items-end mb-1" style="display:none;">
               <input type="hidden" name="cooperado_id" id="inputCooperadoId" value="">
               <div class="col-md-3"><label class="form-label">Valor (R$)</label><input type="number" class="form-control" name="valor" step="0.01" required></div>
               <div class="col-md-3"><label class="form-label">Data</label><input type="date" class="form-control" name="data" required></div>
