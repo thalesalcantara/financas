@@ -358,8 +358,8 @@
               <div class="kpi mb-2"><div class="small text-muted">Total no período</div><div class="v">R$ <span id="kpiTotalValor">0,00</span></div></div>
               <div class="kpi mb-2"><div class="small text-muted">Entregas no período</div><div class="v"><span id="kpiTotalEntregas">0</span></div></div>
 
-              <!-- Exporta SOMENTE somas (visíveis) -->
-              <div class="d-grid"><button class="btn btn-outline-royal" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV (Totais)</button></div>
+              <!-- Exporta TUDO + linha Totais alinhada -->
+              <div class="d-grid"><button class="btn btn-outline-royal" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV</button></div>
             </form>
           </div>
         </div>
@@ -860,22 +860,49 @@
           });
         });
 
-        // Exporta SOMENTE os totais (visíveis) em CSV simples (sem R$, só números)
+        // ===== EXPORTA: todas as linhas visíveis + linha "Totais" alinhada (somando Entregas e Valor)
         document.getElementById('btnExportCsv').addEventListener('click', ()=>{
-          const {totV, totE} = recomputeTotals();
-          // CSV usando ; como separador e vírgula como decimal (pt-BR). Sem aspas, para Excel reconhecer número.
-          const linhaCab = 'total_entregas;total_valor\n';
-          const linhaVal = `${totE};${totV.toFixed(2).replace('.', ',')}\n`;
-          const csv = '\uFEFF' + linhaCab + linhaVal;
+          const rows = getRows().filter(r=>r.style.display!=='none');
+
+          // Cabeçalho
+          const header = ['Data','Cooperado','Contrato','Horário','Entregas','Valor (R$)'];
+          const linhas = [header];
+
+          let totE = 0;
+          let totV = 0;
+
+          rows.forEach(r=>{
+            const data      = r.cells[0].textContent.trim();
+            const coop      = r.cells[1].textContent.trim();
+            const contrato  = r.cells[2].textContent.trim();
+            const horario   = r.cells[3].textContent.trim();
+            const entTxt    = r.cells[4].textContent.trim();
+            const entregas  = entTxt==='-' ? 0 : Number(entTxt.replace(/\D+/g,''));
+            const valorNum  = Number(r.querySelector('.valor')?.dataset.valor || 0); // número puro
+            // Exporta valor como número BR (vírgula decimal), sem "R$"
+            const valorStr  = valorNum.toFixed(2).replace('.',',');
+
+            totE += entregas;
+            totV += valorNum;
+
+            linhas.push([data, coop, contrato, horario, String(entregas), valorStr]);
+          });
+
+          // Linha de totais: “Totais;;;;<entregas>;<valor>”
+          const totalStr = totV.toFixed(2).replace('.',',');
+          linhas.push(['Totais','','','', String(totE), totalStr]);
+
+          // CSV com ; como separador e BOM para Excel PT-BR
+          const csv = '\uFEFF' + linhas.map(l=>l.join(';')).join('\n');
           const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
-          a.download = 'totais_lancamentos.csv';
+          a.download = 'lancamentos.csv';
           a.click();
           URL.revokeObjectURL(a.href);
         });
 
-        // totais iniciais (com período que o back já aplicou)
+        // totais iniciais
         recomputeTotals();
       }
 
