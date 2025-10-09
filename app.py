@@ -3416,46 +3416,119 @@ def admin_recusar_troca(id):
     flash("Solicitação recusada.", "info")
     return redirect(url_for("admin_dashboard", tab="escalas"))
 
-@app.get("/admin/tools/backfill_trocas_afetacao")
+# --- Admin tool: aplicar ON DELETE CASCADE nas FKs de avaliacoes* ---
+@app.get("/admin/tools/apply_fk_cascade")
 @admin_required
-def backfill_trocas_afetacao():
-    alteradas = 0
-    for t in TrocaSolicitacao.query.filter_by(status="aprovada").all():
-        if _parse_linhas_from_msg(t.mensagem):
-            continue
-        solicitante = Cooperado.query.get(t.solicitante_id)
-        destinatario = Cooperado.query.get(t.destino_id)
-        orig = Escala.query.get(t.origem_escala_id)
-        if not (solicitante and destinatario and orig):
-            continue
-        wd_o = _weekday_from_data_str(orig.data)
-        buck_o = _turno_bucket(orig.turno, orig.horario)
+def apply_fk_cascade():
+    # Evita conflito de aspas usando $$ nas strings do EXECUTE
+    sql = r'''
+BEGIN;
 
-        def _linha_from_escala_local(e, saiu, entrou):
-            return {
-                "dia": _escala_label(e).split(" • ")[0],
-                "turno_horario": " • ".join([x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]),
-                "contrato": (e.contrato or "").strip(),
-                "saiu": saiu, "entrou": entrou,
-            }
+-- =========================
+-- AVALIAÇÕES (já existia)
+-- =========================
+-- ajusta FK de avaliacoes.lancamento_id
+ALTER TABLE public.avaliacoes
+  DROP CONSTRAINT IF EXISTS avaliacoes_lancamento_id_fkey;
+ALTER TABLE public.avaliacoes
+  ADD CONSTRAINT avaliacoes_lancamento_id_fkey
+  FOREIGN KEY (lancamento_id)
+  REFERENCES public.lancamentos (id)
+  ON DELETE CASCADE;
 
-        linhas = [_linha_from_escala_local(orig, saiu=solicitante.nome, entrou=destinatario.nome)]
-        candidatas = Escala.query.filter_by(cooperado_id=solicitante.id).all()
-        best = None
-        for e in candidatas:
-            if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
-                if (orig.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
-                    best = e; break
-                if best is None: best = e
-        if best:
-            linhas.append(_linha_from_escala_local(best, saiu=destinatario.nome, entrou=solicitante.nome))
-        afetacao_json = {"linhas": linhas}
-        prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
-        t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps(afetacao_json, ensure_ascii=False)
-        alteradas += 1
-    db.session.commit()
-    flash(f"Backfill concluído: {alteradas} troca(s) atualizada(s).", "success")
-    return redirect(url_for("admin_dashboard", tab="escalas"))
+-- cria/garante CASCADE para avaliacoes_restaurante.lancamento_id
+DO $do$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'av_rest_lancamento_id_fkey'
+          AND table_name = 'avaliacoes_restaurante'
+          AND table_schema = 'public'
+    ) THEN
+        ALTER TABLE public.avaliacoes_restaurante
+          ADD CONSTRAINT av_rest_lancamento_id_fkey
+          FOREIGN KEY (lancamento_id)
+          REFERENCES public.lancamentos (id)
+          ON DELETE CASCADE;
+    ELSE
+        -- garante o CASCADE (drop/add)
+        EXECUTE $$ALTER TABLE public.avaliacoes_restaurante
+                 DROP CONSTRAINT IF EXISTS av_rest_lancamento_id_fkey$$;
+        EXECUTE $$ALTER TABLE public.avaliacoes_restaurante
+                 ADD CONSTRAINT av_rest_lancamento_id_fkey
+                 FOREIGN KEY (lancamento_id)
+                 REFERENCES public.lancamentos (id)
+                 ON DELETE CASCADE$$;
+    END IF;
+END
+$do$;
+
+-- =========================
+-- ESCALAS
+-- =========================
+-- cooperado_id -> cooperados(id) ON DELETE CASCADE
+ALTER TABLE public.escalas
+  DROP CONSTRAINT IF EXISTS escalas_cooperado_id_fkey;
+ALTER TABLE public.escalas
+  ADD CONSTRAINT escalas_cooperado_id_fkey
+  FOREIGN KEY (cooperado_id)
+  REFERENCES public.cooperados (id)
+  ON DELETE CASCADE;
+
+-- restaurante_id -> restaurantes(id) ON DELETE CASCADE
+ALTER TABLE public.escalas
+  DROP CONSTRAINT IF EXISTS escalas_restaurante_id_fkey;
+ALTER TABLE public.escalas
+  ADD CONSTRAINT escalas_restaurante_id_fkey
+  FOREIGN KEY (restaurante_id)
+  REFERENCES public.restaurantes (id)
+  ON DELETE CASCADE;
+
+-- =========================
+-- TROCAS
+-- =========================
+-- solicitante_id -> cooperados(id) ON DELETE CASCADE
+ALTER TABLE public.trocas
+  DROP CONSTRAINT IF EXISTS trocas_solicitante_id_fkey;
+ALTER TABLE public.trocas
+  ADD CONSTRAINT trocas_solicitante_id_fkey
+  FOREIGN KEY (solicitante_id)
+  REFERENCES public.cooperados (id)
+  ON DELETE CASCADE;
+
+-- destino_id -> cooperados(id) ON DELETE CASCADE
+ALTER TABLE public.trocas
+  DROP CONSTRAINT IF EXISTS trocas_destino_id_fkey;
+ALTER TABLE public.trocas
+  ADD CONSTRAINT trocas_destino_id_fkey
+  FOREIGN KEY (destino_id)
+  REFERENCES public.cooperados (id)
+  ON DELETE CASCADE;
+
+-- origem_escala_id -> escalas(id) ON DELETE CASCADE
+ALTER TABLE public.trocas
+  DROP CONSTRAINT IF EXISTS trocas_origem_escala_id_fkey;
+ALTER TABLE public.trocas
+  ADD CONSTRAINT trocas_origem_escala_id_fkey
+  FOREIGN KEY (origem_escala_id)
+  REFERENCES public.escalas (id)
+  ON DELETE CASCADE;
+
+COMMIT;
+'''
+    try:
+        if _is_sqlite():
+            flash("SQLite local: esta operação é específica de Postgres (sem efeito aqui).", "warning")
+            return redirect(url_for("admin_dashboard", tab="config"))
+
+        db.session.execute(sa_text(sql))
+        db.session.commit()
+        flash("FKs com ON DELETE CASCADE aplicadas com sucesso.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Erro ao aplicar FKs: {e}", "danger")
+    return redirect(url_for("admin_dashboard", tab="config"))
 
 
 # --- Admin tool: aplicar ON DELETE CASCADE nas FKs de avaliacoes* ---
