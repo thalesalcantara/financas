@@ -3276,10 +3276,18 @@ def upload_escala():
         flash("Nada importado: nenhum registro válido encontrado.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    # ------- SUBSTITUIÇÃO TOTAL -------
+       # ------- SUBSTITUIÇÃO TOTAL -------
     try:
-        # apaga todas as escalas antigas
-        db.session.execute(sa_delete(Escala))
+        from sqlalchemy import text as sa_text
+
+        # Remove todas as escalas antigas de forma segura (sem violar FKs de trocas)
+        if _is_sqlite():
+            # Em dev/local com SQLite não há TRUNCATE CASCADE — apaga dependentes e depois escalas
+            db.session.execute(sa_delete(TrocaSolicitacao))
+            db.session.execute(sa_delete(Escala))
+        else:
+            # Em produção (Postgres): TRUNCATE com CASCADE limpa escalas e dependentes de uma vez
+            db.session.execute(sa_text("TRUNCATE TABLE escalas RESTART IDENTITY CASCADE"))
 
         # insere novas linhas
         for row in linhas_novas:
