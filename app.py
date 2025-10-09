@@ -4151,36 +4151,43 @@ def portal_restaurante():
     if not rest:
         return "<p style='font-family:Arial;margin:40px'>Seu usuário não está vinculado a um estabelecimento. Avise o administrador.</p>"
 
-    # Abas/visões da tela do restaurante:
-    # 'lancar' (form para lançar produção), 'escalas' (agenda) e 'lancamentos' (lista por período)
+    # Abas/visões: 'lancar', 'escalas', 'lancamentos', 'config', 'avisos'
     view = (request.args.get("view", "lancar") or "lancar").strip().lower()
+
+    # ---- helper mês YYYY-MM
+    import re
+    def _parse_yyyy_mm_local(s: str):
+        if not s:
+            return None, None
+        m = re.fullmatch(r"(\d{4})-(\d{2})", s.strip())
+        if not m:
+            return None, None
+        y = int(m.group(1)); mth = int(m.group(2))
+        try:
+            di_ = date(y, mth, 1)
+            if mth == 12:
+                df_ = date(y + 1, 1, 1) - timedelta(days=1)
+            else:
+                df_ = date(y, mth + 1, 1) - timedelta(days=1)
+            return di_, df_
+        except Exception:
+            return None, None
 
     # -------------------- LANÇAMENTOS (totais por período) --------------------
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
 
-    # NOVO: também aceitar ?mes=YYYY-MM
+    # NOVO: filtro por mês (?mes=YYYY-MM)
     mes = (request.args.get("mes") or "").strip()
-    if mes and (not di or not df):
-        # converte YYYY-MM para primeiro e último dia do mês
-        try:
-            ano, mes_num = mes.split("-")
-            ano = int(ano); mes_num = int(mes_num)
-            di = date(ano, mes_num, 1)
-            if mes_num == 12:
-                df = date(ano + 1, 1, 1) - timedelta(days=1)
-            else:
-                df = date(ano, mes_num + 1, 1) - timedelta(days=1)
+    periodo_desc = None
+    if mes:
+        di_mes, df_mes = _parse_yyyy_mm_local(mes)
+        if di_mes and df_mes:
+            di, df = di_mes, df_mes
             periodo_desc = "mês"
-        except Exception:
-            di = di or None
-            df = df or None
-            periodo_desc = None
-    else:
-        periodo_desc = None
 
     if not di or not df:
-        # Sem filtro completo => janela semanal baseada no período do restaurante
+        # Sem filtro => janela semanal baseada no período do restaurante
         wd_map = {"seg-dom": 0, "sab-sex": 5, "sex-qui": 4}  # seg=0 ... dom=6
         start_wd = wd_map.get(rest.periodo, 0)
         hoje = date.today()
@@ -4241,7 +4248,7 @@ def portal_restaurante():
         escalas_rest = [e for e in escalas_all if (e.contrato or "").strip() == rest.nome.strip()]
 
     agenda = {d: [] for d in dias_list}
-    seen = {d: set() for d in dias_list}  # evita duplicar (mesmo nome/turno/horario/contrato no mesmo dia)
+    seen = {d: set() for d in dias_list}  # evita duplicar
 
     for e in escalas_rest:
         dt = _parse_data_escala_str(e.data)       # date | None
@@ -4256,7 +4263,6 @@ def portal_restaurante():
             nome_show = (coop.nome if coop else nome_fallback) or "—"
             contrato_eff = (eff_map.get(e.id, e.contrato or "") or "").strip()
 
-            # chave de dedupe por dia
             key = (
                 (coop.id if coop else _norm(nome_show)),
                 _norm(e.turno),
@@ -4311,23 +4317,24 @@ def portal_restaurante():
                 "hora_fim": (lanc.hora_fim if isinstance(lanc.hora_fim, str)
                              else (lanc.hora_fim.strftime("%H:%M") if lanc.hora_fim else "")),
                 "qtd_entregas": lanc.qtd_entregas or 0,
-                "valor": float(lanc.valor or 0.0),  # valor já em R$
+                "valor": float(lanc.valor or 0.0),  # já em R$
                 "cooperado_id": coop.id,
                 "cooperado_nome": coop.nome,
                 "contrato_nome": rest.nome,
             }
             lancamentos_periodo.append(item)
 
-        # Totais corretos (sem multiplicar por 100 nem por qtd_entregas)
         total_lanc_valor = sum(x["valor"] for x in lancamentos_periodo)
         total_lanc_entregas = sum(x["qtd_entregas"] for x in lancamentos_periodo)
 
-    # -------------------- URL de ação do form (fallback) --------------------
+    # ---- URLs/flags para template
     from werkzeug.routing import BuildError
     try:
         url_lancar_producao = url_for("lancar_producao")
     except BuildError:
         url_lancar_producao = "/restaurante/lancar_producao"
+
+    has_editar_lanc = ("editar_lancamento" in app.view_functions)
 
     # -------------------- Render --------------------
     return render_template(
@@ -4336,6 +4343,7 @@ def portal_restaurante():
         cooperados=cooperados,
         filtro_inicio=di,
         filtro_fim=df,
+        filtro_mes=(mes or ""),
         periodo_desc=periodo_desc,
         total_bruto=total_bruto,
         total_inss=total_inss,
@@ -4350,15 +4358,15 @@ def portal_restaurante():
         lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
         total_lanc_valor=total_lanc_valor,
         total_lanc_entregas=total_lanc_entregas,
-        url_lancar_producao=url_lancar_producao,  # usado no action do form
-        filtro_mes=(mes or ""),                    # opcional p/ <input type="month">
+        url_lancar_producao=url_lancar_producao,
+        has_editar_lanc=has_editar_lanc,
     )
 
 
 # =========================
 # Rotas de CRUD de lançamento
 # =========================
-@app.route("/restaurante/lancar_producao", methods=["POST"])  # <-- clássico pra evitar 404
+@app.post("/restaurante/lancar_producao")
 @role_required("restaurante")
 def lancar_producao():
     u_id = session.get("user_id")
@@ -4367,7 +4375,7 @@ def lancar_producao():
         abort(403)
     f = request.form
 
-    # 1) cria o lançamento normalmente
+    # 1) cria o lançamento
     l = Lancamento(
         restaurante_id=rest.id,
         cooperado_id=f.get("cooperado_id", type=int),
@@ -4379,9 +4387,9 @@ def lancar_producao():
         qtd_entregas=f.get("qtd_entregas", type=int),
     )
     db.session.add(l)
-    db.session.flush()  # garante l.id para amarrar avaliação
+    db.session.flush()  # garante l.id
 
-    # 2) (OPCIONAL) avaliação
+    # 2) avaliação (opcional)
     g   = _clamp_star(f.get("av_geral"))
     p   = _clamp_star(f.get("av_pontualidade"))
     ed  = _clamp_star(f.get("av_educacao"))
@@ -4414,14 +4422,12 @@ def lancar_producao():
             feedback_motoboy=feed,
         )
         db.session.add(av)
-
         if crise:
             flash("⚠️ Avaliação crítica registrada (1★ + termo de risco). A gerência deve revisar.", "danger")
 
     db.session.commit()
     flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
-    return redirect(url_for("portal_restaurante"))
-
+    return redirect(url_for("portal_restaurante", view="lancar"))
 
 @app.route("/lancamentos/<int:id>/editar", methods=["GET", "POST"])
 @role_required("restaurante")
@@ -4441,10 +4447,10 @@ def editar_lancamento(id):
         l.qtd_entregas = f.get("qtd_entregas", type=int)
         db.session.commit()
         flash("Lançamento atualizado.", "success")
-        return redirect(url_for("portal_restaurante"))
+        return redirect(url_for("portal_restaurante", view="lancamentos",
+                                data_inicio=(l.data and l.data.strftime("%Y-%m-%d"))))
 
     return render_template("editar_lancamento.html", lanc=l)
-
 
 @app.get("/lancamentos/<int:id>/excluir")
 @role_required("restaurante")
@@ -4455,14 +4461,12 @@ def excluir_lancamento(id):
     if not rest or l.restaurante_id != rest.id:
         abort(403)
 
-    # Apaga avaliações amarradas a este lançamento
     db.session.execute(sa_delete(AvaliacaoCooperado).where(AvaliacaoCooperado.lancamento_id == id))
     db.session.execute(sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.lancamento_id == id))
-
     db.session.delete(l)
     db.session.commit()
     flash("Lançamento excluído.", "success")
-    return redirect(url_for("portal_restaurante"))
+    return redirect(url_for("portal_restaurante", view="lancamentos"))
 
 # =========================
 # Documentos (Admin + Público)
