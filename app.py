@@ -9,6 +9,7 @@ import difflib
 import unicodedata
 import re
 import mimetypes
+from dateutil.relativedelta import relativedelta
 from sqlalchemy.inspection import inspect as sa_inspect
 from datetime import datetime, date, timedelta, time
 from functools import wraps
