@@ -3420,17 +3420,37 @@ def admin_recusar_troca(id):
 @app.get("/admin/tools/apply_fk_cascade")
 @admin_required
 def apply_fk_cascade():
-    # Mantém a rota ativa, mas evita falhas de deploy.
-    # Troque o conteúdo de `sql` pelos seus ALTER TABLE quando quiser.
+    """
+    Mantém a rota viva sem quebrar o deploy.
+    Quando quiser aplicar seus ALTER TABLE, troque a lista `stmts`.
+    """
     from sqlalchemy import text as sa_text
+
+    # Coloque aqui seus ALTER TABLE, um por item, SEM aspas triplas.
+    # Exemplo de como ficaria (comentei para não rodar nada perigoso):
+    stmts = [
+        # "ALTER TABLE public.avaliacoes_restaurante DROP CONSTRAINT IF EXISTS avaliacoes_restaurante_restaurante_id_fkey;",
+        # "ALTER TABLE public.avaliacoes_restaurante ADD CONSTRAINT avaliacoes_restaurante_restaurante_id_fkey FOREIGN KEY (restaurante_id) REFERENCES restaurantes(id) ON DELETE CASCADE;",
+        # "ALTER TABLE public.avaliacoes_cooperado DROP CONSTRAINT IF EXISTS avaliacoes_cooperado_cooperado_id_fkey;",
+        # "ALTER TABLE public.avaliacoes_cooperado ADD CONSTRAINT avaliacoes_cooperado_cooperado_id_fkey FOREIGN KEY (cooperado_id) REFERENCES cooperados(id) ON DELETE CASCADE;",
+    ]
+
     try:
-        sql = "SELECT 1;"  # no-op seguro (evita erro de string e de deploy)
-        db.session.execute(sa_text(sql))
+        if not stmts:
+            # no-op seguro para não falhar o deploy
+            db.session.execute(sa_text("SELECT 1;"))
+        else:
+            for s in stmts:
+                db.session.execute(sa_text(s))
         db.session.commit()
-        flash("Ferramenta de FK executada (no-op). Ajustes não aplicados por padrão.", "info")
+        msg = "Ferramenta de FK executada."
+        if not stmts:
+            msg += " (no-op)"
+        flash(msg, "info")
     except Exception as e:
         db.session.rollback()
         flash(f"Falha ao executar ferramenta de FK: {e}", "danger")
+
     return redirect(url_for("admin_dashboard", tab="escalas"))
 
 -- =========================
