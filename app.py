@@ -814,8 +814,7 @@ def _parse_date(s: str | None) -> date | None:
         except Exception:
             pass
     return None
-
-from dateutil.relativedelta import relativedelta
+    
 
 def _parse_ymd(s):
     try:
