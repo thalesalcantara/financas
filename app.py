@@ -4156,6 +4156,9 @@ def portal_restaurante():
     # 'lancar' (form para lançar produção), 'escalas' (agenda) e 'lancamentos' (lista por período)
     view = (request.args.get("view", "lancar") or "lancar").strip().lower()
 
+    # Para o helper local vamos precisar de 're'
+    import re
+
     # Helper local para 'YYYY-MM' -> (primeiro_dia, ultimo_dia)
     def _parse_yyyy_mm_local(s: str):
         if not s:
@@ -4337,140 +4340,30 @@ def portal_restaurante():
     except BuildError:
         url_lancar_producao = "/restaurante/lancar_producao"
 
-   # -------------------- Render --------------------
-return render_template(
-    "restaurante_dashboard.html",
-    rest=rest,
-    cooperados=cooperados,
-    filtro_inicio=di,
-    filtro_fim=df,
-    periodo_desc=periodo_desc,
-    total_bruto=total_bruto,
-    total_inss=total_inss,
-    total_liquido=total_liquido,
-    total_qtd=total_qtd,
-    total_entregas=total_entregas,
-    view=view,
-    filtro_mes=(mes or ""),   # <-- NOVO (esta linha)
-    agenda=agenda,
-    dias_list=dias_list,
-    ref_data=ref,
-    modo=modo,
-    lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
-    total_lanc_valor=total_lanc_valor,
-    total_lanc_entregas=total_lanc_entregas,
-    url_lancar_producao=url_lancar_producao,  # usado no action do form
-)
-
-
-# =========================
-# Rotas de CRUD de lançamento
-# =========================
-@app.post("/restaurante/lancar_producao")
-@role_required("restaurante")
-def lancar_producao():
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first()
-    if not rest:
-        abort(403)
-    f = request.form
-
-    # 1) cria o lançamento normalmente
-    l = Lancamento(
-        restaurante_id=rest.id,
-        cooperado_id=f.get("cooperado_id", type=int),
-        descricao="produção",
-        valor=f.get("valor", type=float),
-        data=_parse_date(f.get("data")) or date.today(),
-        hora_inicio=f.get("hora_inicio"),
-        hora_fim=f.get("hora_fim"),
-        qtd_entregas=f.get("qtd_entregas", type=int),
+    # -------------------- Render --------------------
+    return render_template(
+        "restaurante_dashboard.html",
+        rest=rest,
+        cooperados=cooperados,
+        filtro_inicio=di,
+        filtro_fim=df,
+        periodo_desc=periodo_desc,
+        total_bruto=total_bruto,
+        total_inss=total_inss,
+        total_liquido=total_liquido,
+        total_qtd=total_qtd,
+        total_entregas=total_entregas,
+        view=view,
+        filtro_mes=(mes or ""),   # útil para <input type="month" value="{{ filtro_mes }}">
+        agenda=agenda,
+        dias_list=dias_list,
+        ref_data=ref,
+        modo=modo,
+        lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
+        total_lanc_valor=total_lanc_valor,
+        total_lanc_entregas=total_lanc_entregas,
+        url_lancar_producao=url_lancar_producao,  # usado no action do form
     )
-    db.session.add(l)
-    db.session.flush()  # garante l.id para amarrar avaliação
-
-    # 2) (OPCIONAL) avaliação
-    g   = _clamp_star(f.get("av_geral"))
-    p   = _clamp_star(f.get("av_pontualidade"))
-    ed  = _clamp_star(f.get("av_educacao"))
-    ef  = _clamp_star(f.get("av_eficiencia"))
-    ap  = _clamp_star(f.get("av_apresentacao"))
-    txt = (f.get("av_comentario") or "").strip()
-
-    tem_avaliacao = any(x is not None for x in (g, p, ed, ef, ap)) or bool(txt)
-    if tem_avaliacao:
-        media = _media_ponderada(g, p, ed, ef, ap)
-        senti = _analise_sentimento(txt)
-        temas = _identifica_temas(txt)
-        crise = _sinaliza_crise(g, txt)
-        feed  = _gerar_feedback(p, ed, ef, ap, txt, senti)
-
-        av = AvaliacaoCooperado(
-            restaurante_id=rest.id,
-            cooperado_id=l.cooperado_id,
-            lancamento_id=l.id,
-            estrelas_geral=g,
-            estrelas_pontualidade=p,
-            estrelas_educacao=ed,
-            estrelas_eficiencia=ef,
-            estrelas_apresentacao=ap,
-            comentario=txt,
-            media_ponderada=media,
-            sentimento=senti,
-            temas="; ".join(temas),
-            alerta_crise=crise,
-            feedback_motoboy=feed,
-        )
-        db.session.add(av)
-
-        if crise:
-            flash("⚠️ Avaliação crítica registrada (1★ + termo de risco). A gerência deve revisar.", "danger")
-
-    db.session.commit()
-    flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
-    return redirect(url_for("portal_restaurante"))
-
-
-@app.route("/lancamentos/<int:id>/editar", methods=["GET", "POST"])
-@role_required("restaurante")
-def editar_lancamento(id):
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first()
-    l = Lancamento.query.get_or_404(id)
-    if not rest or l.restaurante_id != rest.id:
-        abort(403)
-
-    if request.method == "POST":
-        f = request.form
-        l.valor = f.get("valor", type=float)
-        l.data = _parse_date(f.get("data")) or l.data
-        l.hora_inicio = f.get("hora_inicio")
-        l.hora_fim = f.get("hora_fim")
-        l.qtd_entregas = f.get("qtd_entregas", type=int)
-        db.session.commit()
-        flash("Lançamento atualizado.", "success")
-        return redirect(url_for("portal_restaurante"))
-
-    return render_template("editar_lancamento.html", lanc=l)
-
-
-@app.get("/lancamentos/<int:id>/excluir")
-@role_required("restaurante")
-def excluir_lancamento(id):
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first()
-    l = Lancamento.query.get_or_404(id)
-    if not rest or l.restaurante_id != rest.id:
-        abort(403)
-
-    # Apaga avaliações amarradas a este lançamento
-    db.session.execute(sa_delete(AvaliacaoCooperado).where(AvaliacaoCooperado.lancamento_id == id))
-    db.session.execute(sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.lancamento_id == id))
-
-    db.session.delete(l)
-    db.session.commit()
-    flash("Lançamento excluído.", "success")
-    return redirect(url_for("portal_restaurante"))
 
 # =========================
 # Documentos (Admin + Público)
