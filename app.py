@@ -3545,7 +3545,6 @@ ALTER TABLE public.trocas
   ON DELETE CASCADE;
 
 COMMIT;
-'''
     try:
         if _is_sqlite():
             flash("SQLite local: esta operação é específica de Postgres (sem efeito aqui).", "warning")
