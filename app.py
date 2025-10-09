@@ -4145,7 +4145,7 @@ def portal_restaurante():
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
     if not di or not df:
-        # Sem filtro completo => aplica janela semanal baseada no período do restaurante
+        # Sem filtro completo => janela semanal baseada no período do restaurante
         wd_map = {"seg-dom": 0, "sab-sex": 5, "sex-qui": 4}  # seg=0 ... dom=6
         start_wd = wd_map.get(rest.periodo, 0)
         hoje = date.today()
@@ -4318,6 +4318,10 @@ def portal_restaurante():
         url_lancar_producao=url_lancar_producao,  # usado no action do form
     )
 
+
+# =========================
+# Rotas de CRUD de lançamento
+# =========================
 @app.post("/restaurante/lancar_producao")
 @role_required("restaurante")
 def lancar_producao():
@@ -4341,7 +4345,7 @@ def lancar_producao():
     db.session.add(l)
     db.session.flush()  # garante l.id para amarrar avaliação
 
-    # 2) (OPCIONAL) lê os campos de avaliação se vieram do form
+    # 2) (OPCIONAL) avaliação
     g   = _clamp_star(f.get("av_geral"))
     p   = _clamp_star(f.get("av_pontualidade"))
     ed  = _clamp_star(f.get("av_educacao"))
@@ -4375,7 +4379,6 @@ def lancar_producao():
         )
         db.session.add(av)
 
-        # Alerta visível imediato (opcional)
         if crise:
             flash("⚠️ Avaliação crítica registrada (1★ + termo de risco). A gerência deve revisar.", "danger")
 
@@ -4416,7 +4419,7 @@ def excluir_lancamento(id):
     if not rest or l.restaurante_id != rest.id:
         abort(403)
 
-    # 👇 LIMPEZA MANUAL: apaga avaliações amarradas a este lançamento
+    # Apaga avaliações amarradas a este lançamento
     db.session.execute(sa_delete(AvaliacaoCooperado).where(AvaliacaoCooperado.lancamento_id == id))
     db.session.execute(sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.lancamento_id == id))
 
