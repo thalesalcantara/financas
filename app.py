@@ -4242,64 +4242,73 @@ def portal_restaurante():
         agenda[d].sort(key=lambda x: ((x["contrato"] or "").lower(),
                                       (x.get("nome_planilha") or (x["coop"].nome if x["coop"] else "")).lower()))
 
-    # -------------------- Lista de lançamentos (aba "lancamentos") --------------------
-    lancamentos_periodo = []
-    if view == "lancamentos":
-        q = (
-            db.session.query(Lancamento, Cooperado)
-            .join(Cooperado, Cooperado.id == Lancamento.cooperado_id)
-            .filter(
-                Lancamento.restaurante_id == rest.id,
-                Lancamento.data >= di,
-                Lancamento.data <= df,
-            )
-            .order_by(Lancamento.data.asc(), Lancamento.id.asc())
+   # -------------------- Lista de lançamentos (aba "lancamentos") --------------------
+lancamentos_periodo = []
+total_lanc_valor = 0.0
+total_lanc_entregas = 0
+
+if view == "lancamentos":
+    q = (
+        db.session.query(Lancamento, Cooperado)
+        .join(Cooperado, Cooperado.id == Lancamento.cooperado_id)
+        .filter(
+            Lancamento.restaurante_id == rest.id,
+            Lancamento.data >= di,
+            Lancamento.data <= df,
         )
-        for lanc, coop in q.all():
-            lancamentos_periodo.append({
-                "id": lanc.id,
-                "data": lanc.data.strftime("%d/%m/%Y") if lanc.data else "",
-                "hora_inicio": (lanc.hora_inicio if isinstance(lanc.hora_inicio, str)
-                                else (lanc.hora_inicio.strftime("%H:%M") if lanc.hora_inicio else "")),
-                "hora_fim": (lanc.hora_fim if isinstance(lanc.hora_fim, str)
-                             else (lanc.hora_fim.strftime("%H:%M") if lanc.hora_fim else "")),
-                "qtd_entregas": lanc.qtd_entregas or 0,
-                "valor": float(lanc.valor or 0),
-                "cooperado_id": coop.id,
-                "cooperado_nome": coop.nome,
-                "contrato_nome": rest.nome,
-            })
-
-    # -------------------- URL de ação do form (fallback) --------------------
-    from werkzeug.routing import BuildError
-    from flask import url_for
-    try:
-        url_lancar_producao = url_for("lancar_producao")
-    except BuildError:
-        url_lancar_producao = "/restaurante/lancar_producao"
-
-    # -------------------- Render --------------------
-    return render_template(
-        "restaurante_dashboard.html",
-        rest=rest,
-        cooperados=cooperados,
-        filtro_inicio=di,
-        filtro_fim=df,
-        periodo_desc=periodo_desc,
-        total_bruto=total_bruto,
-        total_inss=total_inss,
-        total_liquido=total_liquido,
-        total_qtd=total_qtd,
-        total_entregas=total_entregas,
-        view=view,
-        agenda=agenda,
-        dias_list=dias_list,
-        ref_data=ref,
-        modo=modo,
-        lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
-        url_lancar_producao=url_lancar_producao,  # usado no action do form no template
+        .order_by(Lancamento.data.asc(), Lancamento.id.asc())
     )
+    for lanc, coop in q.all():
+        item = {
+            "id": lanc.id,
+            "data": lanc.data.strftime("%d/%m/%Y") if lanc.data else "",
+            "hora_inicio": (lanc.hora_inicio if isinstance(lanc.hora_inicio, str)
+                            else (lanc.hora_inicio.strftime("%H:%M") if lanc.hora_inicio else "")),
+            "hora_fim": (lanc.hora_fim if isinstance(lanc.hora_fim, str)
+                         else (lanc.hora_fim.strftime("%H:%M") if lanc.hora_fim else "")),
+            "qtd_entregas": lanc.qtd_entregas or 0,
+            "valor": float(lanc.valor or 0.0),  # <-- valor já em R$
+            "cooperado_id": coop.id,
+            "cooperado_nome": coop.nome,
+            "contrato_nome": rest.nome,
+        }
+        lancamentos_periodo.append(item)
 
+    # Totais corretos (sem multiplicar por 100 e sem *qtd_entregas*)
+    total_lanc_valor = sum(x["valor"] for x in lancamentos_periodo)
+    total_lanc_entregas = sum(x["qtd_entregas"] for x in lancamentos_periodo)
+
+# -------------------- URL de ação do form (fallback) --------------------
+from werkzeug.routing import BuildError
+from flask import url_for
+try:
+    url_lancar_producao = url_for("lancar_producao")
+except BuildError:
+    url_lancar_producao = "/restaurante/lancar_producao"
+
+# -------------------- Render --------------------
+return render_template(
+    "restaurante_dashboard.html",
+    rest=rest,
+    cooperados=cooperados,
+    filtro_inicio=di,
+    filtro_fim=df,
+    periodo_desc=periodo_desc,
+    total_bruto=total_bruto,
+    total_inss=total_inss,
+    total_liquido=total_liquido,
+    total_qtd=total_qtd,
+    total_entregas=total_entregas,
+    view=view,
+    agenda=agenda,
+    dias_list=dias_list,
+    ref_data=ref,
+    modo=modo,
+    lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
+    total_lanc_valor=total_lanc_valor,
+    total_lanc_entregas=total_lanc_entregas,
+    url_lancar_producao=url_lancar_producao,
+)
 
 @app.post("/restaurante/lancar_producao")
 @role_required("restaurante")
