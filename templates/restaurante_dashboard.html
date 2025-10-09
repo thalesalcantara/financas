@@ -13,24 +13,17 @@
       --ink:#0b1220; --muted:#6b7280; --soft:#f5f7ff; --danger:#e74c3c; --ok:#16a34a;
       --border:#e6e9f2; --chip:#eef1ff;
     }
-    /* ===== Base ===== */
     html,body{ height:100%; }
     body{ background:#fff; color:#111827; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif; }
     a{ text-decoration:none; }
-    /* ===== Layout ===== */
     .shell{ display:grid; grid-template-columns: 260px 1fr; min-height:100vh; }
     .aside{
       background:linear-gradient(180deg, var(--royal) 0%, var(--royal-2) 100%);
       color:#fff; padding:18px 16px; position:sticky; top:0; height:100dvh;
     }
-    .brand{
-      font-weight:800; letter-spacing:.5px; font-size:1.15rem;
-      padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.08); display:flex; align-items:center; gap:8px;
-    }
+    .brand{ font-weight:800; letter-spacing:.5px; font-size:1.15rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.08); display:flex; align-items:center; gap:8px; }
     .navmenu{ margin-top:18px; display:flex; flex-direction:column; gap:6px; }
-    .navmenu a{
-      color:#fff; padding:10px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600;
-    }
+    .navmenu a{ color:#fff; padding:10px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600; }
     .navmenu a.active, .navmenu a:hover{ background:rgba(255,255,255,.14); }
     .navmenu .badge{ margin-left:auto; }
     .content{ padding:24px clamp(14px,3vw,32px); }
@@ -43,32 +36,20 @@
     .btn-royal:hover{ background:var(--royal-2); color:#fff; }
     .btn-outline-royal{ border:1px solid var(--royal); color:var(--royal); }
     .btn-outline-royal:hover{ background:var(--royal); color:#fff; }
-
-    /* ===== Cooperado avatar ===== */
-    .cooperado-avatar{
-      width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 1px 0 #0001;
-    }
+    .cooperado-avatar{ width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 1px 0 #0001; }
     .cooperado-item{ display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; cursor:pointer; }
     .cooperado-item:hover{ background:#f8faff; }
     .cooperado-item.selected{ outline:2px solid var(--royal); background:#f0f4ff; }
-    .selected-header .big{
-      width:180px; height:180px; border-radius:50%; object-fit:cover; border:6px solid var(--royal); box-shadow:0 6px 16px #0002;
-    }
-
-    /* ===== Rating ===== */
+    .selected-header .big{ width:180px; height:180px; border-radius:50%; object-fit:cover; border:6px solid var(--royal); box-shadow:0 6px 16px #0002; }
     .rating-group{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
     .rating-label{ width:160px; font-weight:700; color:#1f2937; }
     .stars{ display:inline-flex; gap:3px; font-size:1.4rem; cursor:pointer; }
     .star{ color:#cbd5e1; transition:transform .06s; }
     .star.active,.star.hover{ color:#fbbf24; }
     .star:active{ transform:scale(.9); }
-
-    /* ===== Filters & KPIs ===== */
     .sticky-tools{ position:sticky; top:12px; }
     .kpi{ background:#fafcff; border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
     .kpi .v{ font-weight:800; font-size:1.05rem; }
-
-    /* Small */
     @media (max-width: 920px){
       .shell{ grid-template-columns: 66px 1fr; }
       .brand span{ display:none; }
@@ -88,7 +69,7 @@
         </a>
 
         <a class="{{ 'active' if view=='lancamentos' else '' }}"
-           href="{{ url_for('portal_restaurante', view='lancamentos', data_inicio=filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else None, data_fim=filtro_fim.strftime('%Y-%m-%d') if filtro_fim else None) }}">
+           href="{{ url_for('portal_restaurante', view='lancamentos', data_inicio=filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else None, data_fim=filtro_fim.strftime('%Y-%m-%d') if filtro_fim else None, mes=filtro_mes if filtro_mes else None) }}">
           <i class="bi bi-receipt"></i><span>Lançamentos</span>
         </a>
 
@@ -120,7 +101,6 @@
     <!-- ============ Main ============ -->
     <main class="content">
 
-      <!-- Flashes -->
       {% with msgs = get_flashed_messages(with_categories=True) %}
         {% if msgs %}
           <div class="mb-3">
@@ -323,23 +303,57 @@
       <div class="section-title"><i class="bi bi-receipt"></i> Lançamentos</div>
 
       <div class="row g-3">
+        <!-- FORM FILTRO (envia datas/mês para o BACK) -->
         <div class="col-lg-3">
           <div class="card card-body sticky-tools">
-            <form id="formFiltroLanc" class="row g-2">
+            <form id="formFiltroLanc"
+                  method="GET"
+                  action="{{ url_for('portal_restaurante') }}"
+                  class="row g-2 align-items-end">
+              <input type="hidden" name="view" value="lancamentos">
+
               <div class="col-12">
                 <label class="form-label">Início</label>
-                <input type="date" class="form-control" name="data_inicio" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
+                <input type="date" class="form-control"
+                       name="data_inicio"
+                       value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
               </div>
+
               <div class="col-12">
                 <label class="form-label">Fim</label>
-                <input type="date" class="form-control" name="data_fim" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
+                <input type="date" class="form-control"
+                       name="data_fim"
+                       value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
               </div>
+
               <div class="col-12">
-                <label class="form-label">Cooperado / Contrato</label>
+                <label class="form-label">Mês (opcional)</label>
+                <input type="month" class="form-control"
+                       name="mes"
+                       value="{{ filtro_mes or '' }}"
+                       oninput="if(this.value){ const f=this.form; f.data_inicio.value=''; f.data_fim.value=''; }">
+                <div class="form-text">Se escolher um mês, as datas serão ignoradas.</div>
+              </div>
+
+              <!-- filtro visual (não vai ao back) -->
+              <div class="col-12">
+                <label class="form-label">Cooperado / Contrato (visual)</label>
                 <input type="text" class="form-control" name="q" placeholder="Filtrar por nome...">
               </div>
-              <div class="col-12 d-grid"><button class="btn btn-royal" type="button" id="btnAplicarLanc"><i class="bi bi-funnel"></i> Aplicar</button></div>
-              <div class="col-12 d-grid"><button class="btn btn-outline-secondary" type="button" id="btnLimparLanc"><i class="bi bi-arrow-counterclockwise"></i> Limpar</button></div>
+
+              <div class="col-12 d-grid">
+                <button class="btn btn-royal" type="submit">
+                  <i class="bi bi-funnel"></i> Aplicar
+                </button>
+              </div>
+
+              <div class="col-12 d-grid">
+                <a class="btn btn-outline-secondary"
+                   href="{{ url_for('portal_restaurante', view='lancamentos') }}">
+                  <i class="bi bi-arrow-counterclockwise"></i> Limpar
+                </a>
+              </div>
+
               <hr class="my-2">
               <div class="kpi mb-2"><div class="small text-muted">Total no período</div><div class="v">R$ <span id="kpiTotalValor">0,00</span></div></div>
               <div class="kpi mb-2"><div class="small text-muted">Entregas no período</div><div class="v"><span id="kpiTotalEntregas">0</span></div></div>
@@ -347,11 +361,16 @@
             </form>
           </div>
         </div>
+
         <div class="col-lg-9">
           <div class="card card-body">
             <div class="d-flex align-items-center justify-content-between mb-2">
               <div class="chip">
-                Período: <span id="txtPeriodo">{{ filtro_inicio.strftime('%d/%m/%Y') if filtro_inicio }}{% if filtro_inicio and filtro_fim %} a {% endif %}{{ filtro_fim.strftime('%d/%m/%Y') if filtro_fim }}</span>
+                Período: <span id="txtPeriodo">
+                  {{ filtro_inicio and filtro_inicio.strftime('%d/%m/%Y') or '' }}
+                  {% if filtro_inicio and filtro_fim %} a {% endif %}
+                  {{ filtro_fim and filtro_fim.strftime('%d/%m/%Y') or '' }}
+                </span>
               </div>
               <div class="small text-muted">Clique no nome do cooperado para destacar seus lançamentos.</div>
             </div>
@@ -381,7 +400,6 @@
                     {% else %}—{% endif %}
                   </td>
                   <td class="text-center">{{ x.qtd_entregas if x.qtd_entregas is not none else '-' }}</td>
-                  <!-- IMPORTANTE: data-valor garante soma correta -->
                   <td class="text-end valor" data-valor="{{ '%.2f'|format(x.valor or 0) }}">R$ {{ '%.2f'|format(x.valor or 0) }}</td>
                 </tr>
                 {% endfor %}
@@ -488,7 +506,6 @@
                 <input type="hidden" name="avaliar" id="inputAvaliar" value="0">
               </div>
 
-              <!-- Avaliação -->
               <div id="boxAval" class="row g-2" style="display:none;">
                 <div class="col-md-6">
                   <div class="rating-group" data-name="av_geral" data-auto="true">
@@ -562,7 +579,11 @@
                     <td>{{ lanc.data.strftime('%d/%m/%Y') if lanc.data }}</td>
                     <td>{{ lanc.hora_inicio or '' }}{% if lanc.hora_inicio or lanc.hora_fim %} às {% endif %}{{ lanc.hora_fim or '' }}</td>
                     <td>{{ lanc.qtd_entregas if lanc.qtd_entregas is not none else '-' }}</td>
-                    <td><a href="{{ url_for('editar_lancamento', id=lanc.id) }}" class="btn btn-outline-royal btn-sm"><i class="bi bi-pencil"></i></a></td>
+                    <td>
+                      {% if has_editar_lanc %}
+                        <a href="{{ url_for('editar_lancamento', id=lanc.id) }}" class="btn btn-outline-royal btn-sm"><i class="bi bi-pencil"></i></a>
+                      {% endif %}
+                    </td>
                     <td><a href="{{ url_for('excluir_lancamento', id=lanc.id) }}" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></a></td>
                   </tr>
                   {% else %}<tr><td colspan="6" class="text-center text-muted">Nenhum lançamento no período selecionado</td></tr>{% endfor %}
@@ -620,7 +641,6 @@
     </div>
   </div>
 
-  <!-- JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     function togglePwd(btn){
@@ -636,7 +656,6 @@
     document.addEventListener('DOMContentLoaded', () => {
       const viewNow = "{{ view|default('lancar') }}";
 
-      // ===== Estrelas =====
       function paintStars(stars, v, hover=false){
         stars.forEach(s=>{
           const on = Number(s.dataset.v) <= v;
@@ -656,14 +675,12 @@
           paintStars(stars, Number(hidden.value||0), false);
         });
       }
-      // Média automática para "Geral" se não clicar nele:
       function autoGeral(){
         const g = document.querySelector('.rating-group[data-name="av_geral"]');
         if(!g) return;
         const geralHidden = g.querySelector('input[type="hidden"]');
         const userSet = g.dataset.userSet === '1';
-        if (userSet) return; // usuário escolheu manualmente
-        // pega valores das outras notas
+        if (userSet) return;
         const nomes = ['av_pontualidade','av_educacao','av_eficiencia','av_apresentacao'];
         const vals = [];
         nomes.forEach(n=>{
@@ -672,13 +689,13 @@
           if (v>0) vals.push(v);
         });
         if (vals.length){
-          const media = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length); // arredonda para inteiro 1..5
+          const media = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
           geralHidden.value = media;
           paintStars(g.querySelectorAll('.star'), media, false);
         }
       }
 
-      // ===== Lançar (lista de cooperados + form) =====
+      // ===== Lançar (lista de cooperados + form)
       if (!['escalas','config','avisos','lancamentos'].includes(viewNow)) {
         const busca = document.getElementById('buscaCoop');
         const select = document.getElementById('selectCoop');
@@ -710,7 +727,7 @@
         select?.addEventListener('change', function(){ const el = itens.find(x=>x.dataset.id===this.value); if (el) mostrarCooperado(el); });
         const primeiro = itens[0]; if (primeiro) mostrarCooperado(primeiro);
 
-        // modal de avaliação (igual antes)
+        // modal de avaliação
         const boxAval = document.getElementById('boxAval');
         const inputAvaliar = document.getElementById('inputAvaliar');
         const chkAvaliar = document.getElementById('chkAvaliar');
@@ -738,7 +755,7 @@
         }
       }
 
-      // ===== Avisos =====
+      // ===== Avisos
       if (viewNow === 'avisos') {
         const toastOKEl = document.getElementById('toastOK');
         const toastOK = toastOKEl ? new bootstrap.Toast(toastOKEl) : null;
@@ -777,47 +794,34 @@
         refreshBadges();
       }
 
-      // ===== Lançamentos (lista) =====
+      // ===== Lançamentos (lista)
       if (viewNow === 'lancamentos') {
-        const tbody = document.getElementById('tbodyLanc');
-        const ftValor = document.getElementById('ftValor');
-        const ftEnt   = document.getElementById('ftEntregas');
-        const kpiV    = document.getElementById('kpiTotalValor');
-        const kpiE    = document.getElementById('kpiTotalEntregas');
-        const grid    = document.getElementById('gridCoop');
+        const tbody  = document.getElementById('tbodyLanc');
+        const ftValor= document.getElementById('ftValor');
+        const ftEnt  = document.getElementById('ftEntregas');
+        const kpiV   = document.getElementById('kpiTotalValor');
+        const kpiE   = document.getElementById('kpiTotalEntregas');
+        const grid   = document.getElementById('gridCoop');
+        const f      = document.getElementById('formFiltroLanc');
 
         function getRows(){ return Array.from(tbody.querySelectorAll('tr')); }
 
-        function applyFilter(){
-          const f = document.getElementById('formFiltroLanc');
-          const di = parseBRDate(f.data_inicio.value);
-          const df = parseBRDate(f.data_fim.value);
-          const q  = (f.q.value||'').toLowerCase().trim();
+        function recomputeTotals(){
           let totV=0, totE=0;
           const perCoop = {};
           getRows().forEach(tr=>{
-            const dTxt = tr.cells[0].textContent.trim();
-            const d = parseBRDate(dTxt);
-            const coop = (tr.dataset.coopnome||'').toLowerCase();
-            const contrato = (tr.dataset.contrato||'').toLowerCase();
-            let show = true;
-            if (di && d && d < di) show=false;
-            if (df && d && d > df) show=false;
-            if (q && !(coop.includes(q) || contrato.includes(q))) show=false;
-            tr.style.display = show?'':'none';
-            if (show){
-              const v = Number(tr.querySelector('.valor')?.dataset.valor || 0); // soma correta
-              const e = Number(tr.cells[4].textContent.replace(/\D+/g,'') || 0);
-              totV += v; totE += e;
-              const id = tr.dataset.coop, nm = tr.dataset.coopnome;
-              perCoop[id] = perCoop[id] || {nome:nm, valor:0, ent:0};
-              perCoop[id].valor += v; perCoop[id].ent += e;
-            }
+            if (tr.style.display==='none') return;
+            const v = Number(tr.querySelector('.valor')?.dataset.valor || 0);
+            const e = Number(tr.cells[4].textContent.replace(/\D+/g,'') || 0);
+            totV += v; totE += e;
+            const id = tr.dataset.coop, nm = tr.dataset.coopnome;
+            perCoop[id] = perCoop[id] || {nome:nm, valor:0, ent:0};
+            perCoop[id].valor += v; perCoop[id].ent += e;
           });
           ftValor.textContent = 'R$ ' + brMoney(totV);
-          ftEnt.textContent = String(totE);
-          kpiV.textContent = brMoney(totV);
-          kpiE.textContent = String(totE);
+          ftEnt.textContent   = String(totE);
+          kpiV.textContent    = brMoney(totV);
+          kpiE.textContent    = String(totE);
 
           grid.innerHTML = '';
           Object.values(perCoop).sort((a,b)=>b.valor-a.valor).forEach(p=>{
@@ -829,6 +833,18 @@
           });
         }
 
+        // filtro de texto local (não envia ao back)
+        f.q.addEventListener('input', ()=>{
+          const q = (f.q.value||'').toLowerCase().trim();
+          getRows().forEach(tr=>{
+            const coop = (tr.dataset.coopnome||'').toLowerCase();
+            const contrato = (tr.dataset.contrato||'').toLowerCase();
+            tr.style.display = (!q || coop.includes(q) || contrato.includes(q)) ? '' : 'none';
+          });
+          recomputeTotals();
+        });
+
+        // destaca cooperado
         tbody.addEventListener('click', (e)=>{
           const td = e.target.closest('.coop-name'); if(!td) return;
           const nome = td.textContent.trim();
@@ -837,38 +853,27 @@
           });
         });
 
-        document.getElementById('btnAplicarLanc').addEventListener('click', applyFilter);
-        document.getElementById('btnLimparLanc').addEventListener('click', ()=>{
-          const f=document.getElementById('formFiltroLanc'); f.data_inicio.value=''; f.data_fim.value=''; f.q.value=''; applyFilter();
-          document.getElementById('txtPeriodo').textContent='—';
-        });
-
+        // exporta somente o visível
         document.getElementById('btnExportCsv').addEventListener('click', ()=>{
           const vis = getRows().filter(r=>r.style.display!=='none');
           const linhas = [['Data','Cooperado','Contrato','Horário','Entregas','Valor (R$)']];
-          vis.forEach(r=>{
-            const arr = Array.from(r.cells).map(td=>td.textContent.trim());
-            linhas.push(arr);
-          });
+          vis.forEach(r=>{ linhas.push(Array.from(r.cells).map(td=>td.textContent.trim())); });
           const csv = '\uFEFF' + linhas.map(l=>l.map(x=>`"${x.replace(/"/g,'""')}"`).join(';')).join('\n');
           const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'}); const a = document.createElement('a');
           a.href = URL.createObjectURL(blob); a.download = 'lancamentos.csv'; a.click(); URL.revokeObjectURL(a.href);
         });
 
-        applyFilter();
+        // totais iniciais (com período que o back já aplicou)
+        recomputeTotals();
       }
 
-      // Toast novos avisos
       const unread = Number(`{{ _toast_unread }}`);
       if (unread > 0) {
         const toastEl = document.getElementById('toastAvisos');
         if (toastEl) { const t = new bootstrap.Toast(toastEl); setTimeout(()=>t.show(), 600); }
       }
 
-      // liga auto-média do geral nas mudanças
-      document.addEventListener('click', (e)=>{
-        if (e.target.closest('.rating-group')) autoGeral();
-      });
+      document.addEventListener('click', (e)=>{ if (e.target.closest('.rating-group')) autoGeral(); });
     });
   </script>
 </body>
