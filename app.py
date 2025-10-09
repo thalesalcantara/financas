@@ -4339,6 +4339,9 @@ def portal_restaurante():
     except BuildError:
         url_lancar_producao = "/restaurante/lancar_producao"
 
+    # Flag útil para proteger link 'editar' no template (opcional)
+    has_editar_lanc = ('editar_lancamento' in app.view_functions)
+
     # -------------------- Render --------------------
     return render_template(
         "restaurante_dashboard.html",
@@ -4362,6 +4365,7 @@ def portal_restaurante():
         total_lanc_valor=total_lanc_valor,
         total_lanc_entregas=total_lanc_entregas,
         url_lancar_producao=url_lancar_producao,  # usado no action do form
+        has_editar_lanc=has_editar_lanc,          # opcional para o botão editar
     )
 
 # =========================
