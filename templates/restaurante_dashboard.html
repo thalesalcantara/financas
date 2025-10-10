@@ -1,21 +1,29 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-br" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <title>Portal do Estabelecimento</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Bootstrap & Icons -->
+  <!-- Bootstrap & Icons (SEM MUDAR LINKS) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <style>
+    /* =================== TEMA BASE (mantido) =================== */
     :root{
       --royal:#2141d9; --royal-2:#3654e6; --royal-3:#eaf0ff;
       --ink:#0b1220; --muted:#6b7280; --soft:#f5f7ff; --danger:#e74c3c; --ok:#16a34a;
-      --border:#e6e9f2; --chip:#eef1ff;
+      --border:#e6e9f2; --chip:#eef1ff; --bg:#fff; --text:#111827; --card:#fff; --subtle:#f8faff;
+      --badge-danger-bg:#dc3545; --badge-danger-color:#fff;
+    }
+    /* =================== DARK MODE (suave) =================== */
+    html[data-theme="dark"]{
+      --bg:#0b1220; --text:#e5e7eb; --card:#111827; --subtle:#0f172a;
+      --border:#1f2937; --chip:#111a3c; --royal:#5074ff; --royal-2:#6d88ff; --royal-3:#0e1a4a;
+      --muted:#9aa3b2; --soft:#0e1324;
     }
     html,body{ height:100%; }
-    body{ background:#fff; color:#111827; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif; }
-    a{ text-decoration:none; }
+    body{ background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif; }
+    a{ text-decoration:underline; } /* nomes sublinhados do menu lateral, conforme pedido */
     .shell{ display:grid; grid-template-columns: 260px 1fr; min-height:100vh; }
     .aside{
       background:linear-gradient(180deg, var(--royal) 0%, var(--royal-2) 100%);
@@ -23,51 +31,45 @@
     }
     .brand{ font-weight:800; letter-spacing:.5px; font-size:1.15rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.08); display:flex; align-items:center; gap:8px; }
     .navmenu{ margin-top:18px; display:flex; flex-direction:column; gap:6px; }
-    .navmenu a{ color:#fff; padding:10px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600; position:relative; }
+    .navmenu a{ color:#fff; padding:10px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600; text-decoration:underline; }
     .navmenu a.active, .navmenu a:hover{ background:rgba(255,255,255,.14); }
     .navmenu .badge{ margin-left:auto; }
-    /* Bolinha contador (badge de avisos) */
-    .navmenu .badge-dot{
-      min-width:22px; height:22px; line-height:22px;
-      border-radius:999px; padding:0 6px; font-size:.75rem; font-weight:800;
-      display:inline-flex; align-items:center; justify-content:center;
-      background:#dc3545; color:#fff; box-shadow:0 0 0 2px rgba(255,255,255,.25) inset;
-    }
-
     .content{ padding:24px clamp(14px,3vw,32px); }
     .section-title{ color:var(--royal); font-weight:800; font-size:1.25rem; display:flex; gap:10px; align-items:center; }
-    .card{ border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 0 #0000000a; }
-    .card-soft{ background:#fff; border:1px solid var(--border); border-radius:14px; padding:14px; }
-    .chip{ background:var(--chip); border:1px solid var(--border); border-radius:999px; padding:.2rem .65rem; font-weight:700; }
+    .card{ border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 0 #0000000a; background:var(--card); }
+    .card-soft{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; }
+    .chip{ background:var(--chip); border:1px solid var(--border); border-radius:999px; padding:.2rem .65rem; font-weight:700; color:var(--text); }
     .table-compact th,.table-compact td{ padding:.5rem .6rem; }
     .btn-royal{ background:var(--royal); color:#fff; border:none; }
     .btn-royal:hover{ background:var(--royal-2); color:#fff; }
-    .btn-outline-royal{ border:1px solid var(--royal); color:#royal; }
+    .btn-outline-royal{ border:1px solid var(--royal); color:#fff; }
+    html[data-theme="light"] .btn-outline-royal{ color:var(--royal); }
     .btn-outline-royal:hover{ background:var(--royal); color:#fff; }
     .cooperado-avatar{ width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 1px 0 #0001; }
     .cooperado-item{ display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; cursor:pointer; }
-    .cooperado-item:hover{ background:#f8faff; }
+    .cooperado-item:hover{ background:var(--subtle); }
     .cooperado-item.selected{ outline:2px solid var(--royal); background:#f0f4ff; }
+    html[data-theme="dark"] .cooperado-item.selected{ background:#0d1a4a; }
     .selected-header .big{ width:180px; height:180px; border-radius:50%; object-fit:cover; border:6px solid var(--royal); box-shadow:0 6px 16px #0002; }
     .rating-group{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .rating-label{ width:160px; font-weight:700; color:#1f2937; }
+    .rating-label{ width:160px; font-weight:700; color:var(--text); }
     .stars{ display:inline-flex; gap:3px; font-size:1.4rem; cursor:pointer; }
     .star{ color:#cbd5e1; transition:transform .06s; }
     .star.active,.star.hover{ color:#fbbf24; }
     .star:active{ transform:scale(.9); }
     .sticky-tools{ position:sticky; top:12px; }
-    .kpi{ background:#fafcff; border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
+    .kpi{ background:var(--soft); border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
     .kpi .v{ font-weight:800; font-size:1.05rem; }
-
-    /* ===== SPA: sections ===== */
-    section[data-view]{ display:none; }
-    section.view-active{ display:block; }
-
+    /* badge vermelho consistente no dark */
+    .badge.text-bg-danger{ background-color:var(--badge-danger-bg)!important; color:var(--badge-danger-color)!important; }
     @media (max-width: 920px){
       .shell{ grid-template-columns: 66px 1fr; }
       .brand span{ display:none; }
       .navmenu a span{ display:none; }
     }
+    /* Ocultar/mostrar seção (usado só quando trocamos via JS dentro do mesmo DOM) */
+    section[data-view]{ display:none; }
+    section[data-view].on{ display:block; }
   </style>
 </head>
 <body>
@@ -75,8 +77,16 @@
     <!-- ============ Aside ============ -->
     <aside class="aside">
       <div class="brand"><i class="bi bi-building"></i><span>Portal do Estabelecimento</span></div>
-      <nav class="navmenu">
-        <!-- Mantidos os links originais (fallback). O SPA intercepta o clique. -->
+
+      <!-- BOTÃO MODO ESCURO (no menu lateral, sem mexer em links existentes) -->
+      <div class="d-grid my-2">
+        <button id="btnTheme" class="btn btn-outline-light btn-sm">
+          <i class="bi bi-moon-stars me-1"></i><span>Modo escuro</span>
+        </button>
+      </div>
+
+      <nav class="navmenu" id="menuLateral">
+        <!-- NÃO ALTEREI SEUS LINKS -->
         <a class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos']) else '' }}"
            href="{{ url_for('portal_restaurante', view='lancar', data_inicio=filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else None, data_fim=filtro_fim.strftime('%Y-%m-%d') if filtro_fim else None) }}">
           <i class="bi bi-person-lines-fill"></i><span>Cooperados</span>
@@ -105,7 +115,7 @@
            href="{{ url_for('portal_restaurante_avisos') }}">
           <i class="bi bi-megaphone"></i><span>Avisos</span>
           {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
-          {% if _cntAvisos > 0 %}<span class="badge badge-dot">{{ _cntAvisos }}</span>{% endif %}
+          {% if _cntAvisos > 0 %}<span class="badge text-bg-danger">{{ _cntAvisos }}</span>{% endif %}
         </a>
 
         <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
@@ -113,29 +123,11 @@
     </aside>
 
     <!-- ============ Main ============ -->
-    <main class="content">
+    <main class="content" id="appMain">
+      {# Mantemos o seu conteúdo original – Jinja vai renderizar a section conforme view #}
 
-      {% with msgs = get_flashed_messages(with_categories=True) %}
-        {% if msgs %}
-          <div class="mb-3">
-            {% for cat, msg in msgs %}
-              <div class="alert alert-{{ 'danger' if cat=='error' else cat }} py-2 px-3 mb-2">{{ msg|safe }}</div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      {% endwith %}
-
-      {# ===== CÓPIAS SEGURAS de variáveis (evita erro se não vierem do back) ===== #}
-      {% set _dias_list = dias_list if dias_list is defined and dias_list is not none else [] %}
-      {% set _agenda = agenda if agenda is defined and agenda is not none else {} %}
-      {% set _ref_data = ref_data if ref_data is defined and ref_data is not none else (now() if false else None) %}
-      {% set _modo = modo if modo is defined and modo is not none else 'semana' %}
-      {% set _cooperados = cooperados if cooperados is defined and cooperados is not none else [] %}
-      {% set _lancamentos_periodo = lancamentos_periodo if lancamentos_periodo is defined and lancamentos_periodo is not none else [] %}
-      {% set _url_lancar_producao = url_lancar_producao if url_lancar_producao is defined else url_for('portal_restaurante') %}
-
-      <!-- =================== CONFIG =================== -->
-      <section data-view="config">
+      {% if view == 'config' %}
+      <section data-view="config" class="on">
         <div class="section-title"><i class="bi bi-shield-lock"></i> Configuração</div>
         <div class="card card-body">
           <form class="row g-3 form-password" method="POST" action="{{ url_for('rest_alterar_senha') }}">
@@ -166,8 +158,8 @@
         </div>
       </section>
 
-      <!-- =================== ESCALA =================== -->
-      <section data-view="escalas">
+      {% elif view == 'escalas' %}
+      <section data-view="escalas" class="on">
         <div class="section-title"><i class="bi bi-calendar-week"></i> Escala semanal</div>
 
         <div class="card card-body">
@@ -176,13 +168,13 @@
             <div class="col-md-3">
               <label class="form-label">Ver</label>
               <select name="modo" class="form-select">
-                <option value="semana" {{ 'selected' if (_modo=='semana') }}>Semana completa</option>
-                <option value="dia" {{ 'selected' if (_modo=='dia') }}>Somente 1 dia</option>
+                <option value="semana" {{ 'selected' if (modo=='semana') }}>Semana completa</option>
+                <option value="dia" {{ 'selected' if (modo=='dia') }}>Somente 1 dia</option>
               </select>
             </div>
             <div class="col-md-3">
               <label class="form-label">Referência</label>
-              <input type="date" name="ref" class="form-control" value="{{ _ref_data and _ref_data.strftime('%Y-%m-%d') }}">
+              <input type="date" name="ref" class="form-control" value="{{ ref_data.strftime('%Y-%m-%d') }}">
             </div>
             <div class="col-md-6 text-end">
               <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
@@ -190,10 +182,10 @@
             </div>
           </form>
 
-          {% if _modo == 'semana' %}
+          {% if modo == 'semana' %}
             <hr class="my-3">
             <div class="row g-3">
-              {% for dia in _dias_list %}
+              {% for dia in dias_list %}
               <div class="col-md-6 col-lg-4">
                 <div class="card-soft">
                   <div class="d-flex justify-content-between align-items-center mb-2">
@@ -201,7 +193,7 @@
                     <i class="bi bi-people"></i>
                   </div>
                   <div style="max-height:360px; overflow:auto; border-top:1px dashed var(--border);">
-                    {% set lista = _agenda.get(dia, []) %}
+                    {% set lista = agenda.get(dia, []) %}
                     {% if lista %}
                       {% for grupo in (lista | groupby('contrato')) %}
                         {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
@@ -227,13 +219,13 @@
             <hr class="my-3">
             <div class="card-soft">
               <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="badge text-bg-primary fw-semibold">{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][_ref_data.weekday()] if _ref_data }} — {{ _ref_data and _ref_data.strftime('%d/%m/%Y') }}</span>
+                <span class="badge text-bg-primary fw-semibold">{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][ref_data.weekday()] }} — {{ ref_data.strftime('%d/%m/%Y') }}</span>
                 <i class="bi bi-calendar-day"></i>
               </div>
               <table class="table table-bordered table-hover align-middle table-compact">
                 <thead><tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr></thead>
                 <tbody>
-                  {% set lista = _agenda.get(_ref_data, []) if _ref_data else [] %}
+                  {% set lista = agenda.get(ref_data, []) %}
                   {% if lista %}
                     {% for grupo in (lista | groupby('contrato')) %}
                       {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
@@ -256,8 +248,8 @@
         </div>
       </section>
 
-      <!-- =================== AVISOS =================== -->
-      <section data-view="avisos">
+      {% elif view == 'avisos' %}
+      <section data-view="avisos" class="on">
         {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
         {% set _unread_from_list = (_avisos | selectattr('lido','equalto',False) | list | length) %}
         {% set _unread_from_ctx = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
@@ -324,12 +316,10 @@
         {% endif %}
       </section>
 
-      <!-- =================== LANCAMENTOS (LISTA) =================== -->
-      <section data-view="lancamentos">
+      {% elif view == 'lancamentos' %}
+      <section data-view="lancamentos" class="on">
         <div class="section-title"><i class="bi bi-receipt"></i> Lançamentos</div>
-
         <div class="row g-3">
-          <!-- FORM FILTRO (envia datas/mês para o BACK) -->
           <div class="col-lg-3">
             <div class="card card-body sticky-tools">
               <form id="formFiltroLanc"
@@ -337,54 +327,35 @@
                     action="{{ url_for('portal_restaurante') }}"
                     class="row g-2 align-items-end">
                 <input type="hidden" name="view" value="lancamentos">
-
                 <div class="col-12">
                   <label class="form-label">Início</label>
-                  <input type="date" class="form-control"
-                         name="data_inicio"
-                         value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
+                  <input type="date" class="form-control" name="data_inicio" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
                 </div>
-
                 <div class="col-12">
                   <label class="form-label">Fim</label>
-                  <input type="date" class="form-control"
-                         name="data_fim"
-                         value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
+                  <input type="date" class="form-control" name="data_fim" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
                 </div>
-
                 <div class="col-12">
                   <label class="form-label">Mês (opcional)</label>
-                  <input type="month" class="form-control"
-                         name="mes"
-                         value="{{ filtro_mes or '' }}"
+                  <input type="month" class="form-control" name="mes" value="{{ filtro_mes or '' }}"
                          oninput="if(this.value){ const f=this.form; f.data_inicio.value=''; f.data_fim.value=''; }">
                   <div class="form-text">Se escolher um mês, as datas serão ignoradas.</div>
                 </div>
-
-                <!-- filtro visual (não vai ao back) -->
                 <div class="col-12">
                   <label class="form-label">Digite o nome do cooperado (visual)</label>
                   <input type="text" class="form-control" name="q" placeholder="Filtrar por nome...">
                 </div>
-
                 <div class="col-12 d-grid">
-                  <button class="btn btn-royal" type="submit">
-                    <i class="bi bi-funnel"></i> Aplicar
-                  </button>
+                  <button class="btn btn-royal" type="submit"><i class="bi bi-funnel"></i> Aplicar</button>
                 </div>
-
                 <div class="col-12 d-grid">
-                  <a class="btn btn-outline-secondary"
-                     href="{{ url_for('portal_restaurante', view='lancamentos') }}">
+                  <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='lancamentos') }}">
                     <i class="bi bi-arrow-counterclockwise"></i> Limpar
                   </a>
                 </div>
-
                 <hr class="my-2">
                 <div class="kpi mb-2"><div class="small text-muted">Total no período</div><div class="v">R$ <span id="kpiTotalValor">0,00</span></div></div>
                 <div class="kpi mb-2"><div class="small text-muted">Entregas no período</div><div class="v"><span id="kpiTotalEntregas">0</span></div></div>
-
-                <!-- Exporta TUDO + linha Totais alinhada -->
                 <div class="d-grid"><button class="btn btn-outline-royal" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV</button></div>
               </form>
             </div>
@@ -415,7 +386,7 @@
                   </tr>
                 </thead>
                 <tbody id="tbodyLanc">
-                  {% for x in _lancamentos_periodo %}
+                  {% for x in lancamentos_periodo or [] %}
                   <tr data-coop="{{ x.cooperado_id or x.coop_id }}"
                       data-coopnome="{{ x.cooperado_nome or x.coop_nome }}"
                       data-contrato="{{ x.contrato_nome or x.contrato }}">
@@ -428,10 +399,8 @@
                       {% else %}—{% endif %}
                     </td>
                     <td class="text-center">{{ x.qtd_entregas if x.qtd_entregas is not none else '-' }}</td>
-                    <!-- data-valor = número puro para soma -->
                     <td class="text-end valor" data-valor="{{ '%.2f'|format(x.valor or 0) }}">R$ {{ '%.2f'|format(x.valor or 0) }}</td>
                   </tr>
-                  {% else %}
                   {% endfor %}
                 </tbody>
                 <tfoot>
@@ -451,8 +420,8 @@
         </div>
       </section>
 
-      <!-- =================== LANÇAR =================== -->
-      <section data-view="lancar">
+      {% else %}
+      <section data-view="lancar" class="on">
         <div class="section-title"><i class="bi bi-plus-circle"></i> Lançar Produção Diária</div>
 
         <div class="card card-body">
@@ -487,11 +456,11 @@
               <div class="input-group mb-2">
                 <span class="input-group-text"><i class="bi bi-search"></i></span>
                 <input id="buscaCoop" type="text" class="form-control" placeholder="Buscar cooperado..." list="cooperadosList">
-                <datalist id="cooperadosList">{% for coop in _cooperados %}<option value="{{ coop.nome }}"></option>{% endfor %}</datalist>
-                <select id="selectCoop" class="form-select"><option value="">Lista...</option>{% for coop in _cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}</select>
+                <datalist id="cooperadosList">{% for coop in cooperados %}<option value="{{ coop.nome }}"></option>{% endfor %}</datalist>
+                <select id="selectCoop" class="form-select"><option value="">Lista...</option>{% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}</select>
               </div>
               <div id="listaCooperados" style="max-height:60vh; overflow:auto;">
-                {% for coop in _cooperados %}
+                {% for coop in cooperados %}
                 <div class="cooperado-item" data-id="{{ coop.id }}" data-nome="{{ coop.nome }}"
                      data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
                      data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}">
@@ -519,7 +488,7 @@
               </div>
 
               <!-- FORM -->
-              <form id="formLancamento" method="POST" action="{{ _url_lancar_producao }}" class="row g-2 align-items-end mb-1" style="display:none;">
+              <form id="formLancamento" method="POST" action="{{ url_lancar_producao }}" class="row g-2 align-items-end mb-1" style="display:none;">
                 <input type="hidden" name="cooperado_id" id="inputCooperadoId" value="">
                 <div class="col-md-3"><label class="form-label">Valor (R$)</label><input type="number" class="form-control" name="valor" step="0.01" required></div>
                 <div class="col-md-3"><label class="form-label">Data</label><input type="date" class="form-control" name="data" required></div>
@@ -599,7 +568,7 @@
             </div>
 
             <div id="blocoTabelas" class="mt-2">
-              {% for coop in _cooperados %}
+              {% for coop in cooperados %}
               <div id="tabela-{{ coop.id }}" class="card card-body lancamentos-table" style="display:none;">
                 <table class="table table-bordered table-hover align-middle table-compact">
                   <thead><tr><th>Valor</th><th>Data</th><th>Horário</th><th>Entregas</th><th>Editar</th><th>Excluir</th></tr></thead>
@@ -626,10 +595,11 @@
           </div>
         </div>
       </section>
+      {% endif %}
     </main>
   </div>
 
-  <!-- TOAST novos avisos -->
+  <!-- TOAST novos avisos (persistente fora do <main>) -->
   {% set _avisos_for_toast = avisos if avisos is defined and avisos is not none else [] %}
   {% set _unread_from_list_t = (_avisos_for_toast | selectattr('lido','equalto',False) | list | length) %}
   {% set _unread_from_ctx_t = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
@@ -641,7 +611,8 @@
         <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
       </div>
       <div class="toast-body">
-        Você tem {{ _toast_unread }} aviso(s) não lido(s). <a href="{{ url_for('portal_restaurante_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
+        Você tem <b id="toastAvisosN">{{ _toast_unread }}</b> aviso(s) não lido(s).
+        <a href="{{ url_for('portal_restaurante_avisos') }}" class="link-light fw-semibold">Ver agora</a>
       </div>
     </div>
   </div>
@@ -657,60 +628,131 @@
     </div>
   </div>
 
-  <!-- Modal Avaliação -->
-  <div class="modal fade" id="modalAval" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header"><h5 class="modal-title"><i class="bi bi-stars me-1"></i> Deseja avaliar agora?</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
-        <div class="modal-body">Você pode registrar a avaliação do cooperado agora ou enviar o lançamento sem avaliação.</div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" id="btnPularAval">Pular e enviar</button>
-          <button type="button" class="btn btn-royal" id="btnAvaliarAgora">Avaliar agora</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
+  <!-- Bootstrap JS (SEM MUDAR LINK) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
   <script>
-    function togglePwd(btn){
-      const i = btn.previousElementSibling; if(!i) return;
-      i.type = i.type==='password'?'text':'password';
-      btn.querySelector('i').classList.toggle('bi-eye');
-      btn.querySelector('i').classList.toggle('bi-eye-slash');
-    }
+  /* ==========================
+     UTIL
+  ========================== */
+  function togglePwd(btn){
+    const i = btn.previousElementSibling; if(!i) return;
+    i.type = i.type==='password'?'text':'password';
+    btn.querySelector('i').classList.toggle('bi-eye');
+    btn.querySelector('i').classList.toggle('bi-eye-slash');
+  }
+  const brMoney = (n)=> (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+  const parseBRDate = (s)=>{ if(!s) return null; if(String(s).includes('/')){ const [d,m,y]=s.split('/'); return new Date(+y, +m-1, +d); } const [y,m,d]=String(s).split('-'); return new Date(+y, +m-1, +d); };
 
-    const brMoney = (n)=> (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
-    const parseBRDate = (s)=>{ if(!s) return null; if(String(s).includes('/')){ const [d,m,y]=s.split('/'); return new Date(+y, +m-1, +d); } const [y,m,d]=String(s).split('-'); return new Date(+y, +m-1, +d); };
-
-    // ===== SPA Helpers =====
-    function getParamViewFromUrl(url){
-      try{ const u = new URL(url || window.location.href); return (u.searchParams.get('view') || 'lancar'); }catch(e){ return 'lancar'; }
+  /* ==========================
+     THEME (salva no localStorage)
+  ========================== */
+  (function(){
+    const html = document.documentElement;
+    const key = 'portal.theme';
+    const saved = localStorage.getItem(key);
+    if(saved) html.setAttribute('data-theme', saved);
+    function updateBtn(){
+      const dark = html.getAttribute('data-theme')==='dark';
+      const btn = document.getElementById('btnTheme');
+      if (btn){
+        btn.innerHTML = (dark
+          ? '<i class="bi bi-sun me-1"></i><span>Modo claro</span>'
+          : '<i class="bi bi-moon-stars me-1"></i><span>Modo escuro</span>');
+      }
     }
-    function setActiveMenu(view){
-      document.querySelectorAll('.navmenu a').forEach(a=>{
-        a.classList.toggle('active', (getParamViewFromUrl(a.href)===view));
+    updateBtn();
+    document.getElementById('btnTheme')?.addEventListener('click', ()=>{
+      const newTheme = html.getAttribute('data-theme')==='dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', newTheme);
+      localStorage.setItem(key, newTheme);
+      updateBtn();
+    });
+  })();
+
+  /* ==========================
+     SPA-lite: troca de abas SEM recarregar (mantém links)
+  ========================== */
+  (function(){
+    const main = document.getElementById('appMain');
+    const menu = document.getElementById('menuLateral');
+
+    function setActiveByUrl(urlStr){
+      const url = new URL(urlStr, location.origin);
+      // checa 'view' OU endpoint específico (tabelas/avisos/…)
+      const view = url.searchParams.get('view');
+      menu.querySelectorAll('a').forEach(a=>{
+        a.classList.remove('active');
+        const ahref = new URL(a.href, location.origin);
+        const av = ahref.searchParams.get('view');
+        if ((view && av===view) || (!view && ahref.pathname===url.pathname)){
+          a.classList.add('active');
+        }
       });
     }
-    function showSection(view){
-      document.querySelectorAll('section[data-view]').forEach(sec=>{
-        sec.classList.toggle('view-active', sec.getAttribute('data-view')===view);
-      });
-      setActiveMenu(view);
-      // Dispara inicialização específica do view (idempotente)
-      if (view==='avisos') initAvisos();
-      else if (view==='lancamentos') initLancamentos();
-      else if (view==='lancar') initLancar();
-      // Outros: escalas/config não precisam de JS extra além do padrão.
-    }
-    function pushView(view){
-      const u = new URL(window.location.href);
-      u.searchParams.set('view', view);
-      history.pushState({view}, '', u.toString());
+
+    async function loadView(urlStr, push=true){
+      const scrollY = document.scrollingElement.scrollTop;
+      try{
+        const resp = await fetch(urlStr, { headers:{ 'X-Requested-With':'fetch' } });
+        if(!resp.ok){ location.href = urlStr; return; } // backend pode exigir redirect
+        const html = await resp.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+
+        // Swap só o <main>
+        const newMain = doc.querySelector('#appMain');
+        if (newMain){
+          main.replaceChildren(...newMain.childNodes);
+          // Atualiza badge de avisos no menu, se existir no HTML retornado
+          const newBadge = doc.querySelector('#linkAvisos .badge');
+          const cur = document.querySelector('#linkAvisos .badge');
+          if (cur && !newBadge){ cur.remove(); }
+          if (!cur && newBadge){
+            document.querySelector('#linkAvisos')?.appendChild(newBadge.cloneNode(true));
+          }
+          if (cur && newBadge){ cur.textContent = newBadge.textContent; cur.style.display = newBadge.style.display || ''; }
+
+          // Atualiza texto do toast (fora do main)
+          const tN = doc.querySelector('#toastAvisosN')?.textContent?.trim();
+          if (tN){ const n = Number(tN)||0; const tgt = document.getElementById('toastAvisosN'); if (tgt) tgt.textContent = String(n); if (n>0){ const t = new bootstrap.Toast(document.getElementById('toastAvisos')); setTimeout(()=>t.show(), 300); } }
+
+          initPage(); // rewire tudo
+          document.scrollingElement.scrollTop = scrollY; // sem pulo de rolagem
+        }
+        if (push){ history.pushState({url:urlStr}, '', urlStr); }
+        setActiveByUrl(urlStr);
+      }catch(e){
+        // Em erro de rede, segue link normalmente
+        location.href = urlStr;
+      }
     }
 
-    // ===== ESTRELAS (utilizado no "lancar")
+    // Intercepta cliques do menu (sem mudar os hrefs)
+    menu.addEventListener('click', (e)=>{
+      const a = e.target.closest('a'); if (!a) return;
+      // Links externos (logout etc.) deixam passar
+      const isSameOrigin = a.origin === location.origin;
+      if (!isSameOrigin) return;
+      // Se for arquivo direto (ex: download), deixar passar
+      if (a.pathname.startsWith('/rest/tabelas/') || a.pathname.startsWith('/logout')) return;
+      e.preventDefault();
+      loadView(a.href, true);
+    });
+
+    // popstate (voltar/avançar)
+    window.addEventListener('popstate', (e)=>{ const url = e.state?.url || location.href; loadView(url, false); });
+
+    // Marca ativo corretamente na carga inicial
+    setActiveByUrl(location.href);
+  })();
+
+  /* ==========================
+     Inicialização por seção
+  ========================== */
+  function initPage(){
+    const viewNow = (new URL(location.href)).searchParams.get('view') || '{{ view|default("lancar") }}';
+
+    // ===== Estrelas
     function paintStars(stars, v, hover=false){
       stars.forEach(s=>{
         const on = Number(s.dataset.v) <= v;
@@ -750,13 +792,9 @@
       }
     }
 
-    // ===== INIT: Lançar
-    let lancarWired = false;
-    function initLancar(){
-      if (lancarWired) return; lancarWired = true;
-      const busca = document.getElementById('buscaCoop');
-      const select = document.getElementById('selectCoop');
-      const itens = Array.from(document.querySelectorAll('.cooperado-item'));
+    // ===== Lançar (delegação para não quebrar após trocar HTML)
+    if (!['escalas','config','avisos','lancamentos'].includes(viewNow)) {
+      const lista = document.getElementById('listaCooperados');
       const form = document.getElementById('formLancamento');
       const hint = document.getElementById('hintSelecione');
       const header = document.getElementById('selectedHeader');
@@ -764,10 +802,13 @@
       const selFoto = document.getElementById('selFoto');
       const selNome = document.getElementById('selNome');
       const selTotal = document.getElementById('selTotal');
+      const select = document.getElementById('selectCoop');
+      const busca = document.getElementById('buscaCoop');
 
       function mostrarCooperado(el){
         if (!el) return;
-        itens.forEach(i => i.classList.remove('selected')); el.classList.add('selected');
+        document.querySelectorAll('.cooperado-item').forEach(i => i.classList.remove('selected'));
+        el.classList.add('selected');
         inputCoopId.value = el.dataset.id;
         selFoto.src = el.dataset.foto; selNome.textContent = el.dataset.nome; selTotal.textContent = el.dataset.total;
         header.style.display = 'block'; form.style.display = 'flex'; hint.style.display = 'none';
@@ -775,14 +816,18 @@
         const tabela = document.getElementById('tabela-' + el.dataset.id); if (tabela) tabela.style.display = 'block';
         wireStars(); autoGeral();
       }
-      itens.forEach(el => el.addEventListener('click', () => mostrarCooperado(el)));
 
+      lista?.addEventListener('click', (e)=>{
+        const el = e.target.closest('.cooperado-item'); if (!el) return;
+        e.preventDefault(); mostrarCooperado(el);
+      });
+      select?.addEventListener('change', function(){ const el = document.querySelector(`.cooperado-item[data-id="${this.value}"]`); if (el) mostrarCooperado(el); });
       busca?.addEventListener('input', function(){
         const q = this.value.trim().toLowerCase();
-        itens.forEach(el => { el.style.display = (el.dataset.nome||'').toLowerCase().includes(q) ? '' : 'none'; });
+        document.querySelectorAll('.cooperado-item').forEach(el => { el.style.display = (el.dataset.nome||'').toLowerCase().includes(q) ? '' : 'none'; });
       });
-      select?.addEventListener('change', function(){ const el = itens.find(x=>x.dataset.id===this.value); if (el) mostrarCooperado(el); });
-      const primeiro = itens[0]; if (primeiro) mostrarCooperado(primeiro);
+      // auto-seleciona o primeiro se existir
+      const primeiro = document.querySelector('.cooperado-item'); if (primeiro) mostrarCooperado(primeiro);
 
       // modal de avaliação
       const boxAval = document.getElementById('boxAval');
@@ -812,10 +857,8 @@
       }
     }
 
-    // ===== INIT: Avisos
-    let avisosWired = false;
-    function initAvisos(){
-      if (avisosWired) return; avisosWired = true;
+    // ===== Avisos
+    if (viewNow === 'avisos') {
       const toastOKEl = document.getElementById('toastOK');
       const toastOK = toastOKEl ? new bootstrap.Toast(toastOKEl) : null;
       const badgeTitulo = document.getElementById('badgeTitulo');
@@ -827,10 +870,8 @@
           badgeTitulo.className = 'badge ' + (n > 0 ? 'text-bg-danger' : 'text-bg-success');
           badgeTitulo.textContent = n > 0 ? (n + ' não lido(s)') : 'Tudo lido';
         }
-        if (badgeSidebar){
-          if (n>0){ badgeSidebar.style.display=''; badgeSidebar.textContent=n; }
-          else { badgeSidebar.style.display='none'; }
-        }
+        if (badgeSidebar){ badgeSidebar.style.display = n>0 ? '' : 'none'; if (n>0) badgeSidebar.textContent = n; }
+        const tN = document.getElementById('toastAvisosN'); if (tN){ tN.textContent = String(n); }
       }
       const toggleNaoLidos = document.getElementById('toggleNaoLidos');
       toggleNaoLidos?.addEventListener('change', () => {
@@ -854,27 +895,18 @@
         });
       });
       refreshBadges();
-
-      // Toast de novos avisos (mantido)
-      const unread = Number(`{{ _toast_unread }}`);
-      if (unread > 0) {
-        const toastEl = document.getElementById('toastAvisos');
-        if (toastEl) { const t = new bootstrap.Toast(toastEl); setTimeout(()=>t.show(), 600); }
-      }
     }
 
-    // ===== INIT: Lançamentos (lista)
-    let lancamentosWired = false;
-    function initLancamentos(){
-      if (lancamentosWired) return; lancamentosWired = true;
+    // ===== Lançamentos (lista)
+    if (viewNow === 'lancamentos') {
       const tbody  = document.getElementById('tbodyLanc');
-      if (!tbody) return;
       const ftValor= document.getElementById('ftValor');
       const ftEnt  = document.getElementById('ftEntregas');
       const kpiV   = document.getElementById('kpiTotalValor');
       const kpiE   = document.getElementById('kpiTotalEntregas');
       const grid   = document.getElementById('gridCoop');
       const f      = document.getElementById('formFiltroLanc');
+      if (!tbody) return;
 
       function getRows(){ return Array.from(tbody.querySelectorAll('tr')); }
 
@@ -884,27 +916,28 @@
         getRows().forEach(tr=>{
           if (tr.style.display==='none') return;
           const v = Number(tr.querySelector('.valor')?.dataset.valor || 0);
-          const eTxt = tr.cells[4]?.textContent?.trim() || '0';
+          const eTxt = tr.cells[4].textContent.trim();
           const e = eTxt==='-' ? 0 : Number(eTxt.replace(/\D+/g,''));
           totV += v; totE += e;
           const id = tr.dataset.coop, nm = tr.dataset.coopnome;
           perCoop[id] = perCoop[id] || {nome:nm, valor:0, ent:0};
           perCoop[id].valor += v; perCoop[id].ent += e;
         });
-        ftValor.textContent = 'R$ ' + brMoney(totV);
-        ftEnt.textContent   = String(totE);
-        kpiV.textContent    = brMoney(totV);
-        kpiE.textContent    = String(totE);
+        if (ftValor) ftValor.textContent = 'R$ ' + brMoney(totV);
+        if (ftEnt)   ftEnt.textContent   = String(totE);
+        if (kpiV)    kpiV.textContent    = brMoney(totV);
+        if (kpiE)    kpiE.textContent    = String(totE);
 
-        grid.innerHTML = '';
-        Object.values(perCoop).sort((a,b)=>b.valor-a.valor).forEach(p=>{
-          const div = document.createElement('div'); div.className='col-sm-6 col-xl-4';
-          div.innerHTML = `<div class="kpi h-100"><div class="fw-bold">${p.nome||'-'}</div>
-            <div class="small text-muted">Entregas: <b>${p.ent||0}</b></div>
-            <div>Total: <b>R$ ${brMoney(p.valor||0)}</b></div></div>`;
-          grid.appendChild(div);
-        });
-
+        if (grid){
+          grid.innerHTML = '';
+          Object.values(perCoop).sort((a,b)=>b.valor-a.valor).forEach(p=>{
+            const div = document.createElement('div'); div.className='col-sm-6 col-xl-4';
+            div.innerHTML = `<div class="kpi h-100"><div class="fw-bold">${p.nome}</div>
+              <div class="small text-muted">Entregas: <b>${p.ent||0}</b></div>
+              <div>Total: <b>R$ ${brMoney(p.valor)}</b></div></div>`;
+            grid.appendChild(div);
+          });
+        }
         return {totV, totE};
       }
 
@@ -934,7 +967,6 @@
         const header = ['Data','Cooperado','Contrato','Horário','Entregas','Valor (R$)'];
         const linhas = [header];
         let totE = 0, totV = 0;
-
         rows.forEach(r=>{
           const data      = r.cells[0].textContent.trim();
           const coop      = r.cells[1].textContent.trim();
@@ -944,59 +976,35 @@
           const entregas  = entTxt==='-' ? 0 : Number(entTxt.replace(/\D+/g,''));
           const valorNum  = Number(r.querySelector('.valor')?.dataset.valor || 0);
           const valorStr  = valorNum.toFixed(2).replace('.',',');
-
           totE += entregas; totV += valorNum;
           linhas.push([data, coop, contrato, horario, String(entregas), valorStr]);
         });
-
         const totalStr = totV.toFixed(2).replace('.',',');
         linhas.push(['Totais','','','', String(totE), totalStr]);
-
         const csv = '\uFEFF' + linhas.map(l=>l.join(';')).join('\n');
         const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'lancamentos.csv';
-        a.click();
+        a.href = URL.createObjectURL(blob); a.download = 'lancamentos.csv'; a.click();
         URL.revokeObjectURL(a.href);
       });
 
+      // totais iniciais
       recomputeTotals();
     }
 
-    // ===== Boot
-    document.addEventListener('DOMContentLoaded', () => {
-      // Intercepta cliques do menu lateral (mantém fallback dos links)
-      document.querySelector('.navmenu')?.addEventListener('click', (e)=>{
-        const a = e.target.closest('a[href]');
-        if (!a) return;
-        const target = getParamViewFromUrl(a.href);
-        const sameRoute = a.href.startsWith(location.origin) && a.pathname === location.pathname;
-        // Só intercepta se for navegação interna no mesmo endpoint com ?view=...
-        if (sameRoute && target){
-          e.preventDefault();
-          showSection(target);
-          pushView(target);
-        }
-      });
+    // Toast de avisos (show se houver)
+    const unread = Number(document.getElementById('toastAvisosN')?.textContent||'0');
+    if (unread > 0) {
+      const toastEl = document.getElementById('toastAvisos');
+      if (toastEl) { const t = new bootstrap.Toast(toastEl); setTimeout(()=>t.show(), 600); }
+    }
 
-      // Ativa o view inicial
-      const initial = getParamViewFromUrl(location.href);
-      showSection(initial);
+    // clique em rating
+    document.addEventListener('click', (e)=>{ if (e.target.closest('.rating-group')) { /* recalcula se necessário */ } });
+  }
 
-      // Popstate (voltar/avançar)
-      window.addEventListener('popstate', (ev)=>{
-        const v = (ev.state && ev.state.view) || getParamViewFromUrl(location.href);
-        showSection(v);
-      });
-
-      // ===== Toast de avisos fora do view avisos (mantido)
-      const unread = Number(`{{ _toast_unread }}`);
-      if (unread > 0) {
-        const toastEl = document.getElementById('toastAvisos');
-        if (toastEl) { const t = new bootstrap.Toast(toastEl); setTimeout(()=>t.show(), 600); }
-      }
-    });
+  // roda na carga inicial
+  document.addEventListener('DOMContentLoaded', initPage);
   </script>
 </body>
 </html>
