@@ -1034,9 +1034,13 @@
     });
   </script>
 
-  <!-- OFFCANVAS: FINANÇAS (flutuante e completo) -->
+ <!-- OFFCANVAS: FINANÇAS (flutuante e completo) -->
 <div class="offcanvas offcanvas-bottom" tabindex="-1" id="financasSheet" aria-labelledby="financasSheetLabel" style="height:92vh">
   <div class="offcanvas-header">
+    <button type="button" class="btn btn-link text-muted me-2"
+            data-bs-dismiss="offcanvas" aria-label="Voltar">
+      <i class="bi bi-arrow-left"></i> Voltar
+    </button>
     <h5 class="offcanvas-title" id="financasSheetLabel">
       <i class="bi bi-wallet2 me-1"></i> Finanças
     </h5>
@@ -1353,39 +1357,84 @@
   </div>
 
   <!-- MODAL: Bloco de Notas -->
-  <div class="modal fade" id="notesModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
-      <div class="modal-content soft-card p-2">
-        <div class="notes-wrap">
-          <div class="notes-list" id="notesList"></div>
-          <div class="notes-editor">
-            <div class="notes-toolbar">
-              <button class="btn btn-sm btn-outline-primary" id="ntNew"><i class="bi bi-file-earmark-plus"></i> Nova</button>
-              <button class="btn btn-sm btn-outline-secondary" id="ntDuplicate" title="Duplicar"><i class="bi bi-files"></i></button>
-              <button class="btn btn-sm btn-outline-warning" id="ntPin" title="Fixar/Desfixar"><i class="bi bi-pin-angle"></i></button>
-              <button class="btn btn-sm btn-outline-danger" id="ntDelete" title="Apagar"><i class="bi bi-trash"></i></button>
-              <span class="vr"></span>
-              <button class="btn btn-sm btn-outline-secondary" data-cmd="bold" title="Negrito"><i class="bi bi-type-bold"></i></button>
-              <button class="btn btn-sm btn-outline-secondary" data-cmd="italic" title="Itálico"><i class="bi bi-type-italic"></i></button>
-              <button class="btn btn-sm btn-outline-secondary" data-cmd="underline" title="Sublinhado"><i class="bi bi-type-underline"></i></button>
-              <button class="btn btn-sm btn-outline-secondary" id="ntH1" title="Título"><i class="bi bi-type-h1"></i></button>
-              <button class="btn btn-sm btn-outline-secondary" id="ntBullets" title="Lista"><i class="bi bi-list-ul"></i></button>
-              <button class="btn btn-sm btn-outline-secondary" id="ntChecklist" title="Checklist"><i class="bi bi-square-check"></i></button>
-              <span class="vr"></span>
-              <button class="btn btn-sm btn-outline-secondary" id="ntShare" title="Compartilhar"><i class="bi bi-share"></i></button>
-              <button class="btn btn-sm btn-outline-secondary" id="ntExport" title="Exportar JSON"><i class="bi bi-download"></i></button>
-              <label class="btn btn-sm btn-outline-secondary mb-0" title="Importar JSON">
-                <i class="bi bi-upload"></i> <input type="file" id="ntImport" accept="application/json" hidden>
-              </label>
-              <button class="btn btn-sm btn-outline-secondary" id="ntPrint" title="Imprimir"><i class="bi bi-printer"></i></button>
-            </div>
-            <input class="notes-title" id="ntTitle" placeholder="Título">
-            <div class="notes-content" id="ntContent" contenteditable="true" spellcheck="true"></div>
+<div class="modal fade" id="notesModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+    <div class="modal-content soft-card p-2">
+      <!-- Cabeçalho com VOLTAR e FECHAR -->
+      <div class="modal-header border-0">
+        <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-arrow-left"></i> Voltar
+        </button>
+        <h5 class="modal-title ms-2">Bloco de Notas</h5>
+        <button class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+
+      <div class="notes-wrap">
+        <div class="notes-list" id="notesList"></div>
+        <div class="notes-editor">
+          <div class="notes-toolbar">
+            <button class="btn btn-sm btn-outline-primary" id="ntNew">
+              <i class="bi bi-file-earmark-plus"></i> Nova
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" id="ntDuplicate" title="Duplicar">
+              <i class="bi bi-files"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-warning" id="ntPin" title="Fixar/Desfixar">
+              <i class="bi bi-pin-angle"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger" id="ntDelete" title="Apagar">
+              <i class="bi bi-trash"></i>
+            </button>
+            <span class="vr"></span>
+            <button class="btn btn-sm btn-outline-secondary" data-cmd="bold" title="Negrito">
+              <i class="bi bi-type-bold"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" data-cmd="italic" title="Itálico">
+              <i class="bi bi-type-italic"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" data-cmd="underline" title="Sublinhado">
+              <i class="bi bi-type-underline"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" id="ntH1" title="Título">
+              <i class="bi bi-type-h1"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" id="ntBullets" title="Lista">
+              <i class="bi bi-list-ul"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" id="ntChecklist" title="Checklist">
+              <i class="bi bi-square-check"></i>
+            </button>
+            <span class="vr"></span>
+            <button class="btn btn-sm btn-outline-secondary" id="ntShare" title="Compartilhar">
+              <i class="bi bi-share"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" id="ntExport" title="Exportar JSON">
+              <i class="bi bi-download"></i>
+            </button>
+            <label class="btn btn-sm btn-outline-secondary mb-0" title="Importar JSON">
+              <i class="bi bi-upload"></i>
+              <input type="file" id="ntImport" accept="application/json" hidden>
+            </label>
+            <button class="btn btn-sm btn-outline-secondary" id="ntPrint" title="Imprimir">
+              <i class="bi bi-printer"></i>
+            </button>
           </div>
+
+          <input class="notes-title" id="ntTitle" placeholder="Título">
+          <div class="notes-content" id="ntContent" contenteditable="true" spellcheck="true"></div>
         </div>
+      </div>
+
+      <!-- Rodapé opcional com botões também -->
+      <div class="modal-footer border-0">
+        <button class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+        <button class="btn btn-royal" data-bs-dismiss="modal">
+          <i class="bi bi-arrow-left"></i> Voltar
+        </button>
       </div>
     </div>
   </div>
+</div>
 
   <!-- TOAST de novos avisos -->
   <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
