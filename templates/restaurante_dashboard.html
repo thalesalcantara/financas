@@ -656,8 +656,7 @@
     const brMoney = (n)=> (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
     const parseBRDate = (s)=>{ if(!s) return null; if(String(s).includes('/')){ const [d,m,y]=s.split('/'); return new Date(+y, +m-1, +d); } const [y,m,d]=String(s).split('-'); return new Date(+y, +m-1, +d); };
 
-    // === tudo que depende do DOM atual vai dentro de wirePage() ===
-    function wirePage(){
+    document.addEventListener('DOMContentLoaded', () => {
       const viewNow = "{{ view|default('lancar') }}";
 
       // ===== Estrelas
@@ -861,14 +860,17 @@
           });
         });
 
-        // ===== EXPORTA
+        // ===== EXPORTA: todas as linhas visíveis + linha "Totais" alinhada (somando Entregas e Valor)
         document.getElementById('btnExportCsv').addEventListener('click', ()=>{
           const rows = getRows().filter(r=>r.style.display!=='none');
 
+          // Cabeçalho
           const header = ['Data','Cooperado','Contrato','Horário','Entregas','Valor (R$)'];
           const linhas = [header];
 
-          let totE = 0, totV = 0;
+          let totE = 0;
+          let totV = 0;
+
           rows.forEach(r=>{
             const data      = r.cells[0].textContent.trim();
             const coop      = r.cells[1].textContent.trim();
@@ -876,16 +878,21 @@
             const horario   = r.cells[3].textContent.trim();
             const entTxt    = r.cells[4].textContent.trim();
             const entregas  = entTxt==='-' ? 0 : Number(entTxt.replace(/\D+/g,''));
-            const valorNum  = Number(r.querySelector('.valor')?.dataset.valor || 0);
+            const valorNum  = Number(r.querySelector('.valor')?.dataset.valor || 0); // número puro
+            // Exporta valor como número BR (vírgula decimal), sem "R$"
             const valorStr  = valorNum.toFixed(2).replace('.',',');
 
-            totE += entregas; totV += valorNum;
+            totE += entregas;
+            totV += valorNum;
+
             linhas.push([data, coop, contrato, horario, String(entregas), valorStr]);
           });
 
+          // Linha de totais: “Totais;;;;<entregas>;<valor>”
           const totalStr = totV.toFixed(2).replace('.',',');
           linhas.push(['Totais','','','', String(totE), totalStr]);
 
+          // CSV com ; como separador e BOM para Excel PT-BR
           const csv = '\uFEFF' + linhas.map(l=>l.join(';')).join('\n');
           const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
           const a = document.createElement('a');
@@ -906,135 +913,7 @@
       }
 
       document.addEventListener('click', (e)=>{ if (e.target.closest('.rating-group')) autoGeral(); });
-    }
-
-    // === SPA Booster: troca de abas instantânea, cache, prefetch e preserva rolagem ===
-    (function(){
-      const mainSel = 'main.content';
-      const cache = new Map();                 // url -> {html, title, scroll}
-      const scrollByUrl = new Map();
-      const isSameOrigin = (url)=> {
-        try { const u = new URL(url, location.href); return u.origin === location.origin; } catch { return false; }
-      };
-      const shouldIntercept = (a)=> {
-        if (!a) return false;
-        if (a.target && a.target !== '' && a.target !== '_self') return false;
-        const href = a.getAttribute('href')||'';
-        if (!href || href.startsWith('#')) return false;
-        if (!isSameOrigin(href)) return false;
-        // não interceptar downloads/abrir de Tabelas
-        if (/\/rest\/tabelas\/\d+\/abrir/.test(href)) return false;
-        return /\/portal\/restaurante/.test(href) || /\/rest\/tabelas$/.test(href);
-      };
-
-      async function fetchPage(url){
-        if (cache.has(url)) return cache.get(url);
-        const r = await fetch(url, {headers:{'X-Requested-With':'spa'}});
-        const text = await r.text();
-        const doc = new DOMParser().parseFromString(text, 'text/html');
-        const html = doc.querySelector(mainSel)?.innerHTML || '';
-        const title = doc.querySelector('title')?.textContent || document.title;
-        const data = {html, title};
-        cache.set(url, data);
-        return data;
-      }
-
-      async function swapTo(url, push=true){
-        // guarda scroll da página atual
-        const cur = location.href;
-        scrollByUrl.set(cur, {x: window.scrollX, y: window.scrollY});
-
-        // ativa link otimista
-        setActive(url);
-
-        // mostra imediato do cache se existir (zero piscar)
-        if (cache.has(url)){
-          document.querySelector(mainSel).innerHTML = cache.get(url).html;
-          document.title = cache.get(url).title;
-          wirePage();
-          // atualiza em background para manter fresco
-          fetchPage(url).then(data=>{
-            cache.set(url, data);
-            document.querySelector(mainSel).innerHTML = data.html;
-            document.title = data.title;
-            wirePage();
-          }).catch(()=>{});
-        } else {
-          // carrega
-          const data = await fetchPage(url);
-          document.querySelector(mainSel).innerHTML = data.html;
-          document.title = data.title;
-          wirePage();
-        }
-
-        if (push) history.pushState({}, '', url);
-
-        // restaura scroll salvo dessa url, se houver
-        const s = scrollByUrl.get(url);
-        if (s) window.scrollTo(s.x, s.y);
-        else window.scrollTo(0,0);
-      }
-
-      function setActive(url){
-        const links = document.querySelectorAll('.navmenu a');
-        const u = new URL(url, location.href);
-        const params = u.searchParams;
-        const view = params.get('view') || 'lancar';
-        links.forEach(a=>{
-          const href = new URL(a.href, location.href);
-          const v2 = href.searchParams.get('view') || (href.pathname.endsWith('/escalas') ? 'escalas' : (href.pathname.endsWith('/config') ? 'config' : (href.pathname.includes('/avisos')?'avisos': (href.searchParams.get('view')||'lancar'))));
-          a.classList.toggle('active', v2===view);
-        });
-      }
-
-      // intercepta cliques do menu
-      document.addEventListener('click', (e)=>{
-        const a = e.target.closest('a');
-        if (!a || !shouldIntercept(a)) return;
-        e.preventDefault();
-        const url = a.href;
-        swapTo(url, true);
-      });
-
-      // prefetch: hover/toque
-      let pfTimer=null;
-      document.addEventListener('pointerenter', (e)=>{
-        const a = e.target.closest('a'); if(!a||!shouldIntercept(a)) return;
-        const url = a.href; clearTimeout(pfTimer);
-        pfTimer = setTimeout(()=>{ fetchPage(url).catch(()=>{}); }, 80);
-      }, true);
-
-      // prefetch em idle para abas principais
-      (window.requestIdleCallback||function(cb){return setTimeout(cb,400)})(()=>{
-        document.querySelectorAll('.navmenu a').forEach(a=>{
-          if (shouldIntercept(a)) fetchPage(a.href).catch(()=>{});
-        });
-      });
-
-      // intercepta forms GET internos (ex.: filtros)
-      document.addEventListener('submit', (e)=>{
-        const form = e.target;
-        if (!(form instanceof HTMLFormElement)) return;
-        if ((form.method||'GET').toUpperCase()!=='GET') return;
-        const action = form.getAttribute('action') || location.href;
-        if (!isSameOrigin(action)) return;
-        if (!/\/portal\/restaurante/.test(action)) return;
-        e.preventDefault();
-        const url = new URL(action, location.href);
-        const fd = new FormData(form);
-        for (const [k,v] of fd.entries()) url.searchParams.set(k, v);
-        swapTo(url.toString(), true);
-      });
-
-      // voltar/avançar
-      window.addEventListener('popstate', ()=>{ swapTo(location.href, false); });
-
-      // ativa na carga
-      setActive(location.href);
-    })();
-
-    // Primeira execução
-    document.addEventListener('DOMContentLoaded', wirePage);
+    });
   </script>
 </body>
 </html>
