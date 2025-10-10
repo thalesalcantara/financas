@@ -498,58 +498,83 @@
 
       
  <!-- ESCALAS -->
-      <div class="tab-pane fade" id="escalas" role="tabpanel">
-        <!-- Documentos -->
-        <div class="card p-3 mb-3">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="mb-0"><i class="bi bi-file-earmark-check"></i> Documentos</h6>
-            <span class="badge-soft">Prazo Final: 31 de Dez · faltam <span class="countdown">{{ doc_cnh.dias_para_prazo }}</span> dias</span>
-          </div>
+<div class="tab-pane fade" id="escalas" role="tabpanel">
+  <!-- Documentos -->
+  <div class="card p-3 mb-3">
+    {% set cnh_ok = doc_cnh.ok %}
+    {% set placa_ok = doc_placa.ok %}
+    {% set show_prazo = (not cnh_ok) or (not placa_ok) %}
 
-          {% set cnh_ok = doc_cnh.ok %}
-          {% set placa_ok = doc_placa.ok %}
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h6 class="mb-0"><i class="bi bi-file-earmark-check"></i> Documentos</h6>
 
-          <div class="p-3 rounded mb-2 {{ 'doc-ok' if cnh_ok else 'doc-bad' }}">
-            <div class="d-flex align-items-start">
-              <div class="me-2" style="font-size:1.25rem">
-                {% if cnh_ok %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
-              </div>
-              <div class="flex-fill">
-                <div class="fw-bold mb-1">CNH — {{ 'Em dia' if cnh_ok else 'Vencida ou pendente' }}</div>
-                <div class="small muted">
-                  Nº: <b>{{ doc_cnh.numero or '—' }}</b> ·
-                  Validade: <b>{{ doc_cnh.vencimento.strftime('%d/%m/%Y') if doc_cnh.vencimento else '—' }}</b>
-                </div>
-                {% if not cnh_ok %}
-                  <div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle-fill"></i> Regularize para não travar repasses.</div>
-                {% else %}
-                  <div class="small text-success mt-1"><i class="bi bi-shield-check"></i> Tudo certo com a CNH.</div>
-                {% endif %}
-              </div>
-            </div>
-          </div>
+      {# Só mostra a badge se algum estiver fora do prazo #}
+      {% if show_prazo %}
+        <span class="badge-soft">
+          {% if not cnh_ok %}
+            CNH:
+            {% if doc_cnh.dias_para_prazo is defined %}
+              faltam <span class="countdown">{{ doc_cnh.dias_para_prazo }}</span> dias
+            {% else %}
+              fora do prazo
+            {% endif %}
+          {% endif %}
 
-          <div class="p-3 rounded {{ 'doc-ok' if placa_ok else 'doc-bad' }}">
-            <div class="d-flex align-items-start">
-              <div class="me-2" style="font-size:1.25rem">
-                {% if placa_ok %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
-              </div>
-              <div class="flex-fill">
-                <div class="fw-bold mb-1">Placa — {{ 'Em dia' if placa_ok else 'Vencida ou pendente' }}</div>
-                <div class="small muted">
-                  Nº: <b>{{ doc_placa.numero or '—' }}</b> ·
-                  Validade: <b>{{ doc_placa.vencimento.strftime('%d/%m/%Y') if doc_placa.vencimento else '—' }}</b>
-                </div>
-                {% if not placa_ok %}
-                  <div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle-fill"></i> Atualize a placa/validade para evitar bloqueios.</div>
-                {% else %}
-                  <div class="small text-success mt-1"><i class="bi bi-shield-check"></i> Tudo certo com a placa.</div>
-                {% endif %}
-              </div>
-            </div>
-          </div>
+          {% if (not cnh_ok) and (not placa_ok) %} · {% endif %}
+
+          {% if not placa_ok %}
+            Placa:
+            {% if doc_placa.dias_para_prazo is defined %}
+              faltam <span class="countdown">{{ doc_placa.dias_para_prazo }}</span> dias
+            {% else %}
+              fora do prazo
+            {% endif %}
+          {% endif %}
+        </span>
+      {% endif %}
+    </div>
+
+    <div class="p-3 rounded mb-2 {{ 'doc-ok' if cnh_ok else 'doc-bad' }}">
+      <div class="d-flex align-items-start">
+        <div class="me-2" style="font-size:1.25rem">
+          {% if cnh_ok %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
         </div>
+        <div class="flex-fill">
+          <div class="fw-bold mb-1">CNH — {{ 'Em dia' if cnh_ok else 'Vencida ou pendente' }}</div>
+          <div class="small muted">
+            Nº: <b>{{ doc_cnh.numero or '—' }}</b> ·
+            Validade: <b>{{ doc_cnh.vencimento.strftime('%d/%m/%Y') if doc_cnh.vencimento else '—' }}</b>
+          </div>
+          {% if not cnh_ok %}
+            <div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle-fill"></i> Regularize para não travar repasses.</div>
+          {% else %}
+            <div class="small text-success mt-1"><i class="bi bi-shield-check"></i> Tudo certo com a CNH.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
 
+    <div class="p-3 rounded {{ 'doc-ok' if placa_ok else 'doc-bad' }}">
+      <div class="d-flex align-items-start">
+        <div class="me-2" style="font-size:1.25rem">
+          {% if placa_ok %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
+        </div>
+        <div class="flex-fill">
+          <div class="fw-bold mb-1">Placa — {{ 'Em dia' if placa_ok else 'Vencida ou pendente' }}</div>
+          <div class="small muted">
+            Nº: <b>{{ doc_placa.numero or '—' }}</b> ·
+            Validade: <b>{{ doc_placa.vencimento.strftime('%d/%m/%Y') if doc_placa.vencimento else '—' }}</b>
+          </div>
+          {% if not placa_ok %}
+            <div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle-fill"></i> Atualize a placa/validade para evitar bloqueios.</div>
+          {% else %}
+            <div class="small text-success mt-1"><i class="bi bi-shield-check"></i> Tudo certo com a placa.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  
  <style>
   /* ——— Escala mobile compacta e alinhada ——— */
   .table-escala { table-layout: fixed; }
@@ -1267,94 +1292,127 @@
     </div>
   </div>
 
-  <!-- MODAL: Custo x Benefício -->
-  <div class="modal fade" id="cxbModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content soft-card p-2">
-        <div class="card p-3 cxbox mb-2">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="mb-0"><i class="bi bi-cash-coin"></i> Custo x Benefício</h6>
-            <div class="d-flex gap-1">
-              <button class="btn btn-sm btn-outline-secondary" id="cxExportCSV"><i class="bi bi-filetype-csv"></i> CSV</button>
-              <button class="btn btn-sm btn-outline-secondary" id="cxShareSum"><i class="bi bi-share"></i> Compartilhar</button>
-            </div>
-          </div>
-          <div class="row g-2">
-            <div class="col-6">
-              <label class="form-label">Preço gasolina (R$/L)</label>
-              <input type="number" step="0.01" min="0" id="cxPreco" class="form-control" placeholder="Ex.: 5,99">
-            </div>
-            <div class="col-6">
-              <label class="form-label">Consumo (km/L)</label>
-              <input type="number" step="0.1" min="0" id="cxKmPorLitro" class="form-control" placeholder="Ex.: 35">
-            </div>
-            <div class="col-6">
-              <label class="form-label">Km rodados</label>
-              <input type="number" step="0.1" min="0" id="cxKmFeitos" class="form-control" placeholder="Ex.: 120">
-            </div>
-            <div class="col-6">
-              <label class="form-label">Quanto ganhou (R$)</label>
-              <input type="number" step="0.01" min="0" id="cxGanho" class="form-control" placeholder="Ex.: 180,00">
-            </div>
-          </div>
-          <hr class="my-2">
-          <div class="row g-2">
-            <div class="col-6">
-              <div class="small text-muted">Custo com combustível</div>
-              <div class="result-badge mono" id="cxCusto">R$ 0,00</div>
-            </div>
-            <div class="col-6">
-              <div class="small text-muted">Custo por km</div>
-              <div class="result-badge mono" id="cxCustoKm">R$ 0,00/km</div>
-            </div>
-            <div class="col-6">
-              <div class="small text-muted">Lucro (ganho − custo)</div>
-              <div class="result-badge mono text-success" id="cxLucro">R$ 0,00</div>
-            </div>
-            <div class="col-6">
-              <div class="small text-muted">Lucro por km</div>
-              <div class="result-badge mono text-success" id="cxLucroKm">R$ 0,00/km</div>
-            </div>
-            <div class="col-12">
-              <div class="small text-muted">Margem (lucro / ganho)</div>
-              <div class="result-badge mono" id="cxMargem">0%</div>
-            </div>
-          </div>
-          <div class="d-grid mt-3">
-            <button class="btn btn-royal" id="cxSalvar"><i class="bi bi-save"></i> Salvar resultado</button>
+ <!-- MODAL: Custo x Benefício -->
+<div class="modal fade" id="cxbModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content soft-card p-2">
+      <!-- Cabeçalho com VOLTAR e FECHAR -->
+      <div class="modal-header border-0">
+        <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-arrow-left"></i> Voltar
+        </button>
+        <h5 class="modal-title ms-2">
+          <i class="bi bi-cash-coin"></i> Custo x Benefício
+        </h5>
+        <button class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+
+      <div class="card p-3 cxbox mb-2">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">Calculadora</h6>
+          <div class="d-flex gap-1">
+            <button class="btn btn-sm btn-outline-secondary" id="cxExportCSV">
+              <i class="bi bi-filetype-csv"></i> CSV
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" id="cxShareSum">
+              <i class="bi bi-share"></i> Compartilhar
+            </button>
           </div>
         </div>
 
-        <div class="card p-3">
-          <div class="d-flex justify-content-between align-items-center">
-            <h6 class="mb-0"><i class="bi bi-clock-history"></i> Histórico</h6>
-            <button class="btn btn-sm btn-outline-danger" id="cxLimpar"><i class="bi bi-trash"></i> Limpar</button>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">Preço gasolina (R$/L)</label>
+            <input type="number" step="0.01" min="0" id="cxPreco" class="form-control" placeholder="Ex.: 5,99">
           </div>
-          <div id="cxHistorico" class="mt-2"></div>
-          <hr class="my-2">
-          <div class="row g-2">
-            <div class="col-6">
-              <div class="small text-muted">Total km</div>
-              <div class="result-badge mono" id="cxTotKm">0</div>
-            </div>
-            <div class="col-6">
-              <div class="small text-muted">Total ganho</div>
-              <div class="result-badge mono" id="cxTotGanho">R$ 0,00</div>
-            </div>
-            <div class="col-6">
-              <div class="small text-muted">Total custo</div>
-              <div class="result-badge mono" id="cxTotCusto">R$ 0,00</div>
-            </div>
-            <div class="col-6">
-              <div class="small text-muted">Total lucro</div>
-              <div class="result-badge mono text-success" id="cxTotLucro">R$ 0,00</div>
-            </div>
+          <div class="col-6">
+            <label class="form-label">Consumo (km/L)</label>
+            <input type="number" step="0.1" min="0" id="cxKmPorLitro" class="form-control" placeholder="Ex.: 35">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Km rodados</label>
+            <input type="number" step="0.1" min="0" id="cxKmFeitos" class="form-control" placeholder="Ex.: 120">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Quanto ganhou (R$)</label>
+            <input type="number" step="0.01" min="0" id="cxGanho" class="form-control" placeholder="Ex.: 180,00">
           </div>
         </div>
 
+        <hr class="my-2">
+
+        <div class="row g-2">
+          <div class="col-6">
+            <div class="small text-muted">Custo com combustível</div>
+            <div class="result-badge mono" id="cxCusto">R$ 0,00</div>
+          </div>
+          <div class="col-6">
+            <div class="small text-muted">Custo por km</div>
+            <div class="result-badge mono" id="cxCustoKm">R$ 0,00/km</div>
+          </div>
+          <div class="col-6">
+            <div class="small text-muted">Lucro (ganho − custo)</div>
+            <div class="result-badge mono text-success" id="cxLucro">R$ 0,00</div>
+          </div>
+          <div class="col-6">
+            <div class="small text-muted">Lucro por km</div>
+            <div class="result-badge mono text-success" id="cxLucroKm">R$ 0,00/km</div>
+          </div>
+          <div class="col-12">
+            <div class="small text-muted">Margem (lucro / ganho)</div>
+            <div class="result-badge mono" id="cxMargem">0%</div>
+          </div>
+        </div>
+
+        <div class="d-grid mt-3">
+          <button class="btn btn-royal" id="cxSalvar">
+            <i class="bi bi-save"></i> Salvar resultado
+          </button>
+        </div>
+      </div>
+
+      <div class="card p-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="mb-0"><i class="bi bi-clock-history"></i> Histórico</h6>
+          <button class="btn btn-sm btn-outline-danger" id="cxLimpar">
+            <i class="bi bi-trash"></i> Limpar
+          </button>
+        </div>
+
+        <div id="cxHistorico" class="mt-2"></div>
+
+        <hr class="my-2">
+
+        <div class="row g-2">
+          <div class="col-6">
+            <div class="small text-muted">Total km</div>
+            <div class="result-badge mono" id="cxTotKm">0</div>
+          </div>
+          <div class="col-6">
+            <div class="small text-muted">Total ganho</div>
+            <div class="result-badge mono" id="cxTotGanho">R$ 0,00</div>
+          </div>
+          <div class="col-6">
+            <div class="small text-muted">Total custo</div>
+            <div class="result-badge mono" id="cxTotCusto">R$ 0,00</div>
+          </div>
+          <div class="col-6">
+            <div class="small text-muted">Total lucro</div>
+            <div class="result-badge mono text-success" id="cxTotLucro">R$ 0,00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rodapé com VOLTAR/FECHAR -->
+      <div class="modal-footer border-0">
+        <button class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+        <button class="btn btn-royal" data-bs-dismiss="modal">
+          <i class="bi bi-arrow-left"></i> Voltar
+        </button>
       </div>
     </div>
   </div>
+</div>
 
   <!-- MODAL: Bloco de Notas -->
 <div class="modal fade" id="notesModal" tabindex="-1" aria-hidden="true">
