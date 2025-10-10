@@ -410,7 +410,6 @@
                       {% else %}—{% endif %}
                     </td>
                     <td class="text-center">{{ x.qtd_entregas if x.qtd_entregas is not none else '-' }}</td>
-                    <!-- data-valor = número puro para soma -->
                     <td class="text-end valor" data-valor="{{ '%.2f'|format(x.valor or 0) }}">R$ {{ '%.2f'|format(x.valor or 0) }}</td>
                   </tr>
                   {% endfor %}
@@ -664,12 +663,12 @@
     const brMoney = (n)=> (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
     const parseBRDate = (s)=>{ if(!s) return null; if(String(s).includes('/')){ const [d,m,y]=s.split('/'); return new Date(+y, +m-1, +d); } const [y,m,d]=String(s).split('-'); return new Date(+y, +m-1, +d); };
 
-    // ====== Inits por aba (reaproveitando seu código original) ======
+    /* ========= INITS POR ABA ========= */
     function wireStars(){
       document.querySelectorAll('.rating-group').forEach(group=>{
         const hidden = group.querySelector('input[type="hidden"]');
         const stars  = group.querySelectorAll('.star');
-        function paintStars(stars, v, hover=false){
+        function paintStars(v, hover=false){
           stars.forEach(s=>{
             const on = Number(s.dataset.v) <= v;
             s.classList.toggle('active', on);
@@ -677,12 +676,11 @@
           });
         }
         stars.forEach(s=>{
-          s.addEventListener('mouseenter',()=>paintStars(stars, Number(s.dataset.v), true));
-          s.addEventListener('mouseleave',()=>paintStars(stars, Number(hidden.value||0), false));
-          s.addEventListener('click',()=>{ hidden.value = Number(s.dataset.v); paintStars(stars, hidden.value, false); group.dataset.userSet='1'; autoGeral(); });
+          s.addEventListener('mouseenter',()=>paintStars(Number(s.dataset.v), true));
+          s.addEventListener('mouseleave',()=>paintStars(Number(hidden.value||0), false));
+          s.addEventListener('click',()=>{ hidden.value = Number(s.dataset.v); paintStars(Number(hidden.value||0), false); group.dataset.userSet='1'; autoGeral(); });
         });
-        // estado inicial
-        const v0 = Number(hidden.value||0); stars.forEach(s=>{}); paintStars(stars, v0, false);
+        paintStars(Number(hidden.value||0), false);
       });
     }
     function autoGeral(){
@@ -701,10 +699,7 @@
       if (vals.length){
         const media = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
         geralHidden.value = media;
-        const stars = g.querySelectorAll('.star');
-        stars.forEach(()=>{}); // no-op
-        // repintar
-        stars.forEach(s=>{
+        g.querySelectorAll('.star').forEach(s=>{
           const on = Number(s.dataset.v) <= media;
           s.classList.toggle('active', on);
           s.classList.toggle('hover', false);
@@ -713,6 +708,8 @@
     }
 
     function initLancar(){
+      const sec = document.querySelector('section[data-view="lancar"].is-active');
+      if(!sec) return;
       const busca = document.getElementById('buscaCoop');
       const select = document.getElementById('selectCoop');
       const itens = Array.from(document.querySelectorAll('.cooperado-item'));
@@ -723,7 +720,6 @@
       const selFoto = document.getElementById('selFoto');
       const selNome = document.getElementById('selNome');
       const selTotal = document.getElementById('selTotal');
-      if(!document.querySelector('section[data-view="lancar"].is-active')) return;
 
       function mostrarCooperado(el){
         if (!el) return;
@@ -736,7 +732,6 @@
         wireStars(); autoGeral();
       }
       itens.forEach(el => el.addEventListener('click', () => mostrarCooperado(el)));
-
       busca?.addEventListener('input', function(){
         const q = this.value.trim().toLowerCase();
         itens.forEach(el => { el.style.display = (el.dataset.nome||'').toLowerCase().includes(q) ? '' : 'none'; });
@@ -775,7 +770,8 @@
     }
 
     function initAvisos(){
-      if(!document.querySelector('section[data-view="avisos"].is-active')) return;
+      const sec = document.querySelector('section[data-view="avisos"].is-active');
+      if(!sec) return;
       const toastOKEl = document.getElementById('toastOK');
       const toastOK = toastOKEl ? new bootstrap.Toast(toastOKEl) : null;
       const badgeTitulo = document.getElementById('badgeTitulo');
@@ -814,7 +810,8 @@
     }
 
     function initLancamentos(){
-      if(!document.querySelector('section[data-view="lancamentos"].is-active')) return;
+      const sec = document.querySelector('section[data-view="lancamentos"].is-active');
+      if(!sec) return;
       const tbody  = document.getElementById('tbodyLanc');
       const ftValor= document.getElementById('ftValor');
       const ftEnt  = document.getElementById('ftEntregas');
@@ -822,8 +819,6 @@
       const kpiE   = document.getElementById('kpiTotalEntregas');
       const grid   = document.getElementById('gridCoop');
       const f      = document.getElementById('formFiltroLanc');
-
-      if(!tbody || !ftValor || !ftEnt || !kpiV || !kpiE || !grid || !f) return;
 
       function getRows(){ return Array.from(tbody.querySelectorAll('tr')); }
 
@@ -857,8 +852,7 @@
         return {totV, totE};
       }
 
-      // filtro de texto local (não envia ao back)
-      f.q?.addEventListener('input', ()=>{
+      f?.q?.addEventListener('input', ()=>{
         const q = (f.q.value||'').toLowerCase().trim();
         getRows().forEach(tr=>{
           const coop = (tr.dataset.coopnome||'').toLowerCase();
@@ -868,8 +862,7 @@
         recomputeTotals();
       });
 
-      // destaca cooperado
-      tbody.addEventListener('click', (e)=>{
+      tbody?.addEventListener('click', (e)=>{
         const td = e.target.closest('.coop-name'); if(!td) return;
         const nome = td.textContent.trim();
         getRows().forEach(r=>{
@@ -877,7 +870,6 @@
         });
       });
 
-      // EXPORTA CSV
       document.getElementById('btnExportCsv')?.addEventListener('click', ()=>{
         const rows = getRows().filter(r=>r.style.display!=='none');
         const header = ['Data','Cooperado','Contrato','Horário','Entregas','Valor (R$)'];
@@ -911,34 +903,36 @@
       recomputeTotals();
     }
 
-    function initEscalas(){ /* nada específico além do próprio formulário */ }
+    function initEscalas(){ /* nada específico */ }
     function initConfig(){ /* nada específico além do togglePwd */ }
 
-    // ====== SPA de Abas (sem alterar links) ======
-    function getViewFromURL(u){
+    /* ========= SPA / Navegação por abas ========= */
+    function getViewFromURL(u, { defaultIfMissing = true } = {}){
       const url = u ? new URL(u, window.location.origin) : window.location;
       const usp = new URLSearchParams(url.search);
-      return usp.get('view') || 'lancar';
+      const v = usp.get('view');
+      return v || (defaultIfMissing ? 'lancar' : null);
     }
+
+    function samePath(urlA, urlB){
+      try{
+        const a = new URL(urlA, location.origin);
+        const b = new URL(urlB, location.origin);
+        return a.pathname === b.pathname;
+      }catch{ return false; }
+    }
+
     function setActiveLink(view){
       document.querySelectorAll('.navmenu a').forEach(a=>{
         a.classList.remove('active');
-        // heurística: se o href contém view=... compara, se não, usa id 'linkAvisos' => 'avisos'
         const href = a.getAttribute('href')||'';
         const v = href.includes('view=') ? (new URL(href, location.origin).searchParams.get('view')) : (a.id==='linkAvisos'?'avisos':null);
         if (v === view) a.classList.add('active');
-        // Cooperados (lancar) pode não ter view por padrão no servidor
         if (!v && view==='lancar' && href.includes('portal_restaurante')) a.classList.add('active');
       });
     }
-    function showView(view){
-      // mostrar/ocultar sections
-      document.querySelectorAll('section[data-view]').forEach(sec=>{
-        sec.classList.toggle('is-active', sec.getAttribute('data-view')===view);
-      });
-      setActiveLink(view);
 
-      // rodar init da aba ativa
+    function runInit(view){
       if(view==='lancar'){ initLancar(); }
       else if(view==='lancamentos'){ initLancamentos(); }
       else if(view==='avisos'){ initAvisos(); }
@@ -946,7 +940,18 @@
       else if(view==='config'){ initConfig(); }
     }
 
-    // Intercepta cliques no menu para SPA
+    function showView(view){
+      document.querySelectorAll('section[data-view]').forEach(sec=>{
+        sec.classList.toggle('is-active', sec.getAttribute('data-view')===view);
+      });
+      setActiveLink(view);
+      runInit(view);
+    }
+
+    // Intercepta cliques do menu somente quando:
+    // - mesmo endpoint do portal (mesmo pathname) E
+    // - tem query view=...
+    // Não intercepta: /logout, /rest_tabelas, /portal_restaurante_avisos etc.
     function handleMenuClicks(){
       const nav = document.querySelector('.navmenu');
       if(!nav) return;
@@ -954,42 +959,73 @@
         const a = e.target.closest('a'); if(!a) return;
         const href = a.getAttribute('href'); if(!href) return;
 
-        // se explicitamente marcado para não usar SPA
-        if (a.hasAttribute('data-no-spa')) return;
+        // Evita SPA se não for o mesmo endpoint do portal
+        if (!samePath(href, location.href)) return;
 
-        // Se link é de "Avisos" (id) -> view=avisos
-        let targetView = null;
-        if (a.id === 'linkAvisos') targetView = 'avisos';
-        else {
-          try { targetView = getViewFromURL(href); } catch(_) {}
-        }
-        if (!targetView) {
-          // não sei qual view é -> deixa seguir normal
-          return;
-        }
+        const targetView = getViewFromURL(href, { defaultIfMissing: false });
+        if (!targetView) return; // sem view -> deixa navegar normal (ex.: logout, tabelas, avisos endpoint dedicado)
 
-        // Evita reload e faz SPA
         e.preventDefault();
-        // Atualiza URL preservando demais parâmetros do link original
         const urlAbs = new URL(href, window.location.origin);
         history.pushState({view: targetView}, '', urlAbs.toString());
         showView(targetView);
       });
     }
 
+    // Intercepta submits dos formulários de filtro (GET no mesmo endpoint) para fazer atualização parcial da seção (ultra-rápido)
+    function handleFilterForms(){
+      document.addEventListener('submit', async (e)=>{
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+
+        // Só GET do mesmo endpoint do portal
+        if ((form.method||'GET').toUpperCase() !== 'GET') return;
+        if (!samePath(form.action || location.href, location.href)) return;
+
+        const fd = new FormData(form);
+        const view = fd.get('view') || getViewFromURL(location.href) || 'lancar';
+        if (!view) return;
+
+        // Monta URL com os params
+        e.preventDefault();
+        const url = new URL(form.action || location.href, location.origin);
+        fd.forEach((v,k)=> url.searchParams.set(k, v));
+
+        // Busca o HTML completo e extrai só a section daquela view
+        const resp = await fetch(url.toString(), { credentials: 'same-origin' });
+        if (!resp.ok){ location.href = url.toString(); return; }
+        const html = await resp.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const newSec = doc.querySelector(`section[data-view="${view}"]`);
+        const curSec = document.querySelector(`section[data-view="${view}"]`);
+        if (newSec && curSec){
+          curSec.innerHTML = newSec.innerHTML; // troca conteúdo da seção
+          // Atualiza URL (sem recarregar)
+          history.pushState({view}, '', url.toString());
+          // Re-inicializa a view
+          runInit(view);
+          // Mantém visível a mesma view
+          showView(view);
+        } else {
+          // fallback hard reload se não achar a section
+          location.href = url.toString();
+        }
+      });
+    }
+
     // Back/forward do navegador
     window.addEventListener('popstate', (ev)=>{
-      const v = ev.state?.view || getViewFromURL();
-      showView(v);
+      const v = ev.state?.view || getViewFromURL(location.href);
+      showView(v || 'lancar');
     });
 
     document.addEventListener('DOMContentLoaded', () => {
-      // Abre a view da URL (ou 'lancar')
-      const view = getViewFromURL();
+      const view = getViewFromURL(location.href);
       showView(view);
       handleMenuClicks();
+      handleFilterForms();
 
-      // Toast de novos avisos na carga inicial
+      // Toast de novos avisos
       const unread = Number(`{{ _toast_unread }}`);
       if (unread > 0) {
         const toastEl = document.getElementById('toastAvisos');
