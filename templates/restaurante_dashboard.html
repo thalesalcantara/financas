@@ -59,6 +59,9 @@
     /* ===== SPA (mostrar/ocultar abas) ===== */
     section[data-view]{ display:none; }
     section[data-view].is-active{ display:block; }
+
+    /* Toast persistente fica sempre visível no canto */
+    #toastAvisos[data-persistent="1"]{ opacity:1 !important; }
   </style>
 </head>
 <body>
@@ -87,10 +90,6 @@
           <i class="bi bi-table"></i><span>Tabelas</span>
         </a>
         {% endif %}
-
-        <a class="{{ 'active' if view=='config' else '' }}" href="{{ url_for('portal_restaurante', view='config') }}">
-          <i class="bi bi-gear"></i><span>Configuração</span>
-        </a>
 
         <a id="linkAvisos" class="{{ 'active' if request.endpoint=='portal_restaurante_avisos' or view=='avisos' else '' }}"
            href="{{ url_for('portal_restaurante_avisos') }}">
@@ -410,6 +409,7 @@
                       {% else %}—{% endif %}
                     </td>
                     <td class="text-center">{{ x.qtd_entregas if x.qtd_entregas is not none else '-' }}</td>
+                    <!-- data-valor = número puro para soma -->
                     <td class="text-end valor" data-valor="{{ '%.2f'|format(x.valor or 0) }}">R$ {{ '%.2f'|format(x.valor or 0) }}</td>
                   </tr>
                   {% endfor %}
@@ -609,19 +609,21 @@
     </main>
   </div>
 
-  <!-- TOAST novos avisos -->
+  <!-- TOAST novos avisos (persistente até ler) -->
   {% set _avisos_for_toast = avisos if avisos is defined and avisos is not none else [] %}
   {% set _unread_from_list_t = (_avisos_for_toast | selectattr('lido','equalto',False) | list | length) %}
   {% set _unread_from_ctx_t = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
   {% set _toast_unread = _unread_from_list_t if _unread_from_list_t>0 else _unread_from_ctx_t %}
   <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1055;">
-    <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="8000">
+    <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
+         data-bs-autohide="false" data-bs-delay="8000" data-persistent="1">
       <div class="toast-header">
         <i class="bi bi-megaphone-fill me-2"></i><strong class="me-auto">Novos avisos</strong><small>agora</small>
         <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
       </div>
       <div class="toast-body">
-        Você tem {{ _toast_unread }} aviso(s) não lido(s). <a href="{{ url_for('portal_restaurante_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
+        Você tem <b><span id="toastUnreadCount">{{ _toast_unread }}</span></b> aviso(s) não lido(s).
+        <a id="toastVerAgora" href="{{ url_for('portal_restaurante_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
       </div>
     </div>
   </div>
@@ -663,7 +665,7 @@
     const brMoney = (n)=> (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
     const parseBRDate = (s)=>{ if(!s) return null; if(String(s).includes('/')){ const [d,m,y]=s.split('/'); return new Date(+y, +m-1, +d); } const [y,m,d]=String(s).split('-'); return new Date(+y, +m-1, +d); };
 
-    /* ========= INITS POR ABA ========= */
+    // ===== Estrelas =====
     function wireStars(){
       document.querySelectorAll('.rating-group').forEach(group=>{
         const hidden = group.querySelector('input[type="hidden"]');
@@ -699,7 +701,8 @@
       if (vals.length){
         const media = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
         geralHidden.value = media;
-        g.querySelectorAll('.star').forEach(s=>{
+        const stars = g.querySelectorAll('.star');
+        stars.forEach(s=>{
           const on = Number(s.dataset.v) <= media;
           s.classList.toggle('active', on);
           s.classList.toggle('hover', false);
@@ -707,9 +710,9 @@
       }
     }
 
+    // ===== Inits por view =====
     function initLancar(){
-      const sec = document.querySelector('section[data-view="lancar"].is-active');
-      if(!sec) return;
+      if(!document.querySelector('section[data-view="lancar"].is-active')) return;
       const busca = document.getElementById('buscaCoop');
       const select = document.getElementById('selectCoop');
       const itens = Array.from(document.querySelectorAll('.cooperado-item'));
@@ -770,20 +773,20 @@
     }
 
     function initAvisos(){
-      const sec = document.querySelector('section[data-view="avisos"].is-active');
-      if(!sec) return;
+      if(!document.querySelector('section[data-view="avisos"].is-active')) return;
       const toastOKEl = document.getElementById('toastOK');
       const toastOK = toastOKEl ? new bootstrap.Toast(toastOKEl) : null;
       const badgeTitulo = document.getElementById('badgeTitulo');
       const badgeSidebar = document.querySelector('#linkAvisos .badge');
-      function getUnreadCount(){ return document.querySelectorAll('.aviso-card[data-lido="0"]').length; }
-      function refreshBadges(){
-        const n = getUnreadCount();
+      function getUnreadCountLocal(){ return document.querySelectorAll('.aviso-card[data-lido="0"]').length; }
+      function refreshBadgesLocal(){
+        const n = getUnreadCountLocal();
         if (badgeTitulo){
           badgeTitulo.className = 'badge ' + (n > 0 ? 'text-bg-danger' : 'text-bg-success');
           badgeTitulo.textContent = n > 0 ? (n + ' não lido(s)') : 'Tudo lido';
         }
         if (badgeSidebar){ badgeSidebar.style.display = n>0 ? '' : 'none'; if (n>0) badgeSidebar.textContent = n; }
+        setToastUnread(n);
       }
       const toggleNaoLidos = document.getElementById('toggleNaoLidos');
       toggleNaoLidos?.addEventListener('change', () => {
@@ -801,17 +804,16 @@
             if (resp.ok){
               card.setAttribute('data-lido','1'); card.classList.add('lido');
               const meta = card.querySelector('.text-muted.small'); if (meta) meta.innerHTML += ' • <span class="text-success">Lido</span>';
-              btn.remove(); refreshBadges(); toastOK?.show();
+              btn.remove(); refreshBadgesLocal(); toastOK?.show();
             } else { alert('Não foi possível marcar como lido ('+resp.status+').'); }
           } catch(e){ alert('Falha de rede.'); }
         });
       });
-      refreshBadges();
+      refreshBadgesLocal();
     }
 
     function initLancamentos(){
-      const sec = document.querySelector('section[data-view="lancamentos"].is-active');
-      if(!sec) return;
+      if(!document.querySelector('section[data-view="lancamentos"].is-active')) return;
       const tbody  = document.getElementById('tbodyLanc');
       const ftValor= document.getElementById('ftValor');
       const ftEnt  = document.getElementById('ftEntregas');
@@ -819,6 +821,8 @@
       const kpiE   = document.getElementById('kpiTotalEntregas');
       const grid   = document.getElementById('gridCoop');
       const f      = document.getElementById('formFiltroLanc');
+
+      if(!tbody || !ftValor || !ftEnt || !kpiV || !kpiE || !grid || !f) return;
 
       function getRows(){ return Array.from(tbody.querySelectorAll('tr')); }
 
@@ -852,7 +856,8 @@
         return {totV, totE};
       }
 
-      f?.q?.addEventListener('input', ()=>{
+      // filtro de texto local (não vai ao back)
+      f.q?.addEventListener('input', ()=>{
         const q = (f.q.value||'').toLowerCase().trim();
         getRows().forEach(tr=>{
           const coop = (tr.dataset.coopnome||'').toLowerCase();
@@ -862,7 +867,8 @@
         recomputeTotals();
       });
 
-      tbody?.addEventListener('click', (e)=>{
+      // destaca cooperado
+      tbody.addEventListener('click', (e)=>{
         const td = e.target.closest('.coop-name'); if(!td) return;
         const nome = td.textContent.trim();
         getRows().forEach(r=>{
@@ -870,6 +876,7 @@
         });
       });
 
+      // EXPORTA CSV
       document.getElementById('btnExportCsv')?.addEventListener('click', ()=>{
         const rows = getRows().filter(r=>r.style.display!=='none');
         const header = ['Data','Cooperado','Contrato','Horário','Entregas','Valor (R$)'];
@@ -903,36 +910,32 @@
       recomputeTotals();
     }
 
-    function initEscalas(){ /* nada específico */ }
-    function initConfig(){ /* nada específico além do togglePwd */ }
+    function initEscalas(){}
+    function initConfig(){}
 
-    /* ========= SPA / Navegação por abas ========= */
-    function getViewFromURL(u, { defaultIfMissing = true } = {}){
+    // ===== Helpers SPA =====
+    function getViewFromURL(u){
       const url = u ? new URL(u, window.location.origin) : window.location;
       const usp = new URLSearchParams(url.search);
-      const v = usp.get('view');
-      return v || (defaultIfMissing ? 'lancar' : null);
+      return usp.get('view') || 'lancar';
     }
-
-    function samePath(urlA, urlB){
-      try{
-        const a = new URL(urlA, location.origin);
-        const b = new URL(urlB, location.origin);
-        return a.pathname === b.pathname;
-      }catch{ return false; }
-    }
-
     function setActiveLink(view){
       document.querySelectorAll('.navmenu a').forEach(a=>{
         a.classList.remove('active');
         const href = a.getAttribute('href')||'';
-        const v = href.includes('view=') ? (new URL(href, location.origin).searchParams.get('view')) : (a.id==='linkAvisos'?'avisos':null);
+        let v = null;
+        if (href.includes('view=')) {
+          try{ v = (new URL(href, location.origin)).searchParams.get('view'); }catch{}
+        } else if (a.id==='linkAvisos'){ v = 'avisos'; }
         if (v === view) a.classList.add('active');
         if (!v && view==='lancar' && href.includes('portal_restaurante')) a.classList.add('active');
       });
     }
-
-    function runInit(view){
+    function showView(view){
+      document.querySelectorAll('section[data-view]').forEach(sec=>{
+        sec.classList.toggle('is-active', sec.getAttribute('data-view')===view);
+      });
+      setActiveLink(view);
       if(view==='lancar'){ initLancar(); }
       else if(view==='lancamentos'){ initLancamentos(); }
       else if(view==='avisos'){ initAvisos(); }
@@ -940,97 +943,175 @@
       else if(view==='config'){ initConfig(); }
     }
 
-    function showView(view){
-      document.querySelectorAll('section[data-view]').forEach(sec=>{
-        sec.classList.toggle('is-active', sec.getAttribute('data-view')===view);
-      });
-      setActiveLink(view);
-      runInit(view);
+    function canSoftNavigate(href){
+      if (!href) return false;
+      const abs = new URL(href, location.origin);
+      // NÃO intercepta logout nem tabelas
+      if (abs.pathname.includes('/logout')) return false;
+      if (abs.pathname.includes('rest_tabelas')) return false;
+      // Só SPA para a mesma rota base (portal_restaurante) e link avisos
+      if (abs.pathname.includes('portal_restaurante')) return true;
+      if (abs.pathname.includes('portal_restaurante_avisos')) return true;
+      return false;
     }
 
-    // Intercepta cliques do menu somente quando:
-    // - mesmo endpoint do portal (mesmo pathname) E
-    // - tem query view=...
-    // Não intercepta: /logout, /rest_tabelas, /portal_restaurante_avisos etc.
+    async function softLoad(href){
+      try{
+        const resp = await fetch(href, {credentials:'same-origin'});
+        if(!resp.ok) return false;
+        const html = await resp.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const targetView = getViewFromURL(href);
+
+        // Se a página tem sections, pega a section certa; se não, pega main.content
+        let newSection = doc.querySelector(`section[data-view="${targetView}"]`);
+        const curMain = document.querySelector('main.content');
+        if (newSection){
+          const curSection = document.querySelector(`section[data-view="${targetView}"]`);
+          if (!curSection) return false;
+          curSection.innerHTML = newSection.innerHTML;
+          document.querySelectorAll('section[data-view]').forEach(s=>s.classList.toggle('is-active', s===curSection));
+          history.pushState({view: targetView}, '', (new URL(href, location.origin)).toString());
+          showView(targetView);
+          return true;
+        } else {
+          const newMain = doc.querySelector('main.content');
+          if (!newMain || !curMain) return false;
+          curMain.innerHTML = newMain.innerHTML;
+          history.pushState({}, '', (new URL(href, location.origin)).toString());
+          // tenta deduzir view
+          showView(targetView || 'lancar');
+          return true;
+        }
+      }catch(e){ return false; }
+    }
+
+    // Intercepta cliques no menu para SPA
     function handleMenuClicks(){
       const nav = document.querySelector('.navmenu');
       if(!nav) return;
-      nav.addEventListener('click', (e)=>{
+      nav.addEventListener('click', async (e)=>{
         const a = e.target.closest('a'); if(!a) return;
         const href = a.getAttribute('href'); if(!href) return;
 
-        // Evita SPA se não for o mesmo endpoint do portal
-        if (!samePath(href, location.href)) return;
-
-        const targetView = getViewFromURL(href, { defaultIfMissing: false });
-        if (!targetView) return; // sem view -> deixa navegar normal (ex.: logout, tabelas, avisos endpoint dedicado)
+        if (!canSoftNavigate(href)) return; // deixa navegar normal
 
         e.preventDefault();
-        const urlAbs = new URL(href, window.location.origin);
-        history.pushState({view: targetView}, '', urlAbs.toString());
-        showView(targetView);
+        const ok = await softLoad(href);
+        if (!ok) window.location.href = href; // fallback
       });
     }
 
-    // Intercepta submits dos formulários de filtro (GET no mesmo endpoint) para fazer atualização parcial da seção (ultra-rápido)
-    function handleFilterForms(){
+    // Intercepta formulários GET das abas SPA para carregar apenas a section
+    function handleSectionForms(){
       document.addEventListener('submit', async (e)=>{
-        const form = e.target;
-        if (!(form instanceof HTMLFormElement)) return;
+        const form = e.target.closest('form'); if(!form) return;
+        if (form.method?.toUpperCase() !== 'GET') return;
+        const action = form.getAttribute('action')||'';
+        if (!action.includes('portal_restaurante')) return;
 
-        // Só GET do mesmo endpoint do portal
-        if ((form.method||'GET').toUpperCase() !== 'GET') return;
-        if (!samePath(form.action || location.href, location.href)) return;
+        const formData = new FormData(form);
+        const usp = new URLSearchParams(formData);
+        const href = action + (action.includes('?')?'&':'?') + usp.toString();
 
-        const fd = new FormData(form);
-        const view = fd.get('view') || getViewFromURL(location.href) || 'lancar';
-        if (!view) return;
-
-        // Monta URL com os params
         e.preventDefault();
-        const url = new URL(form.action || location.href, location.origin);
-        fd.forEach((v,k)=> url.searchParams.set(k, v));
-
-        // Busca o HTML completo e extrai só a section daquela view
-        const resp = await fetch(url.toString(), { credentials: 'same-origin' });
-        if (!resp.ok){ location.href = url.toString(); return; }
-        const html = await resp.text();
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        const newSec = doc.querySelector(`section[data-view="${view}"]`);
-        const curSec = document.querySelector(`section[data-view="${view}"]`);
-        if (newSec && curSec){
-          curSec.innerHTML = newSec.innerHTML; // troca conteúdo da seção
-          // Atualiza URL (sem recarregar)
-          history.pushState({view}, '', url.toString());
-          // Re-inicializa a view
-          runInit(view);
-          // Mantém visível a mesma view
-          showView(view);
-        } else {
-          // fallback hard reload se não achar a section
-          location.href = url.toString();
-        }
+        const ok = await softLoad(href);
+        if (!ok) window.location.href = href;
       });
     }
 
-    // Back/forward do navegador
+    // ===== Avisos: toast persistente + polling =====
+    let toastAvisos = null;
+    function getToastEl(){ return document.getElementById('toastAvisos'); }
+    function setToastUnread(n){
+      const el = document.getElementById('toastUnreadCount');
+      if (el) el.textContent = String(n);
+      // badge no menu
+      const badgeSidebar = document.querySelector('#linkAvisos .badge');
+      if (badgeSidebar){
+        if (n>0){ badgeSidebar.style.display=''; badgeSidebar.textContent = n; }
+        else { badgeSidebar.style.display='none'; }
+      }
+      // mostra/oculta toast
+      if (!toastAvisos){
+        const te = getToastEl();
+        if (te) toastAvisos = new bootstrap.Toast(te, { autohide: false });
+      }
+      if (toastAvisos){
+        if (n>0){
+          // re-exibe sempre que fechar enquanto houver não lidos
+          const te = getToastEl();
+          if (te){
+            te.addEventListener('hidden.bs.toast', ()=>{ if (Number(document.getElementById('toastUnreadCount')?.textContent||'0')>0) setTimeout(()=>toastAvisos.show(), 1200); }, { once:true });
+          }
+          toastAvisos.show();
+        } else {
+          toastAvisos.hide();
+        }
+      }
+    }
+
+    async function pollUnreadLoop(){
+      try{
+        const linkAvisos = document.getElementById('linkAvisos');
+        const href = linkAvisos?.getAttribute('href');
+        if (href){
+          const resp = await fetch(href, {credentials:'same-origin'});
+          if (resp.ok){
+            const html = await resp.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            // Conta na página remota
+            const unreadCards = doc.querySelectorAll('.aviso-card[data-lido="0"]').length;
+            // se não veio o corpo, tenta badge do título
+            let n = unreadCards;
+            if (!n){
+              const b = doc.querySelector('#badgeTitulo');
+              if (b){
+                const m = b.textContent.match(/\d+/);
+                if (m) n = Number(m[0]);
+              }
+            }
+            setToastUnread(n||0);
+          }
+        }
+      }catch(_){}
+      // repete
+      setTimeout(pollUnreadLoop, 25000);
+    }
+
+    // Clique “Ver agora” do toast usa SPA
+    function wireToastVerAgora(){
+      const a = document.getElementById('toastVerAgora');
+      if (!a) return;
+      a.addEventListener('click', async (e)=>{
+        const href = a.getAttribute('href'); if(!href) return;
+        if (!canSoftNavigate(href)) return; // caso especial
+        e.preventDefault();
+        const ok = await softLoad(href);
+        if (!ok) window.location.href = href;
+      });
+    }
+
+    // Back/forward
     window.addEventListener('popstate', (ev)=>{
-      const v = ev.state?.view || getViewFromURL(location.href);
-      showView(v || 'lancar');
+      const v = ev.state?.view || getViewFromURL();
+      showView(v);
     });
 
     document.addEventListener('DOMContentLoaded', () => {
-      const view = getViewFromURL(location.href);
+      // Abre a view da URL (ou 'lancar')
+      const view = getViewFromURL();
       showView(view);
       handleMenuClicks();
-      handleFilterForms();
+      handleSectionForms();
+      wireToastVerAgora();
 
-      // Toast de novos avisos
-      const unread = Number(`{{ _toast_unread }}`);
-      if (unread > 0) {
-        const toastEl = document.getElementById('toastAvisos');
-        if (toastEl) { const t = new bootstrap.Toast(toastEl); setTimeout(()=>t.show(), 600); }
-      }
+      // Toast inicial (persistente)
+      const unreadServer = Number(`{{ _toast_unread }}`) || 0;
+      setToastUnread(unreadServer);
+
+      // Polling periódico para manter badge/toast atualizados sem mexer no back-end
+      pollUnreadLoop();
     });
   </script>
 </body>
