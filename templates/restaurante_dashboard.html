@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-br" data-theme="">
 <head>
   <meta charset="UTF-8">
   <title>Portal do Estabelecimento</title>
@@ -11,66 +11,101 @@
     :root{
       --royal:#2141d9; --royal-2:#3654e6; --royal-3:#eaf0ff;
       --ink:#0b1220; --muted:#6b7280; --soft:#f5f7ff; --danger:#e74c3c; --ok:#16a34a;
-      --border:#e6e9f2; --chip:#eef1ff;
+      --border:#e6e9f2; --chip:#eef1ff; --bg:#ffffff; --card:#ffffff; --shadow:0 1px 0 #0000000a;
+      --badge-danger:#dc3545; --badge-text:#fff;
     }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg:#0b1220; --ink:#e6e6e6; --muted:#a6adc8; --soft:#0f172a; --border:#243045; --chip:#111b33;
+        --royal-3:#0f1933; --card:#0e1424; --shadow:0 1px 0 #00000022;
+      }
+    }
+    /* tema forçado por toggle */
+    [data-theme="dark"]{
+      --bg:#0b1220; --ink:#e6e6e6; --muted:#a6adc8; --soft:#0f172a; --border:#243045; --chip:#111b33;
+      --royal-3:#0f1933; --card:#0e1424; --shadow:0 1px 0 #00000022;
+    }
+    [data-theme="light"]{
+      --bg:#ffffff; --ink:#0b1220; --muted:#6b7280; --soft:#f5f7ff; --border:#e6e9f2; --chip:#eef1ff;
+      --royal-3:#eaf0ff; --card:#ffffff; --shadow:0 1px 0 #0000000a;
+    }
+
     html,body{ height:100%; }
-    body{ background:#fff; color:#111827; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif; }
+    body{ background:var(--bg); color:var(--ink); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif; }
     a{ text-decoration:none; }
     .shell{ display:grid; grid-template-columns: 260px 1fr; min-height:100vh; }
     .aside{
       background:linear-gradient(180deg, var(--royal) 0%, var(--royal-2) 100%);
       color:#fff; padding:18px 16px; position:sticky; top:0; height:100dvh;
     }
-    .brand{ font-weight:800; letter-spacing:.5px; font-size:1.15rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.08); display:flex; align-items:center; gap:8px; }
+    .brand{ font-weight:800; letter-spacing:.5px; font-size:1.15rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.10); display:flex; align-items:center; gap:8px; justify-content:space-between; }
     .navmenu{ margin-top:18px; display:flex; flex-direction:column; gap:6px; }
-    .navmenu a{ color:#fff; padding:10px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600; }
+    .navmenu a{ color:#fff; padding:10px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600; position:relative; }
     .navmenu a.active, .navmenu a:hover{ background:rgba(255,255,255,.14); }
     .navmenu .badge{ margin-left:auto; }
+    .theme-btn{ background:transparent; border:0; color:#fff; font-size:1.1rem; display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
     .content{ padding:24px clamp(14px,3vw,32px); }
     .section-title{ color:var(--royal); font-weight:800; font-size:1.25rem; display:flex; gap:10px; align-items:center; }
-    .card{ border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 0 #0000000a; }
-    .card-soft{ background:#fff; border:1px solid var(--border); border-radius:14px; padding:14px; }
-    .chip{ background:var(--chip); border:1px solid var(--border); border-radius:999px; padding:.2rem .65rem; font-weight:700; }
+    .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); }
+    .card-soft{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; }
+    .chip{ background:var(--chip); border:1px solid var(--border); border-radius:999px; padding:.2rem .65rem; font-weight:700; color:var(--ink); }
+    .table{ color:var(--ink); }
+    .table thead{ background:color-mix(in oklab, var(--royal-3) 60%, transparent); }
     .table-compact th,.table-compact td{ padding:.5rem .6rem; }
     .btn-royal{ background:var(--royal); color:#fff; border:none; }
     .btn-royal:hover{ background:var(--royal-2); color:#fff; }
-    .btn-outline-royal{ border:1px solid var(--royal); color:#royal; }
+    .btn-outline-royal{ border:1px solid var(--royal); color:var(--royal); }
     .btn-outline-royal:hover{ background:var(--royal); color:#fff; }
+    .btn-outline-danger{ color:#e74c3c; border-color:#e74c3c; }
+    .btn-outline-danger:hover{ background:#e74c3c; color:#fff; }
     .cooperado-avatar{ width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 1px 0 #0001; }
     .cooperado-item{ display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; cursor:pointer; }
-    .cooperado-item:hover{ background:#f8faff; }
-    .cooperado-item.selected{ outline:2px solid var(--royal); background:#f0f4ff; }
-    .selected-header .big{ width:180px; height:180px; border-radius:50%; object-fit:cover; border:6px solid var(--royal); box-shadow:0 6px 16px #0002; }
+    .cooperado-item:hover{ background:rgba(33,65,217,.06); }
+    .cooperado-item.selected{ outline:2px solid var(--royal); background:color-mix(in oklab, var(--royal-3) 60%, transparent); }
+    .selected-header .big{ width:180px; height:180px; border-radius:50%; object-fit:cover; border:6px solid var(--royal); box-shadow:0 6px 16px #0003; }
     .rating-group{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .rating-label{ width:160px; font-weight:700; color:#1f2937; }
+    .rating-label{ width:160px; font-weight:700; color:var(--ink); }
     .stars{ display:inline-flex; gap:3px; font-size:1.4rem; cursor:pointer; }
     .star{ color:#cbd5e1; transition:transform .06s; }
     .star.active,.star.hover{ color:#fbbf24; }
     .star:active{ transform:scale(.9); }
     .sticky-tools{ position:sticky; top:12px; }
-    .kpi{ background:#fafcff; border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
+    .kpi{ background:color-mix(in oklab, var(--royal-3) 55%, transparent); border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
     .kpi .v{ font-weight:800; font-size:1.05rem; }
-    @media (max-width: 920px){
-      .shell{ grid-template-columns: 66px 1fr; }
-      .brand span{ display:none; }
-      .navmenu a span{ display:none; }
-    }
 
     /* ===== SPA (mostrar/ocultar abas) ===== */
     section[data-view]{ display:none; }
     section[data-view].is-active{ display:block; }
 
-    /* Toast persistente fica sempre visível no canto */
+    /* Toast persistente */
     #toastAvisos[data-persistent="1"]{ opacity:1 !important; }
+
+    /* bolinha de aviso sempre visível no item "Avisos" (e espelhável em outras abas, via JS) */
+    .notif-dot{
+      position:absolute; right:10px; top:50%; transform:translateY(-50%);
+      min-width:18px; height:18px; border-radius:9px;
+      background:var(--badge-danger); color:var(--badge-text); font-weight:700; font-size:.70rem;
+      display:flex; align-items:center; justify-content:center; padding:0 6px;
+      box-shadow:0 0 0 2px rgba(255,255,255,.35);
+    }
+
+    @media (max-width: 920px){
+      .shell{ grid-template-columns: 66px 1fr; }
+      .brand span{ display:none; }
+      .navmenu a span{ display:none; }
+    }
   </style>
 </head>
 <body>
   <div class="shell">
     <!-- ============ Aside ============ -->
     <aside class="aside">
-      <div class="brand"><i class="bi bi-building"></i><span>Portal do Estabelecimento</span></div>
+      <div class="brand">
+        <span><i class="bi bi-building"></i> <strong>Portal do Estabelecimento</strong></span>
+        <button id="themeToggle" class="theme-btn" title="Alternar tema"><i class="bi bi-moon-stars"></i></button>
+      </div>
       <nav class="navmenu">
-        <!-- Links originais mantidos -->
+        <!-- NENHUM LINK ALTERADO -->
         <a class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos']) else '' }}"
            href="{{ url_for('portal_restaurante', view='lancar', data_inicio=filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else None, data_fim=filtro_fim.strftime('%Y-%m-%d') if filtro_fim else None) }}">
           <i class="bi bi-person-lines-fill"></i><span>Cooperados</span>
@@ -82,7 +117,7 @@
         </a>
 
         <a class="{{ 'active' if view=='escalas' else '' }}" href="{{ url_for('portal_restaurante', view='escalas') }}">
-          <i class="bi bi-calendar-week"></i><span>Escala semanal</span>
+          <i class="bi bi-calendar-week"></i><span>Escala</span>
         </a>
 
         {% if session.get('user_tipo') == 'restaurante' %}
@@ -90,6 +125,10 @@
           <i class="bi bi-table"></i><span>Tabelas</span>
         </a>
         {% endif %}
+
+        <a class="{{ 'active' if view=='config' else '' }}" href="{{ url_for('portal_restaurante', view='config') }}">
+          <i class="bi bi-gear"></i><span>Configuração</span>
+        </a>
 
         <a id="linkAvisos" class="{{ 'active' if request.endpoint=='portal_restaurante_avisos' or view=='avisos' else '' }}"
            href="{{ url_for('portal_restaurante_avisos') }}">
@@ -639,38 +678,50 @@
     </div>
   </div>
 
-  <!-- Modal Avaliação -->
-  <div class="modal fade" id="modalAval" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header"><h5 class="modal-title"><i class="bi bi-stars me-1"></i> Deseja avaliar agora?</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
-        <div class="modal-body">Você pode registrar a avaliação do cooperado agora ou enviar o lançamento sem avaliação.</div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" id="btnPularAval">Pular e enviar</button>
-          <button type="button" class="btn btn-royal" id="btnAvaliarAgora">Avaliar agora</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    /* ===== Tema (modo escuro/claro) ===== */
+    (function themeBoot(){
+      const stored = localStorage.getItem('portal-theme');
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', stored || (prefersDark ? 'dark' : ''));
+      const btn = document.getElementById('themeToggle');
+      function syncIcon(){
+        const isDark = document.documentElement.getAttribute('data-theme')==='dark';
+        btn.innerHTML = isDark ? '<i class="bi bi-brightness-high"></i>' : '<i class="bi bi-moon-stars"></i>';
+      }
+      btn?.addEventListener('click', ()=>{
+        const cur = document.documentElement.getAttribute('data-theme');
+        const next = cur==='dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('portal-theme', next);
+        syncIcon();
+      });
+      syncIcon();
+    })();
+
     function togglePwd(btn){
       const i = btn.previousElementSibling; if(!i) return;
       i.type = i.type==='password'?'text':'password';
       btn.querySelector('i').classList.toggle('bi-eye');
       btn.querySelector('i').classList.toggle('bi-eye-slash');
     }
+
     const brMoney = (n)=> (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
     const parseBRDate = (s)=>{ if(!s) return null; if(String(s).includes('/')){ const [d,m,y]=s.split('/'); return new Date(+y, +m-1, +d); } const [y,m,d]=String(s).split('-'); return new Date(+y, +m-1, +d); };
 
+    // ====== Preservar rolagem por ABA (view) ======
+    const scrollMem = {
+      get(view){ try{ return Number(sessionStorage.getItem('scroll-'+view)||0); }catch{ return 0; } },
+      set(view,y){ try{ sessionStorage.setItem('scroll-'+view, String(y||0)); }catch{} }
+    };
+
     // ===== Estrelas =====
-    function wireStars(){
-      document.querySelectorAll('.rating-group').forEach(group=>{
+    function wireStars(ctx=document){
+      ctx.querySelectorAll('.rating-group').forEach(group=>{
         const hidden = group.querySelector('input[type="hidden"]');
         const stars  = group.querySelectorAll('.star');
-        function paintStars(v, hover=false){
+        function paint(v, hover=false){
           stars.forEach(s=>{
             const on = Number(s.dataset.v) <= v;
             s.classList.toggle('active', on);
@@ -678,15 +729,15 @@
           });
         }
         stars.forEach(s=>{
-          s.addEventListener('mouseenter',()=>paintStars(Number(s.dataset.v), true));
-          s.addEventListener('mouseleave',()=>paintStars(Number(hidden.value||0), false));
-          s.addEventListener('click',()=>{ hidden.value = Number(s.dataset.v); paintStars(Number(hidden.value||0), false); group.dataset.userSet='1'; autoGeral(); });
+          s.addEventListener('mouseenter',()=>paint(Number(s.dataset.v), true));
+          s.addEventListener('mouseleave',()=>paint(Number(hidden.value||0), false));
+          s.addEventListener('click',()=>{ hidden.value = Number(s.dataset.v); paint(Number(hidden.value||0), false); group.dataset.userSet='1'; autoGeral(ctx); });
         });
-        paintStars(Number(hidden.value||0), false);
+        paint(Number(hidden.value||0), false);
       });
     }
-    function autoGeral(){
-      const g = document.querySelector('.rating-group[data-name="av_geral"]');
+    function autoGeral(ctx=document){
+      const g = ctx.querySelector('.rating-group[data-name="av_geral"]');
       if(!g) return;
       const geralHidden = g.querySelector('input[type="hidden"]');
       const userSet = g.dataset.userSet === '1';
@@ -694,7 +745,7 @@
       const nomes = ['av_pontualidade','av_educacao','av_eficiencia','av_apresentacao'];
       const vals = [];
       nomes.forEach(n=>{
-        const grp = document.querySelector(`.rating-group[data-name="${n}"]`);
+        const grp = ctx.querySelector(`.rating-group[data-name="${n}"]`);
         const v = Number(grp?.querySelector('input[type="hidden"]')?.value||0);
         if (v>0) vals.push(v);
       });
@@ -711,8 +762,8 @@
     }
 
     // ===== Inits por view =====
-    function initLancar(){
-      if(!document.querySelector('section[data-view="lancar"].is-active')) return;
+    function initLancar(ctx=document){
+      const sec = ctx.querySelector('section[data-view="lancar"].is-active'); if(!sec) return;
       const busca = document.getElementById('buscaCoop');
       const select = document.getElementById('selectCoop');
       const itens = Array.from(document.querySelectorAll('.cooperado-item'));
@@ -754,26 +805,35 @@
       }
       if (form && modalAval) {
         let allowSubmit = false;
-        form.addEventListener('submit', function(e) {
-          if (allowSubmit) return;
+        form.addEventListener('submit', async function(e) {
+          if (allowSubmit) return; // já confirmado
           const jaMarcouAvaliar = inputAvaliar?.value === '1';
           const temAlgoPreenchido = algumCampoDeAvaliacaoPreenchido();
-          if (!jaMarcouAvaliar && !temAlgoPreenchido) { e.preventDefault(); modalAval.show(); }
+          if (!jaMarcouAvaliar && !temAlgoPreenchido) { e.preventDefault(); modalAval.show(); return; }
+
+          // ======= SUBMIT AJAX sem piscar =======
+          e.preventDefault();
+          const submitBtn = form.querySelector('button[type="submit"]');
+          submitBtn?.setAttribute('disabled','disabled');
+          const formData = new FormData(form);
+          try{
+            const resp = await fetch(form.action, { method:'POST', body: formData });
+            if (resp.redirected || resp.ok){
+              // Recarrega somente a section atual via softLoad para atualizar listas sem perder rolagem
+              await softLoad(new URL(window.location.href));
+            } else {
+              alert('Falha ao lançar ('+resp.status+').');
+            }
+          }catch(_){ alert('Falha de rede ao lançar.'); }
+          finally{ submitBtn?.removeAttribute('disabled'); }
         });
-        document.getElementById('btnAvaliarAgora')?.addEventListener('click', () => {
-          if (boxAval && inputAvaliar) {
-            boxAval.style.display = 'block'; inputAvaliar.value = '1'; if (chkAvaliar) chkAvaliar.checked = true;
-            modalAval.hide(); boxAval.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        });
-        document.getElementById('btnPularAval')?.addEventListener('click', () => { modalAval.hide(); allowSubmit = true; form.submit(); });
       }
 
       document.addEventListener('click', (e)=>{ if (e.target.closest('.rating-group')) autoGeral(); });
     }
 
-    function initAvisos(){
-      if(!document.querySelector('section[data-view="avisos"].is-active')) return;
+    function initAvisos(ctx=document){
+      const sec = ctx.querySelector('section[data-view="avisos"].is-active'); if(!sec) return;
       const toastOKEl = document.getElementById('toastOK');
       const toastOK = toastOKEl ? new bootstrap.Toast(toastOKEl) : null;
       const badgeTitulo = document.getElementById('badgeTitulo');
@@ -812,8 +872,8 @@
       refreshBadgesLocal();
     }
 
-    function initLancamentos(){
-      if(!document.querySelector('section[data-view="lancamentos"].is-active')) return;
+    function initLancamentos(ctx=document){
+      const sec = ctx.querySelector('section[data-view="lancamentos"].is-active'); if(!sec) return;
       const tbody  = document.getElementById('tbodyLanc');
       const ftValor= document.getElementById('ftValor');
       const ftEnt  = document.getElementById('ftEntregas');
@@ -821,7 +881,6 @@
       const kpiE   = document.getElementById('kpiTotalEntregas');
       const grid   = document.getElementById('gridCoop');
       const f      = document.getElementById('formFiltroLanc');
-
       if(!tbody || !ftValor || !ftEnt || !kpiV || !kpiE || !grid || !f) return;
 
       function getRows(){ return Array.from(tbody.querySelectorAll('tr')); }
@@ -852,7 +911,6 @@
             <div>Total: <b>R$ ${brMoney(p.valor)}</b></div></div>`;
           grid.appendChild(div);
         });
-
         return {totV, totE};
       }
 
@@ -882,7 +940,6 @@
         const header = ['Data','Cooperado','Contrato','Horário','Entregas','Valor (R$)'];
         const linhas = [header];
         let totE = 0, totV = 0;
-
         rows.forEach(r=>{
           const data      = r.cells[0].textContent.trim();
           const coop      = r.cells[1].textContent.trim();
@@ -895,7 +952,6 @@
           totE += entregas; totV += valorNum;
           linhas.push([data, coop, contrato, horario, String(entregas), valorStr]);
         });
-
         const totalStr = totV.toFixed(2).replace('.',',');
         linhas.push(['Totais','','','', String(totE), totalStr]);
         const csv = '\uFEFF' + linhas.map(l=>l.join(';')).join('\n');
@@ -910,8 +966,8 @@
       recomputeTotals();
     }
 
-    function initEscalas(){}
-    function initConfig(){}
+    function initEscalas(){ /* nada especial */ }
+    function initConfig(){ /* nada especial */ }
 
     // ===== Helpers SPA =====
     function getViewFromURL(u){
@@ -941,15 +997,23 @@
       else if(view==='avisos'){ initAvisos(); }
       else if(view==='escalas'){ initEscalas(); }
       else if(view==='config'){ initConfig(); }
+
+      // restaurar rolagem da view
+      const y = scrollMem.get(view);
+      if (y) window.scrollTo({top:y, left:0, behavior:'instant'});
     }
+
+    // intercepta rolagem para memorizar por view
+    document.addEventListener('scroll', ()=>{
+      const v = getViewFromURL();
+      scrollMem.set(v, window.scrollY||0);
+    }, {passive:true});
 
     function canSoftNavigate(href){
       if (!href) return false;
       const abs = new URL(href, location.origin);
-      // NÃO intercepta logout nem tabelas
       if (abs.pathname.includes('/logout')) return false;
-      if (abs.pathname.includes('rest_tabelas')) return false;
-      // Só SPA para a mesma rota base (portal_restaurante) e link avisos
+      if (abs.pathname.includes('rest_tabelas')) return false; // deixa abrir página própria de Tabelas
       if (abs.pathname.includes('portal_restaurante')) return true;
       if (abs.pathname.includes('portal_restaurante_avisos')) return true;
       return false;
@@ -957,30 +1021,32 @@
 
     async function softLoad(href){
       try{
+        const targetView = getViewFromURL(href);
+        const yBefore = window.scrollY||0;
         const resp = await fetch(href, {credentials:'same-origin'});
         if(!resp.ok) return false;
         const html = await resp.text();
         const doc = new DOMParser().parseFromString(html, 'text/html');
-        const targetView = getViewFromURL(href);
 
-        // Se a página tem sections, pega a section certa; se não, pega main.content
         let newSection = doc.querySelector(`section[data-view="${targetView}"]`);
         const curMain = document.querySelector('main.content');
+
         if (newSection){
           const curSection = document.querySelector(`section[data-view="${targetView}"]`);
           if (!curSection) return false;
           curSection.innerHTML = newSection.innerHTML;
-          document.querySelectorAll('section[data-view]').forEach(s=>s.classList.toggle('is-active', s===curSection));
           history.pushState({view: targetView}, '', (new URL(href, location.origin)).toString());
           showView(targetView);
+          window.scrollTo({top:yBefore, left:0, behavior:'instant'});
           return true;
         } else {
           const newMain = doc.querySelector('main.content');
           if (!newMain || !curMain) return false;
+          const vNow = getViewFromURL();
           curMain.innerHTML = newMain.innerHTML;
           history.pushState({}, '', (new URL(href, location.origin)).toString());
-          // tenta deduzir view
-          showView(targetView || 'lancar');
+          showView(vNow);
+          window.scrollTo({top:yBefore, left:0, behavior:'instant'});
           return true;
         }
       }catch(e){ return false; }
@@ -993,9 +1059,10 @@
       nav.addEventListener('click', async (e)=>{
         const a = e.target.closest('a'); if(!a) return;
         const href = a.getAttribute('href'); if(!href) return;
-
-        if (!canSoftNavigate(href)) return; // deixa navegar normal
-
+        if (!canSoftNavigate(href)) {
+          // clique em Tabelas: checagem rápida de /rest/tabelas/*/abrir (caso tenha botões dentro da page)
+          return;
+        }
         e.preventDefault();
         const ok = await softLoad(href);
         if (!ok) window.location.href = href; // fallback
@@ -1009,14 +1076,14 @@
         if (form.method?.toUpperCase() !== 'GET') return;
         const action = form.getAttribute('action')||'';
         if (!action.includes('portal_restaurante')) return;
-
+        const before = window.scrollY||0;
         const formData = new FormData(form);
         const usp = new URLSearchParams(formData);
         const href = action + (action.includes('?')?'&':'?') + usp.toString();
-
         e.preventDefault();
         const ok = await softLoad(href);
         if (!ok) window.location.href = href;
+        else window.scrollTo({top:before, left:0, behavior:'instant'});
       });
     }
 
@@ -1027,10 +1094,16 @@
       const el = document.getElementById('toastUnreadCount');
       if (el) el.textContent = String(n);
       // badge no menu
-      const badgeSidebar = document.querySelector('#linkAvisos .badge');
-      if (badgeSidebar){
-        if (n>0){ badgeSidebar.style.display=''; badgeSidebar.textContent = n; }
-        else { badgeSidebar.style.display='none'; }
+      const link = document.getElementById('linkAvisos');
+      let dot = link?.querySelector('.notif-dot');
+      if (!dot && link){
+        dot = document.createElement('span');
+        dot.className = 'notif-dot';
+        link.appendChild(dot);
+      }
+      if (dot){
+        if (n>0){ dot.style.display='flex'; dot.textContent = n>99?'99+':String(n); }
+        else { dot.style.display='none'; }
       }
       // mostra/oculta toast
       if (!toastAvisos){
@@ -1039,10 +1112,9 @@
       }
       if (toastAvisos){
         if (n>0){
-          // re-exibe sempre que fechar enquanto houver não lidos
           const te = getToastEl();
           if (te){
-            te.addEventListener('hidden.bs.toast', ()=>{ if (Number(document.getElementById('toastUnreadCount')?.textContent||'0')>0) setTimeout(()=>toastAvisos.show(), 1200); }, { once:true });
+            te.addEventListener('hidden.bs.toast', ()=>{ if (Number(document.getElementById('toastUnreadCount')?.textContent||'0')>0) setTimeout(()=>toastAvisos.show(), 800); }, { once:true });
           }
           toastAvisos.show();
         } else {
@@ -1060,10 +1132,7 @@
           if (resp.ok){
             const html = await resp.text();
             const doc = new DOMParser().parseFromString(html, 'text/html');
-            // Conta na página remota
-            const unreadCards = doc.querySelectorAll('.aviso-card[data-lido="0"]').length;
-            // se não veio o corpo, tenta badge do título
-            let n = unreadCards;
+            let n = doc.querySelectorAll('.aviso-card[data-lido="0"]').length;
             if (!n){
               const b = doc.querySelector('#badgeTitulo');
               if (b){
@@ -1075,7 +1144,6 @@
           }
         }
       }catch(_){}
-      // repete
       setTimeout(pollUnreadLoop, 25000);
     }
 
@@ -1085,11 +1153,56 @@
       if (!a) return;
       a.addEventListener('click', async (e)=>{
         const href = a.getAttribute('href'); if(!href) return;
-        if (!canSoftNavigate(href)) return; // caso especial
+        if (!canSoftNavigate(href)) return;
         e.preventDefault();
         const ok = await softLoad(href);
         if (!ok) window.location.href = href;
       });
+    }
+
+    // ===== Tabelas: tratar abertura/404 com feedback suave (sem quebrar)
+    document.addEventListener('click', async (e)=>{
+      const a = e.target.closest('a'); if(!a) return;
+      const href = a.getAttribute('href')||'';
+      if (!href.includes('/rest/tabelas/') || !href.endsWith('/abrir')) return; // só botões "abrir"
+      // TENTA HEAD/GET rápido para evitar aba vazia 404
+      try{
+        const resp = await fetch(href, {method:'GET', credentials:'same-origin'});
+        if (resp.status === 404){
+          e.preventDefault();
+          showToastInfo('Arquivo de Tabela não encontrado neste servidor. Peça para reenviar o PDF.', true);
+        } else if (resp.ok){
+          // deixa seguir (nada a fazer)
+        } else {
+          e.preventDefault();
+          showToastInfo('Não foi possível abrir a Tabela ('+resp.status+').', true);
+        }
+      }catch(_){
+        e.preventDefault();
+        showToastInfo('Falha de rede ao abrir a Tabela.', true);
+      }
+    });
+
+    function showToastInfo(msg, danger=false){
+      const id = 'toastInfo';
+      let wrap = document.getElementById(id);
+      if (!wrap){
+        wrap = document.createElement('div');
+        wrap.id = id; wrap.className = 'position-fixed bottom-0 end-0 p-3'; wrap.style.zIndex = 1060;
+        wrap.innerHTML = `<div class="toast" data-bs-autohide="true" data-bs-delay="3500">
+          <div class="toast-header">
+            <i class="bi ${danger?'bi-exclamation-triangle-fill text-danger':'bi-info-circle'} me-2"></i>
+            <strong class="me-auto">Aviso</strong><small>agora</small>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+          </div>
+          <div class="toast-body"></div>
+        </div>`;
+        document.body.appendChild(wrap);
+      }
+      const toastEl = wrap.querySelector('.toast');
+      wrap.querySelector('.toast-body').textContent = msg;
+      const t = new bootstrap.Toast(toastEl);
+      t.show();
     }
 
     // Back/forward
@@ -1110,7 +1223,7 @@
       const unreadServer = Number(`{{ _toast_unread }}`) || 0;
       setToastUnread(unreadServer);
 
-      // Polling periódico para manter badge/toast atualizados sem mexer no back-end
+      // Badge sempre ativo, com polling
       pollUnreadLoop();
     });
   </script>
