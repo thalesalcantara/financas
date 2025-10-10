@@ -3,216 +3,284 @@
 <head>
   <meta charset="UTF-8">
   <title>Portal do Estabelecimento — Avisos</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Bootstrap & Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <style>
     :root{
-      --blue-1:#1b3ce0; --blue-2:#2f5bff; --blue-3:#4e74ff;
-      --ink:#0e1423; --muted:#7c86a0;
-      --bg:#f6f8ff; --card:#ffffff; --border:#e7ebf5;
-      --chip:#eff3ff; --danger:#e74c3c; --ok:#16a34a;
-      --shadow:0 10px 26px rgba(12,18,46,.08);
-      --r-lg:16px; --r-md:12px;
+      --royal:#2141d9; --royal-2:#3654e6; --royal-3:#eaf0ff;
+      --ink:#0b1220; --muted:#6b7280; --soft:#f5f7ff; --danger:#e74c3c; --ok:#16a34a;
+      --border:#e6e9f2; --chip:#eef1ff; --card:#fff; --bg:#fff; --text:#111827;
+      --aside-grad1: var(--royal); --aside-grad2: var(--royal-2);
     }
-    [data-theme="dark"]{
-      --bg:#0d111a; --card:#0f1523; --ink:#e9efff; --muted:#98a6c4;
-      --border:#1b2437; --chip:#0e1a33; --shadow:0 14px 28px rgba(0,0,0,.45);
+    /* Dark theme */
+    :root[data-theme="dark"]{
+      --bg:#0b1220; --text:#e5e7eb; --muted:#9aa4b2; --card:#0f172a;
+      --border:#1f2a44; --chip:#132040; --royal:#3b82f6; --royal-2:#2563eb; --royal-3:#0b2447;
+      --aside-grad1:#0b2a6b; --aside-grad2:#143d86;
     }
 
-    *{box-sizing:border-box} html,body{height:100%}
-    body{margin:0; background:var(--bg); color:var(--ink); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif}
-
-    /* ===== Sidebar (igual ao visual da imagem) ===== */
-    .layout{display:grid; grid-template-columns:260px 1fr; min-height:100vh}
-    @media (max-width:980px){ .layout{grid-template-columns:76px 1fr} }
-
-    .sidebar{
-      background:linear-gradient(180deg, var(--blue-1) 0%, var(--blue-2) 70%, var(--blue-3) 100%);
-      color:#fff; padding:14px; position:sticky; top:0; height:100dvh;
+    html,body{ height:100%; }
+    body{ background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif; }
+    a{ text-decoration:none; }
+    .shell{ display:grid; grid-template-columns: 260px 1fr; min-height:100vh; }
+    .aside{
+      background:linear-gradient(180deg, var(--aside-grad1) 0%, var(--aside-grad2) 100%);
+      color:#fff; padding:18px 16px; position:sticky; top:0; height:100dvh;
     }
-    .brand{display:flex; align-items:center; gap:10px; background:#ffffff1f; border-radius:14px; padding:10px 12px; font-weight:900}
-    .brand i{font-size:1.1rem}
-    .brand .t{line-height:1.15}
-    @media (max-width:980px){ .brand .t{display:none} }
+    .brand{ font-weight:800; letter-spacing:.5px; font-size:1.15rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.08); display:flex; align-items:center; gap:8px; }
+    .theme-toggle{ margin-top:10px; border:1px solid rgba(255,255,255,.25); color:#fff; background:rgba(255,255,255,.06); border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:8px; cursor:pointer; }
 
-    .theme-btn{margin-top:12px; display:flex; align-items:center; gap:8px; background:#ffffff12; color:#fff; border:1px solid #ffffff38;
-      padding:10px; border-radius:12px; cursor:pointer; user-select:none}
-    .theme-btn:hover{background:#ffffff22}
+    /* ===== Menu lateral idêntico ===== */
+    .navmenu{ margin-top:18px; display:flex; flex-direction:column; gap:6px; }
+    .navmenu a{
+      color:#fff; padding:9px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600;
+      position:relative; font-size:.96rem;
+    }
+    .navmenu a span{ text-decoration:underline; }
+    .navmenu a.active, .navmenu a:hover{ background:rgba(255,255,255,.14); }
 
-    .nav{margin-top:10px; display:flex; flex-direction:column; gap:6px}
-    .nav a{display:flex; align-items:center; gap:10px; color:#fff; padding:10px 12px; border-radius:12px}
-    .nav a:hover{background:#ffffff22}
-    .nav a.active{background:#ffffff46}
-    .nav .badge{margin-left:auto; background:#ff4d4f; color:#fff; border-radius:999px; padding:2px 8px; font-weight:800}
-    @media (max-width:980px){ .nav a span{display:none} }
+    .content{ padding:24px clamp(14px,3vw,32px); }
+    .section-title{ color:var(--royal); font-weight:800; font-size:1.25rem; display:flex; gap:10px; align-items:center; }
 
-    /* ===== Main ===== */
-    .main{padding:22px clamp(12px,3vw,32px)}
-    .title{display:flex; align-items:center; gap:10px; font-weight:900; color:var(--blue-1); font-size:1.15rem}
-    [data-theme="dark"] .title{color:#cfe0ff}
+    .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 0 #0000000a; }
+    .card-soft{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; }
+    .chip{ background:var(--chip); color:var(--text); border:1px solid var(--border); border-radius:999px; padding:.2rem .65rem; font-weight:700; }
 
-    .card{background:var(--card); border:1px solid var(--border); border-radius:var(--r-lg); box-shadow:var(--shadow); padding:14px}
-    .toolbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+    /* Avisos */
+    .aviso-card{ border-left:6px solid #3b82f6; }
+    .aviso-card.lido{ border-left-color:#94a3b8; opacity:.98; }
+    .aviso-card.prioridade{ border-left-color:var(--danger); }
 
-    .btn{display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; border:1px solid transparent; font-weight:800; cursor:pointer}
-    .btn-royal{background:#2f5bff; color:#fff} .btn-royal:hover{background:#3b69ff}
-    .btn-outline{background:transparent; color:#fff; border:1px solid #ffffff66}
-    .btn-chip{background:var(--chip); border:1px solid var(--border); border-radius:999px; padding:6px 10px; font-weight:800}
+    /* Badge avisos (bolinha) na lateral */
+    .badge-dot{
+      min-width:22px; height:22px; line-height:22px; border-radius:999px; padding:0 6px;
+      font-size:.75rem; font-weight:800; display:inline-flex; align-items:center; justify-content:center;
+      background:#dc3545; color:#fff; box-shadow:0 0 0 2px rgba(255,255,255,.25) inset; margin-left:auto;
+    }
 
-    .aviso{border-left:6px solid #3b82f6}
-    .aviso.lido{border-left-color:#cbd5e1; opacity:.95}
-    .aviso.prioridade{border-left-color:var(--danger)}
-    .aviso h4{margin:0 0 4px; font-size:1.05rem}
-    .meta{color:var(--muted); font-size:.92rem}
-    .divider{height:1px; background:var(--border); margin:10px 0}
-
-    .toast{position:fixed; right:16px; bottom:16px; background:var(--card); color:var(--ink); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); padding:12px 14px; display:none}
-    .toast.show{display:block}
+    @media (max-width: 920px){
+      .shell{ grid-template-columns: 66px 1fr; }
+      .brand span{ display:none; }
+      .navmenu a span{ display:none; }
+    }
   </style>
 </head>
 <body>
-  <div class="layout">
-    <!-- ===== Sidebar ===== -->
-    <aside class="sidebar">
-      <div class="brand"><i class="bi bi-buildings"></i><div class="t">Portal do<br>Estabelecimento</div></div>
+  <div class="shell">
+    <!-- ============ Aside ============ -->
+    <aside class="aside">
+      <div class="brand"><i class="bi bi-building"></i><span>Portal do Estabelecimento</span></div>
+      <button id="btnTheme" class="theme-toggle" type="button"><i class="bi bi-moon"></i><span id="lblTheme">Escuro</span></button>
 
-      <div id="themeToggle" class="theme-btn"><i id="themeIcon" class="bi bi-moon-stars"></i> <span id="themeText">Escuro</span></div>
-
-      <nav class="nav">
+      <nav class="navmenu" id="sideNav">
+        <!-- Observação: nesta página (avisos) os links navegam normalmente, mas com prefetch p/ ficar instantâneo -->
         <a href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-person-lines-fill"></i><span>Cooperados</span></a>
         <a href="{{ url_for('portal_restaurante', view='lancamentos') }}"><i class="bi bi-receipt"></i><span>Lançamentos</span></a>
         <a href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-calendar-week"></i><span>Escala</span></a>
+
         {% if session.get('user_tipo') == 'restaurante' %}
-        <a class="{{ 'active' if request.endpoint=='rest_tabelas' else '' }}" href="{{ url_for('rest_tabelas') }}"><i class="bi bi-table"></i><span>Tabelas</span></a>
-        {% endif %}
-        <a href="{{ url_for('portal_restaurante', view='config') }}"><i class="bi bi-gear"></i><span>Configuração</span></a>
-        <!-- atual -->
-        <a class="active" href="{{ url_for('portal_restaurante_avisos') }}"><i class="bi bi-megaphone-fill"></i><span>Avisos</span>
-          {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
-          {% if _cntAvisos > 0 %}<span id="badgeSidebar" class="badge">{{ _cntAvisos }}</span>{% endif %}
+        <a id="linkTabelas" class="{{ 'active' if request.endpoint=='rest_tabelas' else '' }}" href="{{ url_for('rest_tabelas') }}">
+          <i class="bi bi-table"></i><span>Tabelas</span>
         </a>
+        {% endif %}
+
+        <a href="{{ url_for('portal_restaurante', view='config') }}"><i class="bi bi-gear"></i><span>Configuração</span></a>
+
+        <!-- Atual (esta página) -->
+        <a id="linkAvisos" class="active" href="{{ url_for('portal_restaurante_avisos') }}">
+          <i class="bi bi-megaphone"></i><span>Avisos</span>
+          {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
+          <span class="badge-dot" id="badgeSidebar" {% if _cntAvisos == 0 %}style="display:none"{% endif %}>{{ _cntAvisos }}</span>
+        </a>
+
         <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
       </nav>
     </aside>
 
-    <!-- ===== Main ===== -->
-    <main class="main">
-      <div class="title"><i class="bi bi-megaphone-fill"></i> Avisos
-        {% if _cntAvisos > 0 %}
-          <span id="badgeTitulo" class="btn-chip" style="background:#ffe8e8; border-color:#ffd2d2; color:#b42318">{{ _cntAvisos }} não lido(s)</span>
-        {% else %}
-          <span id="badgeTitulo" class="btn-chip" style="background:#e9ffe9; border-color:#c8f7cc; color:#0a7a2a">Tudo lido</span>
-        {% endif %}
+    <!-- ============ Main ============ -->
+    <main class="content">
+      {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
+      {% set _unread_from_list = (_avisos | selectattr('lido','equalto',False) | list | length) %}
+      {% set _unread_from_ctx = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
+      {% set _badgeN = (_unread_from_list if _unread_from_list>0 else _unread_from_ctx) %}
+
+      <div class="section-title">
+        <i class="bi bi-megaphone-fill"></i> Avisos
+        <span id="badgeTitulo" class="badge {{ 'text-bg-danger' if _badgeN>0 else 'text-bg-success' }} ms-2">
+          {{ _badgeN>0 and (_badgeN ~ ' não lido(s)') or 'Tudo lido' }}
+        </span>
       </div>
 
-      <div class="card">
-        <div class="toolbar">
-          <form method="POST" action="{{ url_for('marcar_todos_avisos_lidos_restaurante') }}">
-            <button class="btn btn-royal" type="submit" {% if _cntAvisos == 0 %}disabled{% endif %}><i class="bi bi-check2-circle"></i> Marcar todos como lidos</button>
+      <div class="card card-body mb-3">
+        <div class="d-flex align-items-center gap-2">
+          <form method="POST" action="{{ url_for('marcar_todos_avisos_lidos_restaurante') }}" class="m-0">
+            <button class="btn btn-primary fw-bold" type="submit" {% if _badgeN == 0 %}disabled{% endif %}>
+              <i class="bi bi-check2-circle me-1"></i> Marcar todos como lidos
+            </button>
           </form>
-          <label style="margin-left:auto; display:flex; align-items:center; gap:8px">
-            <input type="checkbox" id="toggleNaoLidos"> Mostrar apenas não lidos
-          </label>
+          <div class="form-check ms-auto">
+            <input class="form-check-input" type="checkbox" id="toggleNaoLidos">
+            <label class="form-check-label" for="toggleNaoLidos">Mostrar apenas não lidos</label>
+          </div>
         </div>
       </div>
 
-      {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
+      {% if _unread_from_ctx > 0 and (_avisos | length) == 0 %}
+        <div class="alert alert-warning">
+          Existem {{ _unread_from_ctx }} aviso(s) não lido(s), porém nenhum item foi carregado nesta página.
+          Verifique se a rota está preenchendo a variável <code>avisos</code>.
+        </div>
+      {% endif %}
+
       {% if _avisos and (_avisos | length) > 0 %}
         {% for a in _avisos %}
-        <div id="aviso-{{ a.id }}" class="card aviso {% if a.lido %}lido{% endif %} {% if a.prioridade_alta %}prioridade{% endif %}" data-lido="{{ '1' if a.lido else '0' }}">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start">
+        <div id="aviso-{{ a.id }}" class="card card-body my-2 aviso-card {% if a.lido %}lido{% endif %} {% if a.prioridade_alta %}prioridade{% endif %}" data-lido="{{ '1' if a.lido else '0' }}">
+          <div class="d-flex justify-content-between align-items-start">
             <div>
-              <h4>
+              <div class="fw-bold">
                 {{ a.titulo or 'Aviso' }}
-                {% if a.prioridade_alta %}<span class="btn-chip" style="background:#ffe8e8; border-color:#ffd2d2; color:#b42318"><i class="bi bi-exclamation-triangle"></i> Prioridade</span>{% endif %}
-              </h4>
-              <div class="meta">
+                {% if a.prioridade_alta %}<span class="badge text-bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Prioridade</span>{% endif %}
+              </div>
+              <div class="text-muted small">
                 Publicado em {{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em }}
-                {% if a.lido %} • <span style="color:var(--ok)">Lido</span>{% else %} • <span style="color:var(--danger)">Não lido</span>{% endif %}
+                {% if a.lido %} • <span class="text-success">Lido</span>{% else %} • <span class="text-danger">Não lido</span>{% endif %}
               </div>
             </div>
-            <div>
-            {% if not a.lido %}
-              <button class="btn" style="border:1px solid var(--blue-2); color:var(--blue-2); background:transparent"
+            <div class="ms-3">
+              {% if not a.lido %}
+              <button class="btn btn-outline-primary btn-sm"
                       data-acao="marcar-lido"
                       data-url="{{ url_for('marcar_aviso_lido_universal', aviso_id=a.id) }}">
                 <i class="bi bi-check2"></i> Marcar como lido
               </button>
-            {% endif %}
+              {% endif %}
             </div>
           </div>
-          <div class="divider"></div>
-          <div class="body">{{ a.corpo_html | safe if a.corpo_html else (a.conteudo or a.texto or '') }}</div>
+          <hr class="my-2">
+          <div class="aviso-body">{{ a.corpo_html | safe if a.corpo_html else (a.conteudo or a.texto or '') }}</div>
         </div>
         {% endfor %}
       {% else %}
-        <div class="card"><span class="meta"><i class="bi bi-inbox"></i> Nenhum aviso disponível.</span></div>
+        <div class="card card-body"><div class="text-muted"><i class="bi bi-inbox me-1"></i> Nenhum aviso disponível.</div></div>
       {% endif %}
-
-      <div style="text-align:center; margin-top:14px" class="meta">© {{ current_year or 2025 }} Coopex</div>
     </main>
   </div>
 
-  <!-- ===== Toast ===== -->
-  <div id="toastOK" class="toast"><strong><i class="bi bi-check2-circle" style="color:var(--ok)"></i> Pronto</strong><div style="margin-top:6px">Aviso marcado como lido.</div></div>
+  <!-- TOAST novos avisos (PERSISTENTE) -->
+  {% set _avisos_for_toast = avisos if avisos is defined and avisos is not none else [] %}
+  {% set _unread_from_list_t = (_avisos_for_toast | selectattr('lido','equalto',False) | list | length) %}
+  {% set _unread_from_ctx_t = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
+  {% set _toast_unread = _unread_from_list_t if _unread_from_list_t>0 else _unread_from_ctx_t %}
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1055;">
+    <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
+         data-bs-autohide="false">
+      <div class="toast-header">
+        <i class="bi bi-megaphone-fill me-2"></i><strong class="me-auto">Novos avisos</strong><small>agora</small>
+        <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
+      </div>
+      <div class="toast-body">
+        Você tem {{ _toast_unread }} aviso(s) não lido(s). <a href="{{ url_for('portal_restaurante_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
+      </div>
+    </div>
+  </div>
 
+  <!-- TOAST OK -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1056;">
+    <div id="toastOK" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
+         data-bs-autohide="true" data-bs-delay="2200">
+      <div class="toast-header">
+        <i class="bi bi-check2-circle text-success me-2"></i><strong class="me-auto">Pronto</strong><small>agora</small>
+        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Fechar"></button>
+      </div>
+      <div class="toast-body">Aviso marcado como lido.</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    // ===== Tema claro/escuro
-    (function(){
-      const key='coopex.theme'; const root=document.documentElement;
-      const saved=localStorage.getItem(key); if(saved) root.setAttribute('data-theme', saved);
-      const btn=document.getElementById('themeToggle'); const icon=document.getElementById('themeIcon'); const txt=document.getElementById('themeText');
-      function sync(){ const dark=root.getAttribute('data-theme')==='dark'; icon.className=dark?'bi bi-sun':'bi bi-moon-stars'; txt.textContent=dark?'Claro':'Escuro'; }
-      btn?.addEventListener('click', ()=>{ const next=root.getAttribute('data-theme')==='dark'?'light':'dark'; root.setAttribute('data-theme', next); localStorage.setItem(key,next); sync(); });
-      sync();
+    /* ===== Tema (Claro/Escuro) ===== */
+    const THEME_KEY='portal_theme';
+    function applyTheme(t){
+      document.documentElement.setAttribute('data-theme', t==='dark'?'dark':'light');
+      const lbl=document.getElementById('lblTheme'); const icon=document.querySelector('#btnTheme i');
+      if(lbl) lbl.textContent = (t==='dark')?'Claro':'Escuro';
+      if(icon){ icon.classList.toggle('bi-moon', t!=='dark'); icon.classList.toggle('bi-sun', t==='dark'); }
+      localStorage.setItem(THEME_KEY, t);
+    }
+    (function initTheme(){
+      const saved = localStorage.getItem(THEME_KEY) || 'light';
+      applyTheme(saved);
+      document.getElementById('btnTheme')?.addEventListener('click', ()=>{
+        const cur = localStorage.getItem(THEME_KEY) || 'light';
+        applyTheme(cur==='dark'?'light':'dark');
+      });
     })();
 
-    // ===== Avisos UI
+    /* ===== Avisos UI ===== */
     document.addEventListener('DOMContentLoaded', ()=>{
-      const toast=document.getElementById('toastOK');
-      const toggleNaoLidos=document.getElementById('toggleNaoLidos');
-      const badgeTitulo=document.getElementById('badgeTitulo');
-      const badgeSidebar=document.getElementById('badgeSidebar');
+      const toastOKEl = document.getElementById('toastOK');
+      const toastOK = toastOKEl ? new bootstrap.Toast(toastOKEl) : null;
+      const badgeTitulo = document.getElementById('badgeTitulo');
+      const badgeSidebar = document.getElementById('badgeSidebar');
 
-      function getUnread(){ return document.querySelectorAll('.aviso[data-lido="0"]').length; }
+      function getUnreadCount(){ return document.querySelectorAll('.aviso-card[data-lido="0"]').length; }
       function refreshBadges(){
-        const n=getUnread();
-        if(n>0){
-          badgeTitulo.textContent = n + ' não lido(s)';
-          badgeTitulo.style.background='#ffe8e8'; badgeTitulo.style.borderColor='#ffd2d2'; badgeTitulo.style.color='#b42318';
-          if(badgeSidebar){ badgeSidebar.textContent=n; badgeSidebar.style.display='inline-block'; }
-        }else{
-          badgeTitulo.textContent='Tudo lido';
-          badgeTitulo.style.background='#e9ffe9'; badgeTitulo.style.borderColor='#c8f7cc'; badgeTitulo.style.color='#0a7a2a';
-          if(badgeSidebar){ badgeSidebar.style.display='none'; }
+        const n = getUnreadCount();
+        if (badgeTitulo){
+          badgeTitulo.className = 'badge ' + (n > 0 ? 'text-bg-danger' : 'text-bg-success');
+          badgeTitulo.textContent = n > 0 ? (n + ' não lido(s)') : 'Tudo lido';
+        }
+        if (badgeSidebar){
+          if (n>0){ badgeSidebar.style.display='inline-flex'; badgeSidebar.textContent=n; }
+          else { badgeSidebar.style.display='none'; }
         }
       }
 
-      toggleNaoLidos?.addEventListener('change', e=>{
-        const only=e.target.checked;
-        document.querySelectorAll('.aviso').forEach(card=>{
-          const lido=card.getAttribute('data-lido')==='1';
-          card.style.display=(only&&lido)?'none':'';
+      const toggleNaoLidos = document.getElementById('toggleNaoLidos');
+      toggleNaoLidos?.addEventListener('change', () => {
+        const onlyUnread = toggleNaoLidos.checked;
+        document.querySelectorAll('.aviso-card').forEach(card => {
+          const lido = card.getAttribute('data-lido') === '1';
+          card.style.display = (onlyUnread && lido) ? 'none' : '';
         });
       });
 
-      document.querySelectorAll('[data-acao="marcar-lido"]').forEach(btn=>{
-        btn.addEventListener('click', async ()=>{
-          const url=btn.getAttribute('data-url'); const card=btn.closest('.aviso');
+      document.querySelectorAll('[data-acao="marcar-lido"]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const url = btn.getAttribute('data-url'); const card = btn.closest('.aviso-card');
           try{
-            const resp=await fetch(url,{method:'POST'});
-            if(resp.ok){
-              card.setAttribute('data-lido','1'); card.classList.add('lido'); btn.remove();
-              const meta=card.querySelector('.meta'); if(meta){ meta.innerHTML = meta.innerHTML.replace('Não lido','Lido'); if(!/Lido/.test(meta.textContent)) meta.innerHTML += ' • <span style="color:#16a34a">Lido</span>'; }
-              toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 2200);
-              refreshBadges();
-            }else{ alert('Falha ao marcar como lido ('+resp.status+').'); }
-          }catch(e){ alert('Erro de rede.'); }
+            const resp = await fetch(url, { method: 'POST' });
+            if (resp.ok){
+              card.setAttribute('data-lido','1'); card.classList.add('lido');
+              const meta = card.querySelector('.text-muted.small');
+              if (meta && !/Lido/.test(meta.innerHTML)) meta.innerHTML += ' • <span class="text-success">Lido</span>';
+              btn.remove(); refreshBadges(); toastOK?.show();
+            } else { alert('Não foi possível marcar como lido ('+resp.status+').'); }
+          } catch(e){ alert('Falha de rede.'); }
         });
       });
 
       refreshBadges();
+
+      // Toast de novos avisos (persistente)
+      const unread = Number(`{{ _toast_unread }}`);
+      if (unread > 0) {
+        const toastEl = document.getElementById('toastAvisos');
+        if (toastEl) { const t = new bootstrap.Toast(toastEl); setTimeout(()=>t.show(), 400); }
+      }
     });
+
+    /* ===== Prefetch p/ abrir rápido (parece SPA) ===== */
+    function prefetch(href){
+      try{
+        const l=document.createElement('link');
+        l.rel='prefetch'; l.href=href; document.head.appendChild(l);
+      }catch(e){}
+    }
+    document.getElementById('linkTabelas')?.addEventListener('mouseenter', e=>prefetch(e.currentTarget.href));
+    document.getElementById('linkAvisos')?.addEventListener('mouseenter', e=>prefetch(e.currentTarget.href));
   </script>
 </body>
 </html>
