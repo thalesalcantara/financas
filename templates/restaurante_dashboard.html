@@ -14,7 +14,6 @@
       --border:#e6e9f2; --chip:#eef1ff; --card:#fff; --bg:#fff; --text:#111827;
       --aside-grad1: var(--royal); --aside-grad2: var(--royal-2);
     }
-    /* Dark theme */
     :root[data-theme="dark"]{
       --bg:#0b1220; --text:#e5e7eb; --muted:#9aa4b2; --card:#0f172a;
       --border:#1f2a44; --chip:#132040; --royal:#3b82f6; --royal-2:#2563eb; --royal-3:#0b2447;
@@ -29,18 +28,16 @@
       background:linear-gradient(180deg, var(--aside-grad1) 0%, var(--aside-grad2) 100%);
       color:#fff; padding:18px 16px; position:sticky; top:0; height:100dvh;
     }
-    .brand{ font-weight:800; letter-spacing:.5px; font-size:1.15rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.08); display:flex; align-items:center; gap:8px; }
+    .brand{ font-weight:800; letter-spacing:.5px; font-size:1.12rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.08); display:flex; align-items:center; gap:8px; }
     .theme-toggle{ margin-top:10px; border:1px solid rgba(255,255,255,.25); color:#fff; background:rgba(255,255,255,.06); border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:8px; cursor:pointer; }
 
+    /* MENU: letras e ícones um pouco menores */
     .navmenu{ margin-top:18px; display:flex; flex-direction:column; gap:6px; }
-    .navmenu a{
-      color:#fff; padding:9px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600;
-      position:relative; font-size:.96rem;  /* menor, como pediu */
-    }
-    .navmenu a span{ text-decoration:underline; } /* nomes sublinhados */
+    .navmenu a{ color:#fff; padding:9px 11px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600; position:relative; font-size:.94rem; }
+    .navmenu a i{ font-size:1rem; }
     .navmenu a.active, .navmenu a:hover{ background:rgba(255,255,255,.14); }
-    .content{ padding:24px clamp(14px,3vw,32px); }
 
+    .content{ padding:24px clamp(14px,3vw,32px); }
     .section-title{ color:var(--royal); font-weight:800; font-size:1.25rem; display:flex; gap:10px; align-items:center; }
     .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 0 #0000000a; }
     .card-soft{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; }
@@ -52,11 +49,9 @@
     :root[data-theme="dark"] .table-secondary{ background:#111827; color:#e5e7eb; }
 
     .table-compact th,.table-compact td{ padding:.5rem .6rem; }
-
     .btn-royal{ background:var(--royal); color:#fff; border:none; }
     .btn-royal:hover{ background:var(--royal-2); color:#fff; }
     .btn-outline-royal{ border:1px solid var(--royal); color:#fff; background:transparent; }
-    html[data-theme="light"] .btn-outline-royal{ color: var(--royal); }
     .btn-outline-royal:hover{ background:var(--royal); color:#fff; }
     .btn-outline-danger{ color:#e74c3c; border-color:#e74c3c; }
     .btn-outline-danger:hover{ background:#e74c3c; color:#fff; }
@@ -72,6 +67,7 @@
     .star{ color:#94a3b8; transition:transform .06s; }
     .star.active,.star.hover{ color:#fbbf24; }
     .star:active{ transform:scale(.9); }
+    /* NÃO permite alterar a Geral: média automática */
     .rating-group[data-name="av_geral"] .stars{ pointer-events:none; opacity:.95; }
 
     .sticky-tools{ position:sticky; top:12px; }
@@ -88,6 +84,7 @@
       font-size:.75rem; font-weight:800; display:inline-flex; align-items:center; justify-content:center;
       background:#dc3545; color:#fff; box-shadow:0 0 0 2px rgba(255,255,255,.25) inset; margin-left:auto;
     }
+    .badge-dot-global{ margin-left:6px; }
 
     @media (max-width: 920px){
       .shell{ grid-template-columns: 66px 1fr; }
@@ -110,6 +107,7 @@
            class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos']) else '' }}"
            href="{{ url_for('portal_restaurante', view='lancar', data_inicio=filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else None, data_fim=filtro_fim.strftime('%Y-%m-%d') if filtro_fim else None) }}">
           <i class="bi bi-person-lines-fill"></i><span>Cooperados</span>
+          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
         </a>
 
         <!-- Lançamentos (SPA) -->
@@ -117,6 +115,7 @@
            class="{{ 'active' if view=='lancamentos' else '' }}"
            href="{{ url_for('portal_restaurante', view='lancamentos', data_inicio=filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else None, data_fim=filtro_fim.strftime('%Y-%m-%d') if filtro_fim else None, mes=filtro_mes if filtro_mes else None) }}">
           <i class="bi bi-receipt"></i><span>Lançamentos</span>
+          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
         </a>
 
         <!-- Escala (SPA) -->
@@ -124,14 +123,16 @@
            class="{{ 'active' if view=='escalas' else '' }}"
            href="{{ url_for('portal_restaurante', view='escalas') }}">
           <i class="bi bi-calendar-week"></i><span>Escala</span>
+          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
         </a>
 
         {% if session.get('user_tipo') == 'restaurante' %}
-        <!-- Tabelas (NAVEGA PELO LINK — não interceptar) -->
+        <!-- Tabelas (link normal) -->
         <a id="linkTabelas"
            class="{{ 'active' if request.endpoint=='rest_tabelas' else '' }}"
            href="{{ url_for('rest_tabelas') }}">
           <i class="bi bi-table"></i><span>Tabelas</span>
+          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
         </a>
         {% endif %}
 
@@ -140,18 +141,19 @@
            class="{{ 'active' if view=='config' else '' }}"
            href="{{ url_for('portal_restaurante', view='config') }}">
           <i class="bi bi-gear"></i><span>Configuração</span>
+          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
         </a>
 
-        <!-- Avisos (NAVEGA PELO LINK — não interceptar) -->
-<a id="linkAvisos"
-   class="{{ 'active' if request.endpoint=='portal_restaurante_avisos' or view=='avisos' else '' }}"
-   href="{{ url_for('portal_restaurante_avisos') }}">
-  <i class="bi bi-megaphone"></i><span>Avisos</span>
-  {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
-  <span class="badge-dot" {% if _cntAvisos <= 0 %}style="display:none"{% endif %}>{{ _cntAvisos }}</span>
-</a>
+        <!-- Avisos (link normal; carregado via fetch e injetado) -->
+        <a id="linkAvisos"
+           class="{{ 'active' if request.endpoint=='portal_restaurante_avisos' or view=='avisos' else '' }}"
+           href="{{ url_for('portal_restaurante_avisos') }}">
+          <i class="bi bi-megaphone"></i><span>Avisos</span>
+          {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
+          {% if _cntAvisos > 0 %}<span class="badge-dot">{{ _cntAvisos }}</span>{% else %}<span class="badge-dot" style="display:none">0</span>{% endif %}
+        </a>
 
-        <!-- Sair (link normal) -->
+        <!-- Sair -->
         <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
       </nav>
     </aside>
@@ -169,7 +171,6 @@
         {% endif %}
       {% endwith %}
 
-      {# cópias seguras (SPA) #}
       {% set _dias_list = dias_list if dias_list is defined and dias_list is not none else [] %}
       {% set _agenda = agenda if agenda is defined and agenda is not none else {} %}
       {% set _ref_data = ref_data if ref_data is defined and ref_data is not none else (now() if false else None) %}
@@ -178,9 +179,12 @@
       {% set _lancamentos_periodo = lancamentos_periodo if lancamentos_periodo is defined and lancamentos_periodo is not none else [] %}
       {% set _url_lancar_producao = url_lancar_producao if url_lancar_producao is defined else url_for('portal_restaurante') %}
 
-      <!-- CONFIG (SPA) -->
+      <!-- =================== CONFIG =================== -->
       <section data-view="config">
-        <div class="section-title"><i class="bi bi-shield-lock"></i> Configuração</div>
+        <div class="section-title">
+          <i class="bi bi-shield-lock"></i> Configuração
+          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
+        </div>
         <div class="card card-body">
           <form class="row g-3 form-password" method="POST" action="{{ url_for('rest_alterar_senha') }}">
             <div class="col-md-4">
@@ -210,9 +214,12 @@
         </div>
       </section>
 
-      <!-- ESCALAS (SPA) -->
+      <!-- =================== ESCALAS =================== -->
       <section data-view="escalas">
-        <div class="section-title"><i class="bi bi-calendar-week"></i> Escala semanal</div>
+        <div class="section-title">
+          <i class="bi bi-calendar-week"></i> Escala semanal
+          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
+        </div>
         <div class="card card-body">
           <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
             <input type="hidden" name="view" value="escalas">
@@ -297,19 +304,21 @@
         </div>
       </section>
 
-      <!-- AVISOS (SPA render; link do menu também navega) -->
+      <!-- =================== AVISOS (conteúdo será injetado via fetch) =================== -->
       <section data-view="avisos">
         {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
         {% set _unread_from_list = (_avisos | selectattr('lido','equalto',False) | list | length) %}
         {% set _unread_from_ctx = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
+        {% set _badgeN = (_unread_from_list if _unread_from_list>0 else _unread_from_ctx) %}
         <div class="section-title">
           <i class="bi bi-megaphone-fill"></i> Avisos
-          {% set _badgeN = (_unread_from_list if _unread_from_list>0 else _unread_from_ctx) %}
+          <span class="badge-dot badge-dot-global" data-global-badge {% if _badgeN>0 %}style="display:inline-flex"{% else %}style="display:none"{% endif %}>{{ _badgeN }}</span>
           <span id="badgeTitulo" class="badge {{ 'text-bg-danger' if _badgeN>0 else 'text-bg-success' }} ms-2">
             {{ _badgeN>0 and (_badgeN ~ ' não lido(s)') or 'Tudo lido' }}
           </span>
         </div>
 
+        <!-- Barra -->
         <div class="card card-body">
           <div class="d-flex align-items-center gap-2">
             <form method="POST" action="{{ url_for('marcar_todos_avisos_lidos_restaurante') }}" class="m-0">
@@ -324,50 +333,56 @@
           </div>
         </div>
 
-        {% if _unread_from_ctx > 0 and (_avisos | length) == 0 %}
-          <div class="alert alert-warning mt-3">
-            Existem {{ _unread_from_ctx }} aviso(s) não lido(s), porém nenhum item foi carregado nesta página.
-            Verifique se a rota está preenchendo a variável <code>avisos</code> para este restaurante.
-          </div>
-        {% endif %}
-
-        {% if _avisos and (_avisos | length) > 0 %}
-          {% for a in _avisos %}
-          <div id="aviso-{{ a.id }}" class="card card-body my-2 aviso-card {% if a.lido %}lido{% endif %} {% if a.prioridade_alta %}prioridade{% endif %}" data-lido="{{ '1' if a.lido else '0' }}">
-            <div class="d-flex justify-content-between align-items-start">
-              <div>
-                <div class="fw-bold">
-                  {{ a.titulo or 'Aviso' }}
-                  {% if a.prioridade_alta %}<span class="badge text-bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Prioridade</span>{% endif %}
-                </div>
-                <div class="text-muted small">
-                  Publicado em {{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em }}
-                  {% if a.lido %} • <span class="text-success">Lido</span>{% else %} • <span class="text-danger">Não lido</span>{% endif %}
-                </div>
-              </div>
-              <div class="ms-3">
-                {% if not a.lido %}
-                <button class="btn btn-outline-royal btn-sm"
-                        data-acao="marcar-lido"
-                        data-id="{{ a.id }}"
-                        data-url="{{ url_for('marcar_aviso_lido_universal', aviso_id=a.id) }}">
-                  <i class="bi bi-check2"></i> Marcar como lido
-                </button>
-                {% endif %}
-              </div>
+        <!-- Lista dinâmica (substituída quando puxar da página de Avisos) -->
+        <div id="avisosListContainer">
+          {% if _unread_from_ctx > 0 and (_avisos | length) == 0 %}
+            <div class="alert alert-warning mt-3">
+              Existem {{ _unread_from_ctx }} aviso(s) não lido(s), porém nenhum item foi carregado nesta página.
+              Verifique se a rota está preenchendo a variável <code>avisos</code> para este restaurante.
             </div>
-            <hr class="my-2">
-            <div class="aviso-body">{{ a.corpo_html | safe if a.corpo_html else (a.conteudo or a.texto or '') }}</div>
-          </div>
-          {% endfor %}
-        {% else %}
-          <div class="card card-body"><div class="text-muted"><i class="bi bi-inbox me-1"></i> Nenhum aviso disponível.</div></div>
-        {% endif %}
+          {% endif %}
+
+          {% if _avisos and (_avisos | length) > 0 %}
+            {% for a in _avisos %}
+            <div id="aviso-{{ a.id }}" class="card card-body my-2 aviso-card {% if a.lido %}lido{% endif %} {% if a.prioridade_alta %}prioridade{% endif %}" data-lido="{{ '1' if a.lido else '0' }}">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <div class="fw-bold">
+                    {{ a.titulo or 'Aviso' }}
+                    {% if a.prioridade_alta %}<span class="badge text-bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Prioridade</span>{% endif %}
+                  </div>
+                  <div class="text-muted small">
+                    Publicado em {{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em }}
+                    {% if a.lido %} • <span class="text-success">Lido</span>{% else %} • <span class="text-danger">Não lido</span>{% endif %}
+                  </div>
+                </div>
+                <div class="ms-3">
+                  {% if not a.lido %}
+                  <button class="btn btn-outline-royal btn-sm"
+                          data-acao="marcar-lido"
+                          data-id="{{ a.id }}"
+                          data-url="{{ url_for('marcar_aviso_lido_universal', aviso_id=a.id) }}">
+                    <i class="bi bi-check2"></i> Marcar como lido
+                  </button>
+                  {% endif %}
+                </div>
+              </div>
+              <hr class="my-2">
+              <div class="aviso-body">{{ a.corpo_html | safe if a.corpo_html else (a.conteudo or a.texto or '') }}</div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="card card-body"><div class="text-muted"><i class="bi bi-inbox me-1"></i> Nenhum aviso disponível.</div></div>
+          {% endif %}
+        </div>
       </section>
 
-      <!-- LANCAMENTOS (SPA) -->
+      <!-- =================== LANCAMENTOS =================== -->
       <section data-view="lancamentos">
-        <div class="section-title"><i class="bi bi-receipt"></i> Lançamentos</div>
+        <div class="section-title">
+          <i class="bi bi-receipt"></i> Lançamentos
+          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
+        </div>
 
         <div class="row g-3">
           <div class="col-lg-3">
@@ -420,8 +435,8 @@
                 <div class="kpi mb-2"><div class="small text-muted">Total no período</div><div class="v">R$ <span id="kpiTotalValor">0,00</span></div></div>
                 <div class="kpi mb-2"><div class="small text-muted">Entregas no período</div><div class="v"><span id="kpiTotalEntregas">0</span></div></div>
 
-                <!-- Exportar CSV: AGORA AZUL SEM PRECISAR PASSAR O MOUSE -->
-                <div class="col-12 d-grid"><button class="btn btn-royal" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV</button></div>
+                <!-- BOTÃO AZUL (sempre azul) -->
+                <div class="d-grid"><button class="btn btn-royal" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV</button></div>
               </form>
             </div>
           </div>
@@ -485,9 +500,12 @@
         </div>
       </section>
 
-      <!-- LANÇAR (SPA) -->
+      <!-- =================== LANÇAR =================== -->
       <section data-view="lancar">
-        <div class="section-title"><i class="bi bi-plus-circle"></i> Lançar Produção Diária</div>
+        <div class="section-title">
+          <i class="bi bi-plus-circle"></i> Lançar Produção Diária
+          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
+        </div>
 
         <div class="card card-body">
           <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
@@ -629,7 +647,6 @@
 
                 <div class="col-12 text-end mt-2"><button class="btn btn-royal"><i class="bi bi-plus-circle"></i> Lançar</button></div>
               </form>
-              <!-- /FORM -->
             </div>
 
             <div id="blocoTabelas" class="mt-2">
@@ -666,22 +683,21 @@
   {% set _unread_from_ctx_t = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
   {% set _toast_unread = _unread_from_list_t if _unread_from_list_t>0 else _unread_from_ctx_t %}
   <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1055;">
-    <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
-         data-bs-autohide="false">
+    <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false">
       <div class="toast-header">
         <i class="bi bi-megaphone-fill me-2"></i><strong class="me-auto">Novos avisos</strong><small>agora</small>
         <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
       </div>
       <div class="toast-body">
-        Você tem {{ _toast_unread }} aviso(s) não lido(s). <a href="{{ url_for('portal_restaurante_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
+        Você tem <b id="toastCount">{{ _toast_unread }}</b> aviso(s) não lido(s).
+        <a id="toastVerAgora" href="{{ url_for('portal_restaurante_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
       </div>
     </div>
   </div>
 
   <!-- TOAST OK -->
   <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1056;">
-    <div id="toastOK" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
-         data-bs-autohide="true" data-bs-delay="2200">
+    <div id="toastOK" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="2200">
       <div class="toast-header">
         <i class="bi bi-check2-circle text-success me-2"></i><strong class="me-auto">Pronto</strong><small>agora</small>
         <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Fechar"></button>
@@ -689,36 +705,6 @@
       <div class="toast-body">Aviso marcado como lido.</div>
     </div>
   </div>
-
-  <script>
-  // número inicial vindo do backend (Jinja)
-  const __UNREAD_INIT__ = Number('{{ _toast_unread|int(0) }}') || 0;
-
-  // mostra o toast permanente se houver não lidos
-  function showAvisoToastIfNeeded(n){
-    if (n <= 0) return;
-    const el = document.getElementById('toastAvisos');
-    if (!el) return;
-    const t = new bootstrap.Toast(el); // data-bs-autohide="false"
-    setTimeout(()=>t.show(), 400);
-  }
-
-  // sincroniza a “bolinha” do menu lateral
-  function syncSidebarBadge(n){
-    const badge = document.querySelector('#linkAvisos .badge-dot');
-    if (!badge) return;
-    if (n > 0){ badge.style.display=''; badge.textContent = String(n); }
-    else { badge.style.display='none'; }
-  }
-
-  // deixa disponível para atualizar após “marcar como lido”
-  window.updateAvisosBadge = function(n){ syncSidebarBadge(Math.max(0, Number(n)||0)); };
-
-  document.addEventListener('DOMContentLoaded', ()=>{
-    syncSidebarBadge(__UNREAD_INIT__);
-    showAvisoToastIfNeeded(__UNREAD_INIT__);
-  });
-</script>
 
   <!-- Modal Avaliação -->
   <div class="modal fade" id="modalAval" tabindex="-1" aria-hidden="true">
@@ -765,13 +751,15 @@
     const brMoney = (n)=> (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
     const todayStr = ()=>{ const d=new Date(); const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return d.getFullYear()+'-'+mm+'-'+dd; };
 
-    /* ===== SPA Core (não intercepta Tabelas e Avisos) ===== */
+    /* ===== SPA Core ===== */
     function showSection(view){
       document.querySelectorAll('section[data-view]').forEach(sec=>{
         sec.classList.toggle('view-active', sec.getAttribute('data-view')===view);
       });
-      document.querySelectorAll('#sideNav a[data-target]').forEach(a=>{
-        a.classList.toggle('active', a.getAttribute('data-target')===view);
+      document.querySelectorAll('#sideNav a').forEach(a=>{
+        const t = a.getAttribute('data-target');
+        // Deixa apenas UMA ativa (incluindo links normais)
+        a.classList.toggle('active', (t && t===view) || (!t && view==='__external__' && a.id==='linkAvisos'));
       });
       if (view==='avisos') initAvisos();
       if (view==='lancamentos') initLancamentos();
@@ -785,6 +773,32 @@
     function startView(){
       const u = new URL(window.location.href);
       return u.searchParams.get('view') || 'lancar';
+    }
+
+    /* ===== Toast/Bolinhas Globais ===== */
+    let toastAvisosInst=null;
+    function ensureToastInstance(){
+      const el=document.getElementById('toastAvisos');
+      if (!el) return null;
+      if (!toastAvisosInst) toastAvisosInst = new bootstrap.Toast(el, { autohide:false });
+      return toastAvisosInst;
+    }
+    function setGlobalBadge(n){
+      document.querySelectorAll('[data-global-badge]').forEach(el=>{
+        if (n>0){ el.style.display='inline-flex'; el.textContent=n; }
+        else { el.style.display='none'; el.textContent='0'; }
+      });
+      const sideAvisoBadge = document.querySelector('#linkAvisos .badge-dot');
+      if (sideAvisoBadge){
+        if (n>0){ sideAvisoBadge.style.display=''; sideAvisoBadge.textContent=n; }
+        else { sideAvisoBadge.style.display='none'; sideAvisoBadge.textContent='0'; }
+      }
+      const toastCount = document.getElementById('toastCount');
+      if (toastCount){ toastCount.textContent = n; }
+      const t = ensureToastInstance();
+      if (t){
+        if (n>0) t.show(); else t.hide();
+      }
     }
 
     /* ===== Avaliação (Geral = média automática) ===== */
@@ -845,7 +859,9 @@
         header.style.display = 'block'; form.style.display = 'flex'; hint.style.display = 'none';
         document.querySelectorAll('.lancamentos-table').forEach(t => t.style.display = 'none');
         const tabela = document.getElementById('tabela-' + el.dataset.id); if (tabela) tabela.style.display = 'block';
-        document.querySelectorAll('.rating-group').forEach(g=>{ if (g.dataset.name !== 'av_geral') wireStarsClickable(g); });
+        document.querySelectorAll('.rating-group').forEach(g=>{
+          if (g.dataset.name !== 'av_geral') wireStarsClickable(g);
+        });
         autoGeral();
       }
 
@@ -858,55 +874,108 @@
       const primeiro = itens[0]; if (primeiro) mostrarCooperado(primeiro);
     }
 
-    /* ===== Avisos ===== */
+    /* ===== Avisos (suporta .aviso e .aviso-card) ===== */
     let avisosWired = false;
     function initAvisos(){
       if (avisosWired) return; avisosWired = true;
       const toastOKEl = document.getElementById('toastOK');
       const toastOK = toastOKEl ? new bootstrap.Toast(toastOKEl) : null;
       const badgeTitulo = document.getElementById('badgeTitulo');
-      const badgeSidebar = document.querySelector('#linkAvisos .badge-dot');
 
-      function getUnreadCount(){ return document.querySelectorAll('.aviso-card[data-lido="0"]').length; }
+      function getUnread(){
+        return document.querySelectorAll('.aviso-card[data-lido="0"], .aviso[data-lido="0"]').length;
+      }
       function refreshBadges(){
-        const n = getUnreadCount();
+        const n = getUnread();
         if (badgeTitulo){
           badgeTitulo.className = 'badge ' + (n > 0 ? 'text-bg-danger' : 'text-bg-success');
           badgeTitulo.textContent = n > 0 ? (n + ' não lido(s)') : 'Tudo lido';
         }
-        if (badgeSidebar){
-          if (n>0){ badgeSidebar.style.display=''; badgeSidebar.textContent=n; }
-          else { badgeSidebar.style.display='none'; }
-        }
+        setGlobalBadge(n);
       }
 
       const toggleNaoLidos = document.getElementById('toggleNaoLidos');
       toggleNaoLidos?.addEventListener('change', () => {
         const onlyUnread = toggleNaoLidos.checked;
-        document.querySelectorAll('.aviso-card').forEach(card => {
+        document.querySelectorAll('.aviso-card, .aviso').forEach(card => {
           const lido = card.getAttribute('data-lido') === '1';
           card.style.display = (onlyUnread && lido) ? 'none' : '';
         });
       });
-      document.querySelectorAll('[data-acao="marcar-lido"]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const url = btn.getAttribute('data-url'); const card = btn.closest('.aviso-card');
-          try{
-            const resp = await fetch(url, { method: 'POST' });
-            if (resp.ok){
-              card.setAttribute('data-lido','1'); card.classList.add('lido');
-              const meta = card.querySelector('.text-muted.small'); if (meta) meta.innerHTML += ' • <span class="text-success">Lido</span>';
-              btn.remove(); refreshBadges(); toastOK?.show();
-            } else { alert('Não foi possível marcar como lido ('+resp.status+').'); }
-          } catch(e){ alert('Falha de rede.'); }
-        });
-      });
-      refreshBadges();
 
-      const unread = Number(`{{ _toast_unread }}`);
-      if (unread > 0) {
-        const toastEl = document.getElementById('toastAvisos');
-        if (toastEl) { const t = new bootstrap.Toast(toastEl); setTimeout(()=>t.show(), 600); }
+      function wireMarkButtons(ctx){
+        (ctx||document).querySelectorAll('[data-acao="marcar-lido"]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const url = btn.getAttribute('data-url'); const card = btn.closest('.aviso-card, .aviso');
+            try{
+              const resp = await fetch(url, { method: 'POST' });
+              if (resp.ok){
+                card.setAttribute('data-lido','1'); card.classList.add('lido');
+                const meta = card.querySelector('.text-muted.small, .meta');
+                if (meta){
+                  if (meta.classList.contains('meta')) {
+                    meta.innerHTML = meta.innerHTML.replace('Não lido','Lido');
+                    if (!/Lido/.test(meta.textContent)) meta.innerHTML += ' • <span style="color:#16a34a">Lido</span>';
+                  } else {
+                    meta.innerHTML += ' • <span class="text-success">Lido</span>';
+                  }
+                }
+                btn.remove(); refreshBadges(); toastOK?.show();
+              } else { alert('Não foi possível marcar como lido ('+resp.status+').'); }
+            } catch(e){ alert('Falha de rede.'); }
+          });
+        });
+      }
+      wireMarkButtons(document);
+      refreshBadges();
+    }
+
+    /* ===== Carregar Avisos da página externa e injetar ===== */
+    async function loadAvisosFromExternal(href){
+      try{
+        const res = await fetch(href, {credentials:'same-origin'});
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        const html = await res.text();
+        const dom = new DOMParser().parseFromString(html, 'text/html');
+
+        // Pega os cards (compatível com o HTML enviado: .aviso com id="aviso-...")
+        const cards = Array.from(dom.querySelectorAll('#aviso-\\31, .aviso, .aviso-card'))
+          .filter(el=>/^aviso-\d+/.test(el.id) || el.classList.contains('aviso') || el.classList.contains('aviso-card'));
+
+        const cont = document.getElementById('avisosListContainer');
+        if (cont){
+          cont.innerHTML = '';
+          if (cards.length){
+            cards.forEach(c=> cont.appendChild(document.importNode(c, true)));
+          }else{
+            cont.innerHTML = '<div class="card card-body"><div class="text-muted"><i class="bi bi-inbox me-1"></i> Nenhum aviso disponível.</div></div>';
+          }
+        }
+
+        // Badge da sidebar daquela página (se existir) para saber total não lido
+        let n = 0;
+        const pageBadge = dom.querySelector('#badgeSidebar');
+        if (pageBadge && pageBadge.textContent.trim()){
+          n = Number(pageBadge.textContent.trim().replace(/\D+/g,'')) || 0;
+        } else {
+          // Conta pelos data-lido="0"
+          const pageUnread = dom.querySelectorAll('.aviso[data-lido="0"], .aviso-card[data-lido="0"]').length;
+          n = pageUnread;
+        }
+        setGlobalBadge(n);
+
+        // Re-wire botões de marcar como lido e toggle
+        avisosWired = false; // força reinit para novo conteúdo
+        initAvisos();
+
+        // Mostrar seção Avisos sem recarregar
+        showSection('avisos');
+        pushView('avisos');
+
+        return true;
+      }catch(err){
+        console.warn('Falha ao carregar avisos via fetch:', err);
+        return false;
       }
     }
 
@@ -922,7 +991,6 @@
       const grid   = document.getElementById('gridCoop');
       const f      = document.getElementById('formFiltroLanc');
 
-      // se não houver período, seta hoje e envia (uma vez)
       const appliedKey='lanc_applied_today';
       if (f && !f.data_inicio.value && !f.data_fim.value && !f.mes.value && !sessionStorage.getItem(appliedKey)){
         const t=todayStr(); f.data_inicio.value=t; f.data_fim.value=t;
@@ -1007,44 +1075,75 @@
       if (f?.q?.value) f.q.dispatchEvent(new Event('input'));
     }
 
-    /* ===== Navegação SPA + Prefetch para Tabelas/Avisos ===== */
+    /* ===== Navegação & Integrações ===== */
     document.addEventListener('DOMContentLoaded', () => {
-      // Intercepta apenas itens com data-target (não intercepta TABELAS nem AVISOS)
-      document.getElementById('sideNav')?.addEventListener('click', (e)=>{
+      // Intercepta cliques do menu
+      document.getElementById('sideNav')?.addEventListener('click', async (e)=>{
         const a = e.target.closest('a');
         if (!a) return;
         const target = a.getAttribute('data-target');
-        if (!target) return; // deixa links sem data-target navegarem normalmente
-        if (target==='sair') return;
-        e.preventDefault();
-        showSection(target);
-        pushView(target);
+
+        // Sempre garantir que apenas UMA fica ativa (inclui links normais)
+        document.querySelectorAll('#sideNav a').forEach(x=>x.classList.remove('active'));
+        a.classList.add('active');
+
+        // SPA targets
+        if (target){
+          e.preventDefault();
+          // Avisos SPA é __external__? Não, carregamos abaixo pelo link id=linkAvisos
+          showSection(target);
+          pushView(target);
+          return;
+        }
+
+        // Caso seja o link de Avisos: carrega via fetch e injeta
+        if (a.id === 'linkAvisos'){
+          e.preventDefault();
+          const ok = await loadAvisosFromExternal(a.href);
+          if (!ok){ window.location.href = a.href; } // fallback
+          return;
+        }
+
+        // Demais links (ex.: Tabelas) seguem fluxo normal e abrem rápido
       });
 
-      // Prefetch rápido para Tabelas e Avisos
+      // Prefetch para deixar mais rápido
       function prefetch(href){
-        try{
-          const l=document.createElement('link');
-        l.rel='prefetch'; l.href=href; document.head.appendChild(l);
-        }catch(e){}
+        try{ const l=document.createElement('link'); l.rel='prefetch'; l.href=href; document.head.appendChild(l); }catch(e){}
       }
       document.getElementById('linkTabelas')?.addEventListener('mouseenter', e=>prefetch(e.currentTarget.href));
       document.getElementById('linkAvisos')?.addEventListener('mouseenter', e=>prefetch(e.currentTarget.href));
+      document.getElementById('toastVerAgora')?.addEventListener('click', async (e)=>{
+        e.preventDefault();
+        const href = e.currentTarget.getAttribute('href');
+        const ok = await loadAvisosFromExternal(href);
+        if (!ok) window.location.href = href;
+      });
 
       const initial = startView();
-      showSection(initial);
+      if (initial==='avisos'){
+        // Se entrar direto com ?view=avisos, tenta já puxar via fetch
+        const href = document.getElementById('linkAvisos')?.href;
+        if (href) { loadAvisosFromExternal(href); }
+        else { showSection('avisos'); }
+      } else {
+        showSection(initial);
+      }
 
       window.addEventListener('popstate', (ev)=>{
         const v = (ev.state && ev.state.view) || startView();
-        showSection(v);
+        if (v==='avisos'){
+          const href = document.getElementById('linkAvisos')?.href;
+          if (href) { loadAvisosFromExternal(href); }
+          else { showSection('avisos'); }
+        } else {
+          showSection(v);
+        }
       });
 
-      // Toast de avisos se houver
+      // Toast persistente + bolinhas globais na carga
       const unread = Number(`{{ _toast_unread }}`);
-      if (unread > 0) {
-        const toastEl = document.getElementById('toastAvisos');
-        if (toastEl) { const t = new bootstrap.Toast(toastEl); setTimeout(()=>t.show(), 600); }
-      }
+      setGlobalBadge(unread); // mostra toast se > 0
     });
   </script>
 </body>
