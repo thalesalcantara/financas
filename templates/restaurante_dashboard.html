@@ -1,29 +1,21 @@
 <!DOCTYPE html>
-<html lang="pt-br" data-theme="light">
+<html lang="pt-br">
 <head>
   <meta charset="UTF-8">
   <title>Portal do Estabelecimento</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Bootstrap & Icons (SEM MUDAR LINKS) -->
+  <!-- Bootstrap & Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <style>
-    /* =================== TEMA BASE (mantido) =================== */
     :root{
       --royal:#2141d9; --royal-2:#3654e6; --royal-3:#eaf0ff;
       --ink:#0b1220; --muted:#6b7280; --soft:#f5f7ff; --danger:#e74c3c; --ok:#16a34a;
-      --border:#e6e9f2; --chip:#eef1ff; --bg:#fff; --text:#111827; --card:#fff; --subtle:#f8faff;
-      --badge-danger-bg:#dc3545; --badge-danger-color:#fff;
-    }
-    /* =================== DARK MODE (suave) =================== */
-    html[data-theme="dark"]{
-      --bg:#0b1220; --text:#e5e7eb; --card:#111827; --subtle:#0f172a;
-      --border:#1f2937; --chip:#111a3c; --royal:#5074ff; --royal-2:#6d88ff; --royal-3:#0e1a4a;
-      --muted:#9aa3b2; --soft:#0e1324;
+      --border:#e6e9f2; --chip:#eef1ff;
     }
     html,body{ height:100%; }
-    body{ background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif; }
-    a{ text-decoration:underline; } /* nomes sublinhados do menu lateral, conforme pedido */
+    body{ background:#fff; color:#111827; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif; }
+    a{ text-decoration:none; }
     .shell{ display:grid; grid-template-columns: 260px 1fr; min-height:100vh; }
     .aside{
       background:linear-gradient(180deg, var(--royal) 0%, var(--royal-2) 100%);
@@ -31,45 +23,61 @@
     }
     .brand{ font-weight:800; letter-spacing:.5px; font-size:1.15rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.08); display:flex; align-items:center; gap:8px; }
     .navmenu{ margin-top:18px; display:flex; flex-direction:column; gap:6px; }
-    .navmenu a{ color:#fff; padding:10px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600; text-decoration:underline; }
+    .navmenu a{ color:#fff; padding:10px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600; position:relative; }
     .navmenu a.active, .navmenu a:hover{ background:rgba(255,255,255,.14); }
-    .navmenu .badge{ margin-left:auto; }
+    /* bolinha contador (avisos) */
+    .navmenu .badge-dot{
+      min-width:22px; height:22px; line-height:22px;
+      border-radius:999px; padding:0 6px; font-size:.75rem; font-weight:800;
+      display:inline-flex; align-items:center; justify-content:center;
+      background:#dc3545; color:#fff; box-shadow:0 0 0 2px rgba(255,255,255,.25) inset;
+      margin-left:auto;
+    }
+
     .content{ padding:24px clamp(14px,3vw,32px); }
     .section-title{ color:var(--royal); font-weight:800; font-size:1.25rem; display:flex; gap:10px; align-items:center; }
-    .card{ border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 0 #0000000a; background:var(--card); }
-    .card-soft{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; }
-    .chip{ background:var(--chip); border:1px solid var(--border); border-radius:999px; padding:.2rem .65rem; font-weight:700; color:var(--text); }
+    .card{ border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 0 #0000000a; }
+    .card-soft{ background:#fff; border:1px solid var(--border); border-radius:14px; padding:14px; }
+    .chip{ background:var(--chip); border:1px solid var(--border); border-radius:999px; padding:.2rem .65rem; font-weight:700; }
     .table-compact th,.table-compact td{ padding:.5rem .6rem; }
     .btn-royal{ background:var(--royal); color:#fff; border:none; }
     .btn-royal:hover{ background:var(--royal-2); color:#fff; }
-    .btn-outline-royal{ border:1px solid var(--royal); color:#fff; }
-    html[data-theme="light"] .btn-outline-royal{ color:var(--royal); }
+    .btn-outline-royal{ border:1px solid var(--royal); color:#royal; }
     .btn-outline-royal:hover{ background:var(--royal); color:#fff; }
     .cooperado-avatar{ width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 1px 0 #0001; }
     .cooperado-item{ display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; cursor:pointer; }
-    .cooperado-item:hover{ background:var(--subtle); }
+    .cooperado-item:hover{ background:#f8faff; }
     .cooperado-item.selected{ outline:2px solid var(--royal); background:#f0f4ff; }
-    html[data-theme="dark"] .cooperado-item.selected{ background:#0d1a4a; }
     .selected-header .big{ width:180px; height:180px; border-radius:50%; object-fit:cover; border:6px solid var(--royal); box-shadow:0 6px 16px #0002; }
     .rating-group{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .rating-label{ width:160px; font-weight:700; color:var(--text); }
+    .rating-label{ width:160px; font-weight:700; color:#1f2937; }
     .stars{ display:inline-flex; gap:3px; font-size:1.4rem; cursor:pointer; }
     .star{ color:#cbd5e1; transition:transform .06s; }
     .star.active,.star.hover{ color:#fbbf24; }
     .star:active{ transform:scale(.9); }
+
+    /* Geral travada (média auto) */
+    .rating-group[data-name="av_geral"] .stars{ pointer-events:none; opacity:.95; }
+
     .sticky-tools{ position:sticky; top:12px; }
-    .kpi{ background:var(--soft); border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
+    .kpi{ background:#fafcff; border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
     .kpi .v{ font-weight:800; font-size:1.05rem; }
-    /* badge vermelho consistente no dark */
-    .badge.text-bg-danger{ background-color:var(--badge-danger-bg)!important; color:var(--badge-danger-color)!important; }
+
+    /* SPA sections */
+    section[data-view]{ display:none; }
+    section.view-active{ display:block; }
+
+    /* Tabelas iframe */
+    .tabela-frame{ width:100%; height:70vh; border:1px solid var(--border); border-radius:12px; background:#fff; }
+    .file-row{ display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--border); border-radius:10px; }
+    .file-row+.file-row{ margin-top:8px; }
+
     @media (max-width: 920px){
       .shell{ grid-template-columns: 66px 1fr; }
       .brand span{ display:none; }
       .navmenu a span{ display:none; }
+      .navmenu .badge-dot{ position:absolute; right:10px; }
     }
-    /* Ocultar/mostrar seção (usado só quando trocamos via JS dentro do mesmo DOM) */
-    section[data-view]{ display:none; }
-    section[data-view].on{ display:block; }
   </style>
 </head>
 <body>
@@ -77,57 +85,77 @@
     <!-- ============ Aside ============ -->
     <aside class="aside">
       <div class="brand"><i class="bi bi-building"></i><span>Portal do Estabelecimento</span></div>
-
-      <!-- BOTÃO MODO ESCURO (no menu lateral, sem mexer em links existentes) -->
-      <div class="d-grid my-2">
-        <button id="btnTheme" class="btn btn-outline-light btn-sm">
-          <i class="bi bi-moon-stars me-1"></i><span>Modo escuro</span>
-        </button>
-      </div>
-
-      <nav class="navmenu" id="menuLateral">
-        <!-- NÃO ALTEREI SEUS LINKS -->
-        <a class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos']) else '' }}"
+      <nav class="navmenu" id="sideNav">
+        <!-- Mantém href original (fallback) + data-target para SPA -->
+        <a data-target="lancar"
+           class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos']) else '' }}"
            href="{{ url_for('portal_restaurante', view='lancar', data_inicio=filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else None, data_fim=filtro_fim.strftime('%Y-%m-%d') if filtro_fim else None) }}">
           <i class="bi bi-person-lines-fill"></i><span>Cooperados</span>
         </a>
 
-        <a class="{{ 'active' if view=='lancamentos' else '' }}"
+        <a data-target="lancamentos"
+           class="{{ 'active' if view=='lancamentos' else '' }}"
            href="{{ url_for('portal_restaurante', view='lancamentos', data_inicio=filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else None, data_fim=filtro_fim.strftime('%Y-%m-%d') if filtro_fim else None, mes=filtro_mes if filtro_mes else None) }}">
           <i class="bi bi-receipt"></i><span>Lançamentos</span>
         </a>
 
-        <a class="{{ 'active' if view=='escalas' else '' }}" href="{{ url_for('portal_restaurante', view='escalas') }}">
-          <i class="bi bi-calendar-week"></i><span>Escala semanal</span>
+        <a data-target="escalas"
+           class="{{ 'active' if view=='escalas' else '' }}"
+           href="{{ url_for('portal_restaurante', view='escalas') }}">
+          <i class="bi bi-calendar-week"></i><span>Escala</span>
         </a>
 
         {% if session.get('user_tipo') == 'restaurante' %}
-        <a class="{{ 'active' if request.endpoint=='rest_tabelas' else '' }}" href="{{ url_for('rest_tabelas') }}">
+        <a data-target="tabelas"
+           class="{{ 'active' if request.endpoint=='rest_tabelas' else '' }}"
+           href="{{ url_for('rest_tabelas') }}">
           <i class="bi bi-table"></i><span>Tabelas</span>
         </a>
         {% endif %}
 
-        <a class="{{ 'active' if view=='config' else '' }}" href="{{ url_for('portal_restaurante', view='config') }}">
+        <a data-target="config"
+           class="{{ 'active' if view=='config' else '' }}"
+           href="{{ url_for('portal_restaurante', view='config') }}">
           <i class="bi bi-gear"></i><span>Configuração</span>
         </a>
 
-        <a id="linkAvisos" class="{{ 'active' if request.endpoint=='portal_restaurante_avisos' or view=='avisos' else '' }}"
+        <a id="linkAvisos" data-target="avisos"
+           class="{{ 'active' if request.endpoint=='portal_restaurante_avisos' or view=='avisos' else '' }}"
            href="{{ url_for('portal_restaurante_avisos') }}">
           <i class="bi bi-megaphone"></i><span>Avisos</span>
           {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
-          {% if _cntAvisos > 0 %}<span class="badge text-bg-danger">{{ _cntAvisos }}</span>{% endif %}
+          {% if _cntAvisos > 0 %}<span class="badge-dot">{{ _cntAvisos }}</span>{% endif %}
         </a>
 
-        <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
+        <a data-target="sair" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
       </nav>
     </aside>
 
     <!-- ============ Main ============ -->
-    <main class="content" id="appMain">
-      {# Mantemos o seu conteúdo original – Jinja vai renderizar a section conforme view #}
+    <main class="content">
 
-      {% if view == 'config' %}
-      <section data-view="config" class="on">
+      {% with msgs = get_flashed_messages(with_categories=True) %}
+        {% if msgs %}
+          <div class="mb-3">
+            {% for cat, msg in msgs %}
+              <div class="alert alert-{{ 'danger' if cat=='error' else cat }} py-2 px-3 mb-2">{{ msg|safe }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      {# cópias seguras pra SPA #}
+      {% set _dias_list = dias_list if dias_list is defined and dias_list is not none else [] %}
+      {% set _agenda = agenda if agenda is defined and agenda is not none else {} %}
+      {% set _ref_data = ref_data if ref_data is defined and ref_data is not none else (now() if false else None) %}
+      {% set _modo = modo if modo is defined and modo is not none else 'semana' %}
+      {% set _cooperados = cooperados if cooperados is defined and cooperados is not none else [] %}
+      {% set _lancamentos_periodo = lancamentos_periodo if lancamentos_periodo is defined and lancamentos_periodo is not none else [] %}
+      {% set _url_lancar_producao = url_lancar_producao if url_lancar_producao is defined else url_for('portal_restaurante') %}
+      {% set _tabelas_html = tabelas_html if tabelas_html is defined and tabelas_html is not none else [] %}
+
+      <!-- CONFIG -->
+      <section data-view="config">
         <div class="section-title"><i class="bi bi-shield-lock"></i> Configuração</div>
         <div class="card card-body">
           <form class="row g-3 form-password" method="POST" action="{{ url_for('rest_alterar_senha') }}">
@@ -158,23 +186,22 @@
         </div>
       </section>
 
-      {% elif view == 'escalas' %}
-      <section data-view="escalas" class="on">
+      <!-- ESCALAS -->
+      <section data-view="escalas">
         <div class="section-title"><i class="bi bi-calendar-week"></i> Escala semanal</div>
-
         <div class="card card-body">
           <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
             <input type="hidden" name="view" value="escalas">
             <div class="col-md-3">
               <label class="form-label">Ver</label>
               <select name="modo" class="form-select">
-                <option value="semana" {{ 'selected' if (modo=='semana') }}>Semana completa</option>
-                <option value="dia" {{ 'selected' if (modo=='dia') }}>Somente 1 dia</option>
+                <option value="semana" {{ 'selected' if (_modo=='semana') }}>Semana completa</option>
+                <option value="dia" {{ 'selected' if (_modo=='dia') }}>Somente 1 dia</option>
               </select>
             </div>
             <div class="col-md-3">
               <label class="form-label">Referência</label>
-              <input type="date" name="ref" class="form-control" value="{{ ref_data.strftime('%Y-%m-%d') }}">
+              <input type="date" name="ref" class="form-control" value="{{ _ref_data and _ref_data.strftime('%Y-%m-%d') }}">
             </div>
             <div class="col-md-6 text-end">
               <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
@@ -182,74 +209,72 @@
             </div>
           </form>
 
-          {% if modo == 'semana' %}
-            <hr class="my-3">
-            <div class="row g-3">
-              {% for dia in dias_list %}
-              <div class="col-md-6 col-lg-4">
-                <div class="card-soft">
-                  <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="badge text-bg-primary fw-semibold">{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][dia.weekday()] }} — {{ dia.strftime('%d/%m/%Y') }}</span>
-                    <i class="bi bi-people"></i>
-                  </div>
-                  <div style="max-height:360px; overflow:auto; border-top:1px dashed var(--border);">
-                    {% set lista = agenda.get(dia, []) %}
-                    {% if lista %}
-                      {% for grupo in (lista | groupby('contrato')) %}
-                        {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                        <div class="fw-bold mt-2">{{ contrato_nome }}</div>
-                        {% for item in grupo.list %}
-                          <div class="py-2 border-bottom">
-                            <div class="fw-bold">
-                              {{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}
-                            </div>
-                            <div class="text-muted small">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
-                          </div>
-                        {% endfor %}
-                      {% endfor %}
-                    {% else %}
-                      <div class="text-muted small py-2">Sem escala registrada.</div>
-                    {% endif %}
-                  </div>
+          {% if _modo == 'semana' %}
+          <hr class="my-3">
+          <div class="row g-3">
+            {% for dia in _dias_list %}
+            <div class="col-md-6 col-lg-4">
+              <div class="card-soft">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <span class="badge text-bg-primary fw-semibold">{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][dia.weekday()] }} — {{ dia.strftime('%d/%m/%Y') }}</span>
+                  <i class="bi bi-people"></i>
                 </div>
-              </div>
-              {% endfor %}
-            </div>
-          {% else %}
-            <hr class="my-3">
-            <div class="card-soft">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="badge text-bg-primary fw-semibold">{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][ref_data.weekday()] }} — {{ ref_data.strftime('%d/%m/%Y') }}</span>
-                <i class="bi bi-calendar-day"></i>
-              </div>
-              <table class="table table-bordered table-hover align-middle table-compact">
-                <thead><tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr></thead>
-                <tbody>
-                  {% set lista = agenda.get(ref_data, []) %}
+                <div style="max-height:360px; overflow:auto; border-top:1px dashed var(--border);">
+                  {% set lista = _agenda.get(dia, []) %}
                   {% if lista %}
                     {% for grupo in (lista | groupby('contrato')) %}
                       {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                      <div class="fw-bold mt-2">{{ contrato_nome }}</div>
                       {% for item in grupo.list %}
-                      <tr>
-                        <td>{{ contrato_nome }}</td>
-                        <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
-                        <td>{{ item.turno or '—' }}</td>
-                        <td>{{ item.horario or '—' }}</td>
-                      </tr>
+                        <div class="py-2 border-bottom">
+                          <div class="fw-bold">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
+                          <div class="text-muted small">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
+                        </div>
                       {% endfor %}
                     {% endfor %}
                   {% else %}
-                  <tr><td colspan="4" class="text-center text-muted">Sem escala registrada.</td></tr>
+                    <div class="text-muted small py-2">Sem escala registrada.</div>
                   {% endif %}
-                </tbody>
-              </table>
+                </div>
+              </div>
             </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <hr class="my-3">
+          <div class="card-soft">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="badge text-bg-primary fw-semibold">{{ _ref_data and ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][_ref_data.weekday()] }} — {{ _ref_data and _ref_data.strftime('%d/%m/%Y') }}</span>
+              <i class="bi bi-calendar-day"></i>
+            </div>
+            <table class="table table-bordered table-hover align-middle table-compact">
+              <thead><tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr></thead>
+              <tbody>
+                {% set lista = _agenda.get(_ref_data, []) if _ref_data else [] %}
+                {% if lista %}
+                  {% for grupo in (lista | groupby('contrato')) %}
+                    {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                    {% for item in grupo.list %}
+                    <tr>
+                      <td>{{ contrato_nome }}</td>
+                      <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
+                      <td>{{ item.turno or '—' }}</td>
+                      <td>{{ item.horario or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                  {% endfor %}
+                {% else %}
+                <tr><td colspan="4" class="text-center text-muted">Sem escala registrada.</td></tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
           {% endif %}
         </div>
       </section>
 
-      {% elif view == 'avisos' %}
-      <section data-view="avisos" class="on">
+      <!-- AVISOS -->
+      <section data-view="avisos">
         {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
         {% set _unread_from_list = (_avisos | selectattr('lido','equalto',False) | list | length) %}
         {% set _unread_from_ctx = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
@@ -316,9 +341,10 @@
         {% endif %}
       </section>
 
-      {% elif view == 'lancamentos' %}
-      <section data-view="lancamentos" class="on">
+      <!-- LANCAMENTOS -->
+      <section data-view="lancamentos">
         <div class="section-title"><i class="bi bi-receipt"></i> Lançamentos</div>
+
         <div class="row g-3">
           <div class="col-lg-3">
             <div class="card card-body sticky-tools">
@@ -327,35 +353,49 @@
                     action="{{ url_for('portal_restaurante') }}"
                     class="row g-2 align-items-end">
                 <input type="hidden" name="view" value="lancamentos">
+
                 <div class="col-12">
                   <label class="form-label">Início</label>
-                  <input type="date" class="form-control" name="data_inicio" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
+                  <input type="date" class="form-control" name="data_inicio"
+                         value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
                 </div>
+
                 <div class="col-12">
                   <label class="form-label">Fim</label>
-                  <input type="date" class="form-control" name="data_fim" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
+                  <input type="date" class="form-control" name="data_fim"
+                         value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
                 </div>
+
                 <div class="col-12">
                   <label class="form-label">Mês (opcional)</label>
-                  <input type="month" class="form-control" name="mes" value="{{ filtro_mes or '' }}"
+                  <input type="month" class="form-control" name="mes"
+                         value="{{ filtro_mes or '' }}"
                          oninput="if(this.value){ const f=this.form; f.data_inicio.value=''; f.data_fim.value=''; }">
                   <div class="form-text">Se escolher um mês, as datas serão ignoradas.</div>
                 </div>
+
                 <div class="col-12">
                   <label class="form-label">Digite o nome do cooperado (visual)</label>
                   <input type="text" class="form-control" name="q" placeholder="Filtrar por nome...">
                 </div>
+
                 <div class="col-12 d-grid">
-                  <button class="btn btn-royal" type="submit"><i class="bi bi-funnel"></i> Aplicar</button>
+                  <button class="btn btn-royal" type="submit">
+                    <i class="bi bi-funnel"></i> Aplicar
+                  </button>
                 </div>
+
                 <div class="col-12 d-grid">
-                  <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='lancamentos') }}">
+                  <a class="btn btn-outline-secondary"
+                     href="{{ url_for('portal_restaurante', view='lancamentos') }}">
                     <i class="bi bi-arrow-counterclockwise"></i> Limpar
                   </a>
                 </div>
+
                 <hr class="my-2">
                 <div class="kpi mb-2"><div class="small text-muted">Total no período</div><div class="v">R$ <span id="kpiTotalValor">0,00</span></div></div>
                 <div class="kpi mb-2"><div class="small text-muted">Entregas no período</div><div class="v"><span id="kpiTotalEntregas">0</span></div></div>
+
                 <div class="d-grid"><button class="btn btn-outline-royal" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV</button></div>
               </form>
             </div>
@@ -386,7 +426,7 @@
                   </tr>
                 </thead>
                 <tbody id="tbodyLanc">
-                  {% for x in lancamentos_periodo or [] %}
+                  {% for x in _lancamentos_periodo %}
                   <tr data-coop="{{ x.cooperado_id or x.coop_id }}"
                       data-coopnome="{{ x.cooperado_nome or x.coop_nome }}"
                       data-contrato="{{ x.contrato_nome or x.contrato }}">
@@ -401,7 +441,7 @@
                     <td class="text-center">{{ x.qtd_entregas if x.qtd_entregas is not none else '-' }}</td>
                     <td class="text-end valor" data-valor="{{ '%.2f'|format(x.valor or 0) }}">R$ {{ '%.2f'|format(x.valor or 0) }}</td>
                   </tr>
-                  {% endfor %}
+                  {% else %}{% endfor %}
                 </tbody>
                 <tfoot>
                   <tr class="table-secondary">
@@ -420,8 +460,8 @@
         </div>
       </section>
 
-      {% else %}
-      <section data-view="lancar" class="on">
+      <!-- LANÇAR (com Geral travada) -->
+      <section data-view="lancar">
         <div class="section-title"><i class="bi bi-plus-circle"></i> Lançar Produção Diária</div>
 
         <div class="card card-body">
@@ -456,11 +496,11 @@
               <div class="input-group mb-2">
                 <span class="input-group-text"><i class="bi bi-search"></i></span>
                 <input id="buscaCoop" type="text" class="form-control" placeholder="Buscar cooperado..." list="cooperadosList">
-                <datalist id="cooperadosList">{% for coop in cooperados %}<option value="{{ coop.nome }}"></option>{% endfor %}</datalist>
-                <select id="selectCoop" class="form-select"><option value="">Lista...</option>{% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}</select>
+                <datalist id="cooperadosList">{% for coop in _cooperados %}<option value="{{ coop.nome }}"></option>{% endfor %}</datalist>
+                <select id="selectCoop" class="form-select"><option value="">Lista...</option>{% for coop in _cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}</select>
               </div>
               <div id="listaCooperados" style="max-height:60vh; overflow:auto;">
-                {% for coop in cooperados %}
+                {% for coop in _cooperados %}
                 <div class="cooperado-item" data-id="{{ coop.id }}" data-nome="{{ coop.nome }}"
                      data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
                      data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}">
@@ -488,7 +528,7 @@
               </div>
 
               <!-- FORM -->
-              <form id="formLancamento" method="POST" action="{{ url_lancar_producao }}" class="row g-2 align-items-end mb-1" style="display:none;">
+              <form id="formLancamento" method="POST" action="{{ _url_lancar_producao }}" class="row g-2 align-items-end mb-1" style="display:none;">
                 <input type="hidden" name="cooperado_id" id="inputCooperadoId" value="">
                 <div class="col-md-3"><label class="form-label">Valor (R$)</label><input type="number" class="form-control" name="valor" step="0.01" required></div>
                 <div class="col-md-3"><label class="form-label">Data</label><input type="date" class="form-control" name="data" required></div>
@@ -507,9 +547,10 @@
                 </div>
 
                 <div id="boxAval" class="row g-2" style="display:none;">
+                  <!-- GERAL (travada) -->
                   <div class="col-md-6">
                     <div class="rating-group" data-name="av_geral" data-auto="true">
-                      <div class="rating-label">Geral (auto)</div>
+                      <div class="rating-label">Geral (média automática)</div>
                       <div class="stars">
                         <i class="bi bi-star-fill star" data-v="1"></i>
                         <i class="bi bi-star-fill star" data-v="2"></i>
@@ -568,7 +609,7 @@
             </div>
 
             <div id="blocoTabelas" class="mt-2">
-              {% for coop in cooperados %}
+              {% for coop in _cooperados %}
               <div id="tabela-{{ coop.id }}" class="card card-body lancamentos-table" style="display:none;">
                 <table class="table table-bordered table-hover align-middle table-compact">
                   <thead><tr><th>Valor</th><th>Data</th><th>Horário</th><th>Entregas</th><th>Editar</th><th>Excluir</th></tr></thead>
@@ -579,11 +620,7 @@
                       <td>{{ lanc.data.strftime('%d/%m/%Y') if lanc.data }}</td>
                       <td>{{ lanc.hora_inicio or '' }}{% if lanc.hora_inicio or lanc.hora_fim %} às {% endif %}{{ lanc.hora_fim or '' }}</td>
                       <td>{{ lanc.qtd_entregas if lanc.qtd_entregas is not none else '-' }}</td>
-                      <td>
-                        {% if has_editar_lanc %}
-                          <a href="{{ url_for('editar_lancamento', id=lanc.id) }}" class="btn btn-outline-royal btn-sm"><i class="bi bi-pencil"></i></a>
-                        {% endif %}
-                      </td>
+                      <td>{% if has_editar_lanc %}<a href="{{ url_for('editar_lancamento', id=lanc.id) }}" class="btn btn-outline-royal btn-sm"><i class="bi bi-pencil"></i></a>{% endif %}</td>
                       <td><a href="{{ url_for('excluir_lancamento', id=lanc.id) }}" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></a></td>
                     </tr>
                     {% else %}<tr><td colspan="6" class="text-center text-muted">Nenhum lançamento no período selecionado</td></tr>{% endfor %}
@@ -595,11 +632,61 @@
           </div>
         </div>
       </section>
-      {% endif %}
+
+      <!-- TABELAS (abre HTML dentro da mesma página) -->
+      <section data-view="tabelas">
+        <div class="section-title"><i class="bi bi-table"></i> Tabelas</div>
+
+        <div class="row g-3">
+          <div class="col-lg-4">
+            <div class="card card-body">
+              <div class="mb-2 fw-semibold">Arquivos disponíveis</div>
+
+              {% if _tabelas_html and _tabelas_html|length>0 %}
+                {% for t in _tabelas_html %}
+                <div class="file-row">
+                  <i class="bi bi-filetype-html"></i>
+                  <div class="flex-grow-1 text-truncate">
+                    <div class="small text-muted text-truncate">{{ t.nome or t.title or 'Tabela' }}</div>
+                    <div class="text-truncate" title="{{ t.url }}">{{ t.url }}</div>
+                  </div>
+                  <!-- Mantém link original como fallback -->
+                  <a class="btn btn-outline-secondary btn-sm" href="{{ t.url }}" target="_blank" rel="noopener">Abrir em outra aba</a>
+                  <button class="btn btn-royal btn-sm" data-open-html data-url="{{ t.url }}"><i class="bi bi-box-arrow-in-right"></i> Abrir aqui</button>
+                </div>
+                {% endfor %}
+              {% else %}
+                <div class="text-muted small">Nenhum item listado pelo backend.</div>
+              {% endif %}
+
+              <hr class="my-2">
+              <label class="form-label">Abrir por URL</label>
+              <div class="input-group">
+                <input type="url" class="form-control" id="urlTabela" placeholder="Cole a URL do HTML">
+                <button class="btn btn-royal" id="btnAbrirUrl"><i class="bi bi-box-arrow-in-right"></i> Abrir</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-8">
+            <div class="card card-body">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="chip">Visualização</div>
+                <button class="btn btn-outline-secondary btn-sm" id="btnRecarregarFrame" disabled><i class="bi bi-arrow-clockwise"></i> Recarregar</button>
+              </div>
+              <div class="mt-2">
+                <iframe id="tabelaFrame" class="tabela-frame" sandbox="allow-same-origin allow-forms allow-scripts"></iframe>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!--/sections-->
     </main>
   </div>
 
-  <!-- TOAST novos avisos (persistente fora do <main>) -->
+  <!-- TOAST novos avisos -->
   {% set _avisos_for_toast = avisos if avisos is defined and avisos is not none else [] %}
   {% set _unread_from_list_t = (_avisos_for_toast | selectattr('lido','equalto',False) | list | length) %}
   {% set _unread_from_ctx_t = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
@@ -611,8 +698,7 @@
         <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
       </div>
       <div class="toast-body">
-        Você tem <b id="toastAvisosN">{{ _toast_unread }}</b> aviso(s) não lido(s).
-        <a href="{{ url_for('portal_restaurante_avisos') }}" class="link-light fw-semibold">Ver agora</a>
+        Você tem {{ _toast_unread }} aviso(s) não lido(s). <a href="{{ url_for('portal_restaurante_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
       </div>
     </div>
   </div>
@@ -628,131 +714,57 @@
     </div>
   </div>
 
-  <!-- Bootstrap JS (SEM MUDAR LINK) -->
+  <!-- Modal Avaliação -->
+  <div class="modal fade" id="modalAval" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title"><i class="bi bi-stars me-1"></i> Deseja avaliar agora?</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+        <div class="modal-body">Você pode registrar a avaliação do cooperado agora ou enviar o lançamento sem avaliação.</div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" id="btnPularAval">Pular e enviar</button>
+          <button type="button" class="btn btn-royal" id="btnAvaliarAgora">Avaliar agora</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
   <script>
-  /* ==========================
-     UTIL
-  ========================== */
-  function togglePwd(btn){
-    const i = btn.previousElementSibling; if(!i) return;
-    i.type = i.type==='password'?'text':'password';
-    btn.querySelector('i').classList.toggle('bi-eye');
-    btn.querySelector('i').classList.toggle('bi-eye-slash');
-  }
-  const brMoney = (n)=> (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
-  const parseBRDate = (s)=>{ if(!s) return null; if(String(s).includes('/')){ const [d,m,y]=s.split('/'); return new Date(+y, +m-1, +d); } const [y,m,d]=String(s).split('-'); return new Date(+y, +m-1, +d); };
-
-  /* ==========================
-     THEME (salva no localStorage)
-  ========================== */
-  (function(){
-    const html = document.documentElement;
-    const key = 'portal.theme';
-    const saved = localStorage.getItem(key);
-    if(saved) html.setAttribute('data-theme', saved);
-    function updateBtn(){
-      const dark = html.getAttribute('data-theme')==='dark';
-      const btn = document.getElementById('btnTheme');
-      if (btn){
-        btn.innerHTML = (dark
-          ? '<i class="bi bi-sun me-1"></i><span>Modo claro</span>'
-          : '<i class="bi bi-moon-stars me-1"></i><span>Modo escuro</span>');
-      }
+    function togglePwd(btn){
+      const i = btn.previousElementSibling; if(!i) return;
+      i.type = i.type==='password'?'text':'password';
+      btn.querySelector('i').classList.toggle('bi-eye');
+      btn.querySelector('i').classList.toggle('bi-eye-slash');
     }
-    updateBtn();
-    document.getElementById('btnTheme')?.addEventListener('click', ()=>{
-      const newTheme = html.getAttribute('data-theme')==='dark' ? 'light' : 'dark';
-      html.setAttribute('data-theme', newTheme);
-      localStorage.setItem(key, newTheme);
-      updateBtn();
-    });
-  })();
+    const brMoney = (n)=> (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+    const todayStr = ()=>{ const d=new Date(); const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return d.getFullYear()+'-'+mm+'-'+dd; };
 
-  /* ==========================
-     SPA-lite: troca de abas SEM recarregar (mantém links)
-  ========================== */
-  (function(){
-    const main = document.getElementById('appMain');
-    const menu = document.getElementById('menuLateral');
-
-    function setActiveByUrl(urlStr){
-      const url = new URL(urlStr, location.origin);
-      // checa 'view' OU endpoint específico (tabelas/avisos/…)
-      const view = url.searchParams.get('view');
-      menu.querySelectorAll('a').forEach(a=>{
-        a.classList.remove('active');
-        const ahref = new URL(a.href, location.origin);
-        const av = ahref.searchParams.get('view');
-        if ((view && av===view) || (!view && ahref.pathname===url.pathname)){
-          a.classList.add('active');
-        }
+    /* ===== SPA Core ===== */
+    function showSection(view){
+      document.querySelectorAll('section[data-view]').forEach(sec=>{
+        sec.classList.toggle('view-active', sec.getAttribute('data-view')===view);
       });
+      document.querySelectorAll('#sideNav a[data-target]').forEach(a=>{
+        a.classList.toggle('active', a.getAttribute('data-target')===view);
+      });
+      // inits
+      if (view==='avisos') initAvisos();
+      if (view==='lancamentos') initLancamentos();
+      if (view==='lancar') initLancar();
+      if (view==='tabelas') initTabelas();
+    }
+    function pushView(view){
+      const u = new URL(window.location.href);
+      u.searchParams.set('view', view);
+      history.pushState({view}, '', u.toString());
+    }
+    function startView(){
+      const u = new URL(window.location.href);
+      return u.searchParams.get('view') || 'lancar';
     }
 
-    async function loadView(urlStr, push=true){
-      const scrollY = document.scrollingElement.scrollTop;
-      try{
-        const resp = await fetch(urlStr, { headers:{ 'X-Requested-With':'fetch' } });
-        if(!resp.ok){ location.href = urlStr; return; } // backend pode exigir redirect
-        const html = await resp.text();
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-
-        // Swap só o <main>
-        const newMain = doc.querySelector('#appMain');
-        if (newMain){
-          main.replaceChildren(...newMain.childNodes);
-          // Atualiza badge de avisos no menu, se existir no HTML retornado
-          const newBadge = doc.querySelector('#linkAvisos .badge');
-          const cur = document.querySelector('#linkAvisos .badge');
-          if (cur && !newBadge){ cur.remove(); }
-          if (!cur && newBadge){
-            document.querySelector('#linkAvisos')?.appendChild(newBadge.cloneNode(true));
-          }
-          if (cur && newBadge){ cur.textContent = newBadge.textContent; cur.style.display = newBadge.style.display || ''; }
-
-          // Atualiza texto do toast (fora do main)
-          const tN = doc.querySelector('#toastAvisosN')?.textContent?.trim();
-          if (tN){ const n = Number(tN)||0; const tgt = document.getElementById('toastAvisosN'); if (tgt) tgt.textContent = String(n); if (n>0){ const t = new bootstrap.Toast(document.getElementById('toastAvisos')); setTimeout(()=>t.show(), 300); } }
-
-          initPage(); // rewire tudo
-          document.scrollingElement.scrollTop = scrollY; // sem pulo de rolagem
-        }
-        if (push){ history.pushState({url:urlStr}, '', urlStr); }
-        setActiveByUrl(urlStr);
-      }catch(e){
-        // Em erro de rede, segue link normalmente
-        location.href = urlStr;
-      }
-    }
-
-    // Intercepta cliques do menu (sem mudar os hrefs)
-    menu.addEventListener('click', (e)=>{
-      const a = e.target.closest('a'); if (!a) return;
-      // Links externos (logout etc.) deixam passar
-      const isSameOrigin = a.origin === location.origin;
-      if (!isSameOrigin) return;
-      // Se for arquivo direto (ex: download), deixar passar
-      if (a.pathname.startsWith('/rest/tabelas/') || a.pathname.startsWith('/logout')) return;
-      e.preventDefault();
-      loadView(a.href, true);
-    });
-
-    // popstate (voltar/avançar)
-    window.addEventListener('popstate', (e)=>{ const url = e.state?.url || location.href; loadView(url, false); });
-
-    // Marca ativo corretamente na carga inicial
-    setActiveByUrl(location.href);
-  })();
-
-  /* ==========================
-     Inicialização por seção
-  ========================== */
-  function initPage(){
-    const viewNow = (new URL(location.href)).searchParams.get('view') || '{{ view|default("lancar") }}';
-
-    // ===== Estrelas
+    /* ===== Avaliação (Geral travada = média automática) ===== */
     function paintStars(stars, v, hover=false){
       stars.forEach(s=>{
         const on = Number(s.dataset.v) <= v;
@@ -760,24 +772,20 @@
         s.classList.toggle('hover', hover && on);
       });
     }
-    function wireStars(){
-      document.querySelectorAll('.rating-group').forEach(group=>{
-        const hidden = group.querySelector('input[type="hidden"]');
-        const stars  = group.querySelectorAll('.star');
-        stars.forEach(s=>{
-          s.addEventListener('mouseenter',()=>paintStars(stars, Number(s.dataset.v), true));
-          s.addEventListener('mouseleave',()=>paintStars(stars, Number(hidden.value||0), false));
-          s.addEventListener('click',()=>{ hidden.value = Number(s.dataset.v); paintStars(stars, hidden.value, false); group.dataset.userSet='1'; autoGeral(); });
-        });
-        paintStars(stars, Number(hidden.value||0), false);
+    function wireStarsClickable(group){
+      const hidden = group.querySelector('input[type="hidden"]');
+      const stars  = group.querySelectorAll('.star');
+      stars.forEach(s=>{
+        s.addEventListener('mouseenter',()=>paintStars(stars, Number(s.dataset.v), true));
+        s.addEventListener('mouseleave',()=>paintStars(stars, Number(hidden.value||0), false));
+        s.addEventListener('click',()=>{ hidden.value = Number(s.dataset.v); paintStars(stars, hidden.value, false); autoGeral(); });
       });
+      paintStars(stars, Number(hidden.value||0), false);
     }
     function autoGeral(){
       const g = document.querySelector('.rating-group[data-name="av_geral"]');
       if(!g) return;
       const geralHidden = g.querySelector('input[type="hidden"]');
-      const userSet = g.dataset.userSet === '1';
-      if (userSet) return;
       const nomes = ['av_pontualidade','av_educacao','av_eficiencia','av_apresentacao'];
       const vals = [];
       nomes.forEach(n=>{
@@ -785,16 +793,19 @@
         const v = Number(grp?.querySelector('input[type="hidden"]')?.value||0);
         if (v>0) vals.push(v);
       });
-      if (vals.length){
-        const media = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
-        geralHidden.value = media;
-        paintStars(g.querySelectorAll('.star'), media, false);
-      }
+      const media = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : 0;
+      geralHidden.value = media;
+      paintStars(g.querySelectorAll('.star'), media, false);
     }
 
-    // ===== Lançar (delegação para não quebrar após trocar HTML)
-    if (!['escalas','config','avisos','lancamentos'].includes(viewNow)) {
-      const lista = document.getElementById('listaCooperados');
+    /* ===== Init: Lançar ===== */
+    let lancarWired = false;
+    function initLancar(){
+      if (lancarWired) return; lancarWired = true;
+
+      const busca = document.getElementById('buscaCoop');
+      const select = document.getElementById('selectCoop');
+      const itens = Array.from(document.querySelectorAll('.cooperado-item'));
       const form = document.getElementById('formLancamento');
       const hint = document.getElementById('hintSelecione');
       const header = document.getElementById('selectedHeader');
@@ -802,67 +813,39 @@
       const selFoto = document.getElementById('selFoto');
       const selNome = document.getElementById('selNome');
       const selTotal = document.getElementById('selTotal');
-      const select = document.getElementById('selectCoop');
-      const busca = document.getElementById('buscaCoop');
 
       function mostrarCooperado(el){
         if (!el) return;
-        document.querySelectorAll('.cooperado-item').forEach(i => i.classList.remove('selected'));
-        el.classList.add('selected');
+        itens.forEach(i => i.classList.remove('selected')); el.classList.add('selected');
         inputCoopId.value = el.dataset.id;
         selFoto.src = el.dataset.foto; selNome.textContent = el.dataset.nome; selTotal.textContent = el.dataset.total;
         header.style.display = 'block'; form.style.display = 'flex'; hint.style.display = 'none';
         document.querySelectorAll('.lancamentos-table').forEach(t => t.style.display = 'none');
         const tabela = document.getElementById('tabela-' + el.dataset.id); if (tabela) tabela.style.display = 'block';
-        wireStars(); autoGeral();
+        // estrelas: só as 4 clicáveis
+        document.querySelectorAll('.rating-group').forEach(g=>{
+          if (g.dataset.name !== 'av_geral') wireStarsClickable(g);
+        });
+        autoGeral();
       }
-
-      lista?.addEventListener('click', (e)=>{
-        const el = e.target.closest('.cooperado-item'); if (!el) return;
-        e.preventDefault(); mostrarCooperado(el);
-      });
-      select?.addEventListener('change', function(){ const el = document.querySelector(`.cooperado-item[data-id="${this.value}"]`); if (el) mostrarCooperado(el); });
+      itens.forEach(el => el.addEventListener('click', () => mostrarCooperado(el)));
       busca?.addEventListener('input', function(){
         const q = this.value.trim().toLowerCase();
-        document.querySelectorAll('.cooperado-item').forEach(el => { el.style.display = (el.dataset.nome||'').toLowerCase().includes(q) ? '' : 'none'; });
+        itens.forEach(el => { el.style.display = (el.dataset.nome||'').toLowerCase().includes(q) ? '' : 'none'; });
       });
-      // auto-seleciona o primeiro se existir
-      const primeiro = document.querySelector('.cooperado-item'); if (primeiro) mostrarCooperado(primeiro);
-
-      // modal de avaliação
-      const boxAval = document.getElementById('boxAval');
-      const inputAvaliar = document.getElementById('inputAvaliar');
-      const chkAvaliar = document.getElementById('chkAvaliar');
-      const modalAvalEl = document.getElementById('modalAval');
-      const modalAval = modalAvalEl ? new bootstrap.Modal(modalAvalEl) : null;
-      function algumCampoDeAvaliacaoPreenchido() {
-        return ['av_geral','av_pontualidade','av_educacao','av_eficiencia','av_apresentacao','av_comentario']
-          .some(n => { const el = form.querySelector(`[name="${n}"]`); return el && String(el.value||'').trim()!==''; });
-      }
-      if (form && modalAval) {
-        let allowSubmit = false;
-        form.addEventListener('submit', function(e) {
-          if (allowSubmit) return;
-          const jaMarcouAvaliar = inputAvaliar?.value === '1';
-          const temAlgoPreenchido = algumCampoDeAvaliacaoPreenchido();
-          if (!jaMarcouAvaliar && !temAlgoPreenchido) { e.preventDefault(); modalAval.show(); }
-        });
-        document.getElementById('btnAvaliarAgora')?.addEventListener('click', () => {
-          if (boxAval && inputAvaliar) {
-            boxAval.style.display = 'block'; inputAvaliar.value = '1'; if (chkAvaliar) chkAvaliar.checked = true;
-            modalAval.hide(); boxAval.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        });
-        document.getElementById('btnPularAval')?.addEventListener('click', () => { modalAval.hide(); allowSubmit = true; form.submit(); });
-      }
+      select?.addEventListener('change', function(){ const el = itens.find(x=>x.dataset.id===this.value); if (el) mostrarCooperado(el); });
+      const primeiro = itens[0]; if (primeiro) mostrarCooperado(primeiro);
     }
 
-    // ===== Avisos
-    if (viewNow === 'avisos') {
+    /* ===== Init: Avisos ===== */
+    let avisosWired = false;
+    function initAvisos(){
+      if (avisosWired) return; avisosWired = true;
       const toastOKEl = document.getElementById('toastOK');
       const toastOK = toastOKEl ? new bootstrap.Toast(toastOKEl) : null;
       const badgeTitulo = document.getElementById('badgeTitulo');
-      const badgeSidebar = document.querySelector('#linkAvisos .badge');
+      const badgeSidebar = document.querySelector('#linkAvisos .badge-dot');
+
       function getUnreadCount(){ return document.querySelectorAll('.aviso-card[data-lido="0"]').length; }
       function refreshBadges(){
         const n = getUnreadCount();
@@ -870,9 +853,12 @@
           badgeTitulo.className = 'badge ' + (n > 0 ? 'text-bg-danger' : 'text-bg-success');
           badgeTitulo.textContent = n > 0 ? (n + ' não lido(s)') : 'Tudo lido';
         }
-        if (badgeSidebar){ badgeSidebar.style.display = n>0 ? '' : 'none'; if (n>0) badgeSidebar.textContent = n; }
-        const tN = document.getElementById('toastAvisosN'); if (tN){ tN.textContent = String(n); }
+        if (badgeSidebar){
+          if (n>0){ badgeSidebar.style.display=''; badgeSidebar.textContent=n; }
+          else { badgeSidebar.style.display='none'; }
+        }
       }
+
       const toggleNaoLidos = document.getElementById('toggleNaoLidos');
       toggleNaoLidos?.addEventListener('change', () => {
         const onlyUnread = toggleNaoLidos.checked;
@@ -895,55 +881,75 @@
         });
       });
       refreshBadges();
+
+      // toast se houver avisos
+      const unread = Number(`{{ _toast_unread }}`);
+      if (unread > 0) {
+        const toastEl = document.getElementById('toastAvisos');
+        if (toastEl) { const t = new bootstrap.Toast(toastEl); setTimeout(()=>t.show(), 600); }
+      }
     }
 
-    // ===== Lançamentos (lista)
-    if (viewNow === 'lancamentos') {
-      const tbody  = document.getElementById('tbodyLanc');
+    /* ===== Init: Lançamentos (lista) ===== */
+    let lancamentosWired = false;
+    function initLancamentos(){
+      if (lancamentosWired) return; lancamentosWired = true;
+      const tbody  = document.getElementById('tbodyLanc'); if(!tbody) return;
       const ftValor= document.getElementById('ftValor');
       const ftEnt  = document.getElementById('ftEntregas');
       const kpiV   = document.getElementById('kpiTotalValor');
       const kpiE   = document.getElementById('kpiTotalEntregas');
       const grid   = document.getElementById('gridCoop');
       const f      = document.getElementById('formFiltroLanc');
-      if (!tbody) return;
+
+      // default hoje (só se não houver período e não aplicado antes)
+      const appliedKey='lanc_applied_today';
+      if (f && !f.data_inicio.value && !f.data_fim.value && !f.mes.value && !sessionStorage.getItem(appliedKey)){
+        const t=todayStr(); f.data_inicio.value=t; f.data_fim.value=t;
+        sessionStorage.setItem(appliedKey,'1');
+        // salvar estado antes de enviar
+        sessionStorage.setItem('scrollY', String(window.scrollY));
+        f.submit(); return;
+      }
+
+      // restaurar posição/filtro pós reload
+      const savedY = Number(sessionStorage.getItem('scrollY')||0);
+      if (savedY) { window.scrollTo(0, savedY); sessionStorage.removeItem('scrollY'); }
+      const savedQ = sessionStorage.getItem('lanc_q')||'';
+      if (savedQ && f.q){ f.q.value=savedQ; }
 
       function getRows(){ return Array.from(tbody.querySelectorAll('tr')); }
-
       function recomputeTotals(){
         let totV=0, totE=0;
         const perCoop = {};
         getRows().forEach(tr=>{
           if (tr.style.display==='none') return;
           const v = Number(tr.querySelector('.valor')?.dataset.valor || 0);
-          const eTxt = tr.cells[4].textContent.trim();
+          const eTxt = tr.cells[4]?.textContent?.trim() || '0';
           const e = eTxt==='-' ? 0 : Number(eTxt.replace(/\D+/g,''));
           totV += v; totE += e;
           const id = tr.dataset.coop, nm = tr.dataset.coopnome;
           perCoop[id] = perCoop[id] || {nome:nm, valor:0, ent:0};
           perCoop[id].valor += v; perCoop[id].ent += e;
         });
-        if (ftValor) ftValor.textContent = 'R$ ' + brMoney(totV);
-        if (ftEnt)   ftEnt.textContent   = String(totE);
-        if (kpiV)    kpiV.textContent    = brMoney(totV);
-        if (kpiE)    kpiE.textContent    = String(totE);
+        ftValor.textContent = 'R$ ' + brMoney(totV);
+        ftEnt.textContent   = String(totE);
+        kpiV.textContent    = brMoney(totV);
+        kpiE.textContent    = String(totE);
 
-        if (grid){
-          grid.innerHTML = '';
-          Object.values(perCoop).sort((a,b)=>b.valor-a.valor).forEach(p=>{
-            const div = document.createElement('div'); div.className='col-sm-6 col-xl-4';
-            div.innerHTML = `<div class="kpi h-100"><div class="fw-bold">${p.nome}</div>
-              <div class="small text-muted">Entregas: <b>${p.ent||0}</b></div>
-              <div>Total: <b>R$ ${brMoney(p.valor)}</b></div></div>`;
-            grid.appendChild(div);
-          });
-        }
-        return {totV, totE};
+        grid.innerHTML = '';
+        Object.values(perCoop).sort((a,b)=>b.valor-a.valor).forEach(p=>{
+          const div = document.createElement('div'); div.className='col-sm-6 col-xl-4';
+          div.innerHTML = `<div class="kpi h-100"><div class="fw-bold">${p.nome||'-'}</div>
+            <div class="small text-muted">Entregas: <b>${p.ent||0}</b></div>
+            <div>Total: <b>R$ ${brMoney(p.valor||0)}</b></div></div>`;
+          grid.appendChild(div);
+        });
       }
 
-      // filtro de texto local (não envia ao back)
       f?.q?.addEventListener('input', ()=>{
         const q = (f.q.value||'').toLowerCase().trim();
+        sessionStorage.setItem('lanc_q', q);
         getRows().forEach(tr=>{
           const coop = (tr.dataset.coopnome||'').toLowerCase();
           const contrato = (tr.dataset.contrato||'').toLowerCase();
@@ -952,7 +958,9 @@
         recomputeTotals();
       });
 
-      // destaca cooperado
+      // mantém posição ao aplicar
+      f?.addEventListener('submit', ()=>{ sessionStorage.setItem('scrollY', String(window.scrollY)); });
+
       tbody.addEventListener('click', (e)=>{
         const td = e.target.closest('.coop-name'); if(!td) return;
         const nome = td.textContent.trim();
@@ -961,50 +969,77 @@
         });
       });
 
-      // EXPORTA CSV
       document.getElementById('btnExportCsv')?.addEventListener('click', ()=>{
         const rows = getRows().filter(r=>r.style.display!=='none');
         const header = ['Data','Cooperado','Contrato','Horário','Entregas','Valor (R$)'];
         const linhas = [header];
         let totE = 0, totV = 0;
         rows.forEach(r=>{
-          const data      = r.cells[0].textContent.trim();
-          const coop      = r.cells[1].textContent.trim();
-          const contrato  = r.cells[2].textContent.trim();
-          const horario   = r.cells[3].textContent.trim();
-          const entTxt    = r.cells[4].textContent.trim();
-          const entregas  = entTxt==='-' ? 0 : Number(entTxt.replace(/\D+/g,''));
-          const valorNum  = Number(r.querySelector('.valor')?.dataset.valor || 0);
-          const valorStr  = valorNum.toFixed(2).replace('.',',');
+          const c = r.cells;
+          const entregas = (c[4].textContent.trim()==='-')?0:Number(c[4].textContent.replace(/\D+/g,''));
+          const valorNum = Number(r.querySelector('.valor')?.dataset.valor || 0);
+          linhas.push([c[0].textContent.trim(), c[1].textContent.trim(), c[2].textContent.trim(), c[3].textContent.trim(), String(entregas), valorNum.toFixed(2).replace('.',',')]);
           totE += entregas; totV += valorNum;
-          linhas.push([data, coop, contrato, horario, String(entregas), valorStr]);
         });
-        const totalStr = totV.toFixed(2).replace('.',',');
-        linhas.push(['Totais','','','', String(totE), totalStr]);
+        linhas.push(['Totais','','','', String(totE), totV.toFixed(2).replace('.',',')]);
         const csv = '\uFEFF' + linhas.map(l=>l.join(';')).join('\n');
         const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob); a.download = 'lancamentos.csv'; a.click();
-        URL.revokeObjectURL(a.href);
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='lancamentos.csv'; a.click(); URL.revokeObjectURL(a.href);
       });
 
-      // totais iniciais
       recomputeTotals();
+      if (f?.q?.value) f.q.dispatchEvent(new Event('input'));
     }
 
-    // Toast de avisos (show se houver)
-    const unread = Number(document.getElementById('toastAvisosN')?.textContent||'0');
-    if (unread > 0) {
-      const toastEl = document.getElementById('toastAvisos');
-      if (toastEl) { const t = new bootstrap.Toast(toastEl); setTimeout(()=>t.show(), 600); }
+    /* ===== Init: Tabelas (iframe dentro da página) ===== */
+    let tabelasWired = false;
+    function initTabelas(){
+      if (tabelasWired) return; tabelasWired = true;
+      const frame = document.getElementById('tabelaFrame');
+      const btns  = document.querySelectorAll('[data-open-html]');
+      const openUrl = (url)=>{
+        if(!url) return;
+        frame.src = url;
+        document.getElementById('btnRecarregarFrame').disabled = false;
+      };
+      btns.forEach(b=> b.addEventListener('click', ()=> openUrl(b.dataset.url)));
+      document.getElementById('btnAbrirUrl')?.addEventListener('click', ()=>{
+        const u = document.getElementById('urlTabela').value.trim(); openUrl(u);
+      });
+      document.getElementById('btnRecarregarFrame')?.addEventListener('click', ()=>{
+        try{ const s = frame.src; frame.src='about:blank'; setTimeout(()=>frame.src=s, 60); }catch(e){}
+      });
     }
 
-    // clique em rating
-    document.addEventListener('click', (e)=>{ if (e.target.closest('.rating-group')) { /* recalcula se necessário */ } });
-  }
+    /* ===== Boot / Navegação por abas ===== */
+    document.addEventListener('DOMContentLoaded', () => {
+      // intercepta menu
+      document.getElementById('sideNav')?.addEventListener('click', (e)=>{
+        const a = e.target.closest('a[data-target]');
+        if (!a) return;
+        const target = a.getAttribute('data-target');
+        // deixa "Sair" funcionar normalmente
+        if (target==='sair') return;
+        e.preventDefault();
+        showSection(target);
+        pushView(target);
+      });
 
-  // roda na carga inicial
-  document.addEventListener('DOMContentLoaded', initPage);
+      const initial = startView();
+      showSection(initial);
+
+      window.addEventListener('popstate', (ev)=>{
+        const v = (ev.state && ev.state.view) || startView();
+        showSection(v);
+      });
+
+      // toast avisos global (já aparece rápido)
+      const unread = Number(`{{ _toast_unread }}`);
+      if (unread > 0) {
+        const toastEl = document.getElementById('toastAvisos');
+        if (toastEl) { const t = new bootstrap.Toast(toastEl); setTimeout(()=>t.show(), 600); }
+      }
+    });
   </script>
 </body>
 </html>
