@@ -3099,7 +3099,6 @@ def ratear_beneficios():
     flash("Rateios aplicados.", "success")
     return redirect(url_for("admin_dashboard", tab="beneficios"))
 
-
 # =========================
 # Escalas — Upload (substituição TOTAL sempre)
 # =========================
@@ -3179,8 +3178,41 @@ def upload_escala():
             except Exception: return s
         return s
 
-    # ------- cabeçalhos -------
-    headers_norm = { _norm_local(str(c.value or "")) : j for j, c in enumerate(ws[1], start=1) }
+    # ------- cabeçalhos (detecção automática) -------
+    def _score_header_row(cells):
+        aliases = [
+            "data","dia","data do plantao","turno","horario","horário","hora","periodo","período",
+            "contrato","restaurante","unidade","local",
+            "login","usuario","usuário","username","user","nome de usuario","nome de usuário",
+            "nome","nome do cooperado","cooperado","motoboy","entregador",
+            "cor","cores","cor da celula","cor celula",
+        ]
+        aliases_norm = {_norm_local(a) for a in aliases}
+        score = 0
+        seen = set()
+        for c in cells:
+            key = _norm_local(str(getattr(c, "value", "") or ""))
+            if not key:
+                continue
+            score += 1
+            for a in aliases_norm:
+                if a and (a == key or a in key or key in a):
+                    if (key, a) not in seen:
+                        score += 2
+                        seen.add((key, a))
+        return score
+
+    header_row_idx = 1
+    best_score = -1
+    last_row_to_check = min(ws.max_row, 10)
+    for i in range(1, last_row_to_check + 1):
+        row_cells = list(ws[i])
+        s = _score_header_row(row_cells)
+        if s > best_score:
+            best_score = s
+            header_row_idx = i
+
+    headers_norm = { _norm_local(str(c.value or "")) : j for j, c in enumerate(ws[header_row_idx], start=1) }
 
     def find_col(*aliases):
         al = [_norm_local(a) for a in aliases]
@@ -3199,8 +3231,11 @@ def upload_escala():
     col_nome     = find_col("nome", "nome do cooperado", "cooperado", "motoboy", "entregador")
     col_cor      = find_col("cor","cores","cor da celula","cor celula")
 
+    app.logger.info(f"[ESCALAS] header_row={header_row_idx} headers_norm={headers_norm}")
+
     if not col_login and not col_nome:
         flash("Não encontrei a coluna de LOGIN nem a de NOME do cooperado na planilha.", "danger")
+        app.logger.warning(f"[ESCALAS] Falha header: headers_norm={headers_norm} (linha {header_row_idx})")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
     # ------- cache entidades -------
@@ -3239,11 +3274,23 @@ def upload_escala():
 
     # ------- parse linhas -------
     linhas_novas, total_linhas_planilha = [], 0
-    for i in range(2, ws.max_row + 1):
+    start_row = header_row_idx + 1
+
+    for i in range(start_row, ws.max_row + 1):
         login_txt = str(ws.cell(i, col_login).value).strip() if col_login else ""
         nome_txt  = str(ws.cell(i, col_nome ).value).strip() if col_nome  else ""
+
+        # ignora linhas totalmente vazias
         if not login_txt and not nome_txt:
-            continue
+            vals = [
+                (ws.cell(i, col_data).value     if col_data     else None),
+                (ws.cell(i, col_turno).value    if col_turno    else None),
+                (ws.cell(i, col_horario).value  if col_horario  else None),
+                (ws.cell(i, col_contrato).value if col_contrato else None),
+            ]
+            if all((v is None or str(v).strip() == "") for v in vals):
+                continue
+
         total_linhas_planilha += 1
 
         data_v     = ws.cell(i, col_data).value     if col_data     else None
@@ -3273,12 +3320,13 @@ def upload_escala():
         })
 
     if not linhas_novas:
-        flash("Nada importado: nenhum registro válido encontrado.", "warning")
+        app.logger.warning(f"[ESCALAS] Nenhuma linha importada. header_row={header_row_idx} headers_norm={headers_norm}")
+        flash("Nada importado: nenhum registro válido encontrado. Verifique a linha dos cabeçalhos e os nomes das colunas.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-       # ------- SUBSTITUIÇÃO TOTAL -------
+    # ------- SUBSTITUIÇÃO TOTAL -------
     try:
-        from sqlalchemy import text as sa_text
+        from sqlalchemy import text as sa_text, delete as sa_delete
 
         # Remove todas as escalas antigas de forma segura (sem violar FKs de trocas)
         if _is_sqlite():
