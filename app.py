@@ -1331,27 +1331,8 @@ _PRIORD = case(
     else_=2,
 )
 
+
 def get_avisos_for_cooperado(coop: Cooperado):
-    """
-    COOPERADO vê:
-      - global
-      - cooperado (destino = mim OU broadcast)
-      - restaurante (broadcast OU ligado a QUALQUER restaurante onde tenho escala)
-    """
-    # busca os restaurantes do cooperado sem trazer objetos inteiros
-    rest_ids = [
-        rid for (rid,) in (
-            db.session.query(Escala.restaurante_id)
-            .filter(Escala.cooperado_id == coop.id, Escala.restaurante_id.isnot(None))
-            .distinct()
-            .all()
-        )
-    ]
-
-    cond_rest = or_(~Aviso.restaurantes.any())
-    if rest_ids:  # só usa IN se houver IDs
-        cond_rest = or_(cond_rest, Aviso.restaurantes.any(Restaurante.id.in_(rest_ids)))
-
     q = (
         _avisos_base_query()
         .filter(
@@ -1359,12 +1340,10 @@ def get_avisos_for_cooperado(coop: Cooperado):
                 (Aviso.tipo == "global"),
                 and_(
                     Aviso.tipo == "cooperado",
-                    or_(Aviso.destino_cooperado_id == coop.id,
-                        Aviso.destino_cooperado_id.is_(None)),
-                ),
-                and_(
-                    Aviso.tipo == "restaurante",
-                    cond_rest,
+                    or_(
+                        Aviso.destino_cooperado_id == coop.id,
+                        Aviso.destino_cooperado_id.is_(None)  # broadcast cooperados
+                    ),
                 ),
             )
         )
@@ -1374,7 +1353,6 @@ def get_avisos_for_cooperado(coop: Cooperado):
             Aviso.criado_em.desc(),
         )
     )
-
     return q.all()
 
 def get_avisos_for_restaurante(rest: Restaurante):
