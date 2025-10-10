@@ -14,6 +14,7 @@
       --border:#e6e9f2; --chip:#eef1ff; --card:#fff; --bg:#fff; --text:#111827;
       --aside-grad1: var(--royal); --aside-grad2: var(--royal-2);
     }
+    /* Dark theme */
     :root[data-theme="dark"]{
       --bg:#0b1220; --text:#e5e7eb; --muted:#9aa4b2; --card:#0f172a;
       --border:#1f2a44; --chip:#132040; --royal:#3b82f6; --royal-2:#2563eb; --royal-3:#0b2447;
@@ -30,11 +31,16 @@
     }
     .brand{ font-weight:800; letter-spacing:.5px; font-size:1.15rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.08); display:flex; align-items:center; gap:8px; }
     .theme-toggle{ margin-top:10px; border:1px solid rgba(255,255,255,.25); color:#fff; background:rgba(255,255,255,.06); border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:8px; cursor:pointer; }
-    .navmenu{ margin-top:18px; display:flex; flex-direction:column; gap:6px; }
-    .navmenu a{ color:#fff; padding:10px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600; position:relative; }
-    .navmenu a.active, .navmenu a:hover{ background:rgba(255,255,255,.14); }
 
+    .navmenu{ margin-top:18px; display:flex; flex-direction:column; gap:6px; }
+    .navmenu a{
+      color:#fff; padding:9px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600;
+      position:relative; font-size:.96rem;  /* menor, como pediu */
+    }
+    .navmenu a span{ text-decoration:underline; } /* nomes sublinhados */
+    .navmenu a.active, .navmenu a:hover{ background:rgba(255,255,255,.14); }
     .content{ padding:24px clamp(14px,3vw,32px); }
+
     .section-title{ color:var(--royal); font-weight:800; font-size:1.25rem; display:flex; gap:10px; align-items:center; }
     .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 0 #0000000a; }
     .card-soft{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; }
@@ -46,9 +52,11 @@
     :root[data-theme="dark"] .table-secondary{ background:#111827; color:#e5e7eb; }
 
     .table-compact th,.table-compact td{ padding:.5rem .6rem; }
+
     .btn-royal{ background:var(--royal); color:#fff; border:none; }
     .btn-royal:hover{ background:var(--royal-2); color:#fff; }
     .btn-outline-royal{ border:1px solid var(--royal); color:#fff; background:transparent; }
+    html[data-theme="light"] .btn-outline-royal{ color: var(--royal); }
     .btn-outline-royal:hover{ background:var(--royal); color:#fff; }
     .btn-outline-danger{ color:#e74c3c; border-color:#e74c3c; }
     .btn-outline-danger:hover{ background:#e74c3c; color:#fff; }
@@ -80,7 +88,6 @@
       font-size:.75rem; font-weight:800; display:inline-flex; align-items:center; justify-content:center;
       background:#dc3545; color:#fff; box-shadow:0 0 0 2px rgba(255,255,255,.25) inset; margin-left:auto;
     }
-    .badge-dot-global{ margin-left:6px; }
 
     @media (max-width: 920px){
       .shell{ grid-template-columns: 66px 1fr; }
@@ -103,7 +110,6 @@
            class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos']) else '' }}"
            href="{{ url_for('portal_restaurante', view='lancar', data_inicio=filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else None, data_fim=filtro_fim.strftime('%Y-%m-%d') if filtro_fim else None) }}">
           <i class="bi bi-person-lines-fill"></i><span>Cooperados</span>
-          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
         </a>
 
         <!-- Lançamentos (SPA) -->
@@ -111,7 +117,6 @@
            class="{{ 'active' if view=='lancamentos' else '' }}"
            href="{{ url_for('portal_restaurante', view='lancamentos', data_inicio=filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else None, data_fim=filtro_fim.strftime('%Y-%m-%d') if filtro_fim else None, mes=filtro_mes if filtro_mes else None) }}">
           <i class="bi bi-receipt"></i><span>Lançamentos</span>
-          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
         </a>
 
         <!-- Escala (SPA) -->
@@ -119,16 +124,14 @@
            class="{{ 'active' if view=='escalas' else '' }}"
            href="{{ url_for('portal_restaurante', view='escalas') }}">
           <i class="bi bi-calendar-week"></i><span>Escala</span>
-          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
         </a>
 
         {% if session.get('user_tipo') == 'restaurante' %}
-        <!-- Tabelas (link normal) -->
+        <!-- Tabelas (NAVEGA PELO LINK — não interceptar) -->
         <a id="linkTabelas"
            class="{{ 'active' if request.endpoint=='rest_tabelas' else '' }}"
            href="{{ url_for('rest_tabelas') }}">
           <i class="bi bi-table"></i><span>Tabelas</span>
-          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
         </a>
         {% endif %}
 
@@ -137,19 +140,18 @@
            class="{{ 'active' if view=='config' else '' }}"
            href="{{ url_for('portal_restaurante', view='config') }}">
           <i class="bi bi-gear"></i><span>Configuração</span>
-          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
         </a>
 
-        <!-- Avisos (link normal) -->
+        <!-- Avisos (NAVEGA PELO LINK — não interceptar) -->
         <a id="linkAvisos"
            class="{{ 'active' if request.endpoint=='portal_restaurante_avisos' or view=='avisos' else '' }}"
            href="{{ url_for('portal_restaurante_avisos') }}">
           <i class="bi bi-megaphone"></i><span>Avisos</span>
           {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
-          {% if _cntAvisos > 0 %}<span class="badge-dot">{{ _cntAvisos }}</span>{% else %}<span class="badge-dot" style="display:none">0</span>{% endif %}
+          {% if _cntAvisos > 0 %}<span class="badge-dot">{{ _cntAvisos }}</span>{% endif %}
         </a>
 
-        <!-- Sair -->
+        <!-- Sair (link normal) -->
         <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
       </nav>
     </aside>
@@ -167,6 +169,7 @@
         {% endif %}
       {% endwith %}
 
+      {# cópias seguras (SPA) #}
       {% set _dias_list = dias_list if dias_list is defined and dias_list is not none else [] %}
       {% set _agenda = agenda if agenda is defined and agenda is not none else {} %}
       {% set _ref_data = ref_data if ref_data is defined and ref_data is not none else (now() if false else None) %}
@@ -175,12 +178,9 @@
       {% set _lancamentos_periodo = lancamentos_periodo if lancamentos_periodo is defined and lancamentos_periodo is not none else [] %}
       {% set _url_lancar_producao = url_lancar_producao if url_lancar_producao is defined else url_for('portal_restaurante') %}
 
-      <!-- CONFIG -->
+      <!-- CONFIG (SPA) -->
       <section data-view="config">
-        <div class="section-title">
-          <i class="bi bi-shield-lock"></i> Configuração
-          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
-        </div>
+        <div class="section-title"><i class="bi bi-shield-lock"></i> Configuração</div>
         <div class="card card-body">
           <form class="row g-3 form-password" method="POST" action="{{ url_for('rest_alterar_senha') }}">
             <div class="col-md-4">
@@ -210,12 +210,9 @@
         </div>
       </section>
 
-      <!-- ESCALAS -->
+      <!-- ESCALAS (SPA) -->
       <section data-view="escalas">
-        <div class="section-title">
-          <i class="bi bi-calendar-week"></i> Escala semanal
-          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
-        </div>
+        <div class="section-title"><i class="bi bi-calendar-week"></i> Escala semanal</div>
         <div class="card card-body">
           <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
             <input type="hidden" name="view" value="escalas">
@@ -300,15 +297,14 @@
         </div>
       </section>
 
-      <!-- AVISOS (render local quando vier; link do menu navega) -->
+      <!-- AVISOS (SPA render; link do menu também navega) -->
       <section data-view="avisos">
         {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
         {% set _unread_from_list = (_avisos | selectattr('lido','equalto',False) | list | length) %}
         {% set _unread_from_ctx = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
-        {% set _badgeN = (_unread_from_list if _unread_from_list>0 else _unread_from_ctx) %}
         <div class="section-title">
           <i class="bi bi-megaphone-fill"></i> Avisos
-          <span class="badge-dot badge-dot-global" data-global-badge {% if _badgeN>0 %}style="display:inline-flex"{% else %}style="display:none"{% endif %}>{{ _badgeN }}</span>
+          {% set _badgeN = (_unread_from_list if _unread_from_list>0 else _unread_from_ctx) %}
           <span id="badgeTitulo" class="badge {{ 'text-bg-danger' if _badgeN>0 else 'text-bg-success' }} ms-2">
             {{ _badgeN>0 and (_badgeN ~ ' não lido(s)') or 'Tudo lido' }}
           </span>
@@ -369,12 +365,9 @@
         {% endif %}
       </section>
 
-      <!-- LANCAMENTOS -->
+      <!-- LANCAMENTOS (SPA) -->
       <section data-view="lancamentos">
-        <div class="section-title">
-          <i class="bi bi-receipt"></i> Lançamentos
-          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
-        </div>
+        <div class="section-title"><i class="bi bi-receipt"></i> Lançamentos</div>
 
         <div class="row g-3">
           <div class="col-lg-3">
@@ -427,7 +420,8 @@
                 <div class="kpi mb-2"><div class="small text-muted">Total no período</div><div class="v">R$ <span id="kpiTotalValor">0,00</span></div></div>
                 <div class="kpi mb-2"><div class="small text-muted">Entregas no período</div><div class="v"><span id="kpiTotalEntregas">0</span></div></div>
 
-                <div class="d-grid"><button class="btn btn-outline-royal" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV</button></div>
+                <!-- Exportar CSV: AGORA AZUL SEM PRECISAR PASSAR O MOUSE -->
+                <div class="col-12 d-grid"><button class="btn btn-royal" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV</button></div>
               </form>
             </div>
           </div>
@@ -491,12 +485,9 @@
         </div>
       </section>
 
-      <!-- LANÇAR -->
+      <!-- LANÇAR (SPA) -->
       <section data-view="lancar">
-        <div class="section-title">
-          <i class="bi bi-plus-circle"></i> Lançar Produção Diária
-          <span class="badge-dot badge-dot-global" data-global-badge style="display:none">0</span>
-        </div>
+        <div class="section-title"><i class="bi bi-plus-circle"></i> Lançar Produção Diária</div>
 
         <div class="card card-body">
           <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
@@ -638,6 +629,7 @@
 
                 <div class="col-12 text-end mt-2"><button class="btn btn-royal"><i class="bi bi-plus-circle"></i> Lançar</button></div>
               </form>
+              <!-- /FORM -->
             </div>
 
             <div id="blocoTabelas" class="mt-2">
@@ -674,21 +666,22 @@
   {% set _unread_from_ctx_t = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
   {% set _toast_unread = _unread_from_list_t if _unread_from_list_t>0 else _unread_from_ctx_t %}
   <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1055;">
-    <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false">
+    <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
+         data-bs-autohide="false">
       <div class="toast-header">
         <i class="bi bi-megaphone-fill me-2"></i><strong class="me-auto">Novos avisos</strong><small>agora</small>
         <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
       </div>
       <div class="toast-body">
-        Você tem <b id="toastCount">{{ _toast_unread }}</b> aviso(s) não lido(s).
-        <a href="{{ url_for('portal_restaurante_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
+        Você tem {{ _toast_unread }} aviso(s) não lido(s). <a href="{{ url_for('portal_restaurante_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
       </div>
     </div>
   </div>
 
   <!-- TOAST OK -->
   <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1056;">
-    <div id="toastOK" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="2200">
+    <div id="toastOK" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
+         data-bs-autohide="true" data-bs-delay="2200">
       <div class="toast-header">
         <i class="bi bi-check2-circle text-success me-2"></i><strong class="me-auto">Pronto</strong><small>agora</small>
         <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Fechar"></button>
@@ -764,22 +757,7 @@
       return u.searchParams.get('view') || 'lancar';
     }
 
-    /* ===== Global badges helpers ===== */
-    function setGlobalBadge(n){
-      document.querySelectorAll('[data-global-badge]').forEach(el=>{
-        if (n>0){ el.style.display='inline-flex'; el.textContent=n; }
-        else { el.style.display='none'; el.textContent='0'; }
-      });
-      const sideAvisoBadge = document.querySelector('#linkAvisos .badge-dot');
-      if (sideAvisoBadge){
-        if (n>0){ sideAvisoBadge.style.display=''; sideAvisoBadge.textContent=n; }
-        else { sideAvisoBadge.style.display='none'; sideAvisoBadge.textContent='0'; }
-      }
-      const toastCount = document.getElementById('toastCount');
-      if (toastCount){ toastCount.textContent = n; }
-    }
-
-    /* ===== Avaliação (geral = média automática) ===== */
+    /* ===== Avaliação (Geral = média automática) ===== */
     function paintStars(stars, v, hover=false){
       stars.forEach(s=>{
         const on = Number(s.dataset.v) <= v;
@@ -837,9 +815,7 @@
         header.style.display = 'block'; form.style.display = 'flex'; hint.style.display = 'none';
         document.querySelectorAll('.lancamentos-table').forEach(t => t.style.display = 'none');
         const tabela = document.getElementById('tabela-' + el.dataset.id); if (tabela) tabela.style.display = 'block';
-        document.querySelectorAll('.rating-group').forEach(g=>{
-          if (g.dataset.name !== 'av_geral') wireStarsClickable(g);
-        });
+        document.querySelectorAll('.rating-group').forEach(g=>{ if (g.dataset.name !== 'av_geral') wireStarsClickable(g); });
         autoGeral();
       }
 
@@ -859,17 +835,19 @@
       const toastOKEl = document.getElementById('toastOK');
       const toastOK = toastOKEl ? new bootstrap.Toast(toastOKEl) : null;
       const badgeTitulo = document.getElementById('badgeTitulo');
+      const badgeSidebar = document.querySelector('#linkAvisos .badge-dot');
 
       function getUnreadCount(){ return document.querySelectorAll('.aviso-card[data-lido="0"]').length; }
       function refreshBadges(){
         const n = getUnreadCount();
-        // Título
         if (badgeTitulo){
           badgeTitulo.className = 'badge ' + (n > 0 ? 'text-bg-danger' : 'text-bg-success');
           badgeTitulo.textContent = n > 0 ? (n + ' não lido(s)') : 'Tudo lido';
         }
-        // Globais (todas as abas + menu lateral + toast)
-        setGlobalBadge(n);
+        if (badgeSidebar){
+          if (n>0){ badgeSidebar.style.display=''; badgeSidebar.textContent=n; }
+          else { badgeSidebar.style.display='none'; }
+        }
       }
 
       const toggleNaoLidos = document.getElementById('toggleNaoLidos');
@@ -880,7 +858,6 @@
           card.style.display = (onlyUnread && lido) ? 'none' : '';
         });
       });
-
       document.querySelectorAll('[data-acao="marcar-lido"]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const url = btn.getAttribute('data-url'); const card = btn.closest('.aviso-card');
@@ -895,6 +872,12 @@
         });
       });
       refreshBadges();
+
+      const unread = Number(`{{ _toast_unread }}`);
+      if (unread > 0) {
+        const toastEl = document.getElementById('toastAvisos');
+        if (toastEl) { const t = new bootstrap.Toast(toastEl); setTimeout(()=>t.show(), 600); }
+      }
     }
 
     /* ===== Lançamentos ===== */
@@ -909,6 +892,7 @@
       const grid   = document.getElementById('gridCoop');
       const f      = document.getElementById('formFiltroLanc');
 
+      // se não houver período, seta hoje e envia (uma vez)
       const appliedKey='lanc_applied_today';
       if (f && !f.data_inicio.value && !f.data_fim.value && !f.mes.value && !sessionStorage.getItem(appliedKey)){
         const t=todayStr(); f.data_inicio.value=t; f.data_fim.value=t;
@@ -993,21 +977,26 @@
       if (f?.q?.value) f.q.dispatchEvent(new Event('input'));
     }
 
-    /* ===== Navegação SPA + Prefetch ===== */
+    /* ===== Navegação SPA + Prefetch para Tabelas/Avisos ===== */
     document.addEventListener('DOMContentLoaded', () => {
+      // Intercepta apenas itens com data-target (não intercepta TABELAS nem AVISOS)
       document.getElementById('sideNav')?.addEventListener('click', (e)=>{
         const a = e.target.closest('a');
         if (!a) return;
         const target = a.getAttribute('data-target');
-        if (!target) return; // Tabelas & Avisos navegam normal
+        if (!target) return; // deixa links sem data-target navegarem normalmente
         if (target==='sair') return;
         e.preventDefault();
         showSection(target);
         pushView(target);
       });
 
+      // Prefetch rápido para Tabelas e Avisos
       function prefetch(href){
-        try{ const l=document.createElement('link'); l.rel='prefetch'; l.href=href; document.head.appendChild(l); }catch(e){}
+        try{
+          const l=document.createElement('link');
+        l.rel='prefetch'; l.href=href; document.head.appendChild(l);
+        }catch(e){}
       }
       document.getElementById('linkTabelas')?.addEventListener('mouseenter', e=>prefetch(e.currentTarget.href));
       document.getElementById('linkAvisos')?.addEventListener('mouseenter', e=>prefetch(e.currentTarget.href));
@@ -1020,12 +1009,11 @@
         showSection(v);
       });
 
-      // Toast persistente se houver avisos
+      // Toast de avisos se houver
       const unread = Number(`{{ _toast_unread }}`);
-      setGlobalBadge(unread);
       if (unread > 0) {
         const toastEl = document.getElementById('toastAvisos');
-        if (toastEl) { const t = new bootstrap.Toast(toastEl); setTimeout(()=>t.show(), 400); }
+        if (toastEl) { const t = new bootstrap.Toast(toastEl); setTimeout(()=>t.show(), 600); }
       }
     });
   </script>
