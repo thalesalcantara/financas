@@ -9,6 +9,7 @@ import difflib
 import unicodedata
 import re
 import mimetypes
+from flask import jsonify, current_app, abort
 from dateutil.relativedelta import relativedelta
 from sqlalchemy.inspection import inspect as sa_inspect
 from datetime import datetime, date, timedelta, time
@@ -28,13 +29,27 @@ from sqlalchemy import delete as sa_delete, text as sa_text, func
 # App / DB
 # =========================
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+# Pasta pública (arquivos que podem ir para o git ou reaparecer a cada deploy)
 UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
 DOCS_DIR = os.path.join(UPLOAD_DIR, "docs")
 os.makedirs(DOCS_DIR, exist_ok=True)
-TABELAS_DIR = os.path.join(UPLOAD_DIR, "tabelas")
+
+# >>> PERSISTÊNCIA REAL (Render Disk) <<<
+# Em produção (Render) use /var/data. Em dev/local cai para ./data
+PERSIST_ROOT = os.environ.get("PERSIST_ROOT", "/var/data")
+if not os.path.isdir(PERSIST_ROOT):
+    PERSIST_ROOT = os.path.join(BASE_DIR, "data")
+os.makedirs(PERSIST_ROOT, exist_ok=True)
+
+# Pastas dentro do volume persistente
+TABELAS_DIR = os.path.join(PERSIST_ROOT, "tabelas")
 os.makedirs(TABELAS_DIR, exist_ok=True)
+
+# (opcional) legado: onde suas tabelas antigas talvez estejam
+STATIC_TABLES = os.path.join(BASE_DIR, "static", "uploads", "tabelas")
+os.makedirs(STATIC_TABLES, exist_ok=True)
 
 def _build_db_uri() -> str:
     """
@@ -740,6 +755,48 @@ def _save_upload(file_storage) -> str | None:
     path = os.path.join(UPLOAD_DIR, fname)
     file_storage.save(path)
     return f"/static/uploads/{fname}"
+
+
+from werkzeug.utils import secure_filename
+import time
+
+def salvar_tabela_upload(file_storage) -> str | None:
+    """
+    Salva o arquivo de TABELA dentro do diretório persistente (TABELAS_DIR)
+    e retorna APENAS o nome do arquivo (para guardar no banco em Tabela.arquivo_nome).
+    """
+    if not file_storage or not file_storage.filename:
+        return None
+    fname = secure_filename(file_storage.filename)
+    base, ext = os.path.splitext(fname)
+    unique = f"{base}_{time.strftime('%Y%m%d_%H%M%S')}{ext.lower()}"
+    destino = os.path.join(TABELAS_DIR, unique)
+    file_storage.save(destino)
+    return unique  # <- guarde este em Tabela.arquivo_nome
+
+
+def resolve_tabela_path(nome_arquivo: str) -> str | None:
+    """
+    Resolve o caminho real de uma TABELA:
+      1) /var/data/tabelas   (persistente)
+      2) static/uploads/...  (legado)
+    """
+    if not nome_arquivo:
+        return None
+    candidatos = [
+        os.path.join(TABELAS_DIR, nome_arquivo),
+        os.path.join(STATIC_TABLES, nome_arquivo),  # legado
+        # último fallback: se por acaso gravaram caminho completo em arquivo_url
+        _abs_path_from_url(nome_arquivo) if nome_arquivo.startswith("/") else None,
+    ]
+    for p in candidatos:
+        if p and os.path.isfile(p):
+            return p
+    # log amigável (vai parar com o WARNING que você viu)
+    app.logger.warning("Arquivo de Tabela não encontrado. nome='%s' tents=%s",
+                       nome_arquivo, [c for c in candidatos if c])
+    return None
+
 
 def _save_foto_to_db(entidade, file_storage, *, is_cooperado: bool) -> str | None:
     """
