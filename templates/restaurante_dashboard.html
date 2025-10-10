@@ -143,13 +143,13 @@
         </a>
 
         <!-- Avisos (NAVEGA PELO LINK — não interceptar) -->
-        <a id="linkAvisos"
-           class="{{ 'active' if request.endpoint=='portal_restaurante_avisos' or view=='avisos' else '' }}"
-           href="{{ url_for('portal_restaurante_avisos') }}">
-          <i class="bi bi-megaphone"></i><span>Avisos</span>
-          {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
-          {% if _cntAvisos > 0 %}<span class="badge-dot">{{ _cntAvisos }}</span>{% endif %}
-        </a>
+<a id="linkAvisos"
+   class="{{ 'active' if request.endpoint=='portal_restaurante_avisos' or view=='avisos' else '' }}"
+   href="{{ url_for('portal_restaurante_avisos') }}">
+  <i class="bi bi-megaphone"></i><span>Avisos</span>
+  {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
+  <span class="badge-dot" {% if _cntAvisos <= 0 %}style="display:none"{% endif %}>{{ _cntAvisos }}</span>
+</a>
 
         <!-- Sair (link normal) -->
         <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
@@ -689,6 +689,36 @@
       <div class="toast-body">Aviso marcado como lido.</div>
     </div>
   </div>
+
+  <script>
+  // número inicial vindo do backend (Jinja)
+  const __UNREAD_INIT__ = Number('{{ _toast_unread|int(0) }}') || 0;
+
+  // mostra o toast permanente se houver não lidos
+  function showAvisoToastIfNeeded(n){
+    if (n <= 0) return;
+    const el = document.getElementById('toastAvisos');
+    if (!el) return;
+    const t = new bootstrap.Toast(el); // data-bs-autohide="false"
+    setTimeout(()=>t.show(), 400);
+  }
+
+  // sincroniza a “bolinha” do menu lateral
+  function syncSidebarBadge(n){
+    const badge = document.querySelector('#linkAvisos .badge-dot');
+    if (!badge) return;
+    if (n > 0){ badge.style.display=''; badge.textContent = String(n); }
+    else { badge.style.display='none'; }
+  }
+
+  // deixa disponível para atualizar após “marcar como lido”
+  window.updateAvisosBadge = function(n){ syncSidebarBadge(Math.max(0, Number(n)||0)); };
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    syncSidebarBadge(__UNREAD_INIT__);
+    showAvisoToastIfNeeded(__UNREAD_INIT__);
+  });
+</script>
 
   <!-- Modal Avaliação -->
   <div class="modal fade" id="modalAval" tabindex="-1" aria-hidden="true">
