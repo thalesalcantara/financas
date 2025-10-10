@@ -4,94 +4,67 @@
   <meta charset="UTF-8">
   <title>Portal do Estabelecimento</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Bootstrap & Icons -->
+
+  <!-- Bootstrap & Icons (inalterados) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
   <style>
     :root{
       --royal:#2141d9; --royal-2:#3654e6; --royal-3:#eaf0ff;
-      --ink:#0b1220; --muted:#6b7280; --soft:#f5f7ff; --danger:#e74c3c; --ok:#16a34a;
-      --border:#e6e9f2; --chip:#eef1ff; --bg:#ffffff; --card:#ffffff; --shadow:0 1px 0 #0000000a;
-      --badge-danger:#dc3545; --badge-text:#fff;
+      --ink:#0b1220; --muted:#6b7280; --soft:#f5f7ff;
+      --danger:#e74c3c; --ok:#16a34a; --border:#e6e9f2;
+      --chip:#eef1ff; --bg:#ffffff; --card:#ffffff; --shadow:0 1px 0 #0000000a;
     }
-    @media (prefers-color-scheme: dark){
-      :root{
-        --bg:#0b1220; --ink:#e6e6e6; --muted:#a6adc8; --soft:#0f172a; --border:#243045; --chip:#111b33;
-        --royal-3:#0f1933; --card:#0e1424; --shadow:0 1px 0 #00000022;
-      }
-    }
-    /* tema forçado por toggle */
     [data-theme="dark"]{
-      --bg:#0b1220; --ink:#e6e6e6; --muted:#a6adc8; --soft:#0f172a; --border:#243045; --chip:#111b33;
-      --royal-3:#0f1933; --card:#0e1424; --shadow:0 1px 0 #00000022;
-    }
-    [data-theme="light"]{
-      --bg:#ffffff; --ink:#0b1220; --muted:#6b7280; --soft:#f5f7ff; --border:#e6e9f2; --chip:#eef1ff;
-      --royal-3:#eaf0ff; --card:#ffffff; --shadow:0 1px 0 #0000000a;
+      --bg:#0b1220; --ink:#e6e6e6; --muted:#a6adc8; --soft:#0f172a;
+      --border:#243045; --chip:#111b33; --royal-3:#0f1933; --card:#0e1424; --shadow:0 1px 0 #00000022;
     }
 
-    html,body{ height:100%; }
-    body{ background:var(--bg); color:var(--ink); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif; }
+    html,body{height:100%}
+    body{background:var(--bg); color:var(--ink); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif}
     a{ text-decoration:none; }
-    .shell{ display:grid; grid-template-columns: 260px 1fr; min-height:100vh; }
+    .shell{ display:grid; grid-template-columns:260px 1fr; min-height:100vh; }
     .aside{
       background:linear-gradient(180deg, var(--royal) 0%, var(--royal-2) 100%);
       color:#fff; padding:18px 16px; position:sticky; top:0; height:100dvh;
     }
-    .brand{ font-weight:800; letter-spacing:.5px; font-size:1.15rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.10); display:flex; align-items:center; gap:8px; justify-content:space-between; }
-    .navmenu{ margin-top:18px; display:flex; flex-direction:column; gap:6px; }
-    .navmenu a{ color:#fff; padding:10px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600; position:relative; }
-    .navmenu a.active, .navmenu a:hover{ background:rgba(255,255,255,.14); }
+    .brand{ font-weight:800; letter-spacing:.5px; font-size:1.15rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.10); display:flex; align-items:center; gap:8px; }
+    .theme-pill{ margin-top:12px; display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.10); border-radius:10px; padding:10px 12px; cursor:pointer; }
+    .navmenu{ margin-top:12px; display:flex; flex-direction:column; gap:6px; }
+    .navmenu a{ color:#fff; padding:10px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600; }
+    .navmenu a:hover,.navmenu a.active{ background:rgba(255,255,255,.16); }
     .navmenu .badge{ margin-left:auto; }
-    .theme-btn{ background:transparent; border:0; color:#fff; font-size:1.1rem; display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
     .content{ padding:24px clamp(14px,3vw,32px); }
     .section-title{ color:var(--royal); font-weight:800; font-size:1.25rem; display:flex; gap:10px; align-items:center; }
-    .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); }
+    .card{ border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); background:var(--card); }
     .card-soft{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; }
-    .chip{ background:var(--chip); border:1px solid var(--border); border-radius:999px; padding:.2rem .65rem; font-weight:700; color:var(--ink); }
-    .table{ color:var(--ink); }
-    .table thead{ background:color-mix(in oklab, var(--royal-3) 60%, transparent); }
+    .chip{ background:var(--chip); border:1px solid var(--border); border-radius:999px; padding:.2rem .65rem; font-weight:700; }
     .table-compact th,.table-compact td{ padding:.5rem .6rem; }
     .btn-royal{ background:var(--royal); color:#fff; border:none; }
     .btn-royal:hover{ background:var(--royal-2); color:#fff; }
-    .btn-outline-royal{ border:1px solid var(--royal); color:var(--royal); }
+    .btn-outline-royal{ border:1px solid var(--royal); color:#2141d9; }
     .btn-outline-royal:hover{ background:var(--royal); color:#fff; }
-    .btn-outline-danger{ color:#e74c3c; border-color:#e74c3c; }
-    .btn-outline-danger:hover{ background:#e74c3c; color:#fff; }
     .cooperado-avatar{ width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 1px 0 #0001; }
     .cooperado-item{ display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; cursor:pointer; }
-    .cooperado-item:hover{ background:rgba(33,65,217,.06); }
-    .cooperado-item.selected{ outline:2px solid var(--royal); background:color-mix(in oklab, var(--royal-3) 60%, transparent); }
-    .selected-header .big{ width:180px; height:180px; border-radius:50%; object-fit:cover; border:6px solid var(--royal); box-shadow:0 6px 16px #0003; }
+    .cooperado-item:hover{ background:#f0f4ff22; }
+    .cooperado-item.selected{ outline:2px solid var(--royal); background:#f0f4ff44; }
+    .selected-header .big{ width:180px; height:180px; border-radius:50%; object-fit:cover; border:6px solid var(--royal); box-shadow:0 6px 16px #0002; }
     .rating-group{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .rating-label{ width:160px; font-weight:700; color:var(--ink); }
+    .rating-label{ width:160px; font-weight:700; }
     .stars{ display:inline-flex; gap:3px; font-size:1.4rem; cursor:pointer; }
     .star{ color:#cbd5e1; transition:transform .06s; }
     .star.active,.star.hover{ color:#fbbf24; }
     .star:active{ transform:scale(.9); }
     .sticky-tools{ position:sticky; top:12px; }
-    .kpi{ background:color-mix(in oklab, var(--royal-3) 55%, transparent); border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
+    .kpi{ background:#fafcff05; border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
     .kpi .v{ font-weight:800; font-size:1.05rem; }
+    .fade-swap{ animation: none; } /* sem piscada */
 
-    /* ===== SPA (mostrar/ocultar abas) ===== */
-    section[data-view]{ display:none; }
-    section[data-view].is-active{ display:block; }
-
-    /* Toast persistente */
-    #toastAvisos[data-persistent="1"]{ opacity:1 !important; }
-
-    /* bolinha de aviso sempre visível no item "Avisos" (e espelhável em outras abas, via JS) */
-    .notif-dot{
-      position:absolute; right:10px; top:50%; transform:translateY(-50%);
-      min-width:18px; height:18px; border-radius:9px;
-      background:var(--badge-danger); color:var(--badge-text); font-weight:700; font-size:.70rem;
-      display:flex; align-items:center; justify-content:center; padding:0 6px;
-      box-shadow:0 0 0 2px rgba(255,255,255,.35);
-    }
-
-    @media (max-width: 920px){
-      .shell{ grid-template-columns: 66px 1fr; }
+    @media (max-width:920px){
+      .shell{ grid-template-columns:66px 1fr; }
       .brand span{ display:none; }
+      .theme-pill span{ display:none; }
       .navmenu a span{ display:none; }
     }
   </style>
@@ -100,12 +73,15 @@
   <div class="shell">
     <!-- ============ Aside ============ -->
     <aside class="aside">
-      <div class="brand">
-        <span><i class="bi bi-building"></i> <strong>Portal do Estabelecimento</strong></span>
-        <button id="themeToggle" class="theme-btn" title="Alternar tema"><i class="bi bi-moon-stars"></i></button>
-      </div>
-      <nav class="navmenu">
-        <!-- NENHUM LINK ALTERADO -->
+      <div class="brand"><i class="bi bi-building"></i><span>Portal do Estabelecimento</span></div>
+
+      <!-- Botão de Modo Escuro/Claro (no menu lateral como no seu print) -->
+      <button id="btnTheme" type="button" class="theme-pill">
+        <i class="bi bi-moon-stars"></i><span id="lblTheme">Escuro</span>
+      </button>
+
+      <nav class="navmenu" id="navMenu">
+        <!-- LINKS ORIGINAIS MANTIDOS -->
         <a class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos']) else '' }}"
            href="{{ url_for('portal_restaurante', view='lancar', data_inicio=filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else None, data_fim=filtro_fim.strftime('%Y-%m-%d') if filtro_fim else None) }}">
           <i class="bi bi-person-lines-fill"></i><span>Cooperados</span>
@@ -142,7 +118,7 @@
     </aside>
 
     <!-- ============ Main ============ -->
-    <main class="content">
+    <main class="content" id="mainContent">
 
       {% with msgs = get_flashed_messages(with_categories=True) %}
         {% if msgs %}
@@ -154,8 +130,9 @@
         {% endif %}
       {% endwith %}
 
-      <!-- =================== CONFIG =================== -->
-      <section data-view="config">
+      {# ===================== CONFIG ===================== #}
+      {% if view == 'config' %}
+      <section data-view="config" class="is-active">
         <div class="section-title"><i class="bi bi-shield-lock"></i> Configuração</div>
         <div class="card card-body">
           <form class="row g-3 form-password" method="POST" action="{{ url_for('rest_alterar_senha') }}">
@@ -186,10 +163,10 @@
         </div>
       </section>
 
-      <!-- =================== ESCALAS =================== -->
-      <section data-view="escalas">
-        <div class="section-title"><i class="bi bi-calendar-week"></i> Escala semanal</div>
-
+      {# ===================== ESCALAS ===================== #}
+      {% elif view == 'escalas' %}
+      <section data-view="escalas" class="is-active">
+        <div class="section-title"><i class="bi bi-calendar-week"></i> Escala</div>
         <div class="card card-body">
           <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
             <input type="hidden" name="view" value="escalas">
@@ -211,79 +188,78 @@
           </form>
 
           {% if modo == 'semana' %}
-            <hr class="my-3">
-            <div class="row g-3">
-              {% for dia in dias_list %}
-              <div class="col-md-6 col-lg-4">
-                <div class="card-soft">
-                  <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="badge text-bg-primary fw-semibold">{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][dia.weekday()] }} — {{ dia.strftime('%d/%m/%Y') }}</span>
-                    <i class="bi bi-people"></i>
-                  </div>
-                  <div style="max-height:360px; overflow:auto; border-top:1px dashed var(--border);">
-                    {% set lista = agenda.get(dia, []) %}
-                    {% if lista %}
-                      {% for grupo in (lista | groupby('contrato')) %}
-                        {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                        <div class="fw-bold mt-2">{{ contrato_nome }}</div>
-                        {% for item in grupo.list %}
-                          <div class="py-2 border-bottom">
-                            <div class="fw-bold">
-                              {{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}
-                            </div>
-                            <div class="text-muted small">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
-                          </div>
-                        {% endfor %}
-                      {% endfor %}
-                    {% else %}
-                      <div class="text-muted small py-2">Sem escala registrada.</div>
-                    {% endif %}
-                  </div>
+          <hr class="my-3">
+          <div class="row g-3">
+            {% for dia in dias_list %}
+            <div class="col-md-6 col-lg-4">
+              <div class="card-soft">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <span class="badge text-bg-primary fw-semibold">{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][dia.weekday()] }} — {{ dia.strftime('%d/%m/%Y') }}</span>
+                  <i class="bi bi-people"></i>
                 </div>
-              </div>
-              {% endfor %}
-            </div>
-          {% else %}
-            <hr class="my-3">
-            <div class="card-soft">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="badge text-bg-primary fw-semibold">{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][ref_data.weekday()] }} — {{ ref_data.strftime('%d/%m/%Y') }}</span>
-                <i class="bi bi-calendar-day"></i>
-              </div>
-              <table class="table table-bordered table-hover align-middle table-compact">
-                <thead><tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr></thead>
-                <tbody>
-                  {% set lista = agenda.get(ref_data, []) %}
+                <div style="max-height:360px; overflow:auto; border-top:1px dashed var(--border);">
+                  {% set lista = agenda.get(dia, []) %}
                   {% if lista %}
                     {% for grupo in (lista | groupby('contrato')) %}
                       {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                      <div class="fw-bold mt-2">{{ contrato_nome }}</div>
                       {% for item in grupo.list %}
-                      <tr>
-                        <td>{{ contrato_nome }}</td>
-                        <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
-                        <td>{{ item.turno or '—' }}</td>
-                        <td>{{ item.horario or '—' }}</td>
-                      </tr>
+                        <div class="py-2 border-bottom">
+                          <div class="fw-bold">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
+                          <div class="text-muted small">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
+                        </div>
                       {% endfor %}
                     {% endfor %}
                   {% else %}
-                  <tr><td colspan="4" class="text-center text-muted">Sem escala registrada.</td></tr>
+                    <div class="text-muted small py-2">Sem escala registrada.</div>
                   {% endif %}
-                </tbody>
-              </table>
+                </div>
+              </div>
             </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <hr class="my-3">
+          <div class="card-soft">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="badge text-bg-primary fw-semibold">{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][ref_data.weekday()] }} — {{ ref_data.strftime('%d/%m/%Y') }}</span>
+              <i class="bi bi-calendar-day"></i>
+            </div>
+            <table class="table table-bordered table-hover align-middle table-compact">
+              <thead><tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr></thead>
+              <tbody>
+                {% set lista = agenda.get(ref_data, []) %}
+                {% if lista %}
+                  {% for grupo in (lista | groupby('contrato')) %}
+                    {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                    {% for item in grupo.list %}
+                    <tr>
+                      <td>{{ contrato_nome }}</td>
+                      <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
+                      <td>{{ item.turno or '—' }}</td>
+                      <td>{{ item.horario or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                  {% endfor %}
+                {% else %}
+                <tr><td colspan="4" class="text-center text-muted">Sem escala registrada.</td></tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
           {% endif %}
         </div>
       </section>
 
-      <!-- =================== AVISOS =================== -->
-      <section data-view="avisos">
+      {# ===================== AVISOS ===================== #}
+      {% elif view == 'avisos' %}
+      <section data-view="avisos" class="is-active">
         {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
         {% set _unread_from_list = (_avisos | selectattr('lido','equalto',False) | list | length) %}
         {% set _unread_from_ctx = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
+        {% set _badgeN = (_unread_from_list if _unread_from_list>0 else _unread_from_ctx) %}
         <div class="section-title">
           <i class="bi bi-megaphone-fill"></i> Avisos
-          {% set _badgeN = (_unread_from_list if _unread_from_list>0 else _unread_from_ctx) %}
           <span id="badgeTitulo" class="badge {{ 'text-bg-danger' if _badgeN>0 else 'text-bg-success' }} ms-2">
             {{ _badgeN>0 and (_badgeN ~ ' não lido(s)') or 'Tudo lido' }}
           </span>
@@ -306,13 +282,13 @@
         {% if _unread_from_ctx > 0 and (_avisos | length) == 0 %}
           <div class="alert alert-warning mt-3">
             Existem {{ _unread_from_ctx }} aviso(s) não lido(s), porém nenhum item foi carregado nesta página.
-            Verifique se a rota está preenchendo a variável <code>avisos</code> para este restaurante.
+            Verifique se a rota está preenchendo a variável <code>avisos</code>.
           </div>
         {% endif %}
 
         {% if _avisos and (_avisos | length) > 0 %}
           {% for a in _avisos %}
-          <div id="aviso-{{ a.id }}" class="card card-body my-2 aviso-card {% if a.lido %}lido{% endif %} {% if a.prioridade_alta %}prioridade{% endif %}" data-lido="{{ '1' if a.lido else '0' }}">
+          <div id="aviso-{{ a.id }}" class="card card-body my-2 aviso-card {% if a.lido %}lido{% endif %}" data-lido="{{ '1' if a.lido else '0' }}">
             <div class="d-flex justify-content-between align-items-start">
               <div>
                 <div class="fw-bold">
@@ -328,7 +304,6 @@
                 {% if not a.lido %}
                 <button class="btn btn-outline-royal btn-sm"
                         data-acao="marcar-lido"
-                        data-id="{{ a.id }}"
                         data-url="{{ url_for('marcar_aviso_lido_universal', aviso_id=a.id) }}">
                   <i class="bi bi-check2"></i> Marcar como lido
                 </button>
@@ -344,67 +319,44 @@
         {% endif %}
       </section>
 
-      <!-- =================== LANCAMENTOS (LISTA) =================== -->
-      <section data-view="lancamentos">
+      {# ===================== LANÇAMENTOS (LISTA) ===================== #}
+      {% elif view == 'lancamentos' %}
+      <section data-view="lancamentos" class="is-active">
         <div class="section-title"><i class="bi bi-receipt"></i> Lançamentos</div>
-
         <div class="row g-3">
-          <!-- FORM FILTRO (envia datas/mês para o BACK) -->
           <div class="col-lg-3">
             <div class="card card-body sticky-tools">
-              <form id="formFiltroLanc"
-                    method="GET"
-                    action="{{ url_for('portal_restaurante') }}"
-                    class="row g-2 align-items-end">
+              <form id="formFiltroLanc" method="GET" action="{{ url_for('portal_restaurante') }}" class="row g-2 align-items-end">
                 <input type="hidden" name="view" value="lancamentos">
-
                 <div class="col-12">
                   <label class="form-label">Início</label>
-                  <input type="date" class="form-control"
-                         name="data_inicio"
-                         value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
+                  <input type="date" class="form-control" name="data_inicio" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
                 </div>
-
                 <div class="col-12">
                   <label class="form-label">Fim</label>
-                  <input type="date" class="form-control"
-                         name="data_fim"
-                         value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
+                  <input type="date" class="form-control" name="data_fim" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
                 </div>
-
                 <div class="col-12">
                   <label class="form-label">Mês (opcional)</label>
-                  <input type="month" class="form-control"
-                         name="mes"
-                         value="{{ filtro_mes or '' }}"
-                         oninput="if(this.value){ const f=this.form; f.data_inicio.value=''; f.data_fim.value=''; }">
+                  <input type="month" class="form-control" name="mes" value="{{ filtro_mes or '' }}"
+                         oninput="if(this.value){const f=this.form;f.data_inicio.value='';f.data_fim.value='';}">
                   <div class="form-text">Se escolher um mês, as datas serão ignoradas.</div>
                 </div>
-
-                <!-- filtro visual (não vai ao back) -->
                 <div class="col-12">
                   <label class="form-label">Digite o nome do cooperado (visual)</label>
                   <input type="text" class="form-control" name="q" placeholder="Filtrar por nome...">
                 </div>
-
                 <div class="col-12 d-grid">
-                  <button class="btn btn-royal" type="submit">
-                    <i class="bi bi-funnel"></i> Aplicar
-                  </button>
+                  <button class="btn btn-royal" type="submit"><i class="bi bi-funnel"></i> Aplicar</button>
                 </div>
-
                 <div class="col-12 d-grid">
-                  <a class="btn btn-outline-secondary"
-                     href="{{ url_for('portal_restaurante', view='lancamentos') }}">
+                  <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='lancamentos') }}">
                     <i class="bi bi-arrow-counterclockwise"></i> Limpar
                   </a>
                 </div>
-
                 <hr class="my-2">
                 <div class="kpi mb-2"><div class="small text-muted">Total no período</div><div class="v">R$ <span id="kpiTotalValor">0,00</span></div></div>
                 <div class="kpi mb-2"><div class="small text-muted">Entregas no período</div><div class="v"><span id="kpiTotalEntregas">0</span></div></div>
-
-                <!-- Exporta TUDO + linha Totais alinhada -->
                 <div class="d-grid"><button class="btn btn-outline-royal" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV</button></div>
               </form>
             </div>
@@ -420,7 +372,6 @@
                     {{ filtro_fim and filtro_fim.strftime('%d/%m/%Y') or '' }}
                   </span>
                 </div>
-                <div class="small text-muted"></div>
               </div>
 
               <table class="table table-bordered table-hover align-middle table-compact" id="tblLanc">
@@ -448,7 +399,6 @@
                       {% else %}—{% endif %}
                     </td>
                     <td class="text-center">{{ x.qtd_entregas if x.qtd_entregas is not none else '-' }}</td>
-                    <!-- data-valor = número puro para soma -->
                     <td class="text-end valor" data-valor="{{ '%.2f'|format(x.valor or 0) }}">R$ {{ '%.2f'|format(x.valor or 0) }}</td>
                   </tr>
                   {% endfor %}
@@ -470,8 +420,9 @@
         </div>
       </section>
 
-      <!-- =================== LANÇAR =================== -->
-      <section data-view="lancar">
+      {# ===================== LANÇAR ===================== #}
+      {% else %}
+      <section data-view="lancar" class="is-active">
         <div class="section-title"><i class="bi bi-plus-circle"></i> Lançar Produção Diária</div>
 
         <div class="card card-body">
@@ -645,17 +596,17 @@
           </div>
         </div>
       </section>
+      {% endif %}
     </main>
   </div>
 
-  <!-- TOAST novos avisos (persistente até ler) -->
+  <!-- TOAST novos avisos (persistente) -->
   {% set _avisos_for_toast = avisos if avisos is defined and avisos is not none else [] %}
   {% set _unread_from_list_t = (_avisos_for_toast | selectattr('lido','equalto',False) | list | length) %}
   {% set _unread_from_ctx_t = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
   {% set _toast_unread = _unread_from_list_t if _unread_from_list_t>0 else _unread_from_ctx_t %}
   <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1055;">
-    <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
-         data-bs-autohide="false" data-bs-delay="8000" data-persistent="1">
+    <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false">
       <div class="toast-header">
         <i class="bi bi-megaphone-fill me-2"></i><strong class="me-auto">Novos avisos</strong><small>agora</small>
         <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
@@ -678,468 +629,47 @@
     </div>
   </div>
 
+  <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    /* ===== Tema (modo escuro/claro) ===== */
-    (function themeBoot(){
-      const stored = localStorage.getItem('portal-theme');
-      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      document.documentElement.setAttribute('data-theme', stored || (prefersDark ? 'dark' : ''));
-      const btn = document.getElementById('themeToggle');
-      function syncIcon(){
-        const isDark = document.documentElement.getAttribute('data-theme')==='dark';
-        btn.innerHTML = isDark ? '<i class="bi bi-brightness-high"></i>' : '<i class="bi bi-moon-stars"></i>';
-      }
-      btn?.addEventListener('click', ()=>{
-        const cur = document.documentElement.getAttribute('data-theme');
-        const next = cur==='dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem('portal-theme', next);
-        syncIcon();
-      });
-      syncIcon();
-    })();
-
+    /* ===== Utilidades ===== */
     function togglePwd(btn){
       const i = btn.previousElementSibling; if(!i) return;
       i.type = i.type==='password'?'text':'password';
       btn.querySelector('i').classList.toggle('bi-eye');
       btn.querySelector('i').classList.toggle('bi-eye-slash');
     }
-
     const brMoney = (n)=> (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
-    const parseBRDate = (s)=>{ if(!s) return null; if(String(s).includes('/')){ const [d,m,y]=s.split('/'); return new Date(+y, +m-1, +d); } const [y,m,d]=String(s).split('-'); return new Date(+y, +m-1, +d); };
 
-    // ====== Preservar rolagem por ABA (view) ======
-    const scrollMem = {
-      get(view){ try{ return Number(sessionStorage.getItem('scroll-'+view)||0); }catch{ return 0; } },
-      set(view,y){ try{ sessionStorage.setItem('scroll-'+view, String(y||0)); }catch{} }
-    };
+    /* ===== Tema (Claro/Escuro no menu) ===== */
+    (function themeInit(){
+      const root = document.documentElement;
+      const btn = document.getElementById('btnTheme');
+      const lbl = document.getElementById('lblTheme');
+      function apply(t){ root.setAttribute('data-theme', t); lbl.textContent = (t==='dark'?'Claro':'Escuro'); btn.querySelector('i').className = t==='dark'?'bi bi-brightness-high':'bi bi-moon-stars'; localStorage.setItem('theme', t); }
+      const saved = localStorage.getItem('theme');
+      apply(saved || (window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
+      btn.addEventListener('click', ()=>apply(root.getAttribute('data-theme')==='dark'?'light':'dark'));
+    })();
 
-    // ===== Estrelas =====
-    function wireStars(ctx=document){
-      ctx.querySelectorAll('.rating-group').forEach(group=>{
-        const hidden = group.querySelector('input[type="hidden"]');
-        const stars  = group.querySelectorAll('.star');
-        function paint(v, hover=false){
-          stars.forEach(s=>{
-            const on = Number(s.dataset.v) <= v;
-            s.classList.toggle('active', on);
-            s.classList.toggle('hover', hover && on);
-          });
-        }
-        stars.forEach(s=>{
-          s.addEventListener('mouseenter',()=>paint(Number(s.dataset.v), true));
-          s.addEventListener('mouseleave',()=>paint(Number(hidden.value||0), false));
-          s.addEventListener('click',()=>{ hidden.value = Number(s.dataset.v); paint(Number(hidden.value||0), false); group.dataset.userSet='1'; autoGeral(ctx); });
-        });
-        paint(Number(hidden.value||0), false);
-      });
-    }
-    function autoGeral(ctx=document){
-      const g = ctx.querySelector('.rating-group[data-name="av_geral"]');
-      if(!g) return;
-      const geralHidden = g.querySelector('input[type="hidden"]');
-      const userSet = g.dataset.userSet === '1';
-      if (userSet) return;
-      const nomes = ['av_pontualidade','av_educacao','av_eficiencia','av_apresentacao'];
-      const vals = [];
-      nomes.forEach(n=>{
-        const grp = ctx.querySelector(`.rating-group[data-name="${n}"]`);
-        const v = Number(grp?.querySelector('input[type="hidden"]')?.value||0);
-        if (v>0) vals.push(v);
-      });
-      if (vals.length){
-        const media = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
-        geralHidden.value = media;
-        const stars = g.querySelectorAll('.star');
-        stars.forEach(s=>{
-          const on = Number(s.dataset.v) <= media;
-          s.classList.toggle('active', on);
-          s.classList.toggle('hover', false);
-        });
-      }
-    }
-
-    // ===== Inits por view =====
-    function initLancar(ctx=document){
-      const sec = ctx.querySelector('section[data-view="lancar"].is-active'); if(!sec) return;
-      const busca = document.getElementById('buscaCoop');
-      const select = document.getElementById('selectCoop');
-      const itens = Array.from(document.querySelectorAll('.cooperado-item'));
-      const form = document.getElementById('formLancamento');
-      const hint = document.getElementById('hintSelecione');
-      const header = document.getElementById('selectedHeader');
-      const inputCoopId = document.getElementById('inputCooperadoId');
-      const selFoto = document.getElementById('selFoto');
-      const selNome = document.getElementById('selNome');
-      const selTotal = document.getElementById('selTotal');
-
-      function mostrarCooperado(el){
-        if (!el) return;
-        itens.forEach(i => i.classList.remove('selected')); el.classList.add('selected');
-        inputCoopId.value = el.dataset.id;
-        selFoto.src = el.dataset.foto; selNome.textContent = el.dataset.nome; selTotal.textContent = el.dataset.total;
-        header.style.display = 'block'; form.style.display = 'flex'; hint.style.display = 'none';
-        document.querySelectorAll('.lancamentos-table').forEach(t => t.style.display = 'none');
-        const tabela = document.getElementById('tabela-' + el.dataset.id); if (tabela) tabela.style.display = 'block';
-        wireStars(); autoGeral();
-      }
-      itens.forEach(el => el.addEventListener('click', () => mostrarCooperado(el)));
-      busca?.addEventListener('input', function(){
-        const q = this.value.trim().toLowerCase();
-        itens.forEach(el => { el.style.display = (el.dataset.nome||'').toLowerCase().includes(q) ? '' : 'none'; });
-      });
-      select?.addEventListener('change', function(){ const el = itens.find(x=>x.dataset.id===this.value); if (el) mostrarCooperado(el); });
-      const primeiro = itens[0]; if (primeiro) mostrarCooperado(primeiro);
-
-      // modal de avaliação
-      const boxAval = document.getElementById('boxAval');
-      const inputAvaliar = document.getElementById('inputAvaliar');
-      const chkAvaliar = document.getElementById('chkAvaliar');
-      const modalAvalEl = document.getElementById('modalAval');
-      const modalAval = modalAvalEl ? new bootstrap.Modal(modalAvalEl) : null;
-      function algumCampoDeAvaliacaoPreenchido() {
-        return ['av_geral','av_pontualidade','av_educacao','av_eficiencia','av_apresentacao','av_comentario']
-          .some(n => { const el = form.querySelector(`[name="${n}"]`); return el && String(el.value||'').trim()!==''; });
-      }
-      if (form && modalAval) {
-        let allowSubmit = false;
-        form.addEventListener('submit', async function(e) {
-          if (allowSubmit) return; // já confirmado
-          const jaMarcouAvaliar = inputAvaliar?.value === '1';
-          const temAlgoPreenchido = algumCampoDeAvaliacaoPreenchido();
-          if (!jaMarcouAvaliar && !temAlgoPreenchido) { e.preventDefault(); modalAval.show(); return; }
-
-          // ======= SUBMIT AJAX sem piscar =======
-          e.preventDefault();
-          const submitBtn = form.querySelector('button[type="submit"]');
-          submitBtn?.setAttribute('disabled','disabled');
-          const formData = new FormData(form);
-          try{
-            const resp = await fetch(form.action, { method:'POST', body: formData });
-            if (resp.redirected || resp.ok){
-              // Recarrega somente a section atual via softLoad para atualizar listas sem perder rolagem
-              await softLoad(new URL(window.location.href));
-            } else {
-              alert('Falha ao lançar ('+resp.status+').');
-            }
-          }catch(_){ alert('Falha de rede ao lançar.'); }
-          finally{ submitBtn?.removeAttribute('disabled'); }
-        });
-      }
-
-      document.addEventListener('click', (e)=>{ if (e.target.closest('.rating-group')) autoGeral(); });
-    }
-
-    function initAvisos(ctx=document){
-      const sec = ctx.querySelector('section[data-view="avisos"].is-active'); if(!sec) return;
-      const toastOKEl = document.getElementById('toastOK');
-      const toastOK = toastOKEl ? new bootstrap.Toast(toastOKEl) : null;
-      const badgeTitulo = document.getElementById('badgeTitulo');
-      const badgeSidebar = document.querySelector('#linkAvisos .badge');
-      function getUnreadCountLocal(){ return document.querySelectorAll('.aviso-card[data-lido="0"]').length; }
-      function refreshBadgesLocal(){
-        const n = getUnreadCountLocal();
-        if (badgeTitulo){
-          badgeTitulo.className = 'badge ' + (n > 0 ? 'text-bg-danger' : 'text-bg-success');
-          badgeTitulo.textContent = n > 0 ? (n + ' não lido(s)') : 'Tudo lido';
-        }
-        if (badgeSidebar){ badgeSidebar.style.display = n>0 ? '' : 'none'; if (n>0) badgeSidebar.textContent = n; }
-        setToastUnread(n);
-      }
-      const toggleNaoLidos = document.getElementById('toggleNaoLidos');
-      toggleNaoLidos?.addEventListener('change', () => {
-        const onlyUnread = toggleNaoLidos.checked;
-        document.querySelectorAll('.aviso-card').forEach(card => {
-          const lido = card.getAttribute('data-lido') === '1';
-          card.style.display = (onlyUnread && lido) ? 'none' : '';
-        });
-      });
-      document.querySelectorAll('[data-acao="marcar-lido"]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const url = btn.getAttribute('data-url'); const card = btn.closest('.aviso-card');
-          try{
-            const resp = await fetch(url, { method: 'POST' });
-            if (resp.ok){
-              card.setAttribute('data-lido','1'); card.classList.add('lido');
-              const meta = card.querySelector('.text-muted.small'); if (meta) meta.innerHTML += ' • <span class="text-success">Lido</span>';
-              btn.remove(); refreshBadgesLocal(); toastOK?.show();
-            } else { alert('Não foi possível marcar como lido ('+resp.status+').'); }
-          } catch(e){ alert('Falha de rede.'); }
-        });
-      });
-      refreshBadgesLocal();
-    }
-
-    function initLancamentos(ctx=document){
-      const sec = ctx.querySelector('section[data-view="lancamentos"].is-active'); if(!sec) return;
-      const tbody  = document.getElementById('tbodyLanc');
-      const ftValor= document.getElementById('ftValor');
-      const ftEnt  = document.getElementById('ftEntregas');
-      const kpiV   = document.getElementById('kpiTotalValor');
-      const kpiE   = document.getElementById('kpiTotalEntregas');
-      const grid   = document.getElementById('gridCoop');
-      const f      = document.getElementById('formFiltroLanc');
-      if(!tbody || !ftValor || !ftEnt || !kpiV || !kpiE || !grid || !f) return;
-
-      function getRows(){ return Array.from(tbody.querySelectorAll('tr')); }
-
-      function recomputeTotals(){
-        let totV=0, totE=0;
-        const perCoop = {};
-        getRows().forEach(tr=>{
-          if (tr.style.display==='none') return;
-          const v = Number(tr.querySelector('.valor')?.dataset.valor || 0);
-          const eTxt = tr.cells[4].textContent.trim();
-          const e = eTxt==='-' ? 0 : Number(eTxt.replace(/\D+/g,''));
-          totV += v; totE += e;
-          const id = tr.dataset.coop, nm = tr.dataset.coopnome;
-          perCoop[id] = perCoop[id] || {nome:nm, valor:0, ent:0};
-          perCoop[id].valor += v; perCoop[id].ent += e;
-        });
-        ftValor.textContent = 'R$ ' + brMoney(totV);
-        ftEnt.textContent   = String(totE);
-        kpiV.textContent    = brMoney(totV);
-        kpiE.textContent    = String(totE);
-
-        grid.innerHTML = '';
-        Object.values(perCoop).sort((a,b)=>b.valor-a.valor).forEach(p=>{
-          const div = document.createElement('div'); div.className='col-sm-6 col-xl-4';
-          div.innerHTML = `<div class="kpi h-100"><div class="fw-bold">${p.nome}</div>
-            <div class="small text-muted">Entregas: <b>${p.ent||0}</b></div>
-            <div>Total: <b>R$ ${brMoney(p.valor)}</b></div></div>`;
-          grid.appendChild(div);
-        });
-        return {totV, totE};
-      }
-
-      // filtro de texto local (não vai ao back)
-      f.q?.addEventListener('input', ()=>{
-        const q = (f.q.value||'').toLowerCase().trim();
-        getRows().forEach(tr=>{
-          const coop = (tr.dataset.coopnome||'').toLowerCase();
-          const contrato = (tr.dataset.contrato||'').toLowerCase();
-          tr.style.display = (!q || coop.includes(q) || contrato.includes(q)) ? '' : 'none';
-        });
-        recomputeTotals();
-      });
-
-      // destaca cooperado
-      tbody.addEventListener('click', (e)=>{
-        const td = e.target.closest('.coop-name'); if(!td) return;
-        const nome = td.textContent.trim();
-        getRows().forEach(r=>{
-          r.classList.toggle('table-warning', r.querySelector('.coop-name')?.textContent.trim()===nome);
-        });
-      });
-
-      // EXPORTA CSV
-      document.getElementById('btnExportCsv')?.addEventListener('click', ()=>{
-        const rows = getRows().filter(r=>r.style.display!=='none');
-        const header = ['Data','Cooperado','Contrato','Horário','Entregas','Valor (R$)'];
-        const linhas = [header];
-        let totE = 0, totV = 0;
-        rows.forEach(r=>{
-          const data      = r.cells[0].textContent.trim();
-          const coop      = r.cells[1].textContent.trim();
-          const contrato  = r.cells[2].textContent.trim();
-          const horario   = r.cells[3].textContent.trim();
-          const entTxt    = r.cells[4].textContent.trim();
-          const entregas  = entTxt==='-' ? 0 : Number(entTxt.replace(/\D+/g,''));
-          const valorNum  = Number(r.querySelector('.valor')?.dataset.valor || 0);
-          const valorStr  = valorNum.toFixed(2).replace('.',',');
-          totE += entregas; totV += valorNum;
-          linhas.push([data, coop, contrato, horario, String(entregas), valorStr]);
-        });
-        const totalStr = totV.toFixed(2).replace('.',',');
-        linhas.push(['Totais','','','', String(totE), totalStr]);
-        const csv = '\uFEFF' + linhas.map(l=>l.join(';')).join('\n');
-        const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'lancamentos.csv';
-        a.click();
-        URL.revokeObjectURL(a.href);
-      });
-
-      recomputeTotals();
-    }
-
-    function initEscalas(){ /* nada especial */ }
-    function initConfig(){ /* nada especial */ }
-
-    // ===== Helpers SPA =====
-    function getViewFromURL(u){
-      const url = u ? new URL(u, window.location.origin) : window.location;
-      const usp = new URLSearchParams(url.search);
-      return usp.get('view') || 'lancar';
-    }
-    function setActiveLink(view){
-      document.querySelectorAll('.navmenu a').forEach(a=>{
-        a.classList.remove('active');
-        const href = a.getAttribute('href')||'';
-        let v = null;
-        if (href.includes('view=')) {
-          try{ v = (new URL(href, location.origin)).searchParams.get('view'); }catch{}
-        } else if (a.id==='linkAvisos'){ v = 'avisos'; }
-        if (v === view) a.classList.add('active');
-        if (!v && view==='lancar' && href.includes('portal_restaurante')) a.classList.add('active');
-      });
-    }
-    function showView(view){
-      document.querySelectorAll('section[data-view]').forEach(sec=>{
-        sec.classList.toggle('is-active', sec.getAttribute('data-view')===view);
-      });
-      setActiveLink(view);
-      if(view==='lancar'){ initLancar(); }
-      else if(view==='lancamentos'){ initLancamentos(); }
-      else if(view==='avisos'){ initAvisos(); }
-      else if(view==='escalas'){ initEscalas(); }
-      else if(view==='config'){ initConfig(); }
-
-      // restaurar rolagem da view
-      const y = scrollMem.get(view);
-      if (y) window.scrollTo({top:y, left:0, behavior:'instant'});
-    }
-
-    // intercepta rolagem para memorizar por view
-    document.addEventListener('scroll', ()=>{
-      const v = getViewFromURL();
-      scrollMem.set(v, window.scrollY||0);
-    }, {passive:true});
-
-    function canSoftNavigate(href){
-      if (!href) return false;
-      const abs = new URL(href, location.origin);
-      if (abs.pathname.includes('/logout')) return false;
-      if (abs.pathname.includes('rest_tabelas')) return false; // deixa abrir página própria de Tabelas
-      if (abs.pathname.includes('portal_restaurante')) return true;
-      if (abs.pathname.includes('portal_restaurante_avisos')) return true;
-      return false;
-    }
-
-    async function softLoad(href){
-      try{
-        const targetView = getViewFromURL(href);
-        const yBefore = window.scrollY||0;
-        const resp = await fetch(href, {credentials:'same-origin'});
-        if(!resp.ok) return false;
-        const html = await resp.text();
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-
-        let newSection = doc.querySelector(`section[data-view="${targetView}"]`);
-        const curMain = document.querySelector('main.content');
-
-        if (newSection){
-          const curSection = document.querySelector(`section[data-view="${targetView}"]`);
-          if (!curSection) return false;
-          curSection.innerHTML = newSection.innerHTML;
-          history.pushState({view: targetView}, '', (new URL(href, location.origin)).toString());
-          showView(targetView);
-          window.scrollTo({top:yBefore, left:0, behavior:'instant'});
-          return true;
-        } else {
-          const newMain = doc.querySelector('main.content');
-          if (!newMain || !curMain) return false;
-          const vNow = getViewFromURL();
-          curMain.innerHTML = newMain.innerHTML;
-          history.pushState({}, '', (new URL(href, location.origin)).toString());
-          showView(vNow);
-          window.scrollTo({top:yBefore, left:0, behavior:'instant'});
-          return true;
-        }
-      }catch(e){ return false; }
-    }
-
-    // Intercepta cliques no menu para SPA
-    function handleMenuClicks(){
-      const nav = document.querySelector('.navmenu');
-      if(!nav) return;
-      nav.addEventListener('click', async (e)=>{
-        const a = e.target.closest('a'); if(!a) return;
-        const href = a.getAttribute('href'); if(!href) return;
-        if (!canSoftNavigate(href)) {
-          // clique em Tabelas: checagem rápida de /rest/tabelas/*/abrir (caso tenha botões dentro da page)
-          return;
-        }
-        e.preventDefault();
-        const ok = await softLoad(href);
-        if (!ok) window.location.href = href; // fallback
-      });
-    }
-
-    // Intercepta formulários GET das abas SPA para carregar apenas a section
-    function handleSectionForms(){
-      document.addEventListener('submit', async (e)=>{
-        const form = e.target.closest('form'); if(!form) return;
-        if (form.method?.toUpperCase() !== 'GET') return;
-        const action = form.getAttribute('action')||'';
-        if (!action.includes('portal_restaurante')) return;
-        const before = window.scrollY||0;
-        const formData = new FormData(form);
-        const usp = new URLSearchParams(formData);
-        const href = action + (action.includes('?')?'&':'?') + usp.toString();
-        e.preventDefault();
-        const ok = await softLoad(href);
-        if (!ok) window.location.href = href;
-        else window.scrollTo({top:before, left:0, behavior:'instant'});
-      });
-    }
-
-    // ===== Avisos: toast persistente + polling =====
+    /* ===== Badge/Toast de avisos (polling + persistente) ===== */
     let toastAvisos = null;
-    function getToastEl(){ return document.getElementById('toastAvisos'); }
     function setToastUnread(n){
       const el = document.getElementById('toastUnreadCount');
       if (el) el.textContent = String(n);
-      // badge no menu
-      const link = document.getElementById('linkAvisos');
-      let dot = link?.querySelector('.notif-dot');
-      if (!dot && link){
-        dot = document.createElement('span');
-        dot.className = 'notif-dot';
-        link.appendChild(dot);
-      }
-      if (dot){
-        if (n>0){ dot.style.display='flex'; dot.textContent = n>99?'99+':String(n); }
-        else { dot.style.display='none'; }
-      }
-      // mostra/oculta toast
-      if (!toastAvisos){
-        const te = getToastEl();
-        if (te) toastAvisos = new bootstrap.Toast(te, { autohide: false });
-      }
-      if (toastAvisos){
-        if (n>0){
-          const te = getToastEl();
-          if (te){
-            te.addEventListener('hidden.bs.toast', ()=>{ if (Number(document.getElementById('toastUnreadCount')?.textContent||'0')>0) setTimeout(()=>toastAvisos.show(), 800); }, { once:true });
-          }
-          toastAvisos.show();
-        } else {
-          toastAvisos.hide();
-        }
-      }
+      const badgeSidebar = document.querySelector('#linkAvisos .badge');
+      if (badgeSidebar){ badgeSidebar.style.display = n>0 ? '' : 'none'; if (n>0) badgeSidebar.textContent = n; }
+      if (!toastAvisos){ const te=document.getElementById('toastAvisos'); if(te) toastAvisos=new bootstrap.Toast(te,{autohide:false}); }
+      if (toastAvisos){ n>0 ? toastAvisos.show() : toastAvisos.hide(); }
     }
-
     async function pollUnreadLoop(){
       try{
-        const linkAvisos = document.getElementById('linkAvisos');
-        const href = linkAvisos?.getAttribute('href');
+        const href = document.getElementById('linkAvisos')?.getAttribute('href');
         if (href){
-          const resp = await fetch(href, {credentials:'same-origin'});
-          if (resp.ok){
-            const html = await resp.text();
-            const doc = new DOMParser().parseFromString(html, 'text/html');
+          const r = await fetch(href,{credentials:'same-origin'}); if(r.ok){
+            const html = await r.text(); const doc = new DOMParser().parseFromString(html,'text/html');
             let n = doc.querySelectorAll('.aviso-card[data-lido="0"]').length;
-            if (!n){
-              const b = doc.querySelector('#badgeTitulo');
-              if (b){
-                const m = b.textContent.match(/\d+/);
-                if (m) n = Number(m[0]);
-              }
-            }
+            if (!n){ const b=doc.querySelector('#badgeTitulo'); const m=b?.textContent.match(/\d+/); if(m) n=Number(m[0]); }
             setToastUnread(n||0);
           }
         }
@@ -1147,84 +677,283 @@
       setTimeout(pollUnreadLoop, 25000);
     }
 
-    // Clique “Ver agora” do toast usa SPA
-    function wireToastVerAgora(){
-      const a = document.getElementById('toastVerAgora');
-      if (!a) return;
-      a.addEventListener('click', async (e)=>{
-        const href = a.getAttribute('href'); if(!href) return;
-        if (!canSoftNavigate(href)) return;
+    /* ===== SPA ULTRA RÁPIDA (sem piscar) ===== */
+    const viewCache = new Map(); // key=url -> {sectionHTML, ts}
+    function currentView(){ const url=new URL(location.href); return url.searchParams.get('view') || 'lancar'; }
+    function showViewInstant(view){
+      document.querySelectorAll('section[data-view]').forEach(sec=>{
+        sec.classList.toggle('is-active', sec.getAttribute('data-view')===view);
+      });
+      // marca link ativo
+      document.querySelectorAll('.navmenu a').forEach(a=>{
+        a.classList.remove('active');
+        const href=a.getAttribute('href')||'';
+        let v=null;
+        if(href.includes('view=')){ try{ v=(new URL(href,location.origin)).searchParams.get('view'); }catch{} }
+        else if(a.id==='linkAvisos'){ v='avisos'; }
+        if(v===view) a.classList.add('active');
+        if(!v && view==='lancar' && href.includes('portal_restaurante')) a.classList.add('active');
+      });
+      // inicializa recursos da view
+      initByView(view);
+    }
+    async function softFetchAndPatch(href, view){
+      try{
+        const r = await fetch(href,{credentials:'same-origin'}); if(!r.ok) return false;
+        const html = await r.text();
+        const doc = new DOMParser().parseFromString(html,'text/html');
+        const newSec = doc.querySelector(`section[data-view="${view}"]`);
+        const curSec = document.querySelector(`section[data-view="${view}"]`);
+        if (newSec && curSec){ curSec.innerHTML = newSec.innerHTML; initByView(view); viewCache.set(href,{html:newSec.innerHTML, ts:Date.now()}); return true; }
+        const newMain = doc.querySelector('main.content'); const curMain=document.getElementById('mainContent');
+        if (newMain && curMain){ curMain.innerHTML = newMain.innerHTML; initByView(view); return true; }
+        return false;
+      }catch(_){ return false; }
+    }
+    function canSoft(href){
+      const abs=new URL(href, location.origin);
+      if (abs.pathname.includes('/logout')) return false;
+      if (abs.pathname.includes('rest_tabelas')) return false;
+      return abs.pathname.includes('portal_restaurante') || abs.pathname.includes('portal_restaurante_avisos');
+    }
+    function prefetch(href){
+      if (viewCache.has(href)) return;
+      fetch(href,{credentials:'same-origin'}).then(r=>r.text()).then(t=>{
+        const doc=new DOMParser().parseFromString(t,'text/html');
+        const v=new URL(href,location.origin).searchParams.get('view')||'lancar';
+        const sec=doc.querySelector(`section[data-view="${v}"]`);
+        if (sec) viewCache.set(href,{html:sec.innerHTML, ts:Date.now()});
+      }).catch(()=>{});
+    }
+
+    // Intercepta cliques no menu (ativa instantâneo e atualiza em background)
+    document.getElementById('navMenu').addEventListener('click',async e=>{
+      const a=e.target.closest('a'); if(!a) return;
+      const href=a.getAttribute('href'); if(!href || !canSoft(href)) return;
+      e.preventDefault();
+      const view=new URL(href,location.origin).searchParams.get('view')|| (a.id==='linkAvisos'?'avisos':'lancar');
+
+      // INSTANTE: se já existe section correspondente na página, só ativa
+      showViewInstant(view);
+      history.pushState({view},'',href);
+
+      // PATCH em background (usa cache se já tiver)
+      if (viewCache.has(href)){
+        const curSec=document.querySelector(`section[data-view="${view}"]`); if(curSec){ curSec.innerHTML=viewCache.get(href).html; initByView(view); }
+      } else {
+        softFetchAndPatch(href, view);
+      }
+    });
+
+    // Prefetch ao passar mouse / idle
+    document.querySelectorAll('.navmenu a').forEach(a=>{
+      const href=a.getAttribute('href'); if(!href || !canSoft(href)) return;
+      a.addEventListener('mouseenter',()=>prefetch(href));
+      a.addEventListener('focus',()=>prefetch(href));
+    });
+    window.addEventListener('popstate',ev=>{ showViewInstant(ev.state?.view || currentView()); });
+
+    // Intercepta formulários GET da própria rota (troca sem piscar)
+    document.addEventListener('submit', async (e)=>{
+      const f=e.target.closest('form'); if(!f || (f.method||'').toUpperCase()!=='GET') return;
+      const action=f.getAttribute('action')||''; if(!action.includes('portal_restaurante')) return;
+      const usp=new URLSearchParams(new FormData(f));
+      const href=action+(action.includes('?')?'&':'?')+usp.toString();
+      const view=usp.get('view')||'lancar';
+      e.preventDefault();
+      const y=window.scrollY; // preserva rolagem
+      showViewInstant(view);
+      history.pushState({view},'',href);
+      const ok=await softFetchAndPatch(href,view);
+      if(!ok) location.href=href;
+      else window.scrollTo({top:y,behavior:'instant'});
+    });
+
+    /* ===== Inicializações por view (rápidas, sem piscar) ===== */
+    function initByView(view){
+      if(view==='lancar') initLancar();
+      else if(view==='lancamentos') initLancamentos();
+      else if(view==='avisos') initAvisos();
+      else if(view==='escalas'){} // nada por enquanto
+    }
+
+    // ---- Lançar
+    function initLancar(){
+      const itens=[...document.querySelectorAll('.cooperado-item')];
+      const form=document.getElementById('formLancamento');
+      const hint=document.getElementById('hintSelecione');
+      const header=document.getElementById('selectedHeader');
+      const inputCoopId=document.getElementById('inputCooperadoId');
+      const selFoto=document.getElementById('selFoto');
+      const selNome=document.getElementById('selNome');
+      const selTotal=document.getElementById('selTotal');
+
+      function wireStars(){
+        document.querySelectorAll('.rating-group').forEach(group=>{
+          const hidden=group.querySelector('input[type="hidden"]');
+          const stars=group.querySelectorAll('.star');
+          function paint(v,hover){ stars.forEach(s=>{ const on=Number(s.dataset.v)<=v; s.classList.toggle('active',on); s.classList.toggle('hover',hover&&on); }); }
+          stars.forEach(s=>{
+            s.addEventListener('mouseenter',()=>paint(Number(s.dataset.v),true));
+            s.addEventListener('mouseleave',()=>paint(Number(hidden.value||0),false));
+            s.addEventListener('click',()=>{ hidden.value=Number(s.dataset.v); paint(Number(hidden.value||0),false); });
+          });
+          paint(Number(hidden.value||0),false);
+        });
+      }
+      function mostrarCooperado(el){
+        if(!el) return;
+        itens.forEach(i=>i.classList.remove('selected')); el.classList.add('selected');
+        inputCoopId.value=el.dataset.id;
+        selFoto.src=el.dataset.foto; selNome.textContent=el.dataset.nome; selTotal.textContent=el.dataset.total;
+        header.style.display='block'; form.style.display='flex'; hint.style.display='none';
+        document.querySelectorAll('.lancamentos-table').forEach(t=>t.style.display='none');
+        const tabela=document.getElementById('tabela-'+el.dataset.id); if(tabela) tabela.style.display='block';
+        wireStars();
+      }
+      itens.forEach(el=>el.addEventListener('click',()=>mostrarCooperado(el)));
+      const busca=document.getElementById('buscaCoop');
+      busca?.addEventListener('input',function(){ const q=this.value.trim().toLowerCase(); itens.forEach(el=>{ el.style.display=(el.dataset.nome||'').toLowerCase().includes(q)?'':'none'; }); });
+      const select=document.getElementById('selectCoop');
+      select?.addEventListener('change',function(){ const el=itens.find(x=>x.dataset.id===this.value); if(el) mostrarCooperado(el); });
+      if(itens[0]) mostrarCooperado(itens[0]);
+
+      // Submit AJAX (sem piscar). Se falhar, cai no submit normal.
+      form?.addEventListener('submit', async (e)=>{
         e.preventDefault();
-        const ok = await softLoad(href);
-        if (!ok) window.location.href = href;
+        const y=window.scrollY;
+        try{
+          const fd=new FormData(form);
+          const r=await fetch(form.action,{method:'POST',body:fd});
+          if(!r.ok){ form.submit(); return; }
+          // pega a própria aba novamente para atualizar silencioso
+          const href=new URL(location.href); href.searchParams.set('view','lancar');
+          await softFetchAndPatch(href.toString(),'lancar');
+          window.scrollTo({top:y,behavior:'instant'});
+          new bootstrap.Toast(document.getElementById('toastOK')).show();
+        }catch{ form.submit(); }
       });
     }
 
-    // ===== Tabelas: tratar abertura/404 com feedback suave (sem quebrar)
-    document.addEventListener('click', async (e)=>{
-      const a = e.target.closest('a'); if(!a) return;
-      const href = a.getAttribute('href')||'';
-      if (!href.includes('/rest/tabelas/') || !href.endsWith('/abrir')) return; // só botões "abrir"
-      // TENTA HEAD/GET rápido para evitar aba vazia 404
-      try{
-        const resp = await fetch(href, {method:'GET', credentials:'same-origin'});
-        if (resp.status === 404){
-          e.preventDefault();
-          showToastInfo('Arquivo de Tabela não encontrado neste servidor. Peça para reenviar o PDF.', true);
-        } else if (resp.ok){
-          // deixa seguir (nada a fazer)
-        } else {
-          e.preventDefault();
-          showToastInfo('Não foi possível abrir a Tabela ('+resp.status+').', true);
-        }
-      }catch(_){
-        e.preventDefault();
-        showToastInfo('Falha de rede ao abrir a Tabela.', true);
+    // ---- Avisos
+    function initAvisos(){
+      const toastOKEl=document.getElementById('toastOK');
+      const toastOK=toastOKEl?new bootstrap.Toast(toastOKEl):null;
+      const badgeTitulo=document.getElementById('badgeTitulo');
+      const badgeSidebar=document.querySelector('#linkAvisos .badge');
+      function getUnread(){ return document.querySelectorAll('.aviso-card[data-lido="0"]').length; }
+      function refreshBadges(){
+        const n=getUnread();
+        if (badgeTitulo){ badgeTitulo.className='badge '+(n>0?'text-bg-danger':'text-bg-success'); badgeTitulo.textContent=n>0?(n+' não lido(s)'):'Tudo lido'; }
+        if (badgeSidebar){ badgeSidebar.style.display=n>0?'':'none'; if(n>0) badgeSidebar.textContent=n; }
+        setToastUnread(n);
       }
-    });
-
-    function showToastInfo(msg, danger=false){
-      const id = 'toastInfo';
-      let wrap = document.getElementById(id);
-      if (!wrap){
-        wrap = document.createElement('div');
-        wrap.id = id; wrap.className = 'position-fixed bottom-0 end-0 p-3'; wrap.style.zIndex = 1060;
-        wrap.innerHTML = `<div class="toast" data-bs-autohide="true" data-bs-delay="3500">
-          <div class="toast-header">
-            <i class="bi ${danger?'bi-exclamation-triangle-fill text-danger':'bi-info-circle'} me-2"></i>
-            <strong class="me-auto">Aviso</strong><small>agora</small>
-            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
-          </div>
-          <div class="toast-body"></div>
-        </div>`;
-        document.body.appendChild(wrap);
-      }
-      const toastEl = wrap.querySelector('.toast');
-      wrap.querySelector('.toast-body').textContent = msg;
-      const t = new bootstrap.Toast(toastEl);
-      t.show();
+      document.getElementById('toggleNaoLidos')?.addEventListener('change', (ev)=>{
+        const only=ev.target.checked;
+        document.querySelectorAll('.aviso-card').forEach(card=>{ const lido=card.getAttribute('data-lido')==='1'; card.style.display=(only&&lido)?'none':''; });
+      });
+      document.querySelectorAll('[data-acao="marcar-lido"]').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const url=btn.getAttribute('data-url'); const card=btn.closest('.aviso-card');
+          try{
+            const r=await fetch(url,{method:'POST'}); if(r.ok){
+              card.setAttribute('data-lido','1'); card.classList.add('lido'); btn.remove(); refreshBadges(); toastOK?.show();
+            }else alert('Não foi possível marcar como lido ('+r.status+').');
+          }catch{ alert('Falha de rede.'); }
+        });
+      });
+      refreshBadges();
     }
 
-    // Back/forward
-    window.addEventListener('popstate', (ev)=>{
-      const v = ev.state?.view || getViewFromURL();
-      showView(v);
+    // ---- Lançamentos (lista)
+    function initLancamentos(){
+      const tbody=document.getElementById('tbodyLanc');
+      const ftValor=document.getElementById('ftValor');
+      const ftEnt=document.getElementById('ftEntregas');
+      const kpiV=document.getElementById('kpiTotalValor');
+      const kpiE=document.getElementById('kpiTotalEntregas');
+      const grid=document.getElementById('gridCoop');
+      const f=document.getElementById('formFiltroLanc');
+      if(!tbody) return;
+
+      function rows(){ return Array.from(tbody.querySelectorAll('tr')); }
+      function recompute(){
+        let totV=0, totE=0; const per={};
+        rows().forEach(tr=>{
+          if(tr.style.display==='none') return;
+          const v=Number(tr.querySelector('.valor')?.dataset.valor||0);
+          const eTxt=tr.cells[4].textContent.trim(); const e=(eTxt==='-'?0:Number(eTxt.replace(/\D+/g,'')));
+          totV+=v; totE+=e; const id=tr.dataset.coop, nm=tr.dataset.coopnome;
+          per[id]=per[id]||{nome:nm,valor:0,ent:0}; per[id].valor+=v; per[id].ent+=e;
+        });
+        ftValor.textContent='R$ '+brMoney(totV);
+        ftEnt.textContent=String(totE);
+        kpiV.textContent=brMoney(totV);
+        kpiE.textContent=String(totE);
+        grid.innerHTML='';
+        Object.values(per).sort((a,b)=>b.valor-a.valor).forEach(p=>{
+          const div=document.createElement('div'); div.className='col-sm-6 col-xl-4';
+          div.innerHTML=`<div class="kpi h-100"><div class="fw-bold">${p.nome}</div><div class="small text-muted">Entregas: <b>${p.ent||0}</b></div><div>Total: <b>R$ ${brMoney(p.valor)}</b></div></div>`;
+          grid.appendChild(div);
+        });
+      }
+      f.q?.addEventListener('input', ()=>{
+        const q=(f.q.value||'').toLowerCase().trim();
+        rows().forEach(tr=>{
+          const coop=(tr.dataset.coopnome||'').toLowerCase(); const contrato=(tr.dataset.contrato||'').toLowerCase();
+          tr.style.display=( !q || coop.includes(q) || contrato.includes(q) )?'':'none';
+        });
+        recompute();
+      });
+      tbody.addEventListener('click', (e)=>{
+        const td=e.target.closest('.coop-name'); if(!td) return;
+        const nome=td.textContent.trim();
+        rows().forEach(r=>{ r.classList.toggle('table-warning', r.querySelector('.coop-name')?.textContent.trim()===nome); });
+      });
+      document.getElementById('btnExportCsv')?.addEventListener('click', ()=>{
+        const vis=rows().filter(r=>r.style.display!=='none');
+        const header=['Data','Cooperado','Contrato','Horário','Entregas','Valor (R$)']; const linhas=[header];
+        let totE=0, totV=0;
+        vis.forEach(r=>{
+          const data=r.cells[0].textContent.trim();
+          const coop=r.cells[1].textContent.trim();
+          const contrato=r.cells[2].textContent.trim();
+          const horario=r.cells[3].textContent.trim();
+          const entTxt=r.cells[4].textContent.trim(); const entregas=entTxt==='-'?0:Number(entTxt.replace(/\D+/g,''));
+          const valorNum=Number(r.querySelector('.valor')?.dataset.valor||0);
+          totE+=entregas; totV+=valorNum;
+          linhas.push([data,coop,contrato,horario,String(entregas),valorNum.toFixed(2).replace('.',',')]);
+        });
+        linhas.push(['Totais','','','',String(totE),totV.toFixed(2).replace('.',',')]);
+        const csv='\uFEFF'+linhas.map(l=>l.join(';')).join('\n');
+        const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+        const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='lancamentos.csv'; a.click(); URL.revokeObjectURL(a.href);
+      });
+      recompute();
+    }
+
+    // Clique no “Ver agora” do toast usa SPA
+    document.getElementById('toastVerAgora')?.addEventListener('click', async (e)=>{
+      const href=e.target.getAttribute('href'); if(!href) return;
+      if(!href.includes('portal_restaurante_avisos')) return; // deixa navegar normal se não for a rota
+      e.preventDefault(); history.pushState({view:'avisos'},'',href); showViewInstant('avisos'); softFetchAndPatch(href,'avisos');
     });
 
-    document.addEventListener('DOMContentLoaded', () => {
-      // Abre a view da URL (ou 'lancar')
-      const view = getViewFromURL();
-      showView(view);
-      handleMenuClicks();
-      handleSectionForms();
-      wireToastVerAgora();
-
-      // Toast inicial (persistente)
-      const unreadServer = Number(`{{ _toast_unread }}`) || 0;
-      setToastUnread(unreadServer);
-
-      // Badge sempre ativo, com polling
+    // Inicial
+    document.addEventListener('DOMContentLoaded',()=>{
+      const unread=Number(`{{ _toast_unread }}`)||0; if(unread>0) setTimeout(()=>setToastUnread(unread), 400);
       pollUnreadLoop();
+    });
+
+    /* ===== Abrir Tabelas em nova aba e tratar 404 com aviso suave ===== */
+    document.addEventListener('click', async (e)=>{
+      const a=e.target.closest('a[href*="/rest/tabelas/"][href$="/abrir"]'); if(!a) return;
+      // deixa abrir em nova aba
+      a.setAttribute('target','_blank'); a.setAttribute('rel','noopener');
+      // checa rapidamente se o arquivo existe (não bloqueia a abertura se rede lenta)
+      try{
+        const r=await fetch(a.href,{method:'HEAD'}); if(r.status===404){ e.preventDefault(); alert('Arquivo de tabela não encontrado pelo servidor.'); }
+      }catch(_){}
     });
   </script>
 </body>
