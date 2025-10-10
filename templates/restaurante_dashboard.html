@@ -11,10 +11,15 @@
     :root{
       --royal:#2141d9; --royal-2:#3654e6; --royal-3:#eaf0ff;
       --ink:#0b1220; --muted:#6b7280; --soft:#f5f7ff; --danger:#e74c3c; --ok:#16a34a;
-      --border:#e6e9f2; --chip:#eef1ff;
+      --border:#e6e9f2; --chip:#eef1ff; --bg:#fff; --text:#111827; --card:#fff;
+    }
+    /* Dark mode override (sem mudar visual, só tema) */
+    html[data-theme="dark"]{
+      --bg:#0b1220; --text:#e5e7eb; --border:#27324a; --chip:#18233f; --soft:#0f1830; --card:#0f1630;
+      --royal:#6b83ff; --royal-2:#88a0ff; --royal-3:#0f1630;
     }
     html,body{ height:100%; }
-    body{ background:#fff; color:#111827; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif; }
+    body{ background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif; }
     a{ text-decoration:none; }
     .shell{ display:grid; grid-template-columns: 260px 1fr; min-height:100vh; }
     .aside{
@@ -24,36 +29,48 @@
     .brand{ font-weight:800; letter-spacing:.5px; font-size:1.15rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.08); display:flex; align-items:center; gap:8px; }
     .navmenu{ margin-top:18px; display:flex; flex-direction:column; gap:6px; }
     .navmenu a{ color:#fff; padding:10px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600; }
+    .navmenu a span{ text-decoration: underline; } /* sublinhado pedido */
     .navmenu a.active, .navmenu a:hover{ background:rgba(255,255,255,.14); }
     .navmenu .badge{ margin-left:auto; }
     .content{ padding:24px clamp(14px,3vw,32px); }
     .section-title{ color:var(--royal); font-weight:800; font-size:1.25rem; display:flex; gap:10px; align-items:center; }
-    .card{ border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 0 #0000000a; }
-    .card-soft{ background:#fff; border:1px solid var(--border); border-radius:14px; padding:14px; }
-    .chip{ background:var(--chip); border:1px solid var(--border); border-radius:999px; padding:.2rem .65rem; font-weight:700; }
+    .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 0 #0000000a; }
+    .card-soft{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; }
+    .chip{ background:var(--chip); border:1px solid var(--border); border-radius:999px; padding:.2rem .65rem; font-weight:700; color:var(--text); }
+    .table{ color:var(--text); }
     .table-compact th,.table-compact td{ padding:.5rem .6rem; }
     .btn-royal{ background:var(--royal); color:#fff; border:none; }
     .btn-royal:hover{ background:var(--royal-2); color:#fff; }
-    .btn-outline-royal{ border:1px solid var(--royal); color:#royal; }
+    .btn-outline-royal{ border:1px solid var(--royal); color: #fff; }
     .btn-outline-royal:hover{ background:var(--royal); color:#fff; }
+    html:not([data-theme="dark"]) .btn-outline-royal{ color:#2141d9; } /* no claro mantém seu tom */
     .cooperado-avatar{ width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 1px 0 #0001; }
     .cooperado-item{ display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; cursor:pointer; }
     .cooperado-item:hover{ background:#f8faff; }
+    html[data-theme="dark"] .cooperado-item:hover{ background:#121c3a; }
     .cooperado-item.selected{ outline:2px solid var(--royal); background:#f0f4ff; }
+    html[data-theme="dark"] .cooperado-item.selected{ background:#1b2550; }
     .selected-header .big{ width:180px; height:180px; border-radius:50%; object-fit:cover; border:6px solid var(--royal); box-shadow:0 6px 16px #0002; }
     .rating-group{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
     .rating-label{ width:160px; font-weight:700; color:#1f2937; }
+    html[data-theme="dark"] .rating-label{ color:#e5e7eb; }
     .stars{ display:inline-flex; gap:3px; font-size:1.4rem; cursor:pointer; }
     .star{ color:#cbd5e1; transition:transform .06s; }
     .star.active,.star.hover{ color:#fbbf24; }
     .star:active{ transform:scale(.9); }
     .sticky-tools{ position:sticky; top:12px; }
     .kpi{ background:#fafcff; border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
+    html[data-theme="dark"] .kpi{ background:#0f1830; }
     .kpi .v{ font-weight:800; font-size:1.05rem; }
+    /* switch de tema (no menu) */
+    .theme-toggle{ display:flex; align-items:center; gap:10px; color:#fff; padding:8px 12px; border-radius:10px; cursor:pointer; user-select:none; }
+    .theme-toggle:hover{ background:rgba(255,255,255,.14); }
+    .theme-toggle .mini{ font-size:.85rem; opacity:.9; }
     @media (max-width: 920px){
       .shell{ grid-template-columns: 66px 1fr; }
       .brand span{ display:none; }
       .navmenu a span{ display:none; }
+      .theme-toggle .mini{ display:none; }
     }
   </style>
 </head>
@@ -95,6 +112,13 @@
         </a>
 
         <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
+
+        <!-- Toggle tema no menu (não é link, não altera sua navegação) -->
+        <div id="btnTheme" class="theme-toggle mt-2" role="button" aria-label="Alternar tema">
+          <i class="bi bi-moon-stars"></i>
+          <span class="mini">Modo escuro</span>
+          <span class="badge bg-light text-dark ms-auto" id="themeBadge">OFF</span>
+        </div>
       </nav>
     </aside>
 
@@ -656,7 +680,33 @@
     const brMoney = (n)=> (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
     const parseBRDate = (s)=>{ if(!s) return null; if(String(s).includes('/')){ const [d,m,y]=s.split('/'); return new Date(+y, +m-1, +d); } const [y,m,d]=String(s).split('-'); return new Date(+y, +m-1, +d); };
 
-    document.addEventListener('DOMContentLoaded', () => {
+    /* ===== Tema (claro/escuro) ===== */
+    (function themeInit(){
+      const saved = localStorage.getItem('theme') || 'light';
+      if (saved === 'dark') document.documentElement.setAttribute('data-theme','dark');
+      function refreshBadge(){
+        const isDark = document.documentElement.getAttribute('data-theme')==='dark';
+        const b = document.getElementById('themeBadge'); if(!b) return;
+        b.textContent = isDark ? 'ON' : 'OFF';
+        const ico = document.querySelector('#btnTheme i');
+        if (ico){
+          ico.className = isDark ? 'bi bi-sun' : 'bi bi-moon-stars';
+        }
+        const mini = document.querySelector('#btnTheme .mini');
+        if(mini) mini.textContent = isDark ? 'Modo claro' : 'Modo escuro';
+      }
+      document.addEventListener('DOMContentLoaded', refreshBadge);
+      document.addEventListener('click', (e)=>{
+        const btn = e.target.closest('#btnTheme'); if(!btn) return;
+        const isDark = document.documentElement.getAttribute('data-theme')==='dark';
+        if (isDark) { document.documentElement.removeAttribute('data-theme'); localStorage.setItem('theme','light'); }
+        else { document.documentElement.setAttribute('data-theme','dark'); localStorage.setItem('theme','dark'); }
+        refreshBadge();
+      });
+    })();
+
+    // === tudo que depende do DOM atual vai dentro de wirePage() ===
+    function wirePage(){
       const viewNow = "{{ view|default('lancar') }}";
 
       // ===== Estrelas
@@ -860,17 +910,14 @@
           });
         });
 
-        // ===== EXPORTA: todas as linhas visíveis + linha "Totais" alinhada (somando Entregas e Valor)
+        // ===== EXPORTA
         document.getElementById('btnExportCsv').addEventListener('click', ()=>{
           const rows = getRows().filter(r=>r.style.display!=='none');
 
-          // Cabeçalho
           const header = ['Data','Cooperado','Contrato','Horário','Entregas','Valor (R$)'];
           const linhas = [header];
 
-          let totE = 0;
-          let totV = 0;
-
+          let totE = 0, totV = 0;
           rows.forEach(r=>{
             const data      = r.cells[0].textContent.trim();
             const coop      = r.cells[1].textContent.trim();
@@ -878,21 +925,16 @@
             const horario   = r.cells[3].textContent.trim();
             const entTxt    = r.cells[4].textContent.trim();
             const entregas  = entTxt==='-' ? 0 : Number(entTxt.replace(/\D+/g,''));
-            const valorNum  = Number(r.querySelector('.valor')?.dataset.valor || 0); // número puro
-            // Exporta valor como número BR (vírgula decimal), sem "R$"
+            const valorNum  = Number(r.querySelector('.valor')?.dataset.valor || 0);
             const valorStr  = valorNum.toFixed(2).replace('.',',');
 
-            totE += entregas;
-            totV += valorNum;
-
+            totE += entregas; totV += valorNum;
             linhas.push([data, coop, contrato, horario, String(entregas), valorStr]);
           });
 
-          // Linha de totais: “Totais;;;;<entregas>;<valor>”
           const totalStr = totV.toFixed(2).replace('.',',');
           linhas.push(['Totais','','','', String(totE), totalStr]);
 
-          // CSV com ; como separador e BOM para Excel PT-BR
           const csv = '\uFEFF' + linhas.map(l=>l.join(';')).join('\n');
           const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
           const a = document.createElement('a');
@@ -913,7 +955,134 @@
       }
 
       document.addEventListener('click', (e)=>{ if (e.target.closest('.rating-group')) autoGeral(); });
-    });
+    }
+
+    /* ===== SPA Booster ultra-rápido ===== */
+    (function(){
+      const mainSel = 'main.content';
+      const cache = new Map();     // url -> {html, title}
+      const scrollByUrl = new Map();
+
+      const isSameOrigin = (url)=> {
+        try { const u = new URL(url, location.href); return u.origin === location.origin; } catch { return false; }
+      };
+      const shouldIntercept = (a)=> {
+        if (!a) return false;
+        if (a.target && a.target !== '' && a.target !== '_self') return false;
+        const href = a.getAttribute('href')||'';
+        if (!href || href.startsWith('#')) return false;
+        if (!isSameOrigin(href)) return false;
+        // não interceptar abrir/baixar arquivos de tabela
+        if (/\/rest\/tabelas\/\d+\/abrir/.test(href)) return false;
+        // interceptar abas do portal + listagem de tabelas + avisos
+        return /\/portal\/restaurante/.test(href) || /\/rest\/tabelas$/.test(href) || /\/portal\/restaurante\/avisos$/.test(href);
+      };
+
+      async function fetchPage(url){
+        if (cache.has(url)) return cache.get(url);
+        const r = await fetch(url, {headers:{'X-Requested-With':'spa'}});
+        const text = await r.text();
+        const doc = new DOMParser().parseFromString(text, 'text/html');
+        const html = doc.querySelector(mainSel)?.innerHTML || '';
+        const title = doc.querySelector('title')?.textContent || document.title;
+        const data = {html, title};
+        cache.set(url, data);
+        return data;
+      }
+
+      function setActive(url){
+        const links = document.querySelectorAll('.navmenu a');
+        const u = new URL(url, location.href);
+        const params = u.searchParams;
+        const view = params.get('view') || (
+          u.pathname.endsWith('/escalas') ? 'escalas' :
+          u.pathname.includes('/avisos') ? 'avisos' :
+          params.get('view') || 'lancar'
+        );
+        links.forEach(a=>{
+          const href = new URL(a.href, location.href);
+          const v2 = href.searchParams.get('view') || (href.pathname.endsWith('/escalas') ? 'escalas' : (href.pathname.includes('/avisos')?'avisos': (href.searchParams.get('view')||'lancar')));
+          a.classList.toggle('active', v2===view);
+        });
+      }
+
+      async function swapTo(url, push=true){
+        // guarda scroll atual
+        const cur = location.href;
+        scrollByUrl.set(cur, {x: window.scrollX, y: window.scrollY});
+        setActive(url);
+
+        // mostra instantâneo do cache se tiver
+        if (cache.has(url)){
+          const dataC = cache.get(url);
+          document.querySelector(mainSel).innerHTML = dataC.html;
+          document.title = dataC.title;
+          wirePage();
+          // atualiza em background
+          fetchPage(url).then(data=>{
+            cache.set(url, data);
+            document.querySelector(mainSel).innerHTML = data.html;
+            document.title = data.title;
+            wirePage();
+          }).catch(()=>{});
+        } else {
+          const data = await fetchPage(url);
+          document.querySelector(mainSel).innerHTML = data.html;
+          document.title = data.title;
+          wirePage();
+        }
+        if (push) history.pushState({}, '', url);
+
+        // restaura scroll salvo
+        const s = scrollByUrl.get(url);
+        if (s) window.scrollTo(s.x, s.y);
+        else window.scrollTo(0,0);
+      }
+
+      // intercepta cliques
+      document.addEventListener('click', (e)=>{
+        const a = e.target.closest('a');
+        if (!a || !shouldIntercept(a)) return;
+        e.preventDefault();
+        swapTo(a.href, true);
+      });
+
+      // intercepta forms GET (filtros) do portal
+      document.addEventListener('submit', (e)=>{
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        if ((form.method||'GET').toUpperCase()!=='GET') return;
+        const action = form.getAttribute('action') || location.href;
+        if (!isSameOrigin(action)) return;
+        if (!/\/portal\/restaurante/.test(action)) return;
+        e.preventDefault();
+        const url = new URL(action, location.href);
+        const fd = new FormData(form);
+        for (const [k,v] of fd.entries()) url.searchParams.set(k, v);
+        swapTo(url.toString(), true);
+      });
+
+      // voltar/avançar
+      window.addEventListener('popstate', ()=>{ swapTo(location.href, false); });
+
+      // prefetch sob demanda (hover) e em idle
+      let t=null;
+      document.addEventListener('pointerenter', (e)=>{
+        const a = e.target.closest('a'); if(!a||!shouldIntercept(a)) return;
+        clearTimeout(t); t=setTimeout(()=>fetchPage(a.href).catch(()=>{}), 60);
+      }, true);
+      (window.requestIdleCallback||function(cb){return setTimeout(cb,200)})(()=>{
+        document.querySelectorAll('.navmenu a').forEach(a=>{
+          if (shouldIntercept(a)) fetchPage(a.href).catch(()=>{});
+        });
+      });
+
+      // ativa estado na carga
+      setActive(location.href);
+    })();
+
+    // Primeira execução
+    document.addEventListener('DOMContentLoaded', wirePage);
   </script>
 </body>
 </html>
