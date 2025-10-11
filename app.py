@@ -117,6 +117,22 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 # (confirme que tem '?sslmode=require')
 db = SQLAlchemy(app)
 
+# --- Health checks ---
+@app.get("/healthz")
+def healthz():
+    # Não toca em banco; só diz "ok" pro Render/Gunicorn
+    return "ok", 200
+
+# (Opcional) prontidão com check no banco:
+from sqlalchemy import text as sa_text
+@app.get("/readyz")
+def readyz():
+    try:
+        db.session.execute(sa_text("SELECT 1"))
+        return "ready", 200
+    except Exception:
+        return "not-ready", 503
+
 
 # --- habilita foreign_keys no SQLite (para ON DELETE CASCADE funcionar) ---
 from sqlalchemy import event
