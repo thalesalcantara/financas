@@ -4,35 +4,68 @@
   <meta charset="UTF-8" />
   <title>Avisos do Cooperado</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <!-- Se usar Flask-WTF, descomente a linha abaixo para injetar o token -->
+  <!-- <meta name="csrf-token" content="{{ csrf_token() if csrf_token is defined else '' }}"> -->
+
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
   <style>
-    :root{ --royal:#2747d9; --royal-2:#3b61e3; --bg:#f7f9fc; --ink:#1a1f2b; }
+    :root{
+      --royal:#2747d9; --royal-2:#3b61e3; --bg:#f7f9fc; --ink:#111827;
+      --soft:#eef2ff; --ok:#10b981; --warn:#c0392b; --muted:#6b7280;
+      --card:#ffffff; --ring:#e5e7eb;
+    }
     html,body{height:100%;}
     body{background:var(--bg); color:var(--ink); font-family:'Roboto',sans-serif;}
-    .topbar{ background:var(--royal); color:#fff; position:sticky; top:0; z-index:10; box-shadow:0 2px 10px #0002; }
-    .brand{font-family:'Orbitron',sans-serif; letter-spacing:1px;}
+
+    /* Topbar */
+    .topbar{
+      background:linear-gradient(90deg,var(--royal),var(--royal-2));
+      color:#fff; position:sticky; top:0; z-index:20; box-shadow:0 2px 12px #0002;
+    }
+    .brand{font-family:'Orbitron',sans-serif; letter-spacing:1px; font-size:1.05rem;}
+
+    /* Layout mobile */
     .mobile-wrap{max-width:520px; margin:0 auto;}
-    .btn-royal{background:var(--royal); color:#fff; border:none;}
+
+    /* Botões */
+    .btn-royal{background:var(--royal); color:#fff; border:none; border-radius:12px;}
     .btn-royal:hover{background:var(--royal-2); color:#fff;}
-    .card{border:0; border-radius:16px; box-shadow:0 6px 18px #00000012;}
-    .badge-soft{background:#eef2ff; color:#223; border-radius:999px; padding:.2rem .6rem;}
-    .pill{border-radius:999px; padding:.15rem .5rem;}
-    .aviso-card{overflow:hidden; border:1px solid #e9ecff;}
-    .aviso-unread{border-color:#ffdbdb; background:#fff;}
-    .aviso-head{ background:#fff; border-bottom:1px solid #eef2ff;
-      display:flex; align-items:center; gap:.6rem; justify-content:space-between; padding:12px 14px; }
-    .aviso-title{ font-weight:800; font-size:1rem; display:flex; align-items:center; gap:.45rem; }
+    .btn-outline-success{border-radius:12px;}
+
+    /* Cartões/Avisos */
+    .card{border:0; border-radius:18px; box-shadow:0 8px 22px #00000010;}
+    .aviso-card{overflow:hidden; border:1px solid var(--ring); background:var(--card);}
+    .aviso-unread{border-color:#ffd2d2; box-shadow:0 8px 24px #ff000010;}
+    .aviso-head{
+      background:var(--card); border-bottom:1px solid var(--soft);
+      display:flex; align-items:center; gap:.6rem; justify-content:space-between; padding:14px 14px;
+    }
+    .aviso-title{ font-weight:800; font-size:1rem; display:flex; align-items:center; gap:.5rem; line-height:1.2; }
     .aviso-title i{color:var(--royal);}
-    .aviso-meta{font-size:.85rem; color:#6b7280;}
-    .aviso-body{background:#fff; padding:14px;}
-    .badge-novo{background:#ffe5e5; color:#c0392b;}
-    .btn-link-royal{ color:var(--royal); text-decoration:none; font-weight:600; }
+    .aviso-meta{font-size:.86rem; color:var(--muted);}
+    .aviso-body{background:var(--card); padding:14px;}
+    .aviso-content{ white-space:pre-wrap; font-size:.98rem; line-height:1.45; }
+
+    /* Badges/Pills */
+    .badge-soft{background:var(--soft); color:#1f2937; border-radius:999px; padding:.2rem .6rem;}
+    .badge-novo{background:#ffe5e5; color:var(--warn); border-radius:999px; padding:.15rem .55rem; font-weight:700;}
+    .pill{border-radius:999px; padding:.2rem .6rem;}
+
+    /* Links */
+    .btn-link-royal{ color:var(--royal); text-decoration:none; font-weight:700; }
     .btn-link-royal:hover{color:var(--royal-2); text-decoration:underline;}
-    .accordion-button-custom{ background:transparent; border:0; padding:0; display:flex; align-items:center; gap:.5rem; color:inherit; }
-    .accordion-button-custom:focus{outline:none;}
-    .aviso-content{ white-space:pre-wrap; }
+
+    /* Acessibilidade/touch */
+    .tap-lg{min-height:44px; min-width:44px;}
+
+    /* Accordion botão custom */
+    .accordion-button-custom{
+      background:transparent; border:0; padding:0; display:flex; align-items:center; gap:.5rem; color:inherit;
+    }
+    .accordion-button-custom:focus{outline:2px solid transparent; box-shadow:none;}
   </style>
 </head>
 <body>
@@ -40,12 +73,12 @@
   <!-- TOPO -->
   <header class="topbar">
     <div class="mobile-wrap d-flex align-items-center justify-content-between p-2">
-      <a href="{{ url_for('portal_cooperado') }}" class="btn btn-light btn-sm">
+      <a href="{{ url_for('portal_cooperado') }}" class="btn btn-light btn-sm tap-lg">
         <i class="bi bi-arrow-left"></i> Voltar
       </a>
       <div class="brand fw-bold">Avisos</div>
       <div class="text-end">
-        <span class="badge-soft">Total: {{ avisos|length if avisos else 0 }}</span>
+        <span class="badge-soft">Total: <span id="total-avisos">{{ avisos|length if avisos else 0 }}</span></span>
       </div>
     </div>
   </header>
@@ -55,16 +88,17 @@
     <!-- Barra superior -->
     <div class="d-flex align-items-center justify-content-between mb-2">
       <div class="d-flex align-items-center gap-2">
-        {% if avisos_nao_lidos_count|default(0) > 0 %}
-          <span class="badge rounded-pill bg-danger">{{ avisos_nao_lidos_count }} não lido(s)</span>
+        {% set unread = avisos_nao_lidos_count|default(0) %}
+        {% if unread > 0 %}
+          <span id="badge-nao-lidos" class="badge rounded-pill bg-danger">{{ unread }} não lido(s)</span>
         {% else %}
-          <span class="badge-soft">Você está em dia 🎉</span>
+          <span id="badge-nao-lidos" class="badge-soft">Você está em dia 🎉</span>
         {% endif %}
       </div>
 
-      {% if avisos_nao_lidos_count|default(0) > 0 %}
+      {% if unread > 0 %}
       <form method="POST" action="{{ url_for('marcar_todos_avisos_lidos') }}">
-        <button type="submit" class="btn btn-sm btn-royal">
+        <button type="submit" class="btn btn-sm btn-royal tap-lg">
           <i class="bi bi-check2-all"></i> Marcar todos
         </button>
       </form>
@@ -76,10 +110,11 @@
       {% for a in avisos %}
         {% set cid = 'avisoCollapse_' ~ a.id %}
         {% set is_prior = (a.prioridade_alta if a.prioridade_alta is defined else (a.prioridade if a.prioridade is defined else false)) %}
-        <div class="card aviso-card {% if not a.lido %}aviso-unread{% endif %} mb-3" id="aviso-{{ a.id }}">
+        <div class="card aviso-card {% if not a.lido %}aviso-unread{% endif %} mb-3" id="aviso-{{ a.id }}" data-aviso-id="{{ a.id }}">
           <div class="aviso-head">
             <div class="flex-grow-1">
-              <button class="accordion-button-custom"
+              <!-- Título/abre-fecha -->
+              <button class="accordion-button-custom tap-lg"
                       type="button"
                       data-bs-toggle="collapse"
                       data-bs-target="#{{ cid }}"
@@ -93,24 +128,35 @@
                   </span>
                 </div>
               </button>
+
+              <!-- Meta/estado -->
               <div class="aviso-meta mt-1">
                 <i class="bi bi-clock"></i>
                 {{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em else '' }}
-                {% if not a.lido %} · <span class="badge-novo pill">não lido</span>
-                {% else %} · <span class="text-success"><i class="bi bi-check2-circle"></i> lido</span>
-                {% endif %}
+                <span class="mx-1">·</span>
+                <span class="estado-leitura">
+                  {% if not a.lido %}
+                    <span class="badge-novo">não lido</span>
+                  {% else %}
+                    <span class="text-success"><i class="bi bi-check2-circle"></i> lido</span>
+                  {% endif %}
+                </span>
               </div>
             </div>
 
+            <!-- Botão 1: Marcar (topo) -->
             {% if not a.lido %}
-            <form method="POST" action="{{ url_for('marcar_aviso_lido', aviso_id=a.id) }}">
-              <button type="submit" class="btn btn-sm btn-outline-success">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-success js-mark-read tap-lg"
+                data-url="{{ url_for('marcar_aviso_lido', aviso_id=a.id) }}"
+                aria-label="Marcar aviso como lido">
                 <i class="bi bi-check2"></i> Marcar
               </button>
-            </form>
             {% endif %}
           </div>
 
+          <!-- Corpo -->
           <div id="{{ cid }}" class="collapse {% if not a.lido %}show{% endif %}">
             <div class="aviso-body">
               {% set conteudo = a.corpo_html if a.corpo_html is defined and a.corpo_html
@@ -124,16 +170,19 @@
               {% endif %}
 
               <div class="d-flex align-items-center justify-content-between">
-                <a class="btn-link-royal" data-bs-toggle="collapse" href="#{{ cid }}" role="button" aria-expanded="true" aria-controls="{{ cid }}">
+                <a class="btn-link-royal tap-lg" data-bs-toggle="collapse" href="#{{ cid }}" role="button" aria-expanded="true" aria-controls="{{ cid }}">
                   <i class="bi bi-arrows-collapse"></i> Recolher
                 </a>
 
+                <!-- Botão 2: Marcar (rodapé) -->
                 {% if not a.lido %}
-                <form method="POST" action="{{ url_for('marcar_aviso_lido', aviso_id=a.id) }}">
-                  <button type="submit" class="btn btn-royal btn-sm">
+                  <button
+                    type="button"
+                    class="btn btn-royal btn-sm js-mark-read tap-lg"
+                    data-url="{{ url_for('marcar_aviso_lido', aviso_id=a.id) }}"
+                    aria-label="Marcar aviso como lido">
                     <i class="bi bi-check2"></i> Marcar como lido
                   </button>
-                </form>
                 {% else %}
                   <span class="text-success small"><i class="bi bi-check2-circle"></i> Você já leu este aviso</span>
                 {% endif %}
@@ -156,10 +205,93 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function(){
+      // Scroll para o primeiro não lido
       const firstUnread = document.querySelector('.aviso-unread');
       if(firstUnread){
         setTimeout(() => firstUnread.scrollIntoView({behavior:'smooth', block:'start'}), 120);
       }
+
+      // Utilitário: pega CSRF de meta (se existir)
+      function getCSRFToken(){
+        const m = document.querySelector('meta[name="csrf-token"]');
+        return m ? m.getAttribute('content') : null;
+      }
+
+      // Atualiza contadores/badges e UI do card
+      function atualizarUIComoLido(card){
+        if(!card) return;
+        card.classList.remove('aviso-unread');
+
+        // Estado de leitura (remove badge "não lido" e mostra "lido")
+        const estado = card.querySelector('.estado-leitura');
+        if(estado){
+          estado.innerHTML = '<span class="text-success"><i class="bi bi-check2-circle"></i> lido</span>';
+        }
+
+        // Remove botões "Marcar"
+        card.querySelectorAll('.js-mark-read').forEach(btn => btn.remove());
+
+        // Atualiza contador superior de "não lidos"
+        const badge = document.getElementById('badge-nao-lidos');
+        if(badge){
+          // Extrai número atual (formato: "X não lido(s)")
+          const n = parseInt((badge.textContent || '').replace(/\D+/g,'') || '0', 10);
+          if(!isNaN(n) && n > 0){
+            const novo = n - 1;
+            if(novo > 0){
+              badge.classList.remove('badge-soft');
+              badge.classList.add('bg-danger','badge','rounded-pill');
+              badge.textContent = `${novo} não lido(s)`;
+            } else {
+              badge.classList.remove('bg-danger','badge','rounded-pill');
+              badge.classList.add('badge-soft');
+              badge.textContent = 'Você está em dia 🎉';
+            }
+          }
+        }
+      }
+
+      async function marcarComoLido(url, card){
+        if(!url || !card) return;
+
+        try{
+          const headers = { 'X-Requested-With': 'XMLHttpRequest' };
+          // Se você usa CSRF, descomente as 2 linhas abaixo
+          // const csrf = getCSRFToken();
+          // if(csrf) headers['X-CSRFToken'] = csrf;
+
+          const resp = await fetch(url, { method:'POST', headers });
+          if(resp.ok){
+            // Tenta ler JSON, mas se vier 204, segue mesmo assim
+            let ok = true;
+            try{
+              const data = await resp.json();
+              ok = (data && (data.ok === true || data.status === 'ok')) || resp.status === 204;
+            }catch(e){ /* ignore JSON parse, pode ser 204 */ }
+
+            if(ok){
+              atualizarUIComoLido(card);
+            } else {
+              console.warn('Resposta inesperada ao marcar como lido.');
+            }
+          }else{
+            console.error('Falha no POST marcar_aviso_lido:', resp.status);
+          }
+        }catch(err){
+          console.error('Erro ao marcar como lido:', err);
+        }
+      }
+
+      // Liga os botões de marcar (topo e rodapé)
+      document.querySelectorAll('.js-mark-read').forEach(btn=>{
+        btn.addEventListener('click', function(e){
+          e.preventDefault();
+          e.stopPropagation(); // evita clicar no toggle do accordion
+          const url = this.getAttribute('data-url');
+          const card = this.closest('.aviso-card');
+          marcarComoLido(url, card);
+        }, { passive:false });
+      });
     });
   </script>
 </body>
