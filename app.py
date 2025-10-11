@@ -128,7 +128,8 @@ class Usuario(db.Model):
     usuario = db.Column(db.String(80), unique=True, nullable=False)
     senha_hash = db.Column(db.String(200), nullable=False)
     tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
-    ativo = db.Column(db.Boolean, nullable=False, default=True)  # << NOVO
+    # 👇 NOVO
+    ativo = db.Column(db.Boolean, nullable=False, default=True)
 
     def set_password(self, raw: str):
         self.senha_hash = generate_password_hash(raw)
@@ -604,23 +605,22 @@ def init_db():
     except Exception:
         db.session.rollback()
 
-# 4.x) coluna 'ativo' em usuarios (idempotente)
-try:
-    if _is_sqlite():
-        cols = db.session.execute(sa_text("PRAGMA table_info(usuarios);")).fetchall()
-        colnames = {row[1] for row in cols}
-        if "ativo" not in colnames:
-            # INTEGER 0/1 no SQLite; NOT NULL com default 1
-            db.session.execute(sa_text("ALTER TABLE usuarios ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1"))
-        db.session.commit()
-    else:
-        db.session.execute(sa_text(
-            "ALTER TABLE IF NOT EXISTS public.usuarios "
-            "ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE"
-        ))
-        db.session.commit()
-except Exception:
-    db.session.rollback()
+    # 4.x) coluna 'ativo' em usuarios (idempotente)
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(usuarios);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "ativo" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE usuarios ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS public.usuarios "
+                "ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE"
+            ))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
     # 5) Bootstrap mínimo (admin e config)
     # Observação: se os modelos ainda não estiverem importados neste ponto,
@@ -1520,7 +1520,7 @@ def login():
 
         u = Usuario.query.filter_by(usuario=usuario).first()
 
-        # fallback: aceitar login pelo nome do restaurante
+        # Fallback: aceitar login pelo nome do restaurante
         if not u:
             r = Restaurante.query.filter(Restaurante.nome.ilike(usuario)).first()
             if not r:
@@ -1529,14 +1529,12 @@ def login():
                 u = r.usuario_ref
 
         if u and u.check_password(senha):
-            # 🔒 Bloqueia se a conta estiver desativada (só funciona se a coluna existir)
-            if hasattr(u, "ativo") and not u.ativo:
+            # 🔒 Bloqueia se a conta estiver desativada (funciona mesmo em DB antigo)
+            if hasattr(u, "ativo") and not bool(getattr(u, "ativo", True)):
                 erro_login = "Conta desativada. Fale com o administrador."
                 flash(erro_login, "danger")
                 login_tpl = os.path.join("templates", "login.html")
-                if os.path.exists(login_tpl):
-                    return render_template("login.html", erro_login=erro_login)
-                return "<p>Conta desativada.</p>"
+                return render_template("login.html", erro_login=erro_login) if os.path.exists(login_tpl) else "<p>Conta desativada.</p>"
 
             # Login OK
             session["user_id"] = u.id
