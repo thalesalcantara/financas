@@ -2052,7 +2052,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </script>
 </section>
 
-     <!-- COOPERADOS (versão profissional / drop-in) -->
+    <!-- COOPERADOS (versão profissional / drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
   {% set qtd_coops = cooperados|length %}
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
@@ -2125,46 +2125,69 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
               <th style="width:60px;">Foto</th>
               <th>Nome</th>
               <th>Usuário</th>
-              <th class="text-center" style="width:180px;">Ações</th>
+              <th>Status</th>
+              <th class="text-center" style="width:240px;">Ações</th>
             </tr>
           </thead>
           <tbody id="tbodyCooperados">
             {% for coop in cooperados %}
-              <tr data-nome="{{ coop.nome|lower }}" data-user="{{ coop.usuario_ref.usuario|lower }}">
+              {% set ativo = (coop.usuario_ref.ativo if coop.usuario_ref is not none and coop.usuario_ref.ativo is not none else True) %}
+              <tr data-nome="{{ coop.nome|lower }}"
+                  data-user="{{ coop.usuario_ref.usuario|lower }}"
+                  data-id="{{ coop.id }}"
+                  data-ativo="{{ 1 if ativo else 0 }}"
+                  class="{{ '' if ativo else 'table-light text-muted' }}">
                 <td class="text-center">
                   <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
                        class="avatar border" alt="{{ coop.nome }}"
-                       style="width:40px;height:40px;object-fit:cover;">
+                       style="width:40px;height:40px;object-fit:cover; {{ '' if ativo else 'filter:grayscale(1);opacity:.7;' }}">
                 </td>
                 <td class="fw-medium">{{ coop.nome }}</td>
                 <td class="text-muted">{{ coop.usuario_ref.usuario }}</td>
+                <td>
+                  <span class="badge {{ 'bg-success' if ativo else 'bg-secondary' }}">
+                    {{ 'Ativo' if ativo else 'Desativado' }}
+                  </span>
+                </td>
                 <td class="text-center">
                   <div class="btn-group btn-group-sm" role="group">
+                    <!-- Toggle Ativo/Desativado -->
+                    <button class="btn {{ 'btn-outline-secondary' if ativo else 'btn-outline-success' }} btn-toggle-status"
+                            data-url="{{ url_for('toggle_status_cooperado', id=coop.id) }}"
+                            title="{{ 'Desativar' if ativo else 'Ativar' }}">
+                      <i class="bi {{ 'bi-pause-circle' if ativo else 'bi-play-circle' }}"></i>
+                    </button>
+
+                    <!-- Editar -->
                     <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalEditCooperado"
                             data-id="{{ coop.id }}" data-nome="{{ coop.nome }}" data-usuario="{{ coop.usuario_ref.usuario }}"
                             data-url="{{ url_for('edit_cooperado', id=coop.id) }}" title="Editar">
                       <i class="bi bi-pencil"></i>
                     </button>
+
+                    <!-- Reset senha -->
                     <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalResetSenhaCooperado"
                             data-id="{{ coop.id }}" data-url="{{ url_for('reset_senha_cooperado', id=coop.id) }}" title="Redefinir senha">
                       <i class="bi bi-key"></i>
                     </button>
-                   <form action="{{ url_for('delete_cooperado', id=coop.id) }}"
-      method="POST"
-      class="d-inline"
-      onsubmit="return confirm('Excluir {{ coop.nome }}? Esta ação não pode ser desfeita.');">
-  {% if csrf_token is defined %}
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  {% endif %}
-  <button type="submit" class="btn btn-danger btn-del" title="Excluir">
-    <i class="bi bi-trash"></i>
-  </button>
-</form>
+
+                    <!-- Excluir -->
+                    <form action="{{ url_for('delete_cooperado', id=coop.id) }}"
+                          method="POST"
+                          class="d-inline"
+                          onsubmit="return confirm('Excluir {{ coop.nome }}? Esta ação não pode ser desfeita.');">
+                      {% if csrf_token is defined %}
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      {% endif %}
+                      <button type="submit" class="btn btn-danger btn-del" title="Excluir">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
                   </div>
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="4" class="text-center text-muted">Nenhum cooperado</td></tr>
+              <tr><td colspan="5" class="text-center text-muted">Nenhum cooperado</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -2209,6 +2232,65 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         const isPwd = inp.type === 'password';
         inp.type = isPwd ? 'text' : 'password';
         btn.innerHTML = isPwd ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+      });
+    })();
+
+    // Toggle status (super RÁPIDO via fetch)
+    (function(){
+      const tbody = document.getElementById('tbodyCooperados');
+      const getCsrf = () => {
+        // Se você usa CSRF do Flask-WTF, pegue de um input escondido global
+        const el = document.querySelector('input[name="csrf_token"]');
+        return el ? el.value : null;
+      }
+      tbody?.addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('.btn-toggle-status');
+        if (!btn) return;
+        const tr = btn.closest('tr');
+        const url = btn.dataset.url;
+        if (!url) return;
+
+        btn.disabled = true;
+
+        try {
+          const headers = {"X-Requested-With": "fetch"};
+          const csrf = getCsrf();
+          const body = new FormData();
+          if (csrf) body.append("csrf_token", csrf);
+
+          const resp = await fetch(url, { method: "POST", body, headers });
+          const data = await resp.json();
+
+          if (!data.ok) throw new Error(data.error || "Falha ao alternar status.");
+
+          const ativo = !!data.ativo;
+          tr.dataset.ativo = ativo ? "1" : "0";
+          tr.classList.toggle('table-light', !ativo);
+          tr.classList.toggle('text-muted', !ativo);
+
+          // imagem
+          const img = tr.querySelector('img.avatar');
+          if (img) {
+            img.style.filter = ativo ? '' : 'grayscale(1)';
+            img.style.opacity = ativo ? '' : '.7';
+          }
+
+          // badge
+          const badge = tr.querySelector('span.badge');
+          if (badge) {
+            badge.textContent = ativo ? 'Ativo' : 'Desativado';
+            badge.className = 'badge ' + (ativo ? 'bg-success' : 'bg-secondary');
+          }
+
+          // botão (ícone/estilo/title)
+          btn.className = 'btn btn-toggle-status ' + (ativo ? 'btn-outline-secondary' : 'btn-outline-success');
+          btn.title = ativo ? 'Desativar' : 'Ativar';
+          btn.innerHTML = `<i class="bi ${ativo ? 'bi-pause-circle' : 'bi-play-circle'}"></i>`;
+        } catch (e) {
+          alert(e.message || 'Erro ao alternar status.');
+        } finally {
+          btn.disabled = false;
+        }
       });
     })();
   </script>
