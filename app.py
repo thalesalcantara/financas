@@ -128,6 +128,7 @@ class Usuario(db.Model):
     usuario = db.Column(db.String(80), unique=True, nullable=False)
     senha_hash = db.Column(db.String(200), nullable=False)
     tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
+    ativo = db.Column(db.Boolean, nullable=False, default=True)  # << NOVO
 
     def set_password(self, raw: str):
         self.senha_hash = generate_password_hash(raw)
@@ -602,6 +603,24 @@ def init_db():
             db.session.commit()
     except Exception:
         db.session.rollback()
+
+# 4.x) coluna 'ativo' em usuarios (idempotente)
+try:
+    if _is_sqlite():
+        cols = db.session.execute(sa_text("PRAGMA table_info(usuarios);")).fetchall()
+        colnames = {row[1] for row in cols}
+        if "ativo" not in colnames:
+            # INTEGER 0/1 no SQLite; NOT NULL com default 1
+            db.session.execute(sa_text("ALTER TABLE usuarios ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1"))
+        db.session.commit()
+    else:
+        db.session.execute(sa_text(
+            "ALTER TABLE IF NOT EXISTS public.usuarios "
+            "ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE"
+        ))
+        db.session.commit()
+except Exception:
+    db.session.rollback()
 
     # 5) Bootstrap mínimo (admin e config)
     # Observação: se os modelos ainda não estiverem importados neste ponto,
@@ -1494,6 +1513,7 @@ def index():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     erro_login = None
+
     if request.method == "POST":
         usuario = request.form.get("usuario", "").strip()
         senha = request.form.get("senha", "")
@@ -1509,6 +1529,16 @@ def login():
                 u = r.usuario_ref
 
         if u and u.check_password(senha):
+            # 🔒 Bloqueia se a conta estiver desativada (só funciona se a coluna existir)
+            if hasattr(u, "ativo") and not u.ativo:
+                erro_login = "Conta desativada. Fale com o administrador."
+                flash(erro_login, "danger")
+                login_tpl = os.path.join("templates", "login.html")
+                if os.path.exists(login_tpl):
+                    return render_template("login.html", erro_login=erro_login)
+                return "<p>Conta desativada.</p>"
+
+            # Login OK
             session["user_id"] = u.id
             session["user_tipo"] = u.tipo
             if u.tipo == "admin":
@@ -1517,9 +1547,12 @@ def login():
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
                 return redirect(url_for("portal_restaurante"))
+
+        # Falha
         erro_login = "Usuário/senha inválidos."
         flash(erro_login, "danger")
 
+    # GET (ou erro)
     login_tpl = os.path.join("templates", "login.html")
     if os.path.exists(login_tpl):
         return render_template("login.html", erro_login=erro_login)
@@ -3022,6 +3055,11 @@ def marcar_aviso_lido_universal(aviso_id: int):
 # =========================
 # CRUD Cooperados / Restaurantes / Senhas (Admin)
 # =========================
+from flask import jsonify, current_app  # <- precisa para a rota toggle e logs
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import delete as sa_delete  # já usa mais acima em outras rotas
+
 @app.route("/cooperados/add", methods=["POST"])
 @admin_required
 def add_cooperado():
@@ -3035,7 +3073,12 @@ def add_cooperado():
         flash("Usuário já existente.", "warning")
         return redirect(url_for("admin_dashboard", tab="cooperados"))
 
+    # cria usuário já ativo por padrão
     u = Usuario(usuario=usuario_login, tipo="cooperado", senha_hash="")
+    # se seu modelo tiver a coluna 'ativo', garanta True por segurança
+    if hasattr(u, "ativo"):
+        u.ativo = True
+
     u.set_password(senha)
     db.session.add(u)
     db.session.flush()
@@ -3050,6 +3093,7 @@ def add_cooperado():
     db.session.commit()
     flash("Cooperado cadastrado.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
+
 
 @app.route("/cooperados/<int:id>/edit", methods=["POST"])
 @admin_required
@@ -3066,8 +3110,6 @@ def edit_cooperado(id):
     flash("Cooperado atualizado.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
-from sqlalchemy import or_
-from sqlalchemy.exc import IntegrityError
 
 @app.route("/cooperados/<int:id>/delete", methods=["POST"])
 @admin_required
@@ -3109,7 +3151,7 @@ def delete_cooperado(id):
             sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.cooperado_id == id)
         )
 
-        # --- 4) Lançamentos desse cooperado (se o CASCADE por lancamento_id não estiver ativo) ---
+        # --- 4) Lançamentos desse cooperado ---
         db.session.execute(
             sa_delete(Lancamento).where(Lancamento.cooperado_id == id)
         )
@@ -3142,6 +3184,7 @@ def delete_cooperado(id):
 
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
+
 @app.route("/cooperados/<int:id>/reset_senha", methods=["POST"])
 @admin_required
 def reset_senha_cooperado(id):
@@ -3155,6 +3198,21 @@ def reset_senha_cooperado(id):
     db.session.commit()
     flash("Senha do cooperado atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
+
+
+# === Ativar/Desativar cooperado (toggle) ===
+@app.post("/cooperados/<int:id>/toggle_status")
+@admin_required
+def toggle_status_cooperado(id):
+    c = Cooperado.query.get_or_404(id)
+    u = c.usuario_ref
+    if not u:
+        return jsonify({"ok": False, "error": "Usuário não vinculado"}), 400
+
+    # Alterna o status; se a coluna não existir por algum motivo, considera True como padrão
+    u.ativo = not bool(getattr(u, "ativo", True))
+    db.session.commit()
+    return jsonify({"ok": True, "ativo": bool(u.ativo)})
 
 @app.route("/restaurantes/add", methods=["POST"])
 @admin_required
