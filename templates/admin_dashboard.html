@@ -252,9 +252,40 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   <main class="main">
     <div class="tab-content">
 
-      <!-- RESUMO (versão profissional/compacta – drop-in) -->
+      <!-- RESUMO (com filtro por período) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
   {% set _resultado = (total_receitas|default(0)) - (total_despesas|default(0)) %}
+
+  <!-- Filtro do Resumo -->
+  <div class="card border-0 shadow-sm rounded-3 mb-2">
+    <div class="card-body">
+      <form method="GET" action="{{ url_for('admin_dashboard') }}" class="row g-2 align-items-end">
+        <input type="hidden" name="tab" value="resumo">
+        <div class="col-sm-4 col-md-3">
+          <label class="form-label">De</label>
+          <input type="date" class="form-control form-control-sm" name="resumo_inicio"
+                 value="{{ request.args.get('resumo_inicio','') }}">
+        </div>
+        <div class="col-sm-4 col-md-3">
+          <label class="form-label">Até</label>
+          <input type="date" class="form-control form-control-sm" name="resumo_fim"
+                 value="{{ request.args.get('resumo_fim','') }}">
+        </div>
+        <div class="col-sm-4 col-md-3 d-flex gap-2">
+          <button class="btn btn-royal btn-sm flex-grow-1">
+            <i class="bi bi-funnel"></i> Filtrar
+          </button>
+          <button type="button" id="btnResumoMes" class="btn btn-light btn-sm" title="Preencher mês atual">Mês</button>
+        </div>
+        <div class="col-md-3">
+          <a class="btn btn-outline-secondary btn-sm w-100"
+             href="{{ url_for('admin_dashboard', tab='resumo') }}">
+            Limpar
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- KPIs -->
   <div class="row g-2">
@@ -379,7 +410,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       <div class="card border-0 shadow-sm rounded-3 p-3 h-100">
         <div class="d-flex justify-content-between align-items-center">
           <h6 class="mb-0"><i class="bi bi-currency-dollar me-1"></i> Parâmetro — Salário Mínimo</h6>
-           </a>
         </div>
         <hr class="my-2">
         <div class="small text-muted">Atual</div>
@@ -391,7 +421,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       </div>
     </div>
 
-    <!-- Gráficos (mantém seus IDs para reutilizar o JS existente) -->
+    <!-- Gráfico Cooperativa -->
     <div class="col-12 col-lg-6">
       <div class="card border-0 shadow-sm rounded-3 p-3 chart-card">
         <h6 class="mb-2"><i class="bi bi-graph-up-arrow"></i> Crescimento — Cooperativa</h6>
@@ -400,6 +430,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
   </div>
 
+  <!-- Gráfico Cooperados -->
   <div class="row g-2 mt-1">
     <div class="col-12">
       <div class="card border-0 shadow-sm rounded-3 p-3 chart-card">
@@ -410,6 +441,25 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </section>
 
+<script>
+  // Botão "Mês": preenche 1º e último dia do mês atual
+  (function(){
+    const btn = document.getElementById('btnResumoMes');
+    if(!btn) return;
+    btn.addEventListener('click', ()=>{
+      const now = new Date();
+      const y = now.getFullYear(), m = now.getMonth();
+      const first = new Date(y, m, 1);
+      const last  = new Date(y, m+1, 0);
+      const pad = n => String(n).padStart(2,'0');
+      const toISO = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+      const ini = document.querySelector('input[name="resumo_inicio"]');
+      const fim = document.querySelector('input[name="resumo_fim"]');
+      if(ini) ini.value = toISO(first);
+      if(fim) fim.value = toISO(last);
+    });
+  })();
+</script>
 {# ===================== CONTEÚDO DA ABA "Avaliações" ===================== #}
 <section id="avaliacoes" class="tab-pane fade {{ 'show active' if _tab=='avaliacoes' else '' }}" role="tabpanel">
 
