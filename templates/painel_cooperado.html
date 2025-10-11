@@ -2044,7 +2044,7 @@
           card.className = 'note-card';
           if (n.id===currentId) card.classList.add('active');
           card.innerHTML = `
-            <div class="d-flex align-items-start justify-content-between">
+            <div class="d-flex align.items-start justify-content-between">
               <div class="me-2 flex-fill">
                 <div class="title">${n.title ? n.title : '(sem título)'} ${n.pinned?'<i class="bi bi-pin-angle-fill note-pin" title="Fixada"></i>':''}</div>
                 <div class="preview">${firstText(n.content)}</div>
