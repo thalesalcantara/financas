@@ -96,15 +96,27 @@ app.config.update(
 
 from sqlalchemy.pool import QueuePool
 
+from sqlalchemy.pool import QueuePool  # <— garanta este import
+
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "poolclass": QueuePool,   # usa pool local quando não houver PgBouncer
-    "pool_size": 5,
-    "max_overflow": 10,
-    "pool_pre_ping": True,
-    "pool_recycle": 1800,
+    "poolclass": QueuePool,
+    "pool_size": 5,          # <= pequeno e estável pro plano atual
+    "max_overflow": 5,       # <= reduza pra não estourar conexões no pico
+    "pool_timeout": 10,      # <= não ficar travado esperando conexão
+    "pool_pre_ping": True,   # <= derruba conexões mortas
+    "pool_recycle": 1800,    # <= recicla a cada 30 min
+    "connect_args": {
+        "connect_timeout": 5,
+        # mata queries lentas no servidor depois de 15s
+        "options": "-c statement_timeout=15000"
+    },
 }
 
+# MUITO IMPORTANTE: sua URL do banco deve ter ssl habilitado no Render
+# Ex.: postgresql+psycopg://user:pass@host:5432/dbname?sslmode=require
+# (confirme que tem '?sslmode=require')
 db = SQLAlchemy(app)
+
 
 # --- habilita foreign_keys no SQLite (para ON DELETE CASCADE funcionar) ---
 from sqlalchemy import event
