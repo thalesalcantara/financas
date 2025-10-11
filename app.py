@@ -1,130 +1,99 @@
 from __future__ import annotations
 
-import os
-import csv
-import io
-import re
-import json
-import difflib
-import unicodedata
-import re
-import mimetypes
-from flask import jsonify, current_app, abort
-from dateutil.relativedelta import relativedelta
-from sqlalchemy.inspection import inspect as sa_inspect
-from datetime import datetime, date, timedelta, time
-from functools import wraps
+# ============ Stdlib ============
+import os, io, csv, re, json, time, difflib, urllib.parse, unicodedata
+from datetime import datetime, date, timedelta, time as dtime
 from collections import defaultdict, namedtuple
+from functools import wraps
 from types import SimpleNamespace
+
+# MIME types (fixes p/ Office)
+import mimetypes
+mimetypes.add_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx")
+mimetypes.add_type("application/vnd.ms-excel", ".xls")
+mimetypes.add_type("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx")
+mimetypes.add_type("application/msword", ".doc")
+mimetypes.add_type("application/vnd.openxmlformats-officedocument.presentationml.presentation", ".pptx")
+mimetypes.add_type("application/vnd.ms-powerpoint", ".ppt")
+
+# ============ Terceiros ============
 from flask import (
-    Flask, render_template, request, redirect, url_for,
-    session, flash, send_file, abort
+    Flask, render_template, request, redirect, url_for, session,
+    flash, send_file, abort, jsonify, current_app
 )
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from sqlalchemy import delete as sa_delete, text as sa_text, func
+from dateutil.relativedelta import relativedelta
+from sqlalchemy import func, text as sa_text, or_, and_, case
+from sqlalchemy.inspection import inspect as sa_inspect
+from sqlalchemy.pool import QueuePool
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
-# =========================
-# App / DB
-# =========================
+# ============ App / DB ============
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-# Pasta pública (arquivos que podem ir para o git ou reaparecer a cada deploy)
 UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-DOCS_DIR = os.path.join(UPLOAD_DIR, "docs")
+DOCS_DIR   = os.path.join(UPLOAD_DIR, "docs")
 os.makedirs(DOCS_DIR, exist_ok=True)
 
-# >>> PERSISTÊNCIA REAL (Render Disk) <<<
-# Em produção (Render) use /var/data. Em dev/local cai para ./data
+# Persistência real (Render Disk)
 PERSIST_ROOT = os.environ.get("PERSIST_ROOT", "/var/data")
 if not os.path.isdir(PERSIST_ROOT):
     PERSIST_ROOT = os.path.join(BASE_DIR, "data")
 os.makedirs(PERSIST_ROOT, exist_ok=True)
-
-# Pastas dentro do volume persistente
 TABELAS_DIR = os.path.join(PERSIST_ROOT, "tabelas")
 os.makedirs(TABELAS_DIR, exist_ok=True)
-
-# (opcional) legado: onde suas tabelas antigas talvez estejam
 STATIC_TABLES = os.path.join(BASE_DIR, "static", "uploads", "tabelas")
 os.makedirs(STATIC_TABLES, exist_ok=True)
 
 def _build_db_uri() -> str:
-    """
-    Usa SQLite local se não houver DATABASE_URL.
-    Se estiver no Render/Heroku com postgres, converte para o dialeto psycopg3:
-      postgres://...         -> postgresql+psycopg://...
-      postgresql://...       -> postgresql+psycopg://...
-    Garante sslmode=require quando for Postgres.
-    """
     url = os.environ.get("DATABASE_URL")
     if not url:
         return "sqlite:///" + os.path.join(BASE_DIR, "app.db")
-
-    # normaliza esquema
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql+psycopg://", 1)
     elif url.startswith("postgresql://") and "+psycopg" not in url:
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
-
-    # ssl obrigatório no Render
     if url.startswith("postgresql+psycopg://") and "sslmode=" not in url:
         url += ("&" if "?" in url else "?") + "sslmode=require"
     return url
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
-
-# chave da sessão
 app.secret_key = os.environ.get("SECRET_KEY", "coopex-secret")
 
-# Configs principais
-app.config["SQLALCHEMY_DATABASE_URI"] = _build_db_uri()
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["JSON_SORT_KEYS"] = False  # evita comparar None com int ao serializar |tojson
-app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32MB
-
-# Sessão/cookies (mais seguro; deixe SECURE=True em produção com HTTPS)
 app.config.update(
+    SQLALCHEMY_DATABASE_URI=_build_db_uri(),
+    SQLALCHEMY_TRACK_MODIFICATIONS=False,
+    JSON_SORT_KEYS=False,
+    MAX_CONTENT_LENGTH=32 * 1024 * 1024,  # 32MB
     SESSION_COOKIE_HTTPONLY=True,
     REMEMBER_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",                 # "Strict" pode quebrar logins vindos de links
+    SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.environ.get("FLASK_SECURE_COOKIES", "1") == "1",
-    PERMANENT_SESSION_LIFETIME=timedelta(hours=12) # ajuste conforme sua política
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
+    SQLALCHEMY_ENGINE_OPTIONS={
+        "poolclass": QueuePool,
+        "pool_size": 5,
+        "max_overflow": 5,
+        "pool_timeout": 10,
+        "pool_pre_ping": True,
+        "pool_recycle": 1800,
+        "connect_args": {
+            "connect_timeout": 5,
+            "options": "-c statement_timeout=15000",
+        },
+    },
 )
 
-from sqlalchemy.pool import QueuePool
-
-from sqlalchemy.pool import QueuePool  # <— garanta este import
-
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "poolclass": QueuePool,
-    "pool_size": 5,          # <= pequeno e estável pro plano atual
-    "max_overflow": 5,       # <= reduza pra não estourar conexões no pico
-    "pool_timeout": 10,      # <= não ficar travado esperando conexão
-    "pool_pre_ping": True,   # <= derruba conexões mortas
-    "pool_recycle": 1800,    # <= recicla a cada 30 min
-    "connect_args": {
-        "connect_timeout": 5,
-        # mata queries lentas no servidor depois de 15s
-        "options": "-c statement_timeout=15000"
-    },
-}
-
-# MUITO IMPORTANTE: sua URL do banco deve ter ssl habilitado no Render
-# Ex.: postgresql+psycopg://user:pass@host:5432/dbname?sslmode=require
-# (confirme que tem '?sslmode=require')
 db = SQLAlchemy(app)
 
-# --- Health checks ---
+# Health checks
 @app.get("/healthz")
 def healthz():
-    # Não toca em banco; só diz "ok" pro Render/Gunicorn
     return "ok", 200
 
-# (Opcional) prontidão com check no banco:
-from sqlalchemy import text as sa_text
 @app.get("/readyz")
 def readyz():
     try:
@@ -133,11 +102,7 @@ def readyz():
     except Exception:
         return "not-ready", 503
 
-
-# --- habilita foreign_keys no SQLite (para ON DELETE CASCADE funcionar) ---
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
-
+# Liga foreign_keys no SQLite
 @event.listens_for(Engine, "connect")
 def _set_sqlite_pragma(dbapi_con, con_record):
     try:
@@ -147,6 +112,12 @@ def _set_sqlite_pragma(dbapi_con, con_record):
             cur.close()
     except Exception:
         pass
+
+def _is_sqlite() -> bool:
+    try:
+        return db.session.get_bind().dialect.name == "sqlite"
+    except Exception:
+        return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
 
 # =========================
 # Models
@@ -421,8 +392,17 @@ def _is_sqlite() -> bool:
     except Exception:
         return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
 
+
 def init_db():
-    # --- PERF (SQLite): liga WAL e ajusta synchronous ---
+    """
+    Versão unificada e idempotente:
+      1) Ajustes de performance para SQLite (WAL/synchronous)
+      2) Criação de todas as tabelas (create_all)
+      3) Índices úteis (cooperado/restaurante/criado_em)
+      4) Migrações leves de colunas/tabelas (qtd_entregas, fotos, escalas, avaliacoes_restaurante)
+      5) Bootstrap mínimo (admin e config)
+    """
+    # 1) Perf no SQLite
     try:
         if _is_sqlite():
             db.session.execute(sa_text("PRAGMA journal_mode=WAL;"))
@@ -431,90 +411,90 @@ def init_db():
     except Exception:
         db.session.rollback()
 
-    db.create_all()
-
-def init_db():
-    # --- PERF (SQLite): liga WAL e ajusta synchronous ---
+    # 2) Tabelas/mapeamentos
     try:
-        if _is_sqlite():
-            db.session.execute(sa_text("PRAGMA journal_mode=WAL;"))
-            db.session.execute(sa_text("PRAGMA synchronous=NORMAL;"))
-            db.session.commit()
+        db.create_all()
     except Exception:
         db.session.rollback()
 
-    # Cria tabelas/mapeamentos
-    db.create_all()
-
-    # --- índices de performance p/ avaliações (restaurante_id, cooperado_id, criado_em) ---
+    # 3) Índices de performance (idempotentes)
     try:
         if _is_sqlite():
             db.session.execute(sa_text("""
-            CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON avaliacoes (criado_em);
-            CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON avaliacoes (restaurante_id, criado_em);
-            CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON avaliacoes (cooperado_id,  criado_em);
+                CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON avaliacoes (criado_em);
+                CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON avaliacoes (restaurante_id, criado_em);
+                CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON avaliacoes (cooperado_id,  criado_em);
 
-            CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em           ON avaliacoes_restaurante (criado_em);
-            CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado         ON avaliacoes_restaurante (restaurante_id, criado_em);
-            CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado         ON avaliacoes_restaurante (cooperado_id,  criado_em);
+                CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em           ON avaliacoes_restaurante (criado_em);
+                CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado         ON avaliacoes_restaurante (restaurante_id, criado_em);
+                CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado         ON avaliacoes_restaurante (cooperado_id,  criado_em);
             """))
         else:
             db.session.execute(sa_text("""
-            CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON public.avaliacoes (criado_em);
-            CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON public.avaliacoes (restaurante_id, criado_em);
-            CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON public.avaliacoes (cooperado_id,  criado_em);
+                CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON public.avaliacoes (criado_em);
+                CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON public.avaliacoes (restaurante_id, criado_em);
+                CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON public.avaliacoes (cooperado_id,  criado_em);
 
-            CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em           ON public.avaliacoes_restaurante (criado_em);
-            CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado         ON public.avaliacoes_restaurante (restaurante_id, criado_em);
-            CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado         ON public.avaliacoes_restaurante (cooperado_id,  criado_em);
+                CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em           ON public.avaliacoes_restaurante (criado_em);
+                CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado         ON public.avaliacoes_restaurante (restaurante_id, criado_em);
+                CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado         ON public.avaliacoes_restaurante (cooperado_id,  criado_em);
             """))
         db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # --- qtd_entregas em lancamentos ---
+    # 4) Migração leve: garantir coluna qtd_entregas em lancamentos
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(lancamentos);")).fetchall()
             colnames = {row[1] for row in cols}
             if "qtd_entregas" not in colnames:
                 db.session.execute(sa_text("ALTER TABLE lancamentos ADD COLUMN qtd_entregas INTEGER"))
-                db.session.commit()
+            db.session.commit()
         else:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS lancamentos ADD COLUMN IF NOT EXISTS qtd_entregas INTEGER"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS public.lancamentos "
+                "ADD COLUMN IF NOT EXISTS qtd_entregas INTEGER"
+            ))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # --- cooperado_nome em escalas ---
+    # 4.1) cooperado_nome em escalas
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
             colnames = {row[1] for row in cols}
             if "cooperado_nome" not in colnames:
                 db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
-                db.session.commit()
+            db.session.commit()
         else:
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS escalas ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS escalas "
+                "ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"
+            ))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # --- restaurante_id em escalas ---
+    # 4.2) restaurante_id em escalas
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
             colnames = {row[1] for row in cols}
             if "restaurante_id" not in colnames:
                 db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
-                db.session.commit()
+            db.session.commit()
         else:
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS escalas ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS escalas "
+                "ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"
+            ))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # --- fotos no banco (cooperados) ---
+    # 4.3) fotos no banco (cooperados)
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
@@ -529,15 +509,19 @@ def init_db():
                 db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_url VARCHAR(255)"))
             db.session.commit()
         else:
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # --- tabela avaliacoes_restaurante (se não existir) ---
+    # 4.4) tabela avaliacoes_restaurante (se não existir)
     try:
         if _is_sqlite():
             db.session.execute(sa_text("""
@@ -559,8 +543,10 @@ def init_db():
                   criado_em TIMESTAMP
                 );
             """))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
+            db.session.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
+            db.session.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
             db.session.commit()
         else:
             db.session.execute(sa_text("""
@@ -582,13 +568,15 @@ def init_db():
                   criado_em TIMESTAMP
                 );
             """))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
+            db.session.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
+            db.session.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # --- fotos no banco (restaurantes) ---
+    # 4.5) fotos no banco (restaurantes)
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
@@ -603,26 +591,57 @@ def init_db():
                 db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_url VARCHAR(255)"))
             db.session.commit()
         else:
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # --- usuário admin + config padrão ---
-    if not Usuario.query.filter_by(tipo="admin").first():
-        admin_user = os.environ.get("ADMIN_USER", "admin")
-        admin_pass = os.environ.get("ADMIN_PASS", os.urandom(8).hex())
-        admin = Usuario(usuario=admin_user, tipo="admin", senha_hash="")
-        admin.set_password(admin_pass)
-        db.session.add(admin)
-        db.session.commit()
+    # 5) Bootstrap mínimo (admin e config)
+    # Observação: se os modelos ainda não estiverem importados neste ponto,
+    # engolimos o erro e a criação poderá ocorrer numa próxima chamada ao init_db().
+    try:
+        from models import Usuario, Config  # se você usa modelos em outro módulo
+    except Exception:
+        # Se os modelos estiverem no mesmo arquivo, ignore este import.
+        pass
 
-    if not Config.query.get(1):
-        db.session.add(Config(id=1, salario_minimo=0.0))
-        db.session.commit()
+    # Admin
+    try:
+        # Tenta acessar Usuario; se não existir ainda, NameError cai no except
+        _ = Usuario  # noqa: F401
+        if not Usuario.query.filter_by(tipo="admin").first():
+            admin_user = os.environ.get("ADMIN_USER", "admin")
+            admin_pass = os.environ.get("ADMIN_PASS", os.urandom(8).hex())
+            admin = Usuario(usuario=admin_user, tipo="admin", senha_hash="")
+            # Precisa que Usuario tenha método set_password
+            try:
+                admin.set_password(admin_pass)
+            except Exception:
+                # fallback: se não houver helper, gerar hash direto
+                try:
+                    admin.senha_hash = generate_password_hash(admin_pass)
+                except Exception:
+                    pass
+            db.session.add(admin)
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # Config default (id=1)
+    try:
+        _ = Config  # noqa: F401
+        if not Config.query.get(1):
+            db.session.add(Config(id=1, salario_minimo=0.0))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 # === Bootstrap do banco no start (Render/Gunicorn) ===
@@ -636,6 +655,17 @@ try:
             app.logger.info(f"init_db concluído em {(datetime.utcnow() - _t0).total_seconds():.2f}s")
         except Exception:
             pass
+    else:
+        try:
+            app.logger.info("INIT_DB_ON_START=0: pulando init_db no boot.")
+        except Exception:
+            pass
+except Exception as e:
+    try:
+        app.logger.warning(f"init_db pulado: {e}")
+    except Exception:
+        pass
+
     else:
         try:
             app.logger.info("INIT_DB_ON_START=0: pulando init_db no boot.")
