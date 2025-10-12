@@ -146,7 +146,13 @@
   </style>
 </head>
 <body>
-  {% set unread = (unread | default(avisos_nao_lidos_count | default(avisos_unread_count, true), true)) | int %}
+  {# Fallback robusto para "unread" #}
+{% set _unread =
+    unread if unread is defined else
+    (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else
+    (avisos_unread_count if avisos_unread_count is defined else 0))
+%}
+{% set unread = _unread|int %}
 
 <!-- MENU LATERAL -->
 <div id="menuLateral">
