@@ -4,10 +4,11 @@
   <meta charset="UTF-8" />
   <title>Avisos do Cooperado</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <!-- Se usar Flask-WTF, descomente a linha abaixo para injetar o token -->
   <!-- <meta name="csrf-token" content="{{ csrf_token() if csrf_token is defined else '' }}"> -->
 
+  <!-- Fonts & Icons -->
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Bootstrap (inclua só UMA vez o bundle) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 
@@ -27,8 +28,9 @@
     }
     .brand{font-family:'Orbitron',sans-serif; letter-spacing:1px; font-size:1.05rem;}
 
-    /* Layout mobile */
-    .mobile-wrap{max-width:520px; margin:0 auto;}
+    /* Layout mobile 6" */
+    .mobile-wrap{max-width:420px; margin:0 auto;} /* ~6" */
+    @media (min-width:480px){ .mobile-wrap{max-width:520px;} }
 
     /* Botões */
     .btn-royal{background:var(--royal); color:#fff; border:none; border-radius:12px;}
@@ -41,12 +43,12 @@
     .aviso-unread{border-color:#ffd2d2; box-shadow:0 8px 24px #ff000010;}
     .aviso-head{
       background:var(--card); border-bottom:1px solid var(--soft);
-      display:flex; align-items:center; gap:.6rem; justify-content:space-between; padding:14px 14px;
+      display:flex; align-items:center; gap:.6rem; justify-content:space-between; padding:12px 14px;
     }
     .aviso-title{ font-weight:800; font-size:1rem; display:flex; align-items:center; gap:.5rem; line-height:1.2; }
     .aviso-title i{color:var(--royal);}
     .aviso-meta{font-size:.86rem; color:var(--muted);}
-    .aviso-body{background:var(--card); padding:14px;}
+    .aviso-body{background:var(--card); padding:12px 14px;}
     .aviso-content{ white-space:pre-wrap; font-size:.98rem; line-height:1.45; }
 
     /* Badges/Pills */
@@ -66,6 +68,9 @@
       background:transparent; border:0; padding:0; display:flex; align-items:center; gap:.5rem; color:inherit;
     }
     .accordion-button-custom:focus{outline:2px solid transparent; box-shadow:none;}
+
+    /* Toast: canto inferior */
+    .toast-container{position:fixed; bottom:12px; right:12px; z-index:1080;}
   </style>
 </head>
 <body>
@@ -88,7 +93,7 @@
     <!-- Barra superior -->
     <div class="d-flex align-items-center justify-content-between mb-2">
       <div class="d-flex align-items-center gap-2">
-        {% set unread = avisos_nao_lidos_count|default(0) %}
+        {% set unread = (avisos_nao_lidos_count or avisos_unread_count) | default(0) %}
         {% if unread > 0 %}
           <span id="badge-nao-lidos" class="badge rounded-pill bg-danger">{{ unread }} não lido(s)</span>
         {% else %}
@@ -113,7 +118,6 @@
         <div class="card aviso-card {% if not a.lido %}aviso-unread{% endif %} mb-3" id="aviso-{{ a.id }}" data-aviso-id="{{ a.id }}">
           <div class="aviso-head">
             <div class="flex-grow-1">
-              <!-- Título/abre-fecha -->
               <button class="accordion-button-custom tap-lg"
                       type="button"
                       data-bs-toggle="collapse"
@@ -129,7 +133,6 @@
                 </div>
               </button>
 
-              <!-- Meta/estado -->
               <div class="aviso-meta mt-1">
                 <i class="bi bi-clock"></i>
                 {{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em else '' }}
@@ -144,7 +147,6 @@
               </div>
             </div>
 
-            <!-- Botão 1: Marcar (topo) -->
             {% if not a.lido %}
               <button
                 type="button"
@@ -156,7 +158,6 @@
             {% endif %}
           </div>
 
-          <!-- Corpo -->
           <div id="{{ cid }}" class="collapse {% if not a.lido %}show{% endif %}">
             <div class="aviso-body">
               {% set conteudo = a.corpo_html if a.corpo_html is defined and a.corpo_html
@@ -174,7 +175,6 @@
                   <i class="bi bi-arrows-collapse"></i> Recolher
                 </a>
 
-                <!-- Botão 2: Marcar (rodapé) -->
                 {% if not a.lido %}
                   <button
                     type="button"
@@ -202,39 +202,102 @@
     </div>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', function(){
-      // Scroll para o primeiro não lido
-      const firstUnread = document.querySelector('.aviso-unread');
-      if(firstUnread){
-        setTimeout(() => firstUnread.scrollIntoView({behavior:'smooth', block:'start'}), 120);
-      }
+  <!-- TOAST: novos avisos -->
+  <div class="toast-container">
+    <div id="toastAvisos" class="toast align-items-center border-0" role="alert" aria-live="assertive" aria-atomic="true"
+         data-bs-autohide="true" data-bs-delay="8000">
+      <div class="toast-header">
+        <i class="bi bi-megaphone-fill me-2"></i>
+        <strong class="me-auto">Novos avisos</strong>
+        <small>agora</small>
+        <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
+      </div>
+      <div class="toast-body">
+        Você tem {{ unread|default(0) }} aviso(s) não lido(s).
+        <a href="#topo" class="link-primary fw-semibold">Ver agora</a>
+      </div>
+    </div>
+  </div>
 
-      // Utilitário: pega CSRF de meta (se existir)
+  <!-- Bootstrap bundle (JS) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Lógica da página -->
+  <script>
+    (function(){
+      // Unifica e blinda o valor de 'unread'
+      const UNREAD = parseInt('{{ unread|default(0) }}', 10) || 0;
+
+      // 1) Scroll para o primeiro não lido
+      document.addEventListener('DOMContentLoaded', function(){
+        const firstUnread = document.querySelector('.aviso-unread');
+        if(firstUnread){
+          setTimeout(() => firstUnread.scrollIntoView({behavior:'smooth', block:'start'}), 140);
+        }
+      });
+
+      // 2) Toast ao carregar se houver não lidos
+      document.addEventListener('DOMContentLoaded', function () {
+        if (UNREAD > 0) {
+          const el = document.getElementById('toastAvisos');
+          if (el && window.bootstrap?.Toast) {
+            const t = new bootstrap.Toast(el);
+            t.show();
+          }
+        }
+      });
+
+      // 3) Áudio de notificação (respeitando autoplay)
+      // Coloque seu arquivo em: static/sounds/notify.mp3
+      const audio = new Audio("{{ url_for('static', filename='sounds/notify.mp3') }}");
+      let soundReady = false;
+
+      function armAudioOnce() {
+        if (soundReady) return;
+        audio.play().then(() => {
+          audio.pause(); audio.currentTime = 0;
+          soundReady = true;
+          window.removeEventListener('click', armAudioOnce, true);
+          window.removeEventListener('keydown', armAudioOnce, true);
+          window.removeEventListener('touchstart', armAudioOnce, true);
+        }).catch(()=>{ /* aguardando interação */ });
+      }
+      window.addEventListener('click', armAudioOnce, true);
+      window.addEventListener('keydown', armAudioOnce, true);
+      window.addEventListener('touchstart', armAudioOnce, true);
+
+      // Toca quando o toast aparecer (se já liberado pelo usuário)
+      document.addEventListener('DOMContentLoaded', function () {
+        if (UNREAD > 0) {
+          const el = document.getElementById('toastAvisos');
+          if (el) {
+            el.addEventListener('shown.bs.toast', () => {
+              audio.play().catch(()=>{ /* sem interação ainda — tocará ao próximo gesto */ });
+            });
+          }
+        }
+      });
+
+      // 4) Utilitário: pega CSRF de meta (se existir)
       function getCSRFToken(){
         const m = document.querySelector('meta[name="csrf-token"]');
         return m ? m.getAttribute('content') : null;
       }
 
-      // Atualiza contadores/badges e UI do card
+      // 5) Atualiza UI ao marcar lido
       function atualizarUIComoLido(card){
         if(!card) return;
         card.classList.remove('aviso-unread');
 
-        // Estado de leitura (remove badge "não lido" e mostra "lido")
         const estado = card.querySelector('.estado-leitura');
         if(estado){
           estado.innerHTML = '<span class="text-success"><i class="bi bi-check2-circle"></i> lido</span>';
         }
 
-        // Remove botões "Marcar"
         card.querySelectorAll('.js-mark-read').forEach(btn => btn.remove());
 
-        // Atualiza contador superior de "não lidos"
         const badge = document.getElementById('badge-nao-lidos');
         if(badge){
-          // Extrai número atual (formato: "X não lido(s)")
           const n = parseInt((badge.textContent || '').replace(/\D+/g,'') || '0', 10);
           if(!isNaN(n) && n > 0){
             const novo = n - 1;
@@ -256,24 +319,19 @@
 
         try{
           const headers = { 'X-Requested-With': 'XMLHttpRequest' };
-          // Se você usa CSRF, descomente as 2 linhas abaixo
           // const csrf = getCSRFToken();
           // if(csrf) headers['X-CSRFToken'] = csrf;
 
           const resp = await fetch(url, { method:'POST', headers });
           if(resp.ok){
-            // Tenta ler JSON, mas se vier 204, segue mesmo assim
             let ok = true;
             try{
               const data = await resp.json();
               ok = (data && (data.ok === true || data.status === 'ok')) || resp.status === 204;
-            }catch(e){ /* ignore JSON parse, pode ser 204 */ }
+            }catch(e){ /* pode ser 204 */ }
 
-            if(ok){
-              atualizarUIComoLido(card);
-            } else {
-              console.warn('Resposta inesperada ao marcar como lido.');
-            }
+            if(ok){ atualizarUIComoLido(card); }
+            else { console.warn('Resposta inesperada ao marcar como lido.'); }
           }else{
             console.error('Falha no POST marcar_aviso_lido:', resp.status);
           }
@@ -282,17 +340,19 @@
         }
       }
 
-      // Liga os botões de marcar (topo e rodapé)
-      document.querySelectorAll('.js-mark-read').forEach(btn=>{
-        btn.addEventListener('click', function(e){
-          e.preventDefault();
-          e.stopPropagation(); // evita clicar no toggle do accordion
-          const url = this.getAttribute('data-url');
-          const card = this.closest('.aviso-card');
-          marcarComoLido(url, card);
-        }, { passive:false });
+      // 6) Liga os botões "Marcar"
+      document.addEventListener('DOMContentLoaded', function(){
+        document.querySelectorAll('.js-mark-read').forEach(btn=>{
+          btn.addEventListener('click', function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            const url = this.getAttribute('data-url');
+            const card = this.closest('.aviso-card');
+            marcarComoLido(url, card);
+          }, { passive:false });
+        });
       });
-    });
+    })();
   </script>
 </body>
 </html>
