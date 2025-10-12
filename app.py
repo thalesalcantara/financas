@@ -5169,6 +5169,103 @@ def admin_tabelas_normalize_arquivo_url():
     return jsonify({"ok": True, "alterados": alterados})
 
 # =========================
+# AVISOS — Ações (cooperado/restaurante) + API unread_count
+# =========================
+
+from datetime import datetime
+from flask import request, session, redirect, url_for, render_template, jsonify
+from sqlalchemy import or_
+
+# --- Helpers de contagem (usam as queries já definidas no app) ---
+
+def count_unread_for_coop(coop: Cooperado) -> int:
+    """
+    Conta quantos avisos aplicáveis ao cooperado ainda não foram marcados como lidos.
+    """
+    if not coop:
+        return 0
+    try:
+        avisos = get_avisos_for_cooperado(coop)
+    except NameError:
+        # Fallback: global + cooperado (broadcast)
+        avisos = (Aviso.query
+                  .filter(Aviso.ativo.is_(True))
+                  .filter(or_(Aviso.tipo == "global", Aviso.tipo == "cooperado"))
+                  .all())
+    if not avisos:
+        return 0
+    ids = [a.id for a in avisos]
+    lidos = {
+        r.aviso_id
+        for r in AvisoLeitura.query
+            .filter(AvisoLeitura.cooperado_id == coop.id,
+                    AvisoLeitura.aviso_id.in_(ids))
+            .all()
+    }
+    return sum(1 for aid in ids if aid not in lidos)
+
+
+def count_unread_for_rest(rest: Restaurante) -> int:
+    """
+    Conta quantos avisos aplicáveis ao restaurante ainda não foram marcados como lidos.
+    """
+    if not rest:
+        return 0
+    try:
+        avisos = get_avisos_for_restaurante(rest)
+    except NameError:
+        # Fallback: global + restaurante (associados ou broadcast)
+        avisos = (Aviso.query
+                  .filter(Aviso.ativo.is_(True))
+                  .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
+                  .all())
+    if not avisos:
+        return 0
+    ids = [a.id for a in avisos]
+    lidos = {
+        r.aviso_id
+        for r in AvisoLeitura.query
+            .filter(AvisoLeitura.restaurante_id == rest.id,
+                    AvisoLeitura.aviso_id.in_(ids))
+            .all()
+    }
+    return sum(1 for aid in ids if aid not in lidos)
+
+
+# --- API usada pelo front: /avisos/unread_count (resolve o 404) ---
+@app.get("/avisos/unread_count")
+def avisos_unread_count():
+    """
+    Retorna {"unread": <qtd>} para o usuário logado.
+    - Cooperado: conta avisos destinados a ele (ou broadcast p/ cooperados) ainda não lidos.
+    - Restaurante: conta avisos destinados a restaurantes (broadcast ou específicos) ainda não lidos.
+    - Admin/sem sessão: 0
+    """
+    try:
+        uid = session.get("user_id")
+        tipo = session.get("user_tipo")
+        if not uid or not tipo:
+            return jsonify({"unread": 0}), 200
+
+        if tipo == "cooperado":
+            coop = Cooperado.query.filter_by(usuario_id=uid).first()
+            n = count_unread_for_coop(coop) if coop else 0
+            return jsonify({"unread": int(n)}), 200
+
+        if tipo == "restaurante":
+            rest = Restaurante.query.filter_by(usuario_id=uid).first()
+            n = count_unread_for_rest(rest) if rest else 0
+            return jsonify({"unread": int(n)}), 200
+
+        # admin/outros perfis
+        return jsonify({"unread": 0}), 200
+
+    except Exception:
+        # Falhas silenciosas para não quebrar o front
+        return jsonify({"unread": 0}), 200
+
+
+# =========================
 # AVISOS — Ações (cooperado)
 # =========================
 
@@ -5195,6 +5292,7 @@ def marcar_aviso_lido(aviso_id: int):
     # volta para a lista; se quiser voltar ancorado: + f"#aviso-{aviso.id}"
     return redirect(url_for("portal_cooperado_avisos"))
 
+
 @app.post("/avisos/marcar-todos", endpoint="marcar_todos_avisos_lidos")
 @role_required("cooperado")
 def marcar_todos_avisos_lidos():
@@ -5202,7 +5300,13 @@ def marcar_todos_avisos_lidos():
     coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
 
     # todos avisos visíveis ao cooperado
-    avisos = get_avisos_for_cooperado(coop)
+    try:
+        avisos = get_avisos_for_cooperado(coop)
+    except NameError:
+        avisos = (Aviso.query
+                  .filter(Aviso.ativo.is_(True))
+                  .filter(or_(Aviso.tipo == "global", Aviso.tipo == "cooperado"))
+                  .all())
 
     # ids já lidos
     lidos_ids = {
@@ -5212,16 +5316,19 @@ def marcar_todos_avisos_lidos():
 
     # persiste só os que faltam
     now = datetime.utcnow()
-    for a in avisos:
-        if a.id not in lidos_ids:
-            db.session.add(AvisoLeitura(
-                cooperado_id=coop.id,
-                aviso_id=a.id,
-                lido_em=now,
-            ))
+    pendentes = [a for a in avisos if a.id not in lidos_ids]
+    if pendentes:
+        db.session.bulk_save_objects([
+            AvisoLeitura(cooperado_id=coop.id, aviso_id=a.id, lido_em=now) for a in pendentes
+        ])
+        db.session.commit()
 
-    db.session.commit()
     return redirect(url_for("portal_cooperado_avisos"))
+
+
+# =========================
+# AVISOS — Ações (restaurante)
+# =========================
 
 @app.get("/portal/restaurante/avisos")
 @role_required("restaurante")
@@ -5265,11 +5372,12 @@ def portal_restaurante_avisos():
 
     avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
     return render_template(
-        "portal_restaurante_avisos.html",   # crie/clone seu template
+        "portal_restaurante_avisos.html",
         avisos=avisos,
         avisos_nao_lidos_count=avisos_nao_lidos_count,
         current_year=datetime.now().year,
     )
+
 
 @app.post("/avisos-restaurante/marcar-todos", endpoint="marcar_todos_avisos_lidos_restaurante")
 @role_required("restaurante")
@@ -5291,13 +5399,15 @@ def marcar_todos_avisos_lidos_restaurante():
     }
 
     now = datetime.utcnow()
-    for a in avisos:
-        if a.id not in lidos_ids:
-            db.session.add(AvisoLeitura(
-                restaurante_id=rest.id, aviso_id=a.id, lido_em=now
-            ))
-    db.session.commit()
+    pendentes = [a for a in avisos if a.id not in lidos_ids]
+    if pendentes:
+        db.session.bulk_save_objects([
+            AvisoLeitura(restaurante_id=rest.id, aviso_id=a.id, lido_em=now) for a in pendentes
+        ])
+        db.session.commit()
+
     return redirect(url_for("portal_restaurante_avisos"))
+
 
 # =========================
 # Main
@@ -5306,5 +5416,6 @@ if __name__ == "__main__":
     with app.app_context():
         init_db()
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
 
 
