@@ -14,7 +14,7 @@
 
   <style>
     :root{
-      --royal:#2747d9; --royal-2:#3b61e3; --bg:#f7f9fc; --ink:#111827;
+      --royal:#2747d9; --royal-2:#3b61e3; --bg:#f7f9fc; --ink:#0f172a;
       --soft:#eef2ff; --ok:#10b981; --warn:#c0392b; --muted:#6b7280;
       --card:#ffffff; --ring:#e5e7eb;
     }
@@ -24,12 +24,12 @@
     /* Topbar */
     .topbar{
       background:linear-gradient(90deg,var(--royal),var(--royal-2));
-      color:#fff; position:sticky; top:0; z-index:20; box-shadow:0 2px 12px #0002;
+      color:#fff; position:sticky; top:0; z-index:20; box-shadow:0 2px 16px #0003;
     }
     .brand{font-family:'Orbitron',sans-serif; letter-spacing:1px; font-size:1.05rem;}
 
-    /* Layout mobile 6" */
-    .mobile-wrap{max-width:420px; margin:0 auto;} /* ~6" */
+    /* Layout mobile ~6" */
+    .mobile-wrap{max-width:420px; margin:0 auto;}
     @media (min-width:480px){ .mobile-wrap{max-width:520px;} }
 
     /* Botões */
@@ -38,9 +38,9 @@
     .btn-outline-success{border-radius:12px;}
 
     /* Cartões/Avisos */
-    .card{border:0; border-radius:18px; box-shadow:0 8px 22px #00000010;}
+    .card{border:0; border-radius:18px; box-shadow:0 10px 26px #00000010;}
     .aviso-card{overflow:hidden; border:1px solid var(--ring); background:var(--card);}
-    .aviso-unread{border-color:#ffd2d2; box-shadow:0 8px 24px #ff000010;}
+    .aviso-unread{border-color:#ffd2d2; box-shadow:0 10px 30px #ff000014;}
     .aviso-head{
       background:var(--card); border-bottom:1px solid var(--soft);
       display:flex; align-items:center; gap:.6rem; justify-content:space-between; padding:12px 14px;
@@ -63,14 +63,11 @@
     /* Acessibilidade/touch */
     .tap-lg{min-height:44px; min-width:44px;}
 
-    /* Accordion botão custom */
-    .accordion-button-custom{
-      background:transparent; border:0; padding:0; display:flex; align-items:center; gap:.5rem; color:inherit;
+    /* Rodapé fixo opcional (botão “Marcar todos”) em telas pequenas */
+    .sticky-footer{
+      position:sticky; bottom:0; z-index:15; background:linear-gradient(0deg,#fff, #fff0);
+      padding:10px 12px 16px; backdrop-filter: blur(4px);
     }
-    .accordion-button-custom:focus{outline:2px solid transparent; box-shadow:none;}
-
-    /* Toast: canto inferior */
-    .toast-container{position:fixed; bottom:12px; right:12px; z-index:1080;}
   </style>
 </head>
 <body>
@@ -88,10 +85,10 @@
     </div>
   </header>
 
-  <main class="mobile-wrap p-3">
+  <main class="mobile-wrap p-2 p-sm-3">
 
     <!-- Barra superior -->
-    <div class="d-flex align-items-center justify-content-between mb-2">
+    <div class="d-flex align-items-center justify-content-between mt-1 mb-2">
       <div class="d-flex align-items-center gap-2">
         {% set unread = (avisos_nao_lidos_count or avisos_unread_count) | default(0) %}
         {% if unread > 0 %}
@@ -102,7 +99,7 @@
       </div>
 
       {% if unread > 0 %}
-      <form method="POST" action="{{ url_for('marcar_todos_avisos_lidos') }}">
+      <form class="d-none d-sm-block" method="POST" action="{{ url_for('marcar_todos_avisos_lidos') }}">
         <button type="submit" class="btn btn-sm btn-royal tap-lg">
           <i class="bi bi-check2-all"></i> Marcar todos
         </button>
@@ -123,7 +120,8 @@
                       data-bs-toggle="collapse"
                       data-bs-target="#{{ cid }}"
                       aria-expanded="{{ 'true' if not a.lido else 'false' }}"
-                      aria-controls="{{ cid }}">
+                      aria-controls="{{ cid }}"
+                      style="background:transparent;border:0;display:flex;align-items:center;gap:.5rem;color:inherit">
                 <div class="aviso-title">
                   <i class="bi bi-megaphone-fill"></i>
                   <span>
@@ -153,7 +151,7 @@
                 class="btn btn-sm btn-outline-success js-mark-read tap-lg"
                 data-url="{{ url_for('marcar_aviso_lido', aviso_id=a.id) }}"
                 aria-label="Marcar aviso como lido">
-                <i class="bi bi-check2"></i> Marcar
+                <i class="bi bi-check2"></i>
               </button>
             {% endif %}
           </div>
@@ -197,27 +195,21 @@
       </div>
     {% endif %}
 
+    <!-- Rodapé mobile (botão “Marcar todos”) -->
+    {% if unread > 0 %}
+    <div class="sticky-footer d-sm-none">
+      <form method="POST" action="{{ url_for('marcar_todos_avisos_lidos') }}" class="d-grid">
+        <button type="submit" class="btn btn-royal btn-lg">
+          <i class="bi bi-check2-all"></i> Marcar todos como lidos
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
     <div class="text-center mt-3 mb-2">
       <small class="text-muted">© {{ current_year|default('') }} Coopex</small>
     </div>
   </main>
-
-  <!-- TOAST: novos avisos -->
-  <div class="toast-container">
-    <div id="toastAvisos" class="toast align-items-center border-0" role="alert" aria-live="assertive" aria-atomic="true"
-         data-bs-autohide="true" data-bs-delay="8000">
-      <div class="toast-header">
-        <i class="bi bi-megaphone-fill me-2"></i>
-        <strong class="me-auto">Novos avisos</strong>
-        <small>agora</small>
-        <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
-      </div>
-      <div class="toast-body">
-        Você tem {{ unread|default(0) }} aviso(s) não lido(s).
-        <a href="#topo" class="link-primary fw-semibold">Ver agora</a>
-      </div>
-    </div>
-  </div>
 
   <!-- Bootstrap bundle (JS) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -225,66 +217,29 @@
   <!-- Lógica da página -->
   <script>
     (function(){
-      // Unifica e blinda o valor de 'unread'
+      // Valor consolidado de não lidos
       const UNREAD = parseInt('{{ unread|default(0) }}', 10) || 0;
 
-      // 1) Scroll para o primeiro não lido
+      // 0) NÃO mostramos toast/som nesta página
+      const SHOW_TOAST_HERE = false;
+      const PLAY_SOUND_HERE = false;
+      void SHOW_TOAST_HERE; void PLAY_SOUND_HERE;
+
+      // 1) Scroll suave para o primeiro não lido
       document.addEventListener('DOMContentLoaded', function(){
         const firstUnread = document.querySelector('.aviso-unread');
         if(firstUnread){
-          setTimeout(() => firstUnread.scrollIntoView({behavior:'smooth', block:'start'}), 140);
+          setTimeout(() => firstUnread.scrollIntoView({behavior:'smooth', block:'start'}), 120);
         }
       });
 
-      // 2) Toast ao carregar se houver não lidos
-      document.addEventListener('DOMContentLoaded', function () {
-        if (UNREAD > 0) {
-          const el = document.getElementById('toastAvisos');
-          if (el && window.bootstrap?.Toast) {
-            const t = new bootstrap.Toast(el);
-            t.show();
-          }
-        }
-      });
-
-      // 3) Áudio de notificação (respeitando autoplay)
-      // Coloque seu arquivo em: static/sounds/notify.mp3
-      const audio = new Audio("{{ url_for('static', filename='sounds/notify.mp3') }}");
-      let soundReady = false;
-
-      function armAudioOnce() {
-        if (soundReady) return;
-        audio.play().then(() => {
-          audio.pause(); audio.currentTime = 0;
-          soundReady = true;
-          window.removeEventListener('click', armAudioOnce, true);
-          window.removeEventListener('keydown', armAudioOnce, true);
-          window.removeEventListener('touchstart', armAudioOnce, true);
-        }).catch(()=>{ /* aguardando interação */ });
-      }
-      window.addEventListener('click', armAudioOnce, true);
-      window.addEventListener('keydown', armAudioOnce, true);
-      window.addEventListener('touchstart', armAudioOnce, true);
-
-      // Toca quando o toast aparecer (se já liberado pelo usuário)
-      document.addEventListener('DOMContentLoaded', function () {
-        if (UNREAD > 0) {
-          const el = document.getElementById('toastAvisos');
-          if (el) {
-            el.addEventListener('shown.bs.toast', () => {
-              audio.play().catch(()=>{ /* sem interação ainda — tocará ao próximo gesto */ });
-            });
-          }
-        }
-      });
-
-      // 4) Utilitário: pega CSRF de meta (se existir)
+      // 2) Utilitário: pega CSRF de meta (se existir)
       function getCSRFToken(){
         const m = document.querySelector('meta[name="csrf-token"]');
         return m ? m.getAttribute('content') : null;
       }
 
-      // 5) Atualiza UI ao marcar lido
+      // 3) Atualiza cartão/badges quando vira "lido"
       function atualizarUIComoLido(card){
         if(!card) return;
         card.classList.remove('aviso-unread');
@@ -293,9 +248,9 @@
         if(estado){
           estado.innerHTML = '<span class="text-success"><i class="bi bi-check2-circle"></i> lido</span>';
         }
-
         card.querySelectorAll('.js-mark-read').forEach(btn => btn.remove());
 
+        // Badge do topo
         const badge = document.getElementById('badge-nao-lidos');
         if(badge){
           const n = parseInt((badge.textContent || '').replace(/\D+/g,'') || '0', 10);
@@ -316,11 +271,10 @@
 
       async function marcarComoLido(url, card){
         if(!url || !card) return;
-
         try{
           const headers = { 'X-Requested-With': 'XMLHttpRequest' };
-          // const csrf = getCSRFToken();
-          // if(csrf) headers['X-CSRFToken'] = csrf;
+          const csrf = getCSRFToken();
+          if(csrf) headers['X-CSRFToken'] = csrf;
 
           const resp = await fetch(url, { method:'POST', headers });
           if(resp.ok){
@@ -330,7 +284,7 @@
               ok = (data && (data.ok === true || data.status === 'ok')) || resp.status === 204;
             }catch(e){ /* pode ser 204 */ }
 
-            if(ok){ atualizarUIComoLido(card); }
+            if(ok){ atualizarUIComoLido(card); recalcUnreadAndNotify(); }
             else { console.warn('Resposta inesperada ao marcar como lido.'); }
           }else{
             console.error('Falha no POST marcar_aviso_lido:', resp.status);
@@ -340,7 +294,7 @@
         }
       }
 
-      // 6) Liga os botões "Marcar"
+      // 4) Liga os botões "Marcar"
       document.addEventListener('DOMContentLoaded', function(){
         document.querySelectorAll('.js-mark-read').forEach(btn=>{
           btn.addEventListener('click', function(e){
@@ -352,30 +306,15 @@
           }, { passive:false });
         });
       });
-    })();
-  </script>
 
-  <!-- EMISSOR: envia total de não lidos para o dashboard via BroadcastChannel -->
-  <script>
-    (function () {
-      // Canal compartilhado com o dashboard
+      // 5) Broadcast: enviar não lidos para o dashboard
       const ch = new BroadcastChannel('coopex_avisos');
 
-      // Valor inicial vindo do servidor
-      const UNREAD = parseInt('{{ unread|default(0) }}', 10) || 0;
-
-      // Envia para ouvintes (dashboard e afins)
       function notifyUnread(n) {
         try { ch.postMessage({ source: 'avisos', unread: Number(n) || 0 }); } catch (_) {}
         try { if (window.opener?.coopAvisosNotify) window.opener.coopAvisosNotify(Number(n) || 0); } catch (_) {}
       }
 
-      // Notifica na carga
-      document.addEventListener('DOMContentLoaded', function () {
-        notifyUnread(UNREAD);
-      });
-
-      // Recalcula não lidos a partir do badge ou dos cards
       function recalcUnreadAndNotify() {
         const badge = document.getElementById('badge-nao-lidos');
         let n;
@@ -388,25 +327,9 @@
         notifyUnread(n);
       }
 
-      // Observa cliques nos botões "Marcar" para reagir quando virar "lido"
-      document.addEventListener('click', function (ev) {
-        const btn = ev.target.closest('.js-mark-read');
-        if (!btn) return;
-        const card = btn.closest('.aviso-card');
-        if (!card) return;
-
-        // Quando a classe .aviso-unread sumir, dispara atualização
-        const obs = new MutationObserver(() => {
-          if (!card.classList.contains('aviso-unread')) {
-            obs.disconnect();
-            recalcUnreadAndNotify();
-          }
-        });
-        obs.observe(card, { attributes: true, attributeFilter: ['class'] });
-      }, { passive: true });
-
-      // Opcional: quando o toast local abrir (há não lidos), também notifica
-      document.getElementById('toastAvisos')?.addEventListener('shown.bs.toast', recalcUnreadAndNotify);
+      document.addEventListener('DOMContentLoaded', function () {
+        notifyUnread(UNREAD);
+      });
     })();
   </script>
 </body>
