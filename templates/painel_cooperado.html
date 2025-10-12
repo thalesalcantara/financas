@@ -1498,7 +1498,7 @@
   <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
     <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
          data-bs-autohide="true" data-bs-delay="8000"
-         data-unread-endpoint="{{ url_for('avisos_unread_count') if 'avisos_unread_count' in globals() or 'avisos_unread_count' in locals() else '/avisos/unread_count' }}">
+         data-unread-endpoint="{{ safe_url_for('avisos_unread_count') or '/avisos/unread_count' }}"
       <div class="toast-header">
         <i class="bi bi-megaphone-fill me-2"></i>
         <strong class="me-auto">Novos avisos</strong>
