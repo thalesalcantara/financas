@@ -354,5 +354,60 @@
       });
     })();
   </script>
+
+  <!-- EMISSOR: envia total de não lidos para o dashboard via BroadcastChannel -->
+  <script>
+    (function () {
+      // Canal compartilhado com o dashboard
+      const ch = new BroadcastChannel('coopex_avisos');
+
+      // Valor inicial vindo do servidor
+      const UNREAD = parseInt('{{ unread|default(0) }}', 10) || 0;
+
+      // Envia para ouvintes (dashboard e afins)
+      function notifyUnread(n) {
+        try { ch.postMessage({ source: 'avisos', unread: Number(n) || 0 }); } catch (_) {}
+        try { if (window.opener?.coopAvisosNotify) window.opener.coopAvisosNotify(Number(n) || 0); } catch (_) {}
+      }
+
+      // Notifica na carga
+      document.addEventListener('DOMContentLoaded', function () {
+        notifyUnread(UNREAD);
+      });
+
+      // Recalcula não lidos a partir do badge ou dos cards
+      function recalcUnreadAndNotify() {
+        const badge = document.getElementById('badge-nao-lidos');
+        let n;
+        if (badge) {
+          const m = (badge.textContent || '').match(/\d+/);
+          n = m ? parseInt(m[0], 10) : 0;
+        } else {
+          n = document.querySelectorAll('.aviso-card.aviso-unread').length;
+        }
+        notifyUnread(n);
+      }
+
+      // Observa cliques nos botões "Marcar" para reagir quando virar "lido"
+      document.addEventListener('click', function (ev) {
+        const btn = ev.target.closest('.js-mark-read');
+        if (!btn) return;
+        const card = btn.closest('.aviso-card');
+        if (!card) return;
+
+        // Quando a classe .aviso-unread sumir, dispara atualização
+        const obs = new MutationObserver(() => {
+          if (!card.classList.contains('aviso-unread')) {
+            obs.disconnect();
+            recalcUnreadAndNotify();
+          }
+        });
+        obs.observe(card, { attributes: true, attributeFilter: ['class'] });
+      }, { passive: true });
+
+      // Opcional: quando o toast local abrir (há não lidos), também notifica
+      document.getElementById('toastAvisos')?.addEventListener('shown.bs.toast', recalcUnreadAndNotify);
+    })();
+  </script>
 </body>
 </html>
