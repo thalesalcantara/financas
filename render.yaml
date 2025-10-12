@@ -17,6 +17,6 @@ services:
       - key: PYTHONUTF8
         value: "1"
       - key: SECRET_KEY
-        sync: false             # defina no painel do Render
+        sync: false
       - key: DATABASE_URL
-        sync: false             # defina no painel do Render
+        sync: false
