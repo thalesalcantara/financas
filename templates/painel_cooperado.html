@@ -1465,90 +1465,108 @@
     </div>
   </div>
 
-  <!-- Bootstrap bundle (PRECISA existir em todas as páginas) -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+  <!-- 1) Bootstrap bundle disponível em TODAS as páginas -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- 2) TOAST + ÁUDIO (independente da página) -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:1080;">
+  <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
+       data-bs-autohide="true" data-bs-delay="8000"
+       data-unread-endpoint="/avisos/unread_count">
+    <div class="toast-header">
+      <i class="bi bi-megaphone-fill me-2"></i>
+      <strong class="me-auto">Novos avisos</strong>
+      <small class="toast-time">agora</small>
+      <button class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
+    </div>
+    <div class="toast-body">
+      Você tem <span class="toast-count">0</span> aviso(s) não lido(s).
+      <a href="/portal/avisos" class="link-primary fw-semibold">Ver agora</a>
+    </div>
+  </div>
+</div>
+
+<audio id="avisoSound" preload="auto">
+  <source src="/static/sounds/notify.mp3" type="audio/mpeg">
+</audio>
 
 <script>
-(function () {
-  // ====== Config ======
-  const UNREAD_ENDPOINT = "/avisos/unread_count";
-  const AUDIO_SRC = "{{ url_for('static', filename='sounds/notify.mp3') if url_for else '/static/sounds/notify.mp3' }}";
-  // Se tiver o id do usuário disponível, exponha em um meta/global. Se não, usamos 0.
+(function() {
+  // ====== ELEMENTOS ======
+  const toastEl = document.getElementById('toastAvisos');
+  const toastBody = toastEl?.querySelector('.toast-body');
+  const toastCountEl = toastEl?.querySelector('.toast-count');
+  const toastTimeEl = toastEl?.querySelector('.toast-time');
+  const endpoint = toastEl?.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
+  const audio = document.getElementById('avisoSound');
+
+  // Id de usuário (se existir em alguma global, senão 0)
   const UID = Number(window.COOP_UID || 0);
   const LS_KEY = `COOPEX_AVISOS_LAST_${UID}`;
 
-  // ====== Cria TOAST e AUDIO se não existirem ======
-  function ensureToastAndAudio() {
-    // Toast
-    let toastEl = document.getElementById("toastAvisos");
-    if (!toastEl) {
-      const wrap = document.createElement("div");
-      wrap.className = "position-fixed bottom-0 end-0 p-3";
-      wrap.style.zIndex = "1080";
-      wrap.innerHTML = `
-        <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
-             data-bs-autohide="true" data-bs-delay="8000">
-          <div class="toast-header">
-            <i class="bi bi-megaphone-fill me-2"></i>
-            <strong class="me-auto">Novos avisos</strong>
-            <small class="toast-time">agora</small>
-            <button class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
-          </div>
-          <div class="toast-body">
-            Você tem <span class="toast-count">0</span> aviso(s) não lido(s).
-            <a href="/portal/avisos" class="link-primary fw-semibold">Ver agora</a>
-          </div>
-        </div>`;
-      document.body.appendChild(wrap);
-    }
-
-    // Áudio
-    if (!document.getElementById("avisoSound")) {
-      const audio = document.createElement("audio");
-      audio.id = "avisoSound";
-      audio.preload = "auto";
-      audio.innerHTML = `<source src="${AUDIO_SRC}" type="audio/mpeg">`;
-      document.body.appendChild(audio);
-    }
+  // ====== GARANTE BOOTSTRAP ======
+  function waitForBootstrap(cb) {
+    if (window.bootstrap && window.bootstrap.Toast) return cb();
+    // tenta algumas vezes até o bundle ficar disponível
+    let tries = 0;
+    const t = setInterval(() => {
+      if (window.bootstrap && window.bootstrap.Toast) {
+        clearInterval(t);
+        cb();
+      } else if (++tries > 20) {
+        clearInterval(t);
+      }
+    }, 100);
   }
 
-  function getEls() {
-    const toastEl = document.getElementById("toastAvisos");
-    return {
-      toastEl,
-      toastCountEl: toastEl?.querySelector(".toast-count"),
-      toastTimeEl: toastEl?.querySelector(".toast-time"),
-      audio: document.getElementById("avisoSound"),
-    };
-  }
-
+  // ====== TOAST ======
   function showToast(count) {
-    const { toastEl, toastCountEl, toastTimeEl } = getEls();
-    if (!window.bootstrap?.Toast || !toastEl) return;
+    if (!(window.bootstrap?.Toast) || !toastEl) return;
     if (toastCountEl) toastCountEl.textContent = String(count);
-    if (toastTimeEl) toastTimeEl.textContent = "agora";
+    if (toastTimeEl) toastTimeEl.textContent = 'agora';
     new bootstrap.Toast(toastEl).show();
   }
 
+  // ====== ÁUDIO: desbloqueio por interação ======
+  let audioUnlocked = false;
+  function unlockAudioOnce() {
+    if (audioUnlocked || !audio) return;
+    audioUnlocked = true;
+    // Toca mudo rapidinho para “esquentar” o player (padrão seguro de autoplay)
+    const prevMuted = audio.muted;
+    audio.muted = true;
+    audio.play().then(() => {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.muted = prevMuted;
+    }).catch(() => {
+      // se falhar, ignoramos; o próximo play após interação deve passar
+    });
+  }
+  ['click','keydown','touchstart'].forEach(evt => {
+    document.addEventListener(evt, unlockAudioOnce, { once: true, passive: true });
+  });
+
   async function playAvisoSound() {
-    const { audio } = getEls();
     if (!audio) return;
     try {
       await audio.play();
     } catch {
+      // se por algum motivo ainda bloquear, tenta de novo após próxima interação
       const enable = async () => { try { await audio.play(); } catch {} };
-      document.addEventListener("click", enable, { once: true });
-      document.addEventListener("keydown", enable, { once: true });
-      document.addEventListener("touchstart", enable, { once: true });
+      document.addEventListener('click', enable, { once:true });
+      document.addEventListener('keydown', enable, { once:true });
+      document.addEventListener('touchstart', enable, { once:true });
     }
   }
 
+  // ====== FETCH ======
   async function fetchUnread() {
     try {
-      const resp = await fetch(UNREAD_ENDPOINT, {
-        headers: { "Accept": "application/json" },
-        cache: "no-store",
-        credentials: "same-origin",
+      const resp = await fetch(endpoint, {
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store',
+        credentials: 'same-origin',
       });
       if (!resp.ok) return 0;
       const data = await resp.json();
@@ -1558,13 +1576,13 @@
     }
   }
 
+  // ====== LÓGICA ======
   async function checkUnreadAndNotify() {
     const count = await fetchUnread();
     const current = Number(localStorage.getItem(LS_KEY) || 0);
+
     if (Number.isFinite(count) && count > current) {
-      // Atualiza o texto de cabeça do toast sem quebrar o link
-      const { toastEl } = getEls();
-      const toastBody = toastEl?.querySelector(".toast-body");
+      // Atualiza o texto sem quebrar o link
       if (toastBody && toastBody.firstChild && toastBody.firstChild.nodeType === Node.TEXT_NODE) {
         toastBody.firstChild.nodeValue = `Você tem ${count} aviso(s) não lido(s). `;
       }
@@ -1574,24 +1592,21 @@
     }
   }
 
-  // ====== Boot ======
-  document.addEventListener("DOMContentLoaded", async () => {
-    ensureToastAndAudio();
-
-    // 1) Checa imediatamente ao carregar (faz espelho sem precisar abrir /portal/avisos)
-    await checkUnreadAndNotify();
+  function boot() {
+    // 1) Checa IMEDIATAMENTE ao carregar a HOME
+    checkUnreadAndNotify();
 
     // 2) Polling a cada 20s
     setInterval(checkUnreadAndNotify, 20000);
 
     // 3) Ao voltar a aba
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") checkUnreadAndNotify();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') checkUnreadAndNotify();
     });
 
-    // 4) Integração via BroadcastChannel (quando a página de avisos emitir)
+    // 4) BroadcastChannel vindo de /portal/avisos
     try {
-      const ch = new BroadcastChannel("coopex_avisos");
+      const ch = new BroadcastChannel('coopex_avisos');
       ch.onmessage = (ev) => {
         const count = Number(ev.data?.unread || 0);
         const current = Number(localStorage.getItem(LS_KEY) || 0);
@@ -1601,8 +1616,8 @@
           localStorage.setItem(LS_KEY, String(count));
         }
       };
-      // opcional: função global pra outra aba chamar
-      window.coopAvisosNotify = function (count) {
+      // função global opcional
+      window.coopAvisosNotify = function(count) {
         const n = Number(count || 0);
         const current = Number(localStorage.getItem(LS_KEY) || 0);
         if (Number.isFinite(n) && n > current) {
@@ -1612,6 +1627,11 @@
         }
       };
     } catch {}
+  }
+
+  // Inicia só quando o Bootstrap estiver pronto
+  document.addEventListener('DOMContentLoaded', () => {
+    waitForBootstrap(boot);
   });
 })();
 </script>
