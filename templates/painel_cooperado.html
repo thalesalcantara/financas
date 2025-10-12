@@ -1511,32 +1511,32 @@
 
 <!-- MENU lateral -->
 <script>
-  (function(){
-    const menuLateral = document.getElementById('menuLateral');
-    const fundoMenu   = document.getElementById('fundoMenu');
-    const abrir       = document.getElementById('abrirMenu');
-    const fechar      = document.getElementById('fecharMenu');
+document.addEventListener('DOMContentLoaded', function () {
+  const menuLateral = document.getElementById('menuLateral');
+  const fundoMenu   = document.getElementById('fundoMenu');
+  const abrir       = document.getElementById('abrirMenu');
+  const fechar      = document.getElementById('fecharMenu');
 
-    abrir?.addEventListener('click', () => {
-      menuLateral?.classList.add('aberto');
-      fundoMenu?.classList.add('aberto');
-    });
-    fechar?.addEventListener('click', () => {
-      menuLateral?.classList.remove('aberto');
-      fundoMenu?.classList.remove('aberto');
-    });
-    fundoMenu?.addEventListener('click', () => {
-      menuLateral?.classList.remove('aberto');
-      fundoMenu?.classList.remove('aberto');
-    });
-  })();
+  abrir?.addEventListener('click', () => {
+    menuLateral?.classList.add('aberto');
+    fundoMenu?.classList.add('aberto');
+  });
+  fechar?.addEventListener('click', () => {
+    menuLateral?.classList.remove('aberto');
+    fundoMenu?.classList.remove('aberto');
+  });
+  fundoMenu?.addEventListener('click', () => {
+    menuLateral?.classList.remove('aberto');
+    fundoMenu?.classList.remove('aberto');
+  });
+});
 </script>
 
-<!-- TOAST avisos + SOM ao chegar (CORRIGIDO: sem <script> aninhado) -->
+<!-- TOAST avisos + SOM ao chegar -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const toastEl = document.getElementById('toastAvisos');
-  if (!toastEl) return; // 🔒 não deixa quebrar o resto do site
+  if (!toastEl) return;
 
   const toastCountEl = toastEl.querySelector('.toast-count');
   const toastTimeEl  = toastEl.querySelector('.toast-time');
@@ -1566,24 +1566,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
-  // Mostra também para não lidos antigos (a cada 5min)
-  (function boot() {
-    const lastCount = Number(localStorage.getItem(LS_KEY)) || 0;
-    const lastTs    = Number(localStorage.getItem(LS_TS)) || 0;
-    const FORCE     = new URLSearchParams(location.search).get('show_toast') === '1';
-    const STALE_MS  = 5 * 60 * 1000;
-
-    const shouldShow = unreadInitial > 0 && (
-      FORCE || lastCount === 0 || unreadInitial !== lastCount || (Date.now() - lastTs) > STALE_MS
-    );
-    if (shouldShow) {
-      showToast(unreadInitial);
-      playSound();
-      localStorage.setItem(LS_KEY, String(unreadInitial));
-      localStorage.setItem(LS_TS, String(Date.now()));
-    }
-  })();
-
   async function checkUnread(){
     try {
       const resp = await fetch(endpoint, { headers:{'Accept':'application/json'}, cache:'no-store', credentials:'same-origin' });
@@ -1600,11 +1582,32 @@ document.addEventListener('DOMContentLoaded', function () {
     } catch {}
   }
 
+  // Boot: mostra se já veio algo do servidor e checa imediatamente o endpoint
+  (function boot() {
+    const lastCount = Number(localStorage.getItem(LS_KEY)) || 0;
+    const lastTs    = Number(localStorage.getItem(LS_TS)) || 0;
+    const FORCE     = new URLSearchParams(location.search).get('show_toast') === '1';
+    const STALE_MS  = 5 * 60 * 1000;
+
+    const shouldShow = unreadInitial > 0 && (
+      FORCE || lastCount === 0 || unreadInitial !== lastCount || (Date.now() - lastTs) > STALE_MS
+    );
+    if (shouldShow) {
+      showToast(unreadInitial);
+      playSound();
+      localStorage.setItem(LS_KEY, String(unreadInitial));
+      localStorage.setItem(LS_TS, String(Date.now()));
+    }
+    checkUnread(); // checagem imediata
+  })();
+
+  // Polling + volta ao foco
   setInterval(checkUnread, 20000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') checkUnread();
   });
 
+  // Broadcast opcional
   try {
     const ch = new BroadcastChannel('coopex_avisos');
     ch.onmessage = (ev) => {
@@ -1630,34 +1633,6 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
   
-  <!-- JS: Avaliação (legado simples) -->
-  <script>
-    document.querySelectorAll('.avaliar-form').forEach(form => {
-      if (form.querySelector('.stars-group')) return;
-      const stars = Array.from(form.querySelectorAll('.star-btn'));
-      const input = form.querySelector('input[name="nota"]');
-      const submit = form.querySelector('button[type="submit"]');
-      stars.forEach(btn => {
-        btn.addEventListener('click', () => {
-          const val = Number(btn.dataset.value);
-          input.value = val;
-          submit.disabled = false;
-          stars.forEach(b => {
-            const i = Number(b.dataset.value);
-            const icon = b.querySelector('i');
-            icon.className = 'bi ' + (i <= val ? 'bi-star-fill' : 'bi-star');
-          });
-        });
-      });
-      form.addEventListener('submit', (e) => {
-        if (!input.value) {
-          e.preventDefault();
-          alert('Selecione uma nota de 1 a 5.');
-        }
-      });
-    });
-  </script>
-
   <!-- JS: Avaliação (4 categorias) -->
   <script>
     document.querySelectorAll('.avaliar-form').forEach(form => {
