@@ -441,7 +441,7 @@
                 <div class="cooperado-item" data-id="{{ coop.id }}" data-nome="{{ coop.nome }}"
                      data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
                      data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}">
-                  <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}" class="cooperado-avatar" alt="">
+                  <img src="{{ url_for('media_coop', coop_id=coop.id) if coop.foto_bytes else url_for('static', filename='img/default.png') }}" class="cooperado-avatar" alt="Foto do cooperado">
                   <div class="d-flex flex-column">
                     <span class="fw-bold">{{ coop.nome }}</span>
                     <small class="text-muted">No período: R$ {{ '%.2f'|format(coop.total_periodo or 0) }}</small>
