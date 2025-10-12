@@ -1109,6 +1109,25 @@ def _cooperado_atual() -> Cooperado | None:
     # --- Blueprint Portal (topo do arquivo, depois de criar `app`) ---
 portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
 
+# --- Helpers de avisos para o cooperado ---
+def count_unread_for_coop(coop: Cooperado) -> int:
+    """
+    Conta quantos avisos aplicáveis ao cooperado ainda não foram marcados como lidos.
+    """
+    avisos = get_avisos_for_cooperado(coop)
+    if not avisos:
+        return 0
+    ids = [a.id for a in avisos]
+    lidos = {
+        r.aviso_id
+        for r in AvisoLeitura.query
+            .filter(AvisoLeitura.cooperado_id == coop.id,
+                    AvisoLeitura.aviso_id.in_(ids))
+            .all()
+    }
+    return sum(1 for aid in ids if aid not in lidos)
+
+
 @portal_bp.get("/avisos", endpoint="portal_cooperado_avisos")
 @role_required("cooperado")
 def avisos_list():
@@ -1116,27 +1135,31 @@ def avisos_list():
     if not coop:
         abort(403)
 
-    # pega todos os avisos que se aplicam ao cooperado (seu helper)
+    # Avisos aplicáveis ao cooperado
     avisos = get_avisos_for_cooperado(coop)
 
-    # busca leituras de uma vez (evita N+1)
+    # Leituras (evita N+1)
     lidos_ids = {
         r.aviso_id
         for r in AvisoLeitura.query.filter_by(cooperado_id=coop.id).all()
     }
 
-    # injeta flag lido para o template (sem tocar no banco)
+    # Flag lido para o template (sem tocar no banco)
     for a in avisos:
         a.lido = (a.id in lidos_ids)
 
     avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
     current_year = datetime.now().year
 
+    # >>> Contador geral de não lidos para o TOAST/SOM no layout
+    unread = count_unread_for_coop(coop)
+
     return render_template(
         "portal_cooperado_avisos.html",
         avisos=avisos,
         avisos_nao_lidos_count=avisos_nao_lidos_count,
-        current_year=current_year
+        current_year=current_year,
+        unread=unread,  # <- use no layout para disparar o toast
     )
 
 # === AVALIAÇÕES: Cooperado -> Restaurante (NOVO) =============================
@@ -4518,6 +4541,40 @@ def recusar_troca(troca_id):
 # =========================
 # PORTAL RESTAURANTE
 # =========================
+
+# --- Helpers de Avisos (restaurante) ---------------------------------------
+def _fetch_avisos_for_restaurante(rest):
+    """
+    Busca os avisos que se aplicam ao restaurante.
+    Se já existir um helper no projeto (ex.: get_avisos_for_restaurante),
+    usamos ele; caso contrário, caímos no fallback (todos, mais recentes primeiro).
+    """
+    try:
+        # usa helper do projeto se existir
+        return get_avisos_for_restaurante(rest)  # type: ignore[name-defined]
+    except NameError:
+        # fallback simples (ajuste se tiver segmentação por destino/categoria)
+        return Aviso.query.order_by(Aviso.enviado_em.desc()).all()
+
+def _count_unread_for_restaurante(rest) -> int:
+    """
+    Conta quantos avisos ainda não foram marcados como lidos pelo restaurante.
+    Considera só avisos que efetivamente se aplicam ao restaurante.
+    """
+    avisos = _fetch_avisos_for_restaurante(rest)
+    if not avisos:
+        return 0
+    ids = [a.id for a in avisos]
+    lidos = {
+        r.aviso_id
+        for r in AvisoLeitura.query
+            .filter(AvisoLeitura.restaurante_id == rest.id,
+                    AvisoLeitura.aviso_id.in_(ids))
+            .all()
+    }
+    return sum(1 for aid in ids if aid not in lidos)
+
+
 @app.route("/portal/restaurante")
 @role_required("restaurante")
 def portal_restaurante():
@@ -4702,6 +4759,20 @@ def portal_restaurante():
         total_lanc_valor = sum(x["valor"] for x in lancamentos_periodo)
         total_lanc_entregas = sum(x["qtd_entregas"] for x in lancamentos_periodo)
 
+    # -------------------- Avisos (aba "avisos") --------------------
+    avisos = []
+    avisos_nao_lidos_count = 0
+    current_year = datetime.now().year
+    if view == "avisos":
+        avisos = _fetch_avisos_for_restaurante(rest)
+        lidos_ids = {
+            r.aviso_id
+            for r in AvisoLeitura.query.filter_by(restaurante_id=rest.id).all()
+        }
+        for a in avisos:
+            a.lido = (a.id in lidos_ids)
+        avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
+
     # ---- URLs/flags para template
     from werkzeug.routing import BuildError
     try:
@@ -4710,6 +4781,9 @@ def portal_restaurante():
         url_lancar_producao = "/restaurante/lancar_producao"
 
     has_editar_lanc = ("editar_lancamento" in app.view_functions)
+
+    # >>> Contador geral de não lidos para TOAST/SOM no layout
+    unread = _count_unread_for_restaurante(rest)
 
     # -------------------- Render --------------------
     return render_template(
@@ -4735,340 +4809,12 @@ def portal_restaurante():
         total_lanc_entregas=total_lanc_entregas,
         url_lancar_producao=url_lancar_producao,
         has_editar_lanc=has_editar_lanc,
-    )
 
-
-# =========================
-# Rotas de CRUD de lançamento
-# =========================
-@app.post("/restaurante/lancar_producao")
-@role_required("restaurante")
-def lancar_producao():
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first()
-    if not rest:
-        abort(403)
-    f = request.form
-
-    # 1) cria o lançamento
-    l = Lancamento(
-        restaurante_id=rest.id,
-        cooperado_id=f.get("cooperado_id", type=int),
-        descricao="produção",
-        valor=f.get("valor", type=float),
-        data=_parse_date(f.get("data")) or date.today(),
-        hora_inicio=f.get("hora_inicio"),
-        hora_fim=f.get("hora_fim"),
-        qtd_entregas=f.get("qtd_entregas", type=int),
-    )
-    db.session.add(l)
-    db.session.flush()  # garante l.id
-
-    # 2) avaliação (opcional)
-    g   = _clamp_star(f.get("av_geral"))
-    p   = _clamp_star(f.get("av_pontualidade"))
-    ed  = _clamp_star(f.get("av_educacao"))
-    ef  = _clamp_star(f.get("av_eficiencia"))
-    ap  = _clamp_star(f.get("av_apresentacao"))
-    txt = (f.get("av_comentario") or "").strip()
-
-    tem_avaliacao = any(x is not None for x in (g, p, ed, ef, ap)) or bool(txt)
-    if tem_avaliacao:
-        media = _media_ponderada(g, p, ed, ef, ap)
-        senti = _analise_sentimento(txt)
-        temas = _identifica_temas(txt)
-        crise = _sinaliza_crise(g, txt)
-        feed  = _gerar_feedback(p, ed, ef, ap, txt, senti)
-
-        av = AvaliacaoCooperado(
-            restaurante_id=rest.id,
-            cooperado_id=l.cooperado_id,
-            lancamento_id=l.id,
-            estrelas_geral=g,
-            estrelas_pontualidade=p,
-            estrelas_educacao=ed,
-            estrelas_eficiencia=ef,
-            estrelas_apresentacao=ap,
-            comentario=txt,
-            media_ponderada=media,
-            sentimento=senti,
-            temas="; ".join(temas),
-            alerta_crise=crise,
-            feedback_motoboy=feed,
-        )
-        db.session.add(av)
-        if crise:
-            flash("⚠️ Avaliação crítica registrada (1★ + termo de risco). A gerência deve revisar.", "danger")
-
-    db.session.commit()
-    flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
-    return redirect(url_for("portal_restaurante", view="lancar"))
-
-@app.route("/lancamentos/<int:id>/editar", methods=["GET", "POST"])
-@role_required("restaurante")
-def editar_lancamento(id):
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first()
-    l = Lancamento.query.get_or_404(id)
-    if not rest or l.restaurante_id != rest.id:
-        abort(403)
-
-    if request.method == "POST":
-        f = request.form
-        l.valor = f.get("valor", type=float)
-        l.data = _parse_date(f.get("data")) or l.data
-        l.hora_inicio = f.get("hora_inicio")
-        l.hora_fim = f.get("hora_fim")
-        l.qtd_entregas = f.get("qtd_entregas", type=int)
-        db.session.commit()
-        flash("Lançamento atualizado.", "success")
-        return redirect(url_for("portal_restaurante", view="lancamentos",
-                                data_inicio=(l.data and l.data.strftime("%Y-%m-%d"))))
-
-    return render_template("editar_lancamento.html", lanc=l)
-
-@app.get("/lancamentos/<int:id>/excluir")
-@role_required("restaurante")
-def excluir_lancamento(id):
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first()
-    l = Lancamento.query.get_or_404(id)
-    if not rest or l.restaurante_id != rest.id:
-        abort(403)
-
-    db.session.execute(sa_delete(AvaliacaoCooperado).where(AvaliacaoCooperado.lancamento_id == id))
-    db.session.execute(sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.lancamento_id == id))
-    db.session.delete(l)
-    db.session.commit()
-    flash("Lançamento excluído.", "success")
-    return redirect(url_for("portal_restaurante", view="lancamentos"))
-
-# =========================
-# Documentos (Admin + Público)
-# =========================
-@app.route("/admin/documentos")
-@admin_required
-def admin_documentos():
-    documentos = Documento.query.order_by(Documento.enviado_em.desc()).all()
-    return render_template("admin_documentos.html", documentos=documentos)
-
-@app.post("/admin/documentos/upload")
-@admin_required
-def admin_upload_documento():
-    f = request.form
-    titulo = (f.get("titulo") or "").strip()
-    categoria = (f.get("categoria") or "outro").strip()
-    descricao = (f.get("descricao") or "").strip()
-    arquivo = request.files.get("arquivo")
-
-    if not titulo or not (arquivo and arquivo.filename):
-        flash("Preencha o título e selecione o arquivo.", "warning")
-        return redirect(url_for("admin_documentos"))
-
-    # salva arquivo no diretório DOCS_DIR e cria URL estática
-    fname = secure_filename(arquivo.filename)
-    base, ext = os.path.splitext(fname)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_base = re.sub(r"[^A-Za-z0-9_-]+", "_", base).strip("_") or "arquivo"
-    final_name = f"{safe_base}_{ts}{ext}"
-    full_path = os.path.join(DOCS_DIR, final_name)
-    arquivo.save(full_path)
-
-    doc_url = f"/static/uploads/docs/{final_name}"
-
-    d = Documento(
-        titulo=titulo,
-        categoria=categoria,
-        descricao=descricao,
-        arquivo_url=doc_url,
-        arquivo_nome=fname,
-        enviado_em=datetime.utcnow(),
-    )
-    db.session.add(d)
-    db.session.commit()    
-    flash("Documento enviado.", "success")
-    return redirect(url_for("admin_documentos"))
-
-@app.get("/admin/documentos/<int:doc_id>/delete")
-@admin_required
-def admin_delete_documento(doc_id):
-    d = Documento.query.get_or_404(doc_id)
-    try:
-        local_path = os.path.join(BASE_DIR, d.arquivo_url.lstrip("/"))
-        if os.path.exists(local_path):
-            os.remove(local_path)
-    except Exception:
-        pass
-    db.session.delete(d)
-    db.session.commit()
-    flash("Documento removido.", "success")
-    return redirect(url_for("admin_documentos"))
-
-@app.route("/documentos")
-def documentos_publicos():
-    uid = session.get("user_id")
-    if not uid:
-        return redirect(url_for("login"))
-    documentos = Documento.query.order_by(Documento.enviado_em.desc()).all()
-    return render_template("documentos_publicos.html", documentos=documentos)
-
-@app.route('/documentos/<int:doc_id>/baixar')
-def baixar_documento(doc_id):
-    doc = Documento.query.get_or_404(doc_id)
-    path = os.path.join(BASE_DIR, doc.arquivo_url.lstrip("/"))
-    if not os.path.exists(path):
-        abort(404)
-    return send_file(path, as_attachment=True, download_name=doc.arquivo_nome)
-
-# =========================
-# Inicialização automática do DB em servidores (Gunicorn/Render)
-# =========================
-try:
-    with app.app_context():
-        init_db()
-except Exception as _e:
-    # Evita crash no import; logs úteis no servidor
-    try:
-        app.logger.warning(f"Falha ao inicializar DB: {_e}")
-    except Exception:
-        pass
-
-
-@app.errorhandler(413)
-def too_large(e):
-    flash("Arquivo excede o tamanho máximo permitido (32MB).", "danger")
-    return redirect(url_for('admin_documentos'))
-
-# =========================
-# Inicialização automática do DB em servidores (Gunicorn/Render)
-# =========================
-try:
-    with app.app_context():
-        init_db()
-except Exception as _e:
-    ...
-
-# ==== TABELAS (upload/abrir/baixar) =========================================
-from flask import (
-    render_template, request, redirect, url_for, flash, session,
-    send_file, abort, current_app, jsonify
-)
-from werkzeug.utils import secure_filename
-from datetime import datetime
-from pathlib import Path
-import os, re, unicodedata, mimetypes, logging
-
-log = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# BASE_DIR e TABELAS_DIR (sempre salva/serve de static/uploads/tabelas)
-# ---------------------------------------------------------------------------
-try:
-    BASE_DIR  # type: ignore[name-defined]
-except NameError:
-    BASE_DIR = Path(__file__).resolve().parent
-
-# SEMPRE neste local:
-TABELAS_DIR = str(Path(BASE_DIR) / "static" / "uploads" / "tabelas")
-
-# Requer no app principal:
-# - db (SQLAlchemy)
-# - modelos: Tabela(id, titulo, descricao?, arquivo_url, arquivo_nome?, enviado_em)
-#            Restaurante(usuario_id, nome?, usuario?, usuario_ref?.usuario?)
-# - decorators: admin_required, role_required (se usar avisos/portais)
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-def _tabelas_base_dir() -> Path:
-    p = Path(TABELAS_DIR)
-    p.mkdir(parents=True, exist_ok=True)
-    return p
-
-def _norm_txt(s: str) -> str:
-    s = unicodedata.normalize("NFD", (s or "").strip())
-    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
-    s = re.sub(r"\s+", " ", s)
-    return s.lower()
-
-def _guess_mimetype_from_path(path: str) -> str:
-    mt, _ = mimetypes.guess_type(path)
-    return mt or "application/octet-stream"
-
-def _enforce_restaurante_titulo(tabela, restaurante):
-    """
-    Regra: restaurante só acessa a tabela cujo TÍTULO == NOME/LOGIN do restaurante (normalizado).
-    """
-    login_nome = (
-        getattr(getattr(restaurante, "usuario_ref", None), "usuario", None)
-        or getattr(restaurante, "usuario", None)
-        or (restaurante.nome or "")
-    )
-    if _norm_txt(tabela.titulo) != _norm_txt(login_nome):
-        abort(403)
-
-def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
-    """
-    Resolve e serve o arquivo da Tabela:
-    - http(s) => redirect
-    - sempre tenta primeiro static/uploads/tabelas/<arquivo>
-    - aceita absoluto, relativo e só o nome
-    - ignora querystring/fragments (ex.: foo.pdf?v=123#x)
-    """
-    url = (tabela.arquivo_url or "").strip()
-    if not url:
-        abort(404)
-
-    # URL externa
-    if url.startswith(("http://", "https://")):
-        return redirect(url)
-
-    base_dir    = Path(BASE_DIR)
-    tabelas_dir = _tabelas_base_dir()
-
-    # normaliza: remove "/" inicial, query e fragment
-    raw = url.lstrip("/")
-    raw_no_q = raw.split("?", 1)[0].split("#", 1)[0]
-    fname = (raw_no_q.split("/")[-1] if raw_no_q else "").strip()
-
-    candidates = []
-
-    # 1) SEMPRE prioriza nosso diretório oficial
-    if fname:
-        candidates.append(tabelas_dir / fname)
-
-    # 2) Como veio, relativo ao BASE_DIR (compat c/ legado: static/uploads/tabelas/...)
-    candidates.append(base_dir / raw_no_q)
-
-    # 3) Absoluto (se alguém gravou caminho completo por engano)
-    p = Path(url)
-    if p.is_absolute():
-        candidates.append(p)
-
-    # 4) Mais dois legados comuns
-    if fname:
-        candidates.append(base_dir / "uploads" / "tabelas" / fname)
-        candidates.append(base_dir / "static" / "uploads" / "tabelas" / fname)
-
-    file_path = next((c for c in candidates if c.exists() and c.is_file()), None)
-    if not file_path:
-        try:
-            log.warning(
-                "Arquivo de Tabela não encontrado. id=%s titulo=%r arquivo_url=%r tents=%r",
-                getattr(tabela, "id", None),
-                getattr(tabela, "titulo", None),
-                tabela.arquivo_url,
-                [str(c) for c in candidates],
-            )
-        except Exception:
-            pass
-        abort(404)
-
-    return send_file(
-        str(file_path),
-        as_attachment=as_attachment,
-        download_name=(tabela.arquivo_nome or file_path.name),
-        mimetype=_guess_mimetype_from_path(str(file_path)),
+        # --- Avisos / Toast ---
+        avisos=(avisos if view == "avisos" else []),
+        avisos_nao_lidos_count=avisos_nao_lidos_count,
+        current_year=current_year,
+        unread=unread,  # <- use no layout/base para disparar o toast de "novos avisos"
     )
 
 # ---------------------------------------------------------------------------
