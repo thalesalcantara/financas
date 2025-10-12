@@ -1509,6 +1509,39 @@
   <source src="{{ url_for('static', filename='sounds/notify.mp3') }}" type="audio/mpeg">
 </audio>
 
+<!-- DESBLOQUEIO DE ÁUDIO NA 1ª INTERAÇÃO (necessário em mobile) -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const audio = document.getElementById('avisoSound');
+  if (!audio) return;
+
+  audio.muted = false;
+  audio.volume = 1.0;
+
+  async function unlockAudio() {
+    try {
+      await audio.play();
+      audio.pause();
+      audio.currentTime = 0;
+    } catch (_) {
+      return;
+    } finally {
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('keydown', unlockAudio);
+    }
+  }
+
+  document.addEventListener('click', unlockAudio, { once: true });
+  document.addEventListener('touchstart', unlockAudio, { once: true });
+  document.addEventListener('keydown', unlockAudio, { once: true });
+
+  audio.addEventListener('error', () => {
+    console.warn('Falha ao carregar/tocar áudio:', audio.error);
+  });
+});
+</script>
+
 <!-- MENU lateral -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
