@@ -1504,67 +1504,93 @@
       <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
     </div>
     <div class="toast-body">
-      Você tem {{ unread }} aviso(s) não lido(s).
+      Você tem {{ unread|default(0) }} aviso(s) não lido(s).
       <a href="{{ url_for('portal_cooperado_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
+
+      <!-- Se o navegador bloquear autoplay, mostramos este botão -->
+      <div id="ativarSomWrap" class="mt-2" style="display:none;">
+        <button id="ativarSomBtn" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-volume-up"></i> Ativar som
+        </button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- SOM da notificação (coloque static/sounds/notify.mp3) -->
+<!-- SOM -->
 <audio id="sndAviso" preload="auto">
   <source src="{{ url_for('static', filename='sounds/notify.mp3') }}" type="audio/mpeg">
 </audio>
 
-<!-- Bootstrap -->
+<!-- Se o Bootstrap JS já estiver no layout, NÃO repita esta linha -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- MENU lateral + TOAST avisos + SOM -->
 <script>
-  (function(){
-    // Menu lateral
-    const menuLateral = document.getElementById('menuLateral');
-    const fundoMenu  = document.getElementById('fundoMenu');
-    const abrir      = document.getElementById('abrirMenu');
-    const fechar     = document.getElementById('fecharMenu');
+(function(){
+  document.addEventListener('DOMContentLoaded', function () {
+    const unread = Number('{{ unread|default(0) }}') || 0;
 
-    abrir?.addEventListener('click', () => {
-      menuLateral.classList.add('aberto');
-      fundoMenu.classList.add('aberto');
-    });
-    fechar?.addEventListener('click', () => {
-      menuLateral.classList.remove('aberto');
-      fundoMenu.classList.remove('aberto');
-    });
-    fundoMenu?.addEventListener('click', () => {
-      menuLateral.classList.remove('aberto');
-      fundoMenu.classList.remove('aberto');
-    });
+    const FLAG_TOAST = 'COOPEX_TOAST_AVISOS_SHOWN';
+    const FLAG_SOUND = 'COOPEX_TOAST_AVISOS_SOUND_PLAYED';
+    const jaMostrou = sessionStorage.getItem(FLAG_TOAST) === '1';
 
-    // Toast + Som
-    document.addEventListener('DOMContentLoaded', function () {
-      const unread   = Number('{{ unread|default(0) }}') || 0;
-      const toastEl  = document.getElementById('toastAvisos');
-      const audioEl  = document.getElementById('sndAviso');
+    const toastEl = document.getElementById('toastAvisos');
+    const audioEl = document.getElementById('sndAviso');
 
-      // Evita repetir em cada navegação na mesma aba/sessão
-      const FLAG = 'COOPEX_TOAST_AVISOS_SHOWN';
-      const jaMostrou = sessionStorage.getItem(FLAG) === '1';
+    const ativarSomWrap = document.getElementById('ativarSomWrap');
+    const ativarSomBtn  = document.getElementById('ativarSomBtn');
 
-      if (unread > 0 && toastEl && window.bootstrap?.Toast && !jaMostrou) {
+    function mostrarToast(){
+      if (toastEl && window.bootstrap?.Toast) {
         new bootstrap.Toast(toastEl).show();
-        sessionStorage.setItem(FLAG, '1');
-
-        // Tenta tocar o som (alguns browsers bloqueiam autoplay)
-        const tryPlay = () => audioEl?.play?.().catch(() => {});
-        tryPlay();
-
-        // Se foi bloqueado, toca no primeiro clique/tecla
-        const unlock = () => { tryPlay(); window.removeEventListener('click', unlock); window.removeEventListener('keydown', unlock); };
-        window.addEventListener('click', unlock, { once:true });
-        window.addEventListener('keydown', unlock, { once:true });
+        sessionStorage.setItem(FLAG_TOAST, '1');
       }
-    });
-  })();
+    }
+
+    async function tocarSomAuto(){
+      if (!audioEl) return false;
+      try {
+        await audioEl.play();
+        sessionStorage.setItem(FLAG_SOUND, '1');
+        return true;
+      } catch (e) {
+        return false; // bloqueado
+      }
+    }
+
+    function prepararDesbloqueioSom(){
+      ativarSomWrap.style.display = '';
+      ativarSomBtn?.addEventListener('click', async () => {
+        try {
+          await audioEl.play();
+          sessionStorage.setItem(FLAG_SOUND, '1');
+          ativarSomWrap.style.display = 'none';
+        } catch (_) {}
+      }, { once: true });
+
+      const unlock = async () => {
+        if (sessionStorage.getItem(FLAG_SOUND) === '1') return;
+        try {
+          await audioEl.play();
+          sessionStorage.setItem(FLAG_SOUND, '1');
+          ativarSomWrap.style.display = 'none';
+        } catch (_) {}
+        window.removeEventListener('click', unlock);
+        window.removeEventListener('keydown', unlock);
+      };
+      window.addEventListener('click', unlock);
+      window.addEventListener('keydown', unlock);
+    }
+
+    if (unread > 0 && !jaMostrou) {
+      mostrarToast();
+      const jaTocou = sessionStorage.getItem(FLAG_SOUND) === '1';
+      if (!jaTocou) {
+        tocarSomAuto().then(ok => { if (!ok) prepararDesbloqueioSom(); });
+      }
+    }
+  });
+})();
 </script>
 
   <!-- JS: Avaliação (legado simples) -->
