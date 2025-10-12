@@ -146,6 +146,7 @@
   </style>
 </head>
 <body>
+  {% set unread = (unread | default(avisos_nao_lidos_count | default(avisos_unread_count, true), true)) | int %}
 
 <!-- MENU LATERAL -->
 <div id="menuLateral">
@@ -1476,8 +1477,6 @@
       </div>
     </div>
   </div>
-
-{% set unread = (avisos_nao_lidos_count or avisos_unread_count or 0) | int %}
 
 <!-- TOAST de novos avisos -->
 <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1080;">
