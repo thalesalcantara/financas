@@ -634,7 +634,7 @@
             <tr>
               <th>Data</th>
               <th>Turno</th>
-              <th>Horário</th>
+              <th>Horário</</th>
               <th>Contrato</th>
             </tr>
           </thead>
@@ -1509,10 +1509,9 @@
   <source src="{{ url_for('static', filename='sounds/notify.mp3') }}" type="audio/mpeg">
 </audio>
 
-<!-- MENU lateral + TOAST avisos + SOM ao chegar -->
+<!-- MENU lateral -->
 <script>
   (function(){
-    // Menu lateral
     const menuLateral = document.getElementById('menuLateral');
     const fundoMenu   = document.getElementById('fundoMenu');
     const abrir       = document.getElementById('abrirMenu');
@@ -1531,8 +1530,10 @@
       fundoMenu?.classList.remove('aberto');
     });
   })();
+</script>
 
-  <script>
+<!-- TOAST avisos + SOM ao chegar (CORRIGIDO: sem <script> aninhado) -->
+<script>
 document.addEventListener('DOMContentLoaded', function () {
   const toastEl = document.getElementById('toastAvisos');
   if (!toastEl) return; // 🔒 não deixa quebrar o resto do site
@@ -2199,24 +2200,32 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       btnLimpar?.addEventListener('click', ()=>{ if (confirm('Limpar todo o histórico?')){ saveHist([]); renderHist(); } });
       btnCSV?.addEventListener('click', ()=>{
-  const arr = loadHist();
-  const header = ['data','preco','consumo_km_l','km','ganho','litros','custo','custo_km','lucro','lucro_km','margem_%'];
-  const rows = arr.map(x=>[
-    new Date(x.ts).toISOString(), x.p, x.c, x.k, x.g, x.litros, x.custo, x.custoKm, x.lucro, x.lucroKm, x.margem
-  ]);
-  const csv = [header.join(','), ...rows.map(r=>r.join(','))].join('\n');
+        const arr = loadHist();
+        const header = ['data','preco','consumo_km_l','km','ganho','litros','custo','custo_km','lucro','lucro_km','margem_%'];
+        const rows = arr.map(x=>[
+          new Date(x.ts).toISOString(), x.p, x.c, x.k, x.g, x.litros, x.custo, x.custoKm, x.lucro, x.lucroKm, x.margem
+        ]);
+        const csv = [header.join(','), ...rows.map(r=>r.join(','))].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'custo_beneficio.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+      btnShare?.addEventListener('click', ()=>{
+        const arr = loadHist();
+        if (!navigator.share){ alert('Compartilhamento nativo não suportado.'); return; }
+        const total = arr.reduce((acc,x)=>({km:acc.km+(x.k||0), ganho:acc.ganho+(x.g||0), lucro:acc.lucro+(x.lucro||0)}), {km:0,ganho:0,lucro:0});
+        navigator.share({
+          title: 'Resumo CxB',
+          text: `Km: ${total.km} | Ganhou: R$ ${total.ganho.toFixed(2)} | Lucro: R$ ${total.lucro.toFixed(2)}`
+        }).catch(()=>{});
+      });
 
-  // >>> a linha com erro estava aqui; faltava fechar a aspa do type
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'custo_beneficio.csv';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-})
       calc(); renderHist();
     })();
   </script>
