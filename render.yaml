@@ -5,8 +5,8 @@ services:
     plan: starter
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --worker-class gthread --workers 1 --threads 8 --timeout 120 --keep-alive 75 --worker-tmp-dir /dev/shm --access-logfile - --log-level info
-    healthCheckPath: /healthz   # Remova esta linha se não tiver a rota /healthz
+    startCommand: gunicorn app:app --worker-class gthread --workers 3 --threads 8 --timeout 60 --keep-alive 30 --worker-tmp-dir /dev/shm --access-logfile - --log-level info
+    healthCheckPath: /healthz
     envVars:
       - key: TZ
         value: America/Sao_Paulo
