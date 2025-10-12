@@ -5232,6 +5232,58 @@ def count_unread_for_rest(rest: Restaurante) -> int:
     return sum(1 for aid in ids if aid not in lidos)
 
 
+# === Avisos: contador de não lidos (Cooperado/Restaurante) + API ===
+from flask import jsonify, session
+from sqlalchemy import or_, and_, func
+
+def count_unread_for_rest(rest: Restaurante) -> int:
+    """
+    Conta quantos avisos aplicáveis ao restaurante ainda NÃO foram marcados como lidos.
+    Considera:
+      - Avisos 'global'
+      - Avisos 'restaurante' broadcast (sem restaurantes associados)
+      - Avisos 'restaurante' destinados especificamente a este restaurante
+    Respeita janela (inicio_em/fim_em) e 'ativo' via _avisos_base_query().
+    """
+    if not rest:
+        return 0
+
+    try:
+        avisos = get_avisos_for_restaurante(rest)  # helper já definida no app
+    except NameError:
+        # Fallback seguro (se a helper não estiver disponível por algum motivo)
+        now = func.now()
+        avisos = (Aviso.query
+                  .filter(Aviso.ativo.is_(True))
+                  .filter(or_(Aviso.inicio_em.is_(None), Aviso.inicio_em <= now))
+                  .filter(or_(Aviso.fim_em.is_(None),    Aviso.fim_em    >= now))
+                  .filter(
+                      or_(
+                          Aviso.tipo == "global",
+                          and_(
+                              Aviso.tipo == "restaurante",
+                              or_(
+                                  ~Aviso.restaurantes.any(),                          # broadcast
+                                  Aviso.restaurantes.any(Restaurante.id == rest.id),  # específico
+                              ),
+                          ),
+                      )
+                  )).all()
+
+    if not avisos:
+        return 0
+
+    ids = [a.id for a in avisos]
+    lidos = {
+        r.aviso_id
+        for r in (AvisoLeitura.query
+                  .filter(AvisoLeitura.restaurante_id == rest.id,
+                          AvisoLeitura.aviso_id.in_(ids))
+                  .all())
+    }
+    return sum(1 for aid in ids if aid not in lidos)
+
+
 # --- API usada pelo front: /avisos/unread_count (resolve o 404) ---
 @app.get("/avisos/unread_count")
 def avisos_unread_count():
@@ -5245,25 +5297,35 @@ def avisos_unread_count():
         uid = session.get("user_id")
         tipo = session.get("user_tipo")
         if not uid or not tipo:
-            return jsonify({"unread": 0}), 200
+            resp = jsonify({"unread": 0})
+            # evita cache agressivo no front/CDN
+            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            return resp, 200
 
         if tipo == "cooperado":
             coop = Cooperado.query.filter_by(usuario_id=uid).first()
-            n = count_unread_for_coop(coop) if coop else 0
-            return jsonify({"unread": int(n)}), 200
+            n = count_unread_for_coop(coop) if coop else 0  # assume que você já tem essa helper
+            resp = jsonify({"unread": int(n)})
+            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            return resp, 200
 
         if tipo == "restaurante":
             rest = Restaurante.query.filter_by(usuario_id=uid).first()
             n = count_unread_for_rest(rest) if rest else 0
-            return jsonify({"unread": int(n)}), 200
+            resp = jsonify({"unread": int(n)})
+            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            return resp, 200
 
         # admin/outros perfis
-        return jsonify({"unread": 0}), 200
+        resp = jsonify({"unread": 0})
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        return resp, 200
 
     except Exception:
         # Falhas silenciosas para não quebrar o front
-        return jsonify({"unread": 0}), 200
-
+        resp = jsonify({"unread": 0})
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        return resp, 200
 
 # =========================
 # AVISOS — Ações (cooperado)
