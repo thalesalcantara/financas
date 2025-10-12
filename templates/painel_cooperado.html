@@ -655,7 +655,7 @@
                   <td class="date-cell">
                     <div class="date-top">
                       <span class="date-chip"
-                            style="background:{{ has_multi and cs|length>0 and cs[0] or (colors or '#fff') }}">
+                            style="background:{% if has_multi and cs|length>0 %}{{ cs[0] }}{% else %}{{ colors or '#fff' }}{% endif %}">
                         <span class="d1">{{ data_curta }}</span>
                         {% if dow %}<span class="d2">{{ dow }}</span>{% endif %}
                       </span>
@@ -1533,7 +1533,7 @@
     const toastTimeEl  = toastEl?.querySelector('.toast-time');
     const endpoint     = toastEl?.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
 
-    const unreadInitial = Number('{{ unread }}') || 0;
+    const unreadInitial = Number('{{ unread|default(0)|int }}') || 0;
     const UID     = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
     const LS_KEY  = `COOPEX_AVISOS_LAST_${UID}`;
     const audio   = document.getElementById('avisoSound');
@@ -2200,7 +2200,8 @@
         const header = ['data','preco','consumo_km_l','km','ganho','litros','custo','custo_km','lucro','lucro_km','margem_%'];
         const rows = arr.map(x=>[ new Date(x.ts).toISOString(), x.p, x.c, x.k, x.g, x.litros, x.custo, x.custoKm, x.lucro, x.lucroKm, x.margem ]);
         const csv = [header.join(','), ...rows.map(r=>r.join(','))].join('\n');
-        const blob = new Blob([csv], {type:'text/csv;charset=utf-8;}); const url = URL.createObjectURL(blob);
+        const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a'); a.href = url; a.download = 'custo_beneficio.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
       });
       btnShare?.addEventListener('click', async ()=>{
