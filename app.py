@@ -4021,7 +4021,38 @@ COMMIT;
         return jsonify({"ok": False, "error": str(e)}), 500
 
 # =========================
-# Documentos (Admin)
+# Documentos (Admin + Público)
+# =========================
+from flask import (
+    render_template, request, redirect, url_for, flash, session,
+    send_file, abort
+)
+from werkzeug.utils import secure_filename
+from datetime import datetime, date, timedelta
+from pathlib import Path
+import os, re, logging
+
+log = logging.getLogger(__name__)
+
+# ---- Ajuste de diretórios (onde os arquivos serão salvos e servidos)
+try:
+    BASE_DIR  # type: ignore[name-defined]
+except NameError:
+    BASE_DIR = Path(__file__).resolve().parent
+
+DOCS_DIR = str(Path(BASE_DIR) / "static" / "uploads" / "docs")
+Path(DOCS_DIR).mkdir(parents=True, exist_ok=True)
+
+# Modelos e utilidades esperados no app principal:
+# - db (SQLAlchemy)
+# - modelos: Documento(id, titulo, categoria, descricao, arquivo_url, arquivo_nome, enviado_em)
+#            Cooperado(id, nome, cnh_numero, cnh_validade, placa, placa_validade, ultima_atualizacao)
+# - decorators: admin_required
+# - função util: _prox_ocorrencia_anual (usada no editar_documentos abaixo)
+# - admin_dashboard (endpoint) já existente
+
+# =========================
+# Documentos (Admin) – por cooperado
 # =========================
 @app.route("/documentos/<int:coop_id>", methods=["GET", "POST"])
 @admin_required
@@ -4032,11 +4063,13 @@ def editar_documentos(coop_id):
         f = request.form
         c.cnh_numero = f.get("cnh_numero")
         c.placa = f.get("placa")
+
         def parse_date_local(s):
             try:
                 return datetime.strptime(s, "%Y-%m-%d").date() if s else None
             except Exception:
                 return None
+
         c.cnh_validade = parse_date_local(f.get("cnh_validade"))
         c.placa_validade = parse_date_local(f.get("placa_validade"))
         c.ultima_atualizacao = datetime.now()
@@ -4044,10 +4077,11 @@ def editar_documentos(coop_id):
         flash("Documentos atualizados.", "success")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    tpl = os.path.join("templates", "editar_documentos.html")
+    # Se existir um template dedicado, usa; senão, devolve um HTML inline simples
+    tpl_path = Path(BASE_DIR) / "templates" / "editar_documentos.html"
     hoje = date.today()
     prazo_final = date(hoje.year, 12, 31)
-    if os.path.exists(tpl):
+    if tpl_path.exists():
         docinfo = {
             "prazo_final": prazo_final,
             "dias_ate_prazo": max(0, (prazo_final - hoje).days),
@@ -4068,6 +4102,7 @@ def editar_documentos(coop_id):
         }
         return render_template("editar_documentos.html", cooperado=c, docinfo=docinfo)
 
+    # Fallback HTML inline (caso o template não exista no servidor)
     return f"""
     <div style="max-width:560px;margin:30px auto;font-family:Arial">
       <h3>Documentos — {c.nome}</h3>
@@ -4085,6 +4120,96 @@ def editar_documentos(coop_id):
       </form>
     </div>
     """
+
+# =========================
+# Documentos (Admin) – listagem e upload
+# =========================
+@app.route("/admin/documentos")
+@admin_required
+def admin_documentos():
+    documentos = Documento.query.order_by(Documento.enviado_em.desc()).all()
+    return render_template("admin_documentos.html", documentos=documentos)
+
+@app.post("/admin/documentos/upload")
+@admin_required
+def admin_upload_documento():
+    f = request.form
+    titulo = (f.get("titulo") or "").strip()
+    categoria = (f.get("categoria") or "outro").strip()
+    descricao = (f.get("descricao") or "").strip()
+    arquivo = request.files.get("arquivo")
+
+    if not titulo or not (arquivo and arquivo.filename):
+        flash("Preencha o título e selecione o arquivo.", "warning")
+        return redirect(url_for("admin_documentos"))
+
+    # salva arquivo no diretório DOCS_DIR e cria URL estática
+    fname = secure_filename(arquivo.filename)
+    base, ext = os.path.splitext(fname)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    safe_base = re.sub(r"[^A-Za-z0-9_-]+", "_", base).strip("_") or "arquivo"
+    final_name = f"{safe_base}_{ts}{ext}"
+    full_path = os.path.join(DOCS_DIR, final_name)
+    arquivo.save(full_path)
+
+    doc_url = f"/static/uploads/docs/{final_name}"
+
+    d = Documento(
+        titulo=titulo,
+        categoria=categoria,
+        descricao=descricao,
+        arquivo_url=doc_url,
+        arquivo_nome=fname,
+        enviado_em=datetime.utcnow(),
+    )
+    db.session.add(d)
+    db.session.commit()
+    flash("Documento enviado.", "success")
+    return redirect(url_for("admin_documentos"))
+
+@app.get("/admin/documentos/<int:doc_id>/delete")
+@admin_required
+def admin_delete_documento(doc_id):
+    d = Documento.query.get_or_404(doc_id)
+    # tenta apagar o arquivo físico (se for local)
+    try:
+        local_path = os.path.join(str(BASE_DIR), d.arquivo_url.lstrip("/"))
+        if os.path.exists(local_path):
+            os.remove(local_path)
+    except Exception as e:
+        try:
+            log.warning("Falha ao remover arquivo local do documento %s: %s", d.id, e)
+        except Exception:
+            pass
+    db.session.delete(d)
+    db.session.commit()
+    flash("Documento removido.", "success")
+    return redirect(url_for("admin_documentos"))
+
+# =========================
+# Documentos (Público / Logado)
+# =========================
+@app.route("/documentos", endpoint="documentos_publicos")
+def documentos_publicos():
+    uid = session.get("user_id")
+    if not uid:
+        return redirect(url_for("login"))
+    documentos = Documento.query.order_by(Documento.enviado_em.desc()).all()
+    return render_template("documentos_publicos.html", documentos=documentos)
+
+@app.route('/documentos/<int:doc_id>/baixar')
+def baixar_documento(doc_id):
+    doc = Documento.query.get_or_404(doc_id)
+    # Se for URL externa (S3/Drive), apenas redireciona
+    if (doc.arquivo_url or "").startswith(("http://", "https://")):
+        return redirect(doc.arquivo_url)
+
+    # Caso local, resolve caminho sob BASE_DIR
+    path = os.path.join(str(BASE_DIR), doc.arquivo_url.lstrip("/"))
+    if not os.path.exists(path):
+        abort(404)
+    # usa o nome original para download
+    return send_file(path, as_attachment=True, download_name=(doc.arquivo_nome or os.path.basename(path)))
 
 # =========================
 # PORTAL COOPERADO
