@@ -311,8 +311,7 @@
       <div class="tab-pane fade show active" id="resumo" role="tabpanel">
         <div class="card p-3 summary">
           <div class="d-flex align-items-center mb-2">
-            <img id="coopPreview" class="avatar border" src="{{ url_for('media_coop', coop_id=cooperado.id) if cooperado.foto_bytes else url_for('static', filename='img/default.png') }}" alt="Foto do cooperado" style="width:40px;height:40px;object-fit:cover;">
-                 style="width:46px;height:46px;border-radius:50%;object-fit:cover;border:3px solid var(--royal-blue);margin-right:10px" alt="">
+            <img id="coopPreview" class="avatar border" src="{{ url_for('media_coop', coop_id=cooperado.id) if cooperado.foto_bytes else url_for('static', filename='img/default.png') }}" alt="Foto do cooperado" style="width:46px;height:46px;border-radius:50%;object-fit:cover;border:3px solid var(--royal-blue);margin-right:10px">
             <div>
               <div class="fw-bold">{{ cooperado.nome }}</div>
               <small class="muted">{{ cooperado.usuario }}</small>
