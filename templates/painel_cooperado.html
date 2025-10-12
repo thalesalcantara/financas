@@ -1465,144 +1465,146 @@
     </div>
   </div>
 
-  <!-- TOAST de novos avisos (FIX: tag fechada corretamente) -->
-  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
-    <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
-         data-bs-autohide="true" data-bs-delay="8000"
-         data-unread-endpoint="/avisos/unread_count">
-      <div class="toast-header">
-        <i class="bi bi-megaphone-fill me-2"></i>
-        <strong class="me-auto">Novos avisos</strong>
-        <small class="toast-time">agora</small>
-        <button class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
-      </div>
-      <div class="toast-body">
-        Você tem <span class="toast-count">{{ unread }}</span> aviso(s) não lido(s).
-        <a href="{{ url_for('portal_cooperado_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
-      </div>
+  <!-- TOAST de novos avisos -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+  <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
+       data-bs-autohide="true" data-bs-delay="8000"
+       data-unread-endpoint="/avisos/unread_count">
+    <div class="toast-header">
+      <i class="bi bi-megaphone-fill me-2"></i>
+      <strong class="me-auto">Novos avisos</strong>
+      <small class="toast-time">agora</small>
+      <button class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
+    </div>
+    <div class="toast-body">
+      Você tem <span class="toast-count">{{ unread }}</span> aviso(s) não lido(s).
+      <a href="{{ url_for('portal_cooperado_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
     </div>
   </div>
+</div>
 
-  <!-- ÁUDIO: som de aviso -->
-  <audio id="avisoSound" preload="auto">
-    <source src="{{ url_for('static', filename='avisos.mp3') }}" type="audio/mpeg">
-  </audio>
+<!-- ÁUDIO: som de aviso -->
+<audio id="avisoSound" preload="auto">
+  <source src="{{ url_for('static', filename='sounds/notify.mp3') }}" type="audio/mpeg">
+</audio>
 
-  <!-- MENU lateral + TOAST avisos + SOM ao chegar -->
-  <script>
-    (function(){
-      const menuLateral = document.getElementById('menuLateral');
-      const fundoMenu = document.getElementById('fundoMenu');
-      const abrir = document.getElementById('abrirMenu');
-      const fechar = document.getElementById('fecharMenu');
+<!-- MENU lateral + TOAST avisos + SOM ao chegar -->
+<script>
+  (function(){
+    const menuLateral = document.getElementById('menuLateral');
+    const fundoMenu = document.getElementById('fundoMenu');
+    const abrir = document.getElementById('abrirMenu');
+    const fechar = document.getElementById('fecharMenu');
 
-      abrir?.addEventListener('click', () => {
-        menuLateral.classList.add('aberto');
-        fundoMenu.classList.add('aberto');
-      });
-      fechar?.addEventListener('click', () => {
-        menuLateral.classList.remove('aberto');
-        fundoMenu.classList.remove('aberto');
-      });
-      fundoMenu?.addEventListener('click', () => {
-        menuLateral.classList.remove('aberto');
-        fundoMenu.classList.remove('aberto');
-      });
-    })();
+    abrir?.addEventListener('click', () => {
+      menuLateral?.classList.add('aberto');
+      fundoMenu?.classList.add('aberto');
+    });
+    fechar?.addEventListener('click', () => {
+      menuLateral?.classList.remove('aberto');
+      fundoMenu?.classList.remove('aberto');
+    });
+    fundoMenu?.addEventListener('click', () => {
+      menuLateral?.classList.remove('aberto');
+      fundoMenu?.classList.remove('aberto');
+    });
+  })();
 
-    document.addEventListener('DOMContentLoaded', function () {
-      const toastEl = document.getElementById('toastAvisos');
-      const toastBody = toastEl?.querySelector('.toast-body');
-      const toastCountEl = toastEl?.querySelector('.toast-count');
-      const toastTimeEl = toastEl?.querySelector('.toast-time');
-      const endpoint = toastEl?.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
-      const unreadInitial = Number('{{ unread }}') || 0;
-      const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
-      const LS_KEY = `COOPEX_AVISOS_LAST_${UID}`;
-      const audio = document.getElementById('avisoSound');
+  document.addEventListener('DOMContentLoaded', function () {
+    const toastEl = document.getElementById('toastAvisos');
+    const toastBody = toastEl?.querySelector('.toast-body');
+    const toastCountEl = toastEl?.querySelector('.toast-count');
+    const toastTimeEl = toastEl?.querySelector('.toast-time');
+    const endpoint = toastEl?.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
 
-      // Bootstrap toast
-      const showToast = (count) => {
-        if (!window.bootstrap?.Toast || !toastEl) return;
-        if (toastCountEl) toastCountEl.textContent = String(count);
-        if (toastTimeEl) toastTimeEl.textContent = 'agora';
-        new bootstrap.Toast(toastEl).show();
-      };
+    const unreadInitial = Number('{{ unread }}') || 0;
+    const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
+    const LS_KEY = `COOPEX_AVISOS_LAST_${UID}`;
+    const audio = document.getElementById('avisoSound');
 
-      // Som
-      const playAvisoSound = async () => {
-        if (!audio) return;
-        try { await audio.play(); }
-        catch (err) {
-          const enable = async () => { try { await audio.play(); } catch(_) {} };
-          document.addEventListener('click', enable, { once:true });
-          document.addEventListener('keydown', enable, { once:true });
+    // Bootstrap toast helper
+    function showToast(count) {
+      if (!window.bootstrap?.Toast || !toastEl) return;
+      if (toastCountEl) toastCountEl.textContent = String(count);
+      if (toastTimeEl) toastTimeEl.textContent = 'agora';
+      new bootstrap.Toast(toastEl).show();
+    }
+
+    // Som
+    async function playAvisoSound() {
+      if (!audio) return;
+      try {
+        await audio.play();
+      } catch (err) {
+        const enable = async () => { try { await audio.play(); } catch(_) {} };
+        document.addEventListener('click', enable, { once:true });
+        document.addEventListener('keydown', enable, { once:true });
+        document.addEventListener('touchstart', enable, { once:true });
+      }
+    }
+
+    // Exibe na carga se houver novos
+    const lastSeen = Number(localStorage.getItem(LS_KEY) || 0);
+    if (unreadInitial > 0 && (unreadInitial > lastSeen || lastSeen === 0)) {
+      showToast(unreadInitial);
+      playAvisoSound();
+      localStorage.setItem(LS_KEY, String(unreadInitial));
+    }
+
+    // Polling periódico
+    async function checkUnread(){
+      try {
+        const resp = await fetch(endpoint, { headers: { 'Accept':'application/json' }, cache:'no-store', credentials: 'same-origin' });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const count = Number(data.unread ?? data.count ?? 0);
+        const current = Number(localStorage.getItem(LS_KEY) || 0);
+
+        if (Number.isFinite(count) && count > current) {
+          if (toastBody && typeof data.message === 'string' && data.message.trim()) {
+            // atualiza o texto sem quebrar o link
+            toastBody.firstChild.nodeValue = `Você tem ${count} aviso(s) não lido(s). `;
+          }
+          showToast(count);
+          playAvisoSound();
+          localStorage.setItem(LS_KEY, String(count));
+        }
+      } catch (_) {
+        // silencioso
+      }
+    }
+
+    // roda a cada 20s e ao voltar o foco
+    setInterval(checkUnread, 20000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') checkUnread();
+    });
+
+    // Integração com a página de avisos (opcional)
+    try {
+      const ch = new BroadcastChannel('coopex_avisos');
+      ch.onmessage = (ev) => {
+        const count = Number(ev.data?.unread || 0);
+        const current = Number(localStorage.getItem(LS_KEY) || 0);
+        if (Number.isFinite(count) && count > current) {
+          showToast(count);
+          playAvisoSound();
+          localStorage.setItem(LS_KEY, String(count));
         }
       };
-
-      // Exibe na carga se houver novos
-      const lastSeen = Number(localStorage.getItem(LS_KEY) || 0);
-      if (unreadInitial > lastSeen && unreadInitial > 0) {
-        showToast(unreadInitial);
-        playAvisoSound();
-        localStorage.setItem(LS_KEY, String(unreadInitial));
-      } else if (lastSeen === 0 && unreadInitial > 0) {
-        showToast(unreadInitial);
-        playAvisoSound();
-        localStorage.setItem(LS_KEY, String(unreadInitial));
-      }
-
-      // Polling periódico
-      async function checkUnread(){
-        try {
-          const resp = await fetch(endpoint, { headers: { 'Accept':'application/json' }, cache:'no-store' });
-          if (!resp.ok) return;
-          const data = await resp.json();
-          const count = Number(data.unread ?? data.count ?? 0);
-          const current = Number(localStorage.getItem(LS_KEY) || 0);
-
-          if (Number.isFinite(count) && count > current) {
-            if (toastBody && typeof data.message === 'string' && data.message.trim()) {
-              toastBody.firstChild.nodeValue = `Você tem ${count} aviso(s) não lido(s). `;
-            }
-            showToast(count);
-            playAvisoSound();
-            localStorage.setItem(LS_KEY, String(count));
-          }
-        } catch (_) {}
-      }
-      setInterval(checkUnread, 20000);
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') checkUnread();
-      });
-
-      // === Integração com a página de avisos via BroadcastChannel ===
-      try {
-        const ch = new BroadcastChannel('coopex_avisos');
-        ch.onmessage = (ev) => {
-          const count = Number(ev.data?.unread || 0);
-          if (!Number.isFinite(count)) return;
-          const current = Number(localStorage.getItem(LS_KEY) || 0);
-          if (count > current) {
-            showToast(count);
-            playAvisoSound();
-            localStorage.setItem(LS_KEY, String(count));
-          }
-        };
-        // Expõe função global opcional (caso a outra página queira chamar window.opener)
-        window.coopAvisosNotify = function(count) {
-          const n = Number(count || 0);
-          if (!Number.isFinite(n)) return;
-          const current = Number(localStorage.getItem(LS_KEY) || 0);
-          if (n > current) {
-            showToast(n);
-            playAvisoSound();
-            localStorage.setItem(LS_KEY, String(n));
-          }
-        };
-      } catch (_) { /* browsers muito antigos */ }
-    });
-  </script>
+      // função global opcional
+      window.coopAvisosNotify = function(count) {
+        const n = Number(count || 0);
+        const current = Number(localStorage.getItem(LS_KEY) || 0);
+        if (Number.isFinite(n) && n > current) {
+          showToast(n);
+          playAvisoSound();
+          localStorage.setItem(LS_KEY, String(n));
+        }
+      };
+    } catch (_) { /* browsers antigos */ }
+  });
+</script>
 
   <!-- JS: Avaliação (legado simples) -->
   <script>
