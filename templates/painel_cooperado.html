@@ -83,10 +83,14 @@
     .rating-stars .bi-star, .rating-stars .bi-star-fill{ font-size:1.2rem; }
     .rating-stars .bi-star-fill{ color:#f5c518; }
     .rating-stars .bi-star{ color:#d0d4dc; }
-    .rating-stars.selectable .star-btn{ background:transparent; border:0; padding:0; margin:0; line-height:1; cursor:pointer; }
+    .rating-stars.selectable .star-btn{
+      background:transparent; border:0; padding:0; margin:0; line-height:1; cursor:pointer;
+    }
     .rating-note{ margin-left:.25rem; font-weight:600; }
     .rating-grid{ display:block; }
-    @media (min-width:480px){ .rating-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.25rem .75rem; } }
+    @media (min-width:480px){
+      .rating-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.25rem .75rem; }
+    }
     .rating-stars button{ line-height:1; }
 
     /* ****** ACRESCÍMOS VISUAIS ****** */
@@ -176,8 +180,9 @@
            style="font-weight:600; font-size:1.1rem; border-radius:12px; box-shadow:0 2px 12px #2747d918;">
           <i class="bi bi-megaphone-fill" style="font-size:1.4rem"></i>
           <span class="text-white">Avisos</span>
-          <span id="menuAvisosBadge" class="badge rounded-pill bg-danger ms-auto"
-                style="display: {{ 'inline-block' if unread>0 else 'none' }};">{{ unread or 0 }}</span>
+          {% if unread > 0 %}
+            <span class="badge rounded-pill bg-danger ms-auto">{{ unread }}</span>
+          {% endif %}
         </a>
       </li>
 
@@ -226,563 +231,562 @@
   </div>
 
   <div class="mobile-wrap">
-    <!-- TOPO COM MENU -->
-    <nav class="navbar navbar-dark">
-      <div class="container-fluid d-flex align-items-center flex-nowrap">
-        <!-- Botão do menu (não encolhe) -->
-        <button class="btn btn-link text-white fs-3 px-1 me-2 flex-shrink-0"
-                id="abrirMenu" title="Menu" aria-label="Menu">
-          <i class="bi bi-list"></i>
-        </button>
+  <!-- TOPO COM MENU -->
+  <nav class="navbar navbar-dark">
+    <div class="container-fluid d-flex align-items-center flex-nowrap">
+      <!-- Botão do menu (não encolhe) -->
+      <button class="btn btn-link text-white fs-3 px-1 me-2 flex-shrink-0"
+              id="abrirMenu" title="Menu" aria-label="Menu">
+        <i class="bi bi-list"></i>
+      </button>
 
-        <!-- Título central (bolinha vermelha é criada/atualizada via JS) -->
-        <span class="navbar-brand m-0 text-truncate"
-              style="min-width:0; flex:1 1 auto; text-align:center; letter-spacing:1px;">
-          Cooperado
-          {% if unread > 0 %}
-            <span class="unread-dot" title="Novos avisos" aria-label="Novos avisos"></span>
-          {% endif %}
+      <!-- Título central -->
+      <span class="navbar-brand m-0 text-truncate"
+            style="min-width:0; flex:1 1 auto; text-align:center; letter-spacing:1px;">
+        Cooperado
+        {% if unread > 0 %}
+          <span class="unread-dot" title="Novos avisos" aria-label="Novos avisos"></span>
+        {% endif %}
+      </span>
+
+      <!-- Ações à direita -->
+      <div class="d-flex align-items-center gap-2 flex-shrink-0">
+        {% set _score = cooperado_score|default(5.0) %}
+        <span class="score-pill" title="Sua pontuação como cooperado">
+          <i class="bi bi-star-fill" aria-hidden="true"></i>
+          <span class="mono">{{ ("%.1f"|format(_score)).replace('.',',') }}</span>
         </span>
+        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-light">Sair</a>
+      </div>
+    </div>
+  </nav>
+</div>
 
-        <!-- Ações à direita -->
-        <div class="d-flex align-items-center gap-2 flex-shrink-0">
-          {% set _score = cooperado_score|default(5.0) %}
-          <span class="score-pill" title="Sua pontuação como cooperado">
-            <i class="bi bi-star-fill" aria-hidden="true"></i>
-            <span class="mono">{{ ("%.1f"|format(_score)).replace('.',',') }}</span>
-          </span>
-          <a href="{{ url_for('logout') }}" class="btn btn-sm btn-light">Sair</a>
+    <!-- BANNER: novos avisos -->
+    {% if unread > 0 %}
+    <div class="p-2 pt-3">
+      <div class="alert alert-warning d-flex align-items-center justify-content-between mb-2" role="alert" style="border-radius:12px;">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-megaphone-fill"></i>
+          <span>Você tem <strong>{{ unread }}</strong> novo(s) aviso(s).</span>
+        </div>
+        <a href="{{ url_for('portal_cooperado_avisos') }}" class="btn btn-sm btn-warning">
+          <i class="bi bi-eye"></i> Ver avisos
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Filtro por período -->
+    <form class="card p-3 m-2 mt-3" method="GET" action="{{ url_for('coop_dashboard') }}">
+      <div class="row g-2 align-items-end">
+        <div class="col-6">
+          <label class="form-label mb-0">Início</label>
+          <input type="date" class="form-control" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+        </div>
+        <div class="col-6">
+          <label class="form-label mb-0">Fim</label>
+          <input type="date" class="form-control" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+        </div>
+        <div class="col-12 d-grid">
+          <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar Período</button>
         </div>
       </div>
-    </nav>
-  </div>
+      <small class="muted">Os totais abaixo consideram o período filtrado.</small>
+    </form>
 
-  <!-- (Opcional) Banner se quiser aparecer também na área de conteúdo -->
-  {% if unread > 0 %}
-  <div class="p-2 pt-3">
-    <div class="alert alert-warning d-flex align-items-center justify-content-between mb-2" role="alert" style="border-radius:12px;">
-      <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-megaphone-fill"></i>
-        <span>Você tem <strong>{{ unread }}</strong> novo(s) aviso(s).</span>
-      </div>
-      <a href="{{ url_for('portal_cooperado_avisos') }}" class="btn btn-sm btn-warning">
-        <i class="bi bi-eye"></i> Ver avisos
-      </a>
+    <!-- Abas -->
+    <div class="sticky-tabs px-2">
+      <ul class="nav nav-tabs nav-fill" id="painelTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#resumo">Resumo</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#producoes">Produções</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ajustes">Ajustes Coop</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#escalas">Escalas</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#trocas">Trocas</button></li>
+      </ul>
     </div>
-  </div>
-  {% endif %}
 
-  <!-- Filtro por período -->
-  <form class="card p-3 m-2 mt-3" method="GET" action="{{ url_for('coop_dashboard') }}">
-    <div class="row g-2 align-items-end">
-      <div class="col-6">
-        <label class="form-label mb-0">Início</label>
-        <input type="date" class="form-control" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
-      </div>
-      <div class="col-6">
-        <label class="form-label mb-0">Fim</label>
-        <input type="date" class="form-control" name="data_fim" value="{{ request.args.get('data_fim','') }}">
-      </div>
-      <div class="col-12 d-grid">
-        <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar Período</button>
-      </div>
-    </div>
-    <small class="muted">Os totais abaixo consideram o período filtrado.</small>
-  </form>
+    <div class="tab-content p-2 pb-4">
+      <!-- RESUMO -->
+      <div class="tab-pane fade show active" id="resumo" role="tabpanel">
+        <div class="card p-3 summary">
+          <div class="d-flex align-items-center mb-2">
+            <img src="{{ cooperado.foto_url or url_for('static', filename='img/default.png') }}"
+                 style="width:46px;height:46px;border-radius:50%;object-fit:cover;border:3px solid var(--royal-blue);margin-right:10px" alt="">
+            <div>
+              <div class="fw-bold">{{ cooperado.nome }}</div>
+              <small class="muted">{{ cooperado.usuario }}</small>
+            </div>
+          </div>
 
-  <!-- Abas -->
-  <div class="sticky-tabs px-2">
-    <ul class="nav nav-tabs nav-fill" id="painelTabs" role="tablist">
-      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#resumo">Resumo</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#producoes">Produções</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ajustes">Ajustes Coop</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#escalas">Escalas</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#trocas">Trocas</button></li>
-    </ul>
-  </div>
+          <div class="kpi"><span class="label">Total Bruto</span><span class="value mono">R$ {{ "%.2f"|format(total_bruto|default(0)) }}</span></div>
+          <div class="kpi"><span class="label">Total Descontos Individuais</span><span class="value mono">R$ {{ "%.2f"|format(total_descontos|default(0)) }}</span></div>
+          <hr class="my-2">
+          <div class="kpi"><span class="label">INSS (4,5%)</span><span class="value mono">R$ {{ "%.2f"|format(inss_valor|default(0)) }}</span></div>
+          <div class="kpi"><span class="label">Complemento INSS (meta)</span><span class="value mono">R$ {{ "%.2f"|format(inss_complemento|default(0)) }}</span></div>
+          <hr class="my-2">
+          <div class="kpi"><span class="label">Total Líquido</span><span class="value mono text-success">R$ {{ "%.2f"|format(total_liquido|default(0)) }}</span></div>
+        </div>
+      </div>
 
-  <div class="tab-content p-2 pb-4">
-    <!-- RESUMO -->
-    <div class="tab-pane fade show active" id="resumo" role="tabpanel">
-      <div class="card p-3 summary">
-        <div class="d-flex align-items-center mb-2">
-          <img src="{{ cooperado.foto_url or url_for('static', filename='img/default.png') }}"
-               style="width:46px;height:46px;border-radius:50%;object-fit:cover;border:3px solid var(--royal-blue);margin-right:10px" alt="">
-          <div>
-            <div class="fw-bold">{{ cooperado.nome }}</div>
-            <small class="muted">{{ cooperado.usuario }}</small>
+      <!-- PRODUÇÕES -->
+      <div class="tab-pane fade" id="producoes" role="tabpanel">
+        <div class="card p-3 mb-2">
+          <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Produções no período</h6>
+            <span class="chip mono">Total: R$ {{ "%.2f"|format(total_bruto|default(0)) }}</span>
           </div>
         </div>
 
-        <div class="kpi"><span class="label">Total Bruto</span><span class="value mono">R$ {{ "%.2f"|format(total_bruto|default(0)) }}</span></div>
-        <div class="kpi"><span class="label">Total Descontos Individuais</span><span class="value mono">R$ {{ "%.2f"|format(total_descontos|default(0)) }}</span></div>
-        <hr class="my-2">
-        <div class="kpi"><span class="label">INSS (4,5%)</span><span class="value mono">R$ {{ "%.2f"|format(inss_valor|default(0)) }}</span></div>
-        <div class="kpi"><span class="label">Complemento INSS (meta)</span><span class="value mono">R$ {{ "%.2f"|format(inss_complemento|default(0)) }}</span></div>
-        <hr class="my-2">
-        <div class="kpi"><span class="label">Total Líquido</span><span class="value mono text-success">R$ {{ "%.2f"|format(total_liquido|default(0)) }}</span></div>
-      </div>
-    </div>
+        <div class="card-list">
+          {% for lanc in producoes %}
+          <div class="card p-3">
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="list-item-title">{{ lanc.descricao }}</div>
+                <div class="muted">
+                  <i class="bi bi-shop"></i> {{ lanc.restaurante.nome }}
+                  &nbsp;·&nbsp; <i class="bi bi-calendar-event"></i> {{ lanc.data.strftime('%d/%m/%Y') }}
+                </div>
+                {% if lanc.hora_inicio or lanc.hora_fim %}
+                <small class="muted"><i class="bi bi-clock"></i> {{ lanc.hora_inicio }}{% if lanc.hora_fim %} às {{ lanc.hora_fim }}{% endif %}</small>
+                {% endif %}
 
-    <!-- PRODUÇÕES -->
-    <div class="tab-pane fade" id="producoes" role="tabpanel">
-      <div class="card p-3 mb-2">
-        <div class="d-flex justify-content-between align-items-center">
-          <h6 class="mb-0">Produções no período</h6>
-          <span class="chip mono">Total: R$ {{ "%.2f"|format(total_bruto|default(0)) }}</span>
-        </div>
-      </div>
+                <!-- AVALIAÇÃO DO RESTAURANTE -->
+                <div class="rating-wrap">
+                  {% set minha = lanc.minha_avaliacao %}
+                  {% if minha is not none %}
+                    <div class="small text-muted mb-1">Sua avaliação</div>
+                    <div class="rating-stars" aria-label="Sua avaliação: {{ minha }} de 5">
+                      {% for i in range(1,6) %}
+                        <i class="bi {{ 'bi-star-fill' if i <= minha else 'bi-star' }}"></i>
+                      {% endfor %}
+                      <span class="rating-note">{{ ("%.1f"|format(minha)).replace('.',',') }}</span>
+                    </div>
+                  {% else %}
+                    <form method="post"
+                          action="{{ url_for('producoes_avaliar', lanc_id=lanc.id) }}"
+                          class="avaliar-form" aria-label="Formulário de avaliação do restaurante">
+                      <input type="hidden" name="nota" value="">
+                      <input type="hidden" name="av_geral" value="">
+                      <input type="hidden" name="av_apresentacao" value="">
+                      <input type="hidden" name="av_educacao" value="">
+                      <input type="hidden" name="av_eficiencia" value="">
+                      <input type="hidden" name="av_pontualidade" value="">
 
-      <div class="card-list">
-        {% for lanc in producoes %}
-        <div class="card p-3">
-          <div class="d-flex justify-content-between">
-            <div>
-              <div class="list-item-title">{{ lanc.descricao }}</div>
-              <div class="muted">
-                <i class="bi bi-shop"></i> {{ lanc.restaurante.nome }}
-                &nbsp;·&nbsp; <i class="bi bi-calendar-event"></i> {{ lanc.data.strftime('%d/%m/%Y') }}
-              </div>
-              {% if lanc.hora_inicio or lanc.hora_fim %}
-              <small class="muted"><i class="bi bi-clock"></i> {{ lanc.hora_inicio }}{% if lanc.hora_fim %} às {{ lanc.hora_fim }}{% endif %}</small>
-              {% endif %}
-
-              <!-- AVALIAÇÃO DO RESTAURANTE -->
-              <div class="rating-wrap">
-                {% set minha = lanc.minha_avaliacao %}
-                {% if minha is not none %}
-                  <div class="small text-muted mb-1">Sua avaliação</div>
-                  <div class="rating-stars" aria-label="Sua avaliação: {{ minha }} de 5">
-                    {% for i in range(1,6) %}
-                      <i class="bi {{ 'bi-star-fill' if i <= minha else 'bi-star' }}"></i>
-                    {% endfor %}
-                    <span class="rating-note">{{ ("%.1f"|format(minha)).replace('.',',') }}</span>
-                  </div>
-                {% else %}
-                  <form method="post"
-                        action="{{ url_for('producoes_avaliar', lanc_id=lanc.id) }}"
-                        class="avaliar-form" aria-label="Formulário de avaliação do restaurante">
-                    <input type="hidden" name="nota" value="">
-                    <input type="hidden" name="av_geral" value="">
-                    <input type="hidden" name="av_apresentacao" value="">
-                    <input type="hidden" name="av_educacao" value="">
-                    <input type="hidden" name="av_eficiencia" value="">
-                    <input type="hidden" name="av_pontualidade" value="">
-
-                    <div class="rating-grid">
-                      <div class="mb-1">
-                        <div class="small fw-semibold text-muted">Geral</div>
-                        <div class="rating-stars stars-group" data-field="av_geral" data-readonly="true" aria-label="Média Geral">
-                          {% for i in range(1,6) %}
-                            <button type="button" class="star-btn" data-value="{{ i }}" disabled aria-hidden="true">
-                              <i class="bi bi-star"></i>
-                            </button>
-                          {% endfor %}
+                      <div class="rating-grid">
+                        <div class="mb-1">
+                          <div class="small fw-semibold text-muted">Geral</div>
+                          <div class="rating-stars stars-group" data-field="av_geral" data-readonly="true" aria-label="Média Geral">
+                            {% for i in range(1,6) %}
+                              <button type="button" class="star-btn" data-value="{{ i }}" disabled aria-hidden="true">
+                                <i class="bi bi-star"></i>
+                              </button>
+                            {% endfor %}
+                          </div>
                         </div>
-                      </div>
 
-                      <div class="mb-1">
-                        <div class="small fw-semibold text-muted">Ambiente</div>
-                        <div class="rating-stars selectable stars-group" data-field="av_apresentacao" role="radiogroup"
-                             aria-label="Avaliar Ambiente de 1 a 5">
-                          {% for i in range(1,6) %}
-                            <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} estrela{% if i>1 %}s{% endif %}">
-                              <i class="bi bi-star"></i>
-                            </button>
-                          {% endfor %}
+                        <div class="mb-1">
+                          <div class="small fw-semibold text-muted">Ambiente</div>
+                          <div class="rating-stars selectable stars-group" data-field="av_apresentacao" role="radiogroup"
+                               aria-label="Avaliar Ambiente de 1 a 5">
+                            {% for i in range(1,6) %}
+                              <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} estrela{% if i>1 %}s{% endif %}">
+                                <i class="bi bi-star"></i>
+                              </button>
+                            {% endfor %}
+                          </div>
                         </div>
-                      </div>
 
-                      <div class="mb-1">
-                        <div class="small fw-semibold text-muted">Tratamento</div>
-                        <div class="rating-stars selectable stars-group" data-field="av_educacao" role="radiogroup"
-                             aria-label="Avaliar Tratamento de 1 a 5">
-                          {% for i in range(1,6) %}
-                            <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} estrela{% if i>1 %}s{% endif %}">
-                              <i class="bi bi-star"></i>
-                            </button>
-                          {% endfor %}
+                        <div class="mb-1">
+                          <div class="small fw-semibold text-muted">Tratamento</div>
+                          <div class="rating-stars selectable stars-group" data-field="av_educacao" role="radiogroup"
+                               aria-label="Avaliar Tratamento de 1 a 5">
+                            {% for i in range(1,6) %}
+                              <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} estrela{% if i>1 %}s{% endif %}">
+                                <i class="bi bi-star"></i>
+                              </button>
+                            {% endfor %}
+                          </div>
+                        </div>
+
+                        <div class="mb-2">
+                          <div class="small fw-semibold text-muted">Suporte</div>
+                          <div class="rating-stars selectable stars-group" data-field="av_eficiencia" role="radiogroup"
+                               aria-label="Avaliar Suporte de 1 a 5">
+                            {% for i in range(1,6) %}
+                              <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} estrela{% if i>1 %}s{% endif %}">
+                                <i class="bi bi-star"></i>
+                              </button>
+                            {% endfor %}
+                          </div>
                         </div>
                       </div>
 
                       <div class="mb-2">
-                        <div class="small fw-semibold text-muted">Suporte</div>
-                        <div class="rating-stars selectable stars-group" data-field="av_eficiencia" role="radiogroup"
-                             aria-label="Avaliar Suporte de 1 a 5">
-                          {% for i in range(1,6) %}
-                            <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} estrela{% if i>1 %}s{% endif %}">
-                              <i class="bi bi-star"></i>
-                            </button>
-                          {% endfor %}
-                        </div>
+                        <textarea name="av_comentario" class="form-control form-control-sm" rows="2"
+                                  placeholder="Comentário (opcional)"></textarea>
                       </div>
-                    </div>
 
-                    <div class="mb-2">
-                      <textarea name="av_comentario" class="form-control form-control-sm" rows="2"
-                                placeholder="Comentário (opcional)"></textarea>
-                    </div>
-
-                    <div class="d-flex align-items-center gap-2">
-                      <button type="submit" class="btn btn-xs btn-outline-primary" disabled>Enviar</button>
-                      <small class="text-muted">Você só pode avaliar uma vez.</small>
-                    </div>
-                  </form>
-                {% endif %}
-              </div>
-              <!-- /AVALIAÇÃO -->
-            </div>
-            <div class="text-end">
-              <div class="value mono">R$ {{ "%.2f"|format(lanc.valor) }}</div>
-              <small class="muted">INSS (4,5%): R$ {{ "%.2f"|format((lanc.valor or 0)*0.045) }}</small>
-            </div>
-          </div>
-        </div>
-        {% else %}
-        <div class="card p-3 text-center muted">Nenhuma produção neste período.</div>
-        {% endfor %}
-      </div>
-    </div>
-
-    <!-- AJUSTES -->
-    <div class="tab-pane fade" id="ajustes" role="tabpanel">
-      <div class="card p-3 mb-2">
-        <div class="d-flex justify-content-between align-items-center">
-          <h6 class="mb-0">Créditos da Cooperativa</h6>
-          <span class="chip mono">Total: R$ {{ "%.2f"|format((receitas_coop|sum(attribute='valor'))|default(0)) }}</span>
-        </div>
-      </div>
-      <div class="card-list mb-3">
-        {% for rc in receitas_coop %}
-        <div class="card p-3">
-          <div class="d-flex justify-content-between">
-            <div>
-              <div class="list-item-title"><i class="bi bi-plus-circle"></i> {{ rc.descricao }}</div>
-              {% if rc.data %}<small class="muted"><i class="bi bi-calendar-event"></i> {{ rc.data.strftime('%d/%m/%Y') }}</small>{% endif %}
-            </div>
-            <div class="text-end value mono text-success">+ R$ {{ "%.2f"|format(rc.valor) }}</div>
-          </div>
-        </div>
-        {% else %}
-        <div class="card p-3 text-center muted">Nenhum crédito lançado para você.</div>
-        {% endfor %}
-      </div>
-
-      <div class="card p-3 mb-2">
-        <div class="d-flex justify-content-between align-items-center">
-          <h6 class="mb-0">Descontos / Despesas da Cooperativa</h6>
-          <span class="chip mono">Total: R$ {{ "%.2f"|format((despesas_coop|sum(attribute='valor'))|default(0)) }}</span>
-        </div>
-      </div>
-      <div class="card-list">
-        {% for d in despesas_coop %}
-        <div class="card p-3">
-          <div class="d-flex justify-content-between">
-            <div>
-              <div class="list-item-title"><i class="bi bi-dash-circle"></i> {{ d.descricao }}</div>
-              {% if d.data %}<small class="muted"><i class="bi bi-calendar-event"></i> {{ d.data.strftime('%d/%m/%Y') }}</small>{% endif %}
-            </div>
-            <div class="text-end value mono text-danger">− R$ {{ "%.2f"|format(d.valor) }}</div>
-          </div>
-        </div>
-        {% else %}
-        <div class="card p-3 text-center muted">Nenhum desconto aplicado no período.</div>
-        {% endfor %}
-      </div>
-    </div>
-
-    <!-- ESCALAS -->
-    <div class="tab-pane fade" id="escalas" role="tabpanel">
-      <div class="card p-3 mb-3">
-        {% set cnh_ok = doc_cnh.ok %}
-        {% set placa_ok = doc_placa.ok %}
-        {% set show_prazo = (not cnh_ok) or (not placa_ok) %}
-
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <h6 class="mb-0"><i class="bi bi-file-earmark-check"></i> Documentos</h6>
-
-          {% if show_prazo %}
-            <span class="badge-soft">
-              {% if not cnh_ok %}
-                CNH:
-                {% if doc_cnh.dias_para_prazo is defined %}
-                  faltam <span class="countdown">{{ doc_cnh.dias_para_prazo }}</span> dias
-                {% else %}
-                  fora do prazo
-                {% endif %}
-              {% endif %}
-
-              {% if (not cnh_ok) and (not placa_ok) %} · {% endif %}
-
-              {% if not placa_ok %}
-                Placa:
-                {% if doc_placa.dias_para_prazo is defined %}
-                  faltam <span class="countdown">{{ doc_placa.dias_para_prazo }}</span> dias
-                {% else %}
-                  fora do prazo
-                {% endif %}
-              {% endif %}
-            </span>
-          {% endif %}
-        </div>
-
-        <div class="p-3 rounded mb-2 {{ 'doc-ok' if cnh_ok else 'doc-bad' }}">
-          <div class="d-flex align-items-start">
-            <div class="me-2" style="font-size:1.25rem">
-              {% if cnh_ok %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
-            </div>
-            <div class="flex-fill">
-              <div class="fw-bold mb-1">CNH — {{ 'Em dia' if cnh_ok else 'Vencida ou pendente' }}</div>
-              <div class="small muted">
-                Nº: <b>{{ doc_cnh.numero or '—' }}</b> ·
-                Validade: <b>{{ doc_cnh.vencimento.strftime('%d/%m/%Y') if doc_cnh.vencimento else '—' }}</b>
-              </div>
-              {% if not cnh_ok %}
-                <div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle-fill"></i> Regularize para não travar repasses.</div>
-              {% else %}
-                <div class="small text-success mt-1"><i class="bi bi-shield-check"></i> Tudo certo com a CNH.</div>
-              {% endif %}
-            </div>
-          </div>
-        </div>
-
-        <div class="p-3 rounded {{ 'doc-ok' if placa_ok else 'doc-bad' }}">
-          <div class="d-flex align-items-start">
-            <div class="me-2" style="font-size:1.25rem">
-              {% if placa_ok %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
-            </div>
-            <div class="flex-fill">
-              <div class="fw-bold mb-1">Placa — {{ 'Em dia' if placa_ok else 'Vencida ou pendente' }}</div>
-              <div class="small muted">
-                Nº: <b>{{ doc_placa.numero or '—' }}</b> ·
-                Validade: <b>{{ doc_placa.vencimento.strftime('%d/%m/%Y') if doc_placa.vencimento else '—' }}</b>
-              </div>
-              {% if not placa_ok %}
-                <div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle-fill"></i> Atualize a placa/validade para evitar bloqueios.</div>
-              {% else %}
-                <div class="small text-success mt-1"><i class="bi bi-shield-check"></i> Tudo certo com a placa.</div>
-              {% endif %}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <style>
-        /* ——— Escala mobile compacta ——— */
-        .table-escala { table-layout: fixed; }
-        .table-escala th, .table-escala td{ padding:.40rem .48rem; line-height:1.12; vertical-align:middle; }
-        .table-escala th{ text-align:center; white-space:nowrap; }
-        .table-escala col.c-data     { width: 26%; }
-        .table-escala col.c-turno    { width: 18%; }
-        .table-escala col.c-horario  { width: 26%; }
-        .table-escala col.c-contrato { width: 30%; }
-        .row-stripe{ border-left:4px solid var(--stripe,#e5e7eb); }
-        .table-escala td{ font-size:.95rem; font-weight:600; text-align:justify; }
-        .table-escala td.nowrap{ white-space:nowrap; text-align:center; }
-        .date-cell{ position:relative; overflow:hidden; }
-        .date-top{ display:flex; align-items:center; gap:.35rem; }
-        .date-chip{
-          display:inline-flex; flex-direction:column; align-items:center;
-          border:1px solid #0001; border-radius:14px; padding:.14rem .55rem;
-          min-width:3.9rem; background:#fff; font-weight:800;
-        }
-        .date-chip .d1{ font-size:.98rem; line-height:1.05; }
-        .date-chip .d2{ font-size:.72rem; line-height:1; opacity:.75; }
-        .date-status{
-          display:inline-block; margin-top:.22rem; padding:.16rem .55rem;
-          border-radius:999px; font-size:.78rem; font-weight:800; white-space:nowrap;
-        }
-        .status-hoje{ background:#e8f7ee; color:#117a37; }
-        .status-amanha{ background:#eaf1ff; color:#1a56d6; }
-        .status-passado{ background:#fdecef; color:#c2254e; }
-        .status-futuro{ background:#eef3ff; color:#1a56d6; }
-        .actions-inline .btn{ padding:.22rem .50rem; font-size:.82rem; font-weight:700; }
-        .wrap-2,.wrap-3{
-          overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical;
-          word-break:break-word; hyphens:auto;
-        }
-        .wrap-2{ -webkit-line-clamp:2; }
-        .wrap-3{ -webkit-line-clamp:3; }
-        .hora-tight{ font-size:.92rem; }
-        @media (max-width:420px){
-          .table-escala th{ font-size:.98rem; }
-          .table-escala td{ font-size:.92rem; }
-          .date-chip .d1{ font-size:.95rem; }
-        }
-      </style>
-
-      <table class="table table-bordered table-escala align-middle">
-        <colgroup>
-          <col class="c-data">
-          <col class="c-turno">
-          <col class="c-horario">
-          <col class="c-contrato">
-        </colgroup>
-
-        <thead>
-          <tr>
-            <th>Data</th>
-            <th>Turno</th>
-            <th>Horário</th>
-            <th>Contrato</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {% if minha_escala %}
-            {% for e in minha_escala %}
-              {% set colors   = (e.cor or '')|string %}
-              {% set has_multi= '|' in colors %}
-              {% set cs       = colors.split('|') if has_multi else [] %}
-              {% set stripe   = (colors if not has_multi else (cs[0] if cs|length>0 else '')) or e.status_color %}
-
-              {% set data_curta = e.data_curta
-                                  or (e.data_fmt[:5] if e.data_fmt else (e.data[:5] if e.data else '')) %}
-              {% set dow = (e.dia_semana or e.dow or '')|upper %}
-              {% set status_class =
-                   'status-hoje' if e.status=='today' else
-                   'status-amanha' if e.status=='tomorrow' else
-                   'status-passado' if e.status=='past' else
-                   'status-futuro' %}
-
-              <tr class="row-stripe esc-{{ e.status }}" style="--stripe: {{ stripe }}">
-                <!-- DATA -->
-                <td class="date-cell">
-                  <div class="date-top">
-                    <span class="date-chip"
-                          style="background:{{ has_multi and cs|length>0 and cs[0] or (colors or '#fff') }}">
-                      <span class="d1">{{ data_curta }}</span>
-                      {% if dow %}<span class="d2">{{ dow }}</span>{% endif %}
-                    </span>
-                  </div>
-                  {% if e.status in ['today','tomorrow','past','future'] %}
-                    <span class="date-status {{ status_class }}">
-                      {% if e.status=='today' %}HOJE{% elif e.status=='tomorrow' %}AMANHÃ{% elif e.status=='past' %}PASSADO{% else %}FUTURO{% endif %}
-                    </span>
-                  {% endif %}
-                  <div class="actions-inline mt-1">
-                    <button type="button"
-                            class="btn btn-xs btn-outline-primary"
-                            data-bs-toggle="modal"
-                            data-bs-target="#trocaModal"
-                            data-escala-id="{{ e.id }}"
-                            data-escala-desc="{{ (data_curta or '') ~ ((' - ' ~ dow) if dow else '') ~ ' • ' ~ (e.turno or '') ~ ' • ' ~ (e.horario_fmt or e.horario or '') ~ ' • ' ~ (e.contrato or '') }}">
-                      <i class="bi bi-arrow-left-right"></i> Trocar
-                    </button>
-                  </div>
-                </td>
-
-                <!-- TURNO -->
-                <td class="nowrap">
-                  {{ e.turno or '—' }}
-                </td>
-
-                <!-- HORÁRIO -->
-                <td class="hora-tight">
-                  <span class="wrap-3">{{ e.horario_fmt or e.horario or '—' }}</span>
-                </td>
-
-                <!-- CONTRATO -->
-                <td>
-                  <span class="wrap-3">{{ e.contrato or '—' }}</span>
-                </td>
-              </tr>
-            {% endfor %}
-          {% else %}
-            <tr><td colspan="4" class="text-center muted">Nenhuma escala disponível.</td></tr>
-          {% endif %}
-        </tbody>
-      </table>
-      <div class="mt-1 small text-muted">
-        <i class="bi bi-info-circle"></i> As solicitações de troca ficam visíveis para o administrador.
-      </div>
-    </div> <!-- /tab escalas -->
-
-    <!-- TROCAS -->
-    <div class="tab-pane fade" id="trocas" role="tabpanel">
-      <div class="card p-3 mb-3">
-        <div class="d-flex align-items-center justify-content-between">
-          <h6 class="mb-0"><i class="bi bi-inbox"></i> Solicitações recebidas</h6>
-          <span class="badge-soft">{{ trocas_recebidas_pendentes|length }} pendente(s)</span>
-        </div>
-        <div class="mt-2">
-          {% if trocas_recebidas_pendentes %}
-            {% for t in trocas_recebidas_pendentes %}
-              <div class="border rounded p-2 mb-2 no-x-scroll">
-                <div class="d-flex align-items-center justify-content-between">
-                  <div class="me-2">
-                    <div class="fw-semibold">{{ t.solicitante.nome }}</div>
-                    <div class="small text-muted">{{ t.origem_desc }}</div>
-                    {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
-                    <div class="small text-muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
-                  </div>
-                  <div class="text-end">
-                    <button
-                      class="btn btn-sm btn-success mb-1"
-                      data-bs-toggle="modal"
-                      data-bs-target="#aceitarTrocaModal"
-                      data-troca-id="{{ t.id }}"
-                      data-origem-desc="{{ t.origem_desc }}"
-                      data-origem-weekday="{{ t.origem_weekday }}"
-                      data-origem-bucket="{{ t.origem_turno_bucket }}"
-                    ><i class="bi bi-check2"></i> Aceitar</button>
-                    <form class="d-inline" method="POST" action="{{ url_for('recusar_troca', troca_id=t.id) }}">
-                      <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i> Recusar</button>
+                      <div class="d-flex align-items-center gap-2">
+                        <button type="submit" class="btn btn-xs btn-outline-primary" disabled>Enviar</button>
+                        <small class="text-muted">Você só pode avaliar uma vez.</small>
+                      </div>
                     </form>
-                  </div>
+                  {% endif %}
                 </div>
+                <!-- /AVALIAÇÃO -->
               </div>
-            {% endfor %}
+              <div class="text-end">
+                <div class="value mono">R$ {{ "%.2f"|format(lanc.valor) }}</div>
+                <small class="muted">INSS (4,5%): R$ {{ "%.2f"|format((lanc.valor or 0)*0.045) }}</small>
+              </div>
+            </div>
+          </div>
           {% else %}
-            <div class="text-center text-muted">Nenhuma solicitação recebida.</div>
-          {% endif %}
+          <div class="card p-3 text-center muted">Nenhuma produção neste período.</div>
+          {% endfor %}
         </div>
       </div>
 
-      <div class="card p-3">
-        <div class="d-flex align-items-center justify-content-between">
-          <h6 class="mb-0"><i class="bi bi-send"></i> Minhas solicitações enviadas</h6>
-          <span class="badge-soft">{{ trocas_enviadas|length }}</span>
+      <!-- AJUSTES -->
+      <div class="tab-pane fade" id="ajustes" role="tabpanel">
+        <div class="card p-3 mb-2">
+          <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Créditos da Cooperativa</h6>
+            <span class="chip mono">Total: R$ {{ "%.2f"|format((receitas_coop|sum(attribute='valor'))|default(0)) }}</span>
+          </div>
+        </div>
+        <div class="card-list mb-3">
+          {% for rc in receitas_coop %}
+          <div class="card p-3">
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="list-item-title"><i class="bi bi-plus-circle"></i> {{ rc.descricao }}</div>
+                {% if rc.data %}<small class="muted"><i class="bi bi-calendar-event"></i> {{ rc.data.strftime('%d/%m/%Y') }}</small>{% endif %}
+              </div>
+              <div class="text-end value mono text-success">+ R$ {{ "%.2f"|format(rc.valor) }}</div>
+            </div>
+          </div>
+          {% else %}
+          <div class="card p-3 text-center muted">Nenhum crédito lançado para você.</div>
+          {% endfor %}
         </div>
 
-        <div class="mt-2">
-          {% if trocas_enviadas %}
-            {% for t in trocas_enviadas %}
-              <div class="border rounded p-2 mb-2 no-x-scroll">
-                <div class="d-flex align-items-center justify-content-between">
-                  <div class="me-2">
-                    <div class="fw-semibold">Para: {{ t.destino.nome }}</div>
-                    <div class="small text-muted">{{ t.origem_desc }}</div>
-                    {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
-                    <div class="small text-muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
-                  </div>
-                  <div class="text-end">
-                    {% if t.status == 'pendente' %}
-                      <span class="badge-status bg-warning-subtle text-warning">Pendente</span>
-                    {% elif t.status == 'aprovada' %}
-                      <span class="badge-status bg-success-subtle text-success">Aprovada</span>
-                    {% else %}
-                      <span class="badge-status bg-danger-subtle text-danger">Recusada</span>
+        <div class="card p-3 mb-2">
+          <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Descontos / Despesas da Cooperativa</h6>
+            <span class="chip mono">Total: R$ {{ "%.2f"|format((despesas_coop|sum(attribute='valor'))|default(0)) }}</span>
+          </div>
+        </div>
+        <div class="card-list">
+          {% for d in despesas_coop %}
+          <div class="card p-3">
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="list-item-title"><i class="bi bi-dash-circle"></i> {{ d.descricao }}</div>
+                {% if d.data %}<small class="muted"><i class="bi bi-calendar-event"></i> {{ d.data.strftime('%d/%m/%Y') }}</small>{% endif %}
+              </div>
+              <div class="text-end value mono text-danger">− R$ {{ "%.2f"|format(d.valor) }}</div>
+            </div>
+          </div>
+          {% else %}
+          <div class="card p-3 text-center muted">Nenhum desconto aplicado no período.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- ESCALAS -->
+      <div class="tab-pane fade" id="escalas" role="tabpanel">
+        <div class="card p-3 mb-3">
+          {% set cnh_ok = doc_cnh.ok %}
+          {% set placa_ok = doc_placa.ok %}
+          {% set show_prazo = (not cnh_ok) or (not placa_ok) %}
+
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0"><i class="bi bi-file-earmark-check"></i> Documentos</h6>
+
+            {% if show_prazo %}
+              <span class="badge-soft">
+                {% if not cnh_ok %}
+                  CNH:
+                  {% if doc_cnh.dias_para_prazo is defined %}
+                    faltam <span class="countdown">{{ doc_cnh.dias_para_prazo }}</span> dias
+                  {% else %}
+                    fora do prazo
+                  {% endif %}
+                {% endif %}
+
+                {% if (not cnh_ok) and (not placa_ok) %} · {% endif %}
+
+                {% if not placa_ok %}
+                  Placa:
+                  {% if doc_placa.dias_para_prazo is defined %}
+                    faltam <span class="countdown">{{ doc_placa.dias_para_prazo }}</span> dias
+                  {% else %}
+                    fora do prazo
+                  {% endif %}
+                {% endif %}
+              </span>
+            {% endif %}
+          </div>
+
+          <div class="p-3 rounded mb-2 {{ 'doc-ok' if cnh_ok else 'doc-bad' }}">
+            <div class="d-flex align-items-start">
+              <div class="me-2" style="font-size:1.25rem">
+                {% if cnh_ok %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
+              </div>
+              <div class="flex-fill">
+                <div class="fw-bold mb-1">CNH — {{ 'Em dia' if cnh_ok else 'Vencida ou pendente' }}</div>
+                <div class="small muted">
+                  Nº: <b>{{ doc_cnh.numero or '—' }}</b> ·
+                  Validade: <b>{{ doc_cnh.vencimento.strftime('%d/%m/%Y') if doc_cnh.vencimento else '—' }}</b>
+                </div>
+                {% if not cnh_ok %}
+                  <div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle-fill"></i> Regularize para não travar repasses.</div>
+                {% else %}
+                  <div class="small text-success mt-1"><i class="bi bi-shield-check"></i> Tudo certo com a CNH.</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div class="p-3 rounded {{ 'doc-ok' if placa_ok else 'doc-bad' }}">
+            <div class="d-flex align-items-start">
+              <div class="me-2" style="font-size:1.25rem">
+                {% if placa_ok %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
+              </div>
+              <div class="flex-fill">
+                <div class="fw-bold mb-1">Placa — {{ 'Em dia' if placa_ok else 'Vencida ou pendente' }}</div>
+                <div class="small muted">
+                  Nº: <b>{{ doc_placa.numero or '—' }}</b> ·
+                  Validade: <b>{{ doc_placa.vencimento.strftime('%d/%m/%Y') if doc_placa.vencimento else '—' }}</b>
+                </div>
+                {% if not placa_ok %}
+                  <div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle-fill"></i> Atualize a placa/validade para evitar bloqueios.</div>
+                {% else %}
+                  <div class="small text-success mt-1"><i class="bi bi-shield-check"></i> Tudo certo com a placa.</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <style>
+          /* ——— Escala mobile compacta ——— */
+          .table-escala { table-layout: fixed; }
+          .table-escala th, .table-escala td{ padding:.40rem .48rem; line-height:1.12; vertical-align:middle; }
+          .table-escala th{ text-align:center; white-space:nowrap; }
+          .table-escala col.c-data     { width: 26%; }
+          .table-escala col.c-turno    { width: 18%; }
+          .table-escala col.c-horario  { width: 26%; }
+          .table-escala col.c-contrato { width: 30%; }
+          .row-stripe{ border-left:4px solid var(--stripe,#e5e7eb); }
+          .table-escala td{ font-size:.95rem; font-weight:600; text-align:justify; }
+          .table-escala td.nowrap{ white-space:nowrap; text-align:center; }
+          .date-cell{ position:relative; overflow:hidden; }
+          .date-top{ display:flex; align-items:center; gap:.35rem; }
+          .date-chip{
+            display:inline-flex; flex-direction:column; align-items:center;
+            border:1px solid #0001; border-radius:14px; padding:.14rem .55rem;
+            min-width:3.9rem; background:#fff; font-weight:800;
+          }
+          .date-chip .d1{ font-size:.98rem; line-height:1.05; }
+          .date-chip .d2{ font-size:.72rem; line-height:1; opacity:.75; }
+          .date-status{
+            display:inline-block; margin-top:.22rem; padding:.16rem .55rem;
+            border-radius:999px; font-size:.78rem; font-weight:800; white-space:nowrap;
+          }
+          .status-hoje{ background:#e8f7ee; color:#117a37; }
+          .status-amanha{ background:#eaf1ff; color:#1a56d6; }
+          .status-passado{ background:#fdecef; color:#c2254e; }
+          .status-futuro{ background:#eef3ff; color:#1a56d6; }
+          .actions-inline .btn{ padding:.22rem .50rem; font-size:.82rem; font-weight:700; }
+          .wrap-2,.wrap-3{
+            overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical;
+            word-break:break-word; hyphens:auto;
+          }
+          .wrap-2{ -webkit-line-clamp:2; }
+          .wrap-3{ -webkit-line-clamp:3; }
+          .hora-tight{ font-size:.92rem; }
+          @media (max-width:420px){
+            .table-escala th{ font-size:.98rem; }
+            .table-escala td{ font-size:.92rem; }
+            .date-chip .d1{ font-size:.95rem; }
+          }
+        </style>
+
+        <table class="table table-bordered table-escala align-middle">
+          <colgroup>
+            <col class="c-data">
+            <col class="c-turno">
+            <col class="c-horario">
+            <col class="c-contrato">
+          </colgroup>
+
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Turno</th>
+              <th>Horário</th>
+              <th>Contrato</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% if minha_escala %}
+              {% for e in minha_escala %}
+                {% set colors   = (e.cor or '')|string %}
+                {% set has_multi= '|' in colors %}
+                {% set cs       = colors.split('|') if has_multi else [] %}
+                {% set stripe   = (colors if not has_multi else (cs[0] if cs|length>0 else '')) or e.status_color %}
+
+                {% set data_curta = e.data_curta
+                                    or (e.data_fmt[:5] if e.data_fmt else (e.data[:5] if e.data else '')) %}
+                {% set dow = (e.dia_semana or e.dow or '')|upper %}
+                {% set status_class =
+                     'status-hoje' if e.status=='today' else
+                     'status-amanha' if e.status=='tomorrow' else
+                     'status-passado' if e.status=='past' else
+                     'status-futuro' %}
+
+                <tr class="row-stripe esc-{{ e.status }}" style="--stripe: {{ stripe }}">
+                  <!-- DATA -->
+                  <td class="date-cell">
+                    <div class="date-top">
+                      <span class="date-chip"
+                            style="background:{{ has_multi and cs|length>0 and cs[0] or (colors or '#fff') }}">
+                        <span class="d1">{{ data_curta }}</span>
+                        {% if dow %}<span class="d2">{{ dow }}</span>{% endif %}
+                      </span>
+                    </div>
+                    {% if e.status in ['today','tomorrow','past','future'] %}
+                      <span class="date-status {{ status_class }}">
+                        {% if e.status=='today' %}HOJE{% elif e.status=='tomorrow' %}AMANHÃ{% elif e.status=='past' %}PASSADO{% else %}FUTURO{% endif %}
+                      </span>
                     {% endif %}
+                    <div class="actions-inline mt-1">
+                      <button type="button"
+                              class="btn btn-xs btn-outline-primary"
+                              data-bs-toggle="modal"
+                              data-bs-target="#trocaModal"
+                              data-escala-id="{{ e.id }}"
+                              data-escala-desc="{{ (data_curta or '') ~ ((' - ' ~ dow) if dow else '') ~ ' • ' ~ (e.turno or '') ~ ' • ' ~ (e.horario_fmt or e.horario or '') ~ ' • ' ~ (e.contrato or '') }}">
+                        <i class="bi bi-arrow-left-right"></i> Trocar
+                      </button>
+                    </div>
+                  </td>
+
+                  <!-- TURNO -->
+                  <td class="nowrap">
+                    {{ e.turno or '—' }}
+                  </td>
+
+                  <!-- HORÁRIO -->
+                  <td class="hora-tight">
+                    <span class="wrap-3">{{ e.horario_fmt or e.horario or '—' }}</span>
+                  </td>
+
+                  <!-- CONTRATO -->
+                  <td>
+                    <span class="wrap-3">{{ e.contrato or '—' }}</span>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr><td colspan="4" class="text-center muted">Nenhuma escala disponível.</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+        <div class="mt-1 small text-muted">
+          <i class="bi bi-info-circle"></i> As solicitações de troca ficam visíveis para o administrador.
+        </div>
+      </div> <!-- /tab escalas -->
+
+      <!-- TROCAS -->
+      <div class="tab-pane fade" id="trocas" role="tabpanel">
+        <div class="card p-3 mb-3">
+          <div class="d-flex align-items-center justify-content-between">
+            <h6 class="mb-0"><i class="bi bi-inbox"></i> Solicitações recebidas</h6>
+            <span class="badge-soft">{{ trocas_recebidas_pendentes|length }} pendente(s)</span>
+          </div>
+          <div class="mt-2">
+            {% if trocas_recebidas_pendentes %}
+              {% for t in trocas_recebidas_pendentes %}
+                <div class="border rounded p-2 mb-2 no-x-scroll">
+                  <div class="d-flex align-items-center justify-content-between">
+                    <div class="me-2">
+                      <div class="fw-semibold">{{ t.solicitante.nome }}</div>
+                      <div class="small text-muted">{{ t.origem_desc }}</div>
+                      {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
+                      <div class="small text-muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
+                    </div>
+                    <div class="text-end">
+                      <button
+                        class="btn btn-sm btn-success mb-1"
+                        data-bs-toggle="modal"
+                        data-bs-target="#aceitarTrocaModal"
+                        data-troca-id="{{ t.id }}"
+                        data-origem-desc="{{ t.origem_desc }}"
+                        data-origem-weekday="{{ t.origem_weekday }}"
+                        data-origem-bucket="{{ t.origem_turno_bucket }}"
+                      ><i class="bi bi-check2"></i> Aceitar</button>
+                      <form class="d-inline" method="POST" action="{{ url_for('recusar_troca', troca_id=t.id) }}">
+                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i> Recusar</button>
+                      </form>
+                    </div>
                   </div>
                 </div>
-              </div>
-            {% endfor %}
-          {% else %}
-            <div class="text-center text-muted">Nenhuma solicitação enviada.</div>
-          {% endif %}
+              {% endfor %}
+            {% else %}
+              <div class="text-center text-muted">Nenhuma solicitação recebida.</div>
+            {% endif %}
+          </div>
         </div>
-      </div>
-    </div> <!-- /tab trocas -->
 
+        <div class="card p-3">
+          <div class="d-flex align-items-center justify-content-between">
+            <h6 class="mb-0"><i class="bi bi-send"></i> Minhas solicitações enviadas</h6>
+            <span class="badge-soft">{{ trocas_enviadas|length }}</span>
+          </div>
+
+          <div class="mt-2">
+            {% if trocas_enviadas %}
+              {% for t in trocas_enviadas %}
+                <div class="border rounded p-2 mb-2 no-x-scroll">
+                  <div class="d-flex align-items-center justify-content-between">
+                    <div class="me-2">
+                      <div class="fw-semibold">Para: {{ t.destino.nome }}</div>
+                      <div class="small text-muted">{{ t.origem_desc }}</div>
+                      {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
+                      <div class="small text-muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
+                    </div>
+                    <div class="text-end">
+                      {% if t.status == 'pendente' %}
+                        <span class="badge-status bg-warning-subtle text-warning">Pendente</span>
+                      {% elif t.status == 'aprovada' %}
+                        <span class="badge-status bg-success-subtle text-success">Aprovada</span>
+                      {% else %}
+                        <span class="badge-status bg-danger-subtle text-danger">Recusada</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="text-center text-muted">Nenhuma solicitação enviada.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div> <!-- /tab trocas -->
+
+    </div>
+
+    <!-- Rodapé -->
+    <div class="text-center py-3 muted">
+      <small>© {{ current_year|default('') }} Coopex</small>
+    </div>
   </div>
-
-  <!-- Rodapé -->
-  <div class="text-center py-3 muted">
-    <small>© {{ current_year|default('') }} Coopex</small>
-  </div>
-
-  </div><!-- /mobile-wrap -->
 
   <!-- MODAL: Solicitar troca de escala -->
   <div class="modal fade" id="trocaModal" tabindex="-1" aria-hidden="true">
@@ -859,6 +863,189 @@
       </div>
     </div>
   </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Script: Solicitar troca -->
+  <script>
+    const COOPS_FINAL = {{ cooperados_json | default('[]') | safe }};
+    const MY_ESCALA = {{ minha_escala_json | default('[]') | safe }};
+
+    const coopListEl = document.getElementById('coopList');
+    const coopSearchEl = document.getElementById('coopSearch');
+    const fromEscalaIdEl = document.getElementById('fromEscalaId');
+    const fromEscalaDescEl = document.getElementById('fromEscalaDesc');
+    const toCooperadoIdEl = document.getElementById('toCooperadoId');
+    const btnEnviarTroca = document.getElementById('btnEnviarTroca');
+
+    function renderCoops(filter = '') {
+      const q = (filter || '').trim().toLowerCase();
+      coopListEl.innerHTML = '';
+      const base = Array.isArray(COOPS_FINAL) ? COOPS_FINAL : [];
+      if (!base.length) {
+        coopListEl.innerHTML = '<li class="list-group-item text-muted">Nenhum cooperado disponível para troca.</li>';
+        return;
+      }
+      const filtered = base.filter(c => !q || (String(c.nome || '').toLowerCase().includes(q))).slice(0, 200);
+      if (!filtered.length) {
+        coopListEl.innerHTML = '<li class="list-group-item text-muted">Nenhum resultado.</li>';
+        return;
+      }
+      filtered.forEach(c => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex align-items-center';
+        li.style.cursor = 'pointer';
+
+        const avatar = document.createElement('img');
+        avatar.src = c.foto_url || '{{ url_for("static", filename="img/default.png") }}';
+        avatar.alt = '';
+        avatar.style.width = '28px';
+        avatar.style.height = '28px';
+        avatar.style.objectFit = 'cover';
+        avatar.style.borderRadius = '50%';
+        avatar.style.border = '1px solid #0001';
+        avatar.style.marginRight = '.5rem';
+
+        const name = document.createElement('div');
+        name.className = 'flex-fill';
+        name.innerHTML = `<div class="fw-semibold">${c.nome || '—'}</div>`;
+
+        const choose = document.createElement('button');
+        choose.type = 'button';
+        choose.className = 'btn btn-sm btn-outline-primary';
+        choose.innerHTML = '<i class="bi bi-person-arrows"></i> Selecionar';
+        choose.addEventListener('click', () => {
+          const escala = fromEscalaDescEl.textContent || '';
+          const msg = `Deseja solicitar a troca deste plantão:\n\n${escala}\n\ncom o cooperado "${c.nome}"?`;
+          if (confirm(msg)) {
+            toCooperadoIdEl.value = c.id;
+            btnEnviarTroca.disabled = false;
+            [...coopListEl.querySelectorAll('.list-group-item')].forEach(x => x.classList.remove('active'));
+            li.classList.add('active');
+          }
+        });
+
+        li.appendChild(avatar);
+        li.appendChild(name);
+        li.appendChild(choose);
+        coopListEl.appendChild(li);
+      });
+    }
+
+    coopSearchEl?.addEventListener('input', () => renderCoops(coopSearchEl.value));
+
+    const trocaModalEl = document.getElementById('trocaModal');
+    trocaModalEl.addEventListener('show.bs.modal', (ev) => {
+      const btn = ev.relatedTarget;
+      const escalaId = btn?.getAttribute('data-escala-id') || '';
+      const escalaDesc = btn?.getAttribute('data-escala-desc') || '';
+
+      fromEscalaIdEl.value = escalaId;
+      fromEscalaDescEl.textContent = escalaDesc;
+      toCooperadoIdEl.value = '';
+      btnEnviarTroca.disabled = true;
+
+      coopSearchEl.value = '';
+      renderCoops('');
+    });
+
+    document.getElementById('trocaForm').addEventListener('submit', (e) => {
+      if (!fromEscalaIdEl.value || !toCooperadoIdEl.value) {
+        e.preventDefault();
+        alert('Selecione um cooperado para enviar a solicitação.');
+      }
+    });
+  </script>
+
+  <!-- Helpers: bucket de turno também via horário (compatível, sem \p{Mn}) -->
+  <script>
+    function stripDiacritics(str){
+      let s = String(str || '');
+      if (typeof s.normalize === 'function') s = s.normalize('NFD');
+      return s.replace(/[\u0300-\u036f]/g, '');
+    }
+    function turnoBucket(turno, horario) {
+      const t = stripDiacritics(String(turno || "").toLowerCase());
+      if (t.includes("noite") || t.includes("noturn")) return "noite";
+      if (t.includes("dia") || t.includes("diurn") || t.includes("manha") || t.includes("tarde")) return "dia";
+      const m = String(horario || "").match(/(\d{1,2}):(\d{2})/);
+      if (m) {
+        const h = parseInt(m[1], 10);
+        if (h >= 17 || h <= 6) return "noite";
+        return "dia";
+      }
+      return "dia";
+    }
+  </script>
+
+  <!-- Script: Aceitar troca (sem scroll lateral) -->
+  <script>
+    const aceitarModalEl = document.getElementById('aceitarTrocaModal');
+    const origemTrocaDescEl = document.getElementById('origemTrocaDesc');
+    const minhaEscalaCompatListEl = document.getElementById('minhaEscalaCompatList');
+    const destinoEscalaIdEl = document.getElementById('destinoEscalaId');
+    const btnConfirmarAceite = document.getElementById('btnConfirmarAceite');
+    const aceitarForm = document.getElementById('aceitarTrocaForm');
+
+    aceitarModalEl.addEventListener('show.bs.modal', (ev) => {
+      const btn = ev.relatedTarget;
+      const trocaId = btn?.getAttribute('data-troca-id');
+      const origemDesc = btn?.getAttribute('data-origem-desc') || '—';
+      const origemWeekday = parseInt(btn?.getAttribute('data-origem-weekday'));
+      const origemBucket = btn?.getAttribute('data-origem-bucket');
+
+      origemTrocaDescEl.textContent = origemDesc;
+      aceitarForm.action = `/trocas/${trocaId}/aceitar`;
+      destinoEscalaIdEl.value = '';
+      btnConfirmarAceite.disabled = true;
+
+      const base = Array.isArray(MY_ESCALA) ? MY_ESCALA : [];
+      const compativeis = base.filter(e => {
+        const bucket = e.turno_bucket || turnoBucket(e.turno, e.horario);
+        return e.weekday === origemWeekday && bucket === origemBucket;
+      });
+
+      minhaEscalaCompatListEl.innerHTML = '';
+      if (!compativeis.length) {
+        minhaEscalaCompatListEl.innerHTML = '<li class="list-group-item text-muted">Você não tem plantões compatíveis (mesmo dia da semana e turno).</li>';
+        return;
+      }
+
+      compativeis.forEach(e => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex align-items-center justify-content-between';
+        li.innerHTML = `
+          <div class="me-2">
+            <div class="fw-semibold">${e.data} • ${e.turno || ''} • ${e.horario || ''} • ${e.contrato || ''}</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary">Trocar com este</button>
+        `;
+        li.querySelector('button').addEventListener('click', () => {
+          destinoEscalaIdEl.value = e.id;
+          btnConfirmarAceite.disabled = false;
+          [...minhaEscalaCompatListEl.querySelectorAll('.list-group-item')].forEach(x => x.classList.remove('active'));
+          li.classList.add('active');
+        });
+        minhaEscalaCompatListEl.appendChild(li);
+      });
+    });
+
+    aceitarForm.addEventListener('submit', (e) => {
+      if (!destinoEscalaIdEl.value) {
+        e.preventDefault();
+        alert('Escolha um plantão seu compatível para concluir a troca.');
+      }
+    });
+
+    // Cinto de segurança de acessibilidade para o modal (corrige aria-hidden se necessário)
+    document.addEventListener('shown.bs.modal', (ev) => {
+      if (ev.target.id === 'aceitarTrocaModal') {
+        ev.target.removeAttribute('aria-hidden');
+        try { ev.target.querySelector('.btn-close')?.focus(); } catch(_) {}
+      }
+    });
+  </script>
 
   <!-- OFFCANVAS: FINANÇAS -->
   <div class="offcanvas offcanvas-bottom" tabindex="-1" id="financasSheet" aria-labelledby="financasSheetLabel" style="height:92vh">
@@ -1179,39 +1366,39 @@
             </button>
           </div>
 
-          <div id="cxHistorico" class="mt-2"></div>
+        <div id="cxHistorico" class="mt-2"></div>
 
-          <hr class="my-2">
+        <hr class="my-2">
 
-          <div class="row g-2">
-            <div class="col-6">
-              <div class="small text-muted">Total km</div>
-              <div class="result-badge mono" id="cxTotKm">0</div>
-            </div>
-            <div class="col-6">
-              <div class="small text-muted">Total ganho</div>
-              <div class="result-badge mono" id="cxTotGanho">R$ 0,00</div>
-            </div>
-            <div class="col-6">
-              <div class="small text-muted">Total custo</div>
-              <div class="result-badge mono" id="cxTotCusto">R$ 0,00</div>
-            </div>
-            <div class="col-6">
-              <div class="small text-muted">Total lucro</div>
-              <div class="result-badge mono text-success" id="cxTotLucro">R$ 0,00</div>
-            </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <div class="small text-muted">Total km</div>
+            <div class="result-badge mono" id="cxTotKm">0</div>
+          </div>
+          <div class="col-6">
+            <div class="small text-muted">Total ganho</div>
+            <div class="result-badge mono" id="cxTotGanho">R$ 0,00</div>
+          </div>
+          <div class="col-6">
+            <div class="small text-muted">Total custo</div>
+            <div class="result-badge mono" id="cxTotCusto">R$ 0,00</div>
+          </div>
+          <div class="col-6">
+            <div class="small text-muted">Total lucro</div>
+            <div class="result-badge mono text-success" id="cxTotLucro">R$ 0,00</div>
           </div>
         </div>
+      </div>
 
-        <div class="modal-footer border-0">
-          <button class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
-          <button class="btn btn-royal" data-bs-dismiss="modal">
-            <i class="bi bi-arrow-left"></i> Voltar
-          </button>
-        </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+        <button class="btn btn-royal" data-bs-dismiss="modal">
+          <i class="bi bi-arrow-left"></i> Voltar
+        </button>
       </div>
     </div>
   </div>
+</div>
 
   <!-- MODAL: Bloco de Notas -->
   <div class="modal fade" id="notesModal" tabindex="-1" aria-hidden="true">
@@ -1291,193 +1478,172 @@
     </div>
   </div>
 
-  <!-- Toast: Novos avisos (topo, centro) -->
-  <div id="toastAvisos"
-       class="toast align-items-center position-fixed top-0 start-50 translate-middle-x mt-3"
-       role="alert" aria-live="assertive" aria-atomic="true"
-       data-bs-delay="8000"
-       data-unread-endpoint="{{ url_for('avisos_unread_count') if url_for else '/avisos/unread_count' }}">
-    <div class="d-flex">
-      <div class="toast-body">
-        Você tem <strong class="toast-count">0</strong> aviso(s) não lido(s).
-        <a class="ms-1" href="{{ url_for('portal_cooperado_avisos') }}">Ver</a>
-      </div>
-      <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+  <!-- TOAST de novos avisos -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+  <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
+       data-bs-autohide="true" data-bs-delay="8000"
+       data-unread-endpoint="/avisos/unread_count">
+    <div class="toast-header">
+      <i class="bi bi-megaphone-fill me-2"></i>
+      <strong class="me-auto">Novos avisos</strong>
+      <small class="toast-time">agora</small>
+      <button class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
+    </div>
+    <div class="toast-body">
+      Você tem <span class="toast-count">{{ unread }}</span> aviso(s) não lido(s).
+      <a href="{{ url_for('portal_cooperado_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
     </div>
   </div>
+</div>
 
-  <!-- Som de notificação -->
-  <audio id="avisoSound" preload="auto">
-    <source src="{{ url_for('static', filename='sounds/notify.mp3') }}" type="audio/mpeg">
-  </audio>
+<!-- ÁUDIO: som de aviso -->
+<audio id="avisoSound" preload="auto">
+  <source src="{{ url_for('static', filename='sounds/notify.mp3') }}" type="audio/mpeg">
+</audio>
 
-  <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- MENU lateral + TOAST avisos + SOM ao chegar -->
+<script>
+  (function(){
+    const menuLateral = document.getElementById('menuLateral');
+    const fundoMenu = document.getElementById('fundoMenu');
+    const abrir = document.getElementById('abrirMenu');
+    const fechar = document.getElementById('fecharMenu');
 
-  <!-- MENU lateral + TOAST avisos + SOM ao chegar -->
-  <script>
-    (function(){
-      // === MENU LATERAL ===
-      const menuLateral = document.getElementById('menuLateral');
-      const fundoMenu = document.getElementById('fundoMenu');
-      const abrir = document.getElementById('abrirMenu');
-      const fechar = document.getElementById('fecharMenu');
+    abrir?.addEventListener('click', () => {
+      menuLateral?.classList.add('aberto');
+      fundoMenu?.classList.add('aberto');
+    });
+    fechar?.addEventListener('click', () => {
+      menuLateral?.classList.remove('aberto');
+      fundoMenu?.classList.remove('aberto');
+    });
+    fundoMenu?.addEventListener('click', () => {
+      menuLateral?.classList.remove('aberto');
+      fundoMenu?.classList.remove('aberto');
+    });
+  })();
 
-      abrir?.addEventListener('click', () => {
-        menuLateral?.classList.add('aberto');
-        fundoMenu?.classList.add('aberto');
-      });
-      fechar?.addEventListener('click', () => {
-        menuLateral?.classList.remove('aberto');
-        fundoMenu?.classList.remove('aberto');
-      });
-      fundoMenu?.addEventListener('click', () => {
-        menuLateral?.classList.remove('aberto');
-        fundoMenu?.classList.remove('aberto');
-      });
-    })();
+  document.addEventListener('DOMContentLoaded', function () {
+    const toastEl = document.getElementById('toastAvisos');
+    const toastBody = toastEl?.querySelector('.toast-body');
+    const toastCountEl = toastEl?.querySelector('.toast-count');
+    const toastTimeEl = toastEl?.querySelector('.toast-time');
+    const endpoint = toastEl?.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
 
-    document.addEventListener('DOMContentLoaded', function () {
-      // === TOAST / AVISOS ===
-      const toastEl = document.getElementById('toastAvisos');
-      const toastBody = toastEl?.querySelector('.toast-body');
-      const toastCountEl = toastEl?.querySelector('.toast-count');
-      const endpoint = toastEl?.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
+    const unreadInitial = Number('{{ unread }}') || 0;
+    const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
+    const LS_KEY = `COOPEX_AVISOS_LAST_${UID}`;
+    const audio = document.getElementById('avisoSound');
 
-      const unreadInitial = Number('{{ unread|default(0) }}') || 0;
-      const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
-      const LS_KEY = `COOPEX_AVISOS_LAST_${UID}`;
-      const audio = document.getElementById('avisoSound');
+    // Bootstrap toast helper
+    function showToast(count) {
+      if (!window.bootstrap?.Toast || !toastEl) return;
+      if (toastCountEl) toastCountEl.textContent = String(count);
+      if (toastTimeEl) toastTimeEl.textContent = 'agora';
+      new bootstrap.Toast(toastEl).show();
+    }
 
-      // ——— elementos para sincronizar UI (badge no menu + dot na navbar)
-      const menuAvisosBadge = document.getElementById('menuAvisosBadge');
-      const navbarBrand = document.querySelector('.navbar .navbar-brand');
-
-      function ensureNavbarDot() {
-        if (!navbarBrand) return null;
-        let dot = navbarBrand.querySelector('.unread-dot');
-        if (!dot) {
-          dot = document.createElement('span');
-          dot.className = 'unread-dot';
-          dot.title = 'Novos avisos';
-          navbarBrand.appendChild(dot);
-        }
-        return dot;
-      }
-
-      function syncUI(count) {
-        // badge do menu
-        if (menuAvisosBadge) {
-          if (count > 0) {
-            menuAvisosBadge.textContent = String(count);
-            menuAvisosBadge.style.display = 'inline-block';
-          } else {
-            menuAvisosBadge.textContent = '';
-            menuAvisosBadge.style.display = 'none';
-          }
-        }
-        // dot da navbar
-        const dot = ensureNavbarDot();
-        if (dot) dot.style.display = (count > 0) ? 'inline-block' : 'none';
-
-        // número no toast
-        if (toastCountEl) toastCountEl.textContent = String(count);
-      }
-
-      function showToast(count) {
-        if (!window.bootstrap?.Toast || !toastEl) return;
-        if (toastCountEl) toastCountEl.textContent = String(count);
-        const t = bootstrap.Toast.getOrCreateInstance(toastEl);
-        t.hide(); // evita “empilhar”
-        t.show();
-      }
-
-      async function playAvisoSound() {
-        if (!audio) return;
-        try {
-          await audio.play();
-        } catch (_) {
-          // Desbloqueia o autoplay na primeira interação do usuário
-          const enable = async () => { try { await audio.play(); } catch(_) {} };
-          document.addEventListener('click', enable, { once:true });
-          document.addEventListener('keydown', enable, { once:true });
-          document.addEventListener('touchstart', enable, { once:true });
-        }
-      }
-
-      // Exibe na carga se houver novos (comparando com o último visto salvo no device)
-      const lastSeen = Number(localStorage.getItem(LS_KEY) || 0);
-      syncUI(unreadInitial);
-      if (unreadInitial > 0 && (unreadInitial > lastSeen || lastSeen === 0)) {
-        if (toastBody && toastBody.firstChild && toastBody.firstChild.nodeType === Node.TEXT_NODE) {
-          toastBody.firstChild.nodeValue = `Você tem ${unreadInitial} aviso(s) não lido(s). `;
-        }
-        showToast(unreadInitial);
-        playAvisoSound();
-        localStorage.setItem(LS_KEY, String(unreadInitial));
-      }
-
-      // Polling periódico
-      async function checkUnread(){
-        try {
-          const resp = await fetch(endpoint, {
-            headers: { 'Accept':'application/json' },
-            cache:'no-store',
-            credentials: 'same-origin'
-          });
-          if (!resp.ok) return;
-          const data = await resp.json();
-          const count = Number(data.unread ?? data.count ?? 0);
-          const current = Number(localStorage.getItem(LS_KEY) || 0);
-
-          syncUI(count);
-
-          // Se aumentou, notifica com toast + som e persiste
-          if (Number.isFinite(count) && count > current) {
-            if (toastBody && toastBody.firstChild && toastBody.firstChild.nodeType === Node.TEXT_NODE) {
-              toastBody.firstChild.nodeValue = `Você tem ${count} aviso(s) não lido(s). `;
-            }
-            showToast(count);
-            playAvisoSound();
-            localStorage.setItem(LS_KEY, String(count));
-          }
-        } catch (_) { /* silencioso */ }
-      }
-
-      setInterval(checkUnread, 20000);
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') checkUnread();
-      });
-
-      // Broadcast da página de avisos
+    // Som
+    async function playAvisoSound() {
+      if (!audio) return;
       try {
-        const ch = new BroadcastChannel('coopex_avisos');
-        ch.onmessage = (ev) => {
-          const count = Number(ev.data?.unread || 0);
-          const current = Number(localStorage.getItem(LS_KEY) || 0);
+        await audio.play();
+      } catch (err) {
+        const enable = async () => { try { await audio.play(); } catch(_) {} };
+        document.addEventListener('click', enable, { once:true });
+        document.addEventListener('keydown', enable, { once:true });
+        document.addEventListener('touchstart', enable, { once:true });
+      }
+    }
 
-          syncUI(count);
+    // Exibe na carga se houver novos
+    const lastSeen = Number(localStorage.getItem(LS_KEY) || 0);
+    if (unreadInitial > 0 && (unreadInitial > lastSeen || lastSeen === 0)) {
+      showToast(unreadInitial);
+      playAvisoSound();
+      localStorage.setItem(LS_KEY, String(unreadInitial));
+    }
 
-          if (Number.isFinite(count) && count > current) {
-            showToast(count);
-            playAvisoSound();
-            localStorage.setItem(LS_KEY, String(count));
+    // Polling periódico
+    async function checkUnread(){
+      try {
+        const resp = await fetch(endpoint, { headers: { 'Accept':'application/json' }, cache:'no-store', credentials: 'same-origin' });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const count = Number(data.unread ?? data.count ?? 0);
+        const current = Number(localStorage.getItem(LS_KEY) || 0);
+
+        if (Number.isFinite(count) && count > current) {
+          if (toastBody && typeof data.message === 'string' && data.message.trim()) {
+            // atualiza o texto sem quebrar o link
+            toastBody.firstChild.nodeValue = `Você tem ${count} aviso(s) não lido(s). `;
           }
-        };
-        // utilitário global (se quiser disparar manualmente)
-        window.coopAvisosNotify = function(count) {
-          const n = Number(count || 0);
-          const current = Number(localStorage.getItem(LS_KEY) || 0);
+          showToast(count);
+          playAvisoSound();
+          localStorage.setItem(LS_KEY, String(count));
+        }
+      } catch (_) {
+        // silencioso
+      }
+    }
 
-          syncUI(n);
+    // roda a cada 20s e ao voltar o foco
+    setInterval(checkUnread, 20000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') checkUnread();
+    });
 
-          if (Number.isFinite(n) && n > current) {
-            showToast(n);
-            playAvisoSound();
-            localStorage.setItem(LS_KEY, String(n));
-          }
-        };
-      } catch (_) {}
+    // Integração com a página de avisos (opcional)
+    try {
+      const ch = new BroadcastChannel('coopex_avisos');
+      ch.onmessage = (ev) => {
+        const count = Number(ev.data?.unread || 0);
+        const current = Number(localStorage.getItem(LS_KEY) || 0);
+        if (Number.isFinite(count) && count > current) {
+          showToast(count);
+          playAvisoSound();
+          localStorage.setItem(LS_KEY, String(count));
+        }
+      };
+      // função global opcional
+      window.coopAvisosNotify = function(count) {
+        const n = Number(count || 0);
+        const current = Number(localStorage.getItem(LS_KEY) || 0);
+        if (Number.isFinite(n) && n > current) {
+          showToast(n);
+          playAvisoSound();
+          localStorage.setItem(LS_KEY, String(n));
+        }
+      };
+    } catch (_) { /* browsers antigos */ }
+  });
+</script>
+
+  <!-- JS: Avaliação (legado simples) -->
+  <script>
+    document.querySelectorAll('.avaliar-form').forEach(form => {
+      if (form.querySelector('.stars-group')) return;
+      const stars = Array.from(form.querySelectorAll('.star-btn'));
+      const input = form.querySelector('input[name="nota"]');
+      const submit = form.querySelector('button[type="submit"]');
+      stars.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const val = Number(btn.dataset.value);
+          input.value = val;
+          submit.disabled = false;
+          stars.forEach(b => {
+            const i = Number(b.dataset.value);
+            const icon = b.querySelector('i');
+            icon.className = 'bi ' + (i <= val ? 'bi-star-fill' : 'bi-star');
+          });
+        });
+      });
+      form.addEventListener('submit', (e) => {
+        if (!input.value) {
+          e.preventDefault();
+          alert('Selecione uma nota de 1 a 5.');
+        }
+      });
     });
   </script>
 
@@ -1686,178 +1852,178 @@
   </script>
 
   <script>
-    (function(){
-      const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
-      const LS_KEY = `COOPEX_FIN_${UID}`;
-      const el = id => document.getElementById(id);
-      const monthFmt = (d)=> d.toISOString().slice(0,7);
-      const money = n => 'R$ ' + (Number(n)||0).toFixed(2).replace('.',',');
-      const parseNum = v => { const n=parseFloat(String(v).replace(',', '.')); return Number.isFinite(n)?n:0; };
+  (function(){
+    const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
+    const LS_KEY = `COOPEX_FIN_${UID}`;
+    const el = id => document.getElementById(id);
+    const monthFmt = (d)=> d.toISOString().slice(0,7);
+    const money = n => 'R$ ' + (Number(n)||0).toFixed(2).replace('.',',');
+    const parseNum = v => { const n=parseFloat(String(v).replace(',', '.')); return Number.isFinite(n)?n:0; };
 
-      // UI refs
-      const mesEl = el('finMes');
-      const recSumEl = el('finRecSum'), despSumEl = el('finDespSum'), saldoEl = el('finSaldo');
-      const metaValorEl = el('finMetaValor'), metaPctEl = el('finMetaPct'), metaAlvoEl = el('finMetaAlvo'), guardadoEl = el('finGuardado'), metaProgEl = el('finMetaProg');
-      const tipoEl = el('finTipo'), dataEl = el('finData'), catEl = el('finCat'), valEl = el('finValor'), descEl = el('finDesc');
-      const parcSw = el('finParcSw'), parcWrap = el('finParcWrap'), parcIniEl = el('finParcIni'), parcNEl = el('finParcN'), parcPrevEl = el('finParcPreview');
-      const btnAdd = el('finAdd'), listaEl = el('finLista'), topCatsEl = el('finTopCats');
-      const btnClearMes = el('finClearMes'), btnExport = el('finExport'), btnDicas = el('finDicasBtn');
+    // UI refs
+    const mesEl = el('finMes');
+    const recSumEl = el('finRecSum'), despSumEl = el('finDespSum'), saldoEl = el('finSaldo');
+    const metaValorEl = el('finMetaValor'), metaPctEl = el('finMetaPct'), metaAlvoEl = el('finMetaAlvo'), guardadoEl = el('finGuardado'), metaProgEl = el('finMetaProg');
+    const tipoEl = el('finTipo'), dataEl = el('finData'), catEl = el('finCat'), valEl = el('finValor'), descEl = el('finDesc');
+    const parcSw = el('finParcSw'), parcWrap = el('finParcWrap'), parcIniEl = el('finParcIni'), parcNEl = el('finParcN'), parcPrevEl = el('finParcPreview');
+    const btnAdd = el('finAdd'), listaEl = el('finLista'), topCatsEl = el('finTopCats');
+    const btnClearMes = el('finClearMes'), btnExport = el('finExport'), btnDicas = el('finDicasBtn');
 
-      // Estado
-      let items = load();
-      let currentMonth = (()=>{ const today = new Date(); return monthFmt(today); })();
+    // Estado
+    let items = load();
+    let currentMonth = (()=>{ const today = new Date(); return monthFmt(today); })();
 
-      // Storage
-      function load(){ try{ const raw = localStorage.getItem(LS_KEY); const arr = raw? JSON.parse(raw): []; return Array.isArray(arr)?arr:[]; }catch(_){ return []; } }
-      function save(){ localStorage.setItem(LS_KEY, JSON.stringify(items)); }
+    // Storage
+    function load(){ try{ const raw = localStorage.getItem(LS_KEY); const arr = raw? JSON.parse(raw): []; return Array.isArray(arr)?arr:[]; }catch(_){ return []; } }
+    function save(){ localStorage.setItem(LS_KEY, JSON.stringify(items)); }
 
-      // Helpers
-      function nextMonth(ym, plus=1){
-        const [y,m]=ym.split('-').map(x=>parseInt(x,10));
-        const dt=new Date(y, m-1+plus, 1);
-        return dt.toISOString().slice(0,7);
+    // Helpers
+    function nextMonth(ym, plus=1){
+      const [y,m]=ym.split('-').map(x=>parseInt(x,10));
+      const dt=new Date(y, m-1+plus, 1);
+      return dt.toISOString().slice(0,7);
+    }
+    function endOfMonth(ym){
+      const [y,m]=ym.split('-').map(x=>parseInt(x,10));
+      return new Date(y, m, 0).getDate();
+    }
+    function toDateStr(ym, day=1){
+      const [y,m]=ym.split('-').map(x=>parseInt(x,10));
+      const d = Math.min(day, endOfMonth(ym));
+      return new Date(y, m-1, d).toISOString().slice(0,10);
+    }
+    function uid(){ return Math.random().toString(36).slice(2)+Date.now().toString(36); }
+
+    // Boot inputs
+    mesEl.value = currentMonth;
+    dataEl.value = new Date().toISOString().slice(0,10);
+    parcIniEl.value = currentMonth;
+
+    // Parcelamento preview
+    function renderParcPreview(){
+      const n = Math.max(2, parseInt(parcNEl.value||'10',10));
+      const modo = document.querySelector('input[name="finParcModo"]:checked')?.value || 'valor';
+      const baseVal = parseNum(valEl.value);
+      const start = parcIniEl.value || currentMonth;
+      if (modo==='valor') {
+        parcPrevEl.textContent = `Serão ${n} parcelas de ${money(baseVal)} de ${start} até ${nextMonth(start, n-1)}.`;
+      } else {
+        parcPrevEl.textContent = `Valor total ${money(baseVal)} dividido em ${n} parcelas iguais — primeira em ${start}, última em ${nextMonth(start, n-1)}.`;
       }
-      function endOfMonth(ym){
-        const [y,m]=ym.split('-').map(x=>parseInt(x,10));
-        return new Date(y, m, 0).getDate();
-      }
-      function toDateStr(ym, day=1){
-        const [y,m]=ym.split('-').map(x=>parseInt(x,10));
-        const d = Math.min(day, endOfMonth(ym));
-        return new Date(y, m-1, d).toISOString().slice(0,10);
-      }
-      function uid(){ return Math.random().toString(36).slice(2)+Date.now().toString(36); }
+    }
 
-      // Boot inputs
-      mesEl.value = currentMonth;
-      dataEl.value = new Date().toISOString().slice(0,10);
-      parcIniEl.value = currentMonth;
+    // Toggle parcelamento
+    parcSw.addEventListener('change', ()=> { parcWrap.style.display = parcSw.checked ? '' : 'none'; renderParcPreview(); });
+    ['input','change'].forEach(ev=>{
+      parcNEl.addEventListener(ev, renderParcPreview);
+      parcIniEl.addEventListener(ev, renderParcPreview);
+      valEl.addEventListener(ev, renderParcPreview);
+      document.querySelectorAll('input[name="finParcModo"]').forEach(r=> r.addEventListener(ev, renderParcPreview));
+    });
 
-      // Parcelamento preview
-      function renderParcPreview(){
-        const n = Math.max(2, parseInt(parcNEl.value||'10',10));
-        const modo = document.querySelector('input[name="finParcModo"]:checked')?.value || 'valor';
-        const baseVal = parseNum(valEl.value);
-        const start = parcIniEl.value || currentMonth;
-        if (modo==='valor') {
-          parcPrevEl.textContent = `Serão ${n} parcelas de ${money(baseVal)} de ${start} até ${nextMonth(start, n-1)}.`;
-        } else {
-          parcPrevEl.textContent = `Valor total ${money(baseVal)} dividido em ${n} parcelas iguais — primeira em ${start}, última em ${nextMonth(start, n-1)}.`;
+    // CRUD
+    function addItem(obj){ items.push(obj); save(); refresh(); }
+    function removeItem(id){ items = items.filter(x=>x.id!==id); save(); refresh(); }
+
+    // Adicionar
+    btnAdd.addEventListener('click', ()=>{
+      const tipo = String(tipoEl.value||'despesa');
+      const data = String(dataEl.value||new Date().toISOString().slice(0,10));
+      const cat  = (catEl.value||'Geral').trim();
+      const val  = parseNum(valEl.value);
+      const desc = (descEl.value||'').trim();
+      if (!val || val<=0){ alert('Informe um valor válido.'); return; }
+
+      if (!parcSw.checked){
+        addItem({id:uid(), tipo, data, cat, val, desc, origem:'manual'});
+        clearForm(); return;
+      }
+
+      // Parcelado
+      const n = Math.max(2, parseInt(parcNEl.value||'10',10));
+      const modo = document.querySelector('input[name="finParcModo"]:checked')?.value || 'valor';
+      const startMonth = parcIniEl.value || currentMonth;
+      const day = parseInt(data.slice(-2),10) || 1;
+
+      if (modo==='valor'){
+        const parcela = val;
+        for (let i=0;i<n;i++){
+          const ym = nextMonth(startMonth, i);
+          addItem({id:uid(), tipo, data: toDateStr(ym, day), cat, val: parcela, desc: `${desc} (parc ${i+1}/${n})`, origem:'parc_valor'});
+        }
+      } else {
+        const total = val;
+        const base = Math.floor((total/n)*100)/100;
+        const resto = +(total - base*n).toFixed(2);
+        for (let i=0;i<n;i++){
+          const ym = nextMonth(startMonth, i);
+          const parcVal = +(base + (i===n-1? resto:0)).toFixed(2);
+          addItem({id:uid(), tipo, data: toDateStr(ym, day), cat, val: parcVal, desc: `${desc} (parc ${i+1}/${n})`, origem:'parc_total'});
         }
       }
+      clearForm();
+    });
 
-      // Toggle parcelamento
-      parcSw.addEventListener('change', ()=> { parcWrap.style.display = parcSw.checked ? '' : 'none'; renderParcPreview(); });
-      ['input','change'].forEach(ev=>{
-        parcNEl.addEventListener(ev, renderParcPreview);
-        parcIniEl.addEventListener(ev, renderParcPreview);
-        valEl.addEventListener(ev, renderParcPreview);
-        document.querySelectorAll('input[name="finParcModo"]').forEach(r=> r.addEventListener(ev, renderParcPreview));
-      });
+    function clearForm(){
+      valEl.value = '';
+      descEl.value = '';
+      parcSw.checked = false;
+      parcWrap.style.display = 'none';
+      renderParcPreview();
+    }
 
-      // CRUD
-      function addItem(obj){ items.push(obj); save(); refresh(); }
-      function removeItem(id){ items = items.filter(x=>x.id!==id); save(); refresh(); }
+    // Filtro por mês
+    mesEl.addEventListener('change', ()=>{ currentMonth = mesEl.value || currentMonth; refresh(); });
 
-      // Adicionar
-      btnAdd.addEventListener('click', ()=>{
-        const tipo = String(tipoEl.value||'despesa');
-        const data = String(dataEl.value||new Date().toISOString().slice(0,10));
-        const cat  = (catEl.value||'Geral').trim();
-        const val  = parseNum(valEl.value);
-        const desc = (descEl.value||'').trim();
-        if (!val || val<=0){ alert('Informe um valor válido.'); return; }
+    // Limpar mês
+    btnClearMes.addEventListener('click', ()=>{
+      if (!confirm('Remover todos os lançamentos deste mês?')) return;
+      const prefix = currentMonth + '-';
+      items = items.filter(x=> !String(x.data||'').startsWith(prefix));
+      save(); refresh();
+    });
 
-        if (!parcSw.checked){
-          addItem({id:uid(), tipo, data, cat, val, desc, origem:'manual'});
-          clearForm(); return;
-        }
+    // Export CSV
+    btnExport.addEventListener('click', ()=>{
+      const header = ['id','tipo','data','categoria','valor','descricao','origem'];
+      const rows = items.map(x=>[
+        x.id, x.tipo, x.data, (x.cat||''), (Number(x.val)||0).toFixed(2).replace('.',','), (x.desc||'').replace(/[\r\n]+/g,' '), x.origem||''
+      ]);
+      const csv = [header.join(';'), ...rows.map(r=>r.join(';'))].join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'financas_coopex.csv';
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    });
 
-        // Parcelado
-        const n = Math.max(2, parseInt(parcNEl.value||'10',10));
-        const modo = document.querySelector('input[name="finParcModo"]:checked')?.value || 'valor';
-        const startMonth = parcIniEl.value || currentMonth;
-        const day = parseInt(data.slice(-2),10) || 1;
+    // Dicas
+    btnDicas?.addEventListener('click', ()=>{
+      const modal = new bootstrap.Modal(document.getElementById('finDicasModal'));
+      modal.show();
+    });
 
-        if (modo==='valor'){
-          const parcela = val;
-          for (let i=0;i<n;i++){
-            const ym = nextMonth(startMonth, i);
-            addItem({id:uid(), tipo, data: toDateStr(ym, day), cat, val: parcela, desc: `${desc} (parc ${i+1}/${n})`, origem:'parc_valor'});
-          }
-        } else {
-          const total = val;
-          const base = Math.floor((total/n)*100)/100;
-          const resto = +(total - base*n).toFixed(2);
-          for (let i=0;i<n;i++){
-            const ym = nextMonth(startMonth, i);
-            const parcVal = +(base + (i===n-1? resto:0)).toFixed(2);
-            addItem({id:uid(), tipo, data: toDateStr(ym, day), cat, val: parcVal, desc: `${desc} (parc ${i+1}/${n})`, origem:'parc_total'});
-          }
-        }
-        clearForm();
-      });
+    // Render
+    function refresh(){
+      const prefix = currentMonth + '-';
+      const mesItems = items.filter(x=> String(x.data||'').startsWith(prefix))
+                            .sort((a,b)=> a.data.localeCompare(b.data));
 
-      function clearForm(){
-        valEl.value = '';
-        descEl.value = '';
-        parcSw.checked = false;
-        parcWrap.style.display = 'none';
-        renderParcPreview();
-      }
+      const sum = (arr, pred)=> arr.filter(pred).reduce((s,x)=> s + Number(x.val||0), 0);
+      const rec = sum(mesItems, x=>x.tipo==='receita');
+      const desp = sum(mesItems, x=>x.tipo==='despesa');
+      const guardado = sum(mesItems, x=>x.tipo==='poupanca');
+      const saldo = rec - desp - guardado;
 
-      // Filtro por mês
-      mesEl.addEventListener('change', ()=>{ currentMonth = mesEl.value || currentMonth; refresh(); });
+      recSumEl.textContent = money(rec);
+      despSumEl.textContent = money(desp);
+      saldoEl.textContent = money(saldo);
 
-      // Limpar mês
-      btnClearMes.addEventListener('click', ()=>{
-        if (!confirm('Remover todos os lançamentos deste mês?')) return;
-        const prefix = currentMonth + '-';
-        items = items.filter(x=> !String(x.data||'').startsWith(prefix));
-        save(); refresh();
-      });
-
-      // Export CSV
-      btnExport.addEventListener('click', ()=>{
-        const header = ['id','tipo','data','categoria','valor','descricao','origem'];
-        const rows = items.map(x=>[
-          x.id, x.tipo, x.data, (x.cat||''), (Number(x.val)||0).toFixed(2).replace('.',','), (x.desc||'').replace(/[\r\n]+/g,' '), x.origem||''
-        ]);
-        const csv = [header.join(';'), ...rows.map(r=>r.join(';'))].join('\n');
-        const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = 'financas_coopex.csv';
-        document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-      });
-
-      // Dicas
-      btnDicas?.addEventListener('click', ()=>{
-        const modal = new bootstrap.Modal(document.getElementById('finDicasModal'));
-        modal.show();
-      });
-
-      // Render
-      function refresh(){
-        const prefix = currentMonth + '-';
-        const mesItems = items.filter(x=> String(x.data||'').startsWith(prefix))
-                              .sort((a,b)=> a.data.localeCompare(b.data));
-
-        const sum = (arr, pred)=> arr.filter(pred).reduce((s,x)=> s + Number(x.val||0), 0);
-        const rec = sum(mesItems, x=>x.tipo==='receita');
-        const desp = sum(mesItems, x=>x.tipo==='despesa');
-        const guardado = sum(mesItems, x=>x.tipo==='poupanca');
-        const saldo = rec - desp - guardado;
-
-        recSumEl.textContent = money(rec);
-        despSumEl.textContent = money(desp);
-        saldoEl.textContent = money(saldo);
-
-        // Meta
-        const alvoByValor = parseNum(metaValorEl.value);
-        const pct = Math.max(0, parseNum(metaPctEl.value));
-        const alvoByPct = rec * (pct/100);
-        const alvo = Math.max(alvoByValor, alvoByPct);
-        metaAlvoEl.textContent = money(alvo);
+      // Meta
+      const alvoByValor = parseNum(metaValorEl.value);
+      const pct = Math.max(0, parseNum(metaPctEl.value));
+      const alvoByPct = rec * (pct/100);
+      const alvo = Math.max(alvoByValor, alvoByPct);
+      metaAlvoEl.textContent = money(alvo);
         guardadoEl.textContent = money(guardado);
         const prog = alvo>0 ? Math.min(100, Math.round((guardado/alvo)*100)) : 0;
         metaProgEl.style.width = prog + '%';
