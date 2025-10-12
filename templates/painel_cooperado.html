@@ -175,16 +175,15 @@
       </li>
 
       <li class="my-3">
-        <a href="{{ url_for('portal_cooperado_avisos') }}"
-           class="btn btn-royal w-100 d-flex align-items-center gap-2 text-white"
-           style="font-weight:600; font-size:1.1rem; border-radius:12px; box-shadow:0 2px 12px #2747d918;">
-          <i class="bi bi-megaphone-fill" style="font-size:1.4rem"></i>
-          <span class="text-white">Avisos</span>
-          {% if unread > 0 %}
-            <span class="badge rounded-pill bg-danger ms-auto">{{ unread }}</span>
-          {% endif %}
-        </a>
-      </li>
+  <a href="{{ url_for('portal_cooperado_avisos') }}"
+     class="btn btn-royal w-100 d-flex align-items-center gap-2 text-white"
+     style="font-weight:600; font-size:1.1rem; border-radius:12px; box-shadow:0 2px 12px #2747d918;">
+    <i class="bi bi-megaphone-fill" style="font-size:1.4rem"></i>
+    <span class="text-white">Avisos</span>
+    <span id="menuAvisosBadge" class="badge rounded-pill bg-danger ms-auto"
+          style="display: {{ 'inline-block' if unread>0 else 'none' }};">{{ unread or 0 }}</span>
+  </a>
+</li>
 
       <!-- Atalhos (modais) -->
       <li class="my-3">
@@ -1465,6 +1464,26 @@
     </div>
   </div>
 
+  <!-- Toast "Novos avisos" -->
+<div id="toastAvisos"
+     class="toast align-items-center position-fixed bottom-0 start-50 translate-middle-x mb-3"
+     role="alert" aria-live="assertive" aria-atomic="true"
+     data-bs-delay="8000"
+     data-unread-endpoint="{{ url_for('avisos_unread_count') if url_for else '/avisos/unread_count' }}">
+  <div class="d-flex">
+    <div class="toast-body">
+      Você tem <strong class="toast-count">0</strong> aviso(s) não lido(s).
+      <a class="ms-1" href="{{ url_for('portal_cooperado_avisos') }}">Ver</a>
+    </div>
+    <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+  </div>
+</div>
+
+<!-- Som de notificação -->
+<audio id="avisoSound" preload="auto">
+  <source src="{{ url_for('static', filename='sounds/notify.mp3') }}" type="audio/mpeg">
+</audio>
+
   <!-- MENU lateral + TOAST avisos + SOM ao chegar -->
 <script>
   (function(){
@@ -1493,7 +1512,6 @@
     const toastEl = document.getElementById('toastAvisos');
     const toastBody = toastEl?.querySelector('.toast-body');
     const toastCountEl = toastEl?.querySelector('.toast-count');
-    const toastTimeEl = toastEl?.querySelector('.toast-time');
     const endpoint = toastEl?.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
 
     const unreadInitial = Number('{{ unread }}') || 0;
@@ -1501,19 +1519,69 @@
     const LS_KEY = `COOPEX_AVISOS_LAST_${UID}`;
     const audio = document.getElementById('avisoSound');
 
+    // ——— elementos para sincronizar UI (badge no menu + dot na navbar)
+    const menuAvisosLink = document.querySelector('#menuLateral a[href*="portal_cooperado_avisos"]');
+    const navbarBrand = document.querySelector('.navbar .navbar-brand');
+
+    function ensureMenuBadge() {
+      if (!menuAvisosLink) return null;
+      let badge = menuAvisosLink.querySelector('.badge.rounded-pill');
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'badge rounded-pill bg-danger ms-auto';
+        badge.style.marginLeft = 'auto';
+        menuAvisosLink.appendChild(badge);
+      }
+      return badge;
+    }
+
+    function ensureNavbarDot() {
+      if (!navbarBrand) return null;
+      let dot = navbarBrand.querySelector('.unread-dot');
+      if (!dot) {
+        dot = document.createElement('span');
+        dot.className = 'unread-dot';
+        dot.title = 'Novos avisos';
+        navbarBrand.appendChild(dot);
+      }
+      return dot;
+    }
+
+    function syncUI(count) {
+      // badge do menu
+      const badge = ensureMenuBadge();
+      if (badge) {
+        if (count > 0) {
+          badge.textContent = String(count);
+          badge.style.display = '';
+        } else {
+          badge.textContent = '';
+          badge.style.display = 'none';
+        }
+      }
+      // dot da navbar
+      const dot = ensureNavbarDot();
+      if (dot) {
+        dot.style.display = (count > 0) ? 'inline-block' : 'none';
+      }
+      // número no toast
+      if (toastCountEl) toastCountEl.textContent = String(count);
+    }
+
     function showToast(count) {
       if (!window.bootstrap?.Toast || !toastEl) return;
       if (toastCountEl) toastCountEl.textContent = String(count);
-      if (toastTimeEl) toastTimeEl.textContent = 'agora';
-      new bootstrap.Toast(toastEl).show();
+      const t = bootstrap.Toast.getOrCreateInstance(toastEl);
+      t.hide(); // evita “empilhar”
+      t.show();
     }
 
     async function playAvisoSound() {
       if (!audio) return;
       try {
         await audio.play();
-      } catch (err) {
-        // Desbloqueia na primeira interação
+      } catch (_) {
+        // Desbloqueia o autoplay na primeira interação do usuário
         const enable = async () => { try { await audio.play(); } catch(_) {} };
         document.addEventListener('click', enable, { once:true });
         document.addEventListener('keydown', enable, { once:true });
@@ -1521,10 +1589,10 @@
       }
     }
 
-    // Exibe na carga se houver novos
+    // Exibe na carga se houver novos (comparando com o último visto salvo no device)
     const lastSeen = Number(localStorage.getItem(LS_KEY) || 0);
+    syncUI(unreadInitial);
     if (unreadInitial > 0 && (unreadInitial > lastSeen || lastSeen === 0)) {
-      // Atualiza texto sem quebrar o link
       if (toastBody && toastBody.firstChild && toastBody.firstChild.nodeType === Node.TEXT_NODE) {
         toastBody.firstChild.nodeValue = `Você tem ${unreadInitial} aviso(s) não lido(s). `;
       }
@@ -1546,6 +1614,9 @@
         const count = Number(data.unread ?? data.count ?? 0);
         const current = Number(localStorage.getItem(LS_KEY) || 0);
 
+        syncUI(count);
+
+        // Se aumentou, notifica com toast + som e persiste
         if (Number.isFinite(count) && count > current) {
           if (toastBody && toastBody.firstChild && toastBody.firstChild.nodeType === Node.TEXT_NODE) {
             toastBody.firstChild.nodeValue = `Você tem ${count} aviso(s) não lido(s). `;
@@ -1568,15 +1639,22 @@
       ch.onmessage = (ev) => {
         const count = Number(ev.data?.unread || 0);
         const current = Number(localStorage.getItem(LS_KEY) || 0);
+
+        syncUI(count);
+
         if (Number.isFinite(count) && count > current) {
           showToast(count);
           playAvisoSound();
           localStorage.setItem(LS_KEY, String(count));
         }
       };
+      // utilitário global (se quiser disparar manualmente)
       window.coopAvisosNotify = function(count) {
         const n = Number(count || 0);
         const current = Number(localStorage.getItem(LS_KEY) || 0);
+
+        syncUI(n);
+
         if (Number.isFinite(n) && n > current) {
           showToast(n);
           playAvisoSound();
@@ -1586,33 +1664,6 @@
     } catch (_) {}
   });
 </script>
-  <!-- JS: Avaliação (legado simples) -->
-  <script>
-    document.querySelectorAll('.avaliar-form').forEach(form => {
-      if (form.querySelector('.stars-group')) return;
-      const stars = Array.from(form.querySelectorAll('.star-btn'));
-      const input = form.querySelector('input[name="nota"]');
-      const submit = form.querySelector('button[type="submit"]');
-      stars.forEach(btn => {
-        btn.addEventListener('click', () => {
-          const val = Number(btn.dataset.value);
-          input.value = val;
-          submit.disabled = false;
-          stars.forEach(b => {
-            const i = Number(b.dataset.value);
-            const icon = b.querySelector('i');
-            icon.className = 'bi ' + (i <= val ? 'bi-star-fill' : 'bi-star');
-          });
-        });
-      });
-      form.addEventListener('submit', (e) => {
-        if (!input.value) {
-          e.preventDefault();
-          alert('Selecione uma nota de 1 a 5.');
-        }
-      });
-    });
-  </script>
 
   <!-- JS: Avaliação (4 categorias) -->
   <script>
