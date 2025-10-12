@@ -1532,104 +1532,135 @@
     });
   })();
 
-  document.addEventListener('DOMContentLoaded', function () {
-    const toastEl      = document.getElementById('toastAvisos');
-    const toastCountEl = toastEl?.querySelector('.toast-count');
-    const toastMsgEl   = toastEl?.querySelector('.toast-msg');
-    const toastTimeEl  = toastEl?.querySelector('.toast-time');
-    const endpoint     = toastEl?.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
+  <script>
+document.addEventListener('DOMContentLoaded', function () {
+  const toastEl      = document.getElementById('toastAvisos');
+  const toastCountEl = toastEl?.querySelector('.toast-count');
+  const toastMsgEl   = toastEl?.querySelector('.toast-msg');
+  const toastTimeEl  = toastEl?.querySelector('.toast-time');
+  const endpoint     = toastEl?.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
 
-    const unreadInitial = Number('{{ unread|default(0)|int }}') || 0;
-    const UID     = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
-    const LS_KEY  = `COOPEX_AVISOS_LAST_${UID}`;
-    const audio   = document.getElementById('avisoSound');
+  const unreadInitial = Number('{{ unread|default(0)|int }}') || 0;
+  const UID     = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
+  const LS_KEY  = `COOPEX_AVISOS_LAST_${UID}`;
+  const LS_KEY_TS = `COOPEX_AVISOS_LAST_TS_${UID}`;
+  const audio   = document.getElementById('avisoSound');
 
-    // Mostrar toast
-    function showToast(count) {
-      if (!window.bootstrap?.Toast || !toastEl) return;
-      if (toastCountEl) toastCountEl.textContent = String(count);
-      if (toastMsgEl)   toastMsgEl.textContent   = `Você tem ${count} aviso(s) não lido(s).`;
-      if (toastTimeEl)  toastTimeEl.textContent  = 'agora';
-      new bootstrap.Toast(toastEl).show();
-    }
+  // Mostrar toast
+  function showToast(count) {
+    if (!window.bootstrap?.Toast || !toastEl) return;
+    if (toastCountEl) toastCountEl.textContent = String(count);
+    if (toastMsgEl)   toastMsgEl.textContent   = `Você tem ${count} aviso(s) não lido(s).`;
+    if (toastTimeEl)  toastTimeEl.textContent  = 'agora';
+    new bootstrap.Toast(toastEl).show();
+  }
 
-    // Tocar som de aviso respeitando autoplay
-    async function playAvisoSound() {
-      if (!audio) return;
-      try {
-        audio.currentTime = 0;
-        await audio.play();
-      } catch (err) {
-        // Ativa na primeira interação do usuário (iOS/Safari/Chrome mobile)
-        const enable = async () => { try { audio.currentTime = 0; await audio.play(); } catch(_) {} };
-        document.addEventListener('click',      enable, { once:true });
-        document.addEventListener('keydown',    enable, { once:true });
-        document.addEventListener('touchstart', enable, { once:true });
-      }
-    }
-
-    // Exibe na carga se houver novos
-    const lastSeen = Number(localStorage.getItem(LS_KEY) || 0);
-    if (unreadInitial > 0 && (unreadInitial > lastSeen || lastSeen === 0)) {
-      showToast(unreadInitial);
-      playAvisoSound();
-      localStorage.setItem(LS_KEY, String(unreadInitial));
-    }
-
-    // Polling periódico
-    async function checkUnread(){
-      try {
-        const resp = await fetch(endpoint, {
-          headers: { 'Accept':'application/json' },
-          cache: 'no-store',
-          credentials: 'same-origin'
-        });
-        if (!resp.ok) return;
-
-        const data   = await resp.json();
-        const count  = Number(data.unread ?? data.count ?? 0);
-        const stored = Number(localStorage.getItem(LS_KEY) || 0);
-
-        if (Number.isFinite(count) && count > stored) {
-          showToast(count);
-          playAvisoSound();
-          localStorage.setItem(LS_KEY, String(count));
-        }
-      } catch (_) {
-        // Silencioso
-      }
-    }
-
-    // roda a cada 20s e ao voltar o foco
-    setInterval(checkUnread, 20000);
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') checkUnread();
-    });
-
-    // Integração com página de avisos (opcional)
+  // Som com respeito a bloqueio de autoplay
+  async function tryPlaySound() {
+    if (!audio) return;
     try {
-      const ch = new BroadcastChannel('coopex_avisos');
-      ch.onmessage = (ev) => {
-        const count   = Number(ev.data?.unread || 0);
-        const current = Number(localStorage.getItem(LS_KEY) || 0);
-        if (Number.isFinite(count) && count > current) {
-          showToast(count);
-          playAvisoSound();
-          localStorage.setItem(LS_KEY, String(count));
-        }
-      };
-      // Função global opcional
-      window.coopAvisosNotify = function(count) {
-        const n       = Number(count || 0);
-        const current = Number(localStorage.getItem(LS_KEY) || 0);
-        if (Number.isFinite(n) && n > current) {
-          showToast(n);
-          playAvisoSound();
-          localStorage.setItem(LS_KEY, String(n));
-        }
-      };
-    } catch (_) { /* browsers antigos */ }
+      audio.currentTime = 0;
+      await audio.play();
+    } catch (err) {
+      const enable = async () => { try { audio.currentTime = 0; await audio.play(); } catch(_) {} };
+      document.addEventListener('click',      enable, { once:true });
+      document.addEventListener('keydown',    enable, { once:true });
+      document.addEventListener('touchstart', enable, { once:true });
+    }
+  }
+
+  // Exibe na carga com regras para avisos antigos
+  (function bootToastAtLoad() {
+    const lastCount = Number(localStorage.getItem(LS_KEY)) || 0;
+    const lastTs    = Number(localStorage.getItem(LS_KEY_TS)) || 0;
+    const FORCE     = new URLSearchParams(location.search).get('show_toast') === '1';
+    const STALE_MS  = 5 * 60 * 1000; // 5 minutos
+
+    // Mostra se:
+    // - forçado via query (?show_toast=1)
+    // - nunca mostramos antes
+    // - a contagem mudou
+    // - já se passaram 5 min desde a última exibição e ainda há não lidos
+    const shouldShow =
+      unreadInitial > 0 && (
+        FORCE ||
+        lastCount === 0 ||
+        unreadInitial !== lastCount ||
+        (Date.now() - lastTs) > STALE_MS
+      );
+
+    if (shouldShow) {
+      showToast(unreadInitial);
+      tryPlaySound();
+      localStorage.setItem(LS_KEY, String(unreadInitial));
+      localStorage.setItem(LS_KEY_TS, String(Date.now()));
+    }
+  })();
+
+  // Polling periódico (novos não lidos)
+  async function checkUnread(){
+    try {
+      const resp = await fetch(endpoint, {
+        headers: { 'Accept':'application/json' },
+        cache: 'no-store',
+        credentials: 'same-origin'
+      });
+      if (!resp.ok) return;
+
+      const data   = await resp.json();
+      const count  = Number(data.unread ?? data.count ?? 0);
+      const stored = Number(localStorage.getItem(LS_KEY) || 0);
+
+      if (Number.isFinite(count) && count > stored) {
+        showToast(count);
+        tryPlaySound();
+        localStorage.setItem(LS_KEY, String(count));
+        localStorage.setItem(LS_KEY_TS, String(Date.now()));
+      }
+    } catch (_) {
+      // silencioso
+    }
+  }
+
+  // roda a cada 20s e ao voltar o foco
+  setInterval(checkUnread, 20000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkUnread();
   });
+
+  // Integração com página de avisos (opcional)
+  try {
+    const ch = new BroadcastChannel('coopex_avisos');
+    ch.onmessage = (ev) => {
+      const count   = Number(ev.data?.unread || 0);
+      const current = Number(localStorage.getItem(LS_KEY) || 0);
+      if (Number.isFinite(count) && count > current) {
+        showToast(count);
+        tryPlaySound();
+        localStorage.setItem(LS_KEY, String(count));
+        localStorage.setItem(LS_KEY_TS, String(Date.now()));
+      }
+    };
+    // Função global opcional para testes
+    window.coopAvisosNotify = function(count) {
+      const n       = Number(count || 0);
+      const current = Number(localStorage.getItem(LS_KEY) || 0);
+      if (Number.isFinite(n) && n > current) {
+        showToast(n);
+        tryPlaySound();
+        localStorage.setItem(LS_KEY, String(n));
+        localStorage.setItem(LS_KEY_TS, String(Date.now()));
+      }
+    };
+    // Helper para disparar manualmente em testes locais
+    window.toastTest = function(n = unreadInitial || 1){
+      showToast(n);
+      tryPlaySound();
+      localStorage.setItem(LS_KEY, String(n));
+      localStorage.setItem(LS_KEY_TS, String(Date.now()));
+    };
+  } catch (_) { /* browsers antigos */ }
+});
 </script>
   
   <!-- JS: Avaliação (legado simples) -->
