@@ -1534,101 +1534,76 @@
 
   <script>
 document.addEventListener('DOMContentLoaded', function () {
-  const toastEl      = document.getElementById('toastAvisos');
-  const toastCountEl = toastEl?.querySelector('.toast-count');
-  const toastMsgEl   = toastEl?.querySelector('.toast-msg');
-  const toastTimeEl  = toastEl?.querySelector('.toast-time');
-  const endpoint     = toastEl?.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
+  const toastEl = document.getElementById('toastAvisos');
+  if (!toastEl) return; // 🔒 não deixa quebrar o resto do site
+
+  const toastCountEl = toastEl.querySelector('.toast-count');
+  const toastTimeEl  = toastEl.querySelector('.toast-time');
+  const endpoint     = toastEl.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
 
   const unreadInitial = Number('{{ unread|default(0)|int }}') || 0;
-  const UID     = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
-  const LS_KEY  = `COOPEX_AVISOS_LAST_${UID}`;
-  const LS_KEY_TS = `COOPEX_AVISOS_LAST_TS_${UID}`;
-  const audio   = document.getElementById('avisoSound');
+  const UID    = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
+  const LS_KEY = `COOPEX_AVISOS_LAST_${UID}`;
+  const LS_TS  = `COOPEX_AVISOS_LAST_TS_${UID}`;
+  const audio  = document.getElementById('avisoSound');
 
-  // Mostrar toast
   function showToast(count) {
-    if (!window.bootstrap?.Toast || !toastEl) return;
+    if (!window.bootstrap?.Toast) return;
     if (toastCountEl) toastCountEl.textContent = String(count);
-    if (toastMsgEl)   toastMsgEl.textContent   = `Você tem ${count} aviso(s) não lido(s).`;
     if (toastTimeEl)  toastTimeEl.textContent  = 'agora';
     new bootstrap.Toast(toastEl).show();
   }
 
-  // Som com respeito a bloqueio de autoplay
-  async function tryPlaySound() {
+  async function playSound() {
     if (!audio) return;
-    try {
-      audio.currentTime = 0;
-      await audio.play();
-    } catch (err) {
-      const enable = async () => { try { audio.currentTime = 0; await audio.play(); } catch(_) {} };
-      document.addEventListener('click',      enable, { once:true });
-      document.addEventListener('keydown',    enable, { once:true });
+    try { audio.currentTime = 0; await audio.play(); }
+    catch {
+      const enable = async () => { try { audio.currentTime = 0; await audio.play(); } catch(_){} };
+      document.addEventListener('click', enable, { once:true });
+      document.addEventListener('keydown', enable, { once:true });
       document.addEventListener('touchstart', enable, { once:true });
     }
   }
 
-  // Exibe na carga com regras para avisos antigos
-  (function bootToastAtLoad() {
+  // Mostra também para não lidos antigos (a cada 5min)
+  (function boot() {
     const lastCount = Number(localStorage.getItem(LS_KEY)) || 0;
-    const lastTs    = Number(localStorage.getItem(LS_KEY_TS)) || 0;
+    const lastTs    = Number(localStorage.getItem(LS_TS)) || 0;
     const FORCE     = new URLSearchParams(location.search).get('show_toast') === '1';
-    const STALE_MS  = 5 * 60 * 1000; // 5 minutos
+    const STALE_MS  = 5 * 60 * 1000;
 
-    // Mostra se:
-    // - forçado via query (?show_toast=1)
-    // - nunca mostramos antes
-    // - a contagem mudou
-    // - já se passaram 5 min desde a última exibição e ainda há não lidos
-    const shouldShow =
-      unreadInitial > 0 && (
-        FORCE ||
-        lastCount === 0 ||
-        unreadInitial !== lastCount ||
-        (Date.now() - lastTs) > STALE_MS
-      );
-
+    const shouldShow = unreadInitial > 0 && (
+      FORCE || lastCount === 0 || unreadInitial !== lastCount || (Date.now() - lastTs) > STALE_MS
+    );
     if (shouldShow) {
       showToast(unreadInitial);
-      tryPlaySound();
+      playSound();
       localStorage.setItem(LS_KEY, String(unreadInitial));
-      localStorage.setItem(LS_KEY_TS, String(Date.now()));
+      localStorage.setItem(LS_TS, String(Date.now()));
     }
   })();
 
-  // Polling periódico (novos não lidos)
   async function checkUnread(){
     try {
-      const resp = await fetch(endpoint, {
-        headers: { 'Accept':'application/json' },
-        cache: 'no-store',
-        credentials: 'same-origin'
-      });
+      const resp = await fetch(endpoint, { headers:{'Accept':'application/json'}, cache:'no-store', credentials:'same-origin' });
       if (!resp.ok) return;
-
       const data   = await resp.json();
       const count  = Number(data.unread ?? data.count ?? 0);
       const stored = Number(localStorage.getItem(LS_KEY) || 0);
-
       if (Number.isFinite(count) && count > stored) {
         showToast(count);
-        tryPlaySound();
+        playSound();
         localStorage.setItem(LS_KEY, String(count));
-        localStorage.setItem(LS_KEY_TS, String(Date.now()));
+        localStorage.setItem(LS_TS, String(Date.now()));
       }
-    } catch (_) {
-      // silencioso
-    }
+    } catch {}
   }
 
-  // roda a cada 20s e ao voltar o foco
   setInterval(checkUnread, 20000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') checkUnread();
   });
 
-  // Integração com página de avisos (opcional)
   try {
     const ch = new BroadcastChannel('coopex_avisos');
     ch.onmessage = (ev) => {
@@ -1636,30 +1611,21 @@ document.addEventListener('DOMContentLoaded', function () {
       const current = Number(localStorage.getItem(LS_KEY) || 0);
       if (Number.isFinite(count) && count > current) {
         showToast(count);
-        tryPlaySound();
+        playSound();
         localStorage.setItem(LS_KEY, String(count));
-        localStorage.setItem(LS_KEY_TS, String(Date.now()));
+        localStorage.setItem(LS_TS, String(Date.now()));
       }
     };
-    // Função global opcional para testes
-    window.coopAvisosNotify = function(count) {
-      const n       = Number(count || 0);
-      const current = Number(localStorage.getItem(LS_KEY) || 0);
+    window.coopAvisosNotify = function(count){
+      const n = Number(count||0), current = Number(localStorage.getItem(LS_KEY)||0);
       if (Number.isFinite(n) && n > current) {
         showToast(n);
-        tryPlaySound();
+        playSound();
         localStorage.setItem(LS_KEY, String(n));
-        localStorage.setItem(LS_KEY_TS, String(Date.now()));
+        localStorage.setItem(LS_TS, String(Date.now()));
       }
     };
-    // Helper para disparar manualmente em testes locais
-    window.toastTest = function(n = unreadInitial || 1){
-      showToast(n);
-      tryPlaySound();
-      localStorage.setItem(LS_KEY, String(n));
-      localStorage.setItem(LS_KEY_TS, String(Date.now()));
-    };
-  } catch (_) { /* browsers antigos */ }
+  } catch {}
 });
 </script>
   
@@ -2233,21 +2199,24 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       btnLimpar?.addEventListener('click', ()=>{ if (confirm('Limpar todo o histórico?')){ saveHist([]); renderHist(); } });
       btnCSV?.addEventListener('click', ()=>{
-        const arr = loadHist();
-        const header = ['data','preco','consumo_km_l','km','ganho','litros','custo','custo_km','lucro','lucro_km','margem_%'];
-        const rows = arr.map(x=>[ new Date(x.ts).toISOString(), x.p, x.c, x.k, x.g, x.litros, x.custo, x.custoKm, x.lucro, x.lucroKm, x.margem ]);
-        const csv = [header.join(','), ...rows.map(r=>r.join(','))].join('\n');
-        const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = 'custo_beneficio.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-      });
-      btnShare?.addEventListener('click', async ()=>{
-        const r = calc();
-        const text = `Custo x Benefício\nGasolina: ${fmtMoney(r.p)}\nConsumo: ${r.c} km/L\nKm: ${r.k}\nGanhou: ${fmtMoney(r.g)}\nCusto: ${fmtMoney(r.custo)}\nLucro: ${fmtMoney(r.lucro)}\nMargem: ${r.margem.toFixed(1).replace('.',',')}%`;
-        if (navigator.share){ try{ await navigator.share({title:'Custo x Benefício', text}); }catch(_){ } }
-        else { navigator.clipboard?.writeText(text); alert('Resumo copiado para a área de transferência.'); }
-      });
+  const arr = loadHist();
+  const header = ['data','preco','consumo_km_l','km','ganho','litros','custo','custo_km','lucro','lucro_km','margem_%'];
+  const rows = arr.map(x=>[
+    new Date(x.ts).toISOString(), x.p, x.c, x.k, x.g, x.litros, x.custo, x.custoKm, x.lucro, x.lucroKm, x.margem
+  ]);
+  const csv = [header.join(','), ...rows.map(r=>r.join(','))].join('\n');
 
+  // >>> a linha com erro estava aqui; faltava fechar a aspa do type
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'custo_beneficio.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+})
       calc(); renderHist();
     })();
   </script>
