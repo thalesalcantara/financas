@@ -3997,35 +3997,6 @@ COMMIT;
         db.session.rollback()
         return jsonify({"ok": False, "error": str(e)}), 500
 
-
-# =========================
-# Portais mínimos (caso os seus já existam, remova estes)
-# =========================
-@app.get("/portal/cooperado", endpoint="portal_cooperado")
-@role_required("cooperado")
-def portal_cooperado_min():
-    # Se você já tem um template/blueprint completo, remova esta rota.
-    return render_template("portal_cooperado_home.html") if os.path.exists(
-        os.path.join(BASE_DIR, "templates", "portal_cooperado_home.html")
-    ) else "<h3>Portal do Cooperado</h3>"
-
-@app.get("/portal/restaurante", endpoint="portal_restaurante")
-@role_required("restaurante")
-def portal_restaurante_min():
-    # Se você já tem um template/blueprint completo, remova esta rota.
-    return render_template("portal_restaurante_home.html") if os.path.exists(
-        os.path.join(BASE_DIR, "templates", "portal_restaurante_home.html")
-    ) else "<h3>Portal do Restaurante</h3>"
-
-
-# =========================
-# Dev server (opcional)
-# =========================
-if __name__ == "__main__":
-    # Para rodar local: FLASK_ENV=development python app.py
-    port = int(os.environ.get("PORT", "5000"))
-    app.run(host="0.0.0.0", port=port, debug=os.environ.get("FLASK_DEBUG", "0") == "1")
-
 # =========================
 # Documentos (Admin)
 # =========================
