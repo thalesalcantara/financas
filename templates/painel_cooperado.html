@@ -146,7 +146,7 @@
   </style>
 </head>
 <body>
-  {% set unread = (avisos_nao_lidos_count or avisos_unread_count) | default(0) %}
+  {% set unread = avisos_nao_lidos_count or avisos_unread_count or 0 %}
 
   <!-- MENU LATERAL -->
   <div id="menuLateral">
@@ -197,13 +197,13 @@
       </li>
       
       <li class="my-3">
-  <a href="#" class="btn btn-royal w-100 d-flex align-items-center gap-2 text-white"
-     data-bs-toggle="offcanvas" data-bs-target="#financasSheet"
-     style="font-weight:600; font-size:1.1rem; border-radius:12px; box-shadow:0 2px 12px #2747d918;">
-    <i class="bi bi-wallet2" style="font-size:1.4rem"></i>
-    <span class="text-white">Finanças</span>
-  </a>
-</li>
+        <a href="#" class="btn btn-royal w-100 d-flex align-items-center gap-2 text-white"
+           data-bs-toggle="offcanvas" data-bs-target="#financasSheet"
+           style="font-weight:600; font-size:1.1rem; border-radius:12px; box-shadow:0 2px 12px #2747d918;">
+          <i class="bi bi-wallet2" style="font-size:1.4rem"></i>
+          <span class="text-white">Finanças</span>
+        </a>
+      </li>
 
       <li class="my-3">
         <a href="#" data-bs-toggle="modal" data-bs-target="#cxbModal"
@@ -311,7 +311,8 @@
       <div class="tab-pane fade show active" id="resumo" role="tabpanel">
         <div class="card p-3 summary">
           <div class="d-flex align-items-center mb-2">
-            <img id="coopPreview" class="avatar border" src="{{ url_for('media_coop', coop_id=cooperado.id) if cooperado.foto_bytes else url_for('static', filename='img/default.png') }}" alt="Foto do cooperado" style="width:46px;height:46px;border-radius:50%;object-fit:cover;border:3px solid var(--royal-blue);margin-right:10px">
+            <img src="{{ cooperado.foto_url or url_for('static', filename='img/default.png') }}"
+                 style="width:46px;height:46px;border-radius:50%;object-fit:cover;border:3px solid var(--royal-blue);margin-right:10px" alt="">
             <div>
               <div class="fw-bold">{{ cooperado.nome }}</div>
               <small class="muted">{{ cooperado.usuario }}</small>
@@ -888,7 +889,7 @@
     </div>
   </div>
 
-  <!-- Bootstrap -->
+  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
   <!-- Script: Solicitar troca -->
@@ -1494,104 +1495,132 @@
 </div>
 
   <!-- TOAST de novos avisos -->
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index:1080;">
-  <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
-       data-bs-autohide="true" data-bs-delay="8000">
-    <div class="toast-header">
-      <i class="bi bi-megaphone-fill me-2"></i>
-      <strong class="me-auto">Novos avisos</strong>
-      <small>agora</small>
-      <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
-    </div>
-    <div class="toast-body">
-      Você tem {{ unread|default(0) }} aviso(s) não lido(s).
-      <a href="{{ url_for('portal_cooperado_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
-
-      <!-- Se o navegador bloquear autoplay, mostramos este botão -->
-      <div id="ativarSomWrap" class="mt-2" style="display:none;">
-        <button id="ativarSomBtn" class="btn btn-sm btn-outline-primary">
-          <i class="bi bi-volume-up"></i> Ativar som
-        </button>
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+    <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
+         data-bs-autohide="true" data-bs-delay="8000"
+         data-unread-endpoint="{{ safe_url_for('avisos_unread_count') or '/avisos/unread_count' }}"
+      <div class="toast-header">
+        <i class="bi bi-megaphone-fill me-2"></i>
+        <strong class="me-auto">Novos avisos</strong>
+        <small class="toast-time">agora</small>
+        <button class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
+      </div>
+      <div class="toast-body">
+        Você tem <span class="toast-count">{{ unread }}</span> aviso(s) não lido(s).
+        <a href="{{ url_for('portal_cooperado_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
       </div>
     </div>
   </div>
-</div>
 
-<!-- SOM -->
-<audio id="sndAviso" preload="auto">
-  <source src="{{ url_for('static', filename='sounds/notify.mp3') }}" type="audio/mpeg">
-</audio>
+  <!-- ÁUDIO: som de aviso -->
+  <audio id="avisoSound" preload="auto">
+    <source src="{{ url_for('static', filename='avisos.mp3') }}" type="audio/mpeg">
+  </audio>
 
-<!-- Se o Bootstrap JS já estiver no layout, NÃO repita esta linha -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- MENU lateral + TOAST avisos + SOM ao chegar -->
+  <script>
+    (function(){
+      const menuLateral = document.getElementById('menuLateral');
+      const fundoMenu = document.getElementById('fundoMenu');
+      const abrir = document.getElementById('abrirMenu');
+      const fechar = document.getElementById('fecharMenu');
 
-<script>
-(function(){
-  document.addEventListener('DOMContentLoaded', function () {
-    const unread = Number('{{ unread|default(0) }}') || 0;
+      abrir?.addEventListener('click', () => {
+        menuLateral.classList.add('aberto');
+        fundoMenu.classList.add('aberto');
+      });
+      fechar?.addEventListener('click', () => {
+        menuLateral.classList.remove('aberto');
+        fundoMenu.classList.remove('aberto');
+      });
+      fundoMenu?.addEventListener('click', () => {
+        menuLateral.classList.remove('aberto');
+        fundoMenu.classList.remove('aberto');
+      });
+    })();
 
-    const FLAG_TOAST = 'COOPEX_TOAST_AVISOS_SHOWN';
-    const FLAG_SOUND = 'COOPEX_TOAST_AVISOS_SOUND_PLAYED';
-    const jaMostrou = sessionStorage.getItem(FLAG_TOAST) === '1';
+    document.addEventListener('DOMContentLoaded', function () {
+      const toastEl = document.getElementById('toastAvisos');
+      const toastBody = toastEl?.querySelector('.toast-body');
+      const toastCountEl = toastEl?.querySelector('.toast-count');
+      const toastTimeEl = toastEl?.querySelector('.toast-time');
+      const endpoint = toastEl?.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
+      const unreadInitial = Number('{{ unread }}') || 0;
+      const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
+      const LS_KEY = `COOPEX_AVISOS_LAST_${UID}`;
+      const audio = document.getElementById('avisoSound');
 
-    const toastEl = document.getElementById('toastAvisos');
-    const audioEl = document.getElementById('sndAviso');
-
-    const ativarSomWrap = document.getElementById('ativarSomWrap');
-    const ativarSomBtn  = document.getElementById('ativarSomBtn');
-
-    function mostrarToast(){
-      if (toastEl && window.bootstrap?.Toast) {
+      // Bootstrap toast instance
+      const showToast = (count) => {
+        if (!window.bootstrap?.Toast || !toastEl) return;
+        if (toastCountEl) toastCountEl.textContent = String(count);
+        if (toastTimeEl) toastTimeEl.textContent = 'agora';
         new bootstrap.Toast(toastEl).show();
-        sessionStorage.setItem(FLAG_TOAST, '1');
-      }
-    }
-
-    async function tocarSomAuto(){
-      if (!audioEl) return false;
-      try {
-        await audioEl.play();
-        sessionStorage.setItem(FLAG_SOUND, '1');
-        return true;
-      } catch (e) {
-        return false; // bloqueado
-      }
-    }
-
-    function prepararDesbloqueioSom(){
-      ativarSomWrap.style.display = '';
-      ativarSomBtn?.addEventListener('click', async () => {
-        try {
-          await audioEl.play();
-          sessionStorage.setItem(FLAG_SOUND, '1');
-          ativarSomWrap.style.display = 'none';
-        } catch (_) {}
-      }, { once: true });
-
-      const unlock = async () => {
-        if (sessionStorage.getItem(FLAG_SOUND) === '1') return;
-        try {
-          await audioEl.play();
-          sessionStorage.setItem(FLAG_SOUND, '1');
-          ativarSomWrap.style.display = 'none';
-        } catch (_) {}
-        window.removeEventListener('click', unlock);
-        window.removeEventListener('keydown', unlock);
       };
-      window.addEventListener('click', unlock);
-      window.addEventListener('keydown', unlock);
-    }
 
-    if (unread > 0 && !jaMostrou) {
-      mostrarToast();
-      const jaTocou = sessionStorage.getItem(FLAG_SOUND) === '1';
-      if (!jaTocou) {
-        tocarSomAuto().then(ok => { if (!ok) prepararDesbloqueioSom(); });
+      // Tenta tocar som (navegador pode bloquear sem interação)
+      const playAvisoSound = async () => {
+        if (!audio) return;
+        try {
+          await audio.play();
+        } catch (err) {
+          // Se bloqueado, tenta novamente após primeira interação
+          const enable = async () => {
+            try { await audio.play(); } catch(_) {}
+            document.removeEventListener('click', enable, { once:true });
+            document.removeEventListener('keydown', enable, { once:true });
+          };
+          document.addEventListener('click', enable, { once:true });
+          document.addEventListener('keydown', enable, { once:true });
+        }
+      };
+
+      // Exibe toast na carga se já houver não lidos maiores que o último visto
+      const lastSeen = Number(localStorage.getItem(LS_KEY) || 0);
+      if (unreadInitial > lastSeen && unreadInitial > 0) {
+        showToast(unreadInitial);
+        playAvisoSound();
+        localStorage.setItem(LS_KEY, String(unreadInitial));
+      } else if (lastSeen === 0 && unreadInitial > 0) {
+        // Primeira visita: guarda valor mas também mostra para garantir visibilidade
+        showToast(unreadInitial);
+        playAvisoSound();
+        localStorage.setItem(LS_KEY, String(unreadInitial));
       }
-    }
-  });
-})();
-</script>
+
+      // Polling para detectar chegada de novos avisos
+      async function checkUnread(){
+        try {
+          const resp = await fetch(endpoint, { headers: { 'Accept':'application/json' }, cache:'no-store' });
+          if (!resp.ok) return;
+          const data = await resp.json();
+          const count = Number(data.unread ?? data.count ?? 0);
+          const latestId = Number(data.latest_id ?? 0);
+          const current = Number(localStorage.getItem(LS_KEY) || 0);
+
+          if (Number.isFinite(count) && count > current) {
+            // chegou novo aviso
+            if (toastBody && typeof data.message === 'string' && data.message.trim()) {
+              toastBody.firstChild.nodeValue = `Você tem ${count} aviso(s) não lido(s). `;
+            }
+            showToast(count);
+            playAvisoSound();
+            localStorage.setItem(LS_KEY, String(count));
+            // opcional: guardar último id
+            if (latestId) localStorage.setItem(`${LS_KEY}_LASTID`, String(latestId));
+          }
+        } catch (_) {}
+      }
+
+      // Frequência: a cada 20s (ajuste conforme necessário)
+      setInterval(checkUnread, 20000);
+
+      // Também verifica quando a aba volta a ficar visível
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') checkUnread();
+      });
+    });
+  </script>
 
   <!-- JS: Avaliação (legado simples) -->
   <script>
@@ -1834,7 +1863,7 @@
   const el = id => document.getElementById(id);
   const monthFmt = (d)=> d.toISOString().slice(0,7);
   const money = n => 'R$ ' + (Number(n)||0).toFixed(2).replace('.',',');
-  const parseNum = v => { const n=parseFloat(String(v).replace(',','.')); return Number.isFinite(n)?n:0; };
+  const parseNum = v => { const n=parseFloat(String(v).replace(',', '.')); return Number.isFinite(n)?n:0; };
 
   // UI refs
   const mesEl = el('finMes');
@@ -2228,7 +2257,7 @@
       function firstText(html){ const tmp=document.createElement('div'); tmp.innerHTML=html||''; return (tmp.textContent||tmp.innerText||'').trim().replace(/\s+/g,' ').slice(0,120); }
 
       function renderList(){
-        const ordered = notes.slice().sort((a,b)=>{ if ((b.pinned?1:0)!==(a.pinned?1:0)) return (b.pinned?1:0)-(a.pinned?1:0); return new Date(b.updated_at) - new Date(a.updated_at); });
+        const ordered = notes.slice().sort((a,b)=>{ if ((b.pinned?1:0)!== (a.pinned?1:0)) return (b.pinned?1:0)-(a.pinned?1:0); return new Date(b.updated_at) - new Date(a.updated_at); });
         listEl.innerHTML = '';
         if (!ordered.length){ listEl.innerHTML = `<div class="p-3 text-muted">Nenhuma nota.</div>`; return; }
         ordered.forEach(n=>{
