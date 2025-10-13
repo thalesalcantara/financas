@@ -104,15 +104,25 @@ db = SQLAlchemy(app)
 # Health checks
 @app.get("/healthz")
 def healthz():
+    # Sem tocar no DB — sempre 200
     return "ok", 200
 
 @app.get("/readyz")
 def readyz():
+    # Teste leve de DB; NÃO use esta rota como health check do Render
     try:
+        # evita segurar conexão por muito tempo
         db.session.execute(sa_text("SELECT 1"))
+        db.session.commit()   # no-op, mas fecha o ciclo p/ alguns setups
         return "ready", 200
-    except Exception:
-        return "not-ready", 503
+    except Exception as e:
+        # solta a conexão ruim e não “envenena” o pool
+        db.session.rollback()
+        try:
+            db.session.close()
+        except:
+            pass
+        return f"not-ready: {type(e).__name__}", 503
 
 # Liga foreign_keys no SQLite
 @event.listens_for(Engine, "connect")
