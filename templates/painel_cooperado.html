@@ -1504,11 +1504,10 @@
 </div>
 
 <!-- ÁUDIO: som de aviso -->
-<audio id="avisoSound" preload="auto" playsinline loop>
+<audio id="avisoSound" preload="auto" playsinline>
   <source src="{{ url_for('static', filename='sounds/notify.mp3') }}" type="audio/mpeg">
 </audio>
 
-<!-- SCRIPT -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const toastEl = document.getElementById('toastAvisos');
@@ -1516,6 +1515,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const unreadEndpoint = toastEl.dataset.unreadEndpoint;
   const avisoSound = document.getElementById('avisoSound');
   const toast = new bootstrap.Toast(toastEl);
+  let somJaTocado = false; // garante que só toca uma vez
 
   // --- Desbloqueio de áudio em mobile ---
   avisoSound.muted = false;
@@ -1534,7 +1534,7 @@ document.addEventListener('DOMContentLoaded', function () {
   document.addEventListener('touchstart', unlockAudio, { once: true });
   document.addEventListener('keydown', unlockAudio, { once: true });
 
-  // --- Função para atualizar avisos e som ---
+  // --- Verifica avisos na carga inicial ---
   async function verificarAvisos() {
     try {
       const response = await fetch(unreadEndpoint);
@@ -1544,25 +1544,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
       if (unread > 0) {
         toast.show();
-        if (avisoSound.paused) {
+        if (!somJaTocado) {
+          somJaTocado = true;
+          avisoSound.currentTime = 0;
           avisoSound.play().catch(err => console.warn("Erro ao tocar som:", err));
         }
       } else {
         toast.hide();
-        if (!avisoSound.paused) {
-          avisoSound.pause();
-          avisoSound.currentTime = 0;
-        }
       }
     } catch (err) {
       console.error("Erro ao verificar avisos:", err);
     }
   }
 
-  // Verifica a cada 15 segundos
-  setInterval(verificarAvisos, 15000);
-
-  // Primeira verificação imediata
+  // Executa apenas uma vez na carga da página
   verificarAvisos();
 });
 </script>
