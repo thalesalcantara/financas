@@ -5597,14 +5597,38 @@ def avisos_unread_count():
 
 # =========================
 # AVISOS — Portal Restaurante (listar e marcar lidos)
+# Bloco completo e idempotente (sem conflitos de endpoint)
 # =========================
 
-@app.get("/portal/restaurante/avisos", endpoint="portal_restaurante_avisos")
+from datetime import datetime
+from flask import render_template, session, redirect, url_for, flash, current_app
+from sqlalchemy import or_
+
+# helper p/ registrar rotas sem duplicar
+def safe_add_url_rule(rule, endpoint, view_func, **options):
+    if endpoint in app.view_functions:
+        try:
+            current_app.logger.info("Endpoint já existe, ignorando: %s", endpoint)
+        except Exception:
+            pass
+        return
+    app.add_url_rule(rule, endpoint=endpoint, view_func=view_func, **options)
+
+# extrai corpo onde quer que esteja
+def _corpo_do_aviso_rest(a: Aviso) -> str:
+    for k in ("corpo_html","html","conteudo_html","mensagem_html","descricao_html","texto_html",
+              "corpo","conteudo","mensagem","descricao","texto","resumo","body","content"):
+        v = getattr(a, k, None)
+        if isinstance(v, str) and v.strip():
+            return v
+    return ""
+
+# ---------- VIEWS (decoradas com role_required), registradas via safe_add_url_rule ----------
+
 @role_required("restaurante")
-def portal_restaurante_avisos():
+def _portal_restaurante_avisos():
     """
-    Lista apenas avisos visíveis ao restaurante atual (global + restaurante,
-    broadcast ou específicos), marcando quais já foram lidos.
+    Lista avisos visíveis ao restaurante atual e mostra quais já foram lidos.
     """
     u_id = session.get("user_id")
     rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
@@ -5625,22 +5649,13 @@ def portal_restaurante_avisos():
         .filter(AvisoLeitura.restaurante_id == rest.id).all()
     }
 
-    # extrai corpo onde quer que esteja
-    def corpo_do_aviso(a: Aviso) -> str:
-        for k in ("corpo_html","html","conteudo_html","mensagem_html","descricao_html","texto_html",
-                  "corpo","conteudo","mensagem","descricao","texto","resumo","body","content"):
-            v = getattr(a, k, None)
-            if isinstance(v, str) and v.strip():
-                return v
-        return ""
-
     avisos = [{
         "id": a.id,
         "titulo": a.titulo or "Aviso",
         "criado_em": a.criado_em,
         "lido": (a.id in lidos_ids),
         "prioridade_alta": (str(a.prioridade or "").lower() == "alta"),
-        "corpo_html": corpo_do_aviso(a),
+        "corpo_html": _corpo_do_aviso_rest(a),
     } for a in avisos_db]
 
     avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
@@ -5651,12 +5666,10 @@ def portal_restaurante_avisos():
         current_year=datetime.now().year,
     )
 
-
-@app.post("/portal/restaurante/avisos/<int:aviso_id>/marcar-lido", endpoint="rest_marcar_aviso_lido")
 @role_required("restaurante")
-def rest_marcar_aviso_lido(aviso_id: int):
+def _rest_marcar_aviso_lido(aviso_id: int):
     """
-    Marca um único aviso como lido para o restaurante atual (idempotente).
+    Marca um único aviso como lido (idempotente).
     """
     u_id = session.get("user_id")
     rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
@@ -5676,10 +5689,8 @@ def rest_marcar_aviso_lido(aviso_id: int):
     flash("Aviso marcado como lido.", "success")
     return redirect(url_for("portal_restaurante_avisos"))
 
-
-@app.post("/portal/restaurante/avisos/marcar-todos", endpoint="rest_marcar_todos_avisos_lidos")
 @role_required("restaurante")
-def rest_marcar_todos_avisos_lidos():
+def _rest_marcar_todos_avisos_lidos():
     """
     Marca todos os avisos visíveis ao restaurante atual como lidos (idempotente).
     """
@@ -5708,6 +5719,28 @@ def rest_marcar_todos_avisos_lidos():
 
     flash("Todos os avisos foram marcados como lidos.", "success")
     return redirect(url_for("portal_restaurante_avisos"))
+
+# ---------- Registro idempotente das rotas ----------
+safe_add_url_rule(
+    "/portal/restaurante/avisos",
+    endpoint="portal_restaurante_avisos",
+    view_func=_portal_restaurante_avisos,
+    methods=["GET"],
+)
+
+safe_add_url_rule(
+    "/portal/restaurante/avisos/<int:aviso_id>/marcar-lido",
+    endpoint="rest_marcar_aviso_lido",
+    view_func=_rest_marcar_aviso_lido,
+    methods=["POST"],
+)
+
+safe_add_url_rule(
+    "/portal/restaurante/avisos/marcar-todos",
+    endpoint="rest_marcar_todos_avisos_lidos",
+    view_func=_rest_marcar_todos_avisos_lidos,
+    methods=["POST"],
+)
 
 # =========================
 # Main
