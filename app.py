@@ -2460,6 +2460,17 @@ def admin_avisos_toggle(aviso_id):
     flash("Aviso atualizado.", "success")
     return redirect(request.referrer or url_for("admin_avisos"))
 
+# Ex.: em app.py, junto das outras rotas
+@app.post("/admin/cooperados/<int:id>/toggle", endpoint="toggle_status_cooperado")
+@admin_required  # se você usa isso para proteger páginas de admin
+def toggle_status_cooperado(id):
+    coop = Cooperado.query.get_or_404(id)
+    # alterna o status
+    coop.ativo = not bool(getattr(coop, "ativo", True))
+    db.session.commit()
+    flash("Status do cooperado atualizado.", "success")
+    return redirect(request.referrer or url_for("admin_dashboard"))
+
 
 # Excluir aviso (limpando relações)
 @app.route("/admin/avisos/<int:aviso_id>/excluir", methods=["POST"], endpoint="admin_avisos_excluir")
