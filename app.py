@@ -4669,12 +4669,19 @@ from werkzeug.routing import BuildError
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError, OperationalError
 
+# 🔧 Imports adicionais necessários neste bloco:
+import os, re
+from pathlib import Path
+from flask import jsonify, current_app
+from werkzeug.utils import secure_filename
+
 # Assumindo que já existem:
 # app, db, role_required
-# models: Restaurante, Cooperado, Lancamento, Escala, Aviso, AvisoLeitura, AvaliacaoCooperado
+# models: Restaurante, Cooperado, Lancamento, Escala, Aviso, AvisoLeitura, AvaliacaoCooperado, Tabela
 # helpers: _parse_date, _normalize_name, _carry_forward_contrato,
-#          _parse_data_escala_str, _weekday_from_data_str, _norm,
-#          _clamp_star, _media_ponderada, _analise_sentimento, _identifica_temas, _sinaliza_crise, _gerar_feedback
+#          _parse_data_escala_str, _weekday_from_data_str, _norm, _norm_txt,
+#          _clamp_star, _media_ponderada, _analise_sentimento, _identifica_temas, _sinaliza_crise, _gerar_feedback,
+#          _tabelas_base_dir, _serve_tabela_or_redirect, _enforce_restaurante_titulo
 # (e opcionalmente get_avisos_for_restaurante)
 
 # --- Helpers de navegação: manter a mesma aba após ações -------------------
@@ -4978,7 +4985,7 @@ def portal_restaurante():
 # =========================
 # AVISOS (rotas do Portal Restaurante)
 # =========================
-@app.get("/portal/restaurante/avisos")
+@app.get("/portal/restaurante/avisos", endpoint="portal_restaurante_avisos")
 @role_required("restaurante")
 def portal_restaurante_avisos():
     u_id = session.get("user_id")
@@ -5115,6 +5122,24 @@ def rest_marcar_aviso_lido_legacy(aviso_id: int):
 @role_required("restaurante")
 def rest_marcar_todos_lidos_legacy():
     return rest_marcar_todos_avisos_lidos()
+
+# ✅ Aliases adicionais para compatibilidade com templates que usam
+# 'marcar_todos_lidos' e 'marcar_todos_avisos_lidos_restaurante'
+@app.post("/portal/restaurante/avisos/marcar-todos", endpoint="marcar_todos_lidos")
+@role_required("restaurante")
+def marcar_todos_lidos_alias():
+    return rest_marcar_todos_avisos_lidos()
+
+@app.post("/portal/restaurante/avisos/marcar-todos", endpoint="marcar_todos_avisos_lidos_restaurante")
+@role_required("restaurante")
+def marcar_todos_avisos_lidos_restaurante_alias():
+    return rest_marcar_todos_avisos_lidos()
+
+# (Opcional) alias para marcar 1 aviso, caso algum template antigo use outro nome
+@app.post("/portal/restaurante/avisos/<int:aviso_id>/marcar-lido", endpoint="marcar_aviso_lido_restaurante")
+@role_required("restaurante")
+def marcar_aviso_lido_restaurante_alias(aviso_id: int):
+    return rest_marcar_aviso_lido(aviso_id)
 
 
 # =========================
@@ -5749,6 +5774,4 @@ if __name__ == "__main__":
     with app.app_context():
         init_db()
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
-
-
+    
