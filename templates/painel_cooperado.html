@@ -2237,5 +2237,30 @@ document.addEventListener('DOMContentLoaded', function () {
       calc(); renderHist();
     })();
   </script>
+
+  <!-- DEBUG: remover depois -->
+<div style="position:fixed;bottom:10px;left:10px;z-index:99999;background:#fff;padding:8px;border:1px solid #ddd;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.08)">
+  <button id="dbgToast" class="btn btn-sm btn-primary">Testar Toast+Som</button>
+  <button id="dbgSom" class="btn btn-sm btn-outline-secondary">Testar Som</button>
+  <small class="text-muted ms-2">debug</small>
+</div>
+<script>
+  (function(){
+    const a = document.getElementById('avisoSound');
+    document.getElementById('dbgToast').onclick = () => {
+      // força toast+som sem backend
+      if (window.coopAvisosNotify) window.coopAvisosNotify(3);
+      else {
+        // mostra toast manualmente se o helper não existir
+        const t = document.getElementById('toastAvisos');
+        if (window.bootstrap?.Toast && t) new bootstrap.Toast(t).show();
+        if (a) { a.currentTime = 0; a.play?.().catch(()=>{}); }
+      }
+    };
+    document.getElementById('dbgSom').onclick = async () => {
+      try { a.currentTime = 0; await a.play(); } catch(e){ console.warn('Som falhou:', e); }
+    };
+  })();
+</script>
 </body>
 </html>
