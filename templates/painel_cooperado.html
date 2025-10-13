@@ -1486,7 +1486,7 @@
 <!-- TOAST de novos avisos (persistente) -->
 <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1080;">
   <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true"
-       data-bs-autohide="false"
+       edata-bs-autohide="false"
        data-unread-endpoint="/avisos/unread_count">
     <div class="toast-header">
       <i class="bi bi-megaphone-fill me-2"></i>
@@ -1509,56 +1509,34 @@
 </audio>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-  const toastEl = document.getElementById('toastAvisos');
-  const toastCountEl = document.getElementById('toastCount');
-  const unreadEndpoint = toastEl.dataset.unreadEndpoint;
-  const avisoSound = document.getElementById('avisoSound');
+document.addEventListener("DOMContentLoaded", function () {
+  const toastEl = document.getElementById("toastAvisos");
+  const audio = document.getElementById("avisoSound");
+  const unreadCount = parseInt({{ unread|tojson }});
+
+  if (!toastEl || !audio) return;
+
+  audio.muted = false;
+  audio.volume = 1.0;
+
   const toast = new bootstrap.Toast(toastEl);
-  let somJaTocado = false; // garante que só toca uma vez
 
-  // --- Desbloqueio de áudio em mobile ---
-  avisoSound.muted = false;
-  avisoSound.volume = 1.0;
-  async function unlockAudio() {
+  // 🔔 Só mostra e toca se houver avisos não lidos
+  if (unreadCount > 0) {
+    toast.show();
+
     try {
-      await avisoSound.play();
-      avisoSound.pause();
-      avisoSound.currentTime = 0;
-    } catch (_) {}
-    document.removeEventListener('click', unlockAudio);
-    document.removeEventListener('touchstart', unlockAudio);
-    document.removeEventListener('keydown', unlockAudio);
-  }
-  document.addEventListener('click', unlockAudio, { once: true });
-  document.addEventListener('touchstart', unlockAudio, { once: true });
-  document.addEventListener('keydown', unlockAudio, { once: true });
-
-  // --- Verifica avisos na carga inicial ---
-  async function verificarAvisos() {
-    try {
-      const response = await fetch(unreadEndpoint);
-      const data = await response.json();
-      const unread = data.unread ?? 0;
-      toastCountEl.textContent = unread;
-
-      if (unread > 0) {
-        toast.show();
-        if (!somJaTocado) {
-          somJaTocado = true;
-          avisoSound.currentTime = 0;
-          avisoSound.play().catch(err => console.warn("Erro ao tocar som:", err));
-        }
-      } else {
-        toast.hide();
-      }
+      // tenta tocar apenas 1x
+      audio.currentTime = 0;
+      audio.play().catch(() => {
+        console.log("Som de aviso bloqueado até interação do usuário");
+      });
     } catch (err) {
-      console.error("Erro ao verificar avisos:", err);
+      console.warn("Falha ao tocar o som:", err);
     }
+  } else {
+    toast.hide();
   }
-
-  // Executa apenas uma vez na carga da página
-  verificarAvisos();
 });
 </script>
 
