@@ -4675,6 +4675,18 @@ def recusar_troca(troca_id):
 # =========================
 # PORTAL RESTAURANTE (com Avisos)
 # =========================
+from datetime import date, datetime, timedelta
+from flask import request, session, render_template, redirect, url_for, abort, flash
+from werkzeug.routing import BuildError
+from sqlalchemy.exc import IntegrityError, OperationalError
+
+# Assumindo que já existem:
+# app, db, role_required
+# models: Restaurante, Cooperado, Lancamento, Escala, Aviso, AvisoLeitura, AvaliacaoCooperado
+# helpers: _parse_date, _normalize_name, _carry_forward_contrato,
+#          _parse_data_escala_str, _weekday_from_data_str, _norm,
+#          _clamp_star, _media_ponderada, _analise_sentimento, _identifica_temas, _sinaliza_crise, _gerar_feedback
+# (e opcionalmente get_avisos_for_restaurante)
 
 # --- Helpers de Avisos (restaurante) ---------------------------------------
 def _fetch_avisos_for_restaurante(rest):
@@ -4684,10 +4696,8 @@ def _fetch_avisos_for_restaurante(rest):
     usamos ele; caso contrário, caímos no fallback (todos, mais recentes primeiro).
     """
     try:
-        # usa helper do projeto se existir
         return get_avisos_for_restaurante(rest)  # type: ignore[name-defined]
     except NameError:
-        # fallback simples (ajuste se tiver segmentação por destino/categoria)
         return Aviso.query.order_by(Aviso.enviado_em.desc()).all()
 
 def _count_unread_for_restaurante(rest) -> int:
@@ -4845,8 +4855,8 @@ def portal_restaurante():
                 "coop": coop,
                 "cooperado_nome": nome_fallback or None,
                 "nome_planilha": nome_show,
-                "turno": (e.turno or "").strip(),
-                "horario": (e.horario or "").strip(),
+                "turno": (e.turno ou "").strip(),
+                "horario": (e.horario ou "").strip(),
                 "contrato": contrato_eff,
                 "cor": (e.cor or "").strip(),
             })
@@ -4885,7 +4895,7 @@ def portal_restaurante():
                 "hora_fim": (lanc.hora_fim if isinstance(lanc.hora_fim, str)
                              else (lanc.hora_fim.strftime("%H:%M") if lanc.hora_fim else "")),
                 "qtd_entregas": lanc.qtd_entregas or 0,
-                "valor": float(lanc.valor or 0.0),  # já em R$
+                "valor": float(lanc.valor or 0.0),
                 "cooperado_id": coop.id,
                 "cooperado_nome": coop.nome,
                 "contrato_nome": rest.nome,
@@ -4906,16 +4916,13 @@ def portal_restaurante():
             a.lido = (a.id in lidos_ids)
         avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
 
-    # >>> Contador geral de não lidos para TOAST/SOM no layout
+    # >>> Contador geral de não lidos (para TOAST/SOM no layout)
     unread = _count_unread_for_restaurante(rest)
 
     # ---- URLs/flags para template
-    from werkzeug.routing import BuildError
     try:
-        # Se existir endpoint app-level abaixo, ok:
         url_lancar_producao = url_for("lancar_producao")
     except BuildError:
-        # Fallback correto COM /portal/:
         url_lancar_producao = "/portal/restaurante/lancar_producao"
 
     has_editar_lanc = ("editar_lancamento" in app.view_functions)
@@ -4965,7 +4972,7 @@ def lancar_producao():
         abort(403)
     f = request.form
 
-    # 1) cria o lançamento normalmente
+    # 1) cria o lançamento
     l = Lancamento(
         restaurante_id=rest.id,
         cooperado_id=f.get("cooperado_id", type=int),
@@ -4977,9 +4984,9 @@ def lancar_producao():
         qtd_entregas=f.get("qtd_entregas", type=int),
     )
     db.session.add(l)
-    db.session.flush()  # garante l.id para amarrar avaliação
+    db.session.flush()  # garante l.id
 
-    # 2) (opcional) avaliação — mantém seu fluxo
+    # 2) avaliação (opcional)
     g   = _clamp_star(f.get("av_geral"))
     p   = _clamp_star(f.get("av_pontualidade"))
     ed  = _clamp_star(f.get("av_educacao"))
@@ -5012,17 +5019,15 @@ def lancar_producao():
             feedback_motoboy=feed,
         )
         db.session.add(av)
-
         if crise:
             flash("⚠️ Avaliação crítica registrada (1★ + termo de risco). A gerência deve revisar.", "danger")
 
     db.session.commit()
     flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
-    # redireciona para a aba 'lancamentos' para o usuário já ver o registro
     return redirect(url_for("portal_restaurante", view="lancamentos"))
 
 # =========================
-# EDITAR / EXCLUIR LANÇAMENTO (mantidos)
+# EDITAR / EXCLUIR LANÇAMENTO (excluir remove avaliações vinculadas)
 # =========================
 @app.route("/lancamentos/<int:id>/editar", methods=["GET", "POST"])
 @role_required("restaurante")
@@ -5054,9 +5059,21 @@ def excluir_lancamento(id):
     l = Lancamento.query.get_or_404(id)
     if not rest or l.restaurante_id != rest.id:
         abort(403)
-    db.session.delete(l)
-    db.session.commit()
-    flash("Lançamento excluído.", "success")
+
+    try:
+        # 1) apaga avaliações vinculadas ao lançamento
+        AvaliacaoCooperado.query.filter_by(lancamento_id=l.id).delete(synchronize_session=False)
+        # 2) apaga o lançamento
+        db.session.delete(l)
+        db.session.commit()
+        flash("Lançamento e avaliações vinculadas excluídos.", "success")
+    except IntegrityError:
+        db.session.rollback()
+        flash("Não foi possível excluir por vínculos de integridade. Tente novamente ou verifique constraints.", "danger")
+    except OperationalError:
+        db.session.rollback()
+        flash("Falha de conexão com o banco ao excluir. Tente novamente.", "warning")
+
     return redirect(url_for("portal_restaurante", view="lancamentos"))
 
 # ---------------------------------------------------------------------------
