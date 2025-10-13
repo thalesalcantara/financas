@@ -1564,7 +1564,6 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
-<!-- TOAST avisos + SOM ao chegar (versão compatível com backend + LS) -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const toastEl = document.getElementById('toastAvisos');
@@ -1574,25 +1573,32 @@ document.addEventListener('DOMContentLoaded', function () {
   const toastTimeEl  = toastEl.querySelector('.toast-time');
   const endpoint     = toastEl.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
 
-  // valores iniciais vindos do servidor
   const unreadInitial = Number('{{ unread|default(0)|int }}') || 0;
 
-  // chaves de LS segregadas por perfil + usuário
+  // LS (segue existindo, mas não bloqueia exibição)
   const PERF = '{{ session.get("user_tipo","cooperado") }}';
   const UID  = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
   const LS_KEY = `COOPEX_AVISOS_LAST_${PERF}_${UID}`;
   const LS_TS  = `COOPEX_AVISOS_LAST_TS_${PERF}_${UID}`;
 
   const audio  = document.getElementById('avisoSound');
+  const toast  = bootstrap.Toast.getOrCreateInstance(toastEl, { autohide: false });
 
-  function showToast(count) {
-  if (!window.bootstrap?.Toast) return;
-  if (toastCountEl) toastCountEl.textContent = String(count);
-  if (toastTimeEl)  toastTimeEl.textContent  = 'agora';
-  // força persistente via JS também
-  const inst = bootstrap.Toast.getOrCreateInstance(toastEl, { autohide: false });
-  inst.show();
-}
+  let prevCount = unreadInitial; // usado para decidir quando tocar som
+
+  function renderCount(count){
+    if (toastCountEl) toastCountEl.textContent = String(count);
+    if (toastTimeEl)  toastTimeEl.textContent  = 'agora';
+  }
+
+  function ensureToast(count){
+    renderCount(count);
+    if (count > 0) {
+      toast.show();   // fica visível enquanto houver não lidos
+    } else {
+      toast.hide();   // some quando zerar
+    }
+  }
 
   async function playSound() {
     if (!audio) return;
@@ -1600,13 +1606,16 @@ document.addEventListener('DOMContentLoaded', function () {
       audio.currentTime = 0;
       await audio.play();
     } catch {
-      // se o navegador bloquear, tenta após primeira interação do usuário
-      const enable = async () => {
-        try { audio.currentTime = 0; await audio.play(); } catch(_) {}
+      const once = async () => {
+        try { audio.currentTime = 0; await audio.play(); } finally {
+          document.removeEventListener('click', once);
+          document.removeEventListener('keydown', once);
+          document.removeEventListener('touchstart', once);
+        }
       };
-      document.addEventListener('click', enable, { once:true });
-      document.addEventListener('keydown', enable, { once:true });
-      document.addEventListener('touchstart', enable, { once:true });
+      document.addEventListener('click', once, { once:true });
+      document.addEventListener('keydown', once, { once:true });
+      document.addEventListener('touchstart', once, { once:true });
     }
   }
 
@@ -1619,283 +1628,38 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       if (!resp.ok) return;
 
-      const data   = await resp.json();
-      const count  = Number(data.unread ?? data.count ?? 0);
+      const data  = await resp.json();
+      const count = Number(data.unread ?? data.count ?? 0);
+      if (!Number.isFinite(count)) return;
 
-      const stored = Number(localStorage.getItem(LS_KEY) || 0);
-      const lastTs = Number(localStorage.getItem(LS_TS) || 0);
-      const STALE_MS = 5 * 60 * 1000;
-      const stale = (Date.now() - lastTs) > STALE_MS;
+      // Mantém o toast sempre que houver >0
+      ensureToast(count);
 
-      // mostra quando:
-      // - aumentou (novo aviso),
-      // - ou nunca salvou e agora tem >0,
-      // - ou está “velho” (reaparece de tempos em tempos).
-      if (Number.isFinite(count) && (count > stored || (stored === 0 && count > 0) || stale)) {
-        showToast(count);
+      // Som só nas transições relevantes: 0→>0 ou aumento
+      if ((prevCount === 0 && count > 0) || (count > prevCount)) {
         playSound();
-        localStorage.setItem(LS_KEY, String(count));
-        localStorage.setItem(LS_TS, String(Date.now()));
       }
+
+      prevCount = count;
+      localStorage.setItem(LS_KEY, String(count));
+      localStorage.setItem(LS_TS, String(Date.now()));
     } catch {}
   }
 
-  // Boot: mostra se veio algo do servidor e checa o endpoint já na carga
-  (function boot() {
-    const lastCount = Number(localStorage.getItem(LS_KEY)) || 0;
-    const lastTs    = Number(localStorage.getItem(LS_TS)) || 0;
-    const FORCE     = new URLSearchParams(location.search).get('show_toast') === '1';
-    const STALE_MS  = 5 * 60 * 1000;
+  // Boot: mostra imediatamente se já tem aviso não lido
+  ensureToast(unreadInitial);
+  if (unreadInitial > 0) playSound();
 
-    const shouldShow = unreadInitial > 0 && (
-      FORCE || lastCount === 0 || unreadInitial !== lastCount || (Date.now() - lastTs) > STALE_MS
-    );
-    if (shouldShow) {
-      showToast(unreadInitial);
-      playSound();
-      localStorage.setItem(LS_KEY, String(unreadInitial));
-      localStorage.setItem(LS_TS, String(Date.now()));
-    }
-
-    checkUnread(); // checagem imediata cobre caso unreadInitial==0
-  })();
-
-  // Polling + volta ao foco
-  setInterval(checkUnread, 20000);
+  // Checagem imediata + polling
+  checkUnread();
+  const POLL_MS = 8000;
+  setInterval(checkUnread, POLL_MS);
+  window.addEventListener('pageshow', () => checkUnread());
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') checkUnread();
   });
-
-  // Broadcast opcional (admin pode emitir via channel)
-  try {
-    const ch = new BroadcastChannel('coopex_avisos');
-    ch.onmessage = (ev) => {
-      const count   = Number(ev.data?.unread || 0);
-      const current = Number(localStorage.getItem(LS_KEY) || 0);
-      if (Number.isFinite(count) && count > current) {
-        showToast(count);
-        playSound();
-        localStorage.setItem(LS_KEY, String(count));
-        localStorage.setItem(LS_TS, String(Date.now()));
-      }
-    };
-    // helper global para forçar via console/testes
-    window.coopAvisosNotify = function(count){
-      const n = Number(count||0), current = Number(localStorage.getItem(LS_KEY)||0);
-      if (Number.isFinite(n) && n > current) {
-        showToast(n);
-        playSound();
-        localStorage.setItem(LS_KEY, String(n));
-        localStorage.setItem(LS_TS, String(Date.now()));
-      }
-    };
-  } catch {}
 });
 </script>
-  
-  <!-- JS: Avaliação (4 categorias) -->
-  <script>
-    document.querySelectorAll('.avaliar-form').forEach(form => {
-      if (!form.querySelector('.stars-group')) return;
-      const submitBtn = form.querySelector('button[type="submit"]');
-
-      function setHidden(name, val){
-        const inp = form.querySelector(`input[name="${name}"]`);
-        if (inp) inp.value = String(val ?? '');
-      }
-      function getHidden(name){
-        const v = Number(form.querySelector(`input[name="${name}"]`)?.value || 0);
-        return Number.isFinite(v) ? v : 0;
-      }
-      function paintGroup(groupEl, val){
-        groupEl.querySelectorAll('button').forEach(btn=>{
-          const n = Number(btn.dataset.value);
-          const i = btn.querySelector('i');
-          i.className = 'bi ' + (n <= val ? 'bi-star-fill' : 'bi-star');
-        });
-      }
-      function roundHalf(x){ return Math.round(x*2)/2; }
-      function recalcGeral(){
-        const a = getHidden('av_apresentacao');
-        const b = getHidden('av_educacao');
-        const c = getHidden('av_eficiencia');
-        const filled = a && b && c;
-        const geral = filled ? roundHalf((a+b+c)/3) : 0;
-        const geralGroup = form.querySelector('.stars-group[data-field="av_geral"]');
-        if (geralGroup) paintGroup(geralGroup, geral);
-        setHidden('av_geral', geral ? geral.toFixed(1) : '');
-        setHidden('nota', geral ? String(Math.round(geral)) : '');
-        setHidden('av_pontualidade', geral ? String(Math.round(geral)) : '');
-        submitBtn.disabled = !filled;
-      }
-
-      form.querySelectorAll('.stars-group').forEach(group => {
-        const readonly = group.getAttribute('data-readonly') === 'true';
-        const field = group.getAttribute('data-field');
-        if (readonly) return;
-        group.querySelectorAll('button').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const val = Number(btn.dataset.value);
-            paintGroup(group, val);
-            setHidden(field, val);
-            recalcGeral();
-          });
-        });
-      });
-
-      submitBtn.disabled = true;
-    });
-  </script>
-
-  <!-- Lógica da CALCULADORA -->
-  <script>
-    (function(){
-      const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
-      const LS_TAPE = `COOPEX_CALC_TAPE_${UID}`;
-
-      const statusEl = document.getElementById('calcStatus');
-      const display = document.getElementById('calcDisplay');
-      const tapeEl = document.getElementById('calcTape');
-      const btnTapeClear = document.getElementById('calcTapeClear');
-
-      const symbol = { plus: '+', minus: '−', multiply: '×', divide: '÷' };
-
-      let first = null, operator = null, waitingSecond = false, lastOp = null;
-
-      function fmt(n){
-        if (!Number.isFinite(n)) return 'Erro';
-        const num = Math.round(n * 1e12) / 1e12;
-        return (Number.isInteger(num) ? num.toString() : num.toString());
-      }
-      function updateDisplay(v){ display.textContent = (typeof v === 'string') ? v : fmt(v); }
-      function updateStatus(){
-        if (first !== null && operator){
-          statusEl.textContent = `${fmt(first)} ${symbol[operator]}`;
-        } else {
-          statusEl.innerHTML = '&nbsp;';
-        }
-      }
-      function getValue(){ return parseFloat(display.textContent.replace(',','.')) || 0; }
-
-      function inputDigit(d){
-        if (waitingSecond){ updateDisplay(d); waitingSecond=false; return; }
-        const cur = display.textContent;
-        updateDisplay(cur==='0' ? d : (cur + d));
-      }
-      function inputDot(){
-        if (waitingSecond){ updateDisplay('0.'); waitingSecond=false; return; }
-        if (!display.textContent.includes('.')) updateDisplay(display.textContent + '.');
-      }
-      function toggleSign(){ updateDisplay(-getValue()); }
-      function percent(){ updateDisplay(getValue() / 100); }
-      function backspace(){
-        if (waitingSecond) return;
-        const s = display.textContent;
-        if (s.length <= 1){ updateDisplay(0); return; }
-        updateDisplay(s.slice(0,-1));
-      }
-      function clearAll(){
-        first=null; operator=null; waitingSecond=false; lastOp=null;
-        updateDisplay(0); updateStatus();
-        document.querySelectorAll('#calcModal [data-op]').forEach(btn=>btn.classList.remove('k-active'));
-      }
-      function compute(a,b,op){
-        switch(op){
-          case 'plus': return a+b;
-          case 'minus': return a-b;
-          case 'multiply': return a*b;
-          case 'divide': return (b===0? NaN : a/b);
-          default: return b;
-        }
-      }
-      function setOperator(op){
-        const current = getValue();
-        if (first===null){ first = current; }
-        else if (!waitingSecond){
-          first = compute(first, current, operator);
-          updateDisplay(first);
-        }
-        operator = op; waitingSecond = true; lastOp = {op, b:null};
-        document.querySelectorAll('#calcModal [data-op]').forEach(btn=>btn.classList.toggle('k-active', btn.getAttribute('data-op')===op));
-        updateStatus();
-      }
-      function equal(){
-        const current = getValue();
-        if (!operator && lastOp && lastOp.op){
-          const resRepeat = compute(getValue(), lastOp.b ?? 0, lastOp.op);
-          addTape(getValue(), lastOp.op, lastOp.b ?? 0, resRepeat);
-          updateDisplay(resRepeat);
-          updateStatus();
-          return;
-        }
-        if (first!==null && operator){
-          if (lastOp) lastOp.b = current;
-          const res = compute(first, current, operator);
-          addTape(first, operator, current, res);
-          updateDisplay(res);
-          first = res; waitingSecond = true; operator=null;
-          document.querySelectorAll('#calcModal [data-op]').forEach(btn=>btn.classList.remove('k-active'));
-          updateStatus();
-        }
-      }
-
-      // Fita (histórico)
-      function loadTape(){ try{ const raw = localStorage.getItem(LS_TAPE); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr : []; }catch(_){ return []; } }
-      function saveTape(arr){ localStorage.setItem(LS_TAPE, JSON.stringify(arr)); }
-      function addTape(a,op,b,res){
-        const item = { ts: Date.now(), a, op, b, res };
-        const arr = loadTape(); arr.push(item); saveTape(arr); renderTape();
-      }
-      function renderTape(){
-        const arr = loadTape();
-        if (!tapeEl) return;
-        if (!arr.length){ tapeEl.innerHTML = '<div class="text-muted">Sem histórico.</div>'; return; }
-        tapeEl.innerHTML = '';
-        arr.slice().reverse().forEach((it, idxRev)=>{
-          const idx = arr.length - 1 - idxRev;
-          const row = document.createElement('div');
-          row.className = 'item';
-          row.innerHTML = `
-            <div class="expr">
-              ${fmt(it.a)} ${symbol[it.op]||'?'} ${fmt(it.b)} = <strong>${fmt(it.res)}</strong>
-            </div>
-            <div>
-              <button class="btn-del" title="Apagar" data-idx="${idx}">
-                <i class="bi bi-x-circle"></i>
-              </button>
-            </div>
-          `;
-          row.querySelector('.btn-del').addEventListener('click', ()=>{
-            const arr2 = loadTape(); arr2.splice(idx,1); saveTape(arr2); renderTape();
-          });
-          tapeEl.appendChild(row);
-        });
-      }
-      btnTapeClear?.addEventListener('click', ()=>{
-        if (confirm('Limpar todo o histórico da calculadora?')){
-          saveTape([]); renderTape();
-        }
-      });
-
-      // Bind
-      document.querySelectorAll('#calcModal .calc-btn').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
-          const n=btn.getAttribute('data-num'), dot=btn.getAttribute('data-dot'), act=btn.getAttribute('data-act'), op=btn.getAttribute('data-op');
-          if (n) inputDigit(n);
-          else if (dot) inputDot();
-          else if (act==='ac') clearAll();
-          else if (act==='back') backspace();
-          else if (act==='sign') toggleSign();
-          else if (act==='percent') percent();
-          else if (act==='equal') equal();
-          else if (op) setOperator(op);
-        });
-      });
-
-      // Boot
-      updateDisplay(0); updateStatus(); renderTape();
-    })();
-  </script>
 
   <script>
   (function(){
