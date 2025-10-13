@@ -1,28 +1,33 @@
 from __future__ import annotations
 
-import os
-import io
-import sys
-import csv
-import json
-import difflib
-import unicodedata
-import re
-import mimetypes
-from dateutil.relativedelta import relativedelta
-from sqlalchemy.inspection import inspect as sa_inspect
+# stdlib
+import os, io, sys, csv, json, re, difflib, mimetypes, unicodedata
 from datetime import datetime, date, timedelta, time
 from functools import wraps
 from collections import defaultdict, namedtuple
 from types import SimpleNamespace
+
+# Flask / Werkzeug
 from flask import (
-    Flask, render_template, request, redirect, url_for,
-    session, flash, send_file, abort
+    Flask, Blueprint, render_template, request, redirect, url_for,
+    session, flash, send_file, abort, current_app
 )
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from sqlalchemy import delete as sa_delete, text as sa_text, func
+
+# SQLAlchemy
+from sqlalchemy import (
+    event, func, case, or_, and_,
+)
+from sqlalchemy.sql import text as sa_text
+from sqlalchemy import delete as sa_delete, literal
+from sqlalchemy.engine import Engine
+from sqlalchemy.pool import QueuePool
+from sqlalchemy.orm import selectinload
+
+# Terceiros
+from dateutil.relativedelta import relativedelta
 
 # =========================
 # App / DB
@@ -79,7 +84,6 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=12) # ajuste conforme sua política
 )
 
-from sqlalchemy.pool import QueuePool
 
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "poolclass": QueuePool,   # usa pool local quando não houver PgBouncer
@@ -90,10 +94,6 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 
 db = SQLAlchemy(app)
-
-# --- habilita foreign_keys no SQLite (para ON DELETE CASCADE funcionar) ---
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
 
 @event.listens_for(Engine, "connect")
 def _set_sqlite_pragma(dbapi_con, con_record):
@@ -126,13 +126,14 @@ class Cooperado(db.Model):
     __tablename__ = "cooperados"
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)
-    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False, unique=True)
     usuario_ref = db.relationship("Usuario", backref="coop_account", uselist=False)
-    # Foto: agora guardada no banco (bytea no Postgres / BLOB no SQLite)
+    # status
+    ativo = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    # Foto no banco
     foto_bytes = db.Column(db.LargeBinary)
     foto_mime = db.Column(db.String(100))
     foto_filename = db.Column(db.String(255))
-    # Para manter compatibilidade com os templates existentes que usam 'foto_url'
     foto_url = db.Column(db.String(255))
     cnh_numero = db.Column(db.String(50))
     cnh_validade = db.Column(db.Date)
@@ -146,13 +147,12 @@ class Restaurante(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)
     periodo = db.Column(db.String(20), nullable=False)  # seg-dom | sab-sex | sex-qui
-    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False, unique=True)
     usuario_ref = db.relationship("Usuario", backref="rest_account", uselist=False)
-    # Foto no banco (bytea)
+    ativo = db.Column(db.Boolean, nullable=False, default=True, index=True)
     foto_bytes = db.Column(db.LargeBinary)
     foto_mime = db.Column(db.String(100))
     foto_filename = db.Column(db.String(255))
-    # compatibilidade
     foto_url = db.Column(db.String(255))
 
 
@@ -372,23 +372,25 @@ class AvisoLeitura(db.Model):
 # =========================
 # Helpers
 # =========================
+# Fallbacks caso não estejam definidos no módulo principal
+try:
+    BASE_DIR  # noqa: F401
+except NameError:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+try:
+    UPLOAD_DIR  # noqa: F401
+except NameError:
+    UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
 def _is_sqlite() -> bool:
     try:
         return db.session.get_bind().dialect.name == "sqlite"
     except Exception:
         return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
 
-def init_db():
-    # --- PERF (SQLite): liga WAL e ajusta synchronous ---
-    try:
-        if _is_sqlite():
-            db.session.execute(sa_text("PRAGMA journal_mode=WAL;"))
-            db.session.execute(sa_text("PRAGMA synchronous=NORMAL;"))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
-
-    db.create_all()
 
 def init_db():
     # --- PERF (SQLite): liga WAL e ajusta synchronous ---
@@ -568,6 +570,52 @@ def init_db():
     except Exception:
         db.session.rollback()
 
+    # --- status 'ativo' em cooperados/restaurantes ---
+    try:
+        if _is_sqlite():
+            # cooperados.ativo
+            cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "ativo" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN ativo INTEGER DEFAULT 1"))
+            # restaurantes.ativo
+            cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "ativo" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN ativo INTEGER DEFAULT 1"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT TRUE"
+            )).rowcount
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT TRUE"
+            ))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # --- índice UNIQUE para garantir relação 1:1 com usuarios ---
+    try:
+        if _is_sqlite():
+            db.session.execute(sa_text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_cooperados_usuario_id ON cooperados (usuario_id)"
+            ))
+            db.session.execute(sa_text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_restaurantes_usuario_id ON restaurantes (usuario_id)"
+            ))
+        else:
+            db.session.execute(sa_text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_cooperados_usuario_id ON public.cooperados (usuario_id)"
+            ))
+            db.session.execute(sa_text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_restaurantes_usuario_id ON public.restaurantes (usuario_id)"
+            ))
+        db.session.commit()
+    except Exception:
+        # Se já houver duplicados, o índice pode falhar — revisar dados antes.
+        db.session.rollback()
+
     # --- usuário admin + config padrão ---
     if not Usuario.query.filter_by(tipo="admin").first():
         admin_user = os.environ.get("ADMIN_USER", "admin")
@@ -646,13 +694,13 @@ def _norm_login(s: str) -> str:
     s = re.sub(r"\s+", "", s)
     return s
 
+
 def _match_cooperado_by_login(login_planilha: str, cooperados: list[Cooperado]) -> Cooperado | None:
     """Casa EXATAMENTE com Usuario.usuario após normalização."""
     key = _norm_login(login_planilha)
     if not key:
         return None
     for c in cooperados:
-        # c.usuario_ref.usuario é o login usado no sistema
         login = getattr(c.usuario_ref, "usuario", "") or ""
         if _norm_login(login) == key:
             return c
@@ -741,6 +789,7 @@ def _save_upload(file_storage) -> str | None:
     file_storage.save(path)
     return f"/static/uploads/{fname}"
 
+
 def _save_foto_to_db(entidade, file_storage, *, is_cooperado: bool) -> str | None:
     """
     Salva o arquivo enviado diretamente no banco (bytea/Blob) e
@@ -763,6 +812,7 @@ def _save_foto_to_db(entidade, file_storage, *, is_cooperado: bool) -> str | Non
     entidade.foto_url = f"{url}?v={int(datetime.utcnow().timestamp())}"
     return entidade.foto_url
 
+
 def _abs_path_from_url(rel_url: str) -> str:
     """
     Converte '/static/uploads/arquivo.pdf' para o caminho absoluto no disco.
@@ -773,6 +823,7 @@ def _abs_path_from_url(rel_url: str) -> str:
     if rel_url.startswith("/"):
         rel_url = rel_url.lstrip("/")
     return os.path.join(BASE_DIR, rel_url.replace("/", os.sep))
+
 
 def _serve_uploaded(rel_url: str, *, download_name: str | None = None, force_download: bool = False):
     """
@@ -796,6 +847,7 @@ def _serve_uploaded(rel_url: str, *, download_name: str | None = None, force_dow
         conditional=True,     # ajuda visualização/retomar download
     )
 
+
 def _prox_ocorrencia_anual(dt: date | None) -> date | None:
     if not dt:
         return None
@@ -815,7 +867,7 @@ def _parse_date(s: str | None) -> date | None:
         except Exception:
             pass
     return None
-    
+
 
 def _parse_ymd(s):
     try:
@@ -823,19 +875,21 @@ def _parse_ymd(s):
     except Exception:
         return None
 
+
 def _bounds_mes(yyyy_mm: str):
     # "2025-06" -> [2025-06-01, 2025-07-01)
     y, m = map(int, yyyy_mm.split("-"))
     ini = date(y, m, 1)
     fim = (ini + relativedelta(months=1))
     return ini, fim
-    
+
 
 def _parse_data_ymd(s):
     try:
         return datetime.strptime(s, "%Y-%m-%d").date()
     except Exception:
         return None
+
 
 def _fmt_br(d: date | None) -> str:
     return d.strftime("%d/%m/%Y") if d else ""
@@ -852,6 +906,7 @@ def _clamp_star(v):
     except Exception:
         return None
     return min(5, max(1, v))
+
 
 def _media_ponderada(geral, pont, educ, efic, apres):
     """
@@ -874,12 +929,14 @@ def _media_ponderada(geral, pont, educ, efic, apres):
             den += w
     return round(num / den, 2) if den > 0 else None
 
+
 _POS = set("""
 bom ótima otimo excelente parabéns educado gentil atencioso cordial limpo cheiroso organizado rápido rapida rapido pontual
 """.split())
 _NEG = set("""
 ruim péssimo pessimo horrível horrivel sujo atrasado grosseiro mal educado agressivo impaciente amassado quebrado frio derramou
 """.split())
+
 
 def _analise_sentimento(txt: str | None) -> str:
     if not txt:
@@ -888,9 +945,12 @@ def _analise_sentimento(txt: str | None) -> str:
     # contagem bem simples
     pos = sum(1 for w in _POS if w in t)
     neg = sum(1 for w in _NEG if w in t)
-    if neg > pos + 0: return "negativo"
-    if pos > neg + 0: return "positivo"
+    if neg > pos + 0:
+        return "negativo"
+    if pos > neg + 0:
+        return "positivo"
     return "neutro"
+
 
 # mapeia temas por palavras-chave simples
 _TEMAS = {
@@ -899,6 +959,7 @@ _TEMAS = {
     "Eficiência":    ["amass", "vazou", "quebrad", "frio", "bagunça", "bagunca", "cuidado", "eficien", "desorgan"],
     "Bem apresentado": ["uniform", "higien", "apresenta", "limpo", "cheiroso", "aparencia", "aparência"],
 }
+
 
 def _identifica_temas(txt: str | None) -> list[str]:
     if not txt:
@@ -910,13 +971,16 @@ def _identifica_temas(txt: str | None) -> list[str]:
             hits.append(tema)
     return hits[:4]
 
+
 _RISCO = ["ameaça","ameaca","acidente","quebrado","agress","roubo","violên","violenc","lesão","lesao","sangue","caiu","bateu","droga","alcool","álcool"]
+
 
 def _sinaliza_crise(nota_geral: int | None, txt: str | None) -> bool:
     if nota_geral == 1 and txt:
         low = txt.lower()
         return any(k in low for k in _RISCO)
     return False
+
 
 def _gerar_feedback(pont, educ, efic, apres, comentario, sentimento):
     partes = []
@@ -925,7 +989,8 @@ def _gerar_feedback(pont, educ, efic, apres, comentario, sentimento):
 
     for nome, nota in (("Pontualidade", pont), ("Educação", educ), ("Eficiência", efic), ("Apresentação", apres)):
         b = badge(nome, nota)
-        if b: partes.append(b)
+        if b:
+            partes.append(b)
 
     dicas = []
     if educ is not None and educ <= 2: dicas.append("melhore a abordagem/educação ao falar com o cliente")
@@ -935,20 +1000,16 @@ def _gerar_feedback(pont, educ, efic, apres, comentario, sentimento):
 
     txt = f"Notas — " + " | ".join(partes) if partes else "Obrigado pelo trabalho!"
     if comentario:
-        txt += f". Cliente comentou: \"{comentario.strip()}\""
+        txt += f'. Cliente comentou: "{comentario.strip()}"'
     if dicas:
         txt += ". Dica: " + "; ".join(dicas) + "."
     if sentimento == "positivo":
         txt += " 👏"
     return txt[:1000]
 
-from datetime import datetime, date
-from sqlalchemy import or_, and_
 
 # routes_avisos.py
-from datetime import datetime
-from flask import Blueprint, render_template, redirect, request, url_for, abort
-from flask_login import current_user
+portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
 
 
 def _cooperado_atual() -> Cooperado | None:
@@ -960,8 +1021,6 @@ def _cooperado_atual() -> Cooperado | None:
         return None
     return Cooperado.query.filter_by(usuario_id=uid).first()
 
-    # --- Blueprint Portal (topo do arquivo, depois de criar `app`) ---
-portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
 
 @portal_bp.get("/avisos", endpoint="portal_cooperado_avisos")
 @role_required("cooperado")
@@ -992,6 +1051,7 @@ def avisos_list():
         avisos_nao_lidos_count=avisos_nao_lidos_count,
         current_year=current_year
     )
+
 
 # === AVALIAÇÕES: Cooperado -> Restaurante (NOVO) =============================
 class AvaliacaoRestaurante(db.Model):
@@ -1085,8 +1145,6 @@ def register_blueprints_once(app):
 
 register_blueprints_once(app)
 
-# --- Alias para compatibilidade com o template (endpoint esperado: 'portal_cooperado_avisos')
-from flask import redirect, url_for
 
 def _portal_cooperado_avisos_alias():
     # redireciona para a rota real dentro do blueprint 'portal'
@@ -1253,9 +1311,6 @@ def to_css_color(v: str) -> str:
     return mapa.get(t_low, t)
 
 # ---------- AVISOS: helpers ----------
-from sqlalchemy import case, or_, and_, func
-from sqlalchemy.orm import selectinload
-
 def _avisos_base_query():
     # usa o relógio do banco; evita divergência de TZ/UTC da app
     now = func.now()
@@ -2278,12 +2333,14 @@ def delete_despesa(id):
 # =========================
 # Avisos (admin + públicos)
 # =========================
-import re
 from datetime import datetime, time
-from flask import request, session, render_template, redirect, url_for, flash
+from flask import request, session, render_template, redirect, url_for, flash, abort
 
 @app.get("/avisos", endpoint="avisos_publicos")
 def avisos_publicos():
+    """
+    Redireciona o usuário logado para o painel correto de avisos.
+    """
     t = session.get("user_tipo")
     if t == "cooperado":
         return redirect(url_for("portal_cooperado_avisos"))
@@ -2295,6 +2352,13 @@ def avisos_publicos():
 @app.route("/admin/avisos", methods=["GET", "POST"])
 @admin_required
 def admin_avisos():
+    """
+    Tela/admin para criar e listar avisos.
+    Suporta:
+      - destino: cooperados | restaurantes | ambos | (fallback 'global')
+      - filtros de alcance: todos/selecionados
+      - janela de exibição (início/fim), prioridade e 'ativo'
+    """
     cooperados = Cooperado.query.order_by(Cooperado.nome.asc()).all()
     restaurantes = Restaurante.query.order_by(Restaurante.nome.asc()).all()
 
@@ -2445,12 +2509,16 @@ def admin_avisos():
     )
 
 
-# --------- ROTAS QUE FALTAVAM (usadas no template) ---------
+# --------- Ações rápidas usadas no template ---------
 
 # Toggle VISIBILIDADE/FIXAÇÃO (aceita GET e POST)
 @app.route("/admin/avisos/<int:aviso_id>/toggle", methods=["POST", "GET"], endpoint="admin_avisos_toggle")
 @admin_required
 def admin_avisos_toggle(aviso_id):
+    """
+    Se o modelo tiver 'ativo', alterna ativo on/off.
+    Caso contrário, alterna 'fixado' (compatibilidade com templates existentes).
+    """
     a = Aviso.query.get_or_404(aviso_id)
     if hasattr(a, "ativo"):
         a.ativo = not bool(a.ativo)
@@ -2460,17 +2528,75 @@ def admin_avisos_toggle(aviso_id):
     flash("Aviso atualizado.", "success")
     return redirect(request.referrer or url_for("admin_avisos"))
 
-# Ex.: em app.py, junto das outras rotas
-@app.post("/admin/cooperados/<int:id>/toggle", endpoint="toggle_status_cooperado")
-@admin_required  # se você usa isso para proteger páginas de admin
-def toggle_status_cooperado(id):
-    coop = Cooperado.query.get_or_404(id)
-    # alterna o status
-    coop.ativo = not bool(getattr(coop, "ativo", True))
-    db.session.commit()
-    flash("Status do cooperado atualizado.", "success")
-    return redirect(request.referrer or url_for("admin_dashboard"))
 
+# Excluir aviso (limpando relações)
+@app.route("/admin/avisos/<int:aviso_id>/excluir", methods=["POST"], endpoint="admin_avisos_excluir")
+@admin_required
+def admin_avisos_excluir(aviso_id):
+    """
+    Remove o aviso e apaga vínculos/leitura relacionados.
+    """
+    a = Aviso.query.get_or_404(aviso_id)
+
+    # apaga confirmações/leitorias
+    try:
+        AvisoLeitura.query.filter_by(aviso_id=aviso_id).delete(synchronize_session=False)
+    except Exception:
+        pass
+
+    # limpa M2M com restaurantes, se existir
+    try:
+        if hasattr(a, "restaurantes"):
+            a.restaurantes.clear()
+    except Exception:
+        pass
+
+    db.session.delete(a)
+    db.session.commit()
+    flash("Aviso excluído.", "success")
+    return redirect(url_for("admin_avisos"))
+
+
+# Marcar aviso como lido (funciona com GET e POST) — cooperado e restaurante
+@app.route("/avisos/<int:aviso_id>/lido", methods=["POST", "GET"], endpoint="marcar_aviso_lido_universal")
+def marcar_aviso_lido_universal(aviso_id: int):
+    """
+    Marca como lido para o usuário logado (cooperado OU restaurante).
+    Útil para chamadas AJAX (POST) ou cliques simples (GET).
+    """
+    # se não logado, bloqueia
+    if "user_id" not in session:
+        return redirect(url_for("login")) if request.method == "GET" else ("", 401)
+
+    user_id = session.get("user_id")
+    user_tipo = session.get("user_tipo")
+    Aviso.query.get_or_404(aviso_id)
+
+    def _ok_response():
+        if request.method == "POST":
+            return ("", 204)  # útil para fetch/AJAX
+        # tenta voltar para a página anterior; se não houver, manda para avisos do cooperado
+        return redirect(request.referrer or url_for("portal_cooperado_avisos"))
+
+    if user_tipo == "cooperado":
+        coop = Cooperado.query.filter_by(usuario_id=user_id).first()
+        if not coop:
+            return ("", 403) if request.method == "POST" else redirect(url_for("login"))
+        if not AvisoLeitura.query.filter_by(aviso_id=aviso_id, cooperado_id=coop.id).first():
+            db.session.add(AvisoLeitura(aviso_id=aviso_id, cooperado_id=coop.id, lido_em=datetime.utcnow()))
+            db.session.commit()
+        return _ok_response()
+
+    if user_tipo == "restaurante":
+        rest = Restaurante.query.filter_by(usuario_id=user_id).first()
+        if not rest:
+            return ("", 403) if request.method == "POST" else redirect(url_for("login"))
+        if not AvisoLeitura.query.filter_by(aviso_id=aviso_id, restaurante_id=rest.id).first():
+            db.session.add(AvisoLeitura(aviso_id=aviso_id, restaurante_id=rest.id, lido_em=datetime.utcnow()))
+            db.session.commit()
+        return _ok_response()
+
+    return ("", 403) if request.method == "POST" else redirect(url_for("login"))
 
 # Excluir aviso (limpando relações)
 @app.route("/admin/avisos/<int:aviso_id>/excluir", methods=["POST"], endpoint="admin_avisos_excluir")
@@ -2964,8 +3090,7 @@ def ratear_beneficios():
 @app.route("/escalas/upload", methods=["POST"])
 @admin_required
 def upload_escala():
-    from datetime import datetime, date
-    import os, re as _re, unicodedata as _u, difflib as _dif
+    
 
     file = request.files.get("file")
     if not file or not file.filename.lower().endswith(".xlsx"):
@@ -4627,8 +4752,6 @@ from flask import (
     render_template, request, redirect, url_for, flash, session,
     send_file, abort, current_app, jsonify
 )
-from werkzeug.utils import secure_filename
-from datetime import datetime
 from pathlib import Path
 import os, re, unicodedata, mimetypes, logging
 
