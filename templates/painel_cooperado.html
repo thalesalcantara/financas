@@ -7,6 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="preload" as="audio" href="{{ url_for('static', filename='sounds/notify.mp3') }}" type="audio/mpeg">
   <style>
     :root { --royal-blue:#2747d9; --hover-blue:#3b61e3; --bg:#f7f9fc; }
     html,body{height:100%; overflow-x:hidden;}
@@ -1565,7 +1566,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
-<!-- TOAST avisos + SOM ao chegar -->
+<!-- TOAST avisos + SOM ao chegar (versão compatível com backend + LS) -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const toastEl = document.getElementById('toastAvisos');
@@ -1575,10 +1576,15 @@ document.addEventListener('DOMContentLoaded', function () {
   const toastTimeEl  = toastEl.querySelector('.toast-time');
   const endpoint     = toastEl.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
 
+  // valores iniciais vindos do servidor
   const unreadInitial = Number('{{ unread|default(0)|int }}') || 0;
-  const UID    = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
-  const LS_KEY = `COOPEX_AVISOS_LAST_${UID}`;
-  const LS_TS  = `COOPEX_AVISOS_LAST_TS_${UID}`;
+
+  // chaves de LS segregadas por perfil + usuário
+  const PERF = '{{ session.get("user_tipo","cooperado") }}';
+  const UID  = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
+  const LS_KEY = `COOPEX_AVISOS_LAST_${PERF}_${UID}`;
+  const LS_TS  = `COOPEX_AVISOS_LAST_TS_${PERF}_${UID}`;
+
   const audio  = document.getElementById('avisoSound');
 
   function showToast(count) {
@@ -1590,9 +1596,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
   async function playSound() {
     if (!audio) return;
-    try { audio.currentTime = 0; await audio.play(); }
-    catch {
-      const enable = async () => { try { audio.currentTime = 0; await audio.play(); } catch(_){} };
+    try {
+      audio.currentTime = 0;
+      await audio.play();
+    } catch {
+      // se o navegador bloquear, tenta após primeira interação do usuário
+      const enable = async () => {
+        try { audio.currentTime = 0; await audio.play(); } catch(_) {}
+      };
       document.addEventListener('click', enable, { once:true });
       document.addEventListener('keydown', enable, { once:true });
       document.addEventListener('touchstart', enable, { once:true });
@@ -1601,12 +1612,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
   async function checkUnread(){
     try {
-      const resp = await fetch(endpoint, { headers:{'Accept':'application/json'}, cache:'no-store', credentials:'same-origin' });
+      const resp = await fetch(endpoint, {
+        headers:{'Accept':'application/json'},
+        cache:'no-store',
+        credentials:'same-origin'
+      });
       if (!resp.ok) return;
+
       const data   = await resp.json();
       const count  = Number(data.unread ?? data.count ?? 0);
+
       const stored = Number(localStorage.getItem(LS_KEY) || 0);
-      if (Number.isFinite(count) && count > stored) {
+      const lastTs = Number(localStorage.getItem(LS_TS) || 0);
+      const STALE_MS = 5 * 60 * 1000;
+      const stale = (Date.now() - lastTs) > STALE_MS;
+
+      // mostra quando:
+      // - aumentou (novo aviso),
+      // - ou nunca salvou e agora tem >0,
+      // - ou está “velho” (reaparece de tempos em tempos).
+      if (Number.isFinite(count) && (count > stored || (stored === 0 && count > 0) || stale)) {
         showToast(count);
         playSound();
         localStorage.setItem(LS_KEY, String(count));
@@ -1615,7 +1640,7 @@ document.addEventListener('DOMContentLoaded', function () {
     } catch {}
   }
 
-  // Boot: mostra se já veio algo do servidor e checa imediatamente o endpoint
+  // Boot: mostra se veio algo do servidor e checa o endpoint já na carga
   (function boot() {
     const lastCount = Number(localStorage.getItem(LS_KEY)) || 0;
     const lastTs    = Number(localStorage.getItem(LS_TS)) || 0;
@@ -1631,7 +1656,8 @@ document.addEventListener('DOMContentLoaded', function () {
       localStorage.setItem(LS_KEY, String(unreadInitial));
       localStorage.setItem(LS_TS, String(Date.now()));
     }
-    checkUnread(); // checagem imediata
+
+    checkUnread(); // checagem imediata cobre caso unreadInitial==0
   })();
 
   // Polling + volta ao foco
@@ -1640,7 +1666,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (document.visibilityState === 'visible') checkUnread();
   });
 
-  // Broadcast opcional
+  // Broadcast opcional (admin pode emitir via channel)
   try {
     const ch = new BroadcastChannel('coopex_avisos');
     ch.onmessage = (ev) => {
@@ -1653,6 +1679,7 @@ document.addEventListener('DOMContentLoaded', function () {
         localStorage.setItem(LS_TS, String(Date.now()));
       }
     };
+    // helper global para forçar via console/testes
     window.coopAvisosNotify = function(count){
       const n = Number(count||0), current = Number(localStorage.getItem(LS_KEY)||0);
       if (Number.isFinite(n) && n > current) {
