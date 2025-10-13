@@ -146,28 +146,54 @@
     }
 
     /* ===== BLOQUEIO DE CAPTURA/IMPRESSÃO (overlay) ===== */
-    #ssBlock {
-      position: fixed;
-      inset: 0;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      background: #ffffff;
-      z-index: 99999;
-      padding: 2rem;
-    }
-    #ssBlock.show { display: flex; }
-    #ssBlock .box { max-width: 640px; }
-    #ssBlock img { width: 140px; height: auto; margin-bottom: 1rem; }
-    #ssBlock h2 { margin: 0 0 .25rem 0; font-weight: 800; color: #0d6efd; }
-    #ssBlock .brand { font-weight: 800; letter-spacing: .04em; color: #0d6efd; opacity: .8; }
+    #wmOverlay{
+  position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+}
+#wmOverlay .wm{
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  opacity: .10;           /* ajuste a intensidade */
+  font: 700 42px/1.1 'Roboto', sans-serif;
+  color: #000;
+  user-select: none;
+  transform: rotate(-25deg);
+  white-space: nowrap;
+  /* “mosaico” diagonal */
+  background-image:
+    repeating-linear-gradient( 45deg, transparent 0 120px, rgba(0,0,0,.08) 120px 121px ),
+    repeating-linear-gradient(-45deg, transparent 0 120px, rgba(0,0,0,.08) 120px 121px );
+}
 
-    /* Impressão: some tudo e mostra só o overlay */
-    @media print {
-      body > *:not(#ssBlock) { display: none !important; }
-      #ssBlock { display: flex !important; }
-    }
+/* Overlay anti-captura */
+#ssBlock{
+  position: fixed; inset: 0;
+  display: none;                 /* começa oculto */
+  align-items: center; justify-content: center;
+  background: rgba(0,0,0,.75);   /* fundo escuro */
+  z-index: 99999;                /* acima de tudo */
+}
+#ssBlock.show{ display: flex; }  /* aparece quando JS adiciona .show */
+
+#ssBlock .box{
+  text-align: center;
+  color: #fff;
+  max-width: 90vw;
+  padding: 24px;
+  border-radius: 16px;
+  background: rgba(255,255,255,.06);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 30px rgba(0,0,0,.35);
+}
+#ssBlock .box img{
+  width: 96px; height: 96px; object-fit: contain;
+  margin-bottom: 12px;
+}
+#ssBlock .box h2{
+  font-size: 1.25rem; line-height: 1.35; margin: 0 0 6px 0;
+}
+#ssBlock .box .brand{
+  font-weight: 700; letter-spacing: .02em; opacity: .85;
+}
   </style>
 </head>
 <body>
@@ -897,8 +923,8 @@
 
   <!-- Script: Solicitar troca -->
   <script>
-    const COOPS_FINAL = {{ cooperados_json | default('[]') | safe }};
-    const MY_ESCALA = {{ minha_escala_json | default('[]') | safe }};
+    const COOPS_FINAL = {{ cooperados_json | default([]) | tojson }};
+    const MY_ESCALA   = {{ minha_escala_json | default([]) | tojson }};
 
     const coopListEl = document.getElementById('coopList');
     const coopSearchEl = document.getElementById('coopSearch');
@@ -1380,6 +1406,125 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     </div>
   </div>
+
+  <script>
+document.addEventListener('DOMContentLoaded', () => {
+  const disp = document.getElementById('calcDisplay');
+  const statusEl = document.getElementById('calcStatus');
+  const tapeEl = document.getElementById('calcTape');
+  const tapeClear = document.getElementById('calcTapeClear');
+  const keys = document.querySelectorAll('#calcModal .calc-btn');
+
+  let a = null, b = null, op = null, entering = 'a', justEvaluated = false;
+
+  const sym = o => o==='divide'?'÷':o==='multiply'?'×':o==='minus'?'−':'+';
+  const setDisplay = t => disp.textContent = (t ?? '0');
+
+  function appendDigit(d){
+    const target = entering==='a' ? 'a' : 'b';
+    let cur = ((target==='a'? a : b) ?? '').toString();
+    if (d==='.' && cur.includes('.')) return;
+    if (justEvaluated && entering==='a'){ a=null; cur=''; justEvaluated=false; }
+    cur = (cur==='0' && d!=='.') ? d : cur + d;
+    if (target==='a') a = cur; else b = cur;
+    setDisplay(cur);
+  }
+
+  function setOp(next){
+    if (a==null) a='0';
+    if (op && b!=null) evalNow(false);
+    op = next; entering='b'; justEvaluated=false;
+    statusEl.textContent = `${a} ${sym(op)}`;
+  }
+
+  function percent(){
+    if (entering==='b' && b!=null){ b = String(parseFloat(b)/100); setDisplay(b); }
+    else if (a!=null){ a = String(parseFloat(a)/100); setDisplay(a); }
+  }
+
+  function backspace(){
+    const target = entering==='b' ? 'b' : 'a';
+    if (justEvaluated && entering==='a'){ a=null; setDisplay('0'); justEvaluated=false; return; }
+    let cur = (target==='b'? b : a);
+    if (cur==null) return;
+    cur = cur.toString().slice(0,-1);
+    if (!cur || cur==='-') cur = '0';
+    if (target==='b') b = cur; else a = cur;
+    setDisplay(cur);
+  }
+
+  function clearAll(){
+    a=b=op=null; entering='a'; justEvaluated=false;
+    setDisplay('0'); statusEl.textContent = '\u00A0';
+  }
+
+  function addTape(text){
+    const row = document.createElement('div');
+    row.className='item';
+    row.innerHTML = `<span class="expr">${text}</span>
+                     <button class="btn-del" title="Remover">&times;</button>`;
+    row.querySelector('.btn-del').addEventListener('click', ()=> row.remove());
+    tapeEl.prepend(row);
+  }
+
+  function evalNow(addToTape=true){
+    if (a==null) return;
+    const ax = parseFloat(a);
+    const bx = parseFloat(b ?? a);
+    if (!op){ setDisplay(String(ax)); return; }
+    let res = 0;
+    if (op==='plus') res = ax + bx;
+    else if (op==='minus') res = ax - bx;
+    else if (op==='multiply') res = ax * bx;
+    else if (op==='divide') res = bx===0 ? NaN : ax / bx;
+
+    const expr = `${ax} ${sym(op)} ${bx} = ${res}`;
+    setDisplay(isNaN(res) ? 'Erro' : String(res));
+    statusEl.textContent = expr;
+    if (addToTape) addTape(expr);
+
+    a = String(res); b=null; entering='a'; op=null; justEvaluated=true;
+  }
+
+  // Clicks nos botões
+  keys.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      btn.classList.add('k-active'); setTimeout(()=>btn.classList.remove('k-active'), 90);
+      const num=btn.getAttribute('data-num'),
+            dot=btn.getAttribute('data-dot'),
+            act=btn.getAttribute('data-act'),
+            opBtn=btn.getAttribute('data-op');
+      if (num) return appendDigit(num);
+      if (dot) return appendDigit('.');
+      if (opBtn) return setOp(opBtn);
+      if (act==='ac') return clearAll();
+      if (act==='percent') return percent();
+      if (act==='back') return backspace();
+      if (act==='equal') return evalNow(true);
+    });
+  });
+
+  // Limpar fita
+  tapeClear?.addEventListener('click', ()=> tapeEl.innerHTML='');
+
+  // Teclado (só quando o modal está aberto)
+  document.addEventListener('keydown', (e)=>{
+    const modal = document.getElementById('calcModal');
+    if (!modal.classList.contains('show')) return;
+
+    if (e.key>='0' && e.key<='9') appendDigit(e.key);
+    else if (e.key==='.' || e.key===',') appendDigit('.');
+    else if (e.key==='+'||e.key==='-'||e.key==='*'||e.key==='x'||e.key==='X'||e.key==='/'){
+      if (e.key==='+') setOp('plus');
+      else if (e.key==='-') setOp('minus');
+      else if (e.key==='*'||e.key==='x'||e.key==='X') setOp('multiply');
+      else setOp('divide');
+    } else if (e.key==='Enter' || e.key==='=') evalNow(true);
+    else if (e.key==='Backspace') backspace();
+    else if (e.key==='%') percent();
+  });
+});
+</script>
 
   <!-- MODAL: Custo x Benefício -->
   <div class="modal fade" id="cxbModal" tabindex="-1" aria-hidden="true">
@@ -2127,6 +2272,13 @@ document.addEventListener('DOMContentLoaded', function () {
       calc(); renderHist();
     })();
     </script>
+
+  <!-- WATERMARK -->
+  <div id="wmOverlay" aria-hidden="true">
+    <div class="wm">
+      {{ cooperado.nome }} — {{ cooperado.id }} — {{ current_year }}
+    </div>
+  </div>
   
     <!-- ===== Overlay anti-captura (fica ANTES do </body>) ===== -->
   <div id="ssBlock" aria-hidden="true">
@@ -2137,42 +2289,44 @@ document.addEventListener('DOMContentLoaded', function () {
     </div>
   </div>
 
-  <!-- Bootstrap JS (se já não estiver no layout base) -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
   <!-- Script do overlay (também ANTES do </body>) -->
-  <script>
-  (function(){
-    const overlay = document.getElementById('ssBlock');
+ <script>
+(function(){
+  const overlay = document.getElementById('ssBlock');
 
-    function showOverlay(ms=3000){
-      overlay.classList.add('show');
-      if (ms > 0){
-        clearTimeout(showOverlay._t);
-        showOverlay._t = setTimeout(()=> overlay.classList.remove('show'), ms);
-      }
+  function showOverlay() {
+    overlay.classList.add('show');
+  }
+  function hideOverlay() {
+    overlay.classList.remove('show');
+  }
+
+  // Bloqueia Ctrl/Cmd + P (abrevia a “impressão” via atalho)
+  document.addEventListener('keydown', (ev) => {
+    const isCmdP = (ev.key.toLowerCase() === 'p') && (ev.ctrlKey || ev.metaKey);
+    if (isCmdP) {
+      ev.preventDefault();
+      showOverlay();
+      // opcional: mostre um aviso
+      // alert('Impressão desabilitada por política de privacidade.');
     }
+    // PrintScreen -> mostra overlay e tenta sobrescrever clipboard
+    if (ev.key === 'PrintScreen') {
+      showOverlay();
+      setTimeout(hideOverlay, 4000);
+      try { navigator.clipboard.writeText('Captura bloqueada por privacidade — Kratos System'); } catch(_) {}
+    }
+  });
 
-    // Impressão / pré-visualização
-    window.addEventListener('beforeprint', ()=> overlay.classList.add('show'));
-    window.addEventListener('afterprint',  ()=> overlay.classList.remove('show'));
+  // Garante que somente o overlay aparece em impressão
+  window.addEventListener('beforeprint', showOverlay);
+  window.addEventListener('afterprint',  hideOverlay);
 
-    // Tecla PrintScreen
-    document.addEventListener('keydown', async (ev) => {
-      if (ev.key === 'PrintScreen') {
-        showOverlay();
-        try {
-          await navigator.clipboard.writeText('Captura bloqueada por privacidade — Kratos System');
-        } catch(_) {}
-      }
-      // Opcional: Ctrl/Cmd + P
-      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'p') {
-        showOverlay(3000);
-        // Se quiser impedir o diálogo:
-        // ev.preventDefault();
-      }
-    });
-  })();
-  </script>
+  // Extra: se a aba voltar ao foco, tira o overlay
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') hideOverlay();
+  });
+})();
+</script>
 </body>
 </html>
