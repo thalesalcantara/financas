@@ -4985,63 +4985,6 @@ def portal_restaurante():
 # =========================
 # AVISOS (rotas do Portal Restaurante)
 # =========================
-@app.get("/portal/restaurante/avisos", endpoint="portal_restaurante_avisos")
-@role_required("restaurante")
-def portal_restaurante_avisos():
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-
-    # avisos aplicáveis
-    try:
-        avisos_db = get_avisos_for_restaurante(rest)
-    except NameError:
-        avisos_db = (Aviso.query
-                     .filter(Aviso.ativo.is_(True))
-                     .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
-                     .order_by(Aviso.fixado.desc(), Aviso.criado_em.desc())
-                     .all())
-
-    # ids já lidos
-    lidos_ids = {
-        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
-        .filter(AvisoLeitura.restaurante_id == rest.id).all()
-    }
-
-    def corpo_do_aviso(a: Aviso) -> str:
-        for k in ("corpo_html","html","conteudo_html","mensagem_html","descricao_html","texto_html",
-                  "corpo","conteudo","mensagem","descricao","texto","resumo","body","content"):
-            v = getattr(a, k, None)
-            if isinstance(v, str) and v.strip():
-                return v
-        return ""
-
-    avisos = [{
-        "id": a.id,
-        "titulo": a.titulo or "Aviso",
-        "criado_em": a.criado_em,
-        "lido": (a.id in lidos_ids),
-        "prioridade_alta": (str(a.prioridade or "").lower() == "alta"),
-        "corpo_html": corpo_do_aviso(a),
-    } for a in avisos_db]
-
-    avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
-
-    # contador geral para o TOAST persistente no layout
-    unread = _count_unread_for_restaurante(rest)
-
-    return render_template(
-        "portal_restaurante_avisos.html",
-        avisos=avisos,
-        avisos_nao_lidos_count=avisos_nao_lidos_count,
-        current_year=datetime.now().year,
-        unread=unread,
-    )
-
-# =========================
-# AVISOS — Portal Restaurante
-# =========================
-
-# --- OFICIAL: marcar UM aviso como lido (endpoints únicos p/ evitar colisão)
 @app.get("/portal/restaurante/avisos")
 @role_required("restaurante")
 def portal_restaurante_avisos():
@@ -5117,6 +5060,7 @@ def marcar_todos_avisos_lidos_restaurante():
             ))
     db.session.commit()
     return redirect(url_for("portal_restaurante_avisos"))
+
 
 # =========================
 # LANÇAR PRODUÇÃO — aceita ambos os caminhos (corrige 404)
