@@ -1,130 +1,100 @@
 from __future__ import annotations
 
-# ============ Stdlib ============
-import os, io, csv, re, json, time, difflib, urllib.parse, unicodedata
-from datetime import datetime, date, timedelta, time as dtime
-from collections import defaultdict, namedtuple
-from functools import wraps
-from types import SimpleNamespace
-
-# MIME types (fixes p/ Office)
+import os
+import csv
+import io
+import re
+import json
+import difflib
+import unicodedata
+import re
 import mimetypes
-mimetypes.add_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx")
-mimetypes.add_type("application/vnd.ms-excel", ".xls")
-mimetypes.add_type("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx")
-mimetypes.add_type("application/msword", ".doc")
-mimetypes.add_type("application/vnd.openxmlformats-officedocument.presentationml.presentation", ".pptx")
-mimetypes.add_type("application/vnd.ms-powerpoint", ".ppt")
-
-# ============ Terceiros ============
+from dateutil.relativedelta import relativedelta
+from sqlalchemy.inspection import inspect as sa_inspect
+from datetime import datetime, date, timedelta, time
+from functools import wraps
+from collections import defaultdict, namedtuple
+from types import SimpleNamespace
 from flask import (
-    Flask, render_template, request, redirect, url_for, session,
-    flash, send_file, abort, jsonify, current_app
+    Flask, render_template, request, redirect, url_for,
+    session, flash, send_file, abort
 )
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from dateutil.relativedelta import relativedelta
-from sqlalchemy import func, text as sa_text, or_, and_, case, literal
-from sqlalchemy.inspection import inspect as sa_inspect
-from sqlalchemy.pool import QueuePool
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
+from sqlalchemy import delete as sa_delete, text as sa_text, func
 
-# ============ App / DB ============
+# =========================
+# App / DB
+# =========================
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-
 UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
-DOCS_DIR   = os.path.join(UPLOAD_DIR, "docs")
-os.makedirs(DOCS_DIR, exist_ok=True)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Persistência real (Render Disk)
-PERSIST_ROOT = os.environ.get("PERSIST_ROOT", "/var/data")
-if not os.path.isdir(PERSIST_ROOT):
-    PERSIST_ROOT = os.path.join(BASE_DIR, "data")
-os.makedirs(PERSIST_ROOT, exist_ok=True)
-TABELAS_DIR = os.path.join(PERSIST_ROOT, "tabelas")
+DOCS_DIR = os.path.join(UPLOAD_DIR, "docs")
+os.makedirs(DOCS_DIR, exist_ok=True)
+TABELAS_DIR = os.path.join(UPLOAD_DIR, "tabelas")
 os.makedirs(TABELAS_DIR, exist_ok=True)
-STATIC_TABLES = os.path.join(BASE_DIR, "static", "uploads", "tabelas")
-os.makedirs(STATIC_TABLES, exist_ok=True)
 
 def _build_db_uri() -> str:
+    """
+    Usa SQLite local se não houver DATABASE_URL.
+    Se estiver no Render/Heroku com postgres, converte para o dialeto psycopg3:
+      postgres://...         -> postgresql+psycopg://...
+      postgresql://...       -> postgresql+psycopg://...
+    Garante sslmode=require quando for Postgres.
+    """
     url = os.environ.get("DATABASE_URL")
     if not url:
         return "sqlite:///" + os.path.join(BASE_DIR, "app.db")
+
+    # normaliza esquema
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql+psycopg://", 1)
     elif url.startswith("postgresql://") and "+psycopg" not in url:
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+
+    # ssl obrigatório no Render
     if url.startswith("postgresql+psycopg://") and "sslmode=" not in url:
         url += ("&" if "?" in url else "?") + "sslmode=require"
     return url
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
+
+# chave da sessão
 app.secret_key = os.environ.get("SECRET_KEY", "coopex-secret")
 
+# Configs principais
+app.config["SQLALCHEMY_DATABASE_URI"] = _build_db_uri()
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["JSON_SORT_KEYS"] = False  # evita comparar None com int ao serializar |tojson
+app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32MB
+
+# Sessão/cookies (mais seguro; deixe SECURE=True em produção com HTTPS)
 app.config.update(
-    SQLALCHEMY_DATABASE_URI=_build_db_uri(),
-    SQLALCHEMY_TRACK_MODIFICATIONS=False,
-    JSON_SORT_KEYS=False,
-    MAX_CONTENT_LENGTH=32 * 1024 * 1024,  # 32MB
     SESSION_COOKIE_HTTPONLY=True,
     REMEMBER_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SAMESITE="Lax",                 # "Strict" pode quebrar logins vindos de links
     SESSION_COOKIE_SECURE=os.environ.get("FLASK_SECURE_COOKIES", "1") == "1",
-    PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
-    SQLALCHEMY_ENGINE_OPTIONS={
-        "poolclass": QueuePool,
-        "pool_size": 5,
-        "max_overflow": 5,
-        "pool_timeout": 10,
-        "pool_pre_ping": True,
-        "pool_recycle": 1800,
-        "connect_args": {
-            "connect_timeout": 5,
-            "options": "-c statement_timeout=15000",
-        },
-    },
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=12) # ajuste conforme sua política
 )
 
-# Torna safe_url_for disponível nos templates
-@app.context_processor
-def inject_helpers():
-    def safe_url_for(endpoint, **values):
-        try:
-            return url_for(endpoint, **values)
-        except Exception:
-            return None
-    return {"safe_url_for": safe_url_for}
+from sqlalchemy.pool import QueuePool
+
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "poolclass": QueuePool,   # usa pool local quando não houver PgBouncer
+    "pool_size": 5,
+    "max_overflow": 10,
+    "pool_pre_ping": True,
+    "pool_recycle": 1800,
+}
 
 db = SQLAlchemy(app)
 
+# --- habilita foreign_keys no SQLite (para ON DELETE CASCADE funcionar) ---
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
-
-# Health checks
-@app.get("/healthz")
-def healthz():
-    # Sem tocar no DB — sempre 200
-    return "ok", 200
-
-@app.get("/readyz")
-def readyz():
-    # Teste leve de DB; NÃO use esta rota como health check do Render
-    try:
-        # evita segurar conexão por muito tempo
-        db.session.execute(sa_text("SELECT 1"))
-        db.session.commit()   # no-op, mas fecha o ciclo p/ alguns setups
-        return "ready", 200
-    except Exception as e:
-        # solta a conexão ruim e não “envenena” o pool
-        db.session.rollback()
-        try:
-            db.session.close()
-        except:
-            pass
-        return f"not-ready: {type(e).__name__}", 503
-
-# Liga foreign_keys no SQLite
 @event.listens_for(Engine, "connect")
 def _set_sqlite_pragma(dbapi_con, con_record):
     try:
@@ -135,12 +105,6 @@ def _set_sqlite_pragma(dbapi_con, con_record):
     except Exception:
         pass
 
-def _is_sqlite() -> bool:
-    try:
-        return db.session.get_bind().dialect.name == "sqlite"
-    except Exception:
-        return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
-
 # =========================
 # Models
 # =========================
@@ -150,8 +114,6 @@ class Usuario(db.Model):
     usuario = db.Column(db.String(80), unique=True, nullable=False)
     senha_hash = db.Column(db.String(200), nullable=False)
     tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
-    # 👇 NOVO
-    ativo = db.Column(db.Boolean, nullable=False, default=True)
 
     def set_password(self, raw: str):
         self.senha_hash = generate_password_hash(raw)
@@ -416,17 +378,8 @@ def _is_sqlite() -> bool:
     except Exception:
         return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
 
-
 def init_db():
-    """
-    Versão unificada e idempotente:
-      1) Ajustes de performance para SQLite (WAL/synchronous)
-      2) Criação de todas as tabelas (create_all)
-      3) Índices úteis (cooperado/restaurante/criado_em)
-      4) Migrações leves de colunas/tabelas (qtd_entregas, fotos, escalas, avaliacoes_restaurante)
-      5) Bootstrap mínimo (admin e config)
-    """
-    # 1) Perf no SQLite
+    # --- PERF (SQLite): liga WAL e ajusta synchronous ---
     try:
         if _is_sqlite():
             db.session.execute(sa_text("PRAGMA journal_mode=WAL;"))
@@ -435,90 +388,90 @@ def init_db():
     except Exception:
         db.session.rollback()
 
-    # 2) Tabelas/mapeamentos
+    db.create_all()
+
+def init_db():
+    # --- PERF (SQLite): liga WAL e ajusta synchronous ---
     try:
-        db.create_all()
+        if _is_sqlite():
+            db.session.execute(sa_text("PRAGMA journal_mode=WAL;"))
+            db.session.execute(sa_text("PRAGMA synchronous=NORMAL;"))
+            db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # 3) Índices de performance (idempotentes)
+    # Cria tabelas/mapeamentos
+    db.create_all()
+
+    # --- índices de performance p/ avaliações (restaurante_id, cooperado_id, criado_em) ---
     try:
         if _is_sqlite():
             db.session.execute(sa_text("""
-                CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON avaliacoes (criado_em);
-                CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON avaliacoes (restaurante_id, criado_em);
-                CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON avaliacoes (cooperado_id,  criado_em);
+            CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON avaliacoes (criado_em);
+            CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON avaliacoes (restaurante_id, criado_em);
+            CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON avaliacoes (cooperado_id,  criado_em);
 
-                CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em           ON avaliacoes_restaurante (criado_em);
-                CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado         ON avaliacoes_restaurante (restaurante_id, criado_em);
-                CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado         ON avaliacoes_restaurante (cooperado_id,  criado_em);
+            CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em           ON avaliacoes_restaurante (criado_em);
+            CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado         ON avaliacoes_restaurante (restaurante_id, criado_em);
+            CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado         ON avaliacoes_restaurante (cooperado_id,  criado_em);
             """))
         else:
             db.session.execute(sa_text("""
-                CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON public.avaliacoes (criado_em);
-                CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON public.avaliacoes (restaurante_id, criado_em);
-                CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON public.avaliacoes (cooperado_id,  criado_em);
+            CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON public.avaliacoes (criado_em);
+            CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON public.avaliacoes (restaurante_id, criado_em);
+            CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON public.avaliacoes (cooperado_id,  criado_em);
 
-                CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em           ON public.avaliacoes_restaurante (criado_em);
-                CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado         ON public.avaliacoes_restaurante (restaurante_id, criado_em);
-                CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado         ON public.avaliacoes_restaurante (cooperado_id,  criado_em);
+            CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em           ON public.avaliacoes_restaurante (criado_em);
+            CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado         ON public.avaliacoes_restaurante (restaurante_id, criado_em);
+            CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado         ON public.avaliacoes_restaurante (cooperado_id,  criado_em);
             """))
         db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # 4) Migração leve: garantir coluna qtd_entregas em lancamentos
+    # --- qtd_entregas em lancamentos ---
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(lancamentos);")).fetchall()
             colnames = {row[1] for row in cols}
             if "qtd_entregas" not in colnames:
                 db.session.execute(sa_text("ALTER TABLE lancamentos ADD COLUMN qtd_entregas INTEGER"))
-            db.session.commit()
+                db.session.commit()
         else:
-            db.session.execute(sa_text(
-                "ALTER TABLE IF EXISTS public.lancamentos "
-                "ADD COLUMN IF NOT EXISTS qtd_entregas INTEGER"
-            ))
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS lancamentos ADD COLUMN IF NOT EXISTS qtd_entregas INTEGER"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # 4.1) cooperado_nome em escalas
+    # --- cooperado_nome em escalas ---
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
             colnames = {row[1] for row in cols}
             if "cooperado_nome" not in colnames:
                 db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
-            db.session.commit()
+                db.session.commit()
         else:
-            db.session.execute(sa_text(
-                "ALTER TABLE IF EXISTS escalas "
-                "ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"
-            ))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS escalas ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # 4.2) restaurante_id em escalas
+    # --- restaurante_id em escalas ---
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
             colnames = {row[1] for row in cols}
             if "restaurante_id" not in colnames:
                 db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
-            db.session.commit()
+                db.session.commit()
         else:
-            db.session.execute(sa_text(
-                "ALTER TABLE IF EXISTS escalas "
-                "ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"
-            ))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS escalas ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # 4.3) fotos no banco (cooperados)
+    # --- fotos no banco (cooperados) ---
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
@@ -533,19 +486,15 @@ def init_db():
                 db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_url VARCHAR(255)"))
             db.session.commit()
         else:
-            db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-            db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-            db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-            db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # 4.4) tabela avaliacoes_restaurante (se não existir)
+    # --- tabela avaliacoes_restaurante (se não existir) ---
     try:
         if _is_sqlite():
             db.session.execute(sa_text("""
@@ -567,10 +516,8 @@ def init_db():
                   criado_em TIMESTAMP
                 );
             """))
-            db.session.execute(sa_text(
-                "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
-            db.session.execute(sa_text(
-                "CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
+            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
+            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
             db.session.commit()
         else:
             db.session.execute(sa_text("""
@@ -592,15 +539,13 @@ def init_db():
                   criado_em TIMESTAMP
                 );
             """))
-            db.session.execute(sa_text(
-                "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
-            db.session.execute(sa_text(
-                "CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
+            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
+            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # 4.5) fotos no banco (restaurantes)
+    # --- fotos no banco (restaurantes) ---
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
@@ -615,78 +560,31 @@ def init_db():
                 db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_url VARCHAR(255)"))
             db.session.commit()
         else:
-            db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-            db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-            db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-            db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # 4.x) coluna 'ativo' em usuarios (idempotente)
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(usuarios);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "ativo" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE usuarios ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1"))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text(
-                "ALTER TABLE IF EXISTS public.usuarios "
-                "ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE"
-            ))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
+    # --- usuário admin + config padrão ---
+    if not Usuario.query.filter_by(tipo="admin").first():
+        admin_user = os.environ.get("ADMIN_USER", "admin")
+        admin_pass = os.environ.get("ADMIN_PASS", os.urandom(8).hex())
+        admin = Usuario(usuario=admin_user, tipo="admin", senha_hash="")
+        admin.set_password(admin_pass)
+        db.session.add(admin)
+        db.session.commit()
 
-    # 5) Bootstrap mínimo (admin e config)
-    # Observação: se os modelos ainda não estiverem importados neste ponto,
-    # engolimos o erro e a criação poderá ocorrer numa próxima chamada ao init_db().
-    try:
-        from models import Usuario, Config  # se você usa modelos em outro módulo
-    except Exception:
-        # Se os modelos estiverem no mesmo arquivo, ignore este import.
-        pass
-
-    # Admin
-    try:
-        # Tenta acessar Usuario; se não existir ainda, NameError cai no except
-        _ = Usuario  # noqa: F401
-        if not Usuario.query.filter_by(tipo="admin").first():
-            admin_user = os.environ.get("ADMIN_USER", "admin")
-            admin_pass = os.environ.get("ADMIN_PASS", os.urandom(8).hex())
-            admin = Usuario(usuario=admin_user, tipo="admin", senha_hash="")
-            # Precisa que Usuario tenha método set_password
-            try:
-                admin.set_password(admin_pass)
-            except Exception:
-                # fallback: se não houver helper, gerar hash direto
-                try:
-                    admin.senha_hash = generate_password_hash(admin_pass)
-                except Exception:
-                    pass
-            db.session.add(admin)
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
-
-    # Config default (id=1)
-    try:
-        _ = Config  # noqa: F401
-        if not Config.query.get(1):
-            db.session.add(Config(id=1, salario_minimo=0.0))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
+    if not Config.query.get(1):
+        db.session.add(Config(id=1, salario_minimo=0.0))
+        db.session.commit()
 
 
 # === Bootstrap do banco no start (Render/Gunicorn) ===
 try:
+    # Opcional: controle por variável de ambiente para evitar lentidão no boot
     if os.environ.get("INIT_DB_ON_START", "1") == "1":
         _t0 = datetime.utcnow()
         with app.app_context():
@@ -701,8 +599,9 @@ try:
         except Exception:
             pass
 except Exception as e:
+    # Evita derrubar o serviço se a inicialização falhar por motivo não crítico
     try:
-        app.logger.warning(f"Falha na init_db: {e}")
+        app.logger.warning(f"init_db pulado: {e}")
     except Exception:
         pass
 
@@ -841,48 +740,6 @@ def _save_upload(file_storage) -> str | None:
     path = os.path.join(UPLOAD_DIR, fname)
     file_storage.save(path)
     return f"/static/uploads/{fname}"
-
-
-from werkzeug.utils import secure_filename
-import time
-
-def salvar_tabela_upload(file_storage) -> str | None:
-    """
-    Salva o arquivo de TABELA dentro do diretório persistente (TABELAS_DIR)
-    e retorna APENAS o nome do arquivo (para guardar no banco em Tabela.arquivo_nome).
-    """
-    if not file_storage or not file_storage.filename:
-        return None
-    fname = secure_filename(file_storage.filename)
-    base, ext = os.path.splitext(fname)
-    unique = f"{base}_{time.strftime('%Y%m%d_%H%M%S')}{ext.lower()}"
-    destino = os.path.join(TABELAS_DIR, unique)
-    file_storage.save(destino)
-    return unique  # <- guarde este em Tabela.arquivo_nome
-
-
-def resolve_tabela_path(nome_arquivo: str) -> str | None:
-    """
-    Resolve o caminho real de uma TABELA:
-      1) /var/data/tabelas   (persistente)
-      2) static/uploads/...  (legado)
-    """
-    if not nome_arquivo:
-        return None
-    candidatos = [
-        os.path.join(TABELAS_DIR, nome_arquivo),
-        os.path.join(STATIC_TABLES, nome_arquivo),  # legado
-        # último fallback: se por acaso gravaram caminho completo em arquivo_url
-        _abs_path_from_url(nome_arquivo) if nome_arquivo.startswith("/") else None,
-    ]
-    for p in candidatos:
-        if p and os.path.isfile(p):
-            return p
-    # log amigável (vai parar com o WARNING que você viu)
-    app.logger.warning("Arquivo de Tabela não encontrado. nome='%s' tents=%s",
-                       nome_arquivo, [c for c in candidatos if c])
-    return None
-
 
 def _save_foto_to_db(entidade, file_storage, *, is_cooperado: bool) -> str | None:
     """
@@ -1106,25 +963,6 @@ def _cooperado_atual() -> Cooperado | None:
     # --- Blueprint Portal (topo do arquivo, depois de criar `app`) ---
 portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
 
-# --- Helpers de avisos para o cooperado ---
-def count_unread_for_coop(coop: Cooperado) -> int:
-    """
-    Conta quantos avisos aplicáveis ao cooperado ainda não foram marcados como lidos.
-    """
-    avisos = get_avisos_for_cooperado(coop)
-    if not avisos:
-        return 0
-    ids = [a.id for a in avisos]
-    lidos = {
-        r.aviso_id
-        for r in AvisoLeitura.query
-            .filter(AvisoLeitura.cooperado_id == coop.id,
-                    AvisoLeitura.aviso_id.in_(ids))
-            .all()
-    }
-    return sum(1 for aid in ids if aid not in lidos)
-
-
 @portal_bp.get("/avisos", endpoint="portal_cooperado_avisos")
 @role_required("cooperado")
 def avisos_list():
@@ -1132,40 +970,27 @@ def avisos_list():
     if not coop:
         abort(403)
 
-    # Avisos aplicáveis ao cooperado
+    # pega todos os avisos que se aplicam ao cooperado (seu helper)
     avisos = get_avisos_for_cooperado(coop)
 
-    # Leituras já registradas
-    leituras_existentes = {
+    # busca leituras de uma vez (evita N+1)
+    lidos_ids = {
         r.aviso_id
         for r in AvisoLeitura.query.filter_by(cooperado_id=coop.id).all()
     }
 
-    # Marcar automaticamente como lidos ao abrir a página
-    novos_lidos = [
-        AvisoLeitura(cooperado_id=coop.id, aviso_id=a.id, lido_em=datetime.utcnow())
-        for a in avisos
-        if a.id not in leituras_existentes
-    ]
-    if novos_lidos:
-        db.session.add_all(novos_lidos)
-        db.session.commit()
-
-    # Atualiza flag "lido" no template
+    # injeta flag lido para o template (sem tocar no banco)
     for a in avisos:
-        a.lido = (a.id in leituras_existentes or a.id in [n.aviso_id for n in novos_lidos])
+        a.lido = (a.id in lidos_ids)
 
-    # Contadores
-    avisos_nao_lidos_count = sum(1 for a in avisos if not a.lido)
-    unread = count_unread_for_coop(coop)  # agora deve retornar 0 depois da leitura
+    avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
     current_year = datetime.now().year
 
     return render_template(
         "portal_cooperado_avisos.html",
         avisos=avisos,
         avisos_nao_lidos_count=avisos_nao_lidos_count,
-        current_year=current_year,
-        unread=unread,  # <- usado no layout / toast
+        current_year=current_year
     )
 
 # === AVALIAÇÕES: Cooperado -> Restaurante (NOVO) =============================
@@ -1449,8 +1274,27 @@ _PRIORD = case(
     else_=2,
 )
 
-
 def get_avisos_for_cooperado(coop: Cooperado):
+    """
+    COOPERADO vê:
+      - global
+      - cooperado (destino = mim OU broadcast)
+      - restaurante (broadcast OU ligado a QUALQUER restaurante onde tenho escala)
+    """
+    # busca os restaurantes do cooperado sem trazer objetos inteiros
+    rest_ids = [
+        rid for (rid,) in (
+            db.session.query(Escala.restaurante_id)
+            .filter(Escala.cooperado_id == coop.id, Escala.restaurante_id.isnot(None))
+            .distinct()
+            .all()
+        )
+    ]
+
+    cond_rest = or_(~Aviso.restaurantes.any())
+    if rest_ids:  # só usa IN se houver IDs
+        cond_rest = or_(cond_rest, Aviso.restaurantes.any(Restaurante.id.in_(rest_ids)))
+
     q = (
         _avisos_base_query()
         .filter(
@@ -1458,10 +1302,12 @@ def get_avisos_for_cooperado(coop: Cooperado):
                 (Aviso.tipo == "global"),
                 and_(
                     Aviso.tipo == "cooperado",
-                    or_(
-                        Aviso.destino_cooperado_id == coop.id,
-                        Aviso.destino_cooperado_id.is_(None)  # broadcast cooperados
-                    ),
+                    or_(Aviso.destino_cooperado_id == coop.id,
+                        Aviso.destino_cooperado_id.is_(None)),
+                ),
+                and_(
+                    Aviso.tipo == "restaurante",
+                    cond_rest,
                 ),
             )
         )
@@ -1471,6 +1317,7 @@ def get_avisos_for_cooperado(coop: Cooperado):
             Aviso.criado_em.desc(),
         )
     )
+
     return q.all()
 
 def get_avisos_for_restaurante(rest: Restaurante):
@@ -1554,14 +1401,13 @@ def index():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     erro_login = None
-
     if request.method == "POST":
         usuario = request.form.get("usuario", "").strip()
         senha = request.form.get("senha", "")
 
         u = Usuario.query.filter_by(usuario=usuario).first()
 
-        # Fallback: aceitar login pelo nome do restaurante
+        # fallback: aceitar login pelo nome do restaurante
         if not u:
             r = Restaurante.query.filter(Restaurante.nome.ilike(usuario)).first()
             if not r:
@@ -1570,14 +1416,6 @@ def login():
                 u = r.usuario_ref
 
         if u and u.check_password(senha):
-            # 🔒 Bloqueia se a conta estiver desativada (funciona mesmo em DB antigo)
-            if hasattr(u, "ativo") and not bool(getattr(u, "ativo", True)):
-                erro_login = "Conta desativada. Fale com o administrador."
-                flash(erro_login, "danger")
-                login_tpl = os.path.join("templates", "login.html")
-                return render_template("login.html", erro_login=erro_login) if os.path.exists(login_tpl) else "<p>Conta desativada.</p>"
-
-            # Login OK
             session["user_id"] = u.id
             session["user_tipo"] = u.tipo
             if u.tipo == "admin":
@@ -1586,12 +1424,9 @@ def login():
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
                 return redirect(url_for("portal_restaurante"))
-
-        # Falha
         erro_login = "Usuário/senha inválidos."
         flash(erro_login, "danger")
 
-    # GET (ou erro)
     login_tpl = os.path.join("templates", "login.html")
     if os.path.exists(login_tpl):
         return render_template("login.html", erro_login=erro_login)
@@ -1612,33 +1447,15 @@ def logout():
 # =========================
 # Admin Dashboard
 # =========================
-# =========================
-# Admin Dashboard
-# =========================
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_dashboard():
     args = request.args
-
-    # --- Controle de abas
-    active_tab = args.get("tab", "lancamentos")
-
-    # --- Helper: escolhe a primeira data válida de uma lista de chaves
-    def _pick_date(*keys):
-        for k in keys:
-            v = args.get(k)
-            if v:
-                d = _parse_date(v)
-                if d:
-                    return d
-        return None
-
-    # --- Datas unificadas para o RESUMO (prioriza resumo_inicio/fim)
-    data_inicio = _pick_date("resumo_inicio", "data_inicio")
-    data_fim    = _pick_date("resumo_fim", "data_fim")
-
+    active_tab = args.get("tab", "lancamentos")  # <- NOVO: controla a aba ativa
     restaurante_id = args.get("restaurante_id", type=int)
-    cooperado_id   = args.get("cooperado_id", type=int)
+    cooperado_id = args.get("cooperado_id", type=int)
+    data_inicio = _parse_date(args.get("data_inicio"))
+    data_fim = _parse_date(args.get("data_fim"))
     considerar_periodo = bool(args.get("considerar_periodo"))
     dows = set(args.getlist("dow"))  # {"1","2",...}
 
@@ -1714,240 +1531,6 @@ def admin_dashboard():
         c.id: {"cnh_ok": docinfo_map[c.id]["cnh"]["ok"], "placa_ok": docinfo_map[c.id]["placa"]["ok"]}
         for c in cooperados
     }
-
-    # -------- Escalas agrupadas e contagem por cooperado ----------
-    escalas_all = Escala.query.order_by(Escala.id.asc()).all()
-
-    esc_by_int: dict[int, list] = defaultdict(list)
-    esc_by_str: dict[str, list] = defaultdict(list)
-    for e in escalas_all:
-        k_int = e.cooperado_id if e.cooperado_id is not None else 0  # 0 = sem cadastro
-        esc_item = {
-            "data": e.data, "turno": e.turno, "horario": e.horario,
-            "contrato": e.contrato, "cor": e.cor, "nome_planilha": e.cooperado_nome
-        }
-        esc_by_int[k_int].append(esc_item)
-        esc_by_str[str(k_int)].append(esc_item)
-
-    cont_rows = dict(db.session.query(Escala.cooperado_id, func.count(Escala.id)).group_by(Escala.cooperado_id).all())
-    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
-    qtd_sem_cadastro = int(cont_rows.get(None, 0))
-
-    # gráficos (por mês)
-    sums = {}
-    for l in lancamentos:
-        if not l.data:
-            continue
-        key = l.data.strftime("%Y-%m")
-        sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
-    labels_ord = sorted(sums.keys())
-    labels_fmt = [datetime.strptime(k, "%Y-%m").strftime("%m/%Y") for k in labels_ord]
-    values = [round(sums[k], 2) for k in labels_ord]
-    chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
-    chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
-
-    admin_user = Usuario.query.filter_by(tipo="admin").first()
-
-    # ---- Folha (últimos 30 dias padrão)
-    folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
-    folha_fim = _parse_date(args.get("folha_fim")) or date.today()
-    FolhaItem = namedtuple("FolhaItem", "cooperado lancamentos receitas despesas bruto inss outras_desp liquido")
-    folha_por_coop = []
-    for c in cooperados:
-        l = (Lancamento.query
-             .filter(Lancamento.cooperado_id == c.id,
-                     Lancamento.data >= folha_inicio,
-                     Lancamento.data <= folha_fim)
-             .order_by(Lancamento.data.asc(), Lancamento.id.asc())
-             .all())
-        r = (ReceitaCooperado.query
-             .filter(ReceitaCooperado.cooperado_id == c.id,
-                     ReceitaCooperado.data >= folha_inicio,
-                     ReceitaCooperado.data <= folha_fim)
-             .order_by(ReceitaCooperado.data.asc(), ReceitaCooperado.id.asc())
-             .all())
-        d = (DespesaCooperado.query
-             .filter((DespesaCooperado.cooperado_id == c.id) | (DespesaCooperado.cooperado_id.is_(None)),
-                     DespesaCooperado.data >= folha_inicio,
-                     DespesaCooperado.data <= folha_fim)
-             .order_by(DespesaCooperado.data.asc(), DespesaCooperado.id.asc())
-             .all())
-        bruto_lanc = sum(x.valor or 0 for x in l)
-        inss = round(bruto_lanc * 0.045, 2)
-        outras_desp = sum(x.valor or 0 for x in d)
-        bruto_total = bruto_lanc + sum(x.valor or 0 for x in r)
-        liquido = bruto_total - inss - outras_desp
-        for x in l:
-            x.conta_inss = True
-            x.isento_benef = False
-            x.inss = round((x.valor or 0) * 0.045, 2)
-
-        folha_por_coop.append(FolhaItem(
-            cooperado=c, lancamentos=l, receitas=r, despesas=d,
-            bruto=bruto_total, inss=inss, outras_desp=outras_desp, liquido=liquido
-        ))
-
-    # Benefícios para template
-    def _tokenize(s: str):
-        return [x.strip() for x in re.split(r"[;,]", s or "") if x.strip()]
-
-    historico_beneficios = BeneficioRegistro.query.order_by(BeneficioRegistro.id.desc()).all()
-    beneficios_view = []
-    for b in historico_beneficios:
-        nomes = _tokenize(b.recebedores_nomes or "")
-        ids = _tokenize(b.recebedores_ids or "")
-        recs = []
-        for i, nome in enumerate(nomes):
-            rid = ids[i] if i < len(ids) else None
-            try:
-                rid = int(rid) if rid and str(rid).isdigit() else None
-            except Exception:
-                rid = None
-            recs.append({"id": rid, "nome": nome})
-        beneficios_view.append({
-            "data_inicial": b.data_inicial,
-            "data_final": b.data_final,
-            "data_lancamento": b.data_lancamento,
-            "tipo": b.tipo,
-            "valor_total": b.valor_total or 0.0,
-            "recebedores": recs,
-        })
-
-    # ======== Trocas no admin ========
-    def _escala_desc(e: Escala | None) -> str:
-        return _escala_label(e)
-
-    def _split_turno_horario(s: str) -> tuple[str, str]:
-        if not s:
-            return "", ""
-        parts = [p.strip() for p in s.split("•")]
-        if len(parts) == 2:
-            return parts[0], parts[1]
-        return s.strip(), ""
-
-    def _linha_from_escala(e: Escala, saiu: str, entrou: str) -> dict:
-        return {
-            "dia": _escala_label(e).split(" • ")[0],
-            "turno_horario": " • ".join([x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]),
-            "contrato": (e.contrato or "").strip(),
-            "saiu": saiu,
-            "entrou": entrou,
-        }
-
-    trocas_all = TrocaSolicitacao.query.order_by(TrocaSolicitacao.id.desc()).all()
-    trocas_pendentes, trocas_historico = [], []
-    trocas_historico_flat = []
-
-    for t in trocas_all:
-        solicitante = Cooperado.query.get(t.solicitante_id)
-        destinatario = Cooperado.query.get(t.destino_id)
-        orig = Escala.query.get(t.origem_escala_id)
-
-        linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
-
-        if t.status == "aprovada" and not linhas_afetadas and orig and solicitante and destinatario:
-            linhas_afetadas.append(_linha_from_escala(
-                orig, saiu=solicitante.nome, entrou=destinatario.nome
-            ))
-            wd_o = _weekday_from_data_str(orig.data)
-            buck_o = _turno_bucket(orig.turno, orig.horario)
-            candidatas = (Escala.query
-                          .filter_by(cooperado_id=solicitante.id)
-                          .all())
-            best = None
-            for e in candidatas:
-                if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
-                    if (orig.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
-                        best = e
-                        break
-                    if best is None:
-                        best = e
-            if best:
-                linhas_afetadas.append(_linha_from_escala(
-                    best, saiu=destinatario.nome, entrou=solicitante.nome
-                ))
-
-        item = {
-            "id": t.id,
-            "status": t.status,
-            "mensagem": t.mensagem,
-            "criada_em": t.criada_em,
-            "aplicada_em": t.aplicada_em,
-            "solicitante": solicitante,
-            "destinatario": destinatario,
-            "orig": Escala.query.get(t.origem_escala_id),
-            "destino": destinatario,
-            "origem_desc": _escala_desc(orig),
-            "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
-            "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
-            "linhas_afetadas": linhas_afetadas,
-        }
-
-        if t.status == "aprovada" and linhas_afetadas:
-            itens = []
-            for r in linhas_afetadas:
-                turno_txt, horario_txt = _split_turno_horario(r.get("turno_horario", ""))
-                itens.append({
-                    "data": r.get("dia", ""),
-                    "turno": turno_txt,
-                    "horario": horario_txt,
-                    "contrato": r.get("contrato", ""),
-                    "saiu_nome": r.get("saiu", ""),
-                    "entrou_nome": r.get("entrou", ""),
-                })
-                trocas_historico_flat.append({
-                    "data": r.get("dia", ""),
-                    "turno": turno_txt,
-                    "horario": horario_txt,
-                    "contrato": r.get("contrato", ""),
-                    "saiu_nome": r.get("saiu", ""),
-                    "entrou_nome": r.get("entrou", ""),
-                    "aplicada_em": t.aplicada_em,
-                })
-            item["itens"] = itens
-
-        (trocas_pendentes if t.status == "pendente" else trocas_historico).append(item)
-
-    current_date = date.today()
-    data_limite = date(current_date.year, 12, 31)
-
-    return render_template(
-        "admin_dashboard.html",
-        _tab=active_tab,  # <- importante para o template marcar a aba ativa, inclusive 'resumo'
-        total_producoes=total_producoes,
-        total_inss=total_inss,
-        total_receitas=total_receitas,
-        total_despesas=total_despesas,
-        total_receitas_coop=total_receitas_coop,
-        total_despesas_coop=total_despesas_coop,
-        salario_minimo=cfg.salario_minimo or 0.0,
-        lancamentos=lancamentos,
-        receitas=receitas,
-        despesas=despesas,
-        receitas_coop=receitas_coop,
-        despesas_coop=despesas_coop,
-        cooperados=cooperados,
-        restaurantes=restaurantes,
-        beneficios_view=beneficios_view,
-        historico_beneficios=historico_beneficios,
-        current_date=current_date,
-        data_limite=data_limite,
-        admin=admin_user,
-        docinfo_map=docinfo_map,
-        escalas_por_coop=esc_by_int,
-        escalas_por_coop_json=esc_by_str,
-        qtd_escalas_map=qtd_escalas_map,
-        qtd_escalas_sem_cadastro=qtd_sem_cadastro,
-        status_doc_por_coop=status_doc_por_coop,
-        chart_data_lancamentos_coop=chart_data_lancamentos_coop,
-        chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
-        folha_inicio=folha_inicio,
-        folha_fim=folha_fim,
-        folha_por_coop=folha_por_coop,
-        trocas_pendentes=trocas_pendentes,
-        trocas_historico=trocas_historico,
-        trocas_historico_flat=trocas_historico_flat,
-    )
 
     # -------- Escalas agrupadas e contagem por cooperado ----------
     escalas_all = Escala.query.order_by(Escala.id.asc()).all()
@@ -2287,6 +1870,7 @@ def admin_delete_lancamento(id):
 
 # ===== IMPORTS =====
 from flask import request, render_template, send_file, url_for
+from sqlalchemy import func, literal, and_
 from types import SimpleNamespace
 import io, csv
 
@@ -3093,11 +2677,6 @@ def marcar_aviso_lido_universal(aviso_id: int):
 # =========================
 # CRUD Cooperados / Restaurantes / Senhas (Admin)
 # =========================
-from flask import jsonify, current_app  # <- precisa para a rota toggle e logs
-from sqlalchemy import or_
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy import delete as sa_delete  # já usa mais acima em outras rotas
-
 @app.route("/cooperados/add", methods=["POST"])
 @admin_required
 def add_cooperado():
@@ -3111,12 +2690,7 @@ def add_cooperado():
         flash("Usuário já existente.", "warning")
         return redirect(url_for("admin_dashboard", tab="cooperados"))
 
-    # cria usuário já ativo por padrão
     u = Usuario(usuario=usuario_login, tipo="cooperado", senha_hash="")
-    # se seu modelo tiver a coluna 'ativo', garanta True por segurança
-    if hasattr(u, "ativo"):
-        u.ativo = True
-
     u.set_password(senha)
     db.session.add(u)
     db.session.flush()
@@ -3131,7 +2705,6 @@ def add_cooperado():
     db.session.commit()
     flash("Cooperado cadastrado.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
-
 
 @app.route("/cooperados/<int:id>/edit", methods=["POST"])
 @admin_required
@@ -3148,6 +2721,8 @@ def edit_cooperado(id):
     flash("Cooperado atualizado.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 
 @app.route("/cooperados/<int:id>/delete", methods=["POST"])
 @admin_required
@@ -3189,7 +2764,7 @@ def delete_cooperado(id):
             sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.cooperado_id == id)
         )
 
-        # --- 4) Lançamentos desse cooperado ---
+        # --- 4) Lançamentos desse cooperado (se o CASCADE por lancamento_id não estiver ativo) ---
         db.session.execute(
             sa_delete(Lancamento).where(Lancamento.cooperado_id == id)
         )
@@ -3222,7 +2797,6 @@ def delete_cooperado(id):
 
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
-
 @app.route("/cooperados/<int:id>/reset_senha", methods=["POST"])
 @admin_required
 def reset_senha_cooperado(id):
@@ -3236,21 +2810,6 @@ def reset_senha_cooperado(id):
     db.session.commit()
     flash("Senha do cooperado atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
-
-
-# === Ativar/Desativar cooperado (toggle) ===
-@app.post("/cooperados/<int:id>/toggle_status")
-@admin_required
-def toggle_status_cooperado(id):
-    c = Cooperado.query.get_or_404(id)
-    u = c.usuario_ref
-    if not u:
-        return jsonify({"ok": False, "error": "Usuário não vinculado"}), 400
-
-    # Alterna o status; se a coluna não existir por algum motivo, considera True como padrão
-    u.ativo = not bool(getattr(u, "ativo", True))
-    db.session.commit()
-    return jsonify({"ok": True, "ativo": bool(u.ativo)})
 
 @app.route("/restaurantes/add", methods=["POST"])
 @admin_required
@@ -3294,8 +2853,7 @@ def edit_restaurante(id):
     flash("Estabelecimento atualizado.", "success")
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
 
-# imports (garanta que estejam presentes perto dos demais imports)
-from sqlalchemy import delete as sa_delete, or_
+from sqlalchemy import delete as sa_delete
 from sqlalchemy.exc import IntegrityError
 from flask import current_app
 
@@ -3304,54 +2862,34 @@ from flask import current_app
 def delete_restaurante(id):
     r = Restaurante.query.get_or_404(id)
     u = r.usuario_ref
-
     try:
-        # ---- Subquery com as escalas do restaurante (evita carregar IDs em memória)
-        esc_subq = db.session.query(Escala.id).filter(Escala.restaurante_id == id).subquery()
+        # 1) Coletar IDs das escalas do restaurante
+        escala_ids = [e.id for e in Escala.query.with_entities(Escala.id)
+                      .filter(Escala.restaurante_id == id).all()]
 
-        # 1) Apagar trocas que referenciam QUALQUER escala dessas (origem OU destino)
-        db.session.execute(
-            sa_delete(TrocaSolicitacao).where(
-                or_(
-                    TrocaSolicitacao.origem_escala_id.in_(esc_subq),
-                    TrocaSolicitacao.destino_escala_id.in_(esc_subq),
-                )
-            )
-        )
-
-        # 2) Apagar escalas do restaurante
-        db.session.execute(sa_delete(Escala).where(Escala.restaurante_id == id))
-
-        # 3) Apagar avaliações ligadas a este restaurante
-        #    - Cooperado -> Restaurante (AvaliacaoRestaurante)
-        db.session.execute(
-            sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.restaurante_id == id)
-        )
-        #    - Restaurante -> Cooperado (AvaliacaoCooperado) também guarda restaurante_id (se seu modelo tiver)
-        db.session.execute(
-            sa_delete(AvaliacaoCooperado).where(AvaliacaoCooperado.restaurante_id == id)
-        )
+        if escala_ids:
+            # 2) Apagar trocas que referenciam essas escalas
+            db.session.execute(sa_delete(TrocaSolicitacao)
+                               .where(TrocaSolicitacao.origem_escala_id.in_(escala_ids)))
+            # 3) Apagar as escalas
+            db.session.execute(sa_delete(Escala)
+                               .where(Escala.restaurante_id == id))
 
         # 4) Apagar lançamentos do restaurante
-        db.session.execute(sa_delete(Lancamento).where(Lancamento.restaurante_id == id))
+        db.session.execute(sa_delete(Lancamento)
+                           .where(Lancamento.restaurante_id == id))
 
-        # 5) (Opcional) Apagar avisos/notificações/arquivos ligados ao restaurante
-        #    Ex.: db.session.execute(sa_delete(Aviso).where(Aviso.restaurante_id == id))
-        #    Se existir mídia em disco/S3, remova aqui também (try/except por segurança).
-
-        # 6) Agora apaga o restaurante e o usuário vinculado (se houver)
+        # 5) Agora apaga o restaurante e o usuário vinculado
         db.session.delete(r)
         if u:
             db.session.delete(u)
 
         db.session.commit()
         flash("Estabelecimento excluído.", "success")
-
     except IntegrityError as e:
         db.session.rollback()
         current_app.logger.exception(e)
         flash("Não foi possível excluir: existem vínculos ativos.", "danger")
-
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
 
 @app.route("/restaurantes/<int:id>/reset_senha", methods=["POST"])
@@ -3939,285 +3477,123 @@ def admin_recusar_troca(id):
 def apply_fk_cascade():
     """
     Aplica/garante ON DELETE CASCADE nas FKs relevantes (Postgres).
-    Seguro para rodar mais de uma vez (idempotente).
+    Tudo está dentro de uma string SQL, evitando SyntaxError no deploy.
     """
     from sqlalchemy import text as sa_text
 
     sql = """
 BEGIN;
 
--- =========================================================
--- AVALIAÇÕES (Restaurante -> Cooperado) = tabela: avaliacoes
--- =========================================================
-ALTER TABLE IF EXISTS public.avaliacoes
+-- =========================
+-- AVALIAÇÕES (já existia)
+-- =========================
+-- ajusta FK de avaliacoes.lancamento_id
+ALTER TABLE public.avaliacoes
   DROP CONSTRAINT IF EXISTS avaliacoes_lancamento_id_fkey;
-ALTER TABLE IF EXISTS public.avaliacoes
+ALTER TABLE public.avaliacoes
   ADD CONSTRAINT avaliacoes_lancamento_id_fkey
-  FOREIGN KEY (lancamento_id) REFERENCES public.lancamentos (id) ON DELETE CASCADE;
+  FOREIGN KEY (lancamento_id)
+  REFERENCES public.lancamentos (id)
+  ON DELETE CASCADE;
 
-ALTER TABLE IF EXISTS public.avaliacoes
-  DROP CONSTRAINT IF EXISTS avaliacoes_restaurante_id_fkey;
-ALTER TABLE IF EXISTS public.avaliacoes
-  ADD CONSTRAINT avaliacoes_restaurante_id_fkey
-  FOREIGN KEY (restaurante_id) REFERENCES public.restaurantes (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.avaliacoes
-  DROP CONSTRAINT IF EXISTS avaliacoes_cooperado_id_fkey;
-ALTER TABLE IF EXISTS public.avaliacoes
-  ADD CONSTRAINT avaliacoes_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
-
--- =========================================================
--- AVALIAÇÕES (Cooperado -> Restaurante) = avaliacoes_restaurante
--- =========================================================
-ALTER TABLE IF EXISTS public.avaliacoes_restaurante
-  DROP CONSTRAINT IF EXISTS av_rest_lancamento_id_fkey;
-ALTER TABLE IF EXISTS public.avaliacoes_restaurante
-  ADD CONSTRAINT av_rest_lancamento_id_fkey
-  FOREIGN KEY (lancamento_id) REFERENCES public.lancamentos (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.avaliacoes_restaurante
-  DROP CONSTRAINT IF EXISTS av_rest_restaurante_id_fkey;
-ALTER TABLE IF EXISTS public.avaliacoes_restaurante
-  ADD CONSTRAINT av_rest_restaurante_id_fkey
-  FOREIGN KEY (restaurante_id) REFERENCES public.restaurantes (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.avaliacoes_restaurante
-  DROP CONSTRAINT IF EXISTS av_rest_cooperado_id_fkey;
-ALTER TABLE IF EXISTS public.avaliacoes_restaurante
-  ADD CONSTRAINT av_rest_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
+-- cria/garante CASCADE para avaliacoes_restaurante.lancamento_id
+DO $do$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'av_rest_lancamento_id_fkey'
+          AND table_name = 'avaliacoes_restaurante'
+          AND table_schema = 'public'
+    ) THEN
+        ALTER TABLE public.avaliacoes_restaurante
+          ADD CONSTRAINT av_rest_lancamento_id_fkey
+          FOREIGN KEY (lancamento_id)
+          REFERENCES public.lancamentos (id)
+          ON DELETE CASCADE;
+    ELSE
+        -- garante o CASCADE (drop/add)
+        EXECUTE $$ALTER TABLE public.avaliacoes_restaurante
+                 DROP CONSTRAINT IF EXISTS av_rest_lancamento_id_fkey$$;
+        EXECUTE $$ALTER TABLE public.avaliacoes_restaurante
+                 ADD CONSTRAINT av_rest_lancamento_id_fkey
+                 FOREIGN KEY (lancamento_id)
+                 REFERENCES public.lancamentos (id)
+                 ON DELETE CASCADE$$;
+    END IF;
+END
+$do$;
 
 -- =========================
 -- ESCALAS
 -- =========================
-ALTER TABLE IF EXISTS public.escalas
+-- cooperado_id -> cooperados(id) ON DELETE CASCADE
+ALTER TABLE public.escalas
   DROP CONSTRAINT IF EXISTS escalas_cooperado_id_fkey;
-ALTER TABLE IF EXISTS public.escalas
+ALTER TABLE public.escalas
   ADD CONSTRAINT escalas_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
+  FOREIGN KEY (cooperado_id)
+  REFERENCES public.cooperados (id)
+  ON DELETE CASCADE;
 
-ALTER TABLE IF EXISTS public.escalas
+-- restaurante_id -> restaurantes(id) ON DELETE CASCADE
+ALTER TABLE public.escalas
   DROP CONSTRAINT IF EXISTS escalas_restaurante_id_fkey;
-ALTER TABLE IF EXISTS public.escalas
+ALTER TABLE public.escalas
   ADD CONSTRAINT escalas_restaurante_id_fkey
-  FOREIGN KEY (restaurante_id) REFERENCES public.restaurantes (id) ON DELETE CASCADE;
+  FOREIGN KEY (restaurante_id)
+  REFERENCES public.restaurantes (id)
+  ON DELETE CASCADE;
 
 -- =========================
 -- TROCAS
 -- =========================
-ALTER TABLE IF EXISTS public.trocas
+-- solicitante_id -> cooperados(id) ON DELETE CASCADE
+ALTER TABLE public.trocas
   DROP CONSTRAINT IF EXISTS trocas_solicitante_id_fkey;
-ALTER TABLE IF EXISTS public.trocas
+ALTER TABLE public.trocas
   ADD CONSTRAINT trocas_solicitante_id_fkey
-  FOREIGN KEY (solicitante_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
+  FOREIGN KEY (solicitante_id)
+  REFERENCES public.cooperados (id)
+  ON DELETE CASCADE;
 
-ALTER TABLE IF EXISTS public.trocas
+-- destino_id -> cooperados(id) ON DELETE CASCADE
+ALTER TABLE public.trocas
   DROP CONSTRAINT IF EXISTS trocas_destino_id_fkey;
-ALTER TABLE IF EXISTS public.trocas
+ALTER TABLE public.trocas
   ADD CONSTRAINT trocas_destino_id_fkey
-  FOREIGN KEY (destino_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
+  FOREIGN KEY (destino_id)
+  REFERENCES public.cooperados (id)
+  ON DELETE CASCADE;
 
-ALTER TABLE IF EXISTS public.trocas
+-- origem_escala_id -> escalas(id) ON DELETE CASCADE
+ALTER TABLE public.trocas
   DROP CONSTRAINT IF EXISTS trocas_origem_escala_id_fkey;
-ALTER TABLE IF EXISTS public.trocas
+ALTER TABLE public.trocas
   ADD CONSTRAINT trocas_origem_escala_id_fkey
-  FOREIGN KEY (origem_escala_id) REFERENCES public.escalas (id) ON DELETE CASCADE;
-
--- =========================
--- AVISOS / LEITURAS
--- =========================
-ALTER TABLE IF EXISTS public.aviso_leituras
-  DROP CONSTRAINT IF EXISTS aviso_leituras_aviso_id_fkey;
-ALTER TABLE IF EXISTS public.aviso_leituras
-  ADD CONSTRAINT aviso_leituras_aviso_id_fkey
-  FOREIGN KEY (aviso_id) REFERENCES public.avisos (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.aviso_leituras
-  DROP CONSTRAINT IF EXISTS aviso_leituras_cooperado_id_fkey;
-ALTER TABLE IF EXISTS public.aviso_leituras
-  ADD CONSTRAINT aviso_leituras_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.aviso_leituras
-  DROP CONSTRAINT IF EXISTS aviso_leituras_restaurante_id_fkey;
-ALTER TABLE IF EXISTS public.aviso_leituras
-  ADD CONSTRAINT aviso_leituras_restaurante_id_fkey
-  FOREIGN KEY (restaurante_id) REFERENCES public.restaurantes (id) ON DELETE CASCADE;
-
--- =========================
--- LANCAMENTOS
--- =========================
-ALTER TABLE IF EXISTS public.lancamentos
-  DROP CONSTRAINT IF EXISTS lancamentos_restaurante_id_fkey;
-ALTER TABLE IF EXISTS public.lancamentos
-  ADD CONSTRAINT lancamentos_restaurante_id_fkey
-  FOREIGN KEY (restaurante_id) REFERENCES public.restaurantes (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.lancamentos
-  DROP CONSTRAINT IF EXISTS lancamentos_cooperado_id_fkey;
-ALTER TABLE IF EXISTS public.lancamentos
-  ADD CONSTRAINT lancamentos_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
-
--- =========================
--- MOVIMENTAÇÃO DO COOPERADO
--- =========================
-ALTER TABLE IF EXISTS public.receitas_cooperado
-  DROP CONSTRAINT IF EXISTS receitas_cooperado_cooperado_id_fkey;
-ALTER TABLE IF EXISTS public.receitas_cooperado
-  ADD CONSTRAINT receitas_cooperado_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.despesas_cooperado
-  DROP CONSTRAINT IF EXISTS despesas_cooperado_cooperado_id_fkey;
-ALTER TABLE IF EXISTS public.despesas_cooperado
-  ADD CONSTRAINT despesas_cooperado_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
+  FOREIGN KEY (origem_escala_id)
+  REFERENCES public.escalas (id)
+  ON DELETE CASCADE;
 
 COMMIT;
 """
 
     try:
+        if _is_sqlite():
+            flash("SQLite local: esta operação é específica de Postgres (sem efeito aqui).", "warning")
+            return redirect(url_for("admin_dashboard", tab="config"))
+
         db.session.execute(sa_text(sql))
         db.session.commit()
-        return jsonify({"ok": True, "msg": "FKs (CASCADE) aplicadas/garantidas."})
+        flash("FKs com ON DELETE CASCADE aplicadas com sucesso.", "success")
     except Exception as e:
         db.session.rollback()
-        return jsonify({"ok": False, "error": str(e)}), 500
+        flash(f"Erro ao aplicar FKs: {e}", "danger")
+    return redirect(url_for("admin_dashboard", tab="config"))
 
--- =========================
--- AVALIAÇÕES (Restaurante -> Cooperado e Cooperado -> Restaurante)
--- =========================
--- avaliacoes.lancamento_id -> ON DELETE CASCADE
-ALTER TABLE IF EXISTS public.avaliacoes
-  DROP CONSTRAINT IF EXISTS avaliacoes_lancamento_id_fkey;
-ALTER TABLE IF EXISTS public.avaliacoes
-  ADD CONSTRAINT avaliacoes_lancamento_id_fkey
-  FOREIGN KEY (lancamento_id) REFERENCES public.lancamentos (id) ON DELETE CASCADE;
-
--- avaliacoes_restaurante.lancamento_id -> ON DELETE CASCADE
-ALTER TABLE IF EXISTS public.avaliacoes_restaurante
-  DROP CONSTRAINT IF EXISTS av_rest_lancamento_id_fkey;
-ALTER TABLE IF EXISTS public.avaliacoes_restaurante
-  ADD CONSTRAINT av_rest_lancamento_id_fkey
-  FOREIGN KEY (lancamento_id) REFERENCES public.lancamentos (id) ON DELETE CASCADE;
-
--- =========================
--- ESCALAS
--- =========================
-ALTER TABLE IF EXISTS public.escalas
-  DROP CONSTRAINT IF EXISTS escalas_cooperado_id_fkey;
-ALTER TABLE IF EXISTS public.escalas
-  ADD CONSTRAINT escalas_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.escalas
-  DROP CONSTRAINT IF EXISTS escalas_restaurante_id_fkey;
-ALTER TABLE IF EXISTS public.escalas
-  ADD CONSTRAINT escalas_restaurante_id_fkey
-  FOREIGN KEY (restaurante_id) REFERENCES public.restaurantes (id) ON DELETE CASCADE;
-
--- =========================
--- TROCAS
--- =========================
-ALTER TABLE IF EXISTS public.trocas
-  DROP CONSTRAINT IF EXISTS trocas_solicitante_id_fkey;
-ALTER TABLE IF EXISTS public.trocas
-  ADD CONSTRAINT trocas_solicitante_id_fkey
-  FOREIGN KEY (solicitante_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.trocas
-  DROP CONSTRAINT IF EXISTS trocas_destino_id_fkey;
-ALTER TABLE IF EXISTS public.trocas
-  ADD CONSTRAINT trocas_destino_id_fkey
-  FOREIGN KEY (destino_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.trocas
-  DROP CONSTRAINT IF EXISTS trocas_origem_escala_id_fkey;
-ALTER TABLE IF EXISTS public.trocas
-  ADD CONSTRAINT trocas_origem_escala_id_fkey
-  FOREIGN KEY (origem_escala_id) REFERENCES public.escalas (id) ON DELETE CASCADE;
-
--- =========================
--- AVISOS / LEITURAS
--- =========================
-ALTER TABLE IF EXISTS public.aviso_leituras
-  DROP CONSTRAINT IF EXISTS aviso_leituras_aviso_id_fkey;
-ALTER TABLE IF EXISTS public.aviso_leituras
-  ADD CONSTRAINT aviso_leituras_aviso_id_fkey
-  FOREIGN KEY (aviso_id) REFERENCES public.avisos (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.aviso_leituras
-  DROP CONSTRAINT IF EXISTS aviso_leituras_cooperado_id_fkey;
-ALTER TABLE IF EXISTS public.aviso_leituras
-  ADD CONSTRAINT aviso_leituras_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.aviso_leituras
-  DROP CONSTRAINT IF EXISTS aviso_leituras_restaurante_id_fkey;
-ALTER TABLE IF EXISTS public.aviso_leituras
-  ADD CONSTRAINT aviso_leituras_restaurante_id_fkey
-  FOREIGN KEY (restaurante_id) REFERENCES public.restaurantes (id) ON DELETE CASCADE;
-
--- =========================
--- LANCAMENTOS (FKs antigas sem CASCADE)
--- =========================
-ALTER TABLE IF EXISTS public.lancamentos
-  DROP CONSTRAINT IF EXISTS lancamentos_restaurante_id_fkey;
-ALTER TABLE IF EXISTS public.lancamentos
-  ADD CONSTRAINT lancamentos_restaurante_id_fkey
-  FOREIGN KEY (restaurante_id) REFERENCES public.restaurantes (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.lancamentos
-  DROP CONSTRAINT IF EXISTS lancamentos_cooperado_id_fkey;
-ALTER TABLE IF EXISTS public.lancamentos
-  ADD CONSTRAINT lancamentos_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
-
-COMMIT;
-"""
-    try:
-        db.session.execute(sa_text(sql))
-        db.session.commit()
-        return jsonify({"ok": True, "msg": "FKs (CASCADE) aplicadas/garantidas."})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"ok": False, "error": str(e)}), 500
 
 # =========================
-# Documentos (Admin + Público)
-# =========================
-from flask import (
-    render_template, request, redirect, url_for, flash, session,
-    send_file, abort
-)
-from werkzeug.utils import secure_filename
-from datetime import datetime, date, timedelta
-from pathlib import Path
-import os, re, logging
-
-log = logging.getLogger(__name__)
-
-# ---- Ajuste de diretórios (onde os arquivos serão salvos e servidos)
-try:
-    BASE_DIR  # type: ignore[name-defined]
-except NameError:
-    BASE_DIR = Path(__file__).resolve().parent
-
-DOCS_DIR = str(Path(BASE_DIR) / "static" / "uploads" / "docs")
-Path(DOCS_DIR).mkdir(parents=True, exist_ok=True)
-
-# Modelos e utilidades esperados no app principal:
-# - db (SQLAlchemy)
-# - modelos: Documento(id, titulo, categoria, descricao, arquivo_url, arquivo_nome, enviado_em)
-#            Cooperado(id, nome, cnh_numero, cnh_validade, placa, placa_validade, ultima_atualizacao)
-# - decorators: admin_required
-# - função util: _prox_ocorrencia_anual (usada no editar_documentos abaixo)
-# - admin_dashboard (endpoint) já existente
-
-# =========================
-# Documentos (Admin) – por cooperado
+# Documentos (Admin)
 # =========================
 @app.route("/documentos/<int:coop_id>", methods=["GET", "POST"])
 @admin_required
@@ -4228,13 +3604,11 @@ def editar_documentos(coop_id):
         f = request.form
         c.cnh_numero = f.get("cnh_numero")
         c.placa = f.get("placa")
-
         def parse_date_local(s):
             try:
                 return datetime.strptime(s, "%Y-%m-%d").date() if s else None
             except Exception:
                 return None
-
         c.cnh_validade = parse_date_local(f.get("cnh_validade"))
         c.placa_validade = parse_date_local(f.get("placa_validade"))
         c.ultima_atualizacao = datetime.now()
@@ -4242,11 +3616,10 @@ def editar_documentos(coop_id):
         flash("Documentos atualizados.", "success")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    # Se existir um template dedicado, usa; senão, devolve um HTML inline simples
-    tpl_path = Path(BASE_DIR) / "templates" / "editar_documentos.html"
+    tpl = os.path.join("templates", "editar_documentos.html")
     hoje = date.today()
     prazo_final = date(hoje.year, 12, 31)
-    if tpl_path.exists():
+    if os.path.exists(tpl):
         docinfo = {
             "prazo_final": prazo_final,
             "dias_ate_prazo": max(0, (prazo_final - hoje).days),
@@ -4267,10 +3640,9 @@ def editar_documentos(coop_id):
         }
         return render_template("editar_documentos.html", cooperado=c, docinfo=docinfo)
 
-    # Fallback HTML inline (caso o template não exista no servidor)
     return f"""
     <div style="max-width:560px;margin:30px auto;font-family:Arial">
-      return f"<h3>Documentos — {c.nome}</h3>"
+      <h3>Documentos — {c.nome}</h3>
       <form method="POST">
         <label>CNH (número)</label><br>
         <input name="cnh_numero" value="{c.cnh_numero or ''}" style="width:100%;padding:8px"><br><br>
@@ -4285,96 +3657,6 @@ def editar_documentos(coop_id):
       </form>
     </div>
     """
-
-# =========================
-# Documentos (Admin) – listagem e upload
-# =========================
-@app.route("/admin/documentos")
-@admin_required
-def admin_documentos():
-    documentos = Documento.query.order_by(Documento.enviado_em.desc()).all()
-    return render_template("admin_documentos.html", documentos=documentos)
-
-@app.post("/admin/documentos/upload")
-@admin_required
-def admin_upload_documento():
-    f = request.form
-    titulo = (f.get("titulo") or "").strip()
-    categoria = (f.get("categoria") or "outro").strip()
-    descricao = (f.get("descricao") or "").strip()
-    arquivo = request.files.get("arquivo")
-
-    if not titulo or not (arquivo and arquivo.filename):
-        flash("Preencha o título e selecione o arquivo.", "warning")
-        return redirect(url_for("admin_documentos"))
-
-    # salva arquivo no diretório DOCS_DIR e cria URL estática
-    fname = secure_filename(arquivo.filename)
-    base, ext = os.path.splitext(fname)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_base = re.sub(r"[^A-Za-z0-9_-]+", "_", base).strip("_") or "arquivo"
-    final_name = f"{safe_base}_{ts}{ext}"
-    full_path = os.path.join(DOCS_DIR, final_name)
-    arquivo.save(full_path)
-
-    doc_url = f"/static/uploads/docs/{final_name}"
-
-    d = Documento(
-        titulo=titulo,
-        categoria=categoria,
-        descricao=descricao,
-        arquivo_url=doc_url,
-        arquivo_nome=fname,
-        enviado_em=datetime.utcnow(),
-    )
-    db.session.add(d)
-    db.session.commit()
-    flash("Documento enviado.", "success")
-    return redirect(url_for("admin_documentos"))
-
-@app.get("/admin/documentos/<int:doc_id>/delete")
-@admin_required
-def admin_delete_documento(doc_id):
-    d = Documento.query.get_or_404(doc_id)
-    # tenta apagar o arquivo físico (se for local)
-    try:
-        local_path = os.path.join(str(BASE_DIR), d.arquivo_url.lstrip("/"))
-        if os.path.exists(local_path):
-            os.remove(local_path)
-    except Exception as e:
-        try:
-            log.warning("Falha ao remover arquivo local do documento %s: %s", d.id, e)
-        except Exception:
-            pass
-    db.session.delete(d)
-    db.session.commit()
-    flash("Documento removido.", "success")
-    return redirect(url_for("admin_documentos"))
-
-# =========================
-# Documentos (Público / Logado)
-# =========================
-@app.route("/documentos", endpoint="documentos_publicos")
-def documentos_publicos():
-    uid = session.get("user_id")
-    if not uid:
-        return redirect(url_for("login"))
-    documentos = Documento.query.order_by(Documento.enviado_em.desc()).all()
-    return render_template("documentos_publicos.html", documentos=documentos)
-
-@app.route('/documentos/<int:doc_id>/baixar')
-def baixar_documento(doc_id):
-    doc = Documento.query.get_or_404(doc_id)
-    # Se for URL externa (S3/Drive), apenas redireciona
-    if (doc.arquivo_url or "").startswith(("http://", "https://")):
-        return redirect(doc.arquivo_url)
-
-    # Caso local, resolve caminho sob BASE_DIR
-    path = os.path.join(str(BASE_DIR), doc.arquivo_url.lstrip("/"))
-    if not os.path.exists(path):
-        abort(404)
-    # usa o nome original para download
-    return send_file(path, as_attachment=True, download_name=(doc.arquivo_nome or os.path.basename(path)))
 
 # =========================
 # PORTAL COOPERADO
@@ -4829,89 +4111,7 @@ def recusar_troca(troca_id):
     return redirect(url_for("portal_cooperado"))
 
 # =========================
-# PORTAL RESTAURANTE (com Avisos)
-# =========================
-from datetime import date, datetime, timedelta
-from urllib.parse import urlparse, parse_qs
-from flask import request, session, render_template, redirect, url_for, abort, flash
-from werkzeug.routing import BuildError
-from sqlalchemy import or_
-from sqlalchemy.exc import IntegrityError, OperationalError
-
-# 🔧 Imports adicionais necessários neste bloco:
-import os, re
-from pathlib import Path
-from flask import jsonify, current_app
-from werkzeug.utils import secure_filename
-
-# Assumindo que já existem:
-# app, db, role_required
-# models: Restaurante, Cooperado, Lancamento, Escala, Aviso, AvisoLeitura, AvaliacaoCooperado, Tabela
-# helpers: _parse_date, _normalize_name, _carry_forward_contrato,
-#          _parse_data_escala_str, _weekday_from_data_str, _norm, _norm_txt,
-#          _clamp_star, _media_ponderada, _analise_sentimento, _identifica_temas, _sinaliza_crise, _gerar_feedback,
-#          _tabelas_base_dir, _serve_tabela_or_redirect, _enforce_restaurante_titulo
-# (e opcionalmente get_avisos_for_restaurante)
-
-# --- Helpers de navegação: manter a mesma aba após ações -------------------
-def _get_view_from_referrer():
-    ref = request.referrer
-    if not ref:
-        return None
-    try:
-        q = parse_qs(urlparse(ref).query)
-        v = (q.get("view", [None])[0] or "").strip().lower()
-        return v or None
-    except Exception:
-        return None
-
-def _resolve_portal_view(default_view="lancar"):
-    return (
-        (request.args.get("view") or "").strip().lower()
-        or (request.form.get("view") or "").strip().lower()
-        or _get_view_from_referrer()
-        or default_view
-    )
-
-def redirect_portal_restaurante(default_view="lancar"):
-    return redirect(url_for("portal_restaurante", view=_resolve_portal_view(default_view)))
-
-# --- Helpers de Avisos (restaurante) ---------------------------------------
-def _fetch_avisos_for_restaurante(rest):
-    """
-    Busca os avisos que se aplicam ao restaurante.
-    Se já existir um helper no projeto (ex.: get_avisos_for_restaurante),
-    usamos ele; caso contrário, caímos no fallback (globais + restaurante).
-    """
-    try:
-        return get_avisos_for_restaurante(rest)  # type: ignore[name-defined]
-    except NameError:
-        return (Aviso.query
-                .filter(Aviso.ativo.is_(True))
-                .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
-                .order_by(Aviso.fixado.desc(), Aviso.criado_em.desc())
-                .all())
-
-def _count_unread_for_restaurante(rest) -> int:
-    """
-    Conta quantos avisos ainda não foram marcados como lidos pelo restaurante.
-    Considera só avisos que efetivamente se aplicam ao restaurante.
-    """
-    avisos = _fetch_avisos_for_restaurante(rest)
-    if not avisos:
-        return 0
-    ids = [a.id for a in avisos]
-    lidos = {
-        r.aviso_id
-        for r in AvisoLeitura.query
-            .filter(AvisoLeitura.restaurante_id == rest.id,
-                    AvisoLeitura.aviso_id.in_(ids))
-            .all()
-    }
-    return sum(1 for aid in ids if aid not in lidos)
-
-# =========================
-# PORTAL
+# PORTAL RESTAURANTE
 # =========================
 @app.route("/portal/restaurante")
 @role_required("restaurante")
@@ -4924,7 +4124,7 @@ def portal_restaurante():
     # Abas/visões: 'lancar', 'escalas', 'lancamentos', 'config', 'avisos'
     view = (request.args.get("view", "lancar") or "lancar").strip().lower()
 
-    # ---- helper mês YYYY-MM (opcional)
+    # ---- helper mês YYYY-MM
     import re
     def _parse_yyyy_mm_local(s: str):
         if not s:
@@ -4947,7 +4147,7 @@ def portal_restaurante():
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
 
-    # Filtro por mês (?mes=YYYY-MM) — opcional
+    # NOVO: filtro por mês (?mes=YYYY-MM)
     mes = (request.args.get("mes") or "").strip()
     periodo_desc = None
     if mes:
@@ -4976,10 +4176,12 @@ def portal_restaurante():
     total_qtd = 0
     total_entregas = 0
     for c in cooperados:
-        q = (Lancamento.query
-             .filter_by(restaurante_id=rest.id, cooperado_id=c.id)
-             .filter(Lancamento.data >= di, Lancamento.data <= df)
-             .order_by(Lancamento.data.desc(), Lancamento.id.desc()))
+        q = (
+            Lancamento.query
+            .filter_by(restaurante_id=rest.id, cooperado_id=c.id)
+            .filter(Lancamento.data >= di, Lancamento.data <= df)
+            .order_by(Lancamento.data.desc(), Lancamento.id.desc())
+        )
         c.lancamentos = q.all()
         c.total_periodo = sum((l.valor or 0.0) for l in c.lancamentos)
         total_bruto += c.total_periodo
@@ -5008,11 +4210,9 @@ def portal_restaurante():
     escalas_all = Escala.query.order_by(Escala.id.asc()).all()
     eff_map = _carry_forward_contrato(escalas_all)
 
-    # prioridade: restaurante_id bate, senão por nome (contrato)
     escalas_rest = [
         e for e in escalas_all
-        if (getattr(e, "restaurante_id", None) == rest.id)
-        or contrato_bate_restaurante(eff_map.get(e.id, e.contrato or ""), rest.nome)
+        if contrato_bate_restaurante(eff_map.get(e.id, e.contrato or ""), rest.nome)
     ]
     if not escalas_rest:
         escalas_rest = [e for e in escalas_all if (e.contrato or "").strip() == rest.nome.strip()]
@@ -5048,7 +4248,7 @@ def portal_restaurante():
                 "cooperado_nome": nome_fallback or None,
                 "nome_planilha": nome_show,
                 "turno": (e.turno or "").strip(),
-                "horario": (e.horario or "").strip(),   # <== corrige 'ou'->'or'
+                "horario": (e.horario or "").strip(),
                 "contrato": contrato_eff,
                 "cor": (e.cor or "").strip(),
             })
@@ -5087,7 +4287,7 @@ def portal_restaurante():
                 "hora_fim": (lanc.hora_fim if isinstance(lanc.hora_fim, str)
                              else (lanc.hora_fim.strftime("%H:%M") if lanc.hora_fim else "")),
                 "qtd_entregas": lanc.qtd_entregas or 0,
-                "valor": float(lanc.valor or 0.0),
+                "valor": float(lanc.valor or 0.0),  # já em R$
                 "cooperado_id": coop.id,
                 "cooperado_nome": coop.nome,
                 "contrato_nome": rest.nome,
@@ -5097,25 +4297,12 @@ def portal_restaurante():
         total_lanc_valor = sum(x["valor"] for x in lancamentos_periodo)
         total_lanc_entregas = sum(x["qtd_entregas"] for x in lancamentos_periodo)
 
-    # -------------------- Avisos (aba "avisos") --------------------
-    avisos = []
-    avisos_nao_lidos_count = 0
-    current_year = datetime.now().year
-    if view == "avisos":
-        avisos = _fetch_avisos_for_restaurante(rest)
-        lidos_ids = {r.aviso_id for r in AvisoLeitura.query.filter_by(restaurante_id=rest.id).all()}
-        for a in avisos:
-            a.lido = (a.id in lidos_ids)
-        avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
-
-    # >>> Contador geral de não lidos (para TOAST/SOM no layout)
-    unread = _count_unread_for_restaurante(rest)
-
     # ---- URLs/flags para template
+    from werkzeug.routing import BuildError
     try:
         url_lancar_producao = url_for("lancar_producao")
     except BuildError:
-        url_lancar_producao = "/portal/restaurante/lancar_producao"
+        url_lancar_producao = "/restaurante/lancar_producao"
 
     has_editar_lanc = ("editar_lancamento" in app.view_functions)
 
@@ -5141,101 +4328,15 @@ def portal_restaurante():
         lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
         total_lanc_valor=total_lanc_valor,
         total_lanc_entregas=total_lanc_entregas,
-        # Avisos / Toast
-        avisos=(avisos if view == "avisos" else []),
-        avisos_nao_lidos_count=avisos_nao_lidos_count,
-        current_year=current_year,
-        unread=unread,  # <== usado no layout para o TOAST persistente
-        # URLs/flags
         url_lancar_producao=url_lancar_producao,
         has_editar_lanc=has_editar_lanc,
     )
 
-# =========================
-# AVISOS (rotas do Portal Restaurante)
-# =========================
-@app.get("/portal/restaurante/avisos")
-@role_required("restaurante")
-def portal_restaurante_avisos():
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-
-    # avisos aplicáveis
-    try:
-        avisos_db = get_avisos_for_restaurante(rest)
-    except NameError:
-        # fallback: global + restaurante (associados ou broadcast)
-        avisos_db = (Aviso.query
-                     .filter(Aviso.ativo.is_(True))
-                     .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
-                     .order_by(Aviso.fixado.desc(), Aviso.criado_em.desc())
-                     .all())
-
-    # ids já lidos
-    lidos_ids = {
-        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
-        .filter(AvisoLeitura.restaurante_id == rest.id).all()
-    }
-
-    def corpo_do_aviso(a: Aviso) -> str:
-        for k in ("corpo_html","html","conteudo_html","mensagem_html","descricao_html","texto_html",
-                  "corpo","conteudo","mensagem","descricao","texto","resumo","body","content"):
-            v = getattr(a, k, None)
-            if isinstance(v, str) and v.strip():
-                return v
-        return ""
-
-    avisos = [{
-        "id": a.id,
-        "titulo": a.titulo or "Aviso",
-        "criado_em": a.criado_em,
-        "lido": (a.id in lidos_ids),
-        "prioridade_alta": (str(a.prioridade or "").lower() == "alta"),
-        "corpo_html": corpo_do_aviso(a),
-    } for a in avisos_db]
-
-    avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
-    return render_template(
-        "portal_restaurante_avisos.html",   # crie/clone seu template
-        avisos=avisos,
-        avisos_nao_lidos_count=avisos_nao_lidos_count,
-        current_year=datetime.now().year,
-    )
-
-@app.post("/avisos-restaurante/marcar-todos", endpoint="marcar_todos_avisos_lidos_restaurante")
-@role_required("restaurante")
-def marcar_todos_avisos_lidos_restaurante():
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-
-    try:
-        avisos = get_avisos_for_restaurante(rest)
-    except NameError:
-        avisos = (Aviso.query
-                  .filter(Aviso.ativo.is_(True))
-                  .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
-                  .all())
-
-    lidos_ids = {
-        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
-        .filter(AvisoLeitura.restaurante_id == rest.id).all()
-    }
-
-    now = datetime.utcnow()
-    for a in avisos:
-        if a.id not in lidos_ids:
-            db.session.add(AvisoLeitura(
-                restaurante_id=rest.id, aviso_id=a.id, lido_em=now
-            ))
-    db.session.commit()
-    return redirect(url_for("portal_restaurante_avisos"))
-
 
 # =========================
-# LANÇAR PRODUÇÃO — aceita ambos os caminhos (corrige 404)
+# Rotas de CRUD de lançamento
 # =========================
-@app.route("/portal/restaurante/lancar_producao", methods=["POST"])
-@app.route("/restaurante/lancar_producao", methods=["POST"])
+@app.post("/restaurante/lancar_producao")
 @role_required("restaurante")
 def lancar_producao():
     u_id = session.get("user_id")
@@ -5296,8 +4397,7 @@ def lancar_producao():
 
     db.session.commit()
     flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
-    # mantém a aba atual (se acionou do 'lancar', volta pro 'lancamentos' naturalmente pelo hidden 'view')
-    return redirect_portal_restaurante(default_view="lancamentos")
+    return redirect(url_for("portal_restaurante", view="lancar"))
 
 @app.route("/lancamentos/<int:id>/editar", methods=["GET", "POST"])
 @role_required("restaurante")
@@ -5337,6 +4437,234 @@ def excluir_lancamento(id):
     db.session.commit()
     flash("Lançamento excluído.", "success")
     return redirect(url_for("portal_restaurante", view="lancamentos"))
+
+# =========================
+# Documentos (Admin + Público)
+# =========================
+@app.route("/admin/documentos")
+@admin_required
+def admin_documentos():
+    documentos = Documento.query.order_by(Documento.enviado_em.desc()).all()
+    return render_template("admin_documentos.html", documentos=documentos)
+
+@app.post("/admin/documentos/upload")
+@admin_required
+def admin_upload_documento():
+    f = request.form
+    titulo = (f.get("titulo") or "").strip()
+    categoria = (f.get("categoria") or "outro").strip()
+    descricao = (f.get("descricao") or "").strip()
+    arquivo = request.files.get("arquivo")
+
+    if not titulo or not (arquivo and arquivo.filename):
+        flash("Preencha o título e selecione o arquivo.", "warning")
+        return redirect(url_for("admin_documentos"))
+
+    # salva arquivo no diretório DOCS_DIR e cria URL estática
+    fname = secure_filename(arquivo.filename)
+    base, ext = os.path.splitext(fname)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    safe_base = re.sub(r"[^A-Za-z0-9_-]+", "_", base).strip("_") or "arquivo"
+    final_name = f"{safe_base}_{ts}{ext}"
+    full_path = os.path.join(DOCS_DIR, final_name)
+    arquivo.save(full_path)
+
+    doc_url = f"/static/uploads/docs/{final_name}"
+
+    d = Documento(
+        titulo=titulo,
+        categoria=categoria,
+        descricao=descricao,
+        arquivo_url=doc_url,
+        arquivo_nome=fname,
+        enviado_em=datetime.utcnow(),
+    )
+    db.session.add(d)
+    db.session.commit()    
+    flash("Documento enviado.", "success")
+    return redirect(url_for("admin_documentos"))
+
+@app.get("/admin/documentos/<int:doc_id>/delete")
+@admin_required
+def admin_delete_documento(doc_id):
+    d = Documento.query.get_or_404(doc_id)
+    try:
+        local_path = os.path.join(BASE_DIR, d.arquivo_url.lstrip("/"))
+        if os.path.exists(local_path):
+            os.remove(local_path)
+    except Exception:
+        pass
+    db.session.delete(d)
+    db.session.commit()
+    flash("Documento removido.", "success")
+    return redirect(url_for("admin_documentos"))
+
+@app.route("/documentos")
+def documentos_publicos():
+    uid = session.get("user_id")
+    if not uid:
+        return redirect(url_for("login"))
+    documentos = Documento.query.order_by(Documento.enviado_em.desc()).all()
+    return render_template("documentos_publicos.html", documentos=documentos)
+
+@app.route('/documentos/<int:doc_id>/baixar')
+def baixar_documento(doc_id):
+    doc = Documento.query.get_or_404(doc_id)
+    path = os.path.join(BASE_DIR, doc.arquivo_url.lstrip("/"))
+    if not os.path.exists(path):
+        abort(404)
+    return send_file(path, as_attachment=True, download_name=doc.arquivo_nome)
+
+# =========================
+# Inicialização automática do DB em servidores (Gunicorn/Render)
+# =========================
+try:
+    with app.app_context():
+        init_db()
+except Exception as _e:
+    # Evita crash no import; logs úteis no servidor
+    try:
+        app.logger.warning(f"Falha ao inicializar DB: {_e}")
+    except Exception:
+        pass
+
+
+@app.errorhandler(413)
+def too_large(e):
+    flash("Arquivo excede o tamanho máximo permitido (32MB).", "danger")
+    return redirect(url_for('admin_documentos'))
+
+# =========================
+# Inicialização automática do DB em servidores (Gunicorn/Render)
+# =========================
+try:
+    with app.app_context():
+        init_db()
+except Exception as _e:
+    ...
+
+# ==== TABELAS (upload/abrir/baixar) =========================================
+from flask import (
+    render_template, request, redirect, url_for, flash, session,
+    send_file, abort, current_app, jsonify
+)
+from werkzeug.utils import secure_filename
+from datetime import datetime
+from pathlib import Path
+import os, re, unicodedata, mimetypes, logging
+
+log = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# BASE_DIR e TABELAS_DIR (sempre salva/serve de static/uploads/tabelas)
+# ---------------------------------------------------------------------------
+try:
+    BASE_DIR  # type: ignore[name-defined]
+except NameError:
+    BASE_DIR = Path(__file__).resolve().parent
+
+# SEMPRE neste local:
+TABELAS_DIR = str(Path(BASE_DIR) / "static" / "uploads" / "tabelas")
+
+# Requer no app principal:
+# - db (SQLAlchemy)
+# - modelos: Tabela(id, titulo, descricao?, arquivo_url, arquivo_nome?, enviado_em)
+#            Restaurante(usuario_id, nome?, usuario?, usuario_ref?.usuario?)
+# - decorators: admin_required, role_required (se usar avisos/portais)
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+def _tabelas_base_dir() -> Path:
+    p = Path(TABELAS_DIR)
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+def _norm_txt(s: str) -> str:
+    s = unicodedata.normalize("NFD", (s or "").strip())
+    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+    s = re.sub(r"\s+", " ", s)
+    return s.lower()
+
+def _guess_mimetype_from_path(path: str) -> str:
+    mt, _ = mimetypes.guess_type(path)
+    return mt or "application/octet-stream"
+
+def _enforce_restaurante_titulo(tabela, restaurante):
+    """
+    Regra: restaurante só acessa a tabela cujo TÍTULO == NOME/LOGIN do restaurante (normalizado).
+    """
+    login_nome = (
+        getattr(getattr(restaurante, "usuario_ref", None), "usuario", None)
+        or getattr(restaurante, "usuario", None)
+        or (restaurante.nome or "")
+    )
+    if _norm_txt(tabela.titulo) != _norm_txt(login_nome):
+        abort(403)
+
+def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
+    """
+    Resolve e serve o arquivo da Tabela:
+    - http(s) => redirect
+    - sempre tenta primeiro static/uploads/tabelas/<arquivo>
+    - aceita absoluto, relativo e só o nome
+    - ignora querystring/fragments (ex.: foo.pdf?v=123#x)
+    """
+    url = (tabela.arquivo_url or "").strip()
+    if not url:
+        abort(404)
+
+    # URL externa
+    if url.startswith(("http://", "https://")):
+        return redirect(url)
+
+    base_dir    = Path(BASE_DIR)
+    tabelas_dir = _tabelas_base_dir()
+
+    # normaliza: remove "/" inicial, query e fragment
+    raw = url.lstrip("/")
+    raw_no_q = raw.split("?", 1)[0].split("#", 1)[0]
+    fname = (raw_no_q.split("/")[-1] if raw_no_q else "").strip()
+
+    candidates = []
+
+    # 1) SEMPRE prioriza nosso diretório oficial
+    if fname:
+        candidates.append(tabelas_dir / fname)
+
+    # 2) Como veio, relativo ao BASE_DIR (compat c/ legado: static/uploads/tabelas/...)
+    candidates.append(base_dir / raw_no_q)
+
+    # 3) Absoluto (se alguém gravou caminho completo por engano)
+    p = Path(url)
+    if p.is_absolute():
+        candidates.append(p)
+
+    # 4) Mais dois legados comuns
+    if fname:
+        candidates.append(base_dir / "uploads" / "tabelas" / fname)
+        candidates.append(base_dir / "static" / "uploads" / "tabelas" / fname)
+
+    file_path = next((c for c in candidates if c.exists() and c.is_file()), None)
+    if not file_path:
+        try:
+            log.warning(
+                "Arquivo de Tabela não encontrado. id=%s titulo=%r arquivo_url=%r tents=%r",
+                getattr(tabela, "id", None),
+                getattr(tabela, "titulo", None),
+                tabela.arquivo_url,
+                [str(c) for c in candidates],
+            )
+        except Exception:
+            pass
+        abort(404)
+
+    return send_file(
+        str(file_path),
+        as_attachment=as_attachment,
+        download_name=(tabela.arquivo_nome or file_path.name),
+        mimetype=_guess_mimetype_from_path(str(file_path)),
+    )
 
 # ---------------------------------------------------------------------------
 # Admin: listar / upload / delete
@@ -5565,181 +4893,71 @@ def admin_tabelas_normalize_arquivo_url():
     return jsonify({"ok": True, "alterados": alterados})
 
 # =========================
-# AVISOS — Ações (cooperado/restaurante) + API unread_count
+# AVISOS — Ações (cooperado)
 # =========================
 
-from datetime import datetime
-from flask import request, session, redirect, url_for, render_template, jsonify, flash, abort
-from sqlalchemy import or_, and_, func
+@app.post("/avisos/<int:aviso_id>/lido", endpoint="marcar_aviso_lido")
+@role_required("cooperado")
+def marcar_aviso_lido(aviso_id: int):
+    u_id = session.get("user_id")
+    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
 
-# -------------------------------------------------------------------
-# Helpers de contagem (usam as queries já definidas no app)
-# -------------------------------------------------------------------
+    aviso = Aviso.query.get_or_404(aviso_id)
 
-def count_unread_for_coop(coop: Cooperado) -> int:
-    """
-    Conta quantos avisos aplicáveis ao cooperado ainda não foram marcados como lidos.
-    Considera avisos 'global' e 'cooperado'. Respeita 'ativo'; se sua app tiver
-    janela (inicio_em/fim_em) em get_avisos_for_cooperado, ela será respeitada.
-    """
-    if not coop:
-        return 0
-    try:
-        avisos = get_avisos_for_cooperado(coop)
-    except NameError:
-        avisos = (Aviso.query
-                  .filter(Aviso.ativo.is_(True))
-                  .filter(or_(Aviso.tipo == "global", Aviso.tipo == "cooperado"))
-                  .all())
-    if not avisos:
-        return 0
+    ja_lido = AvisoLeitura.query.filter_by(
+        cooperado_id=coop.id, aviso_id=aviso.id
+    ).first()
 
-    ids = [a.id for a in avisos]
-    lidos = {
-        r.aviso_id
-        for r in (AvisoLeitura.query
-                  .filter(AvisoLeitura.cooperado_id == coop.id,
-                          AvisoLeitura.aviso_id.in_(ids))
-                  .all())
+    if not ja_lido:
+        db.session.add(AvisoLeitura(
+            cooperado_id=coop.id,
+            aviso_id=aviso.id,
+            lido_em=datetime.utcnow(),
+        ))
+        db.session.commit()
+
+    # volta para a lista; se quiser voltar ancorado: + f"#aviso-{aviso.id}"
+    return redirect(url_for("portal_cooperado_avisos"))
+
+@app.post("/avisos/marcar-todos", endpoint="marcar_todos_avisos_lidos")
+@role_required("cooperado")
+def marcar_todos_avisos_lidos():
+    u_id = session.get("user_id")
+    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
+
+    # todos avisos visíveis ao cooperado
+    avisos = get_avisos_for_cooperado(coop)
+
+    # ids já lidos
+    lidos_ids = {
+        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
+        .filter(AvisoLeitura.cooperado_id == coop.id).all()
     }
-    return sum(1 for aid in ids if aid not in lidos)
 
+    # persiste só os que faltam
+    now = datetime.utcnow()
+    for a in avisos:
+        if a.id not in lidos_ids:
+            db.session.add(AvisoLeitura(
+                cooperado_id=coop.id,
+                aviso_id=a.id,
+                lido_em=now,
+            ))
 
-def count_unread_for_rest(rest: Restaurante) -> int:
-    """
-    Conta quantos avisos aplicáveis ao restaurante ainda NÃO foram marcados como lidos.
-    Considera:
-      - Avisos 'global'
-      - Avisos 'restaurante' broadcast (sem restaurantes associados)
-      - Avisos 'restaurante' destinados especificamente a este restaurante
-    Respeita janela (inicio_em/fim_em) e 'ativo' se seu helper já as aplicar.
-    """
-    if not rest:
-        return 0
+    db.session.commit()
+    return redirect(url_for("portal_cooperado_avisos"))
 
-    try:
-        avisos = get_avisos_for_restaurante(rest)  # helper oficial do seu app
-    except NameError:
-        # Fallback seguro (se o helper não existir)
-        now = func.now()
-        avisos = (Aviso.query
-                  .filter(Aviso.ativo.is_(True))
-                  .filter(or_(Aviso.inicio_em.is_(None), Aviso.inicio_em <= now))
-                  .filter(or_(Aviso.fim_em.is_(None),    Aviso.fim_em    >= now))
-                  .filter(
-                      or_(
-                          Aviso.tipo == "global",
-                          and_(
-                              Aviso.tipo == "restaurante",
-                              or_(
-                                  ~Aviso.restaurantes.any(),                          # broadcast
-                                  Aviso.restaurantes.any(Restaurante.id == rest.id),  # específico
-                              ),
-                          ),
-                      )
-                  )).all()
-
-    if not avisos:
-        return 0
-
-    ids = [a.id for a in avisos]
-    lidos = {
-        r.aviso_id
-        for r in (AvisoLeitura.query
-                  .filter(AvisoLeitura.restaurante_id == rest.id,
-                          AvisoLeitura.aviso_id.in_(ids))
-                  .all())
-    }
-    return sum(1 for aid in ids if aid not in lidos)
-
-
-# -------------------------------------------------------------------
-# API usada pelo front: /avisos/unread_count
-# -------------------------------------------------------------------
-@app.get("/avisos/unread_count")
-def avisos_unread_count():
-    """
-    Retorna {"unread": <qtd>} para o usuário logado.
-    - Cooperado: conta avisos destinados a ele (ou broadcast p/ cooperados) ainda não lidos.
-    - Restaurante: conta avisos destinados a restaurantes (broadcast ou específicos) ainda não lidos.
-    - Admin/sem sessão: 0
-    """
-    try:
-        uid = session.get("user_id")
-        tipo = session.get("user_tipo")
-        if not uid or not tipo:
-            resp = jsonify({"unread": 0})
-            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-            return resp, 200
-
-        if tipo == "cooperado":
-            coop = Cooperado.query.filter_by(usuario_id=uid).first()
-            n = count_unread_for_coop(coop) if coop else 0
-            resp = jsonify({"unread": int(n)})
-            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-            return resp, 200
-
-        if tipo == "restaurante":
-            rest = Restaurante.query.filter_by(usuario_id=uid).first()
-            n = count_unread_for_rest(rest) if rest else 0
-            resp = jsonify({"unread": int(n)})
-            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-            return resp, 200
-
-        # admin/outros perfis
-        resp = jsonify({"unread": 0})
-        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        return resp, 200
-
-    except Exception:
-        # Falhas silenciosas para não quebrar o front
-        resp = jsonify({"unread": 0})
-        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        return resp, 200
-
-
-# =========================
-# AVISOS — Portal Restaurante (listar e marcar lidos)
-# Bloco completo e idempotente (sem conflitos de endpoint)
-# =========================
-
-from datetime import datetime
-from flask import render_template, session, redirect, url_for, flash, current_app
-from sqlalchemy import or_
-
-# helper p/ registrar rotas sem duplicar
-def safe_add_url_rule(rule, endpoint, view_func, **options):
-    if endpoint in app.view_functions:
-        try:
-            current_app.logger.info("Endpoint já existe, ignorando: %s", endpoint)
-        except Exception:
-            pass
-        return
-    app.add_url_rule(rule, endpoint=endpoint, view_func=view_func, **options)
-
-# extrai corpo onde quer que esteja
-def _corpo_do_aviso_rest(a: Aviso) -> str:
-    for k in ("corpo_html","html","conteudo_html","mensagem_html","descricao_html","texto_html",
-              "corpo","conteudo","mensagem","descricao","texto","resumo","body","content"):
-        v = getattr(a, k, None)
-        if isinstance(v, str) and v.strip():
-            return v
-    return ""
-
-# ---------- VIEWS (decoradas com role_required), registradas via safe_add_url_rule ----------
-
+@app.get("/portal/restaurante/avisos")
 @role_required("restaurante")
-def _portal_restaurante_avisos():
-    """
-    Lista avisos visíveis ao restaurante atual e mostra quais já foram lidos.
-    """
+def portal_restaurante_avisos():
     u_id = session.get("user_id")
     rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
 
-    # Preferir helper oficial (respeita ativo/janelas/associação)
+    # avisos aplicáveis
     try:
         avisos_db = get_avisos_for_restaurante(rest)
     except NameError:
+        # fallback: global + restaurante (associados ou broadcast)
         avisos_db = (Aviso.query
                      .filter(Aviso.ativo.is_(True))
                      .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
@@ -5752,51 +4970,34 @@ def _portal_restaurante_avisos():
         .filter(AvisoLeitura.restaurante_id == rest.id).all()
     }
 
+    def corpo_do_aviso(a: Aviso) -> str:
+        for k in ("corpo_html","html","conteudo_html","mensagem_html","descricao_html","texto_html",
+                  "corpo","conteudo","mensagem","descricao","texto","resumo","body","content"):
+            v = getattr(a, k, None)
+            if isinstance(v, str) and v.strip():
+                return v
+        return ""
+
     avisos = [{
         "id": a.id,
         "titulo": a.titulo or "Aviso",
         "criado_em": a.criado_em,
         "lido": (a.id in lidos_ids),
         "prioridade_alta": (str(a.prioridade or "").lower() == "alta"),
-        "corpo_html": _corpo_do_aviso_rest(a),
+        "corpo_html": corpo_do_aviso(a),
     } for a in avisos_db]
 
     avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
     return render_template(
-        "portal_restaurante_avisos.html",
+        "portal_restaurante_avisos.html",   # crie/clone seu template
         avisos=avisos,
         avisos_nao_lidos_count=avisos_nao_lidos_count,
         current_year=datetime.now().year,
     )
 
+@app.post("/avisos-restaurante/marcar-todos", endpoint="marcar_todos_avisos_lidos_restaurante")
 @role_required("restaurante")
-def _rest_marcar_aviso_lido(aviso_id: int):
-    """
-    Marca um único aviso como lido (idempotente).
-    """
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-    Aviso.query.get_or_404(aviso_id)
-
-    ja = (AvisoLeitura.query
-          .filter_by(restaurante_id=rest.id, aviso_id=aviso_id)
-          .first())
-    if not ja:
-        db.session.add(AvisoLeitura(
-            restaurante_id=rest.id,
-            aviso_id=aviso_id,
-            lido_em=datetime.utcnow()
-        ))
-        db.session.commit()
-
-    flash("Aviso marcado como lido.", "success")
-    return redirect(url_for("portal_restaurante_avisos"))
-
-@role_required("restaurante")
-def _rest_marcar_todos_avisos_lidos():
-    """
-    Marca todos os avisos visíveis ao restaurante atual como lidos (idempotente).
-    """
+def marcar_todos_avisos_lidos_restaurante():
     u_id = session.get("user_id")
     rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
 
@@ -5814,36 +5015,13 @@ def _rest_marcar_todos_avisos_lidos():
     }
 
     now = datetime.utcnow()
-    novos = [AvisoLeitura(restaurante_id=rest.id, aviso_id=a.id, lido_em=now)
-             for a in avisos if a.id not in lidos_ids]
-    if novos:
-        db.session.bulk_save_objects(novos)
-        db.session.commit()
-
-    flash("Todos os avisos foram marcados como lidos.", "success")
+    for a in avisos:
+        if a.id not in lidos_ids:
+            db.session.add(AvisoLeitura(
+                restaurante_id=rest.id, aviso_id=a.id, lido_em=now
+            ))
+    db.session.commit()
     return redirect(url_for("portal_restaurante_avisos"))
-
-# ---------- Registro idempotente das rotas ----------
-safe_add_url_rule(
-    "/portal/restaurante/avisos",
-    endpoint="portal_restaurante_avisos",
-    view_func=_portal_restaurante_avisos,
-    methods=["GET"],
-)
-
-safe_add_url_rule(
-    "/portal/restaurante/avisos/<int:aviso_id>/marcar-lido",
-    endpoint="rest_marcar_aviso_lido",
-    view_func=_rest_marcar_aviso_lido,
-    methods=["POST"],
-)
-
-safe_add_url_rule(
-    "/portal/restaurante/avisos/marcar-todos",
-    endpoint="rest_marcar_todos_avisos_lidos",
-    view_func=_rest_marcar_todos_avisos_lidos,
-    methods=["POST"],
-)
 
 # =========================
 # Main
@@ -5852,4 +5030,5 @@ if __name__ == "__main__":
     with app.app_context():
         init_db()
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-    
+
+
