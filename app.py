@@ -5030,24 +5030,35 @@ def portal_restaurante_avisos():
         unread=unread,
     )
 
-# Marcar um único aviso como lido
+# =========================
+# AVISOS — Portal Restaurante
+# =========================
+
+# Marcar um único aviso como lido (OFICIAL)
 @app.post("/portal/restaurante/avisos/<int:aviso_id>/marcar-lido", endpoint="marcar_aviso_lido")
 @role_required("restaurante")
 def marcar_aviso_lido(aviso_id: int):
     u_id = session.get("user_id")
     rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-    # evita duplicar
+
+    # evita duplicar leitura
     ja = (AvisoLeitura.query
           .filter_by(restaurante_id=rest.id, aviso_id=aviso_id)
           .first())
     if not ja:
-        db.session.add(AvisoLeitura(restaurante_id=rest.id, aviso_id=aviso_id, lido_em=datetime.utcnow()))
+        db.session.add(AvisoLeitura(
+            restaurante_id=rest.id,
+            aviso_id=aviso_id,
+            lido_em=datetime.utcnow()
+        ))
         db.session.commit()
-    # volta para a aba avisos
+
     flash("Aviso marcado como lido.", "success")
+    # permanece na aba 'avisos'
     return redirect(url_for("portal_restaurante", view="avisos"))
 
-# Marcar todos os avisos como lidos (endpoint oficial usado no template)
+
+# Marcar todos como lidos (OFICIAL)
 @app.post("/portal/restaurante/avisos/marcar-todos", endpoint="marcar_todos_avisos_lidos")
 @role_required("restaurante")
 def marcar_todos_avisos_lidos():
@@ -5062,6 +5073,7 @@ def marcar_todos_avisos_lidos():
                   .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
                   .all())
 
+    # já lidos
     lidos_ids = {
         a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
         .filter(AvisoLeitura.restaurante_id == rest.id).all()
@@ -5071,11 +5083,36 @@ def marcar_todos_avisos_lidos():
     for a in avisos:
         if a.id not in lidos_ids:
             db.session.add(AvisoLeitura(
-                restaurante_id=rest.id, aviso_id=a.id, lido_em=now
+                restaurante_id=rest.id,
+                aviso_id=a.id,
+                lido_em=now
             ))
     db.session.commit()
+
     flash("Todos os avisos foram marcados como lidos.", "success")
     return redirect(url_for("portal_restaurante", view="avisos"))
+
+
+# -------------------------
+# ALIASES DE COMPATIBILIDADE (LEGADOS)
+# -------------------------
+# Se existir template antigo chamando url_for('marcar_aviso_lido') em /avisos/<id>/lido
+# NÃO reutilize o mesmo endpoint (evita o AssertionError). Use outro nome de endpoint.
+@app.post("/avisos/<int:aviso_id>/lido", endpoint="marcar_aviso_lido_legacy")
+@role_required("restaurante")
+def marcar_aviso_lido_legacy(aviso_id: int):
+    # delega para a rota oficial
+    return marcar_aviso_lido(aviso_id)
+
+
+# Alguns templates antigos podem usar url_for('marcar_todos_lidos').
+# Criamos um alias com ESSE endpoint para não quebrar:
+@app.post("/avisos/marcar-todos", endpoint="marcar_todos_lidos")
+@role_required("restaurante")
+def marcar_todos_lidos_legacy():
+    # delega para a rota oficial
+    return marcar_todos_avisos_lidos()
+
 
 
 # =========================
