@@ -4270,7 +4270,7 @@ def editar_documentos(coop_id):
     # Fallback HTML inline (caso o template não exista no servidor)
     return f"""
     <div style="max-width:560px;margin:30px auto;font-family:Arial">
-      <h3>Documentos — {c.nome}</h3>
+      return f"<h3>Documentos — {c.nome}</h3>"
       <form method="POST">
         <label>CNH (número)</label><br>
         <input name="cnh_numero" value="{c.cnh_numero or ''}" style="width:100%;padding:8px"><br><br>
