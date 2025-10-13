@@ -5151,9 +5151,6 @@ def lancar_producao():
     # mantém a aba atual (se acionou do 'lancar', volta pro 'lancamentos' naturalmente pelo hidden 'view')
     return redirect_portal_restaurante(default_view="lancamentos")
 
-# =========================
-# EDITAR / EXCLUIR LANÇAMENTO (excluir remove avaliações vinculadas)
-# =========================
 @app.route("/lancamentos/<int:id>/editar", methods=["GET", "POST"])
 @role_required("restaurante")
 def editar_lancamento(id):
@@ -5172,7 +5169,8 @@ def editar_lancamento(id):
         l.qtd_entregas = f.get("qtd_entregas", type=int)
         db.session.commit()
         flash("Lançamento atualizado.", "success")
-        return redirect_portal_restaurante(default_view="lancamentos")
+        return redirect(url_for("portal_restaurante", view="lancamentos",
+                                data_inicio=(l.data and l.data.strftime("%Y-%m-%d"))))
 
     return render_template("editar_lancamento.html", lanc=l)
 
@@ -5185,21 +5183,12 @@ def excluir_lancamento(id):
     if not rest or l.restaurante_id != rest.id:
         abort(403)
 
-    try:
-        # 1) apaga avaliações vinculadas ao lançamento
-        AvaliacaoCooperado.query.filter_by(lancamento_id=l.id).delete(synchronize_session=False)
-        # 2) apaga o lançamento
-        db.session.delete(l)
-        db.session.commit()
-        flash("Lançamento e avaliações vinculadas excluídos.", "success")
-    except IntegrityError:
-        db.session.rollback()
-        flash("Não foi possível excluir por vínculos de integridade. Tente novamente ou verifique constraints.", "danger")
-    except OperationalError:
-        db.session.rollback()
-        flash("Falha de conexão com o banco ao excluir. Tente novamente.", "warning")
-
-    return redirect_portal_restaurante(default_view="lancamentos")
+    db.session.execute(sa_delete(AvaliacaoCooperado).where(AvaliacaoCooperado.lancamento_id == id))
+    db.session.execute(sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.lancamento_id == id))
+    db.session.delete(l)
+    db.session.commit()
+    flash("Lançamento excluído.", "success")
+    return redirect(url_for("portal_restaurante", view="lancamentos"))
 
 # ---------------------------------------------------------------------------
 # Admin: listar / upload / delete
