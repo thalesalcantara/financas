@@ -5077,11 +5077,6 @@ def marcar_todos_avisos_lidos():
     flash("Todos os avisos foram marcados como lidos.", "success")
     return redirect(url_for("portal_restaurante", view="avisos"))
 
-# Alias retrocompatível (alguns templates antigos usavam 'marcar_todos_lidos')
-@app.post("/portal/restaurante/avisos/marcar-todos-lidos", endpoint="marcar_todos_lidos")
-@role_required("restaurante")
-def marcar_todos_lidos_alias():
-    return marcar_todos_avisos_lidos()
 
 # =========================
 # LANÇAR PRODUÇÃO — aceita ambos os caminhos (corrige 404)
