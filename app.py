@@ -4856,7 +4856,7 @@ def portal_restaurante():
                 "cooperado_nome": nome_fallback or None,
                 "nome_planilha": nome_show,
                 "turno": (e.turno or "").strip(),
-                "horario": (e.horario ou "").strip(),
+                "horario": (e.horario or "").strip(),
                 "contrato": contrato_eff,
                 "cor": (e.cor or "").strip(),
             })
