@@ -4673,7 +4673,43 @@ def recusar_troca(troca_id):
     return redirect(url_for("portal_cooperado"))
 
 # =========================
-# PORTAL RESTAURANTE
+# PORTAL RESTAURANTE (com Avisos)
+# =========================
+
+# --- Helpers de Avisos (restaurante) ---------------------------------------
+def _fetch_avisos_for_restaurante(rest):
+    """
+    Busca os avisos que se aplicam ao restaurante.
+    Se já existir um helper no projeto (ex.: get_avisos_for_restaurante),
+    usamos ele; caso contrário, caímos no fallback (todos, mais recentes primeiro).
+    """
+    try:
+        # usa helper do projeto se existir
+        return get_avisos_for_restaurante(rest)  # type: ignore[name-defined]
+    except NameError:
+        # fallback simples (ajuste se tiver segmentação por destino/categoria)
+        return Aviso.query.order_by(Aviso.enviado_em.desc()).all()
+
+def _count_unread_for_restaurante(rest) -> int:
+    """
+    Conta quantos avisos ainda não foram marcados como lidos pelo restaurante.
+    Considera só avisos que efetivamente se aplicam ao restaurante.
+    """
+    avisos = _fetch_avisos_for_restaurante(rest)
+    if not avisos:
+        return 0
+    ids = [a.id for a in avisos]
+    lidos = {
+        r.aviso_id
+        for r in AvisoLeitura.query
+            .filter(AvisoLeitura.restaurante_id == rest.id,
+                    AvisoLeitura.aviso_id.in_(ids))
+            .all()
+    }
+    return sum(1 for aid in ids if aid not in lidos)
+
+# =========================
+# PORTAL
 # =========================
 @app.route("/portal/restaurante")
 @role_required("restaurante")
@@ -4683,12 +4719,43 @@ def portal_restaurante():
     if not rest:
         return "<p style='font-family:Arial;margin:40px'>Seu usuário não está vinculado a um estabelecimento. Avise o administrador.</p>"
 
-    view = request.args.get("view", "lancar")  # 'lancar' ou 'escalas'
+    # Abas/visões: 'lancar', 'escalas', 'lancamentos', 'config', 'avisos'
+    view = (request.args.get("view", "lancar") or "lancar").strip().lower()
 
-    # -------------------- LANÇAMENTOS --------------------
+    # ---- helper mês YYYY-MM (opcional)
+    import re
+    def _parse_yyyy_mm_local(s: str):
+        if not s:
+            return None, None
+        m = re.fullmatch(r"(\d{4})-(\d{2})", s.strip())
+        if not m:
+            return None, None
+        y = int(m.group(1)); mth = int(m.group(2))
+        try:
+            di_ = date(y, mth, 1)
+            if mth == 12:
+                df_ = date(y + 1, 1, 1) - timedelta(days=1)
+            else:
+                df_ = date(y, mth + 1, 1) - timedelta(days=1)
+            return di_, df_
+        except Exception:
+            return None, None
+
+    # -------------------- LANÇAMENTOS (totais por período) --------------------
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
+
+    # Filtro por mês (?mes=YYYY-MM) — opcional
+    mes = (request.args.get("mes") or "").strip()
+    periodo_desc = None
+    if mes:
+        di_mes, df_mes = _parse_yyyy_mm_local(mes)
+        if di_mes and df_mes:
+            di, df = di_mes, df_mes
+            periodo_desc = "mês"
+
     if not di or not df:
+        # Sem filtro => janela semanal baseada no período do restaurante
         wd_map = {"seg-dom": 0, "sab-sex": 5, "sex-qui": 4}  # seg=0 ... dom=6
         start_wd = wd_map.get(rest.periodo, 0)
         hoje = date.today()
@@ -4697,9 +4764,9 @@ def portal_restaurante():
         df_auto = di_auto + timedelta(days=6)
         di = di or di_auto
         df = df or df_auto
-        periodo_desc = rest.periodo
+        periodo_desc = periodo_desc or rest.periodo
     else:
-        periodo_desc = "personalizado"
+        periodo_desc = periodo_desc or "personalizado"
 
     cooperados = Cooperado.query.order_by(Cooperado.nome).all()
 
@@ -4739,18 +4806,17 @@ def portal_restaurante():
     escalas_all = Escala.query.order_by(Escala.id.asc()).all()
     eff_map = _carry_forward_contrato(escalas_all)
 
-    # AJUSTE: incluir restaurante_id no filtro da escala (prioridade),
-    # além do match por nome de contrato.
+    # prioridade: restaurante_id bate, senão por nome (contrato)
     escalas_rest = [
         e for e in escalas_all
-        if (e.restaurante_id == rest.id)  # <- bateu pelo ID do restaurante
-        or contrato_bate_restaurante(eff_map.get(e.id, e.contrato or ""), rest.nome)  # <- bateu pelo nome
+        if (getattr(e, "restaurante_id", None) == rest.id)
+        or contrato_bate_restaurante(eff_map.get(e.id, e.contrato or ""), rest.nome)
     ]
     if not escalas_rest:
         escalas_rest = [e for e in escalas_all if (e.contrato or "").strip() == rest.nome.strip()]
 
     agenda = {d: [] for d in dias_list}
-    seen = {d: set() for d in dias_list}  # evita duplicar (mesmo nome/turno/horario/contrato no mesmo dia)
+    seen = {d: set() for d in dias_list}  # evita duplicar
 
     for e in escalas_rest:
         dt = _parse_data_escala_str(e.data)       # date | None
@@ -4765,7 +4831,6 @@ def portal_restaurante():
             nome_show = (coop.nome if coop else nome_fallback) or "—"
             contrato_eff = (eff_map.get(e.id, e.contrato or "") or "").strip()
 
-            # chave de dedupe por dia
             key = (
                 (coop.id if coop else _norm(nome_show)),
                 _norm(e.turno),
@@ -4788,15 +4853,81 @@ def portal_restaurante():
             break
 
     for d in dias_list:
-        agenda[d].sort(key=lambda x: ((x["contrato"] or "").lower(),
-                                      (x.get("nome_planilha") or (x["coop"].nome if x["coop"] else "")).lower()))
+        agenda[d].sort(
+            key=lambda x: (
+                (x["contrato"] or "").lower(),
+                (x.get("nome_planilha") or (x["coop"].nome if x["coop"] else "")).lower()
+            )
+        )
 
+    # -------------------- Lista de lançamentos (aba "lancamentos") --------------------
+    lancamentos_periodo = []
+    total_lanc_valor = 0.0
+    total_lanc_entregas = 0
+
+    if view == "lancamentos":
+        q = (
+            db.session.query(Lancamento, Cooperado)
+            .join(Cooperado, Cooperado.id == Lancamento.cooperado_id)
+            .filter(
+                Lancamento.restaurante_id == rest.id,
+                Lancamento.data >= di,
+                Lancamento.data <= df,
+            )
+            .order_by(Lancamento.data.asc(), Lancamento.id.asc())
+        )
+        for lanc, coop in q.all():
+            item = {
+                "id": lanc.id,
+                "data": lanc.data.strftime("%d/%m/%Y") if lanc.data else "",
+                "hora_inicio": (lanc.hora_inicio if isinstance(lanc.hora_inicio, str)
+                                else (lanc.hora_inicio.strftime("%H:%M") if lanc.hora_inicio else "")),
+                "hora_fim": (lanc.hora_fim if isinstance(lanc.hora_fim, str)
+                             else (lanc.hora_fim.strftime("%H:%M") if lanc.hora_fim else "")),
+                "qtd_entregas": lanc.qtd_entregas or 0,
+                "valor": float(lanc.valor or 0.0),  # já em R$
+                "cooperado_id": coop.id,
+                "cooperado_nome": coop.nome,
+                "contrato_nome": rest.nome,
+            }
+            lancamentos_periodo.append(item)
+
+        total_lanc_valor = sum(x["valor"] for x in lancamentos_periodo)
+        total_lanc_entregas = sum(x["qtd_entregas"] for x in lancamentos_periodo)
+
+    # -------------------- Avisos (aba "avisos") --------------------
+    avisos = []
+    avisos_nao_lidos_count = 0
+    current_year = datetime.now().year
+    if view == "avisos":
+        avisos = _fetch_avisos_for_restaurante(rest)
+        lidos_ids = {r.aviso_id for r in AvisoLeitura.query.filter_by(restaurante_id=rest.id).all()}
+        for a in avisos:
+            a.lido = (a.id in lidos_ids)
+        avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
+
+    # >>> Contador geral de não lidos para TOAST/SOM no layout
+    unread = _count_unread_for_restaurante(rest)
+
+    # ---- URLs/flags para template
+    from werkzeug.routing import BuildError
+    try:
+        # Se existir endpoint app-level abaixo, ok:
+        url_lancar_producao = url_for("lancar_producao")
+    except BuildError:
+        # Fallback correto COM /portal/:
+        url_lancar_producao = "/portal/restaurante/lancar_producao"
+
+    has_editar_lanc = ("editar_lancamento" in app.view_functions)
+
+    # -------------------- Render --------------------
     return render_template(
         "restaurante_dashboard.html",
         rest=rest,
         cooperados=cooperados,
         filtro_inicio=di,
         filtro_fim=df,
+        filtro_mes=(mes or ""),
         periodo_desc=periodo_desc,
         total_bruto=total_bruto,
         total_inss=total_inss,
@@ -4808,9 +4939,24 @@ def portal_restaurante():
         dias_list=dias_list,
         ref_data=ref,
         modo=modo,
+        lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
+        total_lanc_valor=total_lanc_valor,
+        total_lanc_entregas=total_lanc_entregas,
+        # Avisos / Toast
+        avisos=(avisos if view == "avisos" else []),
+        avisos_nao_lidos_count=avisos_nao_lidos_count,
+        current_year=current_year,
+        unread=unread,
+        # URLs/flags
+        url_lancar_producao=url_lancar_producao,
+        has_editar_lanc=has_editar_lanc,
     )
 
-@app.post("/restaurante/lancar_producao")
+# =========================
+# LANÇAR PRODUÇÃO — aceita ambos os caminhos (corrige 404)
+# =========================
+@app.route("/portal/restaurante/lancar_producao", methods=["POST"])
+@app.route("/restaurante/lancar_producao", methods=["POST"])
 @role_required("restaurante")
 def lancar_producao():
     u_id = session.get("user_id")
@@ -4833,7 +4979,7 @@ def lancar_producao():
     db.session.add(l)
     db.session.flush()  # garante l.id para amarrar avaliação
 
-    # 2) (OPCIONAL) lê os campos de avaliação se vieram do form
+    # 2) (opcional) avaliação — mantém seu fluxo
     g   = _clamp_star(f.get("av_geral"))
     p   = _clamp_star(f.get("av_pontualidade"))
     ed  = _clamp_star(f.get("av_educacao"))
@@ -4867,14 +5013,17 @@ def lancar_producao():
         )
         db.session.add(av)
 
-        # Alerta visível imediato (opcional)
         if crise:
             flash("⚠️ Avaliação crítica registrada (1★ + termo de risco). A gerência deve revisar.", "danger")
 
     db.session.commit()
     flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
-    return redirect(url_for("portal_restaurante"))
+    # redireciona para a aba 'lancamentos' para o usuário já ver o registro
+    return redirect(url_for("portal_restaurante", view="lancamentos"))
 
+# =========================
+# EDITAR / EXCLUIR LANÇAMENTO (mantidos)
+# =========================
 @app.route("/lancamentos/<int:id>/editar", methods=["GET", "POST"])
 @role_required("restaurante")
 def editar_lancamento(id):
@@ -4893,7 +5042,7 @@ def editar_lancamento(id):
         l.qtd_entregas = f.get("qtd_entregas", type=int)
         db.session.commit()
         flash("Lançamento atualizado.", "success")
-        return redirect(url_for("portal_restaurante"))
+        return redirect(url_for("portal_restaurante", view="lancamentos"))
 
     return render_template("editar_lancamento.html", lanc=l)
 
@@ -4908,21 +5057,6 @@ def excluir_lancamento(id):
     db.session.delete(l)
     db.session.commit()
     flash("Lançamento excluído.", "success")
-    return redirect(url_for("portal_restaurante"))
-
-
-# =========================
-# ROTA DO POST (app-level)
-# =========================
-@app.route("/portal/restaurante/lancar_producao", methods=["POST"])
-@role_required("restaurante")
-def lancar_producao():
-    # Exemplo mínimo: pegue dados do form e salve
-    # descricao = request.form.get("descricao")
-    # valor = request.form.get("valor")
-    # ... persistência ...
-    flash("Produção lançada com sucesso!", "success")
-    # Volta para a mesma página (pode direcionar para aba 'lancamentos' se preferir)
     return redirect(url_for("portal_restaurante", view="lancamentos"))
 
 # ---------------------------------------------------------------------------
