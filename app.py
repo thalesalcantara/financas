@@ -677,7 +677,6 @@ def init_db():
 
 # === Bootstrap do banco no start (Render/Gunicorn) ===
 try:
-    # Opcional: controle por variável de ambiente para evitar lentidão no boot
     if os.environ.get("INIT_DB_ON_START", "1") == "1":
         _t0 = datetime.utcnow()
         with app.app_context():
@@ -693,19 +692,7 @@ try:
             pass
 except Exception as e:
     try:
-        app.logger.warning(f"init_db pulado: {e}")
-    except Exception:
-        pass
-
-    else:
-        try:
-            app.logger.info("INIT_DB_ON_START=0: pulando init_db no boot.")
-        except Exception:
-            pass
-except Exception as e:
-    # Evita derrubar o serviço se a inicialização falhar por motivo não crítico
-    try:
-        app.logger.warning(f"init_db pulado: {e}")
+        app.logger.warning(f"Falha na init_db: {e}")
     except Exception:
         pass
 
@@ -4676,8 +4663,10 @@ def recusar_troca(troca_id):
 # PORTAL RESTAURANTE (com Avisos)
 # =========================
 from datetime import date, datetime, timedelta
+from urllib.parse import urlparse, parse_qs
 from flask import request, session, render_template, redirect, url_for, abort, flash
 from werkzeug.routing import BuildError
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 # Assumindo que já existem:
@@ -4688,17 +4677,44 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 #          _clamp_star, _media_ponderada, _analise_sentimento, _identifica_temas, _sinaliza_crise, _gerar_feedback
 # (e opcionalmente get_avisos_for_restaurante)
 
+# --- Helpers de navegação: manter a mesma aba após ações -------------------
+def _get_view_from_referrer():
+    ref = request.referrer
+    if not ref:
+        return None
+    try:
+        q = parse_qs(urlparse(ref).query)
+        v = (q.get("view", [None])[0] or "").strip().lower()
+        return v or None
+    except Exception:
+        return None
+
+def _resolve_portal_view(default_view="lancar"):
+    return (
+        (request.args.get("view") or "").strip().lower()
+        or (request.form.get("view") or "").strip().lower()
+        or _get_view_from_referrer()
+        or default_view
+    )
+
+def redirect_portal_restaurante(default_view="lancar"):
+    return redirect(url_for("portal_restaurante", view=_resolve_portal_view(default_view)))
+
 # --- Helpers de Avisos (restaurante) ---------------------------------------
 def _fetch_avisos_for_restaurante(rest):
     """
     Busca os avisos que se aplicam ao restaurante.
     Se já existir um helper no projeto (ex.: get_avisos_for_restaurante),
-    usamos ele; caso contrário, caímos no fallback (todos, mais recentes primeiro).
+    usamos ele; caso contrário, caímos no fallback (globais + restaurante).
     """
     try:
         return get_avisos_for_restaurante(rest)  # type: ignore[name-defined]
     except NameError:
-        return Aviso.query.order_by(Aviso.enviado_em.desc()).all()
+        return (Aviso.query
+                .filter(Aviso.ativo.is_(True))
+                .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
+                .order_by(Aviso.fixado.desc(), Aviso.criado_em.desc())
+                .all())
 
 def _count_unread_for_restaurante(rest) -> int:
     """
@@ -4856,7 +4872,7 @@ def portal_restaurante():
                 "cooperado_nome": nome_fallback or None,
                 "nome_planilha": nome_show,
                 "turno": (e.turno or "").strip(),
-                "horario": (e.horario or "").strip(),
+                "horario": (e.horario or "").strip(),   # <== corrige 'ou'->'or'
                 "contrato": contrato_eff,
                 "cor": (e.cor or "").strip(),
             })
@@ -4953,11 +4969,119 @@ def portal_restaurante():
         avisos=(avisos if view == "avisos" else []),
         avisos_nao_lidos_count=avisos_nao_lidos_count,
         current_year=current_year,
-        unread=unread,
+        unread=unread,  # <== usado no layout para o TOAST persistente
         # URLs/flags
         url_lancar_producao=url_lancar_producao,
         has_editar_lanc=has_editar_lanc,
     )
+
+# =========================
+# AVISOS (rotas do Portal Restaurante)
+# =========================
+@app.get("/portal/restaurante/avisos")
+@role_required("restaurante")
+def portal_restaurante_avisos():
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+
+    # avisos aplicáveis
+    try:
+        avisos_db = get_avisos_for_restaurante(rest)
+    except NameError:
+        avisos_db = (Aviso.query
+                     .filter(Aviso.ativo.is_(True))
+                     .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
+                     .order_by(Aviso.fixado.desc(), Aviso.criado_em.desc())
+                     .all())
+
+    # ids já lidos
+    lidos_ids = {
+        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
+        .filter(AvisoLeitura.restaurante_id == rest.id).all()
+    }
+
+    def corpo_do_aviso(a: Aviso) -> str:
+        for k in ("corpo_html","html","conteudo_html","mensagem_html","descricao_html","texto_html",
+                  "corpo","conteudo","mensagem","descricao","texto","resumo","body","content"):
+            v = getattr(a, k, None)
+            if isinstance(v, str) and v.strip():
+                return v
+        return ""
+
+    avisos = [{
+        "id": a.id,
+        "titulo": a.titulo or "Aviso",
+        "criado_em": a.criado_em,
+        "lido": (a.id in lidos_ids),
+        "prioridade_alta": (str(a.prioridade or "").lower() == "alta"),
+        "corpo_html": corpo_do_aviso(a),
+    } for a in avisos_db]
+
+    avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
+
+    # contador geral para o TOAST persistente no layout
+    unread = _count_unread_for_restaurante(rest)
+
+    return render_template(
+        "portal_restaurante_avisos.html",
+        avisos=avisos,
+        avisos_nao_lidos_count=avisos_nao_lidos_count,
+        current_year=datetime.now().year,
+        unread=unread,
+    )
+
+# Marcar um único aviso como lido
+@app.post("/portal/restaurante/avisos/<int:aviso_id>/marcar-lido", endpoint="marcar_aviso_lido")
+@role_required("restaurante")
+def marcar_aviso_lido(aviso_id: int):
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+    # evita duplicar
+    ja = (AvisoLeitura.query
+          .filter_by(restaurante_id=rest.id, aviso_id=aviso_id)
+          .first())
+    if not ja:
+        db.session.add(AvisoLeitura(restaurante_id=rest.id, aviso_id=aviso_id, lido_em=datetime.utcnow()))
+        db.session.commit()
+    # volta para a aba avisos
+    flash("Aviso marcado como lido.", "success")
+    return redirect(url_for("portal_restaurante", view="avisos"))
+
+# Marcar todos os avisos como lidos (endpoint oficial usado no template)
+@app.post("/portal/restaurante/avisos/marcar-todos", endpoint="marcar_todos_avisos_lidos")
+@role_required("restaurante")
+def marcar_todos_avisos_lidos():
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+
+    try:
+        avisos = get_avisos_for_restaurante(rest)
+    except NameError:
+        avisos = (Aviso.query
+                  .filter(Aviso.ativo.is_(True))
+                  .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
+                  .all())
+
+    lidos_ids = {
+        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
+        .filter(AvisoLeitura.restaurante_id == rest.id).all()
+    }
+
+    now = datetime.utcnow()
+    for a in avisos:
+        if a.id not in lidos_ids:
+            db.session.add(AvisoLeitura(
+                restaurante_id=rest.id, aviso_id=a.id, lido_em=now
+            ))
+    db.session.commit()
+    flash("Todos os avisos foram marcados como lidos.", "success")
+    return redirect(url_for("portal_restaurante", view="avisos"))
+
+# Alias retrocompatível (alguns templates antigos usavam 'marcar_todos_lidos')
+@app.post("/portal/restaurante/avisos/marcar-todos-lidos", endpoint="marcar_todos_lidos")
+@role_required("restaurante")
+def marcar_todos_lidos_alias():
+    return marcar_todos_avisos_lidos()
 
 # =========================
 # LANÇAR PRODUÇÃO — aceita ambos os caminhos (corrige 404)
@@ -5024,7 +5148,8 @@ def lancar_producao():
 
     db.session.commit()
     flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
-    return redirect(url_for("portal_restaurante", view="lancamentos"))
+    # mantém a aba atual (se acionou do 'lancar', volta pro 'lancamentos' naturalmente pelo hidden 'view')
+    return redirect_portal_restaurante(default_view="lancamentos")
 
 # =========================
 # EDITAR / EXCLUIR LANÇAMENTO (excluir remove avaliações vinculadas)
@@ -5047,7 +5172,7 @@ def editar_lancamento(id):
         l.qtd_entregas = f.get("qtd_entregas", type=int)
         db.session.commit()
         flash("Lançamento atualizado.", "success")
-        return redirect(url_for("portal_restaurante", view="lancamentos"))
+        return redirect_portal_restaurante(default_view="lancamentos")
 
     return render_template("editar_lancamento.html", lanc=l)
 
@@ -5074,7 +5199,7 @@ def excluir_lancamento(id):
         db.session.rollback()
         flash("Falha de conexão com o banco ao excluir. Tente novamente.", "warning")
 
-    return redirect(url_for("portal_restaurante", view="lancamentos"))
+    return redirect_portal_restaurante(default_view="lancamentos")
 
 # ---------------------------------------------------------------------------
 # Admin: listar / upload / delete
