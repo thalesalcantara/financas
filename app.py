@@ -4183,6 +4183,12 @@ def marcar_todos_avisos_lidos_restaurante():
             ))
     db.session.commit()
     return redirect(url_for("portal_restaurante_avisos"))
+
+@app.post("/portal/restaurante/avisos/<int:aviso_id>/desmarcar", endpoint="desmarcar_aviso_lido")
+def desmarcar_aviso_lido(aviso_id):
+    # TODO: sua lógica pra desmarcar como lido
+    # ...
+    return redirect(url_for("portal_restaurante_avisos"))
     
 @app.route("/portal/restaurante")
 @role_required("restaurante")
@@ -5008,89 +5014,6 @@ def marcar_todos_avisos_lidos():
 
     db.session.commit()
     return redirect(url_for("portal_cooperado_avisos"))
-
-@app.get("/portal/restaurante/avisos")
-@role_required("restaurante")
-def portal_restaurante_avisos():
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-
-    # avisos aplicáveis
-    try:
-        avisos_db = get_avisos_for_restaurante(rest)
-    except NameError:
-        # fallback: global + restaurante (associados ou broadcast)
-        avisos_db = (Aviso.query
-                     .filter(Aviso.ativo.is_(True))
-                     .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
-                     .order_by(Aviso.fixado.desc(), Aviso.criado_em.desc())
-                     .all())
-
-    # ids já lidos
-    lidos_ids = {
-        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
-        .filter(AvisoLeitura.restaurante_id == rest.id).all()
-    }
-
-    def corpo_do_aviso(a: Aviso) -> str:
-        for k in ("corpo_html","html","conteudo_html","mensagem_html","descricao_html","texto_html",
-                  "corpo","conteudo","mensagem","descricao","texto","resumo","body","content"):
-            v = getattr(a, k, None)
-            if isinstance(v, str) and v.strip():
-                return v
-        return ""
-
-    avisos = [{
-        "id": a.id,
-        "titulo": a.titulo or "Aviso",
-        "criado_em": a.criado_em,
-        "lido": (a.id in lidos_ids),
-        "prioridade_alta": (str(a.prioridade or "").lower() == "alta"),
-        "corpo_html": corpo_do_aviso(a),
-    } for a in avisos_db]
-
-    avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
-    return render_template(
-        "portal_restaurante_avisos.html",   # crie/clone seu template
-        avisos=avisos,
-        avisos_nao_lidos_count=avisos_nao_lidos_count,
-        current_year=datetime.now().year,
-    )
-
-@app.post("/avisos-restaurante/marcar-todos", endpoint="marcar_todos_avisos_lidos_restaurante")
-@role_required("restaurante")
-def marcar_todos_avisos_lidos_restaurante():
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-
-    try:
-        avisos = get_avisos_for_restaurante(rest)
-    except NameError:
-        avisos = (Aviso.query
-                  .filter(Aviso.ativo.is_(True))
-                  .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
-                  .all())
-
-    lidos_ids = {
-        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
-        .filter(AvisoLeitura.restaurante_id == rest.id).all()
-    }
-
-    now = datetime.utcnow()
-    for a in avisos:
-        if a.id not in lidos_ids:
-            db.session.add(AvisoLeitura(
-                restaurante_id=rest.id, aviso_id=a.id, lido_em=now
-            ))
-    db.session.commit()
-    return redirect(url_for("portal_restaurante_avisos"))
-
-@app.post("/portal/restaurante/avisos/<int:aviso_id>/desmarcar", endpoint="desmarcar_aviso_lido")
-def desmarcar_aviso_lido(aviso_id):
-    # TODO: sua lógica pra desmarcar como lido
-    # ...
-    return redirect(url_for("portal_restaurante_avisos"))
-
 
 # =========================
 # Main
