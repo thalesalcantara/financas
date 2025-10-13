@@ -145,54 +145,34 @@
       .notes-editor{height:calc(60vh - 190px)}
     }
 
-    /* ===== BLOQUEIO DE CAPTURA/IMPRESSÃO (overlay) ===== */
-    #wmOverlay{
-  position: fixed; inset: 0; pointer-events: none; z-index: 9999;
-}
-#wmOverlay .wm{
-  position: absolute; inset: 0;
-  display: grid; place-items: center;
-  opacity: .10;           /* ajuste a intensidade */
-  font: 700 42px/1.1 'Roboto', sans-serif;
-  color: #000;
-  user-select: none;
-  transform: rotate(-25deg);
-  white-space: nowrap;
-  /* “mosaico” diagonal */
-  background-image:
-    repeating-linear-gradient( 45deg, transparent 0 120px, rgba(0,0,0,.08) 120px 121px ),
-    repeating-linear-gradient(-45deg, transparent 0 120px, rgba(0,0,0,.08) 120px 121px );
+    /* ——— Só na impressão ——— */
+@media print {
+  /* embaça a página toda */
+  body {
+    -webkit-filter: blur(6px) saturate(0.7) brightness(1.05);
+            filter: blur(6px) saturate(0.7) brightness(1.05);
+  }
+
+  /* limpa sombras/efeitos que atrapalham o raster do print */
+  * {
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+
+  /* (opcional) esconde coisas que não precisa imprimir */
+  .no-print,
+  .navbar,
+  #menuLateral,
+  #fundoMenu,
+  .offcanvas,
+  .modal,
+  .toast { display: none !important; }
 }
 
-/* Overlay anti-captura */
-#ssBlock{
-  position: fixed; inset: 0;
-  display: none;                 /* começa oculto */
-  align-items: center; justify-content: center;
-  background: rgba(0,0,0,.75);   /* fundo escuro */
-  z-index: 99999;                /* acima de tudo */
-}
-#ssBlock.show{ display: flex; }  /* aparece quando JS adiciona .show */
-
-#ssBlock .box{
-  text-align: center;
-  color: #fff;
-  max-width: 90vw;
-  padding: 24px;
-  border-radius: 16px;
-  background: rgba(255,255,255,.06);
-  backdrop-filter: blur(6px);
-  box-shadow: 0 8px 30px rgba(0,0,0,.35);
-}
-#ssBlock .box img{
-  width: 96px; height: 96px; object-fit: contain;
-  margin-bottom: 12px;
-}
-#ssBlock .box h2{
-  font-size: 1.25rem; line-height: 1.35; margin: 0 0 6px 0;
-}
-#ssBlock .box .brand{
-  font-weight: 700; letter-spacing: .02em; opacity: .85;
+/* fallback para navegadores que disparam before/afterprint mas ignoram @media print */
+html.printing body {
+  -webkit-filter: blur(6px) saturate(0.7) brightness(1.05);
+          filter: blur(6px) saturate(0.7) brightness(1.05);
 }
   </style>
 </head>
@@ -2271,62 +2251,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
       calc(); renderHist();
     })();
-    </script>
+</script>
 
-  <!-- WATERMARK -->
-  <div id="wmOverlay" aria-hidden="true">
-    <div class="wm">
-      {{ cooperado.nome }} — {{ cooperado.id }} — {{ current_year }}
-    </div>
-  </div>
-  
-    <!-- ===== Overlay anti-captura (fica ANTES do </body>) ===== -->
-  <div id="ssBlock" aria-hidden="true">
-    <div class="box">
-      <img src="{{ url_for('static', filename='img/kratos-logo.png') }}" alt="Kratos System">
-      <h2>Por questões de privacidade,<br> a captura de tela foi bloqueada.</h2>
-      <div class="brand">Kratos System</div>
-    </div>
-  </div>
-
-  <!-- Script do overlay (também ANTES do </body>) -->
- <script>
-(function(){
-  const overlay = document.getElementById('ssBlock');
-
-  function showOverlay() {
-    overlay.classList.add('show');
-  }
-  function hideOverlay() {
-    overlay.classList.remove('show');
-  }
-
-  // Bloqueia Ctrl/Cmd + P (abrevia a “impressão” via atalho)
-  document.addEventListener('keydown', (ev) => {
-    const isCmdP = (ev.key.toLowerCase() === 'p') && (ev.ctrlKey || ev.metaKey);
-    if (isCmdP) {
-      ev.preventDefault();
-      showOverlay();
-      // opcional: mostre um aviso
-      // alert('Impressão desabilitada por política de privacidade.');
-    }
-    // PrintScreen -> mostra overlay e tenta sobrescrever clipboard
-    if (ev.key === 'PrintScreen') {
-      showOverlay();
-      setTimeout(hideOverlay, 4000);
-      try { navigator.clipboard.writeText('Captura bloqueada por privacidade — Kratos System'); } catch(_) {}
-    }
+  <script>
+  // garante que o efeito só exista durante o diálogo/ato de impressão
+  window.addEventListener('beforeprint', () => {
+    document.documentElement.classList.add('printing');
   });
-
-  // Garante que somente o overlay aparece em impressão
-  window.addEventListener('beforeprint', showOverlay);
-  window.addEventListener('afterprint',  hideOverlay);
-
-  // Extra: se a aba voltar ao foco, tira o overlay
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') hideOverlay();
+  window.addEventListener('afterprint', () => {
+    document.documentElement.classList.remove('printing');
   });
-})();
 </script>
 </body>
 </html>
