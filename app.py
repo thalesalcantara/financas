@@ -2598,30 +2598,6 @@ def marcar_aviso_lido_universal(aviso_id: int):
 
     return ("", 403) if request.method == "POST" else redirect(url_for("login"))
 
-# Excluir aviso (limpando relações)
-@app.route("/admin/avisos/<int:aviso_id>/excluir", methods=["POST"], endpoint="admin_avisos_excluir")
-@admin_required
-def admin_avisos_excluir(aviso_id):
-    a = Aviso.query.get_or_404(aviso_id)
-
-    # apaga confirmações/leitorias
-    try:
-        AvisoLeitura.query.filter_by(aviso_id=aviso_id).delete(synchronize_session=False)
-    except Exception:
-        pass
-
-    # limpa M2M com restaurantes, se existir
-    try:
-        if hasattr(a, "restaurantes"):
-            a.restaurantes.clear()
-    except Exception:
-        pass
-
-    db.session.delete(a)
-    db.session.commit()
-    flash("Aviso excluído.", "success")
-    return redirect(url_for("admin_avisos"))
-
 
 # Marcar aviso como lido (funciona com GET e POST)
 @app.route("/avisos/<int:aviso_id>/lido", methods=["POST", "GET"])
