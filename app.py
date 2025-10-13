@@ -4971,31 +4971,217 @@ def portal_restaurante():
         total_lanc_valor = sum(x["valor"] for x in lancamentos_periodo)
         total_lanc_entregas = sum(x["qtd_entregas"] for x in lancamentos_periodo)
 
+    # =========================
+# PORTAL RESTAURANTE
+# =========================
+@app.route("/portal/restaurante")
+@role_required("restaurante")
+def portal_restaurante():
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first()
+    if not rest:
+        return "<p style='font-family:Arial;margin:40px'>Seu usuário não está vinculado a um estabelecimento. Avise o administrador.</p>"
+
+    # Abas/visões: 'lancar', 'escalas', 'lancamentos', 'config', 'avisos'
+    view = (request.args.get("view", "lancar") or "lancar").strip().lower()
+
+    # ---- helper mês YYYY-MM
+    import re
+    def _parse_yyyy_mm_local(s: str):
+        if not s:
+            return None, None
+        m = re.fullmatch(r"(\d{4})-(\d{2})", s.strip())
+        if not m:
+            return None, None
+        y = int(m.group(1)); mth = int(m.group(2))
+        try:
+            di_ = date(y, mth, 1)
+            if mth == 12:
+                df_ = date(y + 1, 1, 1) - timedelta(days=1)
+            else:
+                df_ = date(y, mth + 1, 1) - timedelta(days=1)
+            return di_, df_
+        except Exception:
+            return None, None
+
+    # -------------------- LANÇAMENTOS (totais por período) --------------------
+    di = _parse_date(request.args.get("data_inicio"))
+    df = _parse_date(request.args.get("data_fim"))
+
+    # NOVO: filtro por mês (?mes=YYYY-MM)
+    mes = (request.args.get("mes") or "").strip()
+    periodo_desc = None
+    if mes:
+        di_mes, df_mes = _parse_yyyy_mm_local(mes)
+        if di_mes and df_mes:
+            di, df = di_mes, df_mes
+            periodo_desc = "mês"
+
+    if not di or not df:
+        # Sem filtro => janela semanal baseada no período do restaurante
+        wd_map = {"seg-dom": 0, "sab-sex": 5, "sex-qui": 4}  # seg=0 ... dom=6
+        start_wd = wd_map.get(rest.periodo, 0)
+        hoje = date.today()
+        delta = (hoje.weekday() - start_wd) % 7
+        di_auto = hoje - timedelta(days=delta)
+        df_auto = di_auto + timedelta(days=6)
+        di = di or di_auto
+        df = df or df_auto
+        periodo_desc = periodo_desc or rest.periodo
+    else:
+        periodo_desc = periodo_desc or "personalizado"
+
+    cooperados = Cooperado.query.order_by(Cooperado.nome).all()
+
+    total_bruto = 0.0
+    total_qtd = 0
+    total_entregas = 0
+    for c in cooperados:
+        q = (
+            Lancamento.query
+            .filter_by(restaurante_id=rest.id, cooperado_id=c.id)
+            .filter(Lancamento.data >= di, Lancamento.data <= df)
+            .order_by(Lancamento.data.desc(), Lancamento.id.desc())
+        )
+        c.lancamentos = q.all()
+        c.total_periodo = sum((l.valor or 0.0) for l in c.lancamentos)
+        total_bruto += c.total_periodo
+        total_qtd += len(c.lancamentos)
+        total_entregas += sum((l.qtd_entregas or 0) for l in c.lancamentos)
+
+    total_inss = total_bruto * 0.045
+    total_liquido = total_bruto - total_inss
+
+    # -------------------- ESCALA (Quem trabalha) --------------------
+    def contrato_bate_restaurante(contrato: str, rest_nome: str) -> bool:
+        a = " ".join(_normalize_name(contrato or ""))
+        b = " ".join(_normalize_name(rest_nome or ""))
+        if not a or not b:
+            return False
+        return a == b or a in b or b in a
+
+    ref = _parse_date(request.args.get("ref")) or date.today()
+    modo = request.args.get("modo", "semana")  # 'semana' ou 'dia'
+    if modo == "dia":
+        dias_list = [ref]
+    else:
+        semana_inicio = ref - timedelta(days=ref.weekday())
+        dias_list = [semana_inicio + timedelta(days=i) for i in range(7)]
+
+    escalas_all = Escala.query.order_by(Escala.id.asc()).all()
+    eff_map = _carry_forward_contrato(escalas_all)
+
+    escalas_rest = [
+        e for e in escalas_all
+        if contrato_bate_restaurante(eff_map.get(e.id, e.contrato or ""), rest.nome)
+    ]
+    if not escalas_rest:
+        escalas_rest = [e for e in escalas_all if (e.contrato or "").strip() == rest.nome.strip()]
+
+    agenda = {d: [] for d in dias_list}
+    seen = {d: set() for d in dias_list}  # evita duplicar
+
+    for e in escalas_rest:
+        dt = _parse_data_escala_str(e.data)       # date | None
+        wd = _weekday_from_data_str(e.data)       # 1..7 | None
+        for d in dias_list:
+            hit = (dt and dt == d) or (wd and wd == ((d.weekday() % 7) + 1))
+            if not hit:
+                continue
+
+            coop = Cooperado.query.get(e.cooperado_id) if e.cooperado_id else None
+            nome_fallback = (e.cooperado_nome or "").strip()
+            nome_show = (coop.nome if coop else nome_fallback) or "—"
+            contrato_eff = (eff_map.get(e.id, e.contrato or "") or "").strip()
+
+            key = (
+                (coop.id if coop else _norm(nome_show)),
+                _norm(e.turno),
+                _norm(e.horario),
+                _norm(contrato_eff),
+            )
+            if key in seen[d]:
+                break
+            seen[d].add(key)
+
+            agenda[d].append({
+                "coop": coop,
+                "cooperado_nome": nome_fallback or None,
+                "nome_planilha": nome_show,
+                "turno": (e.turno or "").strip(),
+                "horario": (e.horario or "").strip(),
+                "contrato": contrato_eff,
+                "cor": (e.cor or "").strip(),
+            })
+            break
+
+    for d in dias_list:
+        agenda[d].sort(
+            key=lambda x: (
+                (x["contrato"] or "").lower(),
+                (x.get("nome_planilha") or (x["coop"].nome if x["coop"] else "")).lower()
+            )
+        )
+
+    # -------------------- Lista de lançamentos (aba "lancamentos") --------------------
+    lancamentos_periodo = []
+    total_lanc_valor = 0.0
+    total_lanc_entregas = 0
+
+    if view == "lancamentos":
+        q = (
+            db.session.query(Lancamento, Cooperado)
+            .join(Cooperado, Cooperado.id == Lancamento.cooperado_id)
+            .filter(
+                Lancamento.restaurante_id == rest.id,
+                Lancamento.data >= di,
+                Lancamento.data <= df,
+            )
+            .order_by(Lancamento.data.asc(), Lancamento.id.asc())
+        )
+        for lanc, coop in q.all():
+            item = {
+                "id": lanc.id,
+                "data": lanc.data.strftime("%d/%m/%Y") if lanc.data else "",
+                "hora_inicio": (lanc.hora_inicio if isinstance(lanc.hora_inicio, str)
+                                else (lanc.hora_inicio.strftime("%H:%M") if lanc.hora_inicio else "")),
+                "hora_fim": (lanc.hora_fim if isinstance(lanc.hora_fim, str)
+                             else (lanc.hora_fim.strftime("%H:%M") if lanc.hora_fim else "")),
+                "qtd_entregas": lanc.qtd_entregas or 0,
+                "valor": float(lanc.valor or 0.0),  # já em R$
+                "cooperado_id": coop.id,
+                "cooperado_nome": coop.nome,
+                "contrato_nome": rest.nome,
+            }
+            lancamentos_periodo.append(item)
+
+        total_lanc_valor = sum(x["valor"] for x in lancamentos_periodo)
+        total_lanc_entregas = sum(x["qtd_entregas"] for x in lancamentos_periodo)
+
     # -------------------- Avisos (aba "avisos") --------------------
     avisos = []
     avisos_nao_lidos_count = 0
     current_year = datetime.now().year
     if view == "avisos":
         avisos = _fetch_avisos_for_restaurante(rest)
-        lidos_ids = {
-            r.aviso_id
-            for r in AvisoLeitura.query.filter_by(restaurante_id=rest.id).all()
-        }
+        lidos_ids = {r.aviso_id for r in AvisoLeitura.query.filter_by(restaurante_id=rest.id).all()}
         for a in avisos:
             a.lido = (a.id in lidos_ids)
         avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
 
+    # >>> Contador geral de não lidos para TOAST/SOM no layout
+    unread = _count_unread_for_restaurante(rest)
+
     # ---- URLs/flags para template
     from werkzeug.routing import BuildError
     try:
+        # Se existir endpoint app-level abaixo, ok:
         url_lancar_producao = url_for("lancar_producao")
     except BuildError:
-        url_lancar_producao = "/restaurante/lancar_producao"
+        # Fallback correto COM /portal/:
+        url_lancar_producao = "/portal/restaurante/lancar_producao"
 
     has_editar_lanc = ("editar_lancamento" in app.view_functions)
-
-    # >>> Contador geral de não lidos para TOAST/SOM no layout
-    unread = _count_unread_for_restaurante(rest)
 
     # -------------------- Render --------------------
     return render_template(
@@ -5019,15 +5205,29 @@ def portal_restaurante():
         lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
         total_lanc_valor=total_lanc_valor,
         total_lanc_entregas=total_lanc_entregas,
-        url_lancar_producao=url_lancar_producao,
-        has_editar_lanc=has_editar_lanc,
-
-        # --- Avisos / Toast ---
+        # Avisos / Toast
         avisos=(avisos if view == "avisos" else []),
         avisos_nao_lidos_count=avisos_nao_lidos_count,
         current_year=current_year,
-        unread=unread,  # <- use no layout/base para disparar o toast de "novos avisos"
+        unread=unread,
+        # URLs/flags
+        url_lancar_producao=url_lancar_producao,
+        has_editar_lanc=has_editar_lanc,
     )
+
+# =========================
+# ROTA DO POST (app-level)
+# =========================
+@app.route("/portal/restaurante/lancar_producao", methods=["POST"])
+@role_required("restaurante")
+def lancar_producao():
+    # Exemplo mínimo: pegue dados do form e salve
+    # descricao = request.form.get("descricao")
+    # valor = request.form.get("valor")
+    # ... persistência ...
+    flash("Produção lançada com sucesso!", "success")
+    # Volta para a mesma página (pode direcionar para aba 'lancamentos' se preferir)
+    return redirect(url_for("portal_restaurante", view="lancamentos"))
 
 # ---------------------------------------------------------------------------
 # Admin: listar / upload / delete
