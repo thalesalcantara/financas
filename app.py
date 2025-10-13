@@ -5098,7 +5098,7 @@ def marcar_todos_avisos_lidos():
 # -------------------------
 # Se existir template antigo chamando url_for('marcar_aviso_lido') em /avisos/<id>/lido
 # NÃO reutilize o mesmo endpoint (evita o AssertionError). Use outro nome de endpoint.
-@app.post("/avisos/<int:aviso_id>/lido", endpoint="marcar_aviso_lido_legacy")
+@app.post("/avisos/<int:aviso_id>/lido", _legacy")
 @role_required("restaurante")
 def marcar_aviso_lido_legacy(aviso_id: int):
     # delega para a rota oficial
@@ -5622,61 +5622,64 @@ def avisos_unread_count():
 # AVISOS — Ações (cooperado)
 # =========================
 
-@app.post("/avisos/<int:aviso_id>/lido", endpoint="marcar_aviso_lido")
-@role_required("cooperado")
-def marcar_aviso_lido(aviso_id: int):
+# --- listar avisos no portal do restaurante (exibe só o que ele pode ver)
+@app.get("/portal/restaurante/avisos", endpoint="portal_restaurante_avisos")
+@role_required("restaurante")
+def portal_restaurante_avisos():
     u_id = session.get("user_id")
-    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+    avisos = get_avisos_for_restaurante(rest)  # só global/restaurante (broadcast ou marcado)
 
-    aviso = Aviso.query.get_or_404(aviso_id)
+    # quais já foram lidos
+    lidos = {
+        r.aviso_id
+        for r in AvisoLeitura.query.filter_by(restaurante_id=rest.id).all()
+    }
+    for a in avisos:
+        a.lido = (a.id in lidos)
 
-    ja_lido = AvisoLeitura.query.filter_by(
-        cooperado_id=coop.id, aviso_id=aviso.id
-    ).first()
+    return render_template("portal_restaurante_avisos.html", avisos=avisos)
 
-    if not ja_lido:
-        db.session.add(AvisoLeitura(
-            cooperado_id=coop.id,
-            aviso_id=aviso.id,
-            lido_em=datetime.utcnow(),
-        ))
+# --- marcar 1 aviso como lido (REST)
+@app.post("/portal/restaurante/avisos/<int:aviso_id>/marcar-lido", endpoint="rest_marcar_aviso_lido")
+@role_required("restaurante")
+def rest_marcar_aviso_lido(aviso_id: int):
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+    Aviso.query.get_or_404(aviso_id)
+
+    ja = (AvisoLeitura.query
+          .filter_by(restaurante_id=rest.id, aviso_id=aviso_id)
+          .first())
+    if not ja:
+        db.session.add(AvisoLeitura(restaurante_id=rest.id, aviso_id=aviso_id, lido_em=datetime.utcnow()))
         db.session.commit()
 
-    # volta para a lista; se quiser voltar ancorado: + f"#aviso-{aviso.id}"
-    return redirect(url_for("portal_cooperado_avisos"))
+    flash("Aviso marcado como lido.", "success")
+    return redirect(url_for("portal_restaurante_avisos"))
 
-
-@app.post("/avisos/marcar-todos", endpoint="marcar_todos_avisos_lidos")
-@role_required("cooperado")
-def marcar_todos_avisos_lidos():
+# --- marcar TODOS como lidos (REST)
+@app.post("/portal/restaurante/avisos/marcar-todos", endpoint="rest_marcar_todos_avisos_lidos")
+@role_required("restaurante")
+def rest_marcar_todos_avisos_lidos():
     u_id = session.get("user_id")
-    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
 
-    # todos avisos visíveis ao cooperado
-    try:
-        avisos = get_avisos_for_cooperado(coop)
-    except NameError:
-        avisos = (Aviso.query
-                  .filter(Aviso.ativo.is_(True))
-                  .filter(or_(Aviso.tipo == "global", Aviso.tipo == "cooperado"))
-                  .all())
-
-    # ids já lidos
+    avisos = get_avisos_for_restaurante(rest)
     lidos_ids = {
         a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
-        .filter(AvisoLeitura.cooperado_id == coop.id).all()
+        .filter(AvisoLeitura.restaurante_id == rest.id).all()
     }
-
-    # persiste só os que faltam
     now = datetime.utcnow()
-    pendentes = [a for a in avisos if a.id not in lidos_ids]
-    if pendentes:
-        db.session.bulk_save_objects([
-            AvisoLeitura(cooperado_id=coop.id, aviso_id=a.id, lido_em=now) for a in pendentes
-        ])
+    novos = [AvisoLeitura(restaurante_id=rest.id, aviso_id=a.id, lido_em=now)
+             for a in avisos if a.id not in lidos_ids]
+    if novos:
+        db.session.bulk_save_objects(novos)
         db.session.commit()
 
-    return redirect(url_for("portal_cooperado_avisos"))
+    flash("Todos os avisos foram marcados como lidos.", "success")
+    return redirect(url_for("portal_restaurante_avisos"))
+
 
 
 # =========================
