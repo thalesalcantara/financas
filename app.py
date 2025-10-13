@@ -49,21 +49,13 @@ STATIC_TABLES = os.path.join(BASE_DIR, "static", "uploads", "tabelas")
 os.makedirs(STATIC_TABLES, exist_ok=True)
 
 def _build_db_uri() -> str:
-    """
-    Monta a DATABASE_URL aceitando:
-      - postgres://...  -> troca p/ postgresql+psycopg://
-      - adiciona sslmode=require quando não houver
-      - fallback p/ sqlite local
-    """
     url = os.environ.get("DATABASE_URL")
     if not url:
         return "sqlite:///" + os.path.join(BASE_DIR, "app.db")
-
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql+psycopg://", 1)
     elif url.startswith("postgresql://") and "+psycopg" not in url:
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
-
     if url.startswith("postgresql+psycopg://") and "sslmode=" not in url:
         url += ("&" if "?" in url else "?") + "sslmode=require"
     return url
@@ -71,7 +63,6 @@ def _build_db_uri() -> str:
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "coopex-secret")
 
-# ⚙️ Config da engine — deixe ANTES de criar o db
 app.config.update(
     SQLALCHEMY_DATABASE_URI=_build_db_uri(),
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
@@ -82,51 +73,19 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.environ.get("FLASK_SECURE_COOKIES", "1") == "1",
     PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
-
-    # ✅ Opções do pool (ajuda em “SSL error: bad record mac” quando a conexão fica ociosa)
     SQLALCHEMY_ENGINE_OPTIONS={
         "poolclass": QueuePool,
         "pool_size": 5,
-        "max_overflow": 10,
-        "pool_timeout": 30,
-        "pool_pre_ping": True,     # testa a conexão antes de usar
-        "pool_recycle": 180,       # recicla conexões ociosas cedo (3 min)
+        "max_overflow": 5,
+        "pool_timeout": 10,
+        "pool_pre_ping": True,
+        "pool_recycle": 1800,
         "connect_args": {
-            # psycopg3
             "connect_timeout": 5,
-            # limita query a 15s no Postgres
             "options": "-c statement_timeout=15000",
         },
     },
 )
-
-# 🔌 Cria o objeto db aqui (após config)
-db = SQLAlchemy(app)
-
-# --------- QoL para cada backend ---------
-@event.listens_for(Engine, "connect")
-def _set_sqlite_or_pg_settings(dbapi_conn, conn_record):
-    # sqlite: habilita FK
-    if app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"):
-        try:
-            cur = dbapi_conn.cursor()
-            cur.execute("PRAGMA foreign_keys=ON")
-            cur.close()
-        except Exception:
-            pass
-    # Postgres: nada extra além do statement_timeout já definido em options;
-    # se quiser timezone fixa:
-    try:
-        cur = dbapi_conn.cursor()
-        cur.execute("SET TIME ZONE 'UTC'")
-        cur.close()
-    except Exception:
-        pass
-
-# (opcional) rota de saúde p/ Render
-@app.get("/healthz")
-def healthz():
-    return "ok", 200
 
 # Torna safe_url_for disponível nos templates
 @app.context_processor
@@ -199,7 +158,7 @@ class Usuario(db.Model):
 
     def check_password(self, raw: str) -> bool:
         return check_password_hash(self.senha_hash, raw)
-        
+
 
 class Cooperado(db.Model):
     __tablename__ = "cooperados"
@@ -1546,15 +1505,9 @@ def get_avisos_for_restaurante(rest: Restaurante):
 # =========================
 # Rotas de mídia (fotos armazenadas no banco)
 # =========================
-from sqlalchemy.exc import OperationalError
-
 @app.get("/media/coop/<int:coop_id>")
 def media_coop(coop_id: int):
-    try:
-        c = Cooperado.query.get_or_404(coop_id)
-    except OperationalError:
-        # opcional: servir fallback
-        return send_file("static/img/default.png", mimetype="image/png"), 503
+    c = Cooperado.query.get_or_404(coop_id)
     if c.foto_bytes:
         return send_file(
             io.BytesIO(c.foto_bytes),
@@ -3075,67 +3028,6 @@ def admin_avisos_toggle(aviso_id):
     flash("Aviso atualizado.", "success")
     return redirect(request.referrer or url_for("admin_avisos"))
 
-
-# Excluir aviso (limpando relações)
-@app.route("/admin/avisos/<int:aviso_id>/excluir", methods=["POST"], endpoint="admin_avisos_excluir")
-@admin_required
-def admin_avisos_excluir(aviso_id):
-    a = Aviso.query.get_or_404(aviso_id)
-
-    # apaga confirmações/leitorias
-    try:
-        AvisoLeitura.query.filter_by(aviso_id=aviso_id).delete(synchronize_session=False)
-    except Exception:
-        pass
-
-    # limpa M2M com restaurantes, se existir
-    try:
-        if hasattr(a, "restaurantes"):
-            a.restaurantes.clear()
-    except Exception:
-        pass
-
-    db.session.delete(a)
-    db.session.commit()
-    flash("Aviso excluído.", "success")
-    return redirect(url_for("admin_avisos"))
-
-
-# Marcar aviso como lido (funciona com GET e POST)
-@app.route("/avisos/<int:aviso_id>/lido", methods=["POST", "GET"])
-def marcar_aviso_lido_universal(aviso_id: int):
-    # se não logado, bloqueia
-    if "user_id" not in session:
-        return redirect(url_for("login")) if request.method == "GET" else ("", 401)
-
-    user_id = session.get("user_id")
-    user_tipo = session.get("user_tipo")
-    Aviso.query.get_or_404(aviso_id)
-
-    def _ok_response():
-        if request.method == "POST":
-            return ("", 204)  # útil para fetch/AJAX
-        return redirect(request.referrer or url_for("portal_cooperado_avisos"))
-
-    if user_tipo == "cooperado":
-        coop = Cooperado.query.filter_by(usuario_id=user_id).first()
-        if not coop:
-            return ("", 403) if request.method == "POST" else redirect(url_for("login"))
-        if not AvisoLeitura.query.filter_by(aviso_id=aviso_id, cooperado_id=coop.id).first():
-            db.session.add(AvisoLeitura(aviso_id=aviso_id, cooperado_id=coop.id, lido_em=datetime.utcnow()))
-            db.session.commit()
-        return _ok_response()
-
-    if user_tipo == "restaurante":
-        rest = Restaurante.query.filter_by(usuario_id=user_id).first()
-        if not rest:
-            return ("", 403) if request.method == "POST" else redirect(url_for("login"))
-        if not AvisoLeitura.query.filter_by(aviso_id=aviso_id, restaurante_id=rest.id).first():
-            db.session.add(AvisoLeitura(aviso_id=aviso_id, restaurante_id=rest.id, lido_em=datetime.utcnow()))
-            db.session.commit()
-        return _ok_response()
-
-    return ("", 403) if request.method == "POST" else redirect(url_for("login"))
 
 # Excluir aviso (limpando relações)
 @app.route("/admin/avisos/<int:aviso_id>/excluir", methods=["POST"], endpoint="admin_avisos_excluir")
