@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import os
 import csv
-import io
-import re
+import io, Csv
 import json
 import difflib
 import unicodedata
@@ -1872,7 +1871,6 @@ def admin_delete_lancamento(id):
 from flask import request, render_template, send_file, url_for
 from sqlalchemy import func, literal, and_
 from types import SimpleNamespace
-import io, csv
 
 # =========================
 # /admin/avaliacoes — Lista + KPIs + Ranking (sempre na aba "Avaliações")
@@ -4052,6 +4050,14 @@ def recusar_troca(troca_id):
 # =========================
 # PORTAL RESTAURANTE
 # =========================
+@app.post("/portal/restaurante/avisos/<int:aviso_id>/desmarcar", endpoint="desmarcar_aviso_lido")
+@login_required
+def desmarcar_aviso_lido(aviso_id):
+    aviso = Aviso.query.get_or_404(aviso_id)
+    aviso.lido = False
+    db.session.commit()
+    return redirect(url_for("portal_restaurante_avisos"))
+    
 @app.route("/portal/restaurante")
 @role_required("restaurante")
 def portal_restaurante():
