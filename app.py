@@ -1138,28 +1138,37 @@ def avisos_list():
     # Avisos aplicáveis ao cooperado
     avisos = get_avisos_for_cooperado(coop)
 
-    # Leituras (evita N+1)
-    lidos_ids = {
+    # Leituras já registradas
+    leituras_existentes = {
         r.aviso_id
         for r in AvisoLeitura.query.filter_by(cooperado_id=coop.id).all()
     }
 
-    # Flag lido para o template (sem tocar no banco)
+    # Marcar automaticamente como lidos ao abrir a página
+    novos_lidos = [
+        AvisoLeitura(cooperado_id=coop.id, aviso_id=a.id, lido_em=datetime.utcnow())
+        for a in avisos
+        if a.id not in leituras_existentes
+    ]
+    if novos_lidos:
+        db.session.add_all(novos_lidos)
+        db.session.commit()
+
+    # Atualiza flag "lido" no template
     for a in avisos:
-        a.lido = (a.id in lidos_ids)
+        a.lido = (a.id in leituras_existentes or a.id in [n.aviso_id for n in novos_lidos])
 
-    avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
+    # Contadores
+    avisos_nao_lidos_count = sum(1 for a in avisos if not a.lido)
+    unread = count_unread_for_coop(coop)  # agora deve retornar 0 depois da leitura
     current_year = datetime.now().year
-
-    # >>> Contador geral de não lidos para o TOAST/SOM no layout
-    unread = count_unread_for_coop(coop)
 
     return render_template(
         "portal_cooperado_avisos.html",
         avisos=avisos,
         avisos_nao_lidos_count=avisos_nao_lidos_count,
         current_year=current_year,
-        unread=unread,  # <- use no layout para disparar o toast
+        unread=unread,  # <- usado no layout / toast
     )
 
 # === AVALIAÇÕES: Cooperado -> Restaurante (NOVO) =============================
