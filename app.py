@@ -1,30 +1,48 @@
 from __future__ import annotations
 
 # stdlib
-import os, io, sys, csv, json, re, difflib, mimetypes, unicodedata
-from datetime import datetime, date, timedelta, time
-from functools import wraps
+import csv
+import difflib
+import io
+import json
+import logging
+import mimetypes
+import os
+import re
+import sys
+import unicodedata
 from collections import defaultdict, namedtuple
+from datetime import date, datetime, time, timedelta
+from functools import wraps
+from pathlib import Path
 from types import SimpleNamespace
 
 # Flask / Werkzeug
 from flask import (
-    Flask, Blueprint, render_template, request, redirect, url_for,
-    session, flash, send_file, abort, current_app
+    Flask,
+    Blueprint,
+    request,
+    session,
+    render_template,
+    redirect,
+    url_for,
+    flash,
+    abort,
+    send_file,
+    current_app,
 )
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from werkzeug.routing import BuildError
 
 # SQLAlchemy
-from sqlalchemy import (
-    event, func, case, or_, and_,
-)
-from sqlalchemy.sql import text as sa_text
-from sqlalchemy import delete as sa_delete, literal
+from sqlalchemy import and_, case, event, func, literal, or_, delete as sa_delete
 from sqlalchemy.engine import Engine
-from sqlalchemy.pool import QueuePool
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import selectinload
+from sqlalchemy.pool import QueuePool
+from sqlalchemy.sql import text as sa_text
 
 # Terceiros
 from dateutil.relativedelta import relativedelta
@@ -858,6 +876,7 @@ def _prox_ocorrencia_anual(dt: date | None) -> date | None:
     return alvo
 
 
+# === Helpers de data (únicos) ===
 def _parse_date(s: str | None) -> date | None:
     if not s:
         return None
@@ -869,26 +888,12 @@ def _parse_date(s: str | None) -> date | None:
     return None
 
 
-def _parse_ymd(s):
-    try:
-        return datetime.strptime(s, "%Y-%m-%d").date()
-    except Exception:
-        return None
-
-
 def _bounds_mes(yyyy_mm: str):
-    # "2025-06" -> [2025-06-01, 2025-07-01)
+    # "2025-06" -> (2025-06-01, 2025-07-01)
     y, m = map(int, yyyy_mm.split("-"))
     ini = date(y, m, 1)
-    fim = (ini + relativedelta(months=1))
+    fim = ini + relativedelta(months=1)
     return ini, fim
-
-
-def _parse_data_ymd(s):
-    try:
-        return datetime.strptime(s, "%Y-%m-%d").date()
-    except Exception:
-        return None
 
 
 def _fmt_br(d: date | None) -> str:
@@ -896,7 +901,9 @@ def _fmt_br(d: date | None) -> str:
 
 
 def _dow(dt: date) -> str:
+    # 1=Seg ... 7=Dom
     return str((dt.weekday() % 7) + 1)
+
 
 
 # === Helpers de Avaliação (NLP leve + métricas) =============================
@@ -1923,11 +1930,6 @@ def admin_delete_lancamento(id):
     flash("Lançamento excluído.", "success")
     return redirect(url_for("admin_dashboard", tab="lancamentos"))
 
-# ===== IMPORTS =====
-from flask import request, render_template, send_file, url_for
-from sqlalchemy import func, literal, and_
-from types import SimpleNamespace
-
 # =========================
 # /admin/avaliacoes — Lista + KPIs + Ranking (sempre na aba "Avaliações")
 # =========================
@@ -2333,9 +2335,6 @@ def delete_despesa(id):
 # =========================
 # Avisos (admin + públicos)
 # =========================
-from datetime import datetime, time
-from flask import request, session, render_template, redirect, url_for, flash, abort
-
 @app.get("/avisos", endpoint="avisos_publicos")
 def avisos_publicos():
     """
@@ -2645,8 +2644,6 @@ def edit_cooperado(id):
     flash("Cooperado atualizado.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
-from sqlalchemy import or_
-from sqlalchemy.exc import IntegrityError
 
 @app.route("/cooperados/<int:id>/delete", methods=["POST"])
 @admin_required
@@ -2777,9 +2774,6 @@ def edit_restaurante(id):
     flash("Estabelecimento atualizado.", "success")
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
 
-from sqlalchemy import delete as sa_delete
-from sqlalchemy.exc import IntegrityError
-from flask import current_app
 
 @app.route("/restaurantes/<int:id>/delete", methods=["POST"])
 @admin_required
@@ -2830,8 +2824,6 @@ def reset_senha_restaurante(id):
     flash("Senha do restaurante atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
 # app.py (ou onde ficam suas rotas)
-from flask import request, redirect, url_for, flash, session
-from werkzeug.security import check_password_hash, generate_password_hash
 @app.route("/rest/alterar-senha", methods=["POST"], endpoint="rest_alterar_senha")
 @role_required("restaurante")
 def alterar_senha_rest():
@@ -3029,6 +3021,11 @@ def ratear_beneficios():
 @app.route("/escalas/upload", methods=["POST"])
 @admin_required
 def upload_escala():
+
+    import unicodedata as _u
+    import re as _re
+    import difflib as _dif
+
     
 
     file = request.files.get("file")
@@ -3828,9 +3825,6 @@ def portal_cooperado():
         trocas_enviadas=trocas_enviadas,
     )
 
-from datetime import datetime
-from flask import request, redirect, url_for, flash, abort, session
-
 @app.post("/coop/avaliar/restaurante/<int:lanc_id>")
 @role_required("cooperado")
 def coop_avaliar_restaurante(lanc_id):
@@ -3936,11 +3930,6 @@ def solicitar_troca():
     db.session.commit()
     flash("Solicitação de troca enviada ao administrador.", "success")
     return redirect(url_for("portal_cooperado"))
-
-from datetime import datetime
-import json
-from sqlalchemy import and_
-from sqlalchemy.exc import SQLAlchemyError
 
 @app.post("/trocas/<int:troca_id>/aceitar")
 @role_required("cooperado")
@@ -4126,7 +4115,84 @@ def recusar_troca(troca_id):
 # =========================
 # PORTAL RESTAURANTE
 # =========================
-# -------------------- Avisos (aba "avisos") --------------------
+
+def _restaurante_atual() -> Restaurante | None:
+    uid = session.get("user_id")
+    if not uid:
+        return None
+    return Restaurante.query.filter_by(usuario_id=uid).first()
+
+def _fetch_avisos_for_restaurante(rest: Restaurante):
+    # usa o helper já existente no arquivo
+    return get_avisos_for_restaurante(rest)
+
+def _count_unread_for_restaurante(rest: Restaurante) -> int:
+    """Conta avisos aplicáveis ao restaurante que ainda não foram marcados como lidos pelo próprio restaurante."""
+    if not rest:
+        return 0
+    avisos = get_avisos_for_restaurante(rest)
+    lidos_ids = {
+        r.aviso_id for r in AvisoLeitura.query.filter_by(restaurante_id=rest.id).all()
+    }
+    return sum(1 for a in avisos if a.id not in lidos_ids)
+
+@app.route("/portal/restaurante")
+@role_required("restaurante")
+def portal_restaurante():
+    rest = _restaurante_atual()
+    if not rest:
+        return redirect(url_for("login"))
+
+    # Filtros
+    di = _parse_date(request.args.get("data_inicio"))
+    df = _parse_date(request.args.get("data_fim"))
+    mes = (request.args.get("mes") or "").strip()  # "YYYY-MM"
+    view = (request.args.get("view") or "avisos").strip()
+
+    # Descrição do período (para cabeçalho)
+    if mes:
+        try:
+            ini_m, fim_m = _bounds_mes(mes)
+            periodo_desc = f"{ini_m.strftime('%d/%m/%Y')} - {(fim_m - timedelta(days=1)).strftime('%d/%m/%Y')}"
+        except Exception:
+            periodo_desc = ""
+    elif di and df:
+        periodo_desc = f"{di.strftime('%d/%m/%Y')} - {df.strftime('%d/%m/%Y')}"
+    elif di:
+        periodo_desc = di.strftime('%d/%m/%Y')
+    elif df:
+        periodo_desc = df.strftime('%d/%m/%Y')
+    else:
+        periodo_desc = ""
+
+    # Cooperados para selects na UI
+    cooperados = Cooperado.query.order_by(Cooperado.nome.asc()).all()
+
+    # Base de lançamentos do restaurante
+    q = Lancamento.query.filter(Lancamento.restaurante_id == rest.id)
+    if mes and re.fullmatch(r"\d{4}-\d{2}", mes):
+        ini, fim = _bounds_mes(mes)
+        q = q.filter(Lancamento.data >= ini, Lancamento.data < fim)
+    if di:
+        q = q.filter(Lancamento.data >= di)
+    if df:
+        q = q.filter(Lancamento.data <= df)
+    lancamentos_periodo = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
+
+    total_lanc_valor = sum((l.valor or 0.0) for l in lancamentos_periodo)
+    total_lanc_entregas = sum((l.qtd_entregas or 0) for l in lancamentos_periodo)
+
+    # Agregados “gerais” da tela (podem ser iguais aos do período atual)
+    total_bruto = total_lanc_valor
+    total_inss = total_bruto * 0.045
+    total_liquido = total_bruto - total_inss
+    total_qtd = len(lancamentos_periodo)
+    total_entregas = total_lanc_entregas
+
+    # Dados de agenda (placeholders para manter compat)
+    agenda, dias_list, ref, modo = [], [], date.today(), "mes"
+
+    # -------------------- Avisos (aba "avisos") --------------------
     avisos = []
     avisos_nao_lidos_count = 0
     current_year = datetime.now().year
@@ -4183,17 +4249,21 @@ def recusar_troca(troca_id):
 # =========================
 # AVISOS (rotas do Portal Restaurante)
 # =========================
+# =========================
+# AVISOS (Portal Restaurante)
+# =========================
+
 @app.get("/portal/restaurante/avisos")
 @role_required("restaurante")
 def portal_restaurante_avisos():
     u_id = session.get("user_id")
     rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
 
-    # avisos aplicáveis
+    # avisos aplicáveis (usa seu helper)
     try:
         avisos_db = get_avisos_for_restaurante(rest)
     except NameError:
-        # fallback: global + restaurante (associados ou broadcast)
+        # fallback: global + restaurante (broadcast)
         avisos_db = (Aviso.query
                      .filter(Aviso.ativo.is_(True))
                      .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
@@ -4206,13 +4276,16 @@ def portal_restaurante_avisos():
         .filter(AvisoLeitura.restaurante_id == rest.id).all()
     }
 
+    # extrai corpo html independentemente do campo usado
     def corpo_do_aviso(a: Aviso) -> str:
         for k in ("corpo_html","html","conteudo_html","mensagem_html","descricao_html","texto_html",
                   "corpo","conteudo","mensagem","descricao","texto","resumo","body","content"):
             v = getattr(a, k, None)
             if isinstance(v, str) and v.strip():
                 return v
-        return ""
+        # compat: se só existir .corpo no modelo:
+        v = getattr(a, "corpo", None)
+        return v if isinstance(v, str) else ""
 
     avisos = [{
         "id": a.id,
@@ -4225,11 +4298,12 @@ def portal_restaurante_avisos():
 
     avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
     return render_template(
-        "portal_restaurante_avisos.html",   # crie/clone seu template
+        "portal_restaurante_avisos.html",
         avisos=avisos,
         avisos_nao_lidos_count=avisos_nao_lidos_count,
         current_year=datetime.now().year,
     )
+
 
 @app.post("/avisos-restaurante/marcar-todos", endpoint="marcar_todos_avisos_lidos_restaurante")
 @role_required("restaurante")
@@ -4251,18 +4325,27 @@ def marcar_todos_avisos_lidos_restaurante():
     }
 
     now = datetime.utcnow()
-    for a in avisos:
-        if a.id not in lidos_ids:
-            db.session.add(AvisoLeitura(
-                restaurante_id=rest.id, aviso_id=a.id, lido_em=now
-            ))
-    db.session.commit()
+    pendentes = [a for a in avisos if a.id not in lidos_ids]
+    if pendentes:
+        db.session.bulk_save_objects([
+            AvisoLeitura(restaurante_id=rest.id, aviso_id=a.id, lido_em=now)
+            for a in pendentes
+        ])
+        db.session.commit()
     return redirect(url_for("portal_restaurante_avisos"))
 
-@app.post("/portal/restaurante/avisos/<int:aviso_id>/desmarcar", endpoint="desmarcar_aviso_lido")
-def desmarcar_aviso_lido(aviso_id):
-    # TODO: sua lógica pra desmarcar como lido
-    # ...
+
+@app.post("/portal/restaurante/avisos/<int:aviso_id>/desmarcar", endpoint="desmarcar_aviso_lido_restaurante")
+@role_required("restaurante")
+def desmarcar_aviso_lido_restaurante(aviso_id):
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+
+    # apaga a leitura, se existir (idempotente)
+    db.session.query(AvisoLeitura).filter_by(
+        aviso_id=aviso_id, restaurante_id=rest.id
+    ).delete(synchronize_session=False)
+    db.session.commit()
     return redirect(url_for("portal_restaurante_avisos"))
     
 @app.route("/portal/restaurante")
@@ -4450,7 +4533,6 @@ def portal_restaurante():
         total_lanc_entregas = sum(x["qtd_entregas"] for x in lancamentos_periodo)
 
     # ---- URLs/flags para template
-    from werkzeug.routing import BuildError
     try:
         url_lancar_producao = url_for("lancar_producao")
     except BuildError:
@@ -4691,8 +4773,6 @@ from flask import (
     render_template, request, redirect, url_for, flash, session,
     send_file, abort, current_app, jsonify
 )
-from pathlib import Path
-import os, re, unicodedata, mimetypes, logging
 
 log = logging.getLogger(__name__)
 
