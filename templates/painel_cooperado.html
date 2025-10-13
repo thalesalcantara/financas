@@ -1496,7 +1496,7 @@
     </div>
     <div class="toast-body">
       <span class="toast-msg">
-        Você tem <span class="toast-count">{{ unread }}</span> aviso(s) não lido(s).
+        Você tem <span id="toastCount">{{ unread }}</span> aviso(s) não lido(s).
       </span>
       <a href="{{ url_for('portal_cooperado_avisos') }}" class="link-primary fw-semibold ms-1">Ver agora</a>
     </div>
@@ -1504,40 +1504,66 @@
 </div>
 
 <!-- ÁUDIO: som de aviso -->
-<audio id="avisoSound" preload="auto" playsinline>
+<audio id="avisoSound" preload="auto" playsinline loop>
   <source src="{{ url_for('static', filename='sounds/notify.mp3') }}" type="audio/mpeg">
 </audio>
 
-<!-- DESBLOQUEIO DE ÁUDIO NA 1ª INTERAÇÃO (necessário em mobile) -->
+<!-- SCRIPT -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  const audio = document.getElementById('avisoSound');
-  if (!audio) return;
+  const toastEl = document.getElementById('toastAvisos');
+  const toastCountEl = document.getElementById('toastCount');
+  const unreadEndpoint = toastEl.dataset.unreadEndpoint;
+  const avisoSound = document.getElementById('avisoSound');
+  const toast = new bootstrap.Toast(toastEl);
 
-  audio.muted = false;
-  audio.volume = 1.0;
-
+  // --- Desbloqueio de áudio em mobile ---
+  avisoSound.muted = false;
+  avisoSound.volume = 1.0;
   async function unlockAudio() {
     try {
-      await audio.play();
-      audio.pause();
-      audio.currentTime = 0;
-    } catch (_) {
-      return;
-    } finally {
-      document.removeEventListener('click', unlockAudio);
-      document.removeEventListener('touchstart', unlockAudio);
-      document.removeEventListener('keydown', unlockAudio);
-    }
+      await avisoSound.play();
+      avisoSound.pause();
+      avisoSound.currentTime = 0;
+    } catch (_) {}
+    document.removeEventListener('click', unlockAudio);
+    document.removeEventListener('touchstart', unlockAudio);
+    document.removeEventListener('keydown', unlockAudio);
   }
-
   document.addEventListener('click', unlockAudio, { once: true });
   document.addEventListener('touchstart', unlockAudio, { once: true });
   document.addEventListener('keydown', unlockAudio, { once: true });
 
-  audio.addEventListener('error', () => {
-    console.warn('Falha ao carregar/tocar áudio:', audio.error);
-  });
+  // --- Função para atualizar avisos e som ---
+  async function verificarAvisos() {
+    try {
+      const response = await fetch(unreadEndpoint);
+      const data = await response.json();
+      const unread = data.unread ?? 0;
+      toastCountEl.textContent = unread;
+
+      if (unread > 0) {
+        toast.show();
+        if (avisoSound.paused) {
+          avisoSound.play().catch(err => console.warn("Erro ao tocar som:", err));
+        }
+      } else {
+        toast.hide();
+        if (!avisoSound.paused) {
+          avisoSound.pause();
+          avisoSound.currentTime = 0;
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao verificar avisos:", err);
+    }
+  }
+
+  // Verifica a cada 15 segundos
+  setInterval(verificarAvisos, 15000);
+
+  // Primeira verificação imediata
+  verificarAvisos();
 });
 </script>
 
