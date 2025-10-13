@@ -104,7 +104,7 @@
           </div>
         </form>
         <div class="d-flex gap-2">
-          <form id="formAllRead" method="POST" action="{{ url_for('marcar_todos_lidos') }}">
+          action="{{ url_for('marcar_todos_avisos_lidos') }}"
             {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
             <button type="submit" class="btn btn-royal btn-sm" id="btnAllRead">
               <i class="bi bi-check2-all"></i> Todos lidos
