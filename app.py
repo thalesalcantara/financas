@@ -2124,157 +2124,6 @@ def admin_avaliacoes():
         preserve=preserve,
     )
 
-    # ===== Achata nos nomes que o SEU TEMPLATE usa
-    avaliacoes = []
-    for a, rest_id, rest_nome, coop_id, coop_nome in rows:
-        # comuns
-        item = {
-            "criado_em": a.criado_em,
-            "rest_id":   rest_id,
-            "rest_nome": rest_nome,
-            "coop_id":   coop_id,
-            "coop_nome": coop_nome,
-            "geral":     getattr(a, "estrelas_geral", 0) or 0,
-            "comentario": (getattr(a, "comentario", "") or "").strip(),
-            "media":       getattr(a, "media_ponderada", None),
-            "sentimento":  getattr(a, "sentimento", None),
-            "temas":       getattr(a, "temas", None),
-            "alerta":      bool(getattr(a, "alerta_crise", False)),
-        }
-
-        if tipo == "restaurante":
-            # Cooperado -> Restaurante: Trat/Amb/Sup (com fallbacks)
-            trat = getattr(a, "estrelas_tratamento", None)
-            amb  = getattr(a, "estrelas_ambiente", None)
-            sup  = getattr(a, "estrelas_suporte", None)
-            if trat is None: trat = getattr(a, "estrelas_pontualidade", None)
-            if amb  is None: amb  = getattr(a, "estrelas_educacao", None)
-            if sup  is None: sup  = getattr(a, "estrelas_eficiencia", None)
-            item.update({"trat": trat or 0, "amb": amb or 0, "sup": sup or 0})
-        else:
-            # Restaurante -> Cooperado
-            item.update({
-                "pont":  getattr(a, "estrelas_pontualidade", 0) or 0,
-                "educ":  getattr(a, "estrelas_educacao", 0) or 0,
-                "efic":  getattr(a, "estrelas_eficiencia", 0) or 0,
-                "apres": getattr(a, "estrelas_apresentacao", 0) or 0,
-            })
-
-        avaliacoes.append(SimpleNamespace(**item))
-
-    # ===== KPIs
-    def avg_or_zero(coluna):
-        if coluna is None:
-            return 0.0
-        q = db.session.query(func.coalesce(func.avg(coluna), 0.0))
-        if filtros: q = q.filter(and_(*filtros))
-        return float(q.scalar() or 0.0)
-
-    total_qtd = (db.session.query(func.count(Model.id)).filter(and_(*filtros)).scalar()
-                 if filtros else db.session.query(func.count(Model.id)).scalar())
-    kpis = {"qtd": int(total_qtd or 0), "geral": avg_or_zero(f_geral)}
-
-    if tipo == "restaurante":
-        kpis.update({
-            "trat": avg_or_zero(f_trat),
-            "amb":  avg_or_zero(f_amb),
-            "sup":  avg_or_zero(f_sup),
-        })
-    else:
-        kpis.update({
-            "pont":  avg_or_zero(f_pont),
-            "educ":  avg_or_zero(f_educ),
-            "efic":  avg_or_zero(f_efic),
-            "apres": avg_or_zero(f_apres),
-        })
-
-    # ===== Ranking
-    if tipo == "restaurante":
-        q_rank = (db.session.query(
-                    Restaurante.id.label("id"),
-                    Restaurante.nome.label("nome"),
-                    func.count(Model.id).label("qtd"),
-                    func.coalesce(func.avg(f_geral), 0.0).label("m_geral"),
-                    (func.coalesce(func.avg(f_trat), 0.0) if f_trat is not None else literal(0.0)).label("m_trat"),
-                    (func.coalesce(func.avg(f_amb),  0.0) if f_amb  is not None else literal(0.0)).label("m_amb"),
-                    (func.coalesce(func.avg(f_sup),  0.0) if f_sup  is not None else literal(0.0)).label("m_sup"),
-                 )
-                 .join(Model, Model.restaurante_id == Restaurante.id))
-        if filtros: q_rank = q_rank.filter(and_(*filtros))
-        ranking_rows = q_rank.group_by(Restaurante.id, Restaurante.nome).all()
-        ranking = [{
-            "rest_nome": r.nome, "qtd": int(r.qtd or 0),
-            "m_geral": float(r.m_geral or 0),
-            "m_trat":  float(r.m_trat or 0),
-            "m_amb":   float(r.m_amb or 0),
-            "m_sup":   float(r.m_sup or 0),
-        } for r in ranking_rows]
-        top = sorted([x for x in ranking if x["qtd"] >= 3], key=lambda x: x["m_geral"], reverse=True)[:10]
-        chart_top = {"labels": [r["rest_nome"] for r in top], "values": [round(r["m_geral"], 2) for r in top]}
-    else:
-        q_rank = (db.session.query(
-                    Cooperado.id.label("id"),
-                    Cooperado.nome.label("nome"),
-                    func.count(Model.id).label("qtd"),
-                    func.coalesce(func.avg(f_geral), 0.0).label("m_geral"),
-                    (func.coalesce(func.avg(f_pont), 0.0) if f_pont is not None else literal(0.0)).label("m_pont"),
-                    (func.coalesce(func.avg(f_educ), 0.0) if f_educ is not None else literal(0.0)).label("m_educ"),
-                    (func.coalesce(func.avg(f_efic), 0.0) if f_efic is not None else literal(0.0)).label("m_efic"),
-                    (func.coalesce(func.avg(f_apres),0.0) if f_apres is not None else literal(0.0)).label("m_apres"),
-                 )
-                 .join(Model, Model.cooperado_id == Cooperado.id))
-        if filtros: q_rank = q_rank.filter(and_(*filtros))
-        ranking_rows = q_rank.group_by(Cooperado.id, Cooperado.nome).all()
-        ranking = [{
-            "coop_nome": r.nome, "qtd": int(r.qtd or 0),
-            "m_geral": float(r.m_geral or 0),
-            "m_pont":  float(r.m_pont or 0),
-            "m_educ":  float(r.m_educ or 0),
-            "m_efic":  float(r.m_efic or 0),
-            "m_apres": float(r.m_apres or 0),
-        } for r in ranking_rows]
-        top = sorted([x for x in ranking if x["qtd"] >= 3], key=lambda x: x["m_geral"], reverse=True)[:10]
-        chart_top = {"labels": [r["coop_nome"] for r in top], "values": [round(r["m_geral"], 2) for r in top]}
-
-    # ===== Compatibilidade Cooperado × Restaurante (média de "geral" por par)
-    compat_map = {}
-    for a in avaliacoes:
-        key = (a.coop_id, a.rest_id)
-        d = compat_map.get(key)
-        if not d:
-            d = {"coop": a.coop_nome, "rest": a.rest_nome, "sum": 0.0, "count": 0}
-        d["sum"] += (a.geral or 0)
-        d["count"] += 1
-        compat_map[key] = d
-    compat = []
-    for d in compat_map.values():
-        avg = (d["sum"] / d["count"]) if d["count"] else 0.0
-        compat.append({"coop": d["coop"], "rest": d["rest"], "avg": avg, "count": d["count"]})
-    # pré-ordena por média desc e, em caso de empate, por qtd desc
-    compat.sort(key=lambda x: (-(x["avg"] or 0), -(x["count"] or 0), x["coop"], x["rest"]))
-
-    # Filtros p/ repopular o form
-    _flt = SimpleNamespace(
-        restaurante_id=restaurante_id,
-        cooperado_id=cooperado_id,
-        data_inicio=data_inicio or "",
-        data_fim=data_fim or "",
-    )
-
-    # >>> IMPORTANTÍSSIMO: renderiza o DASHBOARD com a aba "avaliacoes" ativa
-    return render_template(
-        "admin_dashboard.html",
-        tab="avaliacoes",        # <- garante que a UI fique na aba Avaliações
-        tipo=tipo,
-        avaliacoes=avaliacoes,   # lista de SimpleNamespace com campos *planos* esperados no seu template
-        kpis=kpis,
-        ranking=ranking,
-        chart_top=chart_top,
-        compat=compat,
-        _flt=_flt,
-        restaurantes=Restaurante.query.order_by(Restaurante.nome).all(),
-        cooperados=Cooperado.query.order_by(Cooperado.nome).all(),
-    )
 
 # =========================
 # /admin/avaliacoes/export.csv — Exportação CSV (combina com o template)
@@ -4014,83 +3863,173 @@ def solicitar_troca():
     flash("Solicitação de troca enviada ao administrador.", "success")
     return redirect(url_for("portal_cooperado"))
 
+from datetime import datetime
+import json
+from sqlalchemy import and_
+from sqlalchemy.exc import SQLAlchemyError
+
 @app.post("/trocas/<int:troca_id>/aceitar")
 @role_required("cooperado")
 def aceitar_troca(troca_id):
     u_id = session.get("user_id")
     me = Cooperado.query.filter_by(usuario_id=u_id).first()
-    t = TrocaSolicitacao.query.get_or_404(troca_id)
-    if not me or t.destino_id != me.id:
+    if not me:
         abort(403)
-    if t.status != "pendente":
-        flash("Esta solicitação já foi tratada.", "warning")
+
+    try:
+        # Envolve tudo em transação para evitar condições de corrida
+        with db.session.begin():
+            # Lock da solicitação
+            t = (TrocaSolicitacao.query
+                 .filter_by(id=troca_id)
+                 .with_for_update(nowait=True)
+                 .first())
+            if not t:
+                abort(404)
+
+            # Autorização: só o destinatário pode aceitar
+            if t.destino_id != me.id:
+                abort(403)
+
+            # Idempotência / estado
+            if t.status != "pendente":
+                flash("Esta solicitação já foi tratada.", "warning")
+                return redirect(url_for("portal_cooperado"))
+
+            # Escala de origem (lock)
+            orig_e = (Escala.query
+                      .filter_by(id=t.origem_escala_id)
+                      .with_for_update(nowait=True)
+                      .first())
+            if not orig_e:
+                flash("Plantão de origem inválido.", "danger")
+                return redirect(url_for("portal_cooperado"))
+
+            # Evita aceitar trocas de plantões passados (opcional)
+            try:
+                # Se sua coluna `data` é string 'YYYY-MM-DD', adapte conforme seu schema
+                data_orig = orig_e.data  # pode ser str/ date / datetime
+                # se for string:
+                # data_orig = datetime.strptime(orig_e.data, "%Y-%m-%d").date()
+                # if date.today() > data_orig: ...
+            except Exception:
+                pass  # se não houver regra para "passado", ignore
+
+            # Escolha/Inferência da escala de destino
+            destino_escala_id = request.form.get("destino_escala_id", type=int)
+            if not destino_escala_id:
+                # Tentativa de inferir: mesmo dia da semana e bucket de turno
+                minhas = (Escala.query
+                          .filter_by(cooperado_id=me.id)
+                          .order_by(Escala.id.asc())
+                          .all())
+                wd_o = _weekday_from_data_str(orig_e.data)
+                buck_o = _turno_bucket(orig_e.turno, orig_e.horario)
+                candidatas = [e for e in minhas
+                              if _weekday_from_data_str(e.data) == wd_o
+                              and _turno_bucket(e.turno, e.horario) == buck_o]
+                if len(candidatas) == 1:
+                    destino_escala_id = candidatas[0].id
+                elif len(candidatas) == 0:
+                    flash("Você não tem plantões compatíveis (mesmo dia da semana e turno).", "danger")
+                    return redirect(url_for("portal_cooperado"))
+                else:
+                    flash("Selecione no modal qual dos seus plantões compatíveis deseja usar.", "warning")
+                    return redirect(url_for("portal_cooperado"))
+
+            # Escala de destino (lock)
+            dest_e = (Escala.query
+                      .filter_by(id=destino_escala_id)
+                      .with_for_update(nowait=True)
+                      .first())
+            if not dest_e or dest_e.cooperado_id != me.id:
+                flash("Seleção de escala inválida.", "danger")
+                return redirect(url_for("portal_cooperado"))
+
+            # Não permitir trocar a mesma escala com ela mesma
+            if dest_e.id == orig_e.id:
+                flash("Troca inválida: plantões idênticos.", "danger")
+                return redirect(url_for("portal_cooperado"))
+
+            # Valida compatibilidade dia/turno (seu critério atual)
+            wd_orig = _weekday_from_data_str(orig_e.data)
+            wd_dest = _weekday_from_data_str(dest_e.data)
+            buck_orig = _turno_bucket(orig_e.turno, orig_e.horario)
+            buck_dest = _turno_bucket(dest_e.turno, dest_e.horario)
+            if wd_orig is None or wd_dest is None or wd_orig != wd_dest or buck_orig != buck_dest:
+                flash("Troca incompatível: precisa ser mesmo dia da semana e mesmo turno (dia/noite).", "danger")
+                return redirect(url_for("portal_cooperado"))
+
+            # (Opcional) checar se ambos pertencem ao mesmo restaurante/contrato, se isso for uma regra
+            # if (orig_e.restaurante_id != dest_e.restaurante_id):
+            #     flash("Troca inválida: restaurantes diferentes.", "danger")
+            #     return redirect(url_for("portal_cooperado"))
+
+            solicitante  = Cooperado.query.get(t.solicitante_id)
+            destinatario = me  # quem está aceitando
+
+            # Monta linhas do histórico/afetação
+            linhas = [
+                {
+                    "dia": _escala_label(orig_e).split(" • ")[0],
+                    "turno_horario": " • ".join([x for x in [(orig_e.turno or "").strip(), (orig_e.horario or "").strip()] if x]),
+                    "contrato": (orig_e.contrato or "").strip(),
+                    "saiu": solicitante.nome if solicitante else "",
+                    "entrou": destinatario.nome if destinatario else "",
+                },
+                {
+                    "dia": _escala_label(dest_e).split(" • ")[0],
+                    "turno_horario": " • ".join([x for x in [(dest_e.turno or "").strip(), (dest_e.horario or "").strip()] if x]),
+                    "contrato": (dest_e.contrato or "").strip(),
+                    "saiu": destinatario.nome if destinatario else "",
+                    "entrou": solicitante.nome if solicitante else "",
+                }
+            ]
+            afetacao_json = {"linhas": linhas}
+
+            # Aplica a troca (swap dos cooperado_id)
+            solicitante_id = orig_e.cooperado_id
+            destino_id = dest_e.cooperado_id
+            orig_e.cooperado_id, dest_e.cooperado_id = destino_id, solicitante_id
+
+            # Atualiza a solicitação
+            t.status = "aprovada"
+            t.aplicada_em = datetime.utcnow()
+
+            prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
+            t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps(afetacao_json, ensure_ascii=False)
+
+            # (Opcional) marcar quem aprovou
+            t.aprovada_por_id = me.id if hasattr(t, "aprovada_por_id") else getattr(t, "aprovada_por_id", None)
+
+        # <- COMMIT automático do with db.session.begin()
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        current_app.logger.exception("Erro ao aprovar troca %s", troca_id)
+        flash("Não foi possível aplicar a troca agora. Tente novamente.", "danger")
+        return redirect(url_for("portal_cooperado"))
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Falha inesperada ao aprovar troca %s", troca_id)
+        flash("Ocorreu um erro inesperado ao aplicar a troca.", "danger")
         return redirect(url_for("portal_cooperado"))
 
-    destino_escala_id = request.form.get("destino_escala_id", type=int)
-    orig_e = Escala.query.get(t.origem_escala_id)
-    if not orig_e:
-        flash("Plantão de origem inválido.", "danger")
-        return redirect(url_for("portal_cooperado"))
+    # Notificações (fora da transação; melhor esforço)
+    try:
+        if 'notificar' in globals():
+            # Ex.: notificar(usuario_id, titulo, corpo)
+            if solicitante and getattr(solicitante, "usuario_id", None):
+                notificar(solicitante.usuario_id,
+                          "Troca aprovada",
+                          f"Sua solicitação de troca #{troca_id} foi aprovada por {me.nome}.")
+            notificar(me.usuario_id,
+                      "Troca aplicada",
+                      f"A troca #{troca_id} foi aplicada com sucesso.")
+    except Exception:
+        current_app.logger.warning("Falha ao enviar notificações da troca %s", troca_id)
 
-    if not destino_escala_id:
-        minhas = Escala.query.filter_by(cooperado_id=me.id).order_by(Escala.id.asc()).all()
-        wd_o = _weekday_from_data_str(orig_e.data)
-        buck_o = _turno_bucket(orig_e.turno, orig_e.horario)
-        candidatas = [e for e in minhas
-                      if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o]
-        if len(candidatas) == 1:
-            destino_escala_id = candidatas[0].id
-        elif len(candidatas) == 0:
-            flash("Você não tem plantões compatíveis (mesmo dia da semana e turno).", "danger")
-            return redirect(url_for("portal_cooperado"))
-        else:
-            flash("Selecione no modal qual dos seus plantões compatíveis deseja usar.", "warning")
-            return redirect(url_for("portal_cooperado"))
-
-    dest_e = Escala.query.get(destino_escala_id)
-    if not dest_e or dest_e.cooperado_id != me.id:
-        flash("Seleção de escala inválida.", "danger")
-        return redirect(url_for("portal_cooperado"))
-
-    wd_orig = _weekday_from_data_str(orig_e.data)
-    wd_dest = _weekday_from_data_str(dest_e.data)
-    buck_orig = _turno_bucket(orig_e.turno, orig_e.horario)
-    buck_dest = _turno_bucket(dest_e.turno, dest_e.horario)
-    if wd_orig is None or wd_dest is None or wd_orig != wd_dest or buck_orig != buck_dest:
-        flash("Troca incompatível: precisa ser mesmo dia da semana e mesmo turno (dia/noite).", "danger")
-        return redirect(url_for("portal_cooperado"))
-
-    solicitante = Cooperado.query.get(t.solicitante_id)
-    destinatario = me
-    linhas = [
-        {
-            "dia": _escala_label(orig_e).split(" • ")[0],
-            "turno_horario": " • ".join([x for x in [(orig_e.turno or "").strip(), (orig_e.horario or "").strip()] if x]),
-            "contrato": (orig_e.contrato or "").strip(),
-            "saiu": solicitante.nome,
-            "entrou": destinatario.nome,
-        },
-        {
-            "dia": _escala_label(dest_e).split(" • ")[0],
-            "turno_horario": " • ".join([x for x in [(dest_e.turno or "").strip(), (dest_e.horario or "").strip()] if x]),
-            "contrato": (dest_e.contrato or "").strip(),
-            "saiu": destinatario.nome,
-            "entrou": solicitante.nome,
-        }
-    ]
-    afetacao_json = {"linhas": linhas}
-
-    solicitante_id = orig_e.cooperado_id
-    destino_id = dest_e.cooperado_id
-    orig_e.cooperado_id, dest_e.cooperado_id = destino_id, solicitante_id
-
-    t.status = "aprovada"
-    t.aplicada_em = datetime.utcnow()
-    prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
-    t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps(afetacao_json, ensure_ascii=False)
-
-    db.session.commit()
-    flash("Troca aplicada com sucesso!", "success")
+    flash("Troca aprovada e aplicada com sucesso!", "success")
     return redirect(url_for("portal_cooperado"))
 
 @app.post("/trocas/<int:troca_id>/recusar")
@@ -4533,15 +4472,6 @@ except Exception as _e:
 def too_large(e):
     flash("Arquivo excede o tamanho máximo permitido (32MB).", "danger")
     return redirect(url_for('admin_documentos'))
-
-# =========================
-# Inicialização automática do DB em servidores (Gunicorn/Render)
-# =========================
-try:
-    with app.app_context():
-        init_db()
-except Exception as _e:
-    ...
 
 # ==== TABELAS (upload/abrir/baixar) =========================================
 from flask import (
