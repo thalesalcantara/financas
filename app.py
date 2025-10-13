@@ -5034,10 +5034,6 @@ def portal_restaurante_avisos():
 # AVISOS — Portal Restaurante
 # =========================
 
-# =========================
-# AVISOS — Portal Restaurante
-# =========================
-
 # --- OFICIAL: marcar UM aviso como lido (endpoints únicos p/ evitar colisão)
 @app.post("/portal/restaurante/avisos/<int:aviso_id>/marcar-lido", endpoint="rest_marcar_aviso_lido")
 @role_required("restaurante")
@@ -5470,68 +5466,41 @@ def admin_tabelas_normalize_arquivo_url():
 # =========================
 
 from datetime import datetime
-from flask import request, session, redirect, url_for, render_template, jsonify
-from sqlalchemy import or_
+from flask import request, session, redirect, url_for, render_template, jsonify, flash, abort
+from sqlalchemy import or_, and_, func
 
-# --- Helpers de contagem (usam as queries já definidas no app) ---
+# -------------------------------------------------------------------
+# Helpers de contagem (usam as queries já definidas no app)
+# -------------------------------------------------------------------
 
 def count_unread_for_coop(coop: Cooperado) -> int:
     """
     Conta quantos avisos aplicáveis ao cooperado ainda não foram marcados como lidos.
+    Considera avisos 'global' e 'cooperado'. Respeita 'ativo'; se sua app tiver
+    janela (inicio_em/fim_em) em get_avisos_for_cooperado, ela será respeitada.
     """
     if not coop:
         return 0
     try:
         avisos = get_avisos_for_cooperado(coop)
     except NameError:
-        # Fallback: global + cooperado (broadcast)
         avisos = (Aviso.query
                   .filter(Aviso.ativo.is_(True))
                   .filter(or_(Aviso.tipo == "global", Aviso.tipo == "cooperado"))
                   .all())
     if not avisos:
         return 0
+
     ids = [a.id for a in avisos]
     lidos = {
         r.aviso_id
-        for r in AvisoLeitura.query
-            .filter(AvisoLeitura.cooperado_id == coop.id,
-                    AvisoLeitura.aviso_id.in_(ids))
-            .all()
-    }
-    return sum(1 for aid in ids if aid not in lidos)
-
-
-def count_unread_for_rest(rest: Restaurante) -> int:
-    """
-    Conta quantos avisos aplicáveis ao restaurante ainda não foram marcados como lidos.
-    """
-    if not rest:
-        return 0
-    try:
-        avisos = get_avisos_for_restaurante(rest)
-    except NameError:
-        # Fallback: global + restaurante (associados ou broadcast)
-        avisos = (Aviso.query
-                  .filter(Aviso.ativo.is_(True))
-                  .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
+        for r in (AvisoLeitura.query
+                  .filter(AvisoLeitura.cooperado_id == coop.id,
+                          AvisoLeitura.aviso_id.in_(ids))
                   .all())
-    if not avisos:
-        return 0
-    ids = [a.id for a in avisos]
-    lidos = {
-        r.aviso_id
-        for r in AvisoLeitura.query
-            .filter(AvisoLeitura.restaurante_id == rest.id,
-                    AvisoLeitura.aviso_id.in_(ids))
-            .all()
     }
     return sum(1 for aid in ids if aid not in lidos)
 
-
-# === Avisos: contador de não lidos (Cooperado/Restaurante) + API ===
-from flask import jsonify, session
-from sqlalchemy import or_, and_, func
 
 def count_unread_for_rest(rest: Restaurante) -> int:
     """
@@ -5540,15 +5509,15 @@ def count_unread_for_rest(rest: Restaurante) -> int:
       - Avisos 'global'
       - Avisos 'restaurante' broadcast (sem restaurantes associados)
       - Avisos 'restaurante' destinados especificamente a este restaurante
-    Respeita janela (inicio_em/fim_em) e 'ativo' via _avisos_base_query().
+    Respeita janela (inicio_em/fim_em) e 'ativo' se seu helper já as aplicar.
     """
     if not rest:
         return 0
 
     try:
-        avisos = get_avisos_for_restaurante(rest)  # helper já definida no app
+        avisos = get_avisos_for_restaurante(rest)  # helper oficial do seu app
     except NameError:
-        # Fallback seguro (se a helper não estiver disponível por algum motivo)
+        # Fallback seguro (se o helper não existir)
         now = func.now()
         avisos = (Aviso.query
                   .filter(Aviso.ativo.is_(True))
@@ -5581,7 +5550,9 @@ def count_unread_for_rest(rest: Restaurante) -> int:
     return sum(1 for aid in ids if aid not in lidos)
 
 
-# --- API usada pelo front: /avisos/unread_count (resolve o 404) ---
+# -------------------------------------------------------------------
+# API usada pelo front: /avisos/unread_count
+# -------------------------------------------------------------------
 @app.get("/avisos/unread_count")
 def avisos_unread_count():
     """
@@ -5595,13 +5566,12 @@ def avisos_unread_count():
         tipo = session.get("user_tipo")
         if not uid or not tipo:
             resp = jsonify({"unread": 0})
-            # evita cache agressivo no front/CDN
             resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
             return resp, 200
 
         if tipo == "cooperado":
             coop = Cooperado.query.filter_by(usuario_id=uid).first()
-            n = count_unread_for_coop(coop) if coop else 0  # assume que você já tem essa helper
+            n = count_unread_for_coop(coop) if coop else 0
             resp = jsonify({"unread": int(n)})
             resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
             return resp, 200
@@ -5624,85 +5594,25 @@ def avisos_unread_count():
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         return resp, 200
 
+
 # =========================
-# AVISOS — Ações (cooperado)
+# AVISOS — Portal Restaurante (listar e marcar lidos)
 # =========================
 
-# --- listar avisos no portal do restaurante (exibe só o que ele pode ver)
 @app.get("/portal/restaurante/avisos", endpoint="portal_restaurante_avisos")
 @role_required("restaurante")
 def portal_restaurante_avisos():
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-    avisos = get_avisos_for_restaurante(rest)  # só global/restaurante (broadcast ou marcado)
-
-    # quais já foram lidos
-    lidos = {
-        r.aviso_id
-        for r in AvisoLeitura.query.filter_by(restaurante_id=rest.id).all()
-    }
-    for a in avisos:
-        a.lido = (a.id in lidos)
-
-    return render_template("portal_restaurante_avisos.html", avisos=avisos)
-
-# --- marcar 1 aviso como lido (REST)
-@app.post("/portal/restaurante/avisos/<int:aviso_id>/marcar-lido", endpoint="rest_marcar_aviso_lido")
-@role_required("restaurante")
-def rest_marcar_aviso_lido(aviso_id: int):
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-    Aviso.query.get_or_404(aviso_id)
-
-    ja = (AvisoLeitura.query
-          .filter_by(restaurante_id=rest.id, aviso_id=aviso_id)
-          .first())
-    if not ja:
-        db.session.add(AvisoLeitura(restaurante_id=rest.id, aviso_id=aviso_id, lido_em=datetime.utcnow()))
-        db.session.commit()
-
-    flash("Aviso marcado como lido.", "success")
-    return redirect(url_for("portal_restaurante_avisos"))
-
-# --- marcar TODOS como lidos (REST)
-@app.post("/portal/restaurante/avisos/marcar-todos", endpoint="rest_marcar_todos_avisos_lidos")
-@role_required("restaurante")
-def rest_marcar_todos_avisos_lidos():
+    """
+    Lista apenas avisos visíveis ao restaurante atual (global + restaurante,
+    broadcast ou específicos), marcando quais já foram lidos.
+    """
     u_id = session.get("user_id")
     rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
 
-    avisos = get_avisos_for_restaurante(rest)
-    lidos_ids = {
-        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
-        .filter(AvisoLeitura.restaurante_id == rest.id).all()
-    }
-    now = datetime.utcnow()
-    novos = [AvisoLeitura(restaurante_id=rest.id, aviso_id=a.id, lido_em=now)
-             for a in avisos if a.id not in lidos_ids]
-    if novos:
-        db.session.bulk_save_objects(novos)
-        db.session.commit()
-
-    flash("Todos os avisos foram marcados como lidos.", "success")
-    return redirect(url_for("portal_restaurante_avisos"))
-
-
-
-# =========================
-# AVISOS — Ações (restaurante)
-# =========================
-
-@app.get("/portal/restaurante/avisos")
-@role_required("restaurante")
-def portal_restaurante_avisos():
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-
-    # avisos aplicáveis
+    # Preferir helper oficial (respeita ativo/janelas/associação)
     try:
         avisos_db = get_avisos_for_restaurante(rest)
     except NameError:
-        # fallback: global + restaurante (associados ou broadcast)
         avisos_db = (Aviso.query
                      .filter(Aviso.ativo.is_(True))
                      .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
@@ -5715,6 +5625,7 @@ def portal_restaurante_avisos():
         .filter(AvisoLeitura.restaurante_id == rest.id).all()
     }
 
+    # extrai corpo onde quer que esteja
     def corpo_do_aviso(a: Aviso) -> str:
         for k in ("corpo_html","html","conteudo_html","mensagem_html","descricao_html","texto_html",
                   "corpo","conteudo","mensagem","descricao","texto","resumo","body","content"):
@@ -5741,9 +5652,37 @@ def portal_restaurante_avisos():
     )
 
 
-@app.post("/avisos-restaurante/marcar-todos", endpoint="marcar_todos_avisos_lidos_restaurante")
+@app.post("/portal/restaurante/avisos/<int:aviso_id>/marcar-lido", endpoint="rest_marcar_aviso_lido")
 @role_required("restaurante")
-def marcar_todos_avisos_lidos_restaurante():
+def rest_marcar_aviso_lido(aviso_id: int):
+    """
+    Marca um único aviso como lido para o restaurante atual (idempotente).
+    """
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+    Aviso.query.get_or_404(aviso_id)
+
+    ja = (AvisoLeitura.query
+          .filter_by(restaurante_id=rest.id, aviso_id=aviso_id)
+          .first())
+    if not ja:
+        db.session.add(AvisoLeitura(
+            restaurante_id=rest.id,
+            aviso_id=aviso_id,
+            lido_em=datetime.utcnow()
+        ))
+        db.session.commit()
+
+    flash("Aviso marcado como lido.", "success")
+    return redirect(url_for("portal_restaurante_avisos"))
+
+
+@app.post("/portal/restaurante/avisos/marcar-todos", endpoint="rest_marcar_todos_avisos_lidos")
+@role_required("restaurante")
+def rest_marcar_todos_avisos_lidos():
+    """
+    Marca todos os avisos visíveis ao restaurante atual como lidos (idempotente).
+    """
     u_id = session.get("user_id")
     rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
 
@@ -5761,15 +5700,14 @@ def marcar_todos_avisos_lidos_restaurante():
     }
 
     now = datetime.utcnow()
-    pendentes = [a for a in avisos if a.id not in lidos_ids]
-    if pendentes:
-        db.session.bulk_save_objects([
-            AvisoLeitura(restaurante_id=rest.id, aviso_id=a.id, lido_em=now) for a in pendentes
-        ])
+    novos = [AvisoLeitura(restaurante_id=rest.id, aviso_id=a.id, lido_em=now)
+             for a in avisos if a.id not in lidos_ids]
+    if novos:
+        db.session.bulk_save_objects(novos)
         db.session.commit()
 
+    flash("Todos os avisos foram marcados como lidos.", "success")
     return redirect(url_for("portal_restaurante_avisos"))
-
 
 # =========================
 # Main
