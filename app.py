@@ -2598,43 +2598,6 @@ def marcar_aviso_lido_universal(aviso_id: int):
 
     return ("", 403) if request.method == "POST" else redirect(url_for("login"))
 
-
-# Marcar aviso como lido (funciona com GET e POST)
-@app.route("/avisos/<int:aviso_id>/lido", methods=["POST", "GET"])
-def marcar_aviso_lido_universal(aviso_id: int):
-    # se não logado, bloqueia
-    if "user_id" not in session:
-        return redirect(url_for("login")) if request.method == "GET" else ("", 401)
-
-    user_id = session.get("user_id")
-    user_tipo = session.get("user_tipo")
-    Aviso.query.get_or_404(aviso_id)
-
-    def _ok_response():
-        if request.method == "POST":
-            return ("", 204)  # útil para fetch/AJAX
-        return redirect(request.referrer or url_for("portal_cooperado_avisos"))
-
-    if user_tipo == "cooperado":
-        coop = Cooperado.query.filter_by(usuario_id=user_id).first()
-        if not coop:
-            return ("", 403) if request.method == "POST" else redirect(url_for("login"))
-        if not AvisoLeitura.query.filter_by(aviso_id=aviso_id, cooperado_id=coop.id).first():
-            db.session.add(AvisoLeitura(aviso_id=aviso_id, cooperado_id=coop.id, lido_em=datetime.utcnow()))
-            db.session.commit()
-        return _ok_response()
-
-    if user_tipo == "restaurante":
-        rest = Restaurante.query.filter_by(usuario_id=user_id).first()
-        if not rest:
-            return ("", 403) if request.method == "POST" else redirect(url_for("login"))
-        if not AvisoLeitura.query.filter_by(aviso_id=aviso_id, restaurante_id=rest.id).first():
-            db.session.add(AvisoLeitura(aviso_id=aviso_id, restaurante_id=rest.id, lido_em=datetime.utcnow()))
-            db.session.commit()
-        return _ok_response()
-
-    return ("", 403) if request.method == "POST" else redirect(url_for("login"))
-
 # =========================
 # CRUD Cooperados / Restaurantes / Senhas (Admin)
 # =========================
