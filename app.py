@@ -5084,6 +5084,13 @@ def marcar_todos_avisos_lidos_restaurante():
     db.session.commit()
     return redirect(url_for("portal_restaurante_avisos"))
 
+@app.post("/portal/restaurante/avisos/<int:aviso_id>/desmarcar", endpoint="desmarcar_aviso_lido")
+def desmarcar_aviso_lido(aviso_id):
+    # TODO: sua lógica pra desmarcar como lido
+    # ...
+    return redirect(url_for("portal_restaurante_avisos"))
+
+
 # =========================
 # Main
 # =========================
