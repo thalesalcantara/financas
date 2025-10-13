@@ -4050,11 +4050,136 @@ def recusar_troca(troca_id):
 # =========================
 # PORTAL RESTAURANTE
 # =========================
-@app.post("/portal/restaurante/avisos/<int:aviso_id>/desmarcar", endpoint="desmarcar_aviso_lido")
-@login_required
-def desmarcar_aviso_lido(aviso_id):
-    aviso = Aviso.query.get_or_404(aviso_id)
-    aviso.lido = False
+# -------------------- Avisos (aba "avisos") --------------------
+    avisos = []
+    avisos_nao_lidos_count = 0
+    current_year = datetime.now().year
+    if view == "avisos":
+        avisos = _fetch_avisos_for_restaurante(rest)
+        lidos_ids = {r.aviso_id for r in AvisoLeitura.query.filter_by(restaurante_id=rest.id).all()}
+        for a in avisos:
+            a.lido = (a.id in lidos_ids)
+        avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
+
+    # >>> Contador geral de não lidos (para TOAST/SOM no layout)
+    unread = _count_unread_for_restaurante(rest)
+
+    # ---- URLs/flags para template
+    try:
+        url_lancar_producao = url_for("lancar_producao")
+    except BuildError:
+        url_lancar_producao = "/portal/restaurante/lancar_producao"
+
+    has_editar_lanc = ("editar_lancamento" in app.view_functions)
+
+    # -------------------- Render --------------------
+    return render_template(
+        "restaurante_dashboard.html",
+        rest=rest,
+        cooperados=cooperados,
+        filtro_inicio=di,
+        filtro_fim=df,
+        filtro_mes=(mes or ""),
+        periodo_desc=periodo_desc,
+        total_bruto=total_bruto,
+        total_inss=total_inss,
+        total_liquido=total_liquido,
+        total_qtd=total_qtd,
+        total_entregas=total_entregas,
+        view=view,
+        agenda=agenda,
+        dias_list=dias_list,
+        ref_data=ref,
+        modo=modo,
+        lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
+        total_lanc_valor=total_lanc_valor,
+        total_lanc_entregas=total_lanc_entregas,
+        # Avisos / Toast
+        avisos=(avisos if view == "avisos" else []),
+        avisos_nao_lidos_count=avisos_nao_lidos_count,
+        current_year=current_year,
+        unread=unread,  # <== usado no layout para o TOAST persistente
+        # URLs/flags
+        url_lancar_producao=url_lancar_producao,
+        has_editar_lanc=has_editar_lanc,
+    )
+
+# =========================
+# AVISOS (rotas do Portal Restaurante)
+# =========================
+@app.get("/portal/restaurante/avisos")
+@role_required("restaurante")
+def portal_restaurante_avisos():
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+
+    # avisos aplicáveis
+    try:
+        avisos_db = get_avisos_for_restaurante(rest)
+    except NameError:
+        # fallback: global + restaurante (associados ou broadcast)
+        avisos_db = (Aviso.query
+                     .filter(Aviso.ativo.is_(True))
+                     .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
+                     .order_by(Aviso.fixado.desc(), Aviso.criado_em.desc())
+                     .all())
+
+    # ids já lidos
+    lidos_ids = {
+        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
+        .filter(AvisoLeitura.restaurante_id == rest.id).all()
+    }
+
+    def corpo_do_aviso(a: Aviso) -> str:
+        for k in ("corpo_html","html","conteudo_html","mensagem_html","descricao_html","texto_html",
+                  "corpo","conteudo","mensagem","descricao","texto","resumo","body","content"):
+            v = getattr(a, k, None)
+            if isinstance(v, str) and v.strip():
+                return v
+        return ""
+
+    avisos = [{
+        "id": a.id,
+        "titulo": a.titulo or "Aviso",
+        "criado_em": a.criado_em,
+        "lido": (a.id in lidos_ids),
+        "prioridade_alta": (str(a.prioridade or "").lower() == "alta"),
+        "corpo_html": corpo_do_aviso(a),
+    } for a in avisos_db]
+
+    avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
+    return render_template(
+        "portal_restaurante_avisos.html",   # crie/clone seu template
+        avisos=avisos,
+        avisos_nao_lidos_count=avisos_nao_lidos_count,
+        current_year=datetime.now().year,
+    )
+
+@app.post("/avisos-restaurante/marcar-todos", endpoint="marcar_todos_avisos_lidos_restaurante")
+@role_required("restaurante")
+def marcar_todos_avisos_lidos_restaurante():
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+
+    try:
+        avisos = get_avisos_for_restaurante(rest)
+    except NameError:
+        avisos = (Aviso.query
+                  .filter(Aviso.ativo.is_(True))
+                  .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
+                  .all())
+
+    lidos_ids = {
+        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
+        .filter(AvisoLeitura.restaurante_id == rest.id).all()
+    }
+
+    now = datetime.utcnow()
+    for a in avisos:
+        if a.id not in lidos_ids:
+            db.session.add(AvisoLeitura(
+                restaurante_id=rest.id, aviso_id=a.id, lido_em=now
+            ))
     db.session.commit()
     return redirect(url_for("portal_restaurante_avisos"))
     
