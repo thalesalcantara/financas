@@ -1051,6 +1051,79 @@
       }
     });
   </script>
+<!-- Script: AVALIAÇÃO (estrelas) -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.avaliar-form').forEach(form => {
+    const hidden = {
+      nota: form.querySelector('input[name="nota"]'),
+      geral: form.querySelector('input[name="av_geral"]'),
+      amb:  form.querySelector('input[name="av_apresentacao"]'),
+      trat: form.querySelector('input[name="av_educacao"]'),
+      sup:  form.querySelector('input[name="av_eficiencia"]'),
+    };
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const geralGroup = form.querySelector('.stars-group[data-field="av_geral"]');
+
+    function renderGroup(group, value){
+      const stars = group.querySelectorAll('.star-btn i');
+      stars.forEach((icon, idx) => {
+        icon.className = 'bi ' + (idx < value ? 'bi-star-fill' : 'bi-star');
+      });
+    }
+
+    function getVal(input){ return Math.max(0, Math.min(5, Number(input?.value||0) || 0)); }
+
+    function updateDerived(){
+      const a = getVal(hidden.amb);
+      const t = getVal(hidden.trat);
+      const s = getVal(hidden.sup);
+      const ready = a>0 && t>0 && s>0;
+
+      const media = ready ? (a + t + s) / 3 : 0;
+      const mediaRounded10 = Math.round(media * 10) / 10;    // 1 casa
+      const mediaToStars   = Math.round(media);              // para encher 1..5
+
+      if (ready){
+        hidden.geral.value = String(mediaRounded10);
+        hidden.nota.value  = String(mediaRounded10);
+      } else {
+        hidden.geral.value = '';
+        hidden.nota.value  = '';
+      }
+      renderGroup(geralGroup, mediaToStars);
+      submitBtn.disabled = !ready;
+    }
+
+    // Bind grupos selecionáveis
+    form.querySelectorAll('.rating-stars.selectable.stars-group').forEach(group => {
+      group.querySelectorAll('.star-btn').forEach(btn => {
+        const val = Number(btn.dataset.value);
+        btn.addEventListener('click', () => {
+          group.dataset.value = val;
+          const field = group.dataset.field;
+          const hiddenInput = form.querySelector(`input[name="${field}"]`);
+          if (hiddenInput) hiddenInput.value = String(val);
+          renderGroup(group, val);
+          updateDerived();
+        });
+        btn.addEventListener('mouseenter', () => renderGroup(group, val));
+      });
+      // restaura visual ao sair do grupo
+      group.addEventListener('mouseleave', () => {
+        const current = Number(group.dataset.value || 0);
+        renderGroup(group, current);
+      });
+      // inicial visual
+      renderGroup(group, Number(group.dataset.value || 0));
+    });
+
+    // inicia geral zerado
+    renderGroup(geralGroup, 0);
+    updateDerived();
+  });
+});
+</script>
 
   <!-- OFFCANVAS: FINANÇAS -->
   <div class="offcanvas offcanvas-bottom" tabindex="-1" id="financasSheet" aria-labelledby="financasSheetLabel" style="height:92vh">
