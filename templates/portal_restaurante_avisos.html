@@ -166,12 +166,13 @@
               </div>
             </div>
 
+            <!-- CONTEÚDO DO AVISO -->
             <div class="content">
-              {% set html = a.conteudo_html or a.mensagem_html or a.descricao_html %}
-              {% set txt  = a.conteudo      or a.mensagem      or a.descricao %}
-              {% if html %}
+              {% set html = (a.conteudo_html or a.mensagem_html or a.descricao_html) %}
+              {% set txt  = (a.conteudo or a.mensagem or a.descricao) %}
+              {% if html and html|trim %}
                 {{ html|safe }}
-              {% elif txt %}
+              {% elif txt and txt|trim %}
                 <p class="mb-0">{{ txt|e|replace('\n','<br>')|safe }}</p>
               {% else %}
                 <p class="text-muted mb-0"><em>(sem conteúdo)</em></p>
@@ -230,7 +231,6 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
   (function(){
-    // ====== Helpers ======
     const $ = (sel, ctx=document)=>ctx.querySelector(sel);
     const $$ = (sel, ctx=document)=>Array.from(ctx.querySelectorAll(sel));
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -241,18 +241,12 @@
       if (n > 0){ badge.style.display='inline-block'; badge.textContent = n; }
       else { badge.style.display='none'; badge.textContent='0'; }
     }
-    function currentUnreadCount(){
-      return $$('.aviso.unread').length;
-    }
+    function currentUnreadCount(){ return $$('.aviso.unread').length; }
 
-    // ====== AJAX marcar lido ======
     async function postJSON(url, body){
       const res = await fetch(url, {
         method:'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrf ? {'X-CSRFToken': csrf} : {})
-        },
+        headers:{ 'Content-Type':'application/json', ...(csrf?{'X-CSRFToken':csrf}:{}) },
         body: JSON.stringify(body||{})
       });
       if (!res.ok) throw new Error('Falha na requisição');
@@ -267,7 +261,7 @@
       div.innerHTML = `
         <div class="toast show" data-bs-delay="1500" role="status" aria-live="polite" aria-atomic="true">
           <div class="toast-header ${ok?'bg-success-subtle':'bg-danger-subtle'}">
-            <strong class="me-auto">${ok? 'Pronto' : 'Erro'}</strong>
+            <strong class="me-auto">${ok?'Pronto':'Erro'}</strong>
             <button class="btn-close" data-bs-dismiss="toast"></button>
           </div>
           <div class="toast-body">${msg}</div>
@@ -280,20 +274,18 @@
       const id = btn.getAttribute('data-id');
       const card = document.getElementById('aviso-'+id);
       if (!id || !card) return;
-
       const form = btn.closest('form');
       const url = form?.getAttribute('action');
       if (!url) return;
 
       try{
         await postJSON(url, {});
-        // Atualiza UI: vira lido e remove botão
         card.classList.remove('unread');
         card.setAttribute('data-lido','1');
         const badge = card.querySelector('.badge');
         if (badge){ badge.className = 'badge text-bg-light'; badge.textContent = 'Lido'; }
         const actions = card.querySelector('.actions');
-        actions.innerHTML = ''; // sem “desmarcar”
+        actions.innerHTML = '';
         toastQuick('Aviso marcado como lido.');
         setUnreadBadge(currentUnreadCount());
       }catch(e){
@@ -302,7 +294,6 @@
     }
 
     function wireButtons(){
-      // Intercepta submit dos botões para virarem AJAX
       $$('#listaAvisos .btnMark').forEach(btn=>{
         btn.addEventListener('click', function(ev){
           ev.preventDefault();
@@ -310,7 +301,6 @@
         });
       });
 
-      // Todos lidos
       const btnAll = document.getElementById('btnAllRead');
       const formAll = document.getElementById('formAllRead');
       if (btnAll && formAll){
@@ -319,7 +309,6 @@
           if (!confirm('Marcar todos os avisos como lidos?')) return;
           try{
             await postJSON(formAll.getAttribute('action'), {});
-            // Atualiza visual
             $$('.aviso.unread').forEach(card=>{
               card.classList.remove('unread');
               card.setAttribute('data-lido','1');
@@ -337,7 +326,6 @@
       }
     }
 
-    // ====== Som ao detectar não lidos (na carga) ======
     function tryPlayNewSound(){
       const audio = document.getElementById('sndAvisos');
       if (!audio) return;
@@ -347,11 +335,8 @@
       }
     }
 
-    // Boot
     wireButtons();
     tryPlayNewSound();
-
-    // Re-wire se a lista for re-renderizada por AJAX
     const obs = new MutationObserver(()=> wireButtons());
     obs.observe(document.getElementById('listaAvisos'), {childList:true, subtree:true});
   })();
