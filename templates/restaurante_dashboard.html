@@ -305,24 +305,26 @@
               </div>
               <hr class="my-2">
               <div class="aviso-body">
-                {% set html = a.corpo_html or a.conteudo_html or a.mensagem_html or a.descricao_html or a.body_html or a.recado_html %}
-                {% if html and html|trim %}
-                  {{ html|safe }}
-                {% else %}
-                  {% set txt = a.corpo or a.conteudo or a.mensagem or a.texto or a.descricao or a.body or a.message or a.content or a.recado %}
-                  {% if txt and txt|trim %}
-                    <p class="mb-0">{{ txt|e|replace('\r\n','\n')|replace('\n','<br>')|safe }}</p>
-                  {% else %}
-                    <p class="text-muted mb-0"><em>(sem conteúdo)</em></p>
-                  {% endif %}
-                {% endif %}
-              </div>
-            </div>
-            {% endfor %}
-          {% else %}
-            <div class="card card-body text-muted"><i class="bi bi-inbox me-1"></i> Nenhum aviso disponível.</div>
-          {% endif %}
-        </div>
+  {# 1) tenta HTML tanto no objeto raiz quanto no a.dados #}
+  {% set html = (
+    a.corpo_html or a.conteudo_html or a.mensagem_html or a.descricao_html or a.body_html or a.recado_html
+    or (a.dados and (a.dados.corpo_html or a.dados.conteudo_html or a.dados.mensagem_html or a.dados.descricao_html or a.dados.body_html or a.dados.recado_html))
+  ) %}
+  {% if html and html|trim %}
+    {{ html|safe }}
+  {% else %}
+    {# 2) texto simples com todos os nomes possíveis (inclusive dentro de a.dados) #}
+    {% set txt = (
+      a.corpo or a.conteudo or a.mensagem or a.texto or a.descricao or a.body or a.message or a.content or a.recado
+      or (a.dados and (a.dados.corpo or a.dados.conteudo or a.dados.mensagem or a.dados.texto or a.dados.descricao or a.dados.body or a.dados.message or a.dados.content or a.dados.recado))
+    ) %}
+    {% if txt and txt|trim %}
+      <p class="mb-0">{{ txt|e|replace('\r\n','\n')|replace('\n','<br>')|safe }}</p>
+    {% else %}
+      <p class="text-muted mb-0"><em>(sem conteúdo)</em></p>
+    {% endif %}
+  {% endif %}
+</div>
       </section>
 
       <!-- ===== LANCAMENTOS ===== -->
