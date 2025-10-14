@@ -201,54 +201,46 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       <i class="bi bi-person-badge"></i> <span>Cooperados</span>
     </a>
 
-   <!-- Estabelecimentos (tab) -->
-<a class="nav-link {{ 'active' if _tab=='restaurantes' else '' }}"
-   data-bs-toggle="tab"
-   data-bs-target="#restaurantes"
-   href="#restaurantes"
-   role="tab"
-   aria-controls="restaurantes"
-   aria-selected="{{ 'true' if _tab=='restaurantes' else 'false' }}">
-  <i class="bi bi-shop"></i> <span>Estabelecimentos</span>
-</a>
+    <!-- Estabelecimentos (tab) -->
+    <a class="nav-link {{ 'active' if _tab=='restaurantes' else '' }}"
+       data-bs-toggle="tab"
+       data-bs-target="#restaurantes"
+       href="#restaurantes"
+       role="tab"
+       aria-controls="restaurantes"
+       aria-selected="{{ 'true' if _tab=='restaurantes' else 'false' }}">
+      <i class="bi bi-shop"></i> <span>Estabelecimentos</span>
+    </a>
 
-<!-- Escalas (tab) -->
-<a class="nav-link {{ 'active' if _tab=='escalas' else '' }}"
-   data-bs-toggle="tab"
-   data-bs-target="#escalas"
-   href="#escalas"
-   role="tab"
-   aria-controls="escalas"
-   aria-selected="{{ 'true' if _tab=='escalas' else 'false' }}">
-  <i class="bi bi-calendar2-week"></i> <span>Escalas</span>
-</a>
+    <!-- Escalas (tab) -->
+    <a class="nav-link" data-bs-toggle="tab" href="#escalas"><i class="bi bi-calendar2-week"></i> <span>Escalas</span></a>
 
-<!-- Páginas dedicadas (rotas próprias, não tabs) -->
-<a class="nav-link {% if request.endpoint == 'admin_documentos' %}active{% endif %}"
-   href="{{ url_for('admin_documentos') }}">
-  <i class="bi bi-folder2"></i> <span>Documentos</span>
-</a>
+    <!-- Páginas dedicadas (rotas próprias, não tabs) -->
+    <a class="nav-link {% if request.endpoint == 'admin_documentos' %}active{% endif %}"
+       href="{{ url_for('admin_documentos') }}">
+      <i class="bi bi-folder2"></i> <span>Documentos</span>
+    </a>
 
-<a class="nav-link {% if request.endpoint == 'admin_tabelas' %}active{% endif %}"
-   href="{{ url_for('admin_tabelas') }}">
-  <i class="bi bi-table"></i> <span>Tabelas</span>
-</a>
+    <a class="nav-link {% if request.endpoint == 'admin_tabelas' %}active{% endif %}"
+       href="{{ url_for('admin_tabelas') }}">
+      <i class="bi bi-table"></i> <span>Tabelas</span>
+    </a>
 
-<a class="nav-link {% if request.endpoint == 'admin_avisos' %}active{% endif %}"
-   href="{{ url_for('admin_avisos') }}">
-  <i class="bi bi-megaphone"></i> <span>Avisos</span>
-</a>
+    <a class="nav-link {% if request.endpoint == 'admin_avisos' %}active{% endif %}"
+       href="{{ url_for('admin_avisos') }}">
+      <i class="bi bi-megaphone"></i> <span>Avisos</span>
+    </a>
 
-<!-- Config (tab) -->
-<a class="nav-link {{ 'active' if _tab=='config' else '' }}"
-   data-bs-toggle="tab"
-   data-bs-target="#config"
-   href="#config"
-   role="tab"
-   aria-controls="config"
-   aria-selected="{{ 'true' if _tab=='config' else 'false' }}">
-  <i class="bi bi-gear"></i> <span>Configurações</span>
-</a>
+    <!-- Config (tab) -->
+    <a class="nav-link {{ 'active' if _tab=='config' else '' }}"
+       data-bs-toggle="tab"
+       data-bs-target="#config"
+       href="#config"
+       role="tab"
+       aria-controls="config"
+       aria-selected="{{ 'true' if _tab=='config' else 'false' }}">
+      <i class="bi bi-gear"></i> <span>Configurações</span>
+    </a>
 
     <a class="nav-link" href="{{ url_for('logout') }}">
       <i class="bi bi-box-arrow-right"></i> <span>Sair</span>
@@ -260,40 +252,9 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   <main class="main">
     <div class="tab-content">
 
-      <!-- RESUMO (com filtro por período) -->
+      <!-- RESUMO (versão profissional/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
   {% set _resultado = (total_receitas|default(0)) - (total_despesas|default(0)) %}
-
-  <!-- Filtro do Resumo -->
-  <div class="card border-0 shadow-sm rounded-3 mb-2">
-    <div class="card-body">
-      <form method="GET" action="{{ url_for('admin_dashboard') }}" class="row g-2 align-items-end">
-        <input type="hidden" name="tab" value="resumo">
-        <div class="col-sm-4 col-md-3">
-          <label class="form-label">De</label>
-          <input type="date" class="form-control form-control-sm" name="resumo_inicio"
-                 value="{{ request.args.get('resumo_inicio','') }}">
-        </div>
-        <div class="col-sm-4 col-md-3">
-          <label class="form-label">Até</label>
-          <input type="date" class="form-control form-control-sm" name="resumo_fim"
-                 value="{{ request.args.get('resumo_fim','') }}">
-        </div>
-        <div class="col-sm-4 col-md-3 d-flex gap-2">
-          <button class="btn btn-royal btn-sm flex-grow-1">
-            <i class="bi bi-funnel"></i> Filtrar
-          </button>
-          <button type="button" id="btnResumoMes" class="btn btn-light btn-sm" title="Preencher mês atual">Mês</button>
-        </div>
-        <div class="col-md-3">
-          <a class="btn btn-outline-secondary btn-sm w-100"
-             href="{{ url_for('admin_dashboard', tab='resumo') }}">
-            Limpar
-          </a>
-        </div>
-      </form>
-    </div>
-  </div>
 
   <!-- KPIs -->
   <div class="row g-2">
@@ -418,6 +379,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       <div class="card border-0 shadow-sm rounded-3 p-3 h-100">
         <div class="d-flex justify-content-between align-items-center">
           <h6 class="mb-0"><i class="bi bi-currency-dollar me-1"></i> Parâmetro — Salário Mínimo</h6>
+           </a>
         </div>
         <hr class="my-2">
         <div class="small text-muted">Atual</div>
@@ -429,7 +391,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       </div>
     </div>
 
-    <!-- Gráfico Cooperativa -->
+    <!-- Gráficos (mantém seus IDs para reutilizar o JS existente) -->
     <div class="col-12 col-lg-6">
       <div class="card border-0 shadow-sm rounded-3 p-3 chart-card">
         <h6 class="mb-2"><i class="bi bi-graph-up-arrow"></i> Crescimento — Cooperativa</h6>
@@ -438,7 +400,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
   </div>
 
-  <!-- Gráfico Cooperados -->
   <div class="row g-2 mt-1">
     <div class="col-12">
       <div class="card border-0 shadow-sm rounded-3 p-3 chart-card">
@@ -449,25 +410,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </section>
 
-<script>
-  // Botão "Mês": preenche 1º e último dia do mês atual
-  (function(){
-    const btn = document.getElementById('btnResumoMes');
-    if(!btn) return;
-    btn.addEventListener('click', ()=>{
-      const now = new Date();
-      const y = now.getFullYear(), m = now.getMonth();
-      const first = new Date(y, m, 1);
-      const last  = new Date(y, m+1, 0);
-      const pad = n => String(n).padStart(2,'0');
-      const toISO = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-      const ini = document.querySelector('input[name="resumo_inicio"]');
-      const fim = document.querySelector('input[name="resumo_fim"]');
-      if(ini) ini.value = toISO(first);
-      if(fim) fim.value = toISO(last);
-    });
-  })();
-</script>
 {# ===================== CONTEÚDO DA ABA "Avaliações" ===================== #}
 <section id="avaliacoes" class="tab-pane fade {{ 'show active' if _tab=='avaliacoes' else '' }}" role="tabpanel">
 
@@ -2060,7 +2002,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </script>
 </section>
 
-    <!-- COOPERADOS (versão profissional / drop-in) -->
+     <!-- COOPERADOS (versão profissional / drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
   {% set qtd_coops = cooperados|length %}
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
@@ -2133,69 +2075,46 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
               <th style="width:60px;">Foto</th>
               <th>Nome</th>
               <th>Usuário</th>
-              <th>Status</th>
-              <th class="text-center" style="width:240px;">Ações</th>
+              <th class="text-center" style="width:180px;">Ações</th>
             </tr>
           </thead>
           <tbody id="tbodyCooperados">
             {% for coop in cooperados %}
-              {% set ativo = (coop.usuario_ref.ativo if coop.usuario_ref is not none and coop.usuario_ref.ativo is not none else True) %}
-              <tr data-nome="{{ coop.nome|lower }}"
-                  data-user="{{ coop.usuario_ref.usuario|lower }}"
-                  data-id="{{ coop.id }}"
-                  data-ativo="{{ 1 if ativo else 0 }}"
-                  class="{{ '' if ativo else 'table-light text-muted' }}">
+              <tr data-nome="{{ coop.nome|lower }}" data-user="{{ coop.usuario_ref.usuario|lower }}">
                 <td class="text-center">
                   <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
                        class="avatar border" alt="{{ coop.nome }}"
-                       style="width:40px;height:40px;object-fit:cover; {{ '' if ativo else 'filter:grayscale(1);opacity:.7;' }}">
+                       style="width:40px;height:40px;object-fit:cover;">
                 </td>
                 <td class="fw-medium">{{ coop.nome }}</td>
                 <td class="text-muted">{{ coop.usuario_ref.usuario }}</td>
-                <td>
-                  <span class="badge {{ 'bg-success' if ativo else 'bg-secondary' }}">
-                    {{ 'Ativo' if ativo else 'Desativado' }}
-                  </span>
-                </td>
                 <td class="text-center">
                   <div class="btn-group btn-group-sm" role="group">
-                    <!-- Toggle Ativo/Desativado -->
-                    <button class="btn {{ 'btn-outline-secondary' if ativo else 'btn-outline-success' }} btn-toggle-status"
-                            data-url="{{ url_for('toggle_status_cooperado', id=coop.id) }}"
-                            title="{{ 'Desativar' if ativo else 'Ativar' }}">
-                      <i class="bi {{ 'bi-pause-circle' if ativo else 'bi-play-circle' }}"></i>
-                    </button>
-
-                    <!-- Editar -->
                     <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalEditCooperado"
                             data-id="{{ coop.id }}" data-nome="{{ coop.nome }}" data-usuario="{{ coop.usuario_ref.usuario }}"
                             data-url="{{ url_for('edit_cooperado', id=coop.id) }}" title="Editar">
                       <i class="bi bi-pencil"></i>
                     </button>
-
-                    <!-- Reset senha -->
                     <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalResetSenhaCooperado"
                             data-id="{{ coop.id }}" data-url="{{ url_for('reset_senha_cooperado', id=coop.id) }}" title="Redefinir senha">
                       <i class="bi bi-key"></i>
                     </button>
-
-                    <!-- Excluir -->
-                    <form action="{{ url_for('delete_cooperado', id=coop.id) }}"
-                          method="POST"
-                          class="d-inline"
-                          onsubmit="return confirm('Excluir {{ coop.nome }}? Esta ação não pode ser desfeita.');">
-                      {% if csrf_token is defined %}
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      {% endif %}
-                      <button type="submit" class="btn btn-danger btn-del" title="Excluir">
-                        <i class="bi bi-trash"></i>
-                      </button>
-                    </form>
+                   <form action="{{ url_for('delete_cooperado', id=coop.id) }}"
+      method="POST"
+      class="d-inline"
+      onsubmit="return confirm('Excluir {{ coop.nome }}? Esta ação não pode ser desfeita.');">
+  {% if csrf_token is defined %}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% endif %}
+  <button type="submit" class="btn btn-danger btn-del" title="Excluir">
+    <i class="bi bi-trash"></i>
+  </button>
+</form>
                   </div>
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="5" class="text-center text-muted">Nenhum cooperado</td></tr>
+              <tr><td colspan="4" class="text-center text-muted">Nenhum cooperado</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -2240,65 +2159,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         const isPwd = inp.type === 'password';
         inp.type = isPwd ? 'text' : 'password';
         btn.innerHTML = isPwd ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
-      });
-    })();
-
-    // Toggle status (super RÁPIDO via fetch)
-    (function(){
-      const tbody = document.getElementById('tbodyCooperados');
-      const getCsrf = () => {
-        // Se você usa CSRF do Flask-WTF, pegue de um input escondido global
-        const el = document.querySelector('input[name="csrf_token"]');
-        return el ? el.value : null;
-      }
-      tbody?.addEventListener('click', async (ev) => {
-        const btn = ev.target.closest('.btn-toggle-status');
-        if (!btn) return;
-        const tr = btn.closest('tr');
-        const url = btn.dataset.url;
-        if (!url) return;
-
-        btn.disabled = true;
-
-        try {
-          const headers = {"X-Requested-With": "fetch"};
-          const csrf = getCsrf();
-          const body = new FormData();
-          if (csrf) body.append("csrf_token", csrf);
-
-          const resp = await fetch(url, { method: "POST", body, headers });
-          const data = await resp.json();
-
-          if (!data.ok) throw new Error(data.error || "Falha ao alternar status.");
-
-          const ativo = !!data.ativo;
-          tr.dataset.ativo = ativo ? "1" : "0";
-          tr.classList.toggle('table-light', !ativo);
-          tr.classList.toggle('text-muted', !ativo);
-
-          // imagem
-          const img = tr.querySelector('img.avatar');
-          if (img) {
-            img.style.filter = ativo ? '' : 'grayscale(1)';
-            img.style.opacity = ativo ? '' : '.7';
-          }
-
-          // badge
-          const badge = tr.querySelector('span.badge');
-          if (badge) {
-            badge.textContent = ativo ? 'Ativo' : 'Desativado';
-            badge.className = 'badge ' + (ativo ? 'bg-success' : 'bg-secondary');
-          }
-
-          // botão (ícone/estilo/title)
-          btn.className = 'btn btn-toggle-status ' + (ativo ? 'btn-outline-secondary' : 'btn-outline-success');
-          btn.title = ativo ? 'Desativar' : 'Ativar';
-          btn.innerHTML = `<i class="bi ${ativo ? 'bi-pause-circle' : 'bi-play-circle'}"></i>`;
-        } catch (e) {
-          alert(e.message || 'Erro ao alternar status.');
-        } finally {
-          btn.disabled = false;
-        }
       });
     })();
   </script>
@@ -2507,7 +2367,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 </section>
 
        <!-- ESCALAS -->
-      <section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
+      <section class="tab-pane fade" id="escalas">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h4 class="mb-0">Escalas</h4>
           <div class="alert alert-info py-1 px-2 mb-0">
