@@ -28,7 +28,7 @@
     }
     .badge-unread{background:#fff;color:var(--royal);font-weight:800}
 
-    /* Layout wrap (mobile-first, largura contida p/ leitura confortável) */
+    /* Layout wrap */
     .wrap{max-width:640px; margin:0 auto}
 
     /* Head actions */
@@ -60,7 +60,7 @@
     /* Busca */
     .search-input{border-radius:12px}
 
-    /* Skeleton (carregamento rápido) */
+    /* Skeleton */
     .skeleton{position:relative; overflow:hidden; background:#fff; border-radius:14px; height:84px; border:1px solid #eef}
     .skeleton::after{
       content:""; position:absolute; inset:0;
@@ -104,7 +104,7 @@
           </div>
         </form>
         <div class="d-flex gap-2">
-          action="{{ url_for('marcar_todos_avisos_lidos') }}"
+          <form id="formAllRead" method="POST" action="{{ url_for('marcar_todos_avisos_lidos') }}">
             {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
             <button type="submit" class="btn btn-royal btn-sm" id="btnAllRead">
               <i class="bi bi-check2-all"></i> Todos lidos
@@ -122,10 +122,9 @@
       </ul>
     </div>
 
-    <!-- LISTA (com skeleton p/ sensação de velocidade) -->
+    <!-- LISTA -->
     <div id="listaAvisos">
       {% if avisos is not defined %}
-        <!-- fallback se não veio nada: skeletons -->
         <div class="skeleton mb-2"></div>
         <div class="skeleton mb-2"></div>
         <div class="skeleton"></div>
@@ -161,9 +160,9 @@
               </div>
               <div class="text-end">
                 {% if not a.lido %}
-                <span class="badge text-bg-primary">Novo</span>
+                  <span class="badge text-bg-primary">Novo</span>
                 {% else %}
-                <span class="badge text-bg-light">Lido</span>
+                  <span class="badge text-bg-light">Lido</span>
                 {% endif %}
               </div>
             </div>
@@ -185,12 +184,7 @@
                 </button>
               </form>
               {% else %}
-              <form class="d-inline" method="POST" action="{{ url_for('desmarcar_aviso_lido', aviso_id=a.id) }}">
-                {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
-                <button type="submit" class="btn btn-sm btn-outline-secondary btnMark" data-action="unread" data-id="{{ a.id }}">
-                  <i class="bi bi-arrow-counterclockwise"></i> Marcar como não lido
-                </button>
-              </form>
+              <!-- já lido: sem ação de 'desmarcar' -->
               {% endif %}
             </div>
           </article>
@@ -199,7 +193,7 @@
       {% endif %}
     </div>
 
-    <!-- Paginação (opcional) -->
+    <!-- Paginação -->
     {% if pagination is defined and pagination.pages > 1 %}
     <nav class="mt-3">
       <ul class="pagination justify-content-center pager">
@@ -225,7 +219,7 @@
     <div class="text-center text-muted py-3"><small>© {{ current_year|default('') }} Coopex</small></div>
   </main>
 
-  <!-- Áudio opcional para novos avisos (reutiliza seu avisos.mp3 em /static) -->
+  <!-- Áudio (opcional) -->
   <audio id="sndAvisos" preload="auto">
     <source src="{{ url_for('static', filename='avisos.mp3') }}" type="audio/mpeg">
   </audio>
@@ -249,7 +243,7 @@
       return $$('.aviso.unread').length;
     }
 
-    // ====== AJAX marcar (des)lido ======
+    // ====== AJAX marcar lido ======
     async function postJSON(url, body){
       const res = await fetch(url, {
         method:'POST',
@@ -259,7 +253,6 @@
         },
         body: JSON.stringify(body||{})
       });
-      // aceita 200 ou 204; se vier JSON, tenta parsear
       if (!res.ok) throw new Error('Falha na requisição');
       const text = await res.text();
       try { return text ? JSON.parse(text) : {}; } catch(_) { return {}; }
@@ -283,50 +276,23 @@
 
     async function handleMark(btn){
       const id = btn.getAttribute('data-id');
-      const action = btn.getAttribute('data-action'); // "read" | "unread"
       const card = document.getElementById('aviso-'+id);
       if (!id || !card) return;
 
-      // Descobre URL pelos forms existentes (fallback friendly)
       const form = btn.closest('form');
       const url = form?.getAttribute('action');
       if (!url) return;
 
       try{
         await postJSON(url, {});
-        // Atualiza UI
-        if (action === 'read'){
-          card.classList.remove('unread');
-          card.setAttribute('data-lido','1');
-          // troca badgezinha
-          const badge = card.querySelector('.badge');
-          if (badge){ badge.className = 'badge text-bg-light'; badge.textContent = 'Lido'; }
-          // troca botão
-          const actions = card.querySelector('.actions');
-          actions.innerHTML = `
-            <form class="d-inline" method="POST" action="{{ url_for('desmarcar_aviso_lido', aviso_id=0) }}".replace('0','${id}')>
-              ${csrf ? `<input type="hidden" name="csrf_token" value="${csrf}">` : ''}
-              <button type="submit" class="btn btn-sm btn-outline-secondary btnMark" data-action="unread" data-id="${id}">
-                <i class="bi bi-arrow-counterclockwise"></i> Marcar como não lido
-              </button>
-            </form>`;
-          toastQuick('Aviso marcado como lido.');
-        } else {
-          card.classList.add('unread');
-          card.setAttribute('data-lido','0');
-          const badge = card.querySelector('.badge');
-          if (badge){ badge.className = 'badge text-bg-primary'; badge.textContent = 'Novo'; }
-          const actions = card.querySelector('.actions');
-          actions.innerHTML = `
-            <form class="d-inline" method="POST" action="{{ url_for('marcar_aviso_lido', aviso_id=0) }}".replace('0','${id}')>
-              ${csrf ? `<input type="hidden" name="csrf_token" value="${csrf}">` : ''}
-              <button type="submit" class="btn btn-sm btn-outline-primary btnMark" data-action="read" data-id="${id}">
-                <i class="bi bi-check2"></i> Marcar lido
-              </button>
-            </form>`;
-          toastQuick('Aviso marcado como não lido.');
-        }
-        // Badge global
+        // Atualiza UI: vira lido e remove botão
+        card.classList.remove('unread');
+        card.setAttribute('data-lido','1');
+        const badge = card.querySelector('.badge');
+        if (badge){ badge.className = 'badge text-bg-light'; badge.textContent = 'Lido'; }
+        const actions = card.querySelector('.actions');
+        actions.innerHTML = ''; // sem “desmarcar”
+        toastQuick('Aviso marcado como lido.');
         setUnreadBadge(currentUnreadCount());
       }catch(e){
         toastQuick('Não foi possível atualizar. Tente novamente.', false);
@@ -357,15 +323,8 @@
               card.setAttribute('data-lido','1');
               const badge = card.querySelector('.badge');
               if (badge){ badge.className = 'badge text-bg-light'; badge.textContent = 'Lido'; }
-              const id = card.getAttribute('data-id');
               const actions = card.querySelector('.actions');
-              actions.innerHTML = `
-                <form class="d-inline" method="POST" action="{{ url_for('desmarcar_aviso_lido', aviso_id=0) }}".replace('0','${id}')>
-                  ${csrf ? `<input type="hidden" name="csrf_token" value="${csrf}">` : ''}
-                  <button type="submit" class="btn btn-sm btn-outline-secondary btnMark" data-action="unread" data-id="${id}">
-                    <i class="bi bi-arrow-counterclockwise"></i> Marcar como não lido
-                  </button>
-                </form>`;
+              actions.innerHTML = '';
             });
             setUnreadBadge(0);
             toastQuick('Todos marcados como lidos.');
@@ -376,15 +335,13 @@
       }
     }
 
-    // ====== Som ao detectar novos não lidos (se chegar via push/refresh) ======
+    // ====== Som ao detectar não lidos (na carga) ======
     function tryPlayNewSound(){
       const audio = document.getElementById('sndAvisos');
       if (!audio) return;
-      // toca se houver pelo menos 1 não lido e usuário já interagiu (restrição de autoplay)
       if (currentUnreadCount() > 0){
-        // Tenta tocar de forma segura
         audio.volume = 0.8;
-        audio.play().catch(()=>{/* alguns navegadores bloqueiam sem interação */});
+        audio.play().catch(()=>{});
       }
     }
 
@@ -392,7 +349,7 @@
     wireButtons();
     tryPlayNewSound();
 
-    // Re-wire se a lista for re-renderizada por AJAX no futuro
+    // Re-wire se a lista for re-renderizada por AJAX
     const obs = new MutationObserver(()=> wireButtons());
     obs.observe(document.getElementById('listaAvisos'), {childList:true, subtree:true});
   })();
