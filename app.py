@@ -2597,6 +2597,20 @@ def marcar_aviso_lido_universal(aviso_id: int):
 
     return ("", 403) if request.method == "POST" else redirect(url_for("login"))
 
+@app.route("/admin/cooperados/<int:coop_id>/toggle", methods=["POST"])
+@login_required
+def admin_toggle_cooperado(coop_id):
+    # cheque de permissão (ajuste à sua lógica):
+    if not current_user.is_admin:
+        abort(403)
+
+    coop = Cooperado.query.get_or_404(coop_id)
+    coop.ativo = not bool(coop.ativo)
+    db.session.commit()
+    flash(f"Cooperado '{coop.nome}' agora está {'ATIVO' if coop.ativo else 'INATIVO'}.", "success")
+    # volte pra lista de cooperados no admin (ajuste o endpoint se o seu for outro)
+    return redirect(url_for("admin_listar_cooperados"))
+
 # =========================
 # CRUD Cooperados / Restaurantes / Senhas (Admin)
 # =========================
