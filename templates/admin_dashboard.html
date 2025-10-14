@@ -201,46 +201,54 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       <i class="bi bi-person-badge"></i> <span>Cooperados</span>
     </a>
 
-    <!-- Estabelecimentos (tab) -->
-    <a class="nav-link {{ 'active' if _tab=='restaurantes' else '' }}"
-       data-bs-toggle="tab"
-       data-bs-target="#restaurantes"
-       href="#restaurantes"
-       role="tab"
-       aria-controls="restaurantes"
-       aria-selected="{{ 'true' if _tab=='restaurantes' else 'false' }}">
-      <i class="bi bi-shop"></i> <span>Estabelecimentos</span>
-    </a>
+   <!-- Estabelecimentos (tab) -->
+<a class="nav-link {{ 'active' if _tab=='restaurantes' else '' }}"
+   data-bs-toggle="tab"
+   data-bs-target="#restaurantes"
+   href="#restaurantes"
+   role="tab"
+   aria-controls="restaurantes"
+   aria-selected="{{ 'true' if _tab=='restaurantes' else 'false' }}">
+  <i class="bi bi-shop"></i> <span>Estabelecimentos</span>
+</a>
 
-    <!-- Escalas (tab) -->
-    <a class="nav-link" data-bs-toggle="tab" href="#escalas"><i class="bi bi-calendar2-week"></i> <span>Escalas</span></a>
+<!-- Escalas (tab) -->
+<a class="nav-link {{ 'active' if _tab=='escalas' else '' }}"
+   data-bs-toggle="tab"
+   data-bs-target="#escalas"
+   href="#escalas"
+   role="tab"
+   aria-controls="escalas"
+   aria-selected="{{ 'true' if _tab=='escalas' else 'false' }}">
+  <i class="bi bi-calendar2-week"></i> <span>Escalas</span>
+</a>
 
-    <!-- Páginas dedicadas (rotas próprias, não tabs) -->
-    <a class="nav-link {% if request.endpoint == 'admin_documentos' %}active{% endif %}"
-       href="{{ url_for('admin_documentos') }}">
-      <i class="bi bi-folder2"></i> <span>Documentos</span>
-    </a>
+<!-- Páginas dedicadas (rotas próprias, não tabs) -->
+<a class="nav-link {% if request.endpoint == 'admin_documentos' %}active{% endif %}"
+   href="{{ url_for('admin_documentos') }}">
+  <i class="bi bi-folder2"></i> <span>Documentos</span>
+</a>
 
-    <a class="nav-link {% if request.endpoint == 'admin_tabelas' %}active{% endif %}"
-       href="{{ url_for('admin_tabelas') }}">
-      <i class="bi bi-table"></i> <span>Tabelas</span>
-    </a>
+<a class="nav-link {% if request.endpoint == 'admin_tabelas' %}active{% endif %}"
+   href="{{ url_for('admin_tabelas') }}">
+  <i class="bi bi-table"></i> <span>Tabelas</span>
+</a>
 
-    <a class="nav-link {% if request.endpoint == 'admin_avisos' %}active{% endif %}"
-       href="{{ url_for('admin_avisos') }}">
-      <i class="bi bi-megaphone"></i> <span>Avisos</span>
-    </a>
+<a class="nav-link {% if request.endpoint == 'admin_avisos' %}active{% endif %}"
+   href="{{ url_for('admin_avisos') }}">
+  <i class="bi bi-megaphone"></i> <span>Avisos</span>
+</a>
 
-    <!-- Config (tab) -->
-    <a class="nav-link {{ 'active' if _tab=='config' else '' }}"
-       data-bs-toggle="tab"
-       data-bs-target="#config"
-       href="#config"
-       role="tab"
-       aria-controls="config"
-       aria-selected="{{ 'true' if _tab=='config' else 'false' }}">
-      <i class="bi bi-gear"></i> <span>Configurações</span>
-    </a>
+<!-- Config (tab) -->
+<a class="nav-link {{ 'active' if _tab=='config' else '' }}"
+   data-bs-toggle="tab"
+   data-bs-target="#config"
+   href="#config"
+   role="tab"
+   aria-controls="config"
+   aria-selected="{{ 'true' if _tab=='config' else 'false' }}">
+  <i class="bi bi-gear"></i> <span>Configurações</span>
+</a>
 
     <a class="nav-link" href="{{ url_for('logout') }}">
       <i class="bi bi-box-arrow-right"></i> <span>Sair</span>
@@ -2499,7 +2507,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 </section>
 
        <!-- ESCALAS -->
-      <section class="tab-pane fade" id="escalas">
+      <section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h4 class="mb-0">Escalas</h4>
           <div class="alert alert-info py-1 px-2 mb-0">
