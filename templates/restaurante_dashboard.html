@@ -278,40 +278,72 @@
         </div>
 
         <div id="avisosListContainer">
-          {% if _avisos and (_avisos | length) > 0 %}
-            {% for a in _avisos %}
-            <div id="aviso-{{ a.id }}" class="card card-body my-2 aviso-card {% if a.lido %}lido{% endif %} {% if a.prioridade_alta %}prioridade{% endif %}" data-lido="{{ '1' if a.lido else '0' }}">
-              <div class="d-flex justify-content-between align-items-start">
-                <div>
-                  <div class="fw-bold">
-                    {{ a.titulo or 'Aviso' }}
-                    {% if a.prioridade_alta %}<span class="badge text-bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Prioridade</span>{% endif %}
-                  </div>
-                  <div class="text-muted small">
-                    Publicado em {{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em }}
-                    {% if a.lido %} • <span class="text-success">Lido</span>{% else %} • <span class="text-danger">Não lido</span>{% endif %}
-                  </div>
-                </div>
-                <div class="ms-3">
-                  {% if not a.lido %}
-                  <button class="btn btn-outline-royal btn-sm"
-                          data-acao="marcar-lido"
-                          data-url="{{ url_for('marcar_aviso_lido_universal', aviso_id=a.id) }}">
-                    <i class="bi bi-check2"></i> Marcar como lido
-                  </button>
-                  {% endif %}
-                </div>
-              </div>
-              <hr class="my-2">
-              <div class="aviso-body">{{ a.corpo_html | safe if a.corpo_html else (a.conteudo or a.texto or '') }}</div>
-            </div>
-            {% endfor %}
-          {% else %}
-            <!-- Se não vier avisos no contexto, o JS vai buscar na rota e injetar -->
-            <div class="card card-body text-muted">Carregando avisos…</div>
+  {% if _avisos and (_avisos | length) > 0 %}
+    {% for a in _avisos %}
+    <div id="aviso-{{ a.id }}" class="card card-body my-2 aviso-card {% if a.lido %}lido{% endif %} {% if a.prioridade_alta %}prioridade{% endif %}" data-lido="{{ '1' if a.lido else '0' }}">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="fw-bold">
+            {{ a.titulo or 'Aviso' }}
+            {% if a.prioridade_alta %}
+              <span class="badge text-bg-danger ms-2">
+                <i class="bi bi-exclamation-triangle-fill"></i> Prioridade
+              </span>
+            {% endif %}
+          </div>
+          <div class="text-muted small">
+            Publicado em {{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em }}
+            {% if a.atualizado_em %} · Atualizado {{ a.atualizado_em.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+            {% if a.lido %} • <span class="text-success">Lido</span>{% else %} • <span class="text-danger">Não lido</span>{% endif %}
+          </div>
+        </div>
+        <div class="ms-3">
+          {% if not a.lido %}
+          <button class="btn btn-outline-royal btn-sm"
+                  data-acao="marcar-lido"
+                  data-url="{{ url_for('marcar_aviso_lido_universal', aviso_id=a.id) }}">
+            <i class="bi bi-check2"></i> Marcar como lido
+          </button>
           {% endif %}
         </div>
-      </section>
+      </div>
+
+      <hr class="my-2">
+
+      {# ==================== CORPO DO AVISO (corrigido) ==================== #}
+      <div class="aviso-body">
+        {# 1) tenta qualquer campo HTML possível (objeto raiz ou dentro de a.dados) #}
+        {% set html = (
+          a.corpo_html or a.conteudo_html or a.mensagem_html or a.descricao_html or a.body_html or a.recado_html
+          or (a.dados and (a.dados.corpo_html or a.dados.conteudo_html or a.dados.mensagem_html or a.dados.descricao_html or a.dados.recado_html))
+        ) %}
+
+        {% if html and html|trim %}
+          {{ html|safe }}
+
+        {% else %}
+          {# 2) se não houver HTML, tenta texto simples em vários nomes de campo #}
+          {% set txt = (
+            a.corpo or a.conteudo or a.mensagem or a.texto or a.descricao or a.body or a.message or a.content or a.recado
+            or (a.dados and (a.dados.corpo or a.dados.conteudo or a.dados.mensagem or a.dados.texto or a.dados.descricao or a.dados.recado))
+          ) %}
+
+          {% if txt and txt|trim %}
+            {# preserva quebras de linha do texto #}
+            <p class="mb-0">{{ txt|e|replace('\r\n','\n')|replace('\n','<br>')|safe }}</p>
+          {% else %}
+            <p class="text-muted mb-0"><em>(sem conteúdo)</em></p>
+          {% endif %}
+        {% endif %}
+      </div>
+      {# ================== /CORPO DO AVISO (corrigido) ==================== #}
+    </div>
+    {% endfor %}
+  {% else %}
+    <!-- Se não vier avisos no contexto, o JS vai buscar na rota e injetar -->
+    <div class="card card-body text-muted">Carregando avisos…</div>
+  {% endif %}
+</div>
 
       <!-- ===== LANCAMENTOS ===== -->
       <section data-view="lancamentos">
