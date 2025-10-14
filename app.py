@@ -1543,6 +1543,28 @@ def logout():
 # =========================
 # Admin Dashboard
 # =========================
+# app.py
+from flask import jsonify, request
+from sqlalchemy.exc import SQLAlchemyError
+
+@app.post("/admin/cooperados/<int:id>/toggle-status")
+def toggle_status_cooperado(id):
+    try:
+        # Ajuste para o seu modelo real --------------------------
+        # Exemplo: Cooperado tem relação .usuario_ref com campo .ativo
+        coop = db.session.get(Cooperado, id)
+        if not coop or not coop.usuario_ref:
+            return jsonify(ok=False, error="Cooperado não encontrado"), 404
+
+        atual = bool(coop.usuario_ref.ativo)
+        coop.usuario_ref.ativo = not atual
+        db.session.commit()
+
+        return jsonify(ok=True, ativo=bool(coop.usuario_ref.ativo))
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify(ok=False, error="Falha ao salvar no banco"), 500
+
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_dashboard():
