@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <title>Avisos — Coopex</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="csrf-token" content="{{ (csrf_token() if csrf_token is defined) or '' }}">
+  <meta name="csrf-token" content="{{ csrf_token() if csrf_token is defined else '' }}">
 
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -54,7 +54,7 @@
 <body>
   <nav class="navbar">
     <div class="container-fluid wrap d-flex align-items-center gap-2 py-2">
-      <a class="btn btn-sm btn-light" href="{{ url_for('coop_dashboard') }}"><i class="bi bi-arrow-left"></i></a>
+      <a class="btn btn-sm btn-light" href="{{ url_for('portal_cooperado') }}"><i class="bi bi-arrow-left"></i></a>
       <span class="brand flex-fill"><i class="bi bi-megaphone-fill"></i> Avisos</span>
       {% set unread = (avisos_nao_lidos_count or avisos_unread_count or 0) %}
       <span class="badge badge-unread" id="badgeUnread" {% if unread|int == 0 %}style="display:none"{% endif %}>{{ unread|int }}</span>
@@ -119,7 +119,7 @@
             <!-- CONTEÚDO -->
             <div class="content">
               {# tenta campos HTML primeiro #}
-              {% set html = (a.conteudo_html or a.mensagem_html or a.descricao_html) %}
+              {% set html = (a.conteudo_html or a.mensagem_html or a.descricao_html or a.corpo_html) %}
               {% if html and html|trim %}
                 {{ html|safe }}
               {% else %}
@@ -135,7 +135,7 @@
 
             <div class="actions mt-2">
               {% if not a.lido %}
-              <form class="d-inline" method="POST" action="{{ url_for('marcar_aviso_lido', aviso_id=a.id) }}">
+              <form class="d-inline" method="POST" action="{{ url_for('marcar_aviso_lido_universal', aviso_id=a.id) }}">
                 {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
                 <button type="submit" class="btn btn-sm btn-outline-primary btnMark" data-id="{{ a.id }}">
                   <i class="bi bi-check2"></i> Marcar lido
