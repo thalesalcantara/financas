@@ -87,7 +87,19 @@ app.config.update(
     },
 )
 
+# Torna safe_url_for disponível nos templates
+@app.context_processor
+def inject_helpers():
+    def safe_url_for(endpoint, **values):
+        try:
+            return url_for(endpoint, **values)
+        except Exception:
+            return None
+    return {"safe_url_for": safe_url_for}
+
 db = SQLAlchemy(app)
+
+
 
 # Health checks
 @app.get("/healthz")
@@ -3879,6 +3891,7 @@ def apply_fk_cascade():
     """
     Aplica/garante ON DELETE CASCADE nas FKs relevantes (Postgres).
     Tudo está dentro de uma string SQL, evitando SyntaxError no deploy.
+    Seguro para rodar mais de uma vez.
     """
     from sqlalchemy import text as sa_text
 
@@ -3886,112 +3899,103 @@ def apply_fk_cascade():
 BEGIN;
 
 -- =========================
--- AVALIAÇÕES (já existia)
+-- AVALIAÇÕES (Restaurante -> Cooperado e Cooperado -> Restaurante)
 -- =========================
--- ajusta FK de avaliacoes.lancamento_id
-ALTER TABLE public.avaliacoes
+-- avaliacoes.lancamento_id -> ON DELETE CASCADE
+ALTER TABLE IF EXISTS public.avaliacoes
   DROP CONSTRAINT IF EXISTS avaliacoes_lancamento_id_fkey;
-ALTER TABLE public.avaliacoes
+ALTER TABLE IF EXISTS public.avaliacoes
   ADD CONSTRAINT avaliacoes_lancamento_id_fkey
-  FOREIGN KEY (lancamento_id)
-  REFERENCES public.lancamentos (id)
-  ON DELETE CASCADE;
+  FOREIGN KEY (lancamento_id) REFERENCES public.lancamentos (id) ON DELETE CASCADE;
 
--- cria/garante CASCADE para avaliacoes_restaurante.lancamento_id
-DO $do$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM information_schema.table_constraints
-        WHERE constraint_name = 'av_rest_lancamento_id_fkey'
-          AND table_name = 'avaliacoes_restaurante'
-          AND table_schema = 'public'
-    ) THEN
-        ALTER TABLE public.avaliacoes_restaurante
-          ADD CONSTRAINT av_rest_lancamento_id_fkey
-          FOREIGN KEY (lancamento_id)
-          REFERENCES public.lancamentos (id)
-          ON DELETE CASCADE;
-    ELSE
-        -- garante o CASCADE (drop/add)
-        EXECUTE $$ALTER TABLE public.avaliacoes_restaurante
-                 DROP CONSTRAINT IF EXISTS av_rest_lancamento_id_fkey$$;
-        EXECUTE $$ALTER TABLE public.avaliacoes_restaurante
-                 ADD CONSTRAINT av_rest_lancamento_id_fkey
-                 FOREIGN KEY (lancamento_id)
-                 REFERENCES public.lancamentos (id)
-                 ON DELETE CASCADE$$;
-    END IF;
-END
-$do$;
+-- avaliacoes_restaurante.lancamento_id -> ON DELETE CASCADE
+ALTER TABLE IF EXISTS public.avaliacoes_restaurante
+  DROP CONSTRAINT IF EXISTS av_rest_lancamento_id_fkey;
+ALTER TABLE IF EXISTS public.avaliacoes_restaurante
+  ADD CONSTRAINT av_rest_lancamento_id_fkey
+  FOREIGN KEY (lancamento_id) REFERENCES public.lancamentos (id) ON DELETE CASCADE;
 
 -- =========================
 -- ESCALAS
 -- =========================
--- cooperado_id -> cooperados(id) ON DELETE CASCADE
-ALTER TABLE public.escalas
+ALTER TABLE IF EXISTS public.escalas
   DROP CONSTRAINT IF EXISTS escalas_cooperado_id_fkey;
-ALTER TABLE public.escalas
+ALTER TABLE IF EXISTS public.escalas
   ADD CONSTRAINT escalas_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id)
-  REFERENCES public.cooperados (id)
-  ON DELETE CASCADE;
+  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
 
--- restaurante_id -> restaurantes(id) ON DELETE CASCADE
-ALTER TABLE public.escalas
+ALTER TABLE IF EXISTS public.escalas
   DROP CONSTRAINT IF EXISTS escalas_restaurante_id_fkey;
-ALTER TABLE public.escalas
+ALTER TABLE IF EXISTS public.escalas
   ADD CONSTRAINT escalas_restaurante_id_fkey
-  FOREIGN KEY (restaurante_id)
-  REFERENCES public.restaurantes (id)
-  ON DELETE CASCADE;
+  FOREIGN KEY (restaurante_id) REFERENCES public.restaurantes (id) ON DELETE CASCADE;
 
 -- =========================
 -- TROCAS
 -- =========================
--- solicitante_id -> cooperados(id) ON DELETE CASCADE
-ALTER TABLE public.trocas
+ALTER TABLE IF EXISTS public.trocas
   DROP CONSTRAINT IF EXISTS trocas_solicitante_id_fkey;
-ALTER TABLE public.trocas
+ALTER TABLE IF EXISTS public.trocas
   ADD CONSTRAINT trocas_solicitante_id_fkey
-  FOREIGN KEY (solicitante_id)
-  REFERENCES public.cooperados (id)
-  ON DELETE CASCADE;
+  FOREIGN KEY (solicitante_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
 
--- destino_id -> cooperados(id) ON DELETE CASCADE
-ALTER TABLE public.trocas
+ALTER TABLE IF EXISTS public.trocas
   DROP CONSTRAINT IF EXISTS trocas_destino_id_fkey;
-ALTER TABLE public.trocas
+ALTER TABLE IF EXISTS public.trocas
   ADD CONSTRAINT trocas_destino_id_fkey
-  FOREIGN KEY (destino_id)
-  REFERENCES public.cooperados (id)
-  ON DELETE CASCADE;
+  FOREIGN KEY (destino_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
 
--- origem_escala_id -> escalas(id) ON DELETE CASCADE
-ALTER TABLE public.trocas
+ALTER TABLE IF EXISTS public.trocas
   DROP CONSTRAINT IF EXISTS trocas_origem_escala_id_fkey;
-ALTER TABLE public.trocas
+ALTER TABLE IF EXISTS public.trocas
   ADD CONSTRAINT trocas_origem_escala_id_fkey
-  FOREIGN KEY (origem_escala_id)
-  REFERENCES public.escalas (id)
-  ON DELETE CASCADE;
+  FOREIGN KEY (origem_escala_id) REFERENCES public.escalas (id) ON DELETE CASCADE;
+
+-- =========================
+-- AVISOS / LEITURAS
+-- =========================
+ALTER TABLE IF EXISTS public.aviso_leituras
+  DROP CONSTRAINT IF EXISTS aviso_leituras_aviso_id_fkey;
+ALTER TABLE IF EXISTS public.aviso_leituras
+  ADD CONSTRAINT aviso_leituras_aviso_id_fkey
+  FOREIGN KEY (aviso_id) REFERENCES public.avisos (id) ON DELETE CASCADE;
+
+ALTER TABLE IF EXISTS public.aviso_leituras
+  DROP CONSTRAINT IF EXISTS aviso_leituras_cooperado_id_fkey;
+ALTER TABLE IF EXISTS public.aviso_leituras
+  ADD CONSTRAINT aviso_leituras_cooperado_id_fkey
+  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
+
+ALTER TABLE IF EXISTS public.aviso_leituras
+  DROP CONSTRAINT IF EXISTS aviso_leituras_restaurante_id_fkey;
+ALTER TABLE IF EXISTS public.aviso_leituras
+  ADD CONSTRAINT aviso_leituras_restaurante_id_fkey
+  FOREIGN KEY (restaurante_id) REFERENCES public.restaurantes (id) ON DELETE CASCADE;
+
+-- =========================
+-- LANCAMENTOS (FKs antigas sem CASCADE)
+-- =========================
+ALTER TABLE IF EXISTS public.lancamentos
+  DROP CONSTRAINT IF EXISTS lancamentos_restaurante_id_fkey;
+ALTER TABLE IF EXISTS public.lancamentos
+  ADD CONSTRAINT lancamentos_restaurante_id_fkey
+  FOREIGN KEY (restaurante_id) REFERENCES public.restaurantes (id) ON DELETE CASCADE;
+
+ALTER TABLE IF EXISTS public.lancamentos
+  DROP CONSTRAINT IF EXISTS lancamentos_cooperado_id_fkey;
+ALTER TABLE IF EXISTS public.lancamentos
+  ADD CONSTRAINT lancamentos_cooperado_id_fkey
+  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
 
 COMMIT;
 """
-
     try:
-        if _is_sqlite():
-            flash("SQLite local: esta operação é específica de Postgres (sem efeito aqui).", "warning")
-            return redirect(url_for("admin_dashboard", tab="config"))
-
         db.session.execute(sa_text(sql))
         db.session.commit()
-        flash("FKs com ON DELETE CASCADE aplicadas com sucesso.", "success")
+        return jsonify({"ok": True, "msg": "FKs (CASCADE) aplicadas/garantidas."})
     except Exception as e:
         db.session.rollback()
-        flash(f"Erro ao aplicar FKs: {e}", "danger")
-    return redirect(url_for("admin_dashboard", tab="config"))
-
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 # =========================
 # Documentos (Admin)
