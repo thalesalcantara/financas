@@ -11,6 +11,7 @@ import os
 import re
 import sys
 import unicodedata
+from flask_login import login_required
 from collections import defaultdict, namedtuple
 from datetime import date, datetime, time, timedelta
 from functools import wraps
