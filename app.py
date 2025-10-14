@@ -4139,218 +4139,6 @@ def _count_unread_for_restaurante(rest: Restaurante) -> int:
 @app.route("/portal/restaurante")
 @role_required("restaurante")
 def portal_restaurante():
-    rest = _restaurante_atual()
-    if not rest:
-        return redirect(url_for("login"))
-
-    # Filtros
-    di = _parse_date(request.args.get("data_inicio"))
-    df = _parse_date(request.args.get("data_fim"))
-    mes = (request.args.get("mes") or "").strip()  # "YYYY-MM"
-    view = (request.args.get("view") or "avisos").strip()
-
-    # Descrição do período (para cabeçalho)
-    if mes:
-        try:
-            ini_m, fim_m = _bounds_mes(mes)
-            periodo_desc = f"{ini_m.strftime('%d/%m/%Y')} - {(fim_m - timedelta(days=1)).strftime('%d/%m/%Y')}"
-        except Exception:
-            periodo_desc = ""
-    elif di and df:
-        periodo_desc = f"{di.strftime('%d/%m/%Y')} - {df.strftime('%d/%m/%Y')}"
-    elif di:
-        periodo_desc = di.strftime('%d/%m/%Y')
-    elif df:
-        periodo_desc = df.strftime('%d/%m/%Y')
-    else:
-        periodo_desc = ""
-
-    # Cooperados para selects na UI
-    cooperados = Cooperado.query.order_by(Cooperado.nome.asc()).all()
-
-    # Base de lançamentos do restaurante
-    q = Lancamento.query.filter(Lancamento.restaurante_id == rest.id)
-    if mes and re.fullmatch(r"\d{4}-\d{2}", mes):
-        ini, fim = _bounds_mes(mes)
-        q = q.filter(Lancamento.data >= ini, Lancamento.data < fim)
-    if di:
-        q = q.filter(Lancamento.data >= di)
-    if df:
-        q = q.filter(Lancamento.data <= df)
-    lancamentos_periodo = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
-
-    total_lanc_valor = sum((l.valor or 0.0) for l in lancamentos_periodo)
-    total_lanc_entregas = sum((l.qtd_entregas or 0) for l in lancamentos_periodo)
-
-    # Agregados “gerais” da tela (podem ser iguais aos do período atual)
-    total_bruto = total_lanc_valor
-    total_inss = total_bruto * 0.045
-    total_liquido = total_bruto - total_inss
-    total_qtd = len(lancamentos_periodo)
-    total_entregas = total_lanc_entregas
-
-    # Dados de agenda (placeholders para manter compat)
-    agenda, dias_list, ref, modo = [], [], date.today(), "mes"
-
-    # -------------------- Avisos (aba "avisos") --------------------
-    avisos = []
-    avisos_nao_lidos_count = 0
-    current_year = datetime.now().year
-    if view == "avisos":
-        avisos = _fetch_avisos_for_restaurante(rest)
-        lidos_ids = {r.aviso_id for r in AvisoLeitura.query.filter_by(restaurante_id=rest.id).all()}
-        for a in avisos:
-            a.lido = (a.id in lidos_ids)
-        avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
-
-    # >>> Contador geral de não lidos (para TOAST/SOM no layout)
-    unread = _count_unread_for_restaurante(rest)
-
-    # ---- URLs/flags para template
-    try:
-        url_lancar_producao = url_for("lancar_producao")
-    except BuildError:
-        url_lancar_producao = "/portal/restaurante/lancar_producao"
-
-    has_editar_lanc = ("editar_lancamento" in app.view_functions)
-
-    # -------------------- Render --------------------
-    return render_template(
-        "restaurante_dashboard.html",
-        rest=rest,
-        cooperados=cooperados,
-        filtro_inicio=di,
-        filtro_fim=df,
-        filtro_mes=(mes or ""),
-        periodo_desc=periodo_desc,
-        total_bruto=total_bruto,
-        total_inss=total_inss,
-        total_liquido=total_liquido,
-        total_qtd=total_qtd,
-        total_entregas=total_entregas,
-        view=view,
-        agenda=agenda,
-        dias_list=dias_list,
-        ref_data=ref,
-        modo=modo,
-        lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
-        total_lanc_valor=total_lanc_valor,
-        total_lanc_entregas=total_lanc_entregas,
-        # Avisos / Toast
-        avisos=(avisos if view == "avisos" else []),
-        avisos_nao_lidos_count=avisos_nao_lidos_count,
-        current_year=current_year,
-        unread=unread,  # <== usado no layout para o TOAST persistente
-        # URLs/flags
-        url_lancar_producao=url_lancar_producao,
-        has_editar_lanc=has_editar_lanc,
-    )
-
-# =========================
-# AVISOS (rotas do Portal Restaurante)
-# =========================
-# =========================
-# AVISOS (Portal Restaurante)
-# =========================
-
-@app.get("/portal/restaurante/avisos")
-@role_required("restaurante")
-def portal_restaurante_avisos():
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-
-    # avisos aplicáveis (usa seu helper)
-    try:
-        avisos_db = get_avisos_for_restaurante(rest)
-    except NameError:
-        # fallback: global + restaurante (broadcast)
-        avisos_db = (Aviso.query
-                     .filter(Aviso.ativo.is_(True))
-                     .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
-                     .order_by(Aviso.fixado.desc(), Aviso.criado_em.desc())
-                     .all())
-
-    # ids já lidos
-    lidos_ids = {
-        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
-        .filter(AvisoLeitura.restaurante_id == rest.id).all()
-    }
-
-    # extrai corpo html independentemente do campo usado
-    def corpo_do_aviso(a: Aviso) -> str:
-        for k in ("corpo_html","html","conteudo_html","mensagem_html","descricao_html","texto_html",
-                  "corpo","conteudo","mensagem","descricao","texto","resumo","body","content"):
-            v = getattr(a, k, None)
-            if isinstance(v, str) and v.strip():
-                return v
-        # compat: se só existir .corpo no modelo:
-        v = getattr(a, "corpo", None)
-        return v if isinstance(v, str) else ""
-
-    avisos = [{
-        "id": a.id,
-        "titulo": a.titulo or "Aviso",
-        "criado_em": a.criado_em,
-        "lido": (a.id in lidos_ids),
-        "prioridade_alta": (str(a.prioridade or "").lower() == "alta"),
-        "corpo_html": corpo_do_aviso(a),
-    } for a in avisos_db]
-
-    avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
-    return render_template(
-        "portal_restaurante_avisos.html",
-        avisos=avisos,
-        avisos_nao_lidos_count=avisos_nao_lidos_count,
-        current_year=datetime.now().year,
-    )
-
-
-@app.post("/avisos-restaurante/marcar-todos", endpoint="marcar_todos_avisos_lidos_restaurante")
-@role_required("restaurante")
-def marcar_todos_avisos_lidos_restaurante():
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-
-    try:
-        avisos = get_avisos_for_restaurante(rest)
-    except NameError:
-        avisos = (Aviso.query
-                  .filter(Aviso.ativo.is_(True))
-                  .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
-                  .all())
-
-    lidos_ids = {
-        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
-        .filter(AvisoLeitura.restaurante_id == rest.id).all()
-    }
-
-    now = datetime.utcnow()
-    pendentes = [a for a in avisos if a.id not in lidos_ids]
-    if pendentes:
-        db.session.bulk_save_objects([
-            AvisoLeitura(restaurante_id=rest.id, aviso_id=a.id, lido_em=now)
-            for a in pendentes
-        ])
-        db.session.commit()
-    return redirect(url_for("portal_restaurante_avisos"))
-
-
-@app.post("/portal/restaurante/avisos/<int:aviso_id>/desmarcar", endpoint="desmarcar_aviso_lido_restaurante")
-@role_required("restaurante")
-def desmarcar_aviso_lido_restaurante(aviso_id):
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-
-    # apaga a leitura, se existir (idempotente)
-    db.session.query(AvisoLeitura).filter_by(
-        aviso_id=aviso_id, restaurante_id=rest.id
-    ).delete(synchronize_session=False)
-    db.session.commit()
-    return redirect(url_for("portal_restaurante_avisos"))
-    
-@app.route("/portal/restaurante")
-@role_required("restaurante")
-def portal_restaurante():
     u_id = session.get("user_id")
     rest = Restaurante.query.filter_by(usuario_id=u_id).first()
     if not rest:
@@ -4378,18 +4166,17 @@ def portal_restaurante():
         except Exception:
             return None, None
 
-    # -------------------- LANÇAMENTOS (totais por período) --------------------
+    # -------------------- Período de filtro --------------------
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
 
-    # NOVO: filtro por mês (?mes=YYYY-MM)
     mes = (request.args.get("mes") or "").strip()
     periodo_desc = None
     if mes:
         di_mes, df_mes = _parse_yyyy_mm_local(mes)
         if di_mes and df_mes:
             di, df = di_mes, df_mes
-            periodo_desc = "mês"
+            periodo_desc = f"{di.strftime('%d/%m/%Y')} - {df.strftime('%d/%m/%Y')}"
 
     if not di or not df:
         # Sem filtro => janela semanal baseada no período do restaurante
@@ -4407,6 +4194,7 @@ def portal_restaurante():
 
     cooperados = Cooperado.query.order_by(Cooperado.nome).all()
 
+    # -------------------- Totais por cooperado (aba geral) --------------------
     total_bruto = 0.0
     total_qtd = 0
     total_entregas = 0
@@ -4448,12 +4236,10 @@ def portal_restaurante():
     escalas_rest = [
         e for e in escalas_all
         if contrato_bate_restaurante(eff_map.get(e.id, e.contrato or ""), rest.nome)
-    ]
-    if not escalas_rest:
-        escalas_rest = [e for e in escalas_all if (e.contrato or "").strip() == rest.nome.strip()]
+    ] or [e for e in escalas_all if (e.contrato or "").strip() == rest.nome.strip()]
 
     agenda = {d: [] for d in dias_list}
-    seen = {d: set() for d in dias_list}  # evita duplicar
+    seen = {d: set() for d in dias_list}
 
     for e in escalas_rest:
         dt = _parse_data_escala_str(e.data)       # date | None
@@ -4501,7 +4287,6 @@ def portal_restaurante():
     lancamentos_periodo = []
     total_lanc_valor = 0.0
     total_lanc_entregas = 0
-
     if view == "lancamentos":
         q = (
             db.session.query(Lancamento, Cooperado)
@@ -4522,7 +4307,7 @@ def portal_restaurante():
                 "hora_fim": (lanc.hora_fim if isinstance(lanc.hora_fim, str)
                              else (lanc.hora_fim.strftime("%H:%M") if lanc.hora_fim else "")),
                 "qtd_entregas": lanc.qtd_entregas or 0,
-                "valor": float(lanc.valor or 0.0),  # já em R$
+                "valor": float(lanc.valor or 0.0),
                 "cooperado_id": coop.id,
                 "cooperado_nome": coop.nome,
                 "contrato_nome": rest.nome,
@@ -4532,11 +4317,31 @@ def portal_restaurante():
         total_lanc_valor = sum(x["valor"] for x in lancamentos_periodo)
         total_lanc_entregas = sum(x["qtd_entregas"] for x in lancamentos_periodo)
 
+    # -------------------- Avisos (aba "avisos") --------------------
+    avisos = []
+    avisos_nao_lidos_count = 0
+    if view == "avisos":
+        try:
+            avisos = _fetch_avisos_for_restaurante(rest)
+        except NameError:
+            # fallback se seu helper tiver outro nome
+            avisos = get_avisos_for_restaurante(rest)
+
+        lidos_ids = {
+            r.aviso_id for r in AvisoLeitura.query.filter_by(restaurante_id=rest.id).all()
+        }
+        for a in avisos:
+            a.lido = (a.id in lidos_ids)
+        avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
+
+    # Contador global (toast/som no layout)
+    unread = _count_unread_for_restaurante(rest)
+
     # ---- URLs/flags para template
     try:
         url_lancar_producao = url_for("lancar_producao")
     except BuildError:
-        url_lancar_producao = "/restaurante/lancar_producao"
+        url_lancar_producao = "/restaurante/lancar_producao"  # bate com sua rota abaixo
 
     has_editar_lanc = ("editar_lancamento" in app.view_functions)
 
@@ -4562,115 +4367,15 @@ def portal_restaurante():
         lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
         total_lanc_valor=total_lanc_valor,
         total_lanc_entregas=total_lanc_entregas,
+        # Avisos / Toast
+        avisos=(avisos if view == "avisos" else []),
+        avisos_nao_lidos_count=avisos_nao_lidos_count,
+        current_year=datetime.now().year,
+        unread=unread,
+        # URLs/flags
         url_lancar_producao=url_lancar_producao,
         has_editar_lanc=has_editar_lanc,
     )
-
-
-# =========================
-# Rotas de CRUD de lançamento
-# =========================
-@app.post("/restaurante/lancar_producao")
-@role_required("restaurante")
-def lancar_producao():
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first()
-    if not rest:
-        abort(403)
-    f = request.form
-
-    # 1) cria o lançamento
-    l = Lancamento(
-        restaurante_id=rest.id,
-        cooperado_id=f.get("cooperado_id", type=int),
-        descricao="produção",
-        valor=f.get("valor", type=float),
-        data=_parse_date(f.get("data")) or date.today(),
-        hora_inicio=f.get("hora_inicio"),
-        hora_fim=f.get("hora_fim"),
-        qtd_entregas=f.get("qtd_entregas", type=int),
-    )
-    db.session.add(l)
-    db.session.flush()  # garante l.id
-
-    # 2) avaliação (opcional)
-    g   = _clamp_star(f.get("av_geral"))
-    p   = _clamp_star(f.get("av_pontualidade"))
-    ed  = _clamp_star(f.get("av_educacao"))
-    ef  = _clamp_star(f.get("av_eficiencia"))
-    ap  = _clamp_star(f.get("av_apresentacao"))
-    txt = (f.get("av_comentario") or "").strip()
-
-    tem_avaliacao = any(x is not None for x in (g, p, ed, ef, ap)) or bool(txt)
-    if tem_avaliacao:
-        media = _media_ponderada(g, p, ed, ef, ap)
-        senti = _analise_sentimento(txt)
-        temas = _identifica_temas(txt)
-        crise = _sinaliza_crise(g, txt)
-        feed  = _gerar_feedback(p, ed, ef, ap, txt, senti)
-
-        av = AvaliacaoCooperado(
-            restaurante_id=rest.id,
-            cooperado_id=l.cooperado_id,
-            lancamento_id=l.id,
-            estrelas_geral=g,
-            estrelas_pontualidade=p,
-            estrelas_educacao=ed,
-            estrelas_eficiencia=ef,
-            estrelas_apresentacao=ap,
-            comentario=txt,
-            media_ponderada=media,
-            sentimento=senti,
-            temas="; ".join(temas),
-            alerta_crise=crise,
-            feedback_motoboy=feed,
-        )
-        db.session.add(av)
-        if crise:
-            flash("⚠️ Avaliação crítica registrada (1★ + termo de risco). A gerência deve revisar.", "danger")
-
-    db.session.commit()
-    flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
-    return redirect(url_for("portal_restaurante", view="lancar"))
-
-@app.route("/lancamentos/<int:id>/editar", methods=["GET", "POST"])
-@role_required("restaurante")
-def editar_lancamento(id):
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first()
-    l = Lancamento.query.get_or_404(id)
-    if not rest or l.restaurante_id != rest.id:
-        abort(403)
-
-    if request.method == "POST":
-        f = request.form
-        l.valor = f.get("valor", type=float)
-        l.data = _parse_date(f.get("data")) or l.data
-        l.hora_inicio = f.get("hora_inicio")
-        l.hora_fim = f.get("hora_fim")
-        l.qtd_entregas = f.get("qtd_entregas", type=int)
-        db.session.commit()
-        flash("Lançamento atualizado.", "success")
-        return redirect(url_for("portal_restaurante", view="lancamentos",
-                                data_inicio=(l.data and l.data.strftime("%Y-%m-%d"))))
-
-    return render_template("editar_lancamento.html", lanc=l)
-
-@app.get("/lancamentos/<int:id>/excluir")
-@role_required("restaurante")
-def excluir_lancamento(id):
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first()
-    l = Lancamento.query.get_or_404(id)
-    if not rest or l.restaurante_id != rest.id:
-        abort(403)
-
-    db.session.execute(sa_delete(AvaliacaoCooperado).where(AvaliacaoCooperado.lancamento_id == id))
-    db.session.execute(sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.lancamento_id == id))
-    db.session.delete(l)
-    db.session.commit()
-    flash("Lançamento excluído.", "success")
-    return redirect(url_for("portal_restaurante", view="lancamentos"))
 
 # =========================
 # Documentos (Admin + Público)
