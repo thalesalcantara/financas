@@ -93,7 +93,6 @@
   </nav>
 
   <main class="wrap px-2 py-2">
-
     <!-- AÇÕES DE TOPO -->
     <div class="card head-card p-2 mb-3">
       <div class="d-flex align-items-center gap-2">
@@ -168,10 +167,14 @@
             </div>
 
             <div class="content">
-              {% if a.conteudo_html %}
-                {{ a.conteudo_html|safe }}
+              {% set html = a.conteudo_html or a.mensagem_html or a.descricao_html %}
+              {% set txt  = a.conteudo      or a.mensagem      or a.descricao %}
+              {% if html %}
+                {{ html|safe }}
+              {% elif txt %}
+                <p class="mb-0">{{ txt|e|replace('\n','<br>')|safe }}</p>
               {% else %}
-                <p class="mb-0">{{ a.conteudo }}</p>
+                <p class="text-muted mb-0"><em>(sem conteúdo)</em></p>
               {% endif %}
             </div>
 
@@ -238,7 +241,6 @@
       if (n > 0){ badge.style.display='inline-block'; badge.textContent = n; }
       else { badge.style.display='none'; badge.textContent='0'; }
     }
-
     function currentUnreadCount(){
       return $$('.aviso.unread').length;
     }
