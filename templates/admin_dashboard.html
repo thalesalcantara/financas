@@ -2473,62 +2473,111 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       </thead>
       <tbody>
         {% for t in trocas_pendentes or [] %}
+          {% set solicitante = t.solicitante if t.solicitante is defined else none %}
+          {% set origem      = t.origem      if t.origem      is defined else none %}
+          {% set destino     = t.destino     if t.destino     is defined else none %}
+
           <tr>
-            <td class="text-muted">#{{ t.get('id', '-') }}</td>
+            <td class="text-muted">#{{ t.id if t.id is defined else '-' }}</td>
 
             <td>
-              {% set solicitante = t.get('solicitante', {}) %}
-              <div class="text-tight"><b>{{ solicitante.get('nome', t.get('solicitante_nome', '-')) }}</b></div>
+              <div class="text-tight">
+                <b>
+                  {% if solicitante and solicitante.nome is defined %}
+                    {{ solicitante.nome }}
+                  {% elif t.solicitante_nome is defined %}
+                    {{ t.solicitante_nome }}
+                  {% else %}
+                    -
+                  {% endif %}
+                </b>
+              </div>
               <small class="text-muted">
-                ID {{ solicitante.get('id', t.get('solicitante_id', '-')) }}
+                ID
+                {% if solicitante and solicitante.id is defined %}
+                  {{ solicitante.id }}
+                {% elif t.solicitante_id is defined %}
+                  {{ t.solicitante_id }}
+                {% else %}
+                  -
+                {% endif %}
               </small>
             </td>
 
             <td>
-              {% set origem = t.get('origem', {}) %}
-              <div><i class="bi bi-calendar-event"></i> {{ origem.get('data', t.get('origem_data', '—')) }}</div>
-              <div><i class="bi bi-sun"></i> {{ origem.get('turno', t.get('origem_turno', '—')) }}</div>
-              <div><i class="bi bi-clock"></i> {{ origem.get('horario', t.get('origem_horario', '—')) }}</div>
-              <div><i class="bi bi-briefcase"></i> {{ origem.get('contrato', t.get('origem_contrato', '—')) }}</div>
+              <div><i class="bi bi-calendar-event"></i>
+                {% if origem and origem.data is defined %}
+                  {{ origem.data }}
+                {% elif t.origem_data is defined %}
+                  {{ t.origem_data }}
+                {% else %} — {% endif %}
+              </div>
+              <div><i class="bi bi-sun"></i>
+                {% if origem and origem.turno is defined %}
+                  {{ origem.turno }}
+                {% elif t.origem_turno is defined %}
+                  {{ t.origem_turno }}
+                {% else %} — {% endif %}
+              </div>
+              <div><i class="bi bi-clock"></i>
+                {% if origem and origem.horario is defined %}
+                  {{ origem.horario }}
+                {% elif t.origem_horario is defined %}
+                  {{ t.origem_horario }}
+                {% else %} — {% endif %}
+              </div>
+              <div><i class="bi bi-briefcase"></i>
+                {% if origem and origem.contrato is defined %}
+                  {{ origem.contrato }}
+                {% elif t.origem_contrato is defined %}
+                  {{ t.origem_contrato }}
+                {% else %} — {% endif %}
+              </div>
             </td>
 
             <td>
-              {% set destino = t.get('destino', {}) %}
-              <b>{{ destino.get('nome', t.get('destino_nome', '—')) }}</b>
+              <b>
+                {% if destino and destino.nome is defined %}
+                  {{ destino.nome }}
+                {% elif t.destino_nome is defined %}
+                  {{ t.destino_nome }}
+                {% else %} — {% endif %}
+              </b>
               <small class="text-muted d-block">
-                ID {{ destino.get('id', t.get('destino_id', '—')) }}
+                ID
+                {% if destino and destino.id is defined %}
+                  {{ destino.id }}
+                {% elif t.destino_id is defined %}
+                  {{ t.destino_id }}
+                {% else %} — {% endif %}
               </small>
             </td>
 
-            <td class="text-break">{{ t.get('mensagem') or '—' }}</td>
+            <td class="text-break">{{ t.mensagem if t.mensagem is defined and t.mensagem else '—' }}</td>
 
             <td>
-              {# criada_em pode ser datetime OU string; trate os dois #}
-              {% set criada_em = t.get('criada_em') %}
-              {% if criada_em and criada_em.strftime is defined %}
-                {{ criada_em.strftime('%d/%m/%Y %H:%M') }}
-              {% else %}
-                {{ criada_em or '—' }}
-              {% endif %}
+              {% if t.criada_em is defined and t.criada_em %}
+                {% if t.criada_em.strftime is defined %}
+                  {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}
+                {% else %}
+                  {{ t.criada_em }}
+                {% endif %}
+              {% else %} — {% endif %}
             </td>
 
             <td class="text-center">
               <div class="d-flex justify-content-center gap-1">
-                <!-- APROVAR (POST) -->
                 <form method="POST"
-                      action="{{ url_for('admin_aprovar_troca', id=t.get('id')) }}"
+                      action="{{ url_for('admin_aprovar_troca', id=t.id if t.id is defined else none) }}"
                       onsubmit="return confirm('Confirmar aprovação desta troca?');">
-                  {# {{ csrf_token() }} #}
                   <button type="submit" class="btn btn-success btn-sm">
                     <i class="bi bi-check2"></i> Aprovar
                   </button>
                 </form>
 
-                <!-- RECUSAR (POST) -->
                 <form method="POST"
-                      action="{{ url_for('admin_recusar_troca', id=t.get('id')) }}"
+                      action="{{ url_for('admin_recusar_troca', id=t.id if t.id is defined else none) }}"
                       onsubmit="return confirm('Recusar esta solicitação?');">
-                  {# {{ csrf_token() }} #}
                   <button type="submit" class="btn btn-danger btn-sm">
                     <i class="bi bi-x"></i> Recusar
                   </button>
