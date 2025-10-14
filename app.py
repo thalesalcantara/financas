@@ -1,100 +1,108 @@
 from __future__ import annotations
 
-import os
-import csv
-import io
-import re
-import json
-import difflib
-import unicodedata
-import re
-import mimetypes
-from dateutil.relativedelta import relativedelta
-from sqlalchemy.inspection import inspect as sa_inspect
-from datetime import datetime, date, timedelta, time
-from functools import wraps
+# ============ Stdlib ============
+import os, io, csv, re, json, time, difflib, urllib.parse, unicodedata
+from datetime import datetime, date, timedelta, time as dtime
 from collections import defaultdict, namedtuple
+from functools import wraps
 from types import SimpleNamespace
+
+# MIME types (fixes p/ Office)
+import mimetypes
+mimetypes.add_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx")
+mimetypes.add_type("application/vnd.ms-excel", ".xls")
+mimetypes.add_type("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx")
+mimetypes.add_type("application/msword", ".doc")
+mimetypes.add_type("application/vnd.openxmlformats-officedocument.presentationml.presentation", ".pptx")
+mimetypes.add_type("application/vnd.ms-powerpoint", ".ppt")
+
+# ============ Terceiros ============
 from flask import (
-    Flask, render_template, request, redirect, url_for,
-    session, flash, send_file, abort
+    Flask, render_template, request, redirect, url_for, session,
+    flash, send_file, abort, jsonify, current_app
 )
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from sqlalchemy import delete as sa_delete, text as sa_text, func
+from dateutil.relativedelta import relativedelta
+from sqlalchemy import func, text as sa_text, or_, and_, case
+from sqlalchemy.inspection import inspect as sa_inspect
+from sqlalchemy.pool import QueuePool
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
-# =========================
-# App / DB
-# =========================
+# ============ App / DB ============
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-DOCS_DIR = os.path.join(UPLOAD_DIR, "docs")
+UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
+DOCS_DIR   = os.path.join(UPLOAD_DIR, "docs")
 os.makedirs(DOCS_DIR, exist_ok=True)
-TABELAS_DIR = os.path.join(UPLOAD_DIR, "tabelas")
+
+# Persistência real (Render Disk)
+PERSIST_ROOT = os.environ.get("PERSIST_ROOT", "/var/data")
+if not os.path.isdir(PERSIST_ROOT):
+    PERSIST_ROOT = os.path.join(BASE_DIR, "data")
+os.makedirs(PERSIST_ROOT, exist_ok=True)
+TABELAS_DIR = os.path.join(PERSIST_ROOT, "tabelas")
 os.makedirs(TABELAS_DIR, exist_ok=True)
+STATIC_TABLES = os.path.join(BASE_DIR, "static", "uploads", "tabelas")
+os.makedirs(STATIC_TABLES, exist_ok=True)
 
 def _build_db_uri() -> str:
-    """
-    Usa SQLite local se não houver DATABASE_URL.
-    Se estiver no Render/Heroku com postgres, converte para o dialeto psycopg3:
-      postgres://...         -> postgresql+psycopg://...
-      postgresql://...       -> postgresql+psycopg://...
-    Garante sslmode=require quando for Postgres.
-    """
     url = os.environ.get("DATABASE_URL")
     if not url:
         return "sqlite:///" + os.path.join(BASE_DIR, "app.db")
-
-    # normaliza esquema
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql+psycopg://", 1)
     elif url.startswith("postgresql://") and "+psycopg" not in url:
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
-
-    # ssl obrigatório no Render
     if url.startswith("postgresql+psycopg://") and "sslmode=" not in url:
         url += ("&" if "?" in url else "?") + "sslmode=require"
     return url
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
-
-# chave da sessão
 app.secret_key = os.environ.get("SECRET_KEY", "coopex-secret")
 
-# Configs principais
-app.config["SQLALCHEMY_DATABASE_URI"] = _build_db_uri()
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["JSON_SORT_KEYS"] = False  # evita comparar None com int ao serializar |tojson
-app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32MB
-
-# Sessão/cookies (mais seguro; deixe SECURE=True em produção com HTTPS)
 app.config.update(
+    SQLALCHEMY_DATABASE_URI=_build_db_uri(),
+    SQLALCHEMY_TRACK_MODIFICATIONS=False,
+    JSON_SORT_KEYS=False,
+    MAX_CONTENT_LENGTH=32 * 1024 * 1024,  # 32MB
     SESSION_COOKIE_HTTPONLY=True,
     REMEMBER_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",                 # "Strict" pode quebrar logins vindos de links
+    SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.environ.get("FLASK_SECURE_COOKIES", "1") == "1",
-    PERMANENT_SESSION_LIFETIME=timedelta(hours=12) # ajuste conforme sua política
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
+    SQLALCHEMY_ENGINE_OPTIONS={
+        "poolclass": QueuePool,
+        "pool_size": 5,
+        "max_overflow": 5,
+        "pool_timeout": 10,
+        "pool_pre_ping": True,
+        "pool_recycle": 1800,
+        "connect_args": {
+            "connect_timeout": 5,
+            "options": "-c statement_timeout=15000",
+        },
+    },
 )
-
-from sqlalchemy.pool import QueuePool
-
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "poolclass": QueuePool,   # usa pool local quando não houver PgBouncer
-    "pool_size": 5,
-    "max_overflow": 10,
-    "pool_pre_ping": True,
-    "pool_recycle": 1800,
-}
 
 db = SQLAlchemy(app)
 
-# --- habilita foreign_keys no SQLite (para ON DELETE CASCADE funcionar) ---
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
+# Health checks
+@app.get("/healthz")
+def healthz():
+    return "ok", 200
 
+@app.get("/readyz")
+def readyz():
+    try:
+        db.session.execute(sa_text("SELECT 1"))
+        return "ready", 200
+    except Exception:
+        return "not-ready", 503
+
+# Liga foreign_keys no SQLite
 @event.listens_for(Engine, "connect")
 def _set_sqlite_pragma(dbapi_con, con_record):
     try:
@@ -105,6 +113,12 @@ def _set_sqlite_pragma(dbapi_con, con_record):
     except Exception:
         pass
 
+def _is_sqlite() -> bool:
+    try:
+        return db.session.get_bind().dialect.name == "sqlite"
+    except Exception:
+        return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
+
 # =========================
 # Models
 # =========================
@@ -114,6 +128,8 @@ class Usuario(db.Model):
     usuario = db.Column(db.String(80), unique=True, nullable=False)
     senha_hash = db.Column(db.String(200), nullable=False)
     tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
+    # 👇 NOVO
+    ativo = db.Column(db.Boolean, nullable=False, default=True)
 
     def set_password(self, raw: str):
         self.senha_hash = generate_password_hash(raw)
@@ -378,8 +394,17 @@ def _is_sqlite() -> bool:
     except Exception:
         return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
 
+
 def init_db():
-    # --- PERF (SQLite): liga WAL e ajusta synchronous ---
+    """
+    Versão unificada e idempotente:
+      1) Ajustes de performance para SQLite (WAL/synchronous)
+      2) Criação de todas as tabelas (create_all)
+      3) Índices úteis (cooperado/restaurante/criado_em)
+      4) Migrações leves de colunas/tabelas (qtd_entregas, fotos, escalas, avaliacoes_restaurante)
+      5) Bootstrap mínimo (admin e config)
+    """
+    # 1) Perf no SQLite
     try:
         if _is_sqlite():
             db.session.execute(sa_text("PRAGMA journal_mode=WAL;"))
@@ -388,90 +413,90 @@ def init_db():
     except Exception:
         db.session.rollback()
 
-    db.create_all()
-
-def init_db():
-    # --- PERF (SQLite): liga WAL e ajusta synchronous ---
+    # 2) Tabelas/mapeamentos
     try:
-        if _is_sqlite():
-            db.session.execute(sa_text("PRAGMA journal_mode=WAL;"))
-            db.session.execute(sa_text("PRAGMA synchronous=NORMAL;"))
-            db.session.commit()
+        db.create_all()
     except Exception:
         db.session.rollback()
 
-    # Cria tabelas/mapeamentos
-    db.create_all()
-
-    # --- índices de performance p/ avaliações (restaurante_id, cooperado_id, criado_em) ---
+    # 3) Índices de performance (idempotentes)
     try:
         if _is_sqlite():
             db.session.execute(sa_text("""
-            CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON avaliacoes (criado_em);
-            CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON avaliacoes (restaurante_id, criado_em);
-            CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON avaliacoes (cooperado_id,  criado_em);
+                CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON avaliacoes (criado_em);
+                CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON avaliacoes (restaurante_id, criado_em);
+                CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON avaliacoes (cooperado_id,  criado_em);
 
-            CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em           ON avaliacoes_restaurante (criado_em);
-            CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado         ON avaliacoes_restaurante (restaurante_id, criado_em);
-            CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado         ON avaliacoes_restaurante (cooperado_id,  criado_em);
+                CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em           ON avaliacoes_restaurante (criado_em);
+                CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado         ON avaliacoes_restaurante (restaurante_id, criado_em);
+                CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado         ON avaliacoes_restaurante (cooperado_id,  criado_em);
             """))
         else:
             db.session.execute(sa_text("""
-            CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON public.avaliacoes (criado_em);
-            CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON public.avaliacoes (restaurante_id, criado_em);
-            CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON public.avaliacoes (cooperado_id,  criado_em);
+                CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON public.avaliacoes (criado_em);
+                CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON public.avaliacoes (restaurante_id, criado_em);
+                CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON public.avaliacoes (cooperado_id,  criado_em);
 
-            CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em           ON public.avaliacoes_restaurante (criado_em);
-            CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado         ON public.avaliacoes_restaurante (restaurante_id, criado_em);
-            CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado         ON public.avaliacoes_restaurante (cooperado_id,  criado_em);
+                CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em           ON public.avaliacoes_restaurante (criado_em);
+                CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado         ON public.avaliacoes_restaurante (restaurante_id, criado_em);
+                CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado         ON public.avaliacoes_restaurante (cooperado_id,  criado_em);
             """))
         db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # --- qtd_entregas em lancamentos ---
+    # 4) Migração leve: garantir coluna qtd_entregas em lancamentos
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(lancamentos);")).fetchall()
             colnames = {row[1] for row in cols}
             if "qtd_entregas" not in colnames:
                 db.session.execute(sa_text("ALTER TABLE lancamentos ADD COLUMN qtd_entregas INTEGER"))
-                db.session.commit()
+            db.session.commit()
         else:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS lancamentos ADD COLUMN IF NOT EXISTS qtd_entregas INTEGER"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS public.lancamentos "
+                "ADD COLUMN IF NOT EXISTS qtd_entregas INTEGER"
+            ))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # --- cooperado_nome em escalas ---
+    # 4.1) cooperado_nome em escalas
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
             colnames = {row[1] for row in cols}
             if "cooperado_nome" not in colnames:
                 db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
-                db.session.commit()
+            db.session.commit()
         else:
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS escalas ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS escalas "
+                "ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"
+            ))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # --- restaurante_id em escalas ---
+    # 4.2) restaurante_id em escalas
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
             colnames = {row[1] for row in cols}
             if "restaurante_id" not in colnames:
                 db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
-                db.session.commit()
+            db.session.commit()
         else:
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS escalas ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS escalas "
+                "ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"
+            ))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # --- fotos no banco (cooperados) ---
+    # 4.3) fotos no banco (cooperados)
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
@@ -486,15 +511,19 @@ def init_db():
                 db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN foto_url VARCHAR(255)"))
             db.session.commit()
         else:
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # --- tabela avaliacoes_restaurante (se não existir) ---
+    # 4.4) tabela avaliacoes_restaurante (se não existir)
     try:
         if _is_sqlite():
             db.session.execute(sa_text("""
@@ -516,8 +545,10 @@ def init_db():
                   criado_em TIMESTAMP
                 );
             """))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
+            db.session.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
+            db.session.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
             db.session.commit()
         else:
             db.session.execute(sa_text("""
@@ -539,13 +570,15 @@ def init_db():
                   criado_em TIMESTAMP
                 );
             """))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
+            db.session.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
+            db.session.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # --- fotos no banco (restaurantes) ---
+    # 4.5) fotos no banco (restaurantes)
     try:
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
@@ -560,26 +593,74 @@ def init_db():
                 db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN foto_url VARCHAR(255)"))
             db.session.commit()
         else:
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
 
-    # --- usuário admin + config padrão ---
-    if not Usuario.query.filter_by(tipo="admin").first():
-        admin_user = os.environ.get("ADMIN_USER", "admin")
-        admin_pass = os.environ.get("ADMIN_PASS", os.urandom(8).hex())
-        admin = Usuario(usuario=admin_user, tipo="admin", senha_hash="")
-        admin.set_password(admin_pass)
-        db.session.add(admin)
-        db.session.commit()
+    # 4.x) coluna 'ativo' em usuarios (idempotente)
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(usuarios);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "ativo" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE usuarios ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text(
+                "ALTER TABLE IF EXISTS public.usuarios "
+                "ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE"
+            ))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
-    if not Config.query.get(1):
-        db.session.add(Config(id=1, salario_minimo=0.0))
-        db.session.commit()
+    # 5) Bootstrap mínimo (admin e config)
+    # Observação: se os modelos ainda não estiverem importados neste ponto,
+    # engolimos o erro e a criação poderá ocorrer numa próxima chamada ao init_db().
+    try:
+        from models import Usuario, Config  # se você usa modelos em outro módulo
+    except Exception:
+        # Se os modelos estiverem no mesmo arquivo, ignore este import.
+        pass
+
+    # Admin
+    try:
+        # Tenta acessar Usuario; se não existir ainda, NameError cai no except
+        _ = Usuario  # noqa: F401
+        if not Usuario.query.filter_by(tipo="admin").first():
+            admin_user = os.environ.get("ADMIN_USER", "admin")
+            admin_pass = os.environ.get("ADMIN_PASS", os.urandom(8).hex())
+            admin = Usuario(usuario=admin_user, tipo="admin", senha_hash="")
+            # Precisa que Usuario tenha método set_password
+            try:
+                admin.set_password(admin_pass)
+            except Exception:
+                # fallback: se não houver helper, gerar hash direto
+                try:
+                    admin.senha_hash = generate_password_hash(admin_pass)
+                except Exception:
+                    pass
+            db.session.add(admin)
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # Config default (id=1)
+    try:
+        _ = Config  # noqa: F401
+        if not Config.query.get(1):
+            db.session.add(Config(id=1, salario_minimo=0.0))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 # === Bootstrap do banco no start (Render/Gunicorn) ===
@@ -593,6 +674,17 @@ try:
             app.logger.info(f"init_db concluído em {(datetime.utcnow() - _t0).total_seconds():.2f}s")
         except Exception:
             pass
+    else:
+        try:
+            app.logger.info("INIT_DB_ON_START=0: pulando init_db no boot.")
+        except Exception:
+            pass
+except Exception as e:
+    try:
+        app.logger.warning(f"init_db pulado: {e}")
+    except Exception:
+        pass
+
     else:
         try:
             app.logger.info("INIT_DB_ON_START=0: pulando init_db no boot.")
@@ -740,6 +832,48 @@ def _save_upload(file_storage) -> str | None:
     path = os.path.join(UPLOAD_DIR, fname)
     file_storage.save(path)
     return f"/static/uploads/{fname}"
+
+
+from werkzeug.utils import secure_filename
+import time
+
+def salvar_tabela_upload(file_storage) -> str | None:
+    """
+    Salva o arquivo de TABELA dentro do diretório persistente (TABELAS_DIR)
+    e retorna APENAS o nome do arquivo (para guardar no banco em Tabela.arquivo_nome).
+    """
+    if not file_storage or not file_storage.filename:
+        return None
+    fname = secure_filename(file_storage.filename)
+    base, ext = os.path.splitext(fname)
+    unique = f"{base}_{time.strftime('%Y%m%d_%H%M%S')}{ext.lower()}"
+    destino = os.path.join(TABELAS_DIR, unique)
+    file_storage.save(destino)
+    return unique  # <- guarde este em Tabela.arquivo_nome
+
+
+def resolve_tabela_path(nome_arquivo: str) -> str | None:
+    """
+    Resolve o caminho real de uma TABELA:
+      1) /var/data/tabelas   (persistente)
+      2) static/uploads/...  (legado)
+    """
+    if not nome_arquivo:
+        return None
+    candidatos = [
+        os.path.join(TABELAS_DIR, nome_arquivo),
+        os.path.join(STATIC_TABLES, nome_arquivo),  # legado
+        # último fallback: se por acaso gravaram caminho completo em arquivo_url
+        _abs_path_from_url(nome_arquivo) if nome_arquivo.startswith("/") else None,
+    ]
+    for p in candidatos:
+        if p and os.path.isfile(p):
+            return p
+    # log amigável (vai parar com o WARNING que você viu)
+    app.logger.warning("Arquivo de Tabela não encontrado. nome='%s' tents=%s",
+                       nome_arquivo, [c for c in candidatos if c])
+    return None
+
 
 def _save_foto_to_db(entidade, file_storage, *, is_cooperado: bool) -> str | None:
     """
@@ -1274,27 +1408,8 @@ _PRIORD = case(
     else_=2,
 )
 
+
 def get_avisos_for_cooperado(coop: Cooperado):
-    """
-    COOPERADO vê:
-      - global
-      - cooperado (destino = mim OU broadcast)
-      - restaurante (broadcast OU ligado a QUALQUER restaurante onde tenho escala)
-    """
-    # busca os restaurantes do cooperado sem trazer objetos inteiros
-    rest_ids = [
-        rid for (rid,) in (
-            db.session.query(Escala.restaurante_id)
-            .filter(Escala.cooperado_id == coop.id, Escala.restaurante_id.isnot(None))
-            .distinct()
-            .all()
-        )
-    ]
-
-    cond_rest = or_(~Aviso.restaurantes.any())
-    if rest_ids:  # só usa IN se houver IDs
-        cond_rest = or_(cond_rest, Aviso.restaurantes.any(Restaurante.id.in_(rest_ids)))
-
     q = (
         _avisos_base_query()
         .filter(
@@ -1302,12 +1417,10 @@ def get_avisos_for_cooperado(coop: Cooperado):
                 (Aviso.tipo == "global"),
                 and_(
                     Aviso.tipo == "cooperado",
-                    or_(Aviso.destino_cooperado_id == coop.id,
-                        Aviso.destino_cooperado_id.is_(None)),
-                ),
-                and_(
-                    Aviso.tipo == "restaurante",
-                    cond_rest,
+                    or_(
+                        Aviso.destino_cooperado_id == coop.id,
+                        Aviso.destino_cooperado_id.is_(None)  # broadcast cooperados
+                    ),
                 ),
             )
         )
@@ -1317,7 +1430,6 @@ def get_avisos_for_cooperado(coop: Cooperado):
             Aviso.criado_em.desc(),
         )
     )
-
     return q.all()
 
 def get_avisos_for_restaurante(rest: Restaurante):
@@ -1401,13 +1513,14 @@ def index():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     erro_login = None
+
     if request.method == "POST":
         usuario = request.form.get("usuario", "").strip()
         senha = request.form.get("senha", "")
 
         u = Usuario.query.filter_by(usuario=usuario).first()
 
-        # fallback: aceitar login pelo nome do restaurante
+        # Fallback: aceitar login pelo nome do restaurante
         if not u:
             r = Restaurante.query.filter(Restaurante.nome.ilike(usuario)).first()
             if not r:
@@ -1416,6 +1529,14 @@ def login():
                 u = r.usuario_ref
 
         if u and u.check_password(senha):
+            # 🔒 Bloqueia se a conta estiver desativada (funciona mesmo em DB antigo)
+            if hasattr(u, "ativo") and not bool(getattr(u, "ativo", True)):
+                erro_login = "Conta desativada. Fale com o administrador."
+                flash(erro_login, "danger")
+                login_tpl = os.path.join("templates", "login.html")
+                return render_template("login.html", erro_login=erro_login) if os.path.exists(login_tpl) else "<p>Conta desativada.</p>"
+
+            # Login OK
             session["user_id"] = u.id
             session["user_tipo"] = u.tipo
             if u.tipo == "admin":
@@ -1424,9 +1545,12 @@ def login():
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
                 return redirect(url_for("portal_restaurante"))
+
+        # Falha
         erro_login = "Usuário/senha inválidos."
         flash(erro_login, "danger")
 
+    # GET (ou erro)
     login_tpl = os.path.join("templates", "login.html")
     if os.path.exists(login_tpl):
         return render_template("login.html", erro_login=erro_login)
@@ -1447,15 +1571,33 @@ def logout():
 # =========================
 # Admin Dashboard
 # =========================
+# =========================
+# Admin Dashboard
+# =========================
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_dashboard():
     args = request.args
-    active_tab = args.get("tab", "lancamentos")  # <- NOVO: controla a aba ativa
+
+    # --- Controle de abas
+    active_tab = args.get("tab", "lancamentos")
+
+    # --- Helper: escolhe a primeira data válida de uma lista de chaves
+    def _pick_date(*keys):
+        for k in keys:
+            v = args.get(k)
+            if v:
+                d = _parse_date(v)
+                if d:
+                    return d
+        return None
+
+    # --- Datas unificadas para o RESUMO (prioriza resumo_inicio/fim)
+    data_inicio = _pick_date("resumo_inicio", "data_inicio")
+    data_fim    = _pick_date("resumo_fim", "data_fim")
+
     restaurante_id = args.get("restaurante_id", type=int)
-    cooperado_id = args.get("cooperado_id", type=int)
-    data_inicio = _parse_date(args.get("data_inicio"))
-    data_fim = _parse_date(args.get("data_fim"))
+    cooperado_id   = args.get("cooperado_id", type=int)
     considerar_periodo = bool(args.get("considerar_periodo"))
     dows = set(args.getlist("dow"))  # {"1","2",...}
 
@@ -1531,6 +1673,240 @@ def admin_dashboard():
         c.id: {"cnh_ok": docinfo_map[c.id]["cnh"]["ok"], "placa_ok": docinfo_map[c.id]["placa"]["ok"]}
         for c in cooperados
     }
+
+    # -------- Escalas agrupadas e contagem por cooperado ----------
+    escalas_all = Escala.query.order_by(Escala.id.asc()).all()
+
+    esc_by_int: dict[int, list] = defaultdict(list)
+    esc_by_str: dict[str, list] = defaultdict(list)
+    for e in escalas_all:
+        k_int = e.cooperado_id if e.cooperado_id is not None else 0  # 0 = sem cadastro
+        esc_item = {
+            "data": e.data, "turno": e.turno, "horario": e.horario,
+            "contrato": e.contrato, "cor": e.cor, "nome_planilha": e.cooperado_nome
+        }
+        esc_by_int[k_int].append(esc_item)
+        esc_by_str[str(k_int)].append(esc_item)
+
+    cont_rows = dict(db.session.query(Escala.cooperado_id, func.count(Escala.id)).group_by(Escala.cooperado_id).all())
+    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
+    qtd_sem_cadastro = int(cont_rows.get(None, 0))
+
+    # gráficos (por mês)
+    sums = {}
+    for l in lancamentos:
+        if not l.data:
+            continue
+        key = l.data.strftime("%Y-%m")
+        sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
+    labels_ord = sorted(sums.keys())
+    labels_fmt = [datetime.strptime(k, "%Y-%m").strftime("%m/%Y") for k in labels_ord]
+    values = [round(sums[k], 2) for k in labels_ord]
+    chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
+    chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
+
+    admin_user = Usuario.query.filter_by(tipo="admin").first()
+
+    # ---- Folha (últimos 30 dias padrão)
+    folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
+    folha_fim = _parse_date(args.get("folha_fim")) or date.today()
+    FolhaItem = namedtuple("FolhaItem", "cooperado lancamentos receitas despesas bruto inss outras_desp liquido")
+    folha_por_coop = []
+    for c in cooperados:
+        l = (Lancamento.query
+             .filter(Lancamento.cooperado_id == c.id,
+                     Lancamento.data >= folha_inicio,
+                     Lancamento.data <= folha_fim)
+             .order_by(Lancamento.data.asc(), Lancamento.id.asc())
+             .all())
+        r = (ReceitaCooperado.query
+             .filter(ReceitaCooperado.cooperado_id == c.id,
+                     ReceitaCooperado.data >= folha_inicio,
+                     ReceitaCooperado.data <= folha_fim)
+             .order_by(ReceitaCooperado.data.asc(), ReceitaCooperado.id.asc())
+             .all())
+        d = (DespesaCooperado.query
+             .filter((DespesaCooperado.cooperado_id == c.id) | (DespesaCooperado.cooperado_id.is_(None)),
+                     DespesaCooperado.data >= folha_inicio,
+                     DespesaCooperado.data <= folha_fim)
+             .order_by(DespesaCooperado.data.asc(), DespesaCooperado.id.asc())
+             .all())
+        bruto_lanc = sum(x.valor or 0 for x in l)
+        inss = round(bruto_lanc * 0.045, 2)
+        outras_desp = sum(x.valor or 0 for x in d)
+        bruto_total = bruto_lanc + sum(x.valor or 0 for x in r)
+        liquido = bruto_total - inss - outras_desp
+        for x in l:
+            x.conta_inss = True
+            x.isento_benef = False
+            x.inss = round((x.valor or 0) * 0.045, 2)
+
+        folha_por_coop.append(FolhaItem(
+            cooperado=c, lancamentos=l, receitas=r, despesas=d,
+            bruto=bruto_total, inss=inss, outras_desp=outras_desp, liquido=liquido
+        ))
+
+    # Benefícios para template
+    def _tokenize(s: str):
+        return [x.strip() for x in re.split(r"[;,]", s or "") if x.strip()]
+
+    historico_beneficios = BeneficioRegistro.query.order_by(BeneficioRegistro.id.desc()).all()
+    beneficios_view = []
+    for b in historico_beneficios:
+        nomes = _tokenize(b.recebedores_nomes or "")
+        ids = _tokenize(b.recebedores_ids or "")
+        recs = []
+        for i, nome in enumerate(nomes):
+            rid = ids[i] if i < len(ids) else None
+            try:
+                rid = int(rid) if rid and str(rid).isdigit() else None
+            except Exception:
+                rid = None
+            recs.append({"id": rid, "nome": nome})
+        beneficios_view.append({
+            "data_inicial": b.data_inicial,
+            "data_final": b.data_final,
+            "data_lancamento": b.data_lancamento,
+            "tipo": b.tipo,
+            "valor_total": b.valor_total or 0.0,
+            "recebedores": recs,
+        })
+
+    # ======== Trocas no admin ========
+    def _escala_desc(e: Escala | None) -> str:
+        return _escala_label(e)
+
+    def _split_turno_horario(s: str) -> tuple[str, str]:
+        if not s:
+            return "", ""
+        parts = [p.strip() for p in s.split("•")]
+        if len(parts) == 2:
+            return parts[0], parts[1]
+        return s.strip(), ""
+
+    def _linha_from_escala(e: Escala, saiu: str, entrou: str) -> dict:
+        return {
+            "dia": _escala_label(e).split(" • ")[0],
+            "turno_horario": " • ".join([x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]),
+            "contrato": (e.contrato or "").strip(),
+            "saiu": saiu,
+            "entrou": entrou,
+        }
+
+    trocas_all = TrocaSolicitacao.query.order_by(TrocaSolicitacao.id.desc()).all()
+    trocas_pendentes, trocas_historico = [], []
+    trocas_historico_flat = []
+
+    for t in trocas_all:
+        solicitante = Cooperado.query.get(t.solicitante_id)
+        destinatario = Cooperado.query.get(t.destino_id)
+        orig = Escala.query.get(t.origem_escala_id)
+
+        linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
+
+        if t.status == "aprovada" and not linhas_afetadas and orig and solicitante and destinatario:
+            linhas_afetadas.append(_linha_from_escala(
+                orig, saiu=solicitante.nome, entrou=destinatario.nome
+            ))
+            wd_o = _weekday_from_data_str(orig.data)
+            buck_o = _turno_bucket(orig.turno, orig.horario)
+            candidatas = (Escala.query
+                          .filter_by(cooperado_id=solicitante.id)
+                          .all())
+            best = None
+            for e in candidatas:
+                if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
+                    if (orig.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
+                        best = e
+                        break
+                    if best is None:
+                        best = e
+            if best:
+                linhas_afetadas.append(_linha_from_escala(
+                    best, saiu=destinatario.nome, entrou=solicitante.nome
+                ))
+
+        item = {
+            "id": t.id,
+            "status": t.status,
+            "mensagem": t.mensagem,
+            "criada_em": t.criada_em,
+            "aplicada_em": t.aplicada_em,
+            "solicitante": solicitante,
+            "destinatario": destinatario,
+            "orig": Escala.query.get(t.origem_escala_id),
+            "destino": destinatario,
+            "origem_desc": _escala_desc(orig),
+            "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
+            "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
+            "linhas_afetadas": linhas_afetadas,
+        }
+
+        if t.status == "aprovada" and linhas_afetadas:
+            itens = []
+            for r in linhas_afetadas:
+                turno_txt, horario_txt = _split_turno_horario(r.get("turno_horario", ""))
+                itens.append({
+                    "data": r.get("dia", ""),
+                    "turno": turno_txt,
+                    "horario": horario_txt,
+                    "contrato": r.get("contrato", ""),
+                    "saiu_nome": r.get("saiu", ""),
+                    "entrou_nome": r.get("entrou", ""),
+                })
+                trocas_historico_flat.append({
+                    "data": r.get("dia", ""),
+                    "turno": turno_txt,
+                    "horario": horario_txt,
+                    "contrato": r.get("contrato", ""),
+                    "saiu_nome": r.get("saiu", ""),
+                    "entrou_nome": r.get("entrou", ""),
+                    "aplicada_em": t.aplicada_em,
+                })
+            item["itens"] = itens
+
+        (trocas_pendentes if t.status == "pendente" else trocas_historico).append(item)
+
+    current_date = date.today()
+    data_limite = date(current_date.year, 12, 31)
+
+    return render_template(
+        "admin_dashboard.html",
+        _tab=active_tab,  # <- importante para o template marcar a aba ativa, inclusive 'resumo'
+        total_producoes=total_producoes,
+        total_inss=total_inss,
+        total_receitas=total_receitas,
+        total_despesas=total_despesas,
+        total_receitas_coop=total_receitas_coop,
+        total_despesas_coop=total_despesas_coop,
+        salario_minimo=cfg.salario_minimo or 0.0,
+        lancamentos=lancamentos,
+        receitas=receitas,
+        despesas=despesas,
+        receitas_coop=receitas_coop,
+        despesas_coop=despesas_coop,
+        cooperados=cooperados,
+        restaurantes=restaurantes,
+        beneficios_view=beneficios_view,
+        historico_beneficios=historico_beneficios,
+        current_date=current_date,
+        data_limite=data_limite,
+        admin=admin_user,
+        docinfo_map=docinfo_map,
+        escalas_por_coop=esc_by_int,
+        escalas_por_coop_json=esc_by_str,
+        qtd_escalas_map=qtd_escalas_map,
+        qtd_escalas_sem_cadastro=qtd_sem_cadastro,
+        status_doc_por_coop=status_doc_por_coop,
+        chart_data_lancamentos_coop=chart_data_lancamentos_coop,
+        chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
+        folha_inicio=folha_inicio,
+        folha_fim=folha_fim,
+        folha_por_coop=folha_por_coop,
+        trocas_pendentes=trocas_pendentes,
+        trocas_historico=trocas_historico,
+        trocas_historico_flat=trocas_historico_flat,
+    )
 
     # -------- Escalas agrupadas e contagem por cooperado ----------
     escalas_all = Escala.query.order_by(Escala.id.asc()).all()
@@ -2677,6 +3053,11 @@ def marcar_aviso_lido_universal(aviso_id: int):
 # =========================
 # CRUD Cooperados / Restaurantes / Senhas (Admin)
 # =========================
+from flask import jsonify, current_app  # <- precisa para a rota toggle e logs
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import delete as sa_delete  # já usa mais acima em outras rotas
+
 @app.route("/cooperados/add", methods=["POST"])
 @admin_required
 def add_cooperado():
@@ -2690,7 +3071,12 @@ def add_cooperado():
         flash("Usuário já existente.", "warning")
         return redirect(url_for("admin_dashboard", tab="cooperados"))
 
+    # cria usuário já ativo por padrão
     u = Usuario(usuario=usuario_login, tipo="cooperado", senha_hash="")
+    # se seu modelo tiver a coluna 'ativo', garanta True por segurança
+    if hasattr(u, "ativo"):
+        u.ativo = True
+
     u.set_password(senha)
     db.session.add(u)
     db.session.flush()
@@ -2705,6 +3091,7 @@ def add_cooperado():
     db.session.commit()
     flash("Cooperado cadastrado.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
+
 
 @app.route("/cooperados/<int:id>/edit", methods=["POST"])
 @admin_required
@@ -2721,8 +3108,6 @@ def edit_cooperado(id):
     flash("Cooperado atualizado.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
-from sqlalchemy import or_
-from sqlalchemy.exc import IntegrityError
 
 @app.route("/cooperados/<int:id>/delete", methods=["POST"])
 @admin_required
@@ -2764,7 +3149,7 @@ def delete_cooperado(id):
             sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.cooperado_id == id)
         )
 
-        # --- 4) Lançamentos desse cooperado (se o CASCADE por lancamento_id não estiver ativo) ---
+        # --- 4) Lançamentos desse cooperado ---
         db.session.execute(
             sa_delete(Lancamento).where(Lancamento.cooperado_id == id)
         )
@@ -2797,6 +3182,7 @@ def delete_cooperado(id):
 
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
+
 @app.route("/cooperados/<int:id>/reset_senha", methods=["POST"])
 @admin_required
 def reset_senha_cooperado(id):
@@ -2810,6 +3196,21 @@ def reset_senha_cooperado(id):
     db.session.commit()
     flash("Senha do cooperado atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
+
+
+# === Ativar/Desativar cooperado (toggle) ===
+@app.post("/cooperados/<int:id>/toggle_status")
+@admin_required
+def toggle_status_cooperado(id):
+    c = Cooperado.query.get_or_404(id)
+    u = c.usuario_ref
+    if not u:
+        return jsonify({"ok": False, "error": "Usuário não vinculado"}), 400
+
+    # Alterna o status; se a coluna não existir por algum motivo, considera True como padrão
+    u.ativo = not bool(getattr(u, "ativo", True))
+    db.session.commit()
+    return jsonify({"ok": True, "ativo": bool(u.ativo)})
 
 @app.route("/restaurantes/add", methods=["POST"])
 @admin_required
