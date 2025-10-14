@@ -2473,37 +2473,21 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       </thead>
       <tbody>
         {% for t in trocas_pendentes or [] %}
-          {% set solicitante = t.solicitante if t.solicitante is defined else none %}
-          {% set origem      = t.origem      if t.origem      is defined else none %}
-          {% set destino     = t.destino     if t.destino     is defined else none %}
+  {% set solicitante = t.solicitante if t.solicitante else None %}
+  {% set origem = t.origem if t.origem else None %}
+  {% set destino = t.destino if t.destino else None %}
 
-          <tr>
-            <td class="text-muted">#{{ t.id if t.id is defined else '-' }}</td>
+  <tr>
+    <td class="text-muted">#{{ t.id|default('-', true) }}</td>
 
-            <td>
-              <div class="text-tight">
-                <b>
-                  {% if solicitante and solicitante.nome is defined %}
-                    {{ solicitante.nome }}
-                  {% elif t.solicitante_nome is defined %}
-                    {{ t.solicitante_nome }}
-                  {% else %}
-                    -
-                  {% endif %}
-                </b>
-              </div>
-              <small class="text-muted">
-                ID
-                {% if solicitante and solicitante.id is defined %}
-                  {{ solicitante.id }}
-                {% elif t.solicitante_id is defined %}
-                  {{ t.solicitante_id }}
-                {% else %}
-                  -
-                {% endif %}
-              </small>
-            </td>
-
+    <td>
+      <div class="text-tight">
+        <b>{{ (solicitante.nome if solicitante else t.solicitante_nome)|default('-', true) }}</b>
+      </div>
+      <small class="text-muted">
+        ID {{ (solicitante.id if solicitante else t.solicitante_id)|default('-', true) }}
+      </small>
+    </td>
             <td>
               <div><i class="bi bi-calendar-event"></i>
                 {% if origem and origem.data is defined %}
