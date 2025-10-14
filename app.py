@@ -2898,6 +2898,160 @@ def alterar_admin():
     flash("Conta do administrador atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="config"))
 
+# =============================================================================
+# AVISOS — Portal (restaurante)
+# =============================================================================
+@app.get("/portal/restaurante/avisos")
+@role_required("restaurante")
+def portal_restaurante_avisos():
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+    avisos_db = get_avisos_for_restaurante(rest)
+    lidos_ids = {
+        a_id
+        for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
+        .filter(AvisoLeitura.restaurante_id == rest.id).all()
+    }
+
+    avisos = []
+    for a in avisos_db:
+        avisos.append({
+            "id": a.id,
+            "titulo": a.titulo or "Aviso",
+            "criado_em": a.criado_em,
+            "lido": (a.id in lidos_ids),
+            "prioridade_alta": (str(a.prioridade or "").lower() == "alta"),
+            "corpo_html": (a.corpo or ""),
+        })
+
+    avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
+
+    return render_template(
+        "portal_restaurante_avisos.html",
+        avisos=avisos,
+        avisos_nao_lidos_count=avisos_nao_lidos_count,
+        current_year=datetime.now().year,
+    )
+
+@app.post("/portal/restaurante/avisos/<int:aviso_id>/lido")
+@role_required("restaurante")
+def rest_marcar_aviso_lido(aviso_id: int):
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+    Aviso.query.get_or_404(aviso_id)
+    if not AvisoLeitura.query.filter_by(aviso_id=aviso_id, restaurante_id=rest.id).first():
+        db.session.add(AvisoLeitura(aviso_id=aviso_id, restaurante_id=rest.id, lido_em=datetime.utcnow()))
+        db.session.commit()
+    return redirect(url_for("portal_restaurante_avisos"))
+
+# =============================================================================
+# AVISOS — Admin (ÚNICA FUNÇÃO GET/POST) + delete (ÚNICA ROTA)
+# =============================================================================
+@app.route("/admin/avisos", methods=["GET", "POST"])
+@admin_required
+def admin_avisos():
+    cooperados = Cooperado.query.order_by(Cooperado.nome.asc()).all()
+    restaurantes = Restaurante.query.order_by(Restaurante.nome.asc()).all()
+
+    if request.method == "POST":
+        f = request.form
+
+        # Campos básicos
+        titulo     = (f.get("titulo") or "Aviso").strip()
+        corpo      = (f.get("corpo_html") or f.get("corpo") or "").strip()
+        prioridade = (f.get("prioridade") or "normal").strip().lower()  # normal | alta
+        fixado     = bool(f.get("fixado"))
+        ativo      = True
+
+        # Período (opcionais)
+        def _parse_dt(s):
+            if not s:
+                return None
+            for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d", "%d/%m/%Y %H:%M", "%d/%m/%Y"):
+                try:
+                    dt = datetime.strptime(s.strip(), fmt)
+                    if fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+                        dt = datetime.combine(dt.date(), time(0, 0))
+                    return dt
+                except Exception:
+                    pass
+            return None
+
+        inicio_em = _parse_dt(f.get("inicio_em"))
+        fim_em    = _parse_dt(f.get("fim_em"))
+
+        # Alcance
+        alcance = f.get("destino_tipo")  # 'cooperados' | 'restaurantes' | 'ambos' | 'global'
+        coop_alc = f.get("coop_alcance") or f.get("coop_alcance_ambos")  # 'todos' | 'um' | 'lista'
+        rest_alc = f.get("rest_alcance") or f.get("rest_alcance_ambos")  # 'todos' | 'lista'
+
+        sel_coops = request.form.getlist("dest_cooperados[]") or request.form.getlist("dest_cooperados_ambos[]")
+        sel_rests = request.form.getlist("dest_restaurantes[]") or request.form.getlist("dest_restaurantes_ambos[]")
+
+        # Helper de criação
+        def _criar_aviso(tipo, destino_cooperado_id=None, restaurantes_ids=None):
+            a = Aviso(
+                titulo=titulo,
+                corpo=corpo,
+                tipo=tipo,  # 'global' | 'cooperado' | 'restaurante'
+                destino_cooperado_id=destino_cooperado_id,
+                prioridade=("alta" if prioridade == "alta" else "normal"),
+                fixado=fixado,
+                ativo=ativo,
+                inicio_em=inicio_em,
+                fim_em=fim_em,
+                criado_por_id=session.get("user_id"),
+            )
+            if restaurantes_ids is not None:
+                if restaurantes_ids:
+                    a.restaurantes = Restaurante.query.filter(Restaurante.id.in_(restaurantes_ids)).all()
+                else:
+                    a.restaurantes = []  # todos (ver consultas)
+            db.session.add(a)
+            return a
+
+        criados = 0
+
+        if alcance == "global":
+            _criar_aviso("global"); criados += 1
+
+        if alcance in ("restaurantes", "ambos"):
+            if rest_alc == "todos":
+                _criar_aviso("restaurante", restaurantes_ids=[])  # todos
+                criados += 1
+            else:
+                ids = [int(x) for x in sel_rests if str(x).isdigit()]
+                _criar_aviso("restaurante", restaurantes_ids=ids)
+                criados += 1
+
+        if alcance in ("cooperados", "ambos"):
+            if coop_alc == "todos":
+                _criar_aviso("cooperado", destino_cooperado_id=None); criados += 1
+            else:
+                ids = [int(x) for x in sel_coops if str(x).isdigit()]
+                if not ids and (coop_alc == "um"):
+                    cid = f.get("dest_cooperado_id")
+                    if cid and str(cid).isdigit():
+                        ids = [int(cid)]
+                for cid in ids:
+                    _criar_aviso("cooperado", destino_cooperado_id=cid); criados += 1
+
+        db.session.commit()
+        flash(f"Aviso(s) publicado(s): {criados}.", "success")
+        return redirect(url_for("admin_avisos"))
+
+    # GET
+    avisos = (Aviso.query
+              .order_by(Aviso.fixado.desc(),
+                        (Aviso.prioridade == "alta").desc(),
+                        Aviso.criado_em.desc())
+              .all())
+    return render_template("admin_avisos.html",
+                           avisos=avisos,
+                           cooperados=cooperados,
+                           restaurantes=restaurantes)
+
+
 # =========================
 # Receitas/Despesas Cooperado (Admin)
 # =========================
