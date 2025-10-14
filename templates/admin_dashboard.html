@@ -2450,6 +2450,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           </div>
         </div>
 
+       
         <!-- SOLICITAÇÕES DE TROCA (pendentes) -->
 <div class="card p-3 mb-3">
   <div class="d-flex justify-content-between align-items-center">
@@ -2471,30 +2472,51 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         </tr>
       </thead>
       <tbody>
-        {% for t in trocas_pendentes %}
+        {% for t in trocas_pendentes or [] %}
           <tr>
-            <td class="text-muted">#{{ t.id }}</td>
+            <td class="text-muted">#{{ t.get('id', '-') }}</td>
+
             <td>
-              <div class="text-tight"><b>{{ t.solicitante.nome }}</b></div>
-              <small class="text-muted">ID {{ t.solicitante.id }}</small>
+              {% set solicitante = t.get('solicitante', {}) %}
+              <div class="text-tight"><b>{{ solicitante.get('nome', t.get('solicitante_nome', '-')) }}</b></div>
+              <small class="text-muted">
+                ID {{ solicitante.get('id', t.get('solicitante_id', '-')) }}
+              </small>
             </td>
+
             <td>
-              <div><i class="bi bi-calendar-event"></i> {{ t.origem.data }}</div>
-              <div><i class="bi bi-sun"></i> {{ t.origem.turno }}</div>
-              <div><i class="bi bi-clock"></i> {{ t.origem.horario }}</div>
-              <div><i class="bi bi-briefcase"></i> {{ t.origem.contrato }}</div>
+              {% set origem = t.get('origem', {}) %}
+              <div><i class="bi bi-calendar-event"></i> {{ origem.get('data', t.get('origem_data', '—')) }}</div>
+              <div><i class="bi bi-sun"></i> {{ origem.get('turno', t.get('origem_turno', '—')) }}</div>
+              <div><i class="bi bi-clock"></i> {{ origem.get('horario', t.get('origem_horario', '—')) }}</div>
+              <div><i class="bi bi-briefcase"></i> {{ origem.get('contrato', t.get('origem_contrato', '—')) }}</div>
             </td>
+
             <td>
-              <b>{{ t.destino.nome }}</b>
-              <small class="text-muted d-block">ID {{ t.destino.id }}</small>
+              {% set destino = t.get('destino', {}) %}
+              <b>{{ destino.get('nome', t.get('destino_nome', '—')) }}</b>
+              <small class="text-muted d-block">
+                ID {{ destino.get('id', t.get('destino_id', '—')) }}
+              </small>
             </td>
-            <td class="text-break">{{ t.mensagem or '—' }}</td>
-            <td>{{ t.criada_em.strftime('%d/%m/%Y %H:%M') if t.criada_em else '—' }}</td>
+
+            <td class="text-break">{{ t.get('mensagem') or '—' }}</td>
+
+            <td>
+              {# criada_em pode ser datetime OU string; trate os dois #}
+              {% set criada_em = t.get('criada_em') %}
+              {% if criada_em and criada_em.strftime is defined %}
+                {{ criada_em.strftime('%d/%m/%Y %H:%M') }}
+              {% else %}
+                {{ criada_em or '—' }}
+              {% endif %}
+            </td>
+
             <td class="text-center">
               <div class="d-flex justify-content-center gap-1">
                 <!-- APROVAR (POST) -->
                 <form method="POST"
-                      action="{{ url_for('admin_aprovar_troca', id=t.id) }}"
+                      action="{{ url_for('admin_aprovar_troca', id=t.get('id')) }}"
                       onsubmit="return confirm('Confirmar aprovação desta troca?');">
                   {# {{ csrf_token() }} #}
                   <button type="submit" class="btn btn-success btn-sm">
@@ -2504,7 +2526,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 
                 <!-- RECUSAR (POST) -->
                 <form method="POST"
-                      action="{{ url_for('admin_recusar_troca', id=t.id) }}"
+                      action="{{ url_for('admin_recusar_troca', id=t.get('id')) }}"
                       onsubmit="return confirm('Recusar esta solicitação?');">
                   {# {{ csrf_token() }} #}
                   <button type="submit" class="btn btn-danger btn-sm">
