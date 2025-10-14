@@ -87,19 +87,7 @@ app.config.update(
     },
 )
 
-# Torna safe_url_for disponível nos templates
-@app.context_processor
-def inject_helpers():
-    def safe_url_for(endpoint, **values):
-        try:
-            return url_for(endpoint, **values)
-        except Exception:
-            return None
-    return {"safe_url_for": safe_url_for}
-
 db = SQLAlchemy(app)
-
-
 
 # Health checks
 @app.get("/healthz")
@@ -140,8 +128,6 @@ class Usuario(db.Model):
     usuario = db.Column(db.String(80), unique=True, nullable=False)
     senha_hash = db.Column(db.String(200), nullable=False)
     tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
-    # 👇 NOVO
-    ativo = db.Column(db.Boolean, nullable=False, default=True)
 
     def set_password(self, raw: str):
         self.senha_hash = generate_password_hash(raw)
@@ -613,23 +599,6 @@ def init_db():
                 "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
             db.session.execute(sa_text(
                 "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
-
-    # 4.x) coluna 'ativo' em usuarios (idempotente)
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(usuarios);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "ativo" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE usuarios ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1"))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text(
-                "ALTER TABLE IF EXISTS public.usuarios "
-                "ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE"
-            ))
             db.session.commit()
     except Exception:
         db.session.rollback()
@@ -1525,14 +1494,13 @@ def index():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     erro_login = None
-
     if request.method == "POST":
         usuario = request.form.get("usuario", "").strip()
         senha = request.form.get("senha", "")
 
         u = Usuario.query.filter_by(usuario=usuario).first()
 
-        # Fallback: aceitar login pelo nome do restaurante
+        # fallback: aceitar login pelo nome do restaurante
         if not u:
             r = Restaurante.query.filter(Restaurante.nome.ilike(usuario)).first()
             if not r:
@@ -1541,14 +1509,6 @@ def login():
                 u = r.usuario_ref
 
         if u and u.check_password(senha):
-            # 🔒 Bloqueia se a conta estiver desativada (funciona mesmo em DB antigo)
-            if hasattr(u, "ativo") and not bool(getattr(u, "ativo", True)):
-                erro_login = "Conta desativada. Fale com o administrador."
-                flash(erro_login, "danger")
-                login_tpl = os.path.join("templates", "login.html")
-                return render_template("login.html", erro_login=erro_login) if os.path.exists(login_tpl) else "<p>Conta desativada.</p>"
-
-            # Login OK
             session["user_id"] = u.id
             session["user_tipo"] = u.tipo
             if u.tipo == "admin":
@@ -1557,12 +1517,9 @@ def login():
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
                 return redirect(url_for("portal_restaurante"))
-
-        # Falha
         erro_login = "Usuário/senha inválidos."
         flash(erro_login, "danger")
 
-    # GET (ou erro)
     login_tpl = os.path.join("templates", "login.html")
     if os.path.exists(login_tpl):
         return render_template("login.html", erro_login=erro_login)
@@ -3065,11 +3022,6 @@ def marcar_aviso_lido_universal(aviso_id: int):
 # =========================
 # CRUD Cooperados / Restaurantes / Senhas (Admin)
 # =========================
-from flask import jsonify, current_app  # <- precisa para a rota toggle e logs
-from sqlalchemy import or_
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy import delete as sa_delete  # já usa mais acima em outras rotas
-
 @app.route("/cooperados/add", methods=["POST"])
 @admin_required
 def add_cooperado():
@@ -3083,12 +3035,7 @@ def add_cooperado():
         flash("Usuário já existente.", "warning")
         return redirect(url_for("admin_dashboard", tab="cooperados"))
 
-    # cria usuário já ativo por padrão
     u = Usuario(usuario=usuario_login, tipo="cooperado", senha_hash="")
-    # se seu modelo tiver a coluna 'ativo', garanta True por segurança
-    if hasattr(u, "ativo"):
-        u.ativo = True
-
     u.set_password(senha)
     db.session.add(u)
     db.session.flush()
@@ -3103,7 +3050,6 @@ def add_cooperado():
     db.session.commit()
     flash("Cooperado cadastrado.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
-
 
 @app.route("/cooperados/<int:id>/edit", methods=["POST"])
 @admin_required
@@ -3120,6 +3066,8 @@ def edit_cooperado(id):
     flash("Cooperado atualizado.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 
 @app.route("/cooperados/<int:id>/delete", methods=["POST"])
 @admin_required
@@ -3161,7 +3109,7 @@ def delete_cooperado(id):
             sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.cooperado_id == id)
         )
 
-        # --- 4) Lançamentos desse cooperado ---
+        # --- 4) Lançamentos desse cooperado (se o CASCADE por lancamento_id não estiver ativo) ---
         db.session.execute(
             sa_delete(Lancamento).where(Lancamento.cooperado_id == id)
         )
@@ -3194,7 +3142,6 @@ def delete_cooperado(id):
 
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
-
 @app.route("/cooperados/<int:id>/reset_senha", methods=["POST"])
 @admin_required
 def reset_senha_cooperado(id):
@@ -3208,21 +3155,6 @@ def reset_senha_cooperado(id):
     db.session.commit()
     flash("Senha do cooperado atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
-
-
-# === Ativar/Desativar cooperado (toggle) ===
-@app.post("/cooperados/<int:id>/toggle_status")
-@admin_required
-def toggle_status_cooperado(id):
-    c = Cooperado.query.get_or_404(id)
-    u = c.usuario_ref
-    if not u:
-        return jsonify({"ok": False, "error": "Usuário não vinculado"}), 400
-
-    # Alterna o status; se a coluna não existir por algum motivo, considera True como padrão
-    u.ativo = not bool(getattr(u, "ativo", True))
-    db.session.commit()
-    return jsonify({"ok": True, "ativo": bool(u.ativo)})
 
 @app.route("/restaurantes/add", methods=["POST"])
 @admin_required
@@ -3891,7 +3823,6 @@ def apply_fk_cascade():
     """
     Aplica/garante ON DELETE CASCADE nas FKs relevantes (Postgres).
     Tudo está dentro de uma string SQL, evitando SyntaxError no deploy.
-    Seguro para rodar mais de uma vez.
     """
     from sqlalchemy import text as sa_text
 
@@ -3899,103 +3830,112 @@ def apply_fk_cascade():
 BEGIN;
 
 -- =========================
--- AVALIAÇÕES (Restaurante -> Cooperado e Cooperado -> Restaurante)
+-- AVALIAÇÕES (já existia)
 -- =========================
--- avaliacoes.lancamento_id -> ON DELETE CASCADE
-ALTER TABLE IF EXISTS public.avaliacoes
+-- ajusta FK de avaliacoes.lancamento_id
+ALTER TABLE public.avaliacoes
   DROP CONSTRAINT IF EXISTS avaliacoes_lancamento_id_fkey;
-ALTER TABLE IF EXISTS public.avaliacoes
+ALTER TABLE public.avaliacoes
   ADD CONSTRAINT avaliacoes_lancamento_id_fkey
-  FOREIGN KEY (lancamento_id) REFERENCES public.lancamentos (id) ON DELETE CASCADE;
+  FOREIGN KEY (lancamento_id)
+  REFERENCES public.lancamentos (id)
+  ON DELETE CASCADE;
 
--- avaliacoes_restaurante.lancamento_id -> ON DELETE CASCADE
-ALTER TABLE IF EXISTS public.avaliacoes_restaurante
-  DROP CONSTRAINT IF EXISTS av_rest_lancamento_id_fkey;
-ALTER TABLE IF EXISTS public.avaliacoes_restaurante
-  ADD CONSTRAINT av_rest_lancamento_id_fkey
-  FOREIGN KEY (lancamento_id) REFERENCES public.lancamentos (id) ON DELETE CASCADE;
+-- cria/garante CASCADE para avaliacoes_restaurante.lancamento_id
+DO $do$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'av_rest_lancamento_id_fkey'
+          AND table_name = 'avaliacoes_restaurante'
+          AND table_schema = 'public'
+    ) THEN
+        ALTER TABLE public.avaliacoes_restaurante
+          ADD CONSTRAINT av_rest_lancamento_id_fkey
+          FOREIGN KEY (lancamento_id)
+          REFERENCES public.lancamentos (id)
+          ON DELETE CASCADE;
+    ELSE
+        -- garante o CASCADE (drop/add)
+        EXECUTE $$ALTER TABLE public.avaliacoes_restaurante
+                 DROP CONSTRAINT IF EXISTS av_rest_lancamento_id_fkey$$;
+        EXECUTE $$ALTER TABLE public.avaliacoes_restaurante
+                 ADD CONSTRAINT av_rest_lancamento_id_fkey
+                 FOREIGN KEY (lancamento_id)
+                 REFERENCES public.lancamentos (id)
+                 ON DELETE CASCADE$$;
+    END IF;
+END
+$do$;
 
 -- =========================
 -- ESCALAS
 -- =========================
-ALTER TABLE IF EXISTS public.escalas
+-- cooperado_id -> cooperados(id) ON DELETE CASCADE
+ALTER TABLE public.escalas
   DROP CONSTRAINT IF EXISTS escalas_cooperado_id_fkey;
-ALTER TABLE IF EXISTS public.escalas
+ALTER TABLE public.escalas
   ADD CONSTRAINT escalas_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
+  FOREIGN KEY (cooperado_id)
+  REFERENCES public.cooperados (id)
+  ON DELETE CASCADE;
 
-ALTER TABLE IF EXISTS public.escalas
+-- restaurante_id -> restaurantes(id) ON DELETE CASCADE
+ALTER TABLE public.escalas
   DROP CONSTRAINT IF EXISTS escalas_restaurante_id_fkey;
-ALTER TABLE IF EXISTS public.escalas
+ALTER TABLE public.escalas
   ADD CONSTRAINT escalas_restaurante_id_fkey
-  FOREIGN KEY (restaurante_id) REFERENCES public.restaurantes (id) ON DELETE CASCADE;
+  FOREIGN KEY (restaurante_id)
+  REFERENCES public.restaurantes (id)
+  ON DELETE CASCADE;
 
 -- =========================
 -- TROCAS
 -- =========================
-ALTER TABLE IF EXISTS public.trocas
+-- solicitante_id -> cooperados(id) ON DELETE CASCADE
+ALTER TABLE public.trocas
   DROP CONSTRAINT IF EXISTS trocas_solicitante_id_fkey;
-ALTER TABLE IF EXISTS public.trocas
+ALTER TABLE public.trocas
   ADD CONSTRAINT trocas_solicitante_id_fkey
-  FOREIGN KEY (solicitante_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
+  FOREIGN KEY (solicitante_id)
+  REFERENCES public.cooperados (id)
+  ON DELETE CASCADE;
 
-ALTER TABLE IF EXISTS public.trocas
+-- destino_id -> cooperados(id) ON DELETE CASCADE
+ALTER TABLE public.trocas
   DROP CONSTRAINT IF EXISTS trocas_destino_id_fkey;
-ALTER TABLE IF EXISTS public.trocas
+ALTER TABLE public.trocas
   ADD CONSTRAINT trocas_destino_id_fkey
-  FOREIGN KEY (destino_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
+  FOREIGN KEY (destino_id)
+  REFERENCES public.cooperados (id)
+  ON DELETE CASCADE;
 
-ALTER TABLE IF EXISTS public.trocas
+-- origem_escala_id -> escalas(id) ON DELETE CASCADE
+ALTER TABLE public.trocas
   DROP CONSTRAINT IF EXISTS trocas_origem_escala_id_fkey;
-ALTER TABLE IF EXISTS public.trocas
+ALTER TABLE public.trocas
   ADD CONSTRAINT trocas_origem_escala_id_fkey
-  FOREIGN KEY (origem_escala_id) REFERENCES public.escalas (id) ON DELETE CASCADE;
-
--- =========================
--- AVISOS / LEITURAS
--- =========================
-ALTER TABLE IF EXISTS public.aviso_leituras
-  DROP CONSTRAINT IF EXISTS aviso_leituras_aviso_id_fkey;
-ALTER TABLE IF EXISTS public.aviso_leituras
-  ADD CONSTRAINT aviso_leituras_aviso_id_fkey
-  FOREIGN KEY (aviso_id) REFERENCES public.avisos (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.aviso_leituras
-  DROP CONSTRAINT IF EXISTS aviso_leituras_cooperado_id_fkey;
-ALTER TABLE IF EXISTS public.aviso_leituras
-  ADD CONSTRAINT aviso_leituras_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.aviso_leituras
-  DROP CONSTRAINT IF EXISTS aviso_leituras_restaurante_id_fkey;
-ALTER TABLE IF EXISTS public.aviso_leituras
-  ADD CONSTRAINT aviso_leituras_restaurante_id_fkey
-  FOREIGN KEY (restaurante_id) REFERENCES public.restaurantes (id) ON DELETE CASCADE;
-
--- =========================
--- LANCAMENTOS (FKs antigas sem CASCADE)
--- =========================
-ALTER TABLE IF EXISTS public.lancamentos
-  DROP CONSTRAINT IF EXISTS lancamentos_restaurante_id_fkey;
-ALTER TABLE IF EXISTS public.lancamentos
-  ADD CONSTRAINT lancamentos_restaurante_id_fkey
-  FOREIGN KEY (restaurante_id) REFERENCES public.restaurantes (id) ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.lancamentos
-  DROP CONSTRAINT IF EXISTS lancamentos_cooperado_id_fkey;
-ALTER TABLE IF EXISTS public.lancamentos
-  ADD CONSTRAINT lancamentos_cooperado_id_fkey
-  FOREIGN KEY (cooperado_id) REFERENCES public.cooperados (id) ON DELETE CASCADE;
+  FOREIGN KEY (origem_escala_id)
+  REFERENCES public.escalas (id)
+  ON DELETE CASCADE;
 
 COMMIT;
 """
+
     try:
+        if _is_sqlite():
+            flash("SQLite local: esta operação é específica de Postgres (sem efeito aqui).", "warning")
+            return redirect(url_for("admin_dashboard", tab="config"))
+
         db.session.execute(sa_text(sql))
         db.session.commit()
-        return jsonify({"ok": True, "msg": "FKs (CASCADE) aplicadas/garantidas."})
+        flash("FKs com ON DELETE CASCADE aplicadas com sucesso.", "success")
     except Exception as e:
         db.session.rollback()
-        return jsonify({"ok": False, "error": str(e)}), 500
+        flash(f"Erro ao aplicar FKs: {e}", "danger")
+    return redirect(url_for("admin_dashboard", tab="config"))
+
 
 # =========================
 # Documentos (Admin)
