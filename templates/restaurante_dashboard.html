@@ -646,6 +646,28 @@
     </div>
   </div>
 
+  <!-- ======================= -->
+  <!-- MODAL AVALIAR (NOVO) -->
+  <!-- ======================= -->
+  <div class="modal fade" id="modalAvaliar" tabindex="-1" aria-labelledby="modalAvaliarLabel" aria-hidden="true"> <!-- [NOVO] -->
+    <div class="modal-dialog modal-dialog-centered"> <!-- [NOVO] -->
+      <div class="modal-content"> <!-- [NOVO] -->
+        <div class="modal-header"> <!-- [NOVO] -->
+          <h5 class="modal-title" id="modalAvaliarLabel"><i class="bi bi-star-half me-2"></i>Deseja avaliar o motoboy agora?</h5> <!-- [NOVO] -->
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button> <!-- [NOVO] -->
+        </div>
+        <div class="modal-body"> <!-- [NOVO] -->
+          <p class="mb-0">Você pode registrar a avaliação agora ou <b>pular</b> e lançar apenas os dados.</p> <!-- [NOVO] -->
+        </div>
+        <div class="modal-footer"> <!-- [NOVO] -->
+          <button type="button" class="btn btn-outline-secondary" id="btnPularAval"><i class="bi bi-skip-forward"></i> Pular e lançar</button> <!-- [NOVO] -->
+          <button type="button" class="btn btn-royal" id="btnAvaliarAgora"><i class="bi bi-star-fill"></i> Avaliar agora</button> <!-- [NOVO] -->
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- /MODAL AVALIAR -->
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     /* ===== Tema ===== */
@@ -786,7 +808,10 @@
       busca?.addEventListener('input',function(){ const q=this.value.trim().toLowerCase(); itens.forEach(el=>el.style.display=(el.dataset.nome||'').toLowerCase().includes(q)?'':'none'); });
       select?.addEventListener('change',function(){ const el=itens.find(x=>x.dataset.id===this.value); if(el) mostrarCooperado(el); });
       if(itens[0]) mostrarCooperado(itens[0]);
+
+      wireAvaliacaoFlow(); // [NOVO] ligar fluxo do modal de avaliação
     }
+
     function wireStars(group){
       const hidden=group.querySelector('input[type="hidden"]'); const stars=group.querySelectorAll('.star');
       function paint(v,hover=false){ stars.forEach(s=>{ const on=Number(s.dataset.v)<=v; s.classList.toggle('active',on); s.classList.toggle('hover',hover&&on); }); }
@@ -892,6 +917,67 @@
       modalEl.addEventListener('hidden.bs.modal',()=>{ frame.src=''; });
     }
 
+    /* ===== Fluxo do Modal de Avaliação (NOVO) ===== */
+    function wireAvaliacaoFlow(){ // [NOVO]
+      const form = document.getElementById('formLancamento');
+      if(!form) return;
+
+      const modalEl = document.getElementById('modalAvaliar');
+      const modal = new bootstrap.Modal(modalEl);
+      const btnAvaliarAgora = document.getElementById('btnAvaliarAgora');
+      const btnPularAval = document.getElementById('btnPularAval');
+      const chkAvaliar = document.getElementById('chkAvaliar');
+      const inputAvaliar = document.getElementById('inputAvaliar');
+      const boxAval = document.getElementById('boxAval');
+
+      function scrollIntoViewSmooth(el){
+        try{ el?.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
+      }
+
+      // Intercepta submit para perguntar se deseja avaliar
+      form.addEventListener('submit', function(ev){
+        // Se o formulário não é válido, deixa o browser mostrar as mensagens
+        if(!form.checkValidity()){
+          // Garante que as mensagens nativas apareçam
+          form.reportValidity?.();
+          return; // não prevenimos — o browser cancela por inválido
+        }
+
+        // Se já escolheu avaliar (checkbox ligado), não pergunta
+        if(chkAvaliar.checked || inputAvaliar.value === '1' || (boxAval && boxAval.style.display === 'block')){
+          return; // deixa enviar normalmente
+        }
+
+        // Caso contrário, abre o modal de confirmação
+        ev.preventDefault();
+        modal.show();
+      });
+
+      // Clique em "Avaliar agora"
+      btnAvaliarAgora?.addEventListener('click', ()=>{
+        chkAvaliar.checked = true;
+        inputAvaliar.value = '1';
+        if(boxAval) boxAval.style.display = 'block';
+        modal.hide();
+
+        // Rola até a área de avaliação e foca no primeiro star
+        setTimeout(()=>{
+          scrollIntoViewSmooth(boxAval);
+          const firstStar = boxAval.querySelector('.rating-group .star');
+          firstStar?.focus?.();
+        }, 150);
+      });
+
+      // Clique em "Pular e lançar" -> envia o form sem avaliação
+      btnPularAval?.addEventListener('click', ()=>{
+        chkAvaliar.checked = false;
+        inputAvaliar.value = '0';
+        if(boxAval) boxAval.style.display = 'none';
+        modal.hide();
+        // Envia de verdade
+        setTimeout(()=>form.submit(), 80);
+      });
+    }
     /* ===== Eventos do menu ===== */
     document.getElementById('sideNav')?.addEventListener('click', async (e)=>{
       const a=e.target.closest('a'); if(!a) return;
