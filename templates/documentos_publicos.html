@@ -35,15 +35,17 @@
 
     /* Card da lista */
     .doc-row{
-      border:1px solid #e9edf5; border-radius:16px; padding:14px 16px; margin-bottom:12px; background:#fff;
-      box-shadow:0 8px 24px #00000010; transition:transform .08s ease, box-shadow .12s ease; cursor:pointer;
+      border:1px solid #e9edf5; border-radius:18px; padding:14px 16px; margin-bottom:12px; background:#fff;
+      box-shadow:0 8px 24px #00000010; transition:transform .08s ease, box-shadow .12s ease, background .12s ease; cursor:pointer;
+      outline: none;
     }
+    .doc-row:hover{box-shadow:0 10px 28px #00000014; transform:translateY(-1px)}
     .doc-row:active{transform:scale(.995)}
-    .doc-row:hover{box-shadow:0 10px 28px #00000014}
-    .doc-title{font-weight:800; font-size:1.05rem}
+    .doc-row:focus-visible{box-shadow:0 0 0 3px #2747d922, 0 8px 24px #00000012}
+    .doc-title{font-weight:800; font-size:1.06rem; line-height:1.25}
     .doc-cat{font-size:.75rem; color:var(--royal); text-transform:uppercase; letter-spacing:.08em; font-weight:700}
     .doc-date{color:var(--muted); font-size:.88rem}
-    .doc-desc{font-size:.95rem; color:#222; background:var(--soft); border-radius:10px; padding:.6em .9em}
+    .doc-desc{font-size:.95rem; color:#222; background:var(--soft); border-radius:12px; padding:.6em .9em}
     .chip{display:inline-flex; align-items:center; gap:.35rem; padding:.25rem .6rem; border-radius:999px; background:#f1f4ff; font-weight:600; font-size:.8rem}
 
     /* Modal leitor */
@@ -96,6 +98,7 @@
         {% set nome_arquivo = d.arquivo_nome or '' %}
         {% set ext = nome_arquivo.split('.')[-1]|lower if '.' in nome_arquivo else '' %}
         <article class="doc-row position-relative"
+                 tabindex="0" role="button" aria-label="Abrir {{ titulo }}"
                  data-title="{{ titulo|lower }}"
                  data-cat="{{ cat|lower }}"
                  data-desc="{{ (d.descricao or '')|lower }}"
@@ -103,7 +106,7 @@
                  data-title-full="{{ titulo }}"
                  data-ext="{{ ext }}">
           <div class="d-flex justify-content-between align-items-start">
-            <div class="pe-2">
+            <div class="pe-1">
               <div class="doc-cat">{{ cat|upper }}</div>
               <div class="doc-title d-flex align-items-center gap-2">
                 <i class="bi bi-file-earmark-text"></i> {{ titulo }}
@@ -119,11 +122,9 @@
                 {% if ext %}<span class="chip"><i class="bi bi-tag"></i> {{ ext|upper }}</span>{% endif %}
               </div>
             </div>
-            <div class="ms-2">
-              <button class="btn btn-royal" data-open><i class="bi bi-journal-bookmark-fill"></i></button>
-            </div>
           </div>
-          <a href="#" class="stretched-link" data-open aria-label="Abrir {{ titulo }}"></a>
+          <!-- Mantemos um link invisível para acessibilidade e “stretched area” -->
+          <a href="#" class="stretched-link" aria-hidden="true"></a>
         </article>
       {% endfor %}
     {% endif %}
@@ -213,7 +214,7 @@
     })();
   </script>
 
-  <!-- Abrir modal (PDF/Imagem/Outros) -->
+  <!-- Abrir modal (PDF/Imagem/Outros) com clique no CARD inteiro -->
   <script>
     (function(){
       const modalEl = document.getElementById('modalLivro');
@@ -246,10 +247,9 @@
         modal.show();
       }
 
+      // Clique em qualquer ponto do card
       document.addEventListener('click', function(ev){
-        const opener = ev.target.closest('[data-open]');
-        if (!opener) return;
-        const card = opener.closest('.doc-row');
+        const card = ev.target.closest('.doc-row');
         if (!card) return;
         const url = card.dataset.url || '#';
         const title = card.dataset.titleFull || '';
@@ -259,13 +259,23 @@
         openViewer(url, title, ext, cat);
       });
 
-      modalEl.addEventListener('hidden.bs.modal', ()=>{
-        frame.src=''; img.src='';
+      // Acessibilidade: abrir com Enter/Espaço
+      document.addEventListener('keydown', function(ev){
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        const card = ev.target.closest('.doc-row');
+        if (!card) return;
+        ev.preventDefault();
+        openViewer(card.dataset.url || '#',
+                   card.dataset.titleFull || '',
+                   card.dataset.ext || '',
+                   card.dataset.cat || '');
       });
+
+      modalEl.addEventListener('hidden.bs.modal', ()=>{ frame.src=''; img.src=''; });
     })();
   </script>
 
-  <!-- Persistência de scroll (evita “voltar ao topo” ao navegar/voltar) -->
+  <!-- Persistência de scroll -->
   <script>
     (function(){
       try{
