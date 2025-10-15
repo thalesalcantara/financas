@@ -868,7 +868,7 @@ def salvar_documento_upload(file_storage) -> str | None:
         return None
     fname = secure_filename(file_storage.filename)
     base, ext = os.path.splitext(fname)
-    unique = f"{base}_{time.strftime('%Y%m%d_%H%M%S')}{ext.lower()}"
+    unique = f"{base}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}{ext.lower()}"
     destino = os.path.join(DOCS_PERSIST_DIR, unique)
     file_storage.save(destino)
     return unique  # guarde em Documento.arquivo_nome
@@ -961,7 +961,7 @@ def salvar_documento_upload(file_storage) -> str | None:
         return None
     fname = secure_filename(file_storage.filename)
     base, ext = os.path.splitext(fname)
-    unique = f"{base}_{time.strftime('%Y%m%d_%H%M%S')}{ext.lower()}"
+    unique = f"{base}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}{ext.lower()}"
     destino = os.path.join(DOCS_PERSIST_DIR, unique)
     file_storage.save(destino)
     return unique  # <- gravar em Documento.arquivo_nome
