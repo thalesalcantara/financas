@@ -47,6 +47,9 @@ TABELAS_DIR = os.path.join(PERSIST_ROOT, "tabelas")
 os.makedirs(TABELAS_DIR, exist_ok=True)
 STATIC_TABLES = os.path.join(BASE_DIR, "static", "uploads", "tabelas")
 os.makedirs(STATIC_TABLES, exist_ok=True)
+# 🔹 Documentos (persistente em disco)
+DOCS_PERSIST_DIR = os.path.join(PERSIST_ROOT, "docs")
+os.makedirs(DOCS_PERSIST_DIR, exist_ok=True)
 
 def _build_db_uri() -> str:
     url = os.environ.get("DATABASE_URL")
@@ -855,6 +858,42 @@ def resolve_tabela_path(nome_arquivo: str) -> str | None:
                        nome_arquivo, [c for c in candidatos if c])
     return None
 
+# ========= Helpers de DOCUMENTOS (PDFs, etc.) =========
+def salvar_documento_upload(file_storage) -> str | None:
+    """
+    Salva o arquivo em disco persistente (/var/data/docs) e
+    retorna APENAS o nome do arquivo (para guardar no banco).
+    """
+    if not file_storage or not file_storage.filename:
+        return None
+    fname = secure_filename(file_storage.filename)
+    base, ext = os.path.splitext(fname)
+    unique = f"{base}_{time.strftime('%Y%m%d_%H%M%S')}{ext.lower()}"
+    destino = os.path.join(DOCS_PERSIST_DIR, unique)
+    file_storage.save(destino)
+    return unique  # guarde em Documento.arquivo_nome
+
+def resolve_documento_path(nome_arquivo: str) -> str | None:
+    """
+    Procura o arquivo nesta ordem:
+      1) persistente (/var/data/docs)
+      2) legado (DOCS_DIR em static/uploads/docs se você já usava)
+      3) caminho absoluto derivado de '/static/...'
+    """
+    if not nome_arquivo:
+        return None
+    candidatos = [
+        os.path.join(DOCS_PERSIST_DIR, nome_arquivo),
+        os.path.join(DOCS_DIR, nome_arquivo),  # legado (você já tinha DOCS_DIR)
+        _abs_path_from_url(nome_arquivo) if str(nome_arquivo).startswith("/") else None,
+    ]
+    for p in candidatos:
+        if p and os.path.isfile(p):
+            return p
+    app.logger.warning("Documento não encontrado. nome='%s' tents=%s",
+                       nome_arquivo, [c for c in candidatos if c])
+    return None
+
 
 def _save_foto_to_db(entidade, file_storage, *, is_cooperado: bool) -> str | None:
     """
@@ -911,6 +950,65 @@ def _serve_uploaded(rel_url: str, *, download_name: str | None = None, force_dow
         conditional=True,     # ajuda visualização/retomar download
     )
 
+# ========= Helpers de DOCUMENTOS (PDFs, etc.) =========
+def salvar_documento_upload(file_storage) -> str | None:
+    """
+    Salva o arquivo em disco persistente (/var/data/docs ou BASE_DIR/data/docs)
+    e retorna APENAS o nome do arquivo (para guardar no banco em Documento.arquivo_nome).
+    Requer que DOCS_PERSIST_DIR já exista (criado no Passo 1).
+    """
+    if not file_storage or not file_storage.filename:
+        return None
+    fname = secure_filename(file_storage.filename)
+    base, ext = os.path.splitext(fname)
+    unique = f"{base}_{time.strftime('%Y%m%d_%H%M%S')}{ext.lower()}"
+    destino = os.path.join(DOCS_PERSIST_DIR, unique)
+    file_storage.save(destino)
+    return unique  # <- gravar em Documento.arquivo_nome
+
+def resolve_documento_path(nome_arquivo: str) -> str | None:
+    """
+    Resolve o caminho real do documento nesta ordem:
+      1) persistente (/var/data/docs ou BASE_DIR/data/docs)
+      2) legado (DOCS_DIR -> static/uploads/docs)
+      3) caminho absoluto derivado de '/static/...'
+    """
+    if not nome_arquivo:
+        return None
+    candidatos = [
+        os.path.join(DOCS_PERSIST_DIR, nome_arquivo),   # persistente
+        os.path.join(DOCS_DIR, nome_arquivo),           # legado
+        _abs_path_from_url(nome_arquivo) if str(nome_arquivo).startswith("/") else None,
+    ]
+    for p in candidatos:
+        if p and os.path.isfile(p):
+            return p
+    app.logger.warning("Documento não encontrado. nome='%s' tents=%s",
+                       nome_arquivo, [c for c in candidatos if c])
+    return None
+
+# ========= ROTA: /docs/<nome> (abre inline PDF; baixa outros tipos) =========
+@app.get("/docs/<path:nome>")
+def serve_documento(nome: str):
+    """
+    Abre PDFs inline (no navegador) e força download para outros tipos.
+    Busca primeiro no disco persistente e faz fallback pro legado.
+    """
+    path = resolve_documento_path(nome)
+    if not path:
+        abort(404)
+
+    mime, _ = mimetypes.guess_type(path)
+    is_pdf = (mime == "application/pdf") or path.lower().endswith(".pdf")
+
+    return send_file(
+        path,
+        mimetype=mime or "application/octet-stream",
+        as_attachment=not is_pdf,                  # PDF inline, outros baixam
+        download_name=os.path.basename(path),
+        conditional=True,
+    )
+
 def _prox_ocorrencia_anual(dt: date | None) -> date | None:
     if not dt:
         return None
@@ -919,7 +1017,6 @@ def _prox_ocorrencia_anual(dt: date | None) -> date | None:
     if alvo < hoje:
         alvo = date(hoje.year + 1, dt.month, dt.day)
     return alvo
-
 
 def _parse_date(s: str | None) -> date | None:
     if not s:
@@ -4827,44 +4924,49 @@ def admin_upload_documento():
         flash("Preencha o título e selecione o arquivo.", "warning")
         return redirect(url_for("admin_documentos"))
 
-    # salva arquivo no diretório DOCS_DIR e cria URL estática
-    fname = secure_filename(arquivo.filename)
-    base, ext = os.path.splitext(fname)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_base = re.sub(r"[^A-Za-z0-9_-]+", "_", base).strip("_") or "arquivo"
-    final_name = f"{safe_base}_{ts}{ext}"
-    full_path = os.path.join(DOCS_DIR, final_name)
-    arquivo.save(full_path)
+    # === NOVO: salva em diretório persistente e retorna NOME ÚNICO ===
+    nome_unico = salvar_documento_upload(arquivo)
+    if not nome_unico:
+        flash("Falha ao salvar o arquivo.", "danger")
+        return redirect(url_for("admin_documentos"))
 
-    doc_url = f"/static/uploads/docs/{final_name}"
-
+    # compat: também guardamos um URL que aponta para /docs/<nome>
     d = Documento(
         titulo=titulo,
         categoria=categoria,
         descricao=descricao,
-        arquivo_url=doc_url,
-        arquivo_nome=fname,
+        arquivo_url=url_for("serve_documento", nome=nome_unico),  # compat com templates antigos
+        arquivo_nome=nome_unico,  # agora guardamos o NOME ÚNICO persistido
         enviado_em=datetime.utcnow(),
     )
     db.session.add(d)
-    db.session.commit()    
+    db.session.commit()
     flash("Documento enviado.", "success")
     return redirect(url_for("admin_documentos"))
+
 
 @app.get("/admin/documentos/<int:doc_id>/delete")
 @admin_required
 def admin_delete_documento(doc_id):
     d = Documento.query.get_or_404(doc_id)
     try:
-        local_path = os.path.join(BASE_DIR, d.arquivo_url.lstrip("/"))
-        if os.path.exists(local_path):
-            os.remove(local_path)
+        # === NOVO: tenta deletar do armazenamento persistente pelo nome salvo ===
+        p = resolve_document_path(d.arquivo_nome)
+        if p and os.path.exists(p):
+            os.remove(p)
+        # Fallback (legado): se sobrou um caminho em /static/uploads/docs/ no arquivo_url, remove também
+        if d.arquivo_url and d.arquivo_url.startswith("/static/uploads/docs/"):
+            legacy_path = os.path.join(BASE_DIR, d.arquivo_url.lstrip("/"))
+            if os.path.exists(legacy_path):
+                os.remove(legacy_path)
     except Exception:
         pass
+
     db.session.delete(d)
     db.session.commit()
     flash("Documento removido.", "success")
     return redirect(url_for("admin_documentos"))
+
 
 @app.route("/documentos")
 def documentos_publicos():
@@ -4874,13 +4976,20 @@ def documentos_publicos():
     documentos = Documento.query.order_by(Documento.enviado_em.desc()).all()
     return render_template("documentos_publicos.html", documentos=documentos)
 
+
 @app.route('/documentos/<int:doc_id>/baixar')
 def baixar_documento(doc_id):
     doc = Documento.query.get_or_404(doc_id)
-    path = os.path.join(BASE_DIR, doc.arquivo_url.lstrip("/"))
-    if not os.path.exists(path):
+    # === NOVO: resolve caminho persistente pelo nome salvo ===
+    path = resolve_document_path(doc.arquivo_nome)
+    if not path or not os.path.exists(path):
         abort(404)
-    return send_file(path, as_attachment=True, download_name=doc.arquivo_nome)
+    # força download (independente do tipo)
+    return send_file(
+        path,
+        as_attachment=True,
+        download_name=os.path.basename(doc.arquivo_nome)
+    )
 
 # =========================
 # Inicialização automática do DB em servidores (Gunicorn/Render)
