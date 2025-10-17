@@ -1052,7 +1052,49 @@
     });
   }
 
-  /* ===== Avaliar/Editar na página de Lançamentos ===== */
+   /* ===== Fluxo do modal ao lançar ===== */
+  function wireAvaliacaoFlow(){
+    const form = document.getElementById('formLancamento'); if(!form) return;
+    const modalEl = document.getElementById('modalAvaliar');
+    const modal = new bootstrap.Modal(modalEl);
+    const btnAvaliarAgora = document.getElementById('btnAvaliarAgora');
+    const btnPularAval = document.getElementById('btnPularAval');
+    const chkAvaliar = document.getElementById('chkAvaliar');
+    const inputAvaliar = document.getElementById('inputAvaliar');
+    const boxAval = document.getElementById('boxAval');
+
+    setAvalInputsEnabled(false);
+
+    chkAvaliar?.addEventListener('change', ()=>{
+      const on = chkAvaliar.checked;
+      inputAvaliar.value = on ? '1':'0';
+      if(boxAval) boxAval.style.display = on ? 'block':'none';
+      setAvalInputsEnabled(on);
+      if(on){ autoGeral(); }
+    });
+
+    form.addEventListener('submit', function(ev){
+      if(!form.checkValidity()){ form.reportValidity?.(); return; }
+      if(chkAvaliar.checked || inputAvaliar.value === '1' || (boxAval && boxAval.style.display === 'block')){
+        setAvalInputsEnabled(true); autoGeral(); return;
+      }
+      ev.preventDefault(); modal.show();
+    });
+
+    btnAvaliarAgora?.addEventListener('click', ()=>{
+      chkAvaliar.checked = true; inputAvaliar.value = '1';
+      if(boxAval) boxAval.style.display = 'block';
+      setAvalInputsEnabled(true); autoGeral(); modal.hide();
+    });
+
+    btnPularAval?.addEventListener('click', ()=>{
+      chkAvaliar.checked = false; inputAvaliar.value = '0';
+      if(boxAval) boxAval.style.display = 'none'; setAvalInputsEnabled(false);
+      modal.hide(); setTimeout(()=>form.submit(), 80);
+    });
+  }
+
+  /* ===== Avaliar/Editar na lista de lançamentos ===== */
   function wireAvalLanc(){
     const tbody = document.getElementById('tbodyLanc');
     const modalEl = document.getElementById('modalAvalLanc');
@@ -1079,13 +1121,12 @@
       inputLancId.value = lancId;
       info.textContent = `${tr.cells[0].textContent.trim()} • ${tr.dataset.coopnome}`;
 
-      // limpa campos
+      // limpa
       modalEl.querySelectorAll('input[name^="av_"]').forEach(i=>i.value='');
       modalEl.querySelector('textarea[name="av_comentario"]').value='';
 
-      // tenta carregar avaliação existente
       try{
-        const r = await fetch(getUrl, {credentials:'same-origin'});
+        const r = await csrfFetch(getUrl);
         if(r.ok){
           const j = await r.json();
           if(j.ok && j.data){
@@ -1105,7 +1146,7 @@
             if(ta) ta.value = d.comentario || '';
           }
         }
-      }catch(e){ /* ignora erro de rede */ }
+      }catch(e){ /* silencia erro */ }
 
       initStarsInModal();
       modal.show();
@@ -1122,7 +1163,7 @@
       autoGeral();
 
       try{
-        const r = await fetch(postUrl, {method:'POST', body:fd, credentials:'same-origin'});
+        const r = await csrfFetch(postUrl, {method:'POST', body:fd});
         if(!r.ok) throw new Error(r.status);
         const j = await r.json();
         if(j.ok){
