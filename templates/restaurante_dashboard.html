@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <title>Portal do Estabelecimento</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- CSRF (se disponível no servidor/Jinja) -->
+  {% if csrf_token is defined and csrf_token %}
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  {% endif %}
   <!-- Bootstrap & Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
@@ -50,6 +54,7 @@
     section.view-active{display:block}
     .badge-dot{min-width:22px; height:22px; line-height:22px; border-radius:999px; padding:0 6px; font-size:.75rem; font-weight:800; display:inline-flex; align-items:center; justify-content:center; background:#dc3545; color:#fff; box-shadow:0 0 0 2px rgba(255,255,255,.25) inset; margin-left:auto;}
     @media (max-width:920px){ .shell{grid-template-columns:66px 1fr} .brand span{display:none} .navmenu a span{display:none} }
+    /* Cooperados / Avaliações */
     .cooperado-avatar{width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 1px 0 #0001}
     .cooperado-item{display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; cursor:pointer}
     .cooperado-item:hover{background:#f8faff20}
@@ -64,6 +69,7 @@
     .sticky-tools{position:sticky; top:12px}
     .kpi{background:#fafcff10; border:1px solid var(--border); border-radius:12px; padding:10px 12px}
     .kpi .v{font-weight:800; font-size:1.05rem}
+    /* Avisos/Tabelas */
     .aviso-card{border-left:6px solid #3b82f6}
     .aviso-card.lido{border-left-color:#94a3b8; opacity:.98}
     .aviso-card.prioridade{border-left-color:var(--danger)}
@@ -74,6 +80,7 @@
 </head>
 <body>
   <div class="shell">
+    <!-- ===== Aside ===== -->
     <aside class="aside">
       <div class="brand"><i class="bi bi-building"></i><span>Portal do Estabelecimento</span></div>
       <button id="btnTheme" class="theme-toggle" type="button"><i class="bi bi-moon"></i><span id="lblTheme">Escuro</span></button>
@@ -105,6 +112,7 @@
       </nav>
     </aside>
 
+    <!-- ===== Main ===== -->
     <main class="content">
       {% with msgs = get_flashed_messages(with_categories=True) %}
         {% if msgs %}
@@ -195,45 +203,33 @@
                   <span class="badge text-bg-primary fw-semibold">{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][dia.weekday()] }} — {{ dia.strftime('%d/%m/%Y') }}</span>
                 </div>
 
-                {% set dia_grp = lista|selectattr('turno','defined')|selectattr('turno','lower')|list %}
-                {% set tem_dia = lista|selectattr('turno','lower')|selectattr('turno','in',['dia','manhã','manha','tarde'])|list %}
-                {% set tem_noite = lista|selectattr('turno','lower')|selectattr('turno','equalto','noite')|list %}
-
                 <div>
                   <div class="fw-bold small text-muted mt-1">DIA</div>
                   <div class="border-top pt-1" style="max-height:220px; overflow:auto;">
                     {% set blocodia = [] %}
                     {% for it in lista %}
-                      {% if (it.turno or '')|lower in ['dia','manhã','manha','tarde'] %}
-                        {% set _ = blocodia.append(it) %}
-                      {% endif %}
+                      {% if (it.turno or '')|lower in ['dia','manhã','manha','tarde'] %}{% set _ = blocodia.append(it) %}{% endif %}
                     {% endfor %}
                     {% for it in (blocodia|sort(attribute='coop.nome') ) %}
                       <div class="py-2 border-bottom">
                         <div class="fw-bold">{{ nome_item(it) }}</div>
                         <div class="text-muted small">{{ it.turno or '—' }}{% if it.horario %} • {{ it.horario }}{% endif %}</div>
                       </div>
-                    {% else %}
-                      <div class="text-muted small py-2">—</div>
-                    {% endfor %}
+                    {% else %}<div class="text-muted small py-2">—</div>{% endfor %}
                   </div>
 
                   <div class="fw-bold small text-muted mt-3">NOITE</div>
                   <div class="border-top pt-1" style="max-height:220px; overflow:auto;">
                     {% set blnoc = [] %}
                     {% for it in lista %}
-                      {% if (it.turno or '')|lower == 'noite' %}
-                        {% set _ = blnoc.append(it) %}
-                      {% endif %}
+                      {% if (it.turno or '')|lower == 'noite' %}{% set _ = blnoc.append(it) %}{% endif %}
                     {% endfor %}
                     {% for it in (blnoc|sort(attribute='coop.nome')) %}
                       <div class="py-2 border-bottom">
                         <div class="fw-bold">{{ nome_item(it) }}</div>
                         <div class="text-muted small">{{ it.turno or '—' }}{% if it.horario %} • {{ it.horario }}{% endif %}</div>
                       </div>
-                    {% else %}
-                      <div class="text-muted small py-2">—</div>
-                    {% endfor %}
+                    {% else %}<div class="text-muted small py-2">—</div>{% endfor %}
                   </div>
                 </div>
 
@@ -258,9 +254,7 @@
                   <tbody>
                     {% set blocodia = [] %}
                     {% for it in lista %}
-                      {% if (it.turno or '')|lower in ['dia','manhã','manha','tarde'] %}
-                        {% set _ = blocodia.append(it) %}
-                      {% endif %}
+                      {% if (it.turno or '')|lower in ['dia','manhã','manha','tarde'] %}{% set _ = blocodia.append(it) %}{% endif %}
                     {% endfor %}
                     {% for it in (blocodia|sort(attribute='coop.nome')) %}
                       <tr>
@@ -269,9 +263,7 @@
                         <td>{{ it.turno or '—' }}</td>
                         <td>{{ it.horario or '—' }}</td>
                       </tr>
-                    {% else %}
-                      <tr><td colspan="4" class="text-center text-muted">Sem escala de dia.</td></tr>
-                    {% endfor %}
+                    {% else %}<tr><td colspan="4" class="text-center text-muted">Sem escala de dia.</td></tr>{% endfor %}
                   </tbody>
                 </table>
               </div>
@@ -283,9 +275,7 @@
                   <tbody>
                     {% set blnoc = [] %}
                     {% for it in lista %}
-                      {% if (it.turno or '')|lower == 'noite' %}
-                        {% set _ = blnoc.append(it) %}
-                      {% endif %}
+                      {% if (it.turno or '')|lower == 'noite' %}{% set _ = blnoc.append(it) %}{% endif %}
                     {% endfor %}
                     {% for it in (blnoc|sort(attribute='coop.nome')) %}
                       <tr>
@@ -294,9 +284,7 @@
                         <td>{{ it.turno or '—' }}</td>
                         <td>{{ it.horario or '—' }}</td>
                       </tr>
-                    {% else %}
-                      <tr><td colspan="4" class="text-center text-muted">Sem escala de noite.</td></tr>
-                    {% endfor %}
+                    {% else %}<tr><td colspan="4" class="text-center text-muted">Sem escala de noite.</td></tr>{% endfor %}
                   </tbody>
                 </table>
               </div>
@@ -447,8 +435,8 @@
                       data-coop="{{ x.cooperado_id or x.coop_id }}"
                       data-coopnome="{{ x.cooperado_nome or x.coop_nome }}"
                       data-contrato="{{ x.contrato_nome or x.contrato }}"
-                      data-avurl="{{ x.avaliar_url or '/avaliar/' ~ x.id }}"
-                      data-getavurl="{{ x.avaliar_get_url or '/avaliar/' ~ x.id ~ '/get' }}"
+                      data-avurl="{{ x.avaliar_url or url_for('avaliar_lancamento_ajax', id=x.id) }}"
+                      data-getavurl="{{ x.avaliar_get_url or url_for('avaliar_lancamento_get', id=x.id) }}"
                   >
                     <td class="text-center">{{ (x.data.strftime('%d/%m/%Y') if x.data) if x.data is not string else x.data }}</td>
                     <td class="fw-semibold coop-name">{{ x.cooperado_nome or x.coop_nome }}</td>
@@ -456,7 +444,7 @@
                     <td class="text-center">
                       {% if x.hora_inicio or x.hora_fim %}
                         {{ x.hora_inicio or '' }}{% if x.hora_inicio or x.hora_fim %} às {% endif %}{{ x.hora_fim or '' }}
-                      {% else %}—{% endif %}
+                                            {% else %}—{% endif %}
                     </td>
                     <td class="text-center">{{ x.qtd_entregas if x.qtd_entregas is not none else '-' }}</td>
                     <td class="text-end valor" data-valor="{{ '%.2f'|format(x.valor or 0) }}">R$ {{ '%.2f'|format(x.valor or 0) }}</td>
@@ -489,132 +477,7 @@
         </div>
       </section>
 
-      <!-- ===== LANÇAR ===== -->
-      <section data-view="lancar">
-        <div class="section-title"><i class="bi bi-plus-circle"></i> Lançar Produção Diária</div>
-
-        <div class="card card-body">
-          <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
-            <input type="hidden" name="view" value="lancar">
-            <div class="col-md-3"><label class="form-label">Início</label><input type="date" name="data_inicio" class="form-control" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}"></div>
-            <div class="col-md-3"><label class="form-label">Fim</label><input type="date" name="data_fim" class="form-control" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}"></div>
-            <div class="col-md-3"><div class="small text-muted mb-1">Período em uso</div><div class="chip">{% if filtro_inicio and filtro_fim %}{{ filtro_inicio.strftime('%d/%m/%Y') }} a {{ filtro_fim.strftime('%d/%m/%Y') }}{% else %} — {% endif %}</div></div>
-            <div class="col-md-3 text-end">
-              <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
-              <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-arrow-counterclockwise"></i> Limpar</a>
-            </div>
-          </form>
-        </div>
-
-        <div class="row g-3 mt-1">
-          <div class="col-lg-4">
-            <div class="card card-body">
-              <div class="input-group mb-2">
-                <span class="input-group-text"><i class="bi bi-search"></i></span>
-                <input id="buscaCoop" type="text" class="form-control" placeholder="Buscar cooperado..." list="cooperadosList">
-                <datalist id="cooperadosList">{% for coop in _cooperados %}<option value="{{ coop.nome }}"></option>{% endfor %}</datalist>
-                <select id="selectCoop" class="form-select"><option value="">Lista...</option>{% for coop in _cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}</select>
-              </div>
-
-              <!-- IMPORTANTE: data-hoje="1" marca quem está na escala de HOJE (passa via escala_hoje_ids) -->
-              <div id="listaCooperados" style="max-height:60vh; overflow:auto;">
-                {% for coop in _cooperados %}
-                <div class="cooperado-item"
-                     data-id="{{ coop.id }}"
-                     data-nome="{{ coop.nome }}"
-                     data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
-                     data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}"
-                     data-hoje="{{ 1 if coop.id in _escala_hoje_ids else 0 }}">
-                  <img src="{{ url_for('media_coop', coop_id=coop.id) if coop.foto_bytes else url_for('static', filename='img/default.png') }}" class="cooperado-avatar" alt="Foto do cooperado">
-                  <div class="d-flex flex-column">
-                    <span class="fw-bold">{{ coop.nome }}</span>
-                    <small class="text-muted">No período: R$ {{ '%.2f'|format(coop.total_periodo or 0) }}</small>
-                  </div>
-                </div>
-                {% else %}<div class="text-muted small">Nenhum cooperado encontrado.</div>{% endfor %}
-              </div>
-            </div>
-          </div>
-
-          <div class="col-lg-8">
-            <div class="card card-body" id="blocoLancamento">
-              <div class="selected-header text-center mb-2" id="selectedHeader" style="display:none;">
-                <img id="selFoto" src="" class="big" alt="">
-                <div class="fw-bold fs-5 mt-2" id="selNome"></div>
-                <div class="text-muted">Total no período: R$ <span id="selTotal">0,00</span></div>
-              </div>
-
-              <div class="alert alert-info py-2 px-3 mb-2" id="hintSelecione">Selecione um cooperado para lançar.</div>
-
-              <form id="formLancamento" method="POST" action="{{ _url_lancar_producao }}" class="row g-2 align-items-end mb-1" style="display:none;">
-                <input type="hidden" name="cooperado_id" id="inputCooperadoId" value="">
-                <div class="col-md-3"><label class="form-label">Valor (R$)</label><input type="number" class="form-control" name="valor" step="0.01" required></div>
-                <div class="col-md-3"><label class="form-label">Data</label><input type="date" class="form-control" name="data" required></div>
-                <div class="col-md-3"><label class="form-label">Hora Início</label><input type="time" class="form-control" name="hora_inicio"></div>
-                <div class="col-md-3"><label class="form-label">Hora Fim</label><input type="time" class="form-control" name="hora_fim"></div>
-                <div class="col-md-3"><label class="form-label">Entregas</label><input type="number" class="form-control" name="qtd_entregas" min="0" step="1"></div>
-
-                <div class="col-12"><hr class="my-2"></div>
-                <div class="col-12">
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="chkAvaliar"
-                      onclick="document.getElementById('boxAval').style.display=this.checked?'block':'none'; document.getElementById('inputAvaliar').value=this.checked?'1':'0';">
-                    <label class="form-check-label" for="chkAvaliar">Registrar avaliação agora</label>
-                  </div>
-                  <input type="hidden" name="avaliar" id="inputAvaliar" value="0">
-                </div>
-
-                <div id="boxAval" class="row g-2" style="display:none;">
-                  {% for nm,titulo in [('av_pontualidade','Pontualidade'),('av_educacao','Educação'),('av_eficiencia','Eficiência / Cuidado'),('av_apresentacao','Apresentação')] %}
-                  <div class="col-md-6">
-                    <div class="rating-group" data-name="{{ nm }}">
-                      <div class="rating-label">{{ titulo }}</div>
-                      <div class="stars">
-                        <i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i>
-                      </div>
-                      <input type="hidden" name="{{ nm }}" value="">
-                    </div>
-                  </div>
-                  {% endfor %}
-                  <div class="col-md-6">
-                    <div class="rating-group" data-name="av_geral" data-auto="true">
-                      <div class="rating-label">Geral (média automática)</div>
-                      <div class="stars"><i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i></div>
-                      <input type="hidden" name="av_geral" value="">
-                    </div>
-                  </div>
-                  <div class="col-12"><label class="form-label">Comentário (opcional)</label><textarea class="form-control" name="av_comentario" rows="2" placeholder="Conte rapidamente como foi a experiência..."></textarea></div>
-                </div>
-
-                <div class="col-12 text-end mt-2"><button class="btn btn-royal"><i class="bi bi-plus-circle"></i> Lançar</button></div>
-              </form>
-            </div>
-
-            <!-- tabelas por cooperado (exibidas conforme seleção) -->
-            <div id="blocoTabelas" class="mt-2">
-              {% for coop in _cooperados %}
-              <div id="tabela-{{ coop.id }}" class="card card-body lancamentos-table" style="display:none;">
-                <table class="table table-bordered table-hover align-middle table-compact">
-                  <thead><tr><th>Valor</th><th>Data</th><th>Horário</th><th>Entregas</th><th>Editar</th><th>Excluir</th></tr></thead>
-                  <tbody>
-                    {% for lanc in coop.lancamentos %}
-                    <tr>
-                      <td>R$ {{ '%.2f'|format(lanc.valor or 0) }}</td>
-                      <td>{{ lanc.data.strftime('%d/%m/%Y') if lanc.data }}</td>
-                      <td>{{ lanc.hora_inicio or '' }}{% if lanc.hora_inicio or lanc.hora_fim %} às {% endif %}{{ lanc.hora_fim or '' }}</td>
-                      <td>{{ lanc.qtd_entregas if lanc.qtd_entregas is not none else '-' }}</td>
-                      <td>{% if has_editar_lanc %}<a href="{{ url_for('editar_lancamento', id=lanc.id) }}" class="btn btn-outline-royal btn-sm"><i class="bi bi-pencil"></i></a>{% endif %}</td>
-                      <td><a href="{{ url_for('excluir_lancamento', id=lanc.id) }}" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></a></td>
-                    </tr>
-                    {% else %}<tr><td colspan="6" class="text-center text-muted">Nenhum lançamento no período selecionado</td></tr>{% endfor %}
-                  </tbody>
-                </table>
-              </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-      </section>
+      <!-- ===== LANÇAR (já incluído acima) ===== -->
 
       <!-- ===== TABELAS ===== -->
       <section data-view="tabelas">
@@ -651,6 +514,7 @@
           {% endif %}
         </div>
       </section>
+      <!-- /sections -->
     </main>
   </div>
 
@@ -677,7 +541,27 @@
     </div>
   </div>
 
-  <!-- MODAL AVALIAR DEPOIS (em Lançamentos) -->
+  <!-- MODAL TABELA FULLSCREEN -->
+  <div class="modal fade" id="modalTabela" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div><div class="doc-cat mb-0">TABELA</div><h5 class="modal-title" id="modalTabelaLabel"></h5></div>
+          <div class="d-flex align-items-center gap-2">
+            <a id="modalAbrirNovaAba" href="#" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-up-right"></i> Abrir em nova aba</a>
+            <a id="modalBaixar" href="#" class="btn btn-primary btn-sm"><i class="bi bi-download"></i> Baixar</a>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+        </div>
+        <div class="modal-body p-2">
+          <iframe id="modalFrame" class="w-100" style="height:82vh; border:0" allowfullscreen></iframe>
+          <div id="modalAviso" class="small text-muted mt-2 d-none">Se o arquivo não abrir, use “Abrir em nova aba” ou “Baixar”.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL AVALIAR/EDITAR NA LISTA -->
   <div class="modal fade" id="modalAvalLanc" tabindex="-1" aria-labelledby="modalAvalLancLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
@@ -721,7 +605,7 @@
     </div>
   </div>
 
-  <!-- MODAL pergunta (ao lançar) -->
+  <!-- MODAL PERGUNTA AO LANÇAR -->
   <div class="modal fade" id="modalAvaliar" tabindex="-1" aria-labelledby="modalAvaliarLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
@@ -740,6 +624,20 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
+  /* ===== CSRF helper (evita “Erro de rede” no fetch POST) ===== */
+  function getCsrf(){
+    const m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.getAttribute('content') : null;
+  }
+  async function csrfFetch(url, opts={}){
+    const token = getCsrf();
+    const headers = new Headers(opts.headers||{});
+    if(token){ headers.set('X-CSRFToken', token); headers.set('X-CSRF-Token', token); }
+    // para Flask-WTF/Django e afins
+    headers.set('Accept','application/json, text/html, */*;q=0.9');
+    return fetch(url, {credentials:'same-origin', ...opts, headers});
+  }
+
   /* ===== Tema ===== */
   const THEME_KEY='portal_theme';
   function applyTheme(t){
@@ -775,7 +673,6 @@
   /* ===== Utils ===== */
   function togglePwd(btn){ const i=btn.previousElementSibling; if(!i) return; i.type=i.type==='password'?'text':'password'; btn.querySelector('i').classList.toggle('bi-eye'); btn.querySelector('i').classList.toggle('bi-eye-slash'); }
   const brMoney = (n)=> (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
-  const todayStr = ()=>{ const d=new Date(); const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return d.getFullYear()+'-'+mm+'-'+dd; };
 
   /* ===== Avisos ===== */
   let toastAvisosInst=null;
@@ -806,7 +703,7 @@
       const btn=ev.target.closest('[data-acao="marcar-lido"]'); if(!btn) return;
       const url=btn.getAttribute('data-url'); const card=btn.closest('.aviso-card');
       try{
-        const resp=await fetch(url,{method:'POST',credentials:'same-origin'});
+        const resp=await csrfFetch(url,{method:'POST'});
         if(resp.ok){
           card.setAttribute('data-lido','1'); card.classList.add('lido');
           const meta=card.querySelector('.text-muted.small'); if(meta && !/Lido/.test(meta.innerHTML)) meta.innerHTML += ' • <span class="text-success">Lido</span>';
@@ -834,11 +731,11 @@
     const selNome=document.getElementById('selNome');
     const selTotal=document.getElementById('selTotal');
 
-    // 1) PRIORIDADE: escala de HOJE no topo, depois alfabético
+    // ordenar: quem está na escala hoje primeiro
     try{
       const hojePrimeiro = [...itens].sort((a,b)=>{
         const ah = Number(a.dataset.hoje||0), bh=Number(b.dataset.hoje||0);
-        if(ah!==bh) return bh-ah; // quem tem hoje=1 vem antes
+        if(ah!==bh) return bh-ah;
         return (a.dataset.nome||'').localeCompare(b.dataset.nome||'', 'pt-BR', {sensitivity:'base'});
       });
       hojePrimeiro.forEach(el=>lista.appendChild(el));
@@ -859,7 +756,7 @@
     select?.addEventListener('change',function(){ const el=itens.find(x=>x.dataset.id===this.value); if(el) mostrarCooperado(el); });
     if(itens[0]) mostrarCooperado(itens[0]);
 
-    wireAvaliacaoFlow(); // fluxo modal "avaliar agora" ao lançar
+    wireAvaliacaoFlow();
   }
 
   function wireStars(group){
@@ -873,10 +770,11 @@
     paint(Number(hidden.value||0),false);
   }
 
+  // média automática para o campo "Geral"
   function autoGeral(){
     const g=document.querySelector('.rating-group[data-name="av_geral"]'); if(!g) return;
     const h=g.querySelector('input[type="hidden"]');
-    const nomes=['av_pontualidade','av_educacao','av_eficiencia','av_apresentacao']; 
+    const nomes=['av_pontualidade','av_educacao','av_eficiencia','av_apresentacao'];
     const vals=[];
     nomes.forEach(n=>{
       const v=Number(document.querySelector(`.rating-group[data-name="${n}"] input[type="hidden"]`)?.value||0);
@@ -891,7 +789,7 @@
     });
   }
 
-  /* ===== Lancamentos ===== */
+  /* ===== Lançamentos (lista) ===== */
   let lancamentosWired=false;
   function initLancamentos(){
     if(lancamentosWired) return; lancamentosWired=true;
@@ -906,20 +804,27 @@
       rows().forEach(tr=>{
         if(tr.style.display==='none') return;
         const v=Number(tr.querySelector('.valor')?.dataset.valor||0);
-        const eTxt=tr.cells[4]?.textContent?.trim()||'0'; const e=eTxt==='-'?0:Number(eTxt.replace(/\D+/g,''));
+        const eTxt=tr.cells[4]?.textContent?.trim()||'0'; const e=eTxt==='-'?0:Number(eTxt.replace(/\D+/g,'')); // entregas
         totV+=v; totE+=e;
         const id=tr.dataset.coop, nm=tr.dataset.coopnome;
         per[id]=per[id]||{nome:nm,valor:0,ent:0}; per[id].valor+=v; per[id].ent+=e;
       });
-      ftValor.textContent='R$ '+brMoney(totV); ftEnt.textContent=String(totE); kpiV.textContent=brMoney(totV); kpiE.textContent=String(totE);
-      grid.innerHTML=''; Object.values(per).sort((a,b)=>b.valor-a.valor).forEach(p=>{
-        const div=document.createElement('div'); div.className='col-sm-6 col-xl-4';
-        div.innerHTML=`<div class="kpi h-100"><div class="fw-bold">${p.nome||'-'}</div><div class="small text-muted">Entregas: <b>${p.ent||0}</b></div><div>Total: <b>R$ ${brMoney(p.valor||0)}</b></div></div>`; grid.appendChild(div);
-      });
+      ftValor.textContent='R$ '+brMoney(totV); ftEnt.textContent=String(totE);
+      if(kpiV) kpiV.textContent=brMoney(totV);
+      if(kpiE) kpiE.textContent=String(totE);
+      if(grid){
+        grid.innerHTML='';
+        Object.values(per).sort((a,b)=>b.valor-a.valor).forEach(p=>{
+          const div=document.createElement('div'); div.className='col-sm-6 col-xl-4';
+          div.innerHTML=`<div class="kpi h-100"><div class="fw-bold">${p.nome||'-'}</div><div class="small text-muted">Entregas: <b>${p.ent||0}</b></div><div>Total: <b>R$ ${brMoney(p.valor||0)}</b></div></div>`;
+          grid.appendChild(div);
+        });
+      }
     }
+
     f?.q?.addEventListener('input', ()=>{
       const q=(f.q.value||'').toLowerCase().trim();
-            rows().forEach(tr=>{ const coop=(tr.dataset.coopnome||'').toLowerCase(); const contrato=(tr.dataset.contrato||'').toLowerCase(); tr.style.display = (!q || coop.includes(q) || contrato.includes(q)) ? '' : 'none'; });
+      rows().forEach(tr=>{ const coop=(tr.dataset.coopnome||'').toLowerCase(); const contrato=(tr.dataset.contrato||'').toLowerCase(); tr.style.display = (!q || coop.includes(q) || contrato.includes(q)) ? '' : 'none'; });
       recompute();
     });
 
@@ -930,7 +835,7 @@
       const linhas=[header]; let totE=0, totV=0;
       rowsVis.forEach(r=>{
         const c=r.cells;
-        const entregas=(c[4].textContent.trim()==='-')?0:Number(c[4].textContent.replace(/\D+/g,''));
+        const entregas=(c[4].textContent.trim()==='-')?0:Number(c[4].textContent.replace(/\D+/g,'')); 
         const valorNum=Number(r.querySelector('.valor')?.dataset.valor||0);
         linhas.push([c[0].textContent.trim(),c[1].textContent.trim(),c[2].textContent.trim(),c[3].textContent.trim(),String(entregas),valorNum.toFixed(2).replace('.',',')]);
         totE+=entregas; totV+=valorNum;
@@ -941,20 +846,17 @@
       const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='lancamentos.csv'; a.click(); URL.revokeObjectURL(a.href);
     });
 
-    // pinta estrelas estáticas iniciais (se houver)
+    // estrelas estáticas
     document.querySelectorAll('.stars-static').forEach(paintStaticStars);
 
-    // ligar modal de avaliar/editar diretamente na tabela
+    // modal avaliar/editar
     wireAvalLanc();
 
-    // calcula totais iniciais
     recompute();
   }
 
   /* ===== Tabelas ===== */
-  function initTabelas(){
-    wireTabelaViewer();
-  }
+  function initTabelas(){ wireTabelaViewer(); }
   function wireTabelaViewer(){
     const modalEl=document.getElementById('modalTabela');
     if(!modalEl) return;
@@ -973,86 +875,23 @@
     modalEl.addEventListener('hidden.bs.modal',()=>{ frame.src=''; });
   }
 
-  /* ===== Helpers para avaliação ===== */
+  /* ===== Helpers de avaliação ===== */
   function paintStaticStars(el){
     if(!el) return;
     const score = Math.max(0, Math.min(5, Number(el.dataset.score||0)));
     el.textContent = '★★★★★'.slice(0, score).padEnd(5, '☆');
   }
 
-  // desliga/religa inputs de avaliação (para não mandar no POST quando pular)
   function setAvalInputsEnabled(enabled){
     const boxAval = document.getElementById('boxAval');
     if(!boxAval) return;
     boxAval.querySelectorAll('input[name^="av_"], textarea[name="av_comentario"]').forEach(el=>{
-      if(enabled){
-        if(el.dataset.origName){ el.name = el.dataset.origName; delete el.dataset.origName; }
-      }else{
-        if(!el.dataset.origName) el.dataset.origName = el.name;
-        el.name = '';
-      }
+      if(enabled){ if(el.dataset.origName){ el.name = el.dataset.origName; delete el.dataset.origName; } }
+      else{ if(!el.dataset.origName) el.dataset.origName = el.name; el.name = ''; }
     });
   }
 
-  /* ===== Fluxo do Modal "Avaliar agora" ao lançar ===== */
-  function wireAvaliacaoFlow(){
-    const form = document.getElementById('formLancamento');
-    if(!form) return;
-
-    const modalEl = document.getElementById('modalAvaliar');
-    const modal = new bootstrap.Modal(modalEl);
-    const btnAvaliarAgora = document.getElementById('btnAvaliarAgora');
-    const btnPularAval = document.getElementById('btnPularAval');
-    const chkAvaliar = document.getElementById('chkAvaliar');
-    const inputAvaliar = document.getElementById('inputAvaliar');
-    const boxAval = document.getElementById('boxAval');
-
-    // estado inicial: sem avaliação
-    setAvalInputsEnabled(false);
-
-    chkAvaliar?.addEventListener('change', ()=>{
-      const on = chkAvaliar.checked;
-      inputAvaliar.value = on ? '1':'0';
-      if(boxAval) boxAval.style.display = on ? 'block':'none';
-      setAvalInputsEnabled(on);
-      if(on){ autoGeral(); }
-    });
-
-    // intercepta submit: pergunta se deseja avaliar
-    form.addEventListener('submit', function(ev){
-      if(!form.checkValidity()){
-        form.reportValidity?.();
-        return;
-      }
-      if(chkAvaliar.checked || inputAvaliar.value === '1' || (boxAval && boxAval.style.display === 'block')){
-        setAvalInputsEnabled(true);
-        autoGeral();
-        return; // deixa enviar
-      }
-      ev.preventDefault();
-      modal.show();
-    });
-
-    btnAvaliarAgora?.addEventListener('click', ()=>{
-      chkAvaliar.checked = true;
-      inputAvaliar.value = '1';
-      if(boxAval) boxAval.style.display = 'block';
-      setAvalInputsEnabled(true);
-      autoGeral();
-      modal.hide();
-    });
-
-    btnPularAval?.addEventListener('click', ()=>{
-      chkAvaliar.checked = false;
-      inputAvaliar.value = '0';
-      if(boxAval) boxAval.style.display = 'none';
-      setAvalInputsEnabled(false);
-      modal.hide();
-      setTimeout(()=>form.submit(), 80);
-    });
-  }
-
-   /* ===== Fluxo do modal ao lançar ===== */
+  /* ===== Fluxo do modal ao lançar ===== */
   function wireAvaliacaoFlow(){
     const form = document.getElementById('formLancamento'); if(!form) return;
     const modalEl = document.getElementById('modalAvaliar');
@@ -1183,19 +1022,17 @@
     });
   }
 
-  /* ===== Eventos do menu ===== */
+  /* ===== Eventos do menu + inicialização ===== */
   document.getElementById('sideNav')?.addEventListener('click', async (e)=>{
     const a=e.target.closest('a'); if(!a) return;
-    const t=a.getAttribute('data-target'); if(!t) return; // logout segue normal
+    const t=a.getAttribute('data-target'); if(!t) return;
     e.preventDefault();
     document.querySelectorAll('#sideNav a').forEach(x=>x.classList.remove('active')); a.classList.add('active');
     showSection(t); pushView(t);
   });
 
-  /* ===== Inicialização ===== */
   document.addEventListener('DOMContentLoaded', ()=>{
     const initial=startView(); showSection(initial);
-    // badge inicial de avisos (com base no toast)
     const unread=Number(document.getElementById('toastCount')?.textContent||'0'); setAvisosBadge(unread);
   });
   window.addEventListener('popstate',(ev)=>{ const v=(ev.state&&ev.state.view)||startView(); showSection(v); });
