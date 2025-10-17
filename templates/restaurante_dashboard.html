@@ -1,1181 +1,907 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8" />
-  <title>Portal do Estabelecimento</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="csrf-token" content="TOKEN_DE_TESTE">
-  
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-  <style>
-    /* Estilos Customizados (Mantidos do Original) */
-    :root{
-      --royal:#2141d9; --royal-2:#3654e6; --royal-3:#eaf0ff;
-      --ink:#0b1220; --muted:#6b7280; --soft:#f5f7ff; --danger:#e74c3c; --ok:#16a34a;
-      --border:#e6e9f2; --chip:#eef1ff; --card:#fff; --bg:#fff; --text:#111827;
-      --aside-grad1: var(--royal); --aside-grad2: var(--royal-2);
-    }
-    :root[data-theme="dark"]{
-      --bg:#0b1220; --text:#e5e7eb; --muted:#9aa4b2; --card:#0f172a;
-      --border:#1f2a44; --chip:#132040; --royal:#3b82f6; --royal-2:#2563eb; --royal-3:#0b2447;
-      --aside-grad1:#0b2a6b; --aside-grad2:#143d86;
-    }
-    html,body{height:100%}
-    body{margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif}
-    a{text-decoration:none}
-    .shell{display:grid; grid-template-columns:260px 1fr; min-height:100vh}
-    .aside{
-      background:linear-gradient(180deg,var(--aside-grad1) 0%,var(--aside-grad2) 100%);
-      color:#fff; padding:18px 16px; position:sticky; top:0; height:100dvh;
-    }
-    .brand{font-weight:800; font-size:1.12rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.08); display:flex; align-items:center; gap:8px}
-    .theme-toggle{margin-top:10px; border:1px solid rgba(255,255,255,.25); color:#fff; background:rgba(255,255,255,.06); border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:8px; cursor:pointer}
-    .navmenu{margin-top:18px; display:flex; flex-direction:column; gap:6px}
-    .navmenu a{color:#fff; padding:9px 11px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600; position:relative; font-size:.94rem}
-    .navmenu a i{font-size:1rem}
-    .navmenu a.active,.navmenu a:hover{background:rgba(255,255,255,.14)}
-    .content{padding:24px clamp(14px,3vw,32px)}
-    .section-title{color:var(--royal); font-weight:800; font-size:1.25rem; display:flex; gap:10px; align-items:center}
-    .card{background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 0 #0000000a}
-    .card-soft{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px}
-    .chip{background:var(--chip); color:var(--text); border:1px solid var(--border); border-radius:999px; padding:.2rem .65rem; font-weight:700}
-    .table{color:var(--text)} .table td,.table th{border-color:var(--border)} .table thead th{border-color:var(--border)}
-    .table-compact th,.table-compact td{padding:.5rem .6rem}
-    .btn-royal{background:var(--royal); color:#fff; border:none}
-    .btn-royal:hover{background:var(--royal-2); color:#fff}
-    .btn-outline-royal{border:1px solid var(--royal); color:var(--royal); background:transparent}
-    .btn-outline-royal:hover{background:var(--royal); color:#fff}
-    .btn-outline-danger{color:#e74c3c; border-color:#e74c3c}
-    .btn-outline-danger:hover{background:#e74c3c; color:#fff}
-    section[data-view]{display:none}
-    section.view-active{display:block}
-    .badge-dot{min-width:22px; height:22px; line-height:22px; border-radius:999px; padding:0 6px; font-size:.75rem; font-weight:800; display:inline-flex; align-items:center; justify-content:center; background:#dc3545; color:#fff; box-shadow:0 0 0 2px rgba(255,255,255,.25) inset; margin-left:auto;}
-    @media (max-width:920px){ .shell{grid-template-columns:66px 1fr} .brand span{display:none} .navmenu a span{display:none} }
-    /* Estilos de Avaliação */
-    .rating-group{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
-    .rating-label{width:160px; font-weight:700}
-    .stars{display:inline-flex; gap:3px; font-size:1.4rem; cursor:pointer}
-    .star{color:#94a3b8; transition:transform .06s}
-    .star.active,.star.hover{color:#fbbf24}
-    /* Para a avaliação geral, que é apenas visual e não interativa */
-    .rating-group[data-name="av_geral"] .stars{pointer-events:none; opacity:.95} 
-    .sticky-tools{position:sticky; top:12px}
-    .kpi{background:#fafcff10; border:1px solid var(--border); border-radius:12px; padding:10px 12px}
-    .kpi .v{font-weight:800; font-size:1.05rem}
-    /* Estilos de Estrelas Estáticas */
-    .stars-static::before {
-        content: '★★★★★';
-        display: inline-block;
-        color: #94a3b8; /* Cor das estrelas "vazias" */
-        font-size: 1rem;
-        line-height: 1;
-        letter-spacing: 3px;
-        position: relative;
-    }
-    .stars-static {
-        display: inline-block;
-        line-height: 1;
-        text-indent: -9999px; /* Oculta o texto original (★★★★★) */
-    }
-    .stars-static::after {
-        content: '★★★★★';
-        display: block;
-        color: #fbbf24; /* Cor das estrelas preenchidas */
-        font-size: 1rem;
-        line-height: 1;
-        position: absolute;
-        top: 0;
-        left: 0;
-        overflow: hidden;
-        white-space: nowrap;
-    }
-    .stars-static[data-score="0"]::after { width: 0%; }
-    .stars-static[data-score="1"]::after { width: 20%; }
-    .stars-static[data-score="2"]::after { width: 40%; }
-    .stars-static[data-score="3"]::after { width: 60%; }
-    .stars-static[data-score="4"]::after { width: 80%; }
-    .stars-static[data-score="5"]::after { width: 100%; }
-
-    /* Avisos/Tabelas */
-    .aviso-card{border-left:6px solid #3b82f6}
-    .aviso-card.lido{border-left-color:#94a3b8; opacity:.98}
-    .aviso-card.prioridade{border-left-color:var(--danger)}
-    .doc-row{border:1px solid var(--border); border-radius:16px; padding:14px 16px; background:var(--card); box-shadow:0 10px 28px #00000012; transition:transform .08s, box-shadow .12s; cursor:pointer}
-    .doc-row:hover{box-shadow:0 12px 32px #00000018}
-    .doc-cat{font-size:.75rem; color:var(--royal); text-transform:uppercase; letter-spacing:.08em; font-weight:800}
-  </style>
+  <meta charset="UTF-8" />
+  <title>Portal do Estabelecimento</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <style>
+    :root{
+      --royal:#2141d9; --royal-2:#3654e6; --royal-3:#eaf0ff;
+      --ink:#0b1220; --muted:#6b7280; --soft:#f5f7ff; --danger:#e74c3c; --ok:#16a34a;
+      --border:#e6e9f2; --chip:#eef1ff; --card:#fff; --bg:#fff; --text:#111827;
+      --aside-grad1: var(--royal); --aside-grad2: var(--royal-2);
+    }
+    :root[data-theme="dark"]{
+      --bg:#0b1220; --text:#e5e7eb; --muted:#9aa4b2; --card:#0f172a;
+      --border:#1f2a44; --chip:#132040; --royal:#3b82f6; --royal-2:#2563eb; --royal-3:#0b2447;
+      --aside-grad1:#0b2a6b; --aside-grad2:#143d86;
+    }
+    html,body{height:100%}
+    body{margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif}
+    a{text-decoration:none}
+    .shell{display:grid; grid-template-columns:260px 1fr; min-height:100vh}
+    .aside{
+      background:linear-gradient(180deg,var(--aside-grad1) 0%,var(--aside-grad2) 100%);
+      color:#fff; padding:18px 16px; position:sticky; top:0; height:100dvh;
+    }
+    .brand{font-weight:800; font-size:1.12rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.08); display:flex; align-items:center; gap:8px}
+    .theme-toggle{margin-top:10px; border:1px solid rgba(255,255,255,.25); color:#fff; background:rgba(255,255,255,.06); border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:8px; cursor:pointer}
+    /* menu menor */
+    .navmenu{margin-top:18px; display:flex; flex-direction:column; gap:6px}
+    .navmenu a{color:#fff; padding:9px 11px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600; position:relative; font-size:.94rem}
+    .navmenu a i{font-size:1rem}
+    .navmenu a.active,.navmenu a:hover{background:rgba(255,255,255,.14)}
+    .content{padding:24px clamp(14px,3vw,32px)}
+    .section-title{color:var(--royal); font-weight:800; font-size:1.25rem; display:flex; gap:10px; align-items:center}
+    .card{background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 0 #0000000a}
+    .card-soft{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px}
+    .chip{background:var(--chip); color:var(--text); border:1px solid var(--border); border-radius:999px; padding:.2rem .65rem; font-weight:700}
+    .table{color:var(--text)} .table td,.table th{border-color:var(--border)} .table thead th{border-color:var(--border)}
+    .table-compact th,.table-compact td{padding:.5rem .6rem}
+    .btn-royal{background:var(--royal); color:#fff; border:none}
+    .btn-royal:hover{background:var(--royal-2); color:#fff}
+    .btn-outline-royal{border:1px solid var(--royal); color:var(--royal); background:transparent}
+    .btn-outline-royal:hover{background:var(--royal); color:#fff}
+    .btn-outline-danger{color:#e74c3c; border-color:#e74c3c}
+    .btn-outline-danger:hover{background:#e74c3c; color:#fff}
+    /* SPA sections */
+    section[data-view]{display:none}
+    section.view-active{display:block}
+    /* somente Avisos tem bolinha */
+    .badge-dot{
+      min-width:22px; height:22px; line-height:22px; border-radius:999px; padding:0 6px;
+      font-size:.75rem; font-weight:800; display:inline-flex; align-items:center; justify-content:center;
+      background:#dc3545; color:#fff; box-shadow:0 0 0 2px rgba(255,255,255,.25) inset; margin-left:auto;
+    }
+    @media (max-width:920px){ .shell{grid-template-columns:66px 1fr} .brand span{display:none} .navmenu a span{display:none} }
+    /* Avisos */
+    .aviso-card{border-left:6px solid #3b82f6}
+    .aviso-card.lido{border-left-color:#94a3b8; opacity:.98}
+    .aviso-card.prioridade{border-left-color:var(--danger)}
+    /* Cooperados */
+    .cooperado-avatar{width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 1px 0 #0001}
+    .cooperado-item{display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; cursor:pointer}
+    .cooperado-item:hover{background:#f8faff20}
+    .cooperado-item.selected{outline:2px solid var(--royal); background:#1d4ed820}
+    .selected-header .big{width:180px; height:180px; border-radius:50%; object-fit:cover; border:6px solid var(--royal); box-shadow:0 6px 16px #0002}
+    .rating-group{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .rating-label{width:160px; font-weight:700}
+    .stars{display:inline-flex; gap:3px; font-size:1.4rem; cursor:pointer}
+    .star{color:#94a3b8; transition:transform .06s}
+    .star.active,.star.hover{color:#fbbf24}
+    .rating-group[data-name="av_geral"] .stars{pointer-events:none; opacity:.95}
+    .sticky-tools{position:sticky; top:12px}
+    .kpi{background:#fafcff10; border:1px solid var(--border); border-radius:12px; padding:10px 12px}
+    .kpi .v{font-weight:800; font-size:1.05rem}
+    /* Tabelas (cartão) */
+    .doc-row{border:1px solid var(--border); border-radius:16px; padding:14px 16px; background:var(--card); box-shadow:0 10px 28px #00000012; transition:transform .08s, box-shadow .12s; cursor:pointer}
+    .doc-row:active{transform:scale(.995)} .doc-row:hover{box-shadow:0 12px 32px #00000018}
+    .doc-title{font-weight:800; font-size:1.05rem}
+    .doc-cat{font-size:.75rem; color:var(--royal); text-transform:uppercase; letter-spacing:.08em; font-weight:800}
+    .doc-date{color:var(--muted); font-size:.9rem}
+    .doc-desc{font-size:.95rem; color:var(--text); background:var(--soft); border-radius:10px; padding:.6em .9em}
+  </style>
 </head>
 <body>
-  
-  {% set view = view|default('lancar') %}
-  {% set session = {'user_tipo': 'restaurante'} %}
-
-  {% macro url_for(route, **kwargs) -%}
-    {{ route }}
-    {% set params = [] %}
-    {% for key, value in kwargs.items() %}
-      {% set _ = params.append(key ~ '=' ~ value) %}
-    {% endfor %}
-    {% if params %}{{ '?' ~ params|join('&') }}{% endif %}
-  {%- endmacro %}
-  {% macro get_flashed_messages(with_categories) -%}
-    {% if view == 'config_success' %}[('success', 'Senha alterada com sucesso!')]{% else %}[]{% endif %}
-  {%- endmacro %}
-
-  {% set cooperados = [
-    {'id':1, 'nome':'Alice Silva', 'avatar':'https://i.pravatar.cc/150?img=1'},
-    {'id':2, 'nome':'Bruno Costa', 'avatar':'https://i.pravatar.cc/150?img=2'},
-    {'id':3, 'nome':'Carla Dias', 'avatar':'https://i.pravatar.cc/150?img=3'},
-  ] %}
-  {% set _date_today = '2025-10-17' %}
-  {% set _date_30_days_ago = '2025-09-17' %}
-  {% set _ref_data = _ref_data|default(_date_today)|force_date %}
-  {% set _modo = modo|default('semana') %}
-  {% set filtro_inicio = filtro_inicio|default(_date_30_days_ago)|force_date %}
-  {% set filtro_fim = filtro_fim|default(_date_today)|force_date %}
-  {% set filtro_mes = filtro_mes|default(None) %}
-  
-  {% set _lancamentos_periodo = [
-    {'id': 101, 'data': '2025-10-15'|force_date, 'cooperado_id': 1, 'cooperado_nome': 'Alice Silva', 'contrato_nome': 'Contrato A', 'hora_inicio': '14:00', 'hora_fim': '18:00', 'qtd_entregas': 12, 'valor': 120.50, 'nota_geral': 5, 'avaliar_url': url_for('lancar_avaliacao', id=101)},
-    {'id': 102, 'data': '2025-10-15'|force_date, 'cooperado_id': 2, 'cooperado_nome': 'Bruno Costa', 'contrato_nome': 'Contrato B', 'hora_inicio': '08:00', 'hora_fim': '12:00', 'qtd_entregas': 20, 'valor': 250.00, 'nota_geral': None, 'avaliar_url': url_for('lancar_avaliacao', id=102)},
-    {'id': 103, 'data': '2025-10-16'|force_date, 'cooperado_id': 1, 'cooperado_nome': 'Alice Silva', 'contrato_nome': 'Contrato A', 'hora_inicio': '14:00', 'hora_fim': '18:00', 'qtd_entregas': 10, 'valor': 100.00, 'nota_geral': 4, 'avaliar_url': url_for('lancar_avaliacao', id=103)},
-    {'id': 104, 'data': '2025-10-17'|force_date, 'cooperado_id': 3, 'cooperado_nome': 'Carla Dias', 'contrato_nome': 'Contrato C', 'hora_inicio': '08:00', 'hora_fim': '12:00', 'qtd_entregas': 8, 'valor': 95.00, 'nota_geral': None, 'avaliar_url': url_for('lancar_avaliacao', id=104)},
-  ] %}
-  {% set _dias_list = ['2025-10-14','2025-10-15','2025-10-16','2025-10-17','2025-10-18','2025-10-19','2025-10-20'] | map('force_date') | list %}
-  {% set _agenda = {
-    _dias_list[3]: [
-      {'coop': cooperados[0], 'turno': 'Tarde', 'horario': '14h-18h', 'contrato': 'Contrato A'},
-      {'coop': cooperados[1], 'turno': 'Manhã', 'horario': '08h-12h', 'contrato': 'Contrato B'},
-      {'coop': cooperados[2], 'turno': 'Noite', 'horario': '18h-22h', 'contrato': 'Contrato C'},
-    ]
-  } %}
-  {% set avisos_nao_lidos_count = 2 %}
-  {% set avisos = [
-    {'id':1, 'titulo':'Novo Contrato Disponível', 'criado_em':'2025-10-10 10:00'|force_date, 'lido':False, 'prioridade_alta':True, 'corpo':'Sua nova tabela de preços já está disponível na seção "Tabelas". Por favor, revise-a com atenção.'},
-    {'id':2, 'titulo':'Manutenção de Sistema', 'criado_em':'2025-10-09 18:00'|force_date, 'lido':False, 'corpo':'O sistema passará por manutenção na madrugada de sábado para domingo. O acesso pode ser interrompido entre 01h e 04h.'},
-    {'id':3, 'titulo':'Feriado Próximo', 'criado_em':'2025-10-05 12:00'|force_date, 'lido':True, 'corpo':'Lembramos que o feriado de 15 de Novembro impactará a escala de entregas. Consulte a Escala atualizada.'},
-  ] %}
-  {% set tabela = {'id': 1, 'titulo': 'Tabela de Preços - Out/2025', 'arquivo_nome': 'tabela_out_25.pdf', 'enviado_em': '2025-09-30 09:30'|force_date, 'descricao': 'Tabela de preços atualizada, com reajustes nas rotas A e C.'} %}
-  
-  {% filter force_date(value) -%}
-    {% set result = value if value is not string else value|datetime_from_string('%Y-%m-%d %H:%M')|default(value|datetime_from_string('%Y-%m-%d'))|default(value) %}
-    {{ result }}
-  {%- endfilter %}
-
-  <div class="shell">
-    <aside class="aside">
-      <div class="brand"><i class="bi bi-building"></i><span>Portal do Estabelecimento</span></div>
-      <button id="btnTheme" class="theme-toggle" type="button"><i class="bi bi-moon"></i><span id="lblTheme">Escuro</span></button>
-
-      <nav class="navmenu" id="sideNav">
-        <a data-target="lancar" class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos','tabelas']) else '' }}" href="#lancar">
-          <i class="bi bi-person-lines-fill"></i><span>Cooperados</span>
-        </a>
-        <a data-target="lancamentos" class="{{ 'active' if view=='lancamentos' else '' }}" href="#lancamentos">
-          <i class="bi bi-receipt"></i><span>Lançamentos</span>
-        </a>
-        <a data-target="escalas" class="{{ 'active' if view=='escalas' else '' }}" href="#escalas">
-          <i class="bi bi-calendar-week"></i><span>Escala</span>
-        </a>
-        {% if session.get('user_tipo') == 'restaurante' %}
-        <a data-target="tabelas" id="linkTabelas" href="#tabelas">
-          <i class="bi bi-table"></i><span>Tabelas</span>
-        </a>
-        {% endif %}
-        <a data-target="config" class="{{ 'active' if view=='config' else '' }}" href="#config">
-          <i class="bi bi-gear"></i><span>Configuração</span>
-        </a>
-        <a id="linkAvisos" data-target="avisos" class="{{ 'active' if view=='avisos' else '' }}" href="#avisos">
-          <i class="bi bi-megaphone"></i><span>Avisos</span>
-          {% set _cntAvisos = avisos_nao_lidos_count or 0 %}
-          <span class="badge-dot" id="badgeAvisos" {% if _cntAvisos == 0 %}style="display:none"{% endif %}>{{ _cntAvisos }}</span>
-        </a>
-        <a href="#logout"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
-      </nav>
-    </aside>
-
-    <main class="content">
-      {% with msgs = get_flashed_messages(with_categories=True) %}
-        {% if msgs %}
-          <div class="mb-3">
-            {% for cat, msg in msgs %}
-              <div class="alert alert-{{ 'danger' if cat=='error' else cat }} py-2 px-3 mb-2">{{ msg|safe }}</div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      {% endwith %}
-
-      {% macro nome_item(it) -%}
-        {{ it.coop.nome if it.coop else (it.nome_planilha or it.cooperado_nome or '—') }}
-      {%- endmacro %}
-
-      <section data-view="lancar" class="{{ 'view-active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos','tabelas']) else '' }}">
-        <div class="section-title"><i class="bi bi-person-lines-fill"></i> Cooperados (Avaliações Pendentes)</div>
-        <div class="card card-body text-muted">Esta é a tela principal de Cooperados. Para lançar avaliações, use a aba "Lançamentos" abaixo.</div>
-      </section>
-
-      <section data-view="config" class="{{ 'view-active' if view=='config' else '' }}">
-        <div class="section-title"><i class="bi bi-shield-lock"></i> Configuração</div>
-        <div class="card card-body">
-          <form class="row g-3 form-password" method="POST" action="{% if view=='config' %}#config_success{% else %}#config{% endif %}" onsubmit="return handlePasswordChange(event)">
-            <div class="col-md-4">
-              <label class="form-label">Senha atual</label>
-              <div class="input-group">
-                <input type="password" class="form-control" name="senha_atual" required>
-                <button class="btn btn-outline-royal" type="button" onclick="togglePwd(this)"><i class="bi bi-eye"></i></button>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Nova senha</label>
-              <div class="input-group">
-                <input type="password" class="form-control" name="senha_nova" minlength="6" required>
-                <button class="btn btn-outline-royal" type="button" onclick="togglePwd(this)"><i class="bi bi-eye"></i></button>
-              </div>
-              <div class="form-text">Mínimo de 6 caracteres.</div>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Confirmar nova senha</label>
-              <div class="input-group">
-                <input type="password" class="form-control" name="senha_conf" minlength="6" required>
-                <button class="btn btn-outline-royal" type="button" onclick="togglePwd(this)"><i class="bi bi-eye"></i></button>
-              </div>
-            </div>
-            <div class="col-12 text-end"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
-          </form>
-        </div>
-      </section>
-
-      <section data-view="escalas" class="{{ 'view-active' if view=='escalas' else '' }}">
-        <div class="section-title"><i class="bi bi-calendar-week"></i> Escala</div>
-        <div class="card card-body">
-          <form class="row g-2 align-items-end" method="GET" action="#escalas" onsubmit="handleFormSubmit(this, event)">
-            <input type="hidden" name="view" value="escalas">
-            <div class="col-md-3">
-              <label class="form-label">Ver</label>
-              <select name="modo" class="form-select">
-                <option value="semana" {{ 'selected' if (_modo=='semana') }}>Semana completa</option>
-                <option value="dia" {{ 'selected' if (_modo=='dia') }}>Somente 1 dia</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Referência</label>
-              <input type="date" name="ref" class="form-control" value="{{ _ref_data and _ref_data.strftime('%Y-%m-%d') }}">
-            </div>
-            <div class="col-md-6 text-end">
-              <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
-              <a class="btn btn-outline-secondary" href="#escalas"><i class="bi bi-arrow-counterclockwise"></i> Hoje</a>
-            </div>
-          </form>
-
-          {% if _modo == 'semana' %}
-          <hr class="my-3">
-          <div class="row g-3">
-            {% for dia in _dias_list %}
-            {% set lista = _agenda.get(dia, []) %}
-            <div class="col-md-6 col-lg-4">
-              <div class="card-soft">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <span class="badge text-bg-primary fw-semibold">{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][dia.weekday()] }} — {{ dia.strftime('%d/%m/%Y') }}</span>
-                </div>
-
-                <div>
-                  <div class="fw-bold small text-muted mt-1">DIA</div>
-                  <div class="border-top pt-1" style="max-height:220px; overflow:auto;">
-                    {% set blocodia = [] %}
-                    {% for it in lista %}
-                      {% if (it.turno or '')|lower in ['dia','manhã','manha','tarde'] %}{% set _ = blocodia.append(it) %}{% endif %}
-                    {% endfor %}
-                    {% for it in (blocodia|sort(attribute='coop.nome') ) %}
-                      <div class="py-2 border-bottom">
-                        <div class="fw-bold">{{ nome_item(it) }}</div>
-                        <div class="text-muted small">{{ it.turno or '—' }}{% if it.horario %} • {{ it.horario }}{% endif %}</div>
-                      </div>
-                    {% else %}<div class="text-muted small py-2">—</div>{% endfor %}
-                  </div>
-
-                  <div class="fw-bold small text-muted mt-3">NOITE</div>
-                  <div class="border-top pt-1" style="max-height:220px; overflow:auto;">
-                    {% set blnoc = [] %}
-                    {% for it in lista %}
-                      {% if (it.turno or '')|lower == 'noite' %}{% set _ = blnoc.append(it) %}{% endif %}
-                    {% endfor %}
-                    {% for it in (blnoc|sort(attribute='coop.nome')) %}
-                      <div class="py-2 border-bottom">
-                        <div class="fw-bold">{{ nome_item(it) }}</div>
-                        <div class="text-muted small">{{ it.turno or '—' }}{% if it.horario %} • {{ it.horario }}{% endif %}</div>
-                      </div>
-                    {% else %}<div class="text-muted small py-2">—</div>{% endfor %}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-            {% endfor %}
-          </div>
-          {% else %}
-          <hr class="my-3">
-          {% set lista = _agenda.get(_ref_data, []) if _ref_data else [] %}
-
-          <div class="card-soft">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <span class="badge text-bg-primary fw-semibold">{{ _ref_data and ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][_ref_data.weekday()] }} — {{ _ref_data and _ref_data.strftime('%d/%m/%Y') }}</span>
-            </div>
-
-            <div class="row g-2">
-              <div class="col-md-6">
-                <h6 class="mb-2">DIA</h6>
-                <table class="table table-bordered table-hover align-middle table-compact">
-                  <thead><tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr></thead>
-                  <tbody>
-                    {% set blocodia = [] %}
-                    {% for it in lista %}
-                      {% if (it.turno or '')|lower in ['dia','manhã','manha','tarde'] %}{% set _ = blocodia.append(it) %}{% endif %}
-                    {% endfor %}
-                    {% for it in (blocodia|sort(attribute='coop.nome')) %}
-                      <tr>
-                        <td>{{ it.contrato or it.contrato_nome or 'Sem contrato' }}</td>
-                        <td>{{ nome_item(it) }}</td>
-                        <td>{{ it.turno or '—' }}</td>
-                        <td>{{ it.horario or '—' }}</td>
-                      </tr>
-                    {% else %}<tr><td colspan="4" class="text-center text-muted">Sem escala de dia.</td></tr>{% endfor %}
-                  </tbody>
-                </table>
-              </div>
-
-              <div class="col-md-6">
-                <h6 class="mb-2">NOITE</h6>
-                <table class="table table-bordered table-hover align-middle table-compact">
-                  <thead><tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr></thead>
-                  <tbody>
-                    {% set blnoc = [] %}
-                    {% for it in lista %}
-                      {% if (it.turno or '')|lower == 'noite' %}{% set _ = blnoc.append(it) %}{% endif %}
-                    {% endfor %}
-                    {% for it in (blnoc|sort(attribute='coop.nome')) %}
-                      <tr>
-                        <td>{{ it.contrato or it.contrato_nome or 'Sem contrato' }}</td>
-                        <td>{{ nome_item(it) }}</td>
-                        <td>{{ it.turno or '—' }}</td>
-                        <td>{{ it.horario or '—' }}</td>
-                      </tr>
-                    {% else %}<tr><td colspan="4" class="text-center text-muted">Sem escala de noite.</td></tr>{% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-          {% endif %}
-        </div>
-      </section>
-
-      <section data-view="avisos" class="{{ 'view-active' if view=='avisos' else '' }}">
-        {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
-        {% set _unread_from_list = (_avisos | selectattr('lido','equalto',False) | list | length) %}
-        {% set _unread_from_ctx = avisos_nao_lidos_count or 0 %}
-        {% set _badgeN = (_unread_from_list if _unread_from_list>0 else _unread_from_ctx) %}
-        <div class="section-title">
-          <i class="bi bi-megaphone-fill"></i> Avisos
-          <span id="badgeTitulo" class="badge {{ 'text-bg-danger' if _badgeN>0 else 'text-bg-success' }} ms-2">
-            {{ _badgeN>0 and (_badgeN ~ ' não lido(s)') or 'Tudo lido' }}
-          </span>
-        </div>
-
-        <div class="card card-body">
-          <div class="d-flex align-items-center gap-2">
-            <form method="POST" action="#avisos" class="m-0" onsubmit="return handleMarkAllRead(event, this)">
-              <button class="btn btn-royal" type="submit" {% if _badgeN == 0 %}disabled{% endif %}><i class="bi bi-check2-circle me-1"></i> Marcar todos como lidos</button>
-            </form>
-            <div class="form-check ms-auto">
-              <input class="form-check-input" type="checkbox" id="toggleNaoLidos">
-              <label class="form-check-label" for="toggleNaoLidos">Mostrar apenas não lidos</label>
-            </div>
-          </div>
-        </div>
-
-        <div id="avisosListContainer">
-          {% if _avisos and (_avisos | length) > 0 %}
-            {% for a in _avisos %}
-            <div id="aviso-{{ a.id }}" class="card card-body my-2 aviso-card {% if a.lido %}lido{% endif %} {% if a.prioridade_alta %}prioridade{% endif %}" data-lido="{{ '1' if a.lido else '0' }}">
-              <div class="d-flex justify-content-between align-items-start">
-                <div>
-                  <div class="fw-bold">
-                    {{ a.titulo or 'Aviso' }}
-                    {% if a.prioridade_alta %}
-                      <span class="badge text-bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Prioridade</span>
-                    {% endif %}
-                  </div>
-                  <div class="text-muted small">
-                    Publicado em {{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em }}
-                    {% if a.atualizado_em %} · Atualizado {{ a.atualizado_em.strftime('%d/%m/%Y %H:%M') }}{% endif %}
-                    <span class="lido-status">{% if a.lido %} • <span class="text-success">Lido</span>{% else %} • <span class="text-danger">Não lido</span>{% endif %}</span>
-                  </div>
-                </div>
-                <div class="ms-3">
-                  {% if not a.lido %}
-                  <button class="btn btn-outline-royal btn-sm btn-marcar-lido"
-                          data-acao="marcar-lido"
-                          data-id="{{ a.id }}"
-                          data-url="#marcar_aviso_lido_universal?aviso_id={{ a.id }}">
-                    <i class="bi bi-check2"></i> Marcar como lido
-                  </button>
-                  {% endif %}
-                </div>
-              </div>
-              <hr class="my-2">
-              {% set txt = (a.corpo or a.conteudo or a.mensagem or a.texto or a.descricao or a.body) %}
-              <p class="mb-0">{{ (txt or '(sem conteúdo)')|e|replace('\r\n','\n')|replace('\n','<br>')|safe }}</p>
-            </div>
-            {% endfor %}
-          {% else %}
-            <div class="card card-body text-muted">Carregando avisos…</div>
-          {% endif %}
-        </div>
-      </section>
-      <section data-view="lancamentos" class="{{ 'view-active' if view=='lancamentos' else '' }}">
-        <div class="section-title"><i class="bi bi-receipt"></i> Lançamentos</div>
-        <div class="row g-3">
-          <div class="col-lg-3">
-            <div class="card card-body sticky-tools">
-              <form id="formFiltroLanc" method="GET" action="#lancamentos" class="row g-2 align-items-end" onsubmit="handleFormSubmit(this, event)">
-                <input type="hidden" name="view" value="lancamentos">
-
-                <div class="col-12">
-                  <label class="form-label">Início</label>
-                  <input type="date" class="form-control" name="data_inicio" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Fim</label>
-                  <input type="date" class="form-control" name="data_fim" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Mês (opcional)</label>
-                  <input type="month" class="form-control" name="mes" value="{{ filtro_mes or '' }}"
-                      oninput="if(this.value){ const f=this.form; f.data_inicio.value=''; f.data_fim.value=''; }">
-                  <div class="form-text">Se escolher um mês, as datas serão ignoradas.</div>
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Digite o nome do cooperado (visual)</label>
-                  <input type="text" class="form-control" name="q" placeholder="Filtrar por nome..." oninput="filterLancamentosTable(this.value)">
-                </div>
-
-                <div class="col-12 d-grid"><button class="btn btn-royal" type="submit"><i class="bi bi-funnel"></i> Aplicar</button></div>
-                <div class="col-12 d-grid"><a class="btn btn-outline-secondary" href="#lancamentos"><i class="bi bi-arrow-counterclockwise"></i> Limpar</a></div>
-
-                <hr class="my-2">
-                <div class="kpi mb-2"><div class="small text-muted">Total no período</div><div class="v">R$ <span id="kpiTotalValor">0,00</span></div></div>
-                <div class="kpi mb-2"><div class="small text-muted">Entregas no período</div><div class="v"><span id="kpiTotalEntregas">0</span></div></div>
-
-                <div class="d-grid"><button class="btn btn-royal" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV</button></div>
-              </form>
-            </div>
-          </div>
-
-          <div class="col-lg-9">
-            <div class="card card-body">
-              <div class="d-flex align-items-center justify-content-between mb-2">
-                <div class="chip">Período: <span id="txtPeriodo">
-                  {{ filtro_inicio and filtro_inicio.strftime('%d/%m/%Y') or '' }}
-                  {% if filtro_inicio and filtro_fim %} a {% endif %}
-                  {{ filtro_fim and filtro_fim.strftime('%d/%m/%Y') or '' }}
-                </span></div>
-              </div>
-
-              <table class="table table-bordered table-hover align-middle table-compact" id="tblLanc">
-                <thead>
-                  <tr>
-                    <th class="text-center" style="width:110px;">Data</th>
-                    <th>Cooperado</th>
-                    <th>Contrato</th>
-                    <th class="text-center" style="width:160px;">Horário</th>
-                    <th class="text-center" style="width:120px;">Entregas</th>
-                    <th class="text-end" style="width:140px;">Valor (R$)</th>
-                    <th class="text-center" style="width:160px;">Avaliação</th>
-                  </tr>
-                </thead>
-                <tbody id="tbodyLanc">
-                  {% for x in _lancamentos_periodo %}
-                  <tr
-                      data-id="{{ x.id }}"
-                      data-coop="{{ x.cooperado_id or x.coop_id }}"
-                      data-coopnome="{{ x.cooperado_nome or x.coop_nome }}"
-                      data-contrato="{{ x.contrato_nome or x.contrato }}"
-                      data-avurl="{{ x.avaliar_url or ('/avaliar/' ~ x.id) }}"
-                      data-entregas="{{ x.qtd_entregas or 0 }}"
-                      data-valor="{{ x.valor or 0 }}"
-                  >
-                    <td class="text-center">{{ (x.data.strftime('%d/%m/%Y') if x.data) if x.data is not string else x.data }}</td>
-                    <td class="fw-semibold coop-name">{{ x.cooperado_nome or x.coop_nome }}</td>
-                    <td>{{ x.contrato_nome or x.contrato or '—' }}</td>
-                    <td class="text-center">
-                      {% if x.hora_inicio or x.hora_fim %}
-                        {{ x.hora_inicio or '' }}{% if x.hora_inicio or x.hora_fim %} às {% endif %}{{ x.hora_fim or '' }}
-                                                {% else %}—{% endif %}
-                    </td>
-                    <td class="text-center entregas-val">{{ x.qtd_entregas if x.qtd_entregas is not none else '-' }}</td>
-                    <td class="text-end valor" data-valor="{{ '%.2f'|format(x.valor or 0) }}">R$ {{ '%.2f'|format(x.valor or 0) }}</td>
-                    <td class="text-center" data-avcell>
-                      {% if x.nota_geral %}
-                        <span class="stars-static" data-score="{{ x.nota_geral }}">★★★★★</span>
-                      {% else %}
-                        <button class="btn btn-outline-royal btn-sm btn-abrir-avaliacao" data-open-av><i class="bi bi-star"></i> Avaliar</button>
-                      {% endif %}
-                    </td>
-                  </tr>
-                  {% else %}
-                    <tr><td colspan="7" class="text-center text-muted">Nenhum lançamento encontrado.</td></tr>
-                  {% endfor %}
-                </tbody>
-                <tfoot>
-                  <tr class="table-secondary">
-                    <th colspan="4" class="text-end">Totais</th>
-                    <th class="text-center" id="ftEntregas">0</th>
-                    <th class="text-end" id="ftValor">R$ 0,00</th>
-                    <th></th>
-                  </tr>
-                </tfoot>
-              </table>
-
-              <hr class="my-3">
-              <h6 class="mb-2"><i class="bi bi-people"></i> Totais por cooperado</h6>
-              <div id="gridCoop" class="row g-2">
-                </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section data-view="tabelas" class="{{ 'view-active' if view=='tabelas' else '' }}">
-        <div class="section-title"><i class="bi bi-table"></i> Minhas Tabelas</div>
-        <div id="tabelasContainer">
-          {% if tabela %}
-            {% set titulo = tabela.titulo or 'Documento' %}
-            {% set nome_arquivo = tabela.arquivo_nome or '' %}
-            {% set ext = nome_arquivo.split('.')[-1]|lower if '.' in nome_arquivo else '' %}
-            <article class="doc-row my-2"
-                     data-view="#tabela_abrir?tabela_id={{ tabela.id }}"
-                     data-download="#tabela_download?tabela_id={{ tabela.id }}"
-                     data-title-full="{{ titulo }}" data-ext="{{ ext }}">
-              <div class="d-flex justify-content-between align-items-start">
-                <div class="pe-2">
-                  <div class="doc-cat">TABELA</div>
-                  <div class="doc-title d-flex align-items-center gap-2"><i class="bi bi-journal-text"></i> {{ titulo }}</div>
-                  <div class="doc-date text-muted small">{{ tabela.enviado_em.strftime('%d/%m/%Y %H:%M') if tabela.enviado_em else '' }}</div>
-                  {% if tabela.descricao %}<div class="doc-desc mt-2">{{ tabela.descricao }}</div>{% endif %}
-                  <div class="mt-2 d-flex flex-wrap gap-2">
-                    <span class="chip"><i class="bi bi-file-earmark"></i> {{ nome_arquivo or '—' }}</span>
-                    {% if ext %}<span class="chip"><i class="bi bi-tag"></i> {{ ext|upper }}</span>{% endif %}
-                  </div>
-                </div>
-                <div class="ms-2 d-flex flex-column gap-2">
-                  <button class="btn btn-royal" data-open title="Visualizar"><i class="bi bi-journal-bookmark-fill"></i></button>
-                  <a class="btn btn-outline-secondary btn-sm" data-direct-download href="#tabela_download?tabela_id={{ tabela.id }}"><i class="bi bi-download"></i></a>
-                </div>
-              </div>
-              <div class="text-muted small mt-2">Clique para visualizar em tela cheia ou baixe o arquivo.</div>
-            </article>
-          {% else %}
-            <div class="card card-body text-muted">Carregando tabelas…</div>
-          {% endif %}
-        </div>
-      </section>
-      </main>
-  </div>
-
-  <div class="position-fixed top-0 end-0 p-3" style="z-index:1060;">
-    <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false" {% if _cntAvisos == 0 %}style="display:none"{% endif %}>
-      <div class="toast-header">
-        <i class="bi bi-megaphone-fill me-2"></i><strong class="me-auto">Novos avisos</strong><small>agora</small>
-        <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
-      </div>
-      <div class="toast-body">
-        Você tem <b id="toastCount">{{ _cntAvisos }}</b> aviso(s) não lido(s).
-        <a id="toastVerAgora" href="#avisos" class="link-primary fw-semibold">Ver agora</a>
-      </div>
-    </div>
-  </div>
-  <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1056;">
-    <div id="toastOK" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="2200">
-      <div class="toast-header">
-        <i class="bi bi-check2-circle text-success me-2"></i><strong class="me-auto">Pronto</strong><small>agora</small>
-        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Fechar"></button>
-      </div>
-      <div class="toast-body">Aviso marcado como lido.</div>
-    </div>
-    <div id="toastAvaliacaoOK" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="2200">
-      <div class="toast-header">
-        <i class="bi bi-star-fill text-warning me-2"></i><strong class="me-auto">Avaliação Salva</strong><small>agora</small>
-        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Fechar"></button>
-      </div>
-      <div class="toast-body">A avaliação do cooperado foi salva com sucesso.</div>
-    </div>
-  </div>
-
-  <div class="modal fade" id="modalDocViewer" tabindex="-1" aria-labelledby="modalDocViewerLabel" aria-hidden="true">
-    <div class="modal-dialog modal-fullscreen">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="modalDocViewerLabel">Visualizando Documento</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <iframe id="docFrame" style="width:100%; height:100%; border:none;" title="Visualizador de Documento"></iframe>
-        </div>
-        <div class="modal-footer">
-          <a id="docDownloadLink" class="btn btn-royal" download><i class="bi bi-download"></i> Baixar Arquivo</a>
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal fade" id="modalAvaliacao" tabindex="-1" aria-labelledby="modalAvaliacaoLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <form id="formAvaliacao" method="POST" action="#lancar_avaliacao" onsubmit="return handleSubmitAvaliacao(event, this)">
-          <input type="hidden" name="lancamento_id" id="av_lancamento_id">
-          <input type="hidden" name="nota_geral" id="av_nota_geral">
-
-          <div class="modal-header">
-            <h5 class="modal-title" id="modalAvaliacaoLabel">Avaliar Serviço de <span id="av_cooperado_nome" class="fw-bold"></span></h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <p class="text-muted small mb-3">Lançamento em: <span id="av_data_servico"></span> | Contrato: <span id="av_contrato_nome"></span></p>
-
-            <div class="rating-group mb-3" data-name="av_geral">
-              <span class="rating-label">Nota Geral *</span>
-              <div class="stars" data-score-input="av_nota_geral">
-                <i class="bi bi-star star" data-value="1"></i>
-                <i class="bi bi-star star" data-value="2"></i>
-                <i class="bi bi-star star" data-value="3"></i>
-                <i class="bi bi-star star" data-value="4"></i>
-                <i class="bi bi-star star" data-value="5"></i>
-              </div>
-            </div>
-
-            <div class="rating-group mb-3" data-name="av_pontualidade">
-              <span class="rating-label">Pontualidade</span>
-              <div class="stars" data-score-input="av_pontualidade">
-                <i class="bi bi-star star" data-value="1"></i>
-                <i class="bi bi-star star" data-value="2"></i>
-                <i class="bi bi-star star" data-value="3"></i>
-                <i class="bi bi-star star" data-value="4"></i>
-                <i class="bi bi-star star" data-value="5"></i>
-              </div>
-              <input type="hidden" name="av_pontualidade" id="av_pontualidade">
-            </div>
-
-            <div class="rating-group mb-3" data-name="av_cortesia">
-              <span class="rating-label">Cortesia/Atendimento</span>
-              <div class="stars" data-score-input="av_cortesia">
-                <i class="bi bi-star star" data-value="1"></i>
-                <i class="bi bi-star star" data-value="2"></i>
-                <i class="bi bi-star star" data-value="3"></i>
-                <i class="bi bi-star star" data-value="4"></i>
-                <i class="bi bi-star star" data-value="5"></i>
-              </div>
-              <input type="hidden" name="av_cortesia" id="av_cortesia">
-            </div>
-            
-            <div class="mb-3">
-              <label for="av_comentario" class="form-label fw-bold">Comentário (opcional)</label>
-              <textarea class="form-control" id="av_comentario" name="av_comentario" rows="3"></textarea>
-            </div>
-            <p class="text-muted small">* Campo obrigatório</p>
-
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button type="submit" class="btn btn-royal" id="btnSalvarAvaliacao"><i class="bi bi-star"></i> Salvar Avaliação</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
-
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    // Polyfill simples para o map no contexto de simulação Jinja
-    // Se o seu ambiente Jinja tiver filtros personalizados (como datetime_from_string), você precisará de um back-end real.
-    // Aqui, apenas simulo o toLocaleString para formatação de data.
-    if (!('force_date' in window)) {
-      window.force_date = (dateString) => {
-        if (!dateString) return null;
-        try {
-          // Tenta forçar o formato 'DD/MM/YYYY' se for uma string
-          if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-              const [y, m, d] = dateString.split('-');
-              return `${d}/${m}/${y}`;
-          }
-          return dateString;
-        } catch (e) {
-          return dateString;
-        }
-      };
-    }
-    
-    // ====================================================================
-    // 1. LÓGICA DE NAVEGAÇÃO E TEMA
-    // ====================================================================
-    
-    const shell = document.querySelector('.shell');
-    const sideNav = document.getElementById('sideNav');
-    const btnTheme = document.getElementById('btnTheme');
-    const lblTheme = document.getElementById('lblTheme');
-    
-    // Função para alternar o tema (Light/Dark)
-    function toggleTheme(initialLoad = false) {
-      const isDark = shell.getAttribute('data-theme') === 'dark';
-      const newTheme = isDark ? 'light' : 'dark';
-      shell.setAttribute('data-theme', newTheme);
-      
-      const icon = btnTheme.querySelector('i');
-      if (newTheme === 'dark') {
-        icon.className = 'bi bi-sun';
-        lblTheme.textContent = 'Claro';
-      } else {
-        icon.className = 'bi bi-moon';
-        lblTheme.textContent = 'Escuro';
-      }
-      
-      localStorage.setItem('theme', newTheme);
-      document.documentElement.setAttribute('data-theme', newTheme); // Atualiza o root
-    }
-
-    // Carregar tema salvo ou definir padrão
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    shell.setAttribute('data-theme', savedTheme);
-    if (savedTheme === 'dark') {
-      toggleTheme(true);
-    } else {
-      lblTheme.textContent = 'Escuro'; // Estado inicial para light
-    }
-
-    btnTheme.addEventListener('click', () => toggleTheme());
-
-    // Função para alternar a View
-    function setActiveView(targetView) {
-      document.querySelectorAll('section[data-view]').forEach(sec => {
-        sec.classList.remove('view-active');
-      });
-      document.querySelectorAll('.navmenu a').forEach(link => {
-        link.classList.remove('active');
-      });
-
-      const activeSection = document.querySelector(`section[data-view="${targetView}"]`);
-      if (activeSection) {
-        activeSection.classList.add('view-active');
-      }
-
-      const activeLink = document.querySelector(`.navmenu a[data-target="${targetView}"]`);
-      if (activeLink) {
-        activeLink.classList.add('active');
-      }
-      
-      // Se for a aba de lançamentos, recalcula os totais
-      if (targetView === 'lancamentos') {
-          calculateLancamentoTotals();
-          calculateCoopTotals();
-      }
-      // Se for avisos, mostra o toast
-      if (targetView === 'avisos') {
-          const toastAvisos = bootstrap.Toast.getOrCreateInstance(document.getElementById('toastAvisos'));
-          toastAvisos.hide(); // Oculta o toast ao abrir a aba
-      }
-    }
-
-    // Roteamento baseado no hash da URL (para simulação)
-    function handleRouting() {
-      const hash = window.location.hash.replace('#', '');
-      const targetView = hash || 'lancar';
-      setActiveView(targetView.split('?')[0]);
-    }
-
-    window.addEventListener('hashchange', handleRouting);
-    document.addEventListener('DOMContentLoaded', handleRouting);
-    
-    // Simula o envio de formulário para mudar a URL (para fins de simulação de roteamento)
-    function handleFormSubmit(form, event) {
-        event.preventDefault();
-        const view = form.querySelector('input[name="view"]').value;
-        const urlParams = new URLSearchParams(new FormData(form)).toString();
-        window.location.hash = `${view}?${urlParams}`;
-    }
-
-    // Simula a alteração de senha
-    function handlePasswordChange(event) {
-        event.preventDefault();
-        const form = event.target;
-        const senhaNova = form.querySelector('input[name="senha_nova"]').value;
-        const senhaConf = form.querySelector('input[name="senha_conf"]').value;
-
-        if (senhaNova !== senhaConf) {
-            alert('A nova senha e a confirmação não coincidem.');
-            return false;
-        }
-        if (senhaNova.length < 6) {
-            alert('A nova senha deve ter no mínimo 6 caracteres.');
-            return false;
-        }
-
-        // Simulação de sucesso
-        const url = form.getAttribute('action');
-        window.location.hash = url.endsWith('_success') ? 'config_success' : 'config';
-        // Redireciona para simular a mensagem flash
-        setTimeout(() => {
-            window.location.reload(); // Recarrega para simular a mensagem flash
-        }, 100); 
-
-        return false;
-    }
-
-    // Função para mostrar/esconder senha
-    function togglePwd(button) {
-      const input = button.parentElement.querySelector('input');
-      const icon = button.querySelector('i');
-      if (input.type === 'password') {
-        input.type = 'text';
-        icon.className = 'bi bi-eye-slash';
-      } else {
-        input.type = 'password';
-        icon.className = 'bi bi-eye';
-      }
-    }
-
-
-    // ====================================================================
-    // 2. LÓGICA DE AVISOS
-    // ====================================================================
-
-    const badgeAvisos = document.getElementById('badgeAvisos');
-    const badgeTitulo = document.getElementById('badgeTitulo');
-    const toastOK = bootstrap.Toast.getOrCreateInstance(document.getElementById('toastOK'));
-    
-    // Ação de Marcar um Aviso como Lido (Simulada)
-    document.querySelectorAll('.btn-marcar-lido').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const avisoId = this.dataset.id;
-            const avisoCard = document.getElementById(`aviso-${avisoId}`);
-            
-            // Simula a requisição ao servidor
-            // fetch(this.dataset.url, { method: 'POST' })
-            // .then(response => {
-                // if (response.ok) {
-                    // Atualiza o estado visual
-                    if (avisoCard) {
-                        avisoCard.classList.add('lido');
-                        avisoCard.setAttribute('data-lido', '1');
-                        avisoCard.querySelector('.lido-status').innerHTML = ' • <span class="text-success">Lido</span>';
-                        this.remove(); // Remove o botão "Marcar como lido"
-                        
-                        // Atualiza o contador
-                        let count = parseInt(badgeAvisos.textContent) || 0;
-                        if (count > 0) {
-                            count--;
-                            badgeAvisos.textContent = count;
-                            if (count === 0) {
-                                badgeAvisos.style.display = 'none';
-                                badgeTitulo.textContent = 'Tudo lido';
-                                badgeTitulo.classList.remove('text-bg-danger');
-                                badgeTitulo.classList.add('text-bg-success');
-                            } else {
-                                badgeTitulo.textContent = `${count} não lido(s)`;
-                            }
-                        }
-                    }
-                    toastOK.show();
-                // } else {
-                //     alert('Erro ao marcar aviso como lido.');
-                // }
-            // })
-        });
-    });
-
-    // Ação de Marcar TODOS os Avisos como Lido (Simulada)
-    function handleMarkAllRead(event, form) {
-        event.preventDefault();
-        // Simula a requisição ao servidor
-        // fetch(form.action, { method: 'POST' })
-        // .then(response => {
-            // if (response.ok) {
-                document.querySelectorAll('.aviso-card').forEach(card => {
-                    card.classList.add('lido');
-                    card.setAttribute('data-lido', '1');
-                    const btn = card.querySelector('.btn-marcar-lido');
-                    if(btn) btn.remove();
-                    const status = card.querySelector('.lido-status');
-                    if(status) status.innerHTML = ' • <span class="text-success">Lido</span>';
-                });
-                badgeAvisos.style.display = 'none';
-                badgeAvisos.textContent = '0';
-                badgeTitulo.textContent = 'Tudo lido';
-                badgeTitulo.classList.remove('text-bg-danger');
-                badgeTitulo.classList.add('text-bg-success');
-                document.querySelector('button[type="submit"]:not([disabled])').disabled = true; // Desabilita o botão Marcar todos
-                toastOK.show();
-            // } else {
-            //     alert('Erro ao marcar todos como lidos.');
-            // }
-        // })
-        return false;
-    }
-    
-    // Lógica para filtrar avisos (apenas no cliente)
-    document.getElementById('toggleNaoLidos').addEventListener('change', function() {
-        document.querySelectorAll('.aviso-card').forEach(card => {
-            const isUnread = card.dataset.lido === '0';
-            if (this.checked) {
-                card.style.display = isUnread ? 'block' : 'none';
-            } else {
-                card.style.display = 'block';
-            }
-        });
-    });
-
-    // ====================================================================
-    // 3. LÓGICA DE LANÇAMENTOS E AVALIAÇÃO
-    // ====================================================================
-
-    const modalAvaliacao = new bootstrap.Modal(document.getElementById('modalAvaliacao'));
-    const formAvaliacao = document.getElementById('formAvaliacao');
-    const toastAvaliacaoOK = bootstrap.Toast.getOrCreateInstance(document.getElementById('toastAvaliacaoOK'));
-    
-    // Função para calcular Totais
-    function calculateLancamentoTotals() {
-      let totalValor = 0;
-      let totalEntregas = 0;
-      
-      const rows = document.querySelectorAll('#tbodyLanc tr:not([style*="display: none"])');
-      
-      rows.forEach(row => {
-          const valor = parseFloat(row.dataset.valor) || 0;
-          const entregas = parseInt(row.dataset.entregas) || 0;
-          
-          totalValor += valor;
-          totalEntregas += entregas;
-      });
-      
-      const formattedValor = totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      
-      document.getElementById('kpiTotalValor').textContent = formattedValor;
-      document.getElementById('kpiTotalEntregas').textContent = totalEntregas;
-      document.getElementById('ftValor').textContent = `R$ ${formattedValor}`;
-      document.getElementById('ftEntregas').textContent = totalEntregas;
-    }
-
-    // Função para calcular Totais por Cooperado
-    function calculateCoopTotals() {
-        const rows = document.querySelectorAll('#tbodyLanc tr:not([style*="display: none"])');
-        const totals = {};
-
-        rows.forEach(row => {
-            const id = row.dataset.coop;
-            const nome = row.dataset.coopnome;
-            const valor = parseFloat(row.dataset.valor) || 0;
-            const entregas = parseInt(row.dataset.entregas) || 0;
-
-            if (!totals[id]) {
-                totals[id] = { nome: nome, valor: 0, entregas: 0 };
-            }
-            totals[id].valor += valor;
-            totals[id].entregas += entregas;
-        });
-
-        const gridCoop = document.getElementById('gridCoop');
-        gridCoop.innerHTML = ''; // Limpa antes de preencher
-
-        Object.values(totals).forEach(coop => {
-            const formattedValor = coop.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const html = `
-                <div class="col-md-6">
-                    <div class="card card-soft">
-                        <div class="fw-bold">${coop.nome}</div>
-                        <div class="row mt-2 g-2">
-                            <div class="col-6 kpi"><div class="small text-muted">Total (R$)</div><div class="v">R$ ${formattedValor}</div></div>
-                            <div class="col-6 kpi"><div class="small text-muted">Entregas</div><div class="v">${coop.entregas}</div></div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            gridCoop.insertAdjacentHTML('beforeend', html);
-        });
-
-        if (rows.length === 0) {
-            gridCoop.innerHTML = '<div class="col-12 text-muted">Nenhum dado para totalizar.</div>';
-        }
-    }
-    
-    // Filtro da Tabela de Lançamentos (apenas no cliente)
-    function filterLancamentosTable(query) {
-        const rows = document.querySelectorAll('#tbodyLanc tr');
-        query = query.toLowerCase().trim();
-        let visibleCount = 0;
-
-        rows.forEach(row => {
-            const coopName = row.dataset.coopnome.toLowerCase();
-            const isVisible = coopName.includes(query);
-            row.style.display = isVisible ? '' : 'none';
-            if (isVisible) visibleCount++;
-        });
-
-        calculateLancamentoTotals(); // Recalcula totais para itens visíveis
-        calculateCoopTotals();
-        
-        // Trata o caso de "nenhum item encontrado" se necessário
-        const noDataRow = document.querySelector('#tbodyLanc tr td[colspan="7"]');
-        if (rows.length > 0 && noDataRow && noDataRow.closest('tr').style.display !== 'none') {
-             // Se a linha "Nenhum lançamento encontrado" for o único item, ela deve sumir se houver filtros.
-        }
-    }
-    
-    // Inicialização dos totais (no carregamento da página, se na view de lançamentos)
-    if (document.querySelector('section[data-view="lancamentos"]').classList.contains('view-active')) {
-      calculateLancamentoTotals();
-      calculateCoopTotals();
-    }
-    
-    // --- Lógica das Estrelas ---
-    function initStarRating(container) {
-      const stars = container.querySelectorAll('.star');
-      const inputId = container.dataset.scoreInput;
-      const input = document.getElementById(inputId);
-
-      stars.forEach(star => {
-        star.addEventListener('click', () => {
-          const score = parseInt(star.dataset.value);
-          input.value = score;
-          updateStars(stars, score);
-        });
-
-        star.addEventListener('mouseover', () => {
-          const hoverValue = parseInt(star.dataset.value);
-          updateStars(stars, hoverValue, true);
-        });
-
-        star.addEventListener('mouseout', () => {
-          const currentValue = parseInt(input.value) || 0;
-          updateStars(stars, currentValue);
-        });
-      });
-    }
-
-    function updateStars(stars, score, isHover = false) {
-      stars.forEach(s => {
-        const val = parseInt(s.dataset.value);
-        s.classList.remove('active', 'hover');
-        if (val <= score) {
-          s.classList.add(isHover ? 'hover' : 'active');
-        }
-        s.classList.remove(isHover ? 'active' : 'hover'); // Remove a classe oposta
-      });
-    }
-    
-    // Inicializa todos os grupos de estrelas no modal
-    document.querySelectorAll('.modal .rating-group').forEach(group => {
-        initStarRating(group.querySelector('.stars'));
-    });
-
-    // Função para preencher e abrir o modal de avaliação
-    document.querySelectorAll('#tbodyLanc button[data-open-av]').forEach(button => {
-        button.addEventListener('click', function() {
-            const row = this.closest('tr');
-            
-            // 1. Coleta dados do lançamento
-            const lancamentoId = row.dataset.id;
-            const coopNome = row.dataset.coopnome;
-            const contratoNome = row.dataset.contrato;
-            const dataServico = row.cells[0].textContent; 
-            
-            // 2. Preenche campos estáticos do modal
-            document.getElementById('av_cooperado_nome').textContent = coopNome;
-            document.getElementById('av_data_servico').textContent = dataServico;
-            document.getElementById('av_contrato_nome').textContent = contratoNome;
-            document.getElementById('av_lancamento_id').value = lancamentoId;
-            document.getElementById('btnSalvarAvaliacao').innerHTML = '<i class="bi bi-star"></i> Salvar Avaliação';
-            
-            // 3. Reseta campos de avaliação (sem lógica de preenchimento/edição)
-            formAvaliacao.reset();
-            document.getElementById('av_nota_geral').value = '';
-            document.getElementById('av_pontualidade').value = '';
-            document.getElementById('av_cortesia').value = '';
-            document.getElementById('av_comentario').value = '';
-            document.querySelectorAll('.modal .stars').forEach(container => {
-                updateStars(container.querySelectorAll('.star'), 0);
-            });
-
-            // 4. Abre o modal
-            modalAvaliacao.show();
-        });
-    });
-
-    // Função de envio da avaliação (Simulada)
-    function handleSubmitAvaliacao(event, form) {
-        event.preventDefault();
-        
-        const lancamentoId = form.querySelector('#av_lancamento_id').value;
-        const notaGeral = parseInt(form.querySelector('#av_nota_geral').value);
-        
-        if (notaGeral === 0 || isNaN(notaGeral)) {
-            alert('A Nota Geral é obrigatória.');
-            return false;
-        }
-
-        // SIMULAÇÃO: Envia para a rota de lançamento e trata o sucesso
-        // fetch(form.action, { method: 'POST', body: new FormData(form) })
-        // .then(response => {
-            // if (response.ok) {
-                // 1. Atualiza a linha da tabela (DOM)
-                const row = document.querySelector(`tr[data-id="${lancamentoId}"]`);
-                if (row) {
-                    const avCell = row.querySelector('[data-avcell]');
-                    if (avCell) {
-                        // Substitui o botão 'Avaliar' pela visualização de estrelas
-                        avCell.innerHTML = `<span class="stars-static" data-score="${notaGeral}">★★★★★</span>`;
-                        // Remove o botão de avaliação da simulação de dados do Jinja
-                        const lancamento = _lancamentos_periodo.find(l => l.id == lancamentoId);
-                        if (lancamento) {
-                            lancamento.nota_geral = notaGeral; 
-                        }
-                    }
-                }
-                
-                // 2. Fecha o modal e mostra sucesso
-                modalAvaliacao.hide();
-                toastAvaliacaoOK.show();
-            // } else {
-            //     alert('Erro ao salvar avaliação.');
-            // }
-        // })
-
-        return false;
-    }
-
-    // ====================================================================
-    // 4. LÓGICA DE TABELAS
-    // ====================================================================
-
-    const modalDocViewer = new bootstrap.Modal(document.getElementById('modalDocViewer'));
-    
-    document.querySelectorAll('.doc-row button[data-open]').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const row = this.closest('.doc-row');
-        const viewUrl = row.dataset.view;
-        const downloadUrl = row.dataset.download;
-        const title = row.dataset.titleFull;
-        
-        document.getElementById('modalDocViewerLabel').textContent = title;
-        document.getElementById('docFrame').src = viewUrl;
-        document.getElementById('docDownloadLink').href = downloadUrl;
-        
-        modalDocViewer.show();
-      });
-    });
-
-  </script>
+  
+{# O macro `url_for` estava na linha 114 e causava erro. Foi corrigido para aceitar apenas `route`, 
+   utilizando a variável `kwargs` que é injetada automaticamente. 
+   O código abaixo é uma simulação (necessária para compilar) da função url_for real do seu backend Flask/Jinja2: #}
+{% macro url_for(route) -%}
+    {{ _context.get('flask_url_for', _context.get('url_for_func'))(route, **kwargs) }}
+{%- endmacro %}
+
+<div class="shell">
+        <aside class="aside">
+      <div class="brand"><i class="bi bi-building"></i><span>Portal do Estabelecimento</span></div>
+      <button id="btnTheme" class="theme-toggle" type="button"><i class="bi bi-moon"></i><span id="lblTheme">Escuro</span></button>
+
+      <nav class="navmenu" id="sideNav">
+        <a data-target="lancar" class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos','tabelas']) else '' }}" href="{{ url_for('portal_restaurante', view='lancar') }}">
+          <i class="bi bi-person-lines-fill"></i><span>Cooperados</span>
+        </a>
+        <a data-target="lancamentos" class="{{ 'active' if view=='lancamentos' else '' }}" href="{{ url_for('portal_restaurante', view='lancamentos') }}">
+          <i class="bi bi-receipt"></i><span>Lançamentos</span>
+        </a>
+        <a data-target="escalas" class="{{ 'active' if view=='escalas' else '' }}" href="{{ url_for('portal_restaurante', view='escalas') }}">
+          <i class="bi bi-calendar-week"></i><span>Escala</span>
+        </a>
+        {% if session.get('user_tipo') == 'restaurante' %}
+        <a data-target="tabelas" id="linkTabelas" href="{{ url_for('rest_tabelas') }}">
+          <i class="bi bi-table"></i><span>Tabelas</span>
+        </a>
+        {% endif %}
+        <a data-target="config" class="{{ 'active' if view=='config' else '' }}" href="{{ url_for('portal_restaurante', view='config') }}">
+          <i class="bi bi-gear"></i><span>Configuração</span>
+        </a>
+                <a id="linkAvisos" data-target="avisos" class="{{ 'active' if view=='avisos' else '' }}" href="{{ url_for('portal_restaurante_avisos') }}">
+          <i class="bi bi-megaphone"></i><span>Avisos</span>
+          {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
+          <span class="badge-dot" id="badgeAvisos" {% if _cntAvisos == 0 %}style="display:none"{% endif %}>{{ _cntAvisos }}</span>
+        </a>
+        <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
+      </nav>
+    </aside>
+
+        <main class="content">
+      {% with msgs = get_flashed_messages(with_categories=True) %}
+        {% if msgs %}
+          <div class="mb-3">
+            {% for cat, msg in msgs %}
+              <div class="alert alert-{{ 'danger' if cat=='error' else cat }} py-2 px-3 mb-2">{{ msg|safe }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      {% set _cooperados = cooperados if cooperados is defined and cooperados is not none else [] %}
+      {% set _lancamentos_periodo = lancamentos_periodo if lancamentos_periodo is defined and lancamentos_periodo is not none else [] %}
+      {% set _dias_list = dias_list if dias_list is defined and dias_list is not none else [] %}
+      {% set _agenda = agenda if agenda is defined and agenda is not none else {} %}
+      {% set _ref_data = ref_data if ref_data is defined and ref_data is not none else None %}
+      {% set _modo = modo if modo is defined and modo is not none else 'semana' %}
+      {% set _url_lancar_producao = url_lancar_producao if url_lancar_producao is defined else url_for('portal_restaurante') %}
+
+            <section data-view="config">
+        <div class="section-title"><i class="bi bi-shield-lock"></i> Configuração</div>
+        <div class="card card-body">
+          <form class="row g-3 form-password" method="POST" action="{{ url_for('rest_alterar_senha') }}">
+            <div class="col-md-4">
+              <label class="form-label">Senha atual</label>
+              <div class="input-group">
+                <input type="password" class="form-control" name="senha_atual" required>
+                <button class="btn btn-outline-royal" type="button" onclick="togglePwd(this)"><i class="bi bi-eye"></i></button>
+              </div>
+                      </div>
+            <div class="col-md-4">
+              <label class="form-label">Nova senha</label>
+              <div class="input-group">
+                <input type="password" class="form-control" name="senha_nova" minlength="6" required>
+                <button class="btn btn-outline-royal" type="button" onclick="togglePwd(this)"><i class="bi bi-eye"></i></button>
+              </div>
+              <div class="form-text">Mínimo de 6 caracteres.</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Confirmar nova senha</label>
+              <div class="input-group">
+                <input type="password" class="form-control" name="senha_conf" minlength="6" required>
+                <button class="btn btn-outline-royal" type="button" onclick="togglePwd(this)"><i class="bi bi-eye"></i></button>
+              </div>
+            </div>
+            <div class="col-12 text-end"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
+          </form>
+        </div>
+      </section>
+
+            <section data-view="escalas">
+        <div class="section-title"><i class="bi bi-calendar-week"></i> Escala semanal</div>
+        <div class="card card-body">
+          <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
+            <input type="hidden" name="view" value="escalas">
+            <div class="col-md-3">
+              <label class="form-label">Ver</label>
+              <select name="modo" class="form-select">
+                <option value="semana" {{ 'selected' if (_modo=='semana') }}>Semana completa</option>
+                <option value="dia" {{ 'selected' if (_modo=='dia') }}>Somente 1 dia</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Referência</label>
+              <input type="date" name="ref" class="form-control" value="{{ _ref_data and _ref_data.strftime('%Y-%m-%d') }}">
+            </div>
+            <div class="col-md-6 text-end">
+              <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
+              <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-arrow-counterclockwise"></i> Hoje</a>
+            </div>
+          </form>
+
+          {% if _modo == 'semana' %}
+          <hr class="my-3">
+          <div class="row g-3">
+            {% for dia in _dias_list %}
+            <div class="col-md-6 col-lg-4">
+              <div class="card-soft">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <span class="badge text-bg-primary fw-semibold">{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][dia.weekday()] }} — {{ dia.strftime('%d/%m/%Y') }}</span>
+                  <i class="bi bi-people"></i>
+                </div>
+                <div style="max-height:360px; overflow:auto; border-top:1px dashed var(--border);">
+                  {% set lista = _agenda.get(dia, []) %}
+                  {% if lista %}
+                    {% for grupo in (lista | groupby('contrato')) %}
+                      {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                      <div class="fw-bold mt-2">{{ contrato_nome }}</div>
+                      {% for item in grupo.list %}
+                        <div class="py-2 border-bottom">
+                          <div class="fw-bold">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
+                          <div class="text-muted small">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
+                        </div>
+                      {% endfor %}
+                    {% endfor %}
+                  {% else %}
+                    <div class="text-muted small py-2">Sem escala registrada.</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <hr class="my-3">
+          <div class="card-soft">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="badge text-bg-primary fw-semibold">{{ _ref_data and ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][_ref_data.weekday()] }} — {{ _ref_data and _ref_data.strftime('%d/%m/%Y') }}</span>
+              <i class="bi bi-calendar-day"></i>
+            </div>
+            <table class="table table-bordered table-hover align-middle table-compact">
+              <thead><tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr></thead>
+              <tbody>
+                {% set lista = _agenda.get(_ref_data, []) if _ref_data else [] %}
+                {% if lista %}
+                  {% for grupo in (lista | groupby('contrato')) %}
+                    {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                    {% for item in grupo.list %}
+                    <tr><td>{{ contrato_nome }}</td><td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td><td>{{ item.turno or '—' }}</td><td>{{ item.horario or '—' }}</td></tr>
+                    {% endfor %}
+                  {% endfor %}
+                {% else %}<tr><td colspan="4" class="text-center text-muted">Sem escala registrada.</td></tr>{% endif %}
+              </tbody>
+            </table>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+
+            <section data-view="avisos">
+        {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
+        {% set _unread_from_list = (_avisos | selectattr('lido','equalto',False) | list | length) %}
+        {% set _unread_from_ctx = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
+        {% set _badgeN = (_unread_from_list if _unread_from_list>0 else _unread_from_ctx) %}
+        <div class="section-title">
+          <i class="bi bi-megaphone-fill"></i> Avisos
+          <span id="badgeTitulo" class="badge {{ 'text-bg-danger' if _badgeN>0 else 'text-bg-success' }} ms-2">
+            {{ _badgeN>0 and (_badgeN ~ ' não lido(s)') or 'Tudo lido' }}
+          </span>
+        </div>
+
+        <div class="card card-body">
+          <div class="d-flex align-items-center gap-2">
+            <form method="POST" action="{{ url_for('marcar_todos_avisos_lidos_restaurante') }}" class="m-0">
+              <button class="btn btn-royal" type="submit" {% if _badgeN == 0 %}disabled{% endif %}><i class="bi bi-check2-circle me-1"></i> Marcar todos como lidos</button>
+            </form>
+            <div class="form-check ms-auto">
+              <input class="form-check-input" type="checkbox" id="toggleNaoLidos">
+              <label class="form-check-label" for="toggleNaoLidos">Mostrar apenas não lidos</label>
+            </div>
+          </div>
+        </div>
+
+        <div id="avisosListContainer">
+          {% if _avisos and (_avisos | length) > 0 %}
+            {% for a in _avisos %}
+            <div id="aviso-{{ a.id }}" class="card card-body my-2 aviso-card {% if a.lido %}lido{% endif %} {% if a.prioridade_alta %}prioridade{% endif %}" data-lido="{{ '1' if a.lido else '0' }}">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <div class="fw-bold">
+                    {{ a.titulo or 'Aviso' }}
+                    {% if a.prioridade_alta %}
+                      <span class="badge text-bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Prioridade</span>
+                    {% endif %}
+                  </div>
+                  <div class="text-muted small">
+                    Publicado em {{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em }}
+                    {% if a.atualizado_em %} · Atualizado {{ a.atualizado_em.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+                    {% if a.lido %} • <span class="text-success">Lido</span>{% else %} • <span class="text-danger">Não lido</span>{% endif %}
+                  </div>
+                </div>
+                <div class="ms-3">
+                  {% if not a.lido %}
+                  <button class="btn btn-outline-royal btn-sm"
+                          data-acao="marcar-lido"
+                          data-url="{{ url_for('marcar_aviso_lido_universal', aviso_id=a.id) }}">
+                    <i class="bi bi-check2"></i> Marcar como lido
+                  </button>
+                  {% endif %}
+                </div>
+              </div>
+
+              <hr class="my-2">
+
+                            <div class="aviso-body">
+                {% set html = (
+                  a.corpo_html or a.conteudo_html or a.mensagem_html or a.descricao_html or a.body_html or a.recado_html
+                  or (a.dados and (a.dados.corpo_html or a.dados.conteudo_html or a.dados.mensagem_html or a.dados.descricao_html or a.dados.body_html or a.dados.recado_html))
+                ) %}
+                {% if html and html|trim %}
+                  {{ html|safe }}
+                {% else %}
+                  {% set txt = (
+                    a.corpo or a.conteudo or a.mensagem or a.texto or a.descricao or a.body or a.message or a.content or a.recado
+                    or (a.dados and (a.dados.corpo or a.dados.conteudo or a.dados.mensagem or a.dados.texto or a.dados.descricao or a.dados.body or a.dados.message or a.dados.content or a.dados.recado))
+                  ) %}
+                  {% if txt and txt|trim %}
+                    <p class="mb-0">{{ txt|e|replace('\r\n','\n')|replace('\n','<br>')|safe }}</p>
+                  {% else %}
+                    <p class="text-muted mb-0"><em>(sem conteúdo)</em></p>
+                  {% endif %}
+                {% endif %}
+              </div>
+                          </div>
+            {% endfor %}
+          {% else %}
+                        <div class="card card-body text-muted">Carregando avisos…</div>
+          {% endif %}
+        </div>
+      </section>
+                  <section data-view="lancamentos">
+        <div class="section-title"><i class="bi bi-receipt"></i> Lançamentos</div>
+        <div class="row g-3">
+          <div class="col-lg-3">
+            <div class="card card-body sticky-tools">
+              <form id="formFiltroLanc" method="GET" action="{{ url_for('portal_restaurante') }}" class="row g-2 align-items-end">
+                <input type="hidden" name="view" value="lancamentos">
+
+                <div class="col-12">
+                  <label class="form-label">Início</label>
+                  <input type="date" class="form-control" name="data_inicio" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Fim</label>
+                  <input type="date" class="form-control" name="data_fim" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Mês (opcional)</label>
+                  <input type="month" class="form-control" name="mes" value="{{ filtro_mes or '' }}"
+                         oninput="if(this.value){ const f=this.form; f.data_inicio.value=''; f.data_fim.value=''; }">
+                  <div class="form-text">Se escolher um mês, as datas serão ignoradas.</div>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Digite o nome do cooperado (visual)</label>
+                  <input type="text" class="form-control" name="q" placeholder="Filtrar por nome...">
+                </div>
+
+                <div class="col-12 d-grid"><button class="btn btn-royal" type="submit"><i class="bi bi-funnel"></i> Aplicar</button></div>
+                <div class="col-12 d-grid"><a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='lancamentos') }}"><i class="bi bi-arrow-counterclockwise"></i> Limpar</a></div>
+
+                <hr class="my-2">
+                <div class="kpi mb-2"><div class="small text-muted">Total no período</div><div class="v">R$ <span id="kpiTotalValor">0,00</span></div></div>
+                <div class="kpi mb-2"><div class="small text-muted">Entregas no período</div><div class="v"><span id="kpiTotalEntregas">0</span></div></div>
+
+                                <div class="d-grid"><button class="btn btn-royal" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV</button></div>
+              </form>
+            </div>
+          </div>
+
+          <div class="col-lg-9">
+            <div class="card card-body">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="chip">Período: <span id="txtPeriodo">
+                  {{ filtro_inicio and filtro_inicio.strftime('%d/%m/%Y') or '' }}
+                  {% if filtro_inicio and filtro_fim %} a {% endif %}
+                  {{ filtro_fim and filtro_fim.strftime('%d/%m/%Y') or '' }}
+                </span></div>
+              </div>
+
+              <table class="table table-bordered table-hover align-middle table-compact" id="tblLanc">
+                <thead>
+                  <tr>
+                    <th class="text-center" style="width:110px;">Data</th>
+                    <th>Cooperado</th>
+                    <th>Contrato</th>
+                    <th class="text-center" style="width:160px;">Horário</th>
+                    <th class="text-center" style="width:120px;">Entregas</th>
+                    <th class="text-end" style="width:140px;">Valor (R$)</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyLanc">
+                  {% for x in _lancamentos_periodo %}
+                  <tr data-coop="{{ x.cooperado_id or x.coop_id }}"
+                      data-coopnome="{{ x.cooperado_nome or x.coop_nome }}"
+                      data-contrato="{{ x.contrato_nome or x.contrato }}">
+                    <td class="text-center">{{ (x.data.strftime('%d/%m/%Y') if x.data) if x.data is not string else x.data }}</td>
+                    <td class="fw-semibold coop-name">{{ x.cooperado_nome or x.coop_nome }}</td>
+                    <td>{{ x.contrato_nome or x.contrato or '—' }}</td>
+                    <td class="text-center">
+                      {% if x.hora_inicio or x.hora_fim %}
+                        {{ x.hora_inicio or '' }}{% if x.hora_inicio or x.hora_fim %} às {% endif %}{{ x.hora_fim or '' }}
+                      {% else %}—{% endif %}
+                    </td>
+                    <td class="text-center">{{ x.qtd_entregas if x.qtd_entregas is not none else '-' }}</td>
+                    <td class="text-end valor" data-valor="{{ '%.2f'|format(x.valor or 0) }}">R$ {{ '%.2f'|format(x.valor or 0) }}</td>
+                  </tr>
+                  {% else %}{% endfor %}
+                </tbody>
+                <tfoot>
+                  <tr class="table-secondary">
+                    <th colspan="4" class="text-end">Totais</th>
+                    <th class="text-center" id="ftEntregas">0</th>
+                    <th class="text-end" id="ftValor">R$ 0,00</th>
+                  </tr>
+                </tfoot>
+              </table>
+
+              <hr class="my-3">
+              <h6 class="mb-2"><i class="bi bi-people"></i> Totais por cooperado</h6>
+              <div id="gridCoop" class="row g-2"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+            <section data-view="lancar">
+        <div class="section-title"><i class="bi bi-plus-circle"></i> Lançar Produção Diária</div>
+
+        <div class="card card-body">
+          <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
+            <input type="hidden" name="view" value="lancar">
+            <div class="col-md-3"><label class="form-label">Início</label><input type="date" name="data_inicio" class="form-control" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}"></div>
+            <div class="col-md-3"><label class="form-label">Fim</label><input type="date" name="data_fim" class="form-control" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}"></div>
+            <div class="col-md-3"><div class="small text-muted mb-1">Período em uso</div><div class="chip">{% if filtro_inicio and filtro_fim %}{{ filtro_inicio.strftime('%d/%m/%Y') }} a {{ filtro_fim.strftime('%d/%m/%Y') }}{% else %} — {% endif %}</div></div>
+            <div class="col-md-3 text-end">
+              <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
+              <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-arrow-counterclockwise"></i> Limpar</a>
+            </div>
+          </form>
+        </div>
+
+        <div class="row g-3 mt-1">
+          <div class="col-lg-4">
+            <div class="card card-body">
+              <div class="input-group mb-2">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input id="buscaCoop" type="text" class="form-control" placeholder="Buscar cooperado..." list="cooperadosList">
+                <datalist id="cooperadosList">{% for coop in _cooperados %}<option value="{{ coop.nome }}"></option>{% endfor %}</datalist>
+                <select id="selectCoop" class="form-select"><option value="">Lista...</option>{% for coop in _cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}</select>
+              </div>
+              <div id="listaCooperados" style="max-height:60vh; overflow:auto;">
+                {% for coop in _cooperados %}
+                <div class="cooperado-item" data-id="{{ coop.id }}" data-nome="{{ coop.nome }}"
+                     data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
+                     data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}">
+                  <img src="{{ url_for('media_coop', coop_id=coop.id) if coop.foto_bytes else url_for('static', filename='img/default.png') }}" class="cooperado-avatar" alt="Foto do cooperado">
+                  <div class="d-flex flex-column">
+                    <span class="fw-bold">{{ coop.nome }}</span>
+                    <small class="text-muted">No período: R$ {{ '%.2f'|format(coop.total_periodo or 0) }}</small>
+                  </div>
+                </div>
+                {% else %}<div class="text-muted small">Nenhum cooperado encontrado.</div>{% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-8">
+            <div class="card card-body" id="blocoLancamento">
+              <div class="selected-header text-center mb-2" id="selectedHeader" style="display:none;">
+                <img id="selFoto" src="" class="big" alt="">
+                <div class="fw-bold fs-5 mt-2" id="selNome"></div>
+                <div class="text-muted">Total no período: R$ <span id="selTotal">0,00</span></div>
+              </div>
+
+              <div class="alert alert-info py-2 px-3 mb-2" id="hintSelecione">Selecione um cooperado para lançar.</div>
+
+              <form id="formLancamento" method="POST" action="{{ _url_lancar_producao }}" class="row g-2 align-items-end mb-1" style="display:none;">
+                <input type="hidden" name="cooperado_id" id="inputCooperadoId" value="">
+                <div class="col-md-3"><label class="form-label">Valor (R$)</label><input type="number" class="form-control" name="valor" step="0.01" required></div>
+                <div class="col-md-3"><label class="form-label">Data</label><input type="date" class="form-control" name="data" required></div>
+                <div class="col-md-3"><label class="form-label">Hora Início</label><input type="time" class="form-control" name="hora_inicio"></div>
+                <div class="col-md-3"><label class="form-label">Hora Fim</label><input type="time" class="form-control" name="hora_fim"></div>
+                <div class="col-md-3"><label class="form-label">Entregas</label><input type="number" class="form-control" name="qtd_entregas" min="0" step="1"></div>
+
+                <div class="col-12"><hr class="my-2"></div>
+                <div class="col-12">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="chkAvaliar"
+                      onclick="document.getElementById('boxAval').style.display=this.checked?'block':'none'; document.getElementById('inputAvaliar').value=this.checked?'1':'0';">
+                    <label class="form-check-label" for="chkAvaliar">Registrar avaliação agora</label>
+                  </div>
+                  <input type="hidden" name="avaliar" id="inputAvaliar" value="0">
+                </div>
+
+                <div id="boxAval" class="row g-2" style="display:none;">
+                  {% for nm,titulo in [('av_pontualidade','Pontualidade'),('av_educacao','Educação'),('av_eficiencia','Eficiência / Cuidado'),('av_apresentacao','Apresentação')] %}
+                  <div class="col-md-6">
+                    <div class="rating-group" data-name="{{ nm }}">
+                      <div class="rating-label">{{ titulo }}</div>
+                      <div class="stars">
+                        <i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i>
+                      </div>
+                      <input type="hidden" name="{{ nm }}" value="0">
+                    </div>
+                  </div>
+                  {% endfor %}
+                  <div class="col-12"><label class="form-label">Comentário (opcional)</label><textarea name="av_comentario" class="form-control" rows="2"></textarea></div>
+                  <div class="col-12"><hr class="my-2"></div>
+                </div>
+                
+                <div class="col-12 text-end">
+                  <button class="btn btn-royal" type="submit"><i class="bi bi-plus-circle"></i> Lançar</button>
+                </div>
+              </form>
+
+              <hr class="my-3" id="histLancHr" style="display:none;">
+
+              <h6 class="mb-2" id="histLancTitle" style="display:none;"><i class="bi bi-clock-history"></i> Histórico do período</h6>
+
+              <div id="historicoLancamentos">
+                <table class="table table-bordered table-hover align-middle table-compact" id="tblHist">
+                  <thead><tr><th>Data</th><th>Valor (R$)</th><th>Entregas</th><th>Horário</th><th style="width:1%"></th></tr></thead>
+                  <tbody><tr><td colspan="5" class="text-center text-muted">Selecione um cooperado.</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+            <section data-view="tabelas">
+        <div class="section-title"><i class="bi bi-table"></i> Documentos e Tabelas</div>
+        <div class="card card-body">
+          <div class="alert alert-info py-2 px-3 mb-3">Estes são documentos importantes para consulta.</div>
+          {% if tabelas and (tabelas|length) > 0 %}
+          <div class="row g-3" id="tabelasGrid">
+            {% for doc in tabelas %}
+            <div class="col-md-6 col-lg-4">
+              <div class="doc-row" data-file-url="{{ url_for('download_rest_tabela', file_id=doc.id) }}" onclick="window.open(this.dataset.fileUrl,'_blank')">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <div class="doc-cat">{{ doc.categoria or 'Documento' }}</div>
+                  <i class="bi bi-download fs-5 text-royal"></i>
+                </div>
+                <div class="doc-title">{{ doc.titulo or 'Sem título' }}</div>
+                <div class="doc-date">Publicado em {{ doc.criado_em.strftime('%d/%m/%Y') if doc.criado_em }}</div>
+                {% if doc.descricao %}<div class="doc-desc mt-2">{{ doc.descricao }}</div>{% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+            <div class="text-muted text-center py-4">Nenhum documento ou tabela disponível no momento.</div>
+          {% endif %}
+        </div>
+      </section>
+          </main>
+  </div>
+
+    <script>
+    // Funções de utilidade
+    const moneyFormat = (n) => `R$ ${parseFloat(n).toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.')}`;
+    const formatDate = (dateString) => {
+      if (!dateString) return '—';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+    const togglePwd = (btn) => {
+      const input = btn.parentNode.querySelector('input');
+      input.type = input.type === 'password' ? 'text' : 'password';
+      btn.querySelector('i').className = input.type === 'password' ? 'bi bi-eye' : 'bi bi-eye-slash';
+    };
+
+    // Lógica de Tema
+    const themeToggle = document.getElementById('btnTheme');
+    const lblTheme = document.getElementById('lblTheme');
+    const currentTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    lblTheme.textContent = currentTheme === 'dark' ? 'Claro' : 'Escuro';
+    themeToggle.querySelector('i').className = currentTheme === 'dark' ? 'bi bi-sun' : 'bi bi-moon';
+
+    themeToggle.addEventListener('click', () => {
+      let newTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+      lblTheme.textContent = newTheme === 'dark' ? 'Claro' : 'Escuro';
+      themeToggle.querySelector('i').className = newTheme === 'dark' ? 'bi bi-sun' : 'bi bi-moon';
+    });
+
+    // Lógica de Navegação SPA (opcional, pode ser via link simples)
+    const sections = document.querySelectorAll('section[data-view]');
+    const navLinks = document.querySelectorAll('.navmenu a');
+    
+    const initialView = '{{ view|default('lancar') }}';
+    const activateView = (viewName) => {
+      sections.forEach(sec => sec.classList.remove('view-active'));
+      const target = document.querySelector(`section[data-view="${viewName}"]`);
+      if (target) target.classList.add('view-active');
+      
+      navLinks.forEach(link => link.classList.remove('active'));
+      const activeLink = document.querySelector(`.navmenu a[data-target="${viewName}"]`);
+      if (activeLink) activeLink.classList.add('active');
+      
+      // Tenta rodar lógica específica da view
+      if(viewName === 'lancamentos') calculateTotals();
+      if(viewName === 'avisos') initAvisos();
+      if(viewName === 'lancar') initLancar();
+
+      // Se for uma rota que altera URL (i.e. não SPA), apenas recarrega
+      // if (viewName === 'tabelas') window.location.href = document.getElementById('linkTabelas').href;
+    };
+    
+    // Ativar a view inicial
+    activateView(initialView);
+    
+    // Lógica para o bloco de lançamentos (view 'lancar')
+    let historicoData = [];
+    const blocoLancamento = document.getElementById('blocoLancamento');
+    const formLancamento = document.getElementById('formLancamento');
+    const hintSelecione = document.getElementById('hintSelecione');
+    const selectedHeader = document.getElementById('selectedHeader');
+    const selNome = document.getElementById('selNome');
+    const selTotal = document.getElementById('selTotal');
+    const selFoto = document.getElementById('selFoto');
+    const inputCooperadoId = document.getElementById('inputCooperadoId');
+    const listaCooperados = document.getElementById('listaCooperados');
+    const tblHistBody = document.querySelector('#tblHist tbody');
+    const histLancTitle = document.getElementById('histLancTitle');
+    const histLancHr = document.getElementById('histLancHr');
+    
+    const initLancar = () => {
+      // Tentar selecionar o primeiro cooperado se a lista não estiver vazia
+      const firstCoop = listaCooperados.querySelector('.cooperado-item');
+      if(firstCoop) firstCoop.click();
+
+      // Adicionar listeners para as estrelas de avaliação
+      document.querySelectorAll('.rating-group').forEach(group => {
+        const input = group.querySelector('input[type="hidden"]');
+        const stars = group.querySelectorAll('.star');
+        stars.forEach(star => {
+          star.addEventListener('mouseover', () => {
+            const v = parseInt(star.dataset.v);
+            stars.forEach(s => s.classList.toggle('hover', parseInt(s.dataset.v) <= v));
+          });
+          star.addEventListener('mouseout', () => {
+            stars.forEach(s => s.classList.remove('hover'));
+          });
+          star.addEventListener('click', () => {
+            const v = parseInt(star.dataset.v);
+            input.value = v;
+            stars.forEach(s => s.classList.toggle('active', parseInt(s.dataset.v) <= v));
+          });
+        });
+      });
+    }
+
+    // Lógica de seleção de cooperado
+    listaCooperados.addEventListener('click', (e) => {
+      const item = e.target.closest('.cooperado-item');
+      if (!item) return;
+
+      // Desativa a seleção anterior
+      listaCooperados.querySelectorAll('.cooperado-item').forEach(i => i.classList.remove('selected'));
+      item.classList.add('selected');
+
+      // Atualiza o cabeçalho e o formulário
+      hintSelecione.style.display = 'none';
+      selectedHeader.style.display = 'block';
+      formLancamento.style.display = 'flex';
+      histLancTitle.style.display = 'block';
+      histLancHr.style.display = 'block';
+
+      const coopId = item.dataset.id;
+      const coopNome = item.dataset.nome;
+      const coopFoto = item.dataset.foto;
+      const coopTotal = item.dataset.total;
+
+      selNome.textContent = coopNome;
+      selTotal.textContent = moneyFormat(coopTotal);
+      selFoto.src = coopFoto;
+      inputCooperadoId.value = coopId;
+      
+      // Resetar formulário
+      formLancamento.reset();
+      document.getElementById('boxAval').style.display = 'none';
+      document.getElementById('inputAvaliar').value = '0';
+      document.querySelectorAll('.rating-group .star').forEach(s => s.classList.remove('active', 'hover'));
+      document.querySelectorAll('.rating-group input[type="hidden"]').forEach(i => i.value = '0');
+
+      // Buscar histórico (simulação)
+      fetchHistorico(coopId);
+    });
+    
+    // Filtro da lista de cooperados
+    document.getElementById('buscaCoop').addEventListener('input', (e) => {
+      const termo = e.target.value.toLowerCase();
+      listaCooperados.querySelectorAll('.cooperado-item').forEach(item => {
+        const nome = item.dataset.nome.toLowerCase();
+        item.style.display = nome.includes(termo) ? 'flex' : 'none';
+      });
+    });
+    document.getElementById('selectCoop').addEventListener('change', (e) => {
+      const coopId = e.target.value;
+      if (coopId) {
+        const item = document.querySelector(`.cooperado-item[data-id="${coopId}"]`);
+        if (item) item.click();
+      }
+    });
+
+    // Função para buscar e renderizar o histórico (simulação)
+    const fetchHistorico = (coopId) => {
+      // Em um ambiente real, você faria um fetch:
+      // const url = `{{ url_for('api_rest_historico_coop') }}?coop_id=${coopId}&data_inicio=${...}`;
+      
+      // Simulação: Filtrar a lista de lançamentos existente no contexto Flask
+      const lancamentos = JSON.parse('{{ _lancamentos_periodo | tojson | safe }}'.replace(/&quot;/g, '"'));
+      
+      // O servidor deve converter os objetos Python (datetime, decimal) para JSON
+      // Para simular, vamos tentar transformar a data (que veio como string se não houve filtro)
+      const filtered = lancamentos.filter(l => (l.cooperado_id == coopId || l.coop_id == coopId));
+
+      tblHistBody.innerHTML = '';
+      if (filtered.length === 0) {
+        tblHistBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Sem lançamentos no período.</td></tr>';
+        return;
+      }
+
+      filtered.forEach(l => {
+        const row = tblHistBody.insertRow();
+        row.innerHTML = `
+          <td>${formatDate(l.data)}</td>
+          <td class="text-end fw-semibold">${moneyFormat(l.valor)}</td>
+          <td class="text-center">${l.qtd_entregas || '-'}</td>
+          <td class="text-center">${l.hora_inicio || ''}${l.hora_inicio || l.hora_fim ? ' às ' : '—'}${l.hora_fim || ''}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-danger" onclick="if(confirm('Tem certeza?')) removerLancamento(${l.id})">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </td>
+        `;
+      });
+    };
+    
+    // Função de remover lançamento (simulação)
+    const removerLancamento = (id) => {
+      // Em um ambiente real, você faria um fetch:
+      // fetch(`{{ url_for('api_rest_remover_lancamento', id=id) }}`.replace('id', id), { method: 'POST' })
+      // .then(() => window.location.reload());
+      
+      alert(`Remover lançamento ID: ${id}. No ambiente real, a página seria recarregada.`);
+      // Aqui você teria que recarregar o histórico ou a página.
+    };
+
+    // Lógica para a view de Lançamentos
+    const tableLancBody = document.getElementById('tbodyLanc');
+    const totalValorEl = document.getElementById('kpiTotalValor');
+    const totalEntregasEl = document.getElementById('kpiTotalEntregas');
+    const ftValorEl = document.getElementById('ftValor');
+    const ftEntregasEl = document.getElementById('ftEntregas');
+    const gridCoopEl = document.getElementById('gridCoop');
+    const inputFiltroLanc = document.querySelector('#formFiltroLanc input[name="q"]');
+    
+    const calculateTotals = () => {
+      let totalValor = 0;
+      let totalEntregas = 0;
+      const totalsByCoop = {};
+      
+      document.querySelectorAll('#tblLanc tbody tr').forEach(row => {
+        const valor = parseFloat(row.querySelector('.valor').dataset.valor) || 0;
+        const entregas = parseInt(row.querySelector('td:nth-child(5)').textContent) || 0;
+        const coopId = row.dataset.coop;
+        const coopNome = row.dataset.coopnome;
+
+        totalValor += valor;
+        totalEntregas += entregas;
+
+        if (coopId) {
+          if (!totalsByCoop[coopId]) {
+            totalsByCoop[coopId] = { nome: coopNome, valor: 0, entregas: 0 };
+          }
+          totalsByCoop[coopId].valor += valor;
+          totalsByCoop[coopId].entregas += entregas;
+        }
+      });
+
+      totalValorEl.textContent = moneyFormat(totalValor);
+      ftValorEl.textContent = moneyFormat(totalValor);
+      
+      totalEntregasEl.textContent = totalEntregas;
+      ftEntregasEl.textContent = totalEntregas;
+      
+      // Renderizar totais por cooperado
+      gridCoopEl.innerHTML = '';
+      Object.values(totalsByCoop).sort((a,b) => b.valor - a.valor).forEach(coop => {
+        gridCoopEl.innerHTML += `
+          <div class="col-md-4">
+            <div class="kpi">
+              <div class="small fw-semibold text-royal">${coop.nome}</div>
+              <div class="v">${moneyFormat(coop.valor)} <span class="text-muted small ms-2">(${coop.entregas} entr.)</span></div>
+            </div>
+          </div>
+        `;
+      });
+    };
+    
+    // Filtro de lançamentos por nome de cooperado (visual/JS)
+    inputFiltroLanc.addEventListener('input', (e) => {
+      const termo = e.target.value.toLowerCase();
+      let totalValorFiltro = 0;
+      let totalEntregasFiltro = 0;
+      
+      document.querySelectorAll('#tblLanc tbody tr').forEach(row => {
+        const nome = row.dataset.coopnome.toLowerCase();
+        const isVisible = nome.includes(termo);
+        row.style.display = isVisible ? 'table-row' : 'none';
+
+        if (isVisible) {
+          totalValorFiltro += parseFloat(row.querySelector('.valor').dataset.valor) || 0;
+          totalEntregasFiltro += parseInt(row.querySelector('td:nth-child(5)').textContent) || 0;
+        }
+      });
+      
+      // Atualiza footer e KPI (apenas os do filtro local)
+      ftValorEl.textContent = moneyFormat(totalValorFiltro);
+      ftEntregasEl.textContent = totalEntregasFiltro;
+      
+      // Não altera os KPI gerais (kpiTotalValor/Entregas)
+    });
+
+    // Lógica para exportação CSV (simulação)
+    document.getElementById('btnExportCsv').addEventListener('click', () => {
+      const form = document.getElementById('formFiltroLanc');
+      const originalAction = form.action;
+      
+      // Ação real de exportação (pode ser uma nova rota)
+      form.action = "{{ url_for('export_rest_lancamentos_csv') }}";
+      form.submit();
+      
+      // Restaura a ação original após um pequeno delay
+      setTimeout(() => { form.action = originalAction; }, 100);
+    });
+    
+    
+    // Lógica para a view de Avisos
+    const avisosListContainer = document.getElementById('avisosListContainer');
+    const badgeAvisosNav = document.getElementById('badgeAvisos');
+    const badgeTitulo = document.getElementById('badgeTitulo');
+    const toggleNaoLidos = document.getElementById('toggleNaoLidos');
+    
+    const updateAvisosBadge = () => {
+      const unreadCount = avisosListContainer.querySelectorAll('.aviso-card[data-lido="0"]').length;
+      badgeAvisosNav.textContent = unreadCount;
+      badgeAvisosNav.style.display = unreadCount > 0 ? 'inline-flex' : 'none';
+      
+      badgeTitulo.textContent = unreadCount > 0 ? `${unreadCount} não lido(s)` : 'Tudo lido';
+      badgeTitulo.classList.toggle('text-bg-danger', unreadCount > 0);
+      badgeTitulo.classList.toggle('text-bg-success', unreadCount === 0);
+      
+      document.querySelector('#avisosListContainer button[type="submit"]').disabled = unreadCount === 0;
+    };
+    
+    const initAvisos = () => {
+      updateAvisosBadge();
+    };
+    
+    toggleNaoLidos.addEventListener('change', (e) => {
+      const showOnlyUnread = e.target.checked;
+      avisosListContainer.querySelectorAll('.aviso-card').forEach(card => {
+        const isUnread = card.dataset.lido === '0';
+        card.style.display = (showOnlyUnread && !isUnread) ? 'none' : 'block';
+      });
+    });
+
+    // Lógica de marcar aviso como lido via JS
+    avisosListContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-acao="marcar-lido"]');
+      if (!btn) return;
+      
+      const url = btn.dataset.url;
+      const card = btn.closest('.aviso-card');
+      
+      fetch(url, { method: 'POST' })
+        .then(response => {
+          if (response.ok) {
+            card.classList.add('lido');
+            card.dataset.lido = '1';
+            btn.remove(); // Remove o botão de "Marcar como lido"
+            
+            // Se o filtro estiver ativo, esconde o card
+            if (toggleNaoLidos.checked) card.style.display = 'none';
+            
+            updateAvisosBadge();
+          } else {
+            alert('Erro ao marcar aviso como lido.');
+          }
+        })
+        .catch(() => alert('Erro de rede ao marcar aviso como lido.'));
+    });
+  </script>
 </body>
 </html>
