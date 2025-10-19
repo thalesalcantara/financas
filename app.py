@@ -4922,39 +4922,38 @@ def admin_upload_documento():
 
     if not titulo or not (arquivo and arquivo.filename):
         flash("Preencha o título e selecione o arquivo.", "warning")
-        return redirect(url_for("admin_documentos"))
+        return redirect(url_for("admin_documentos"), code=303)
 
-    # === NOVO: salva em diretório persistente e retorna NOME ÚNICO ===
+    # Salva e retorna nome único persistente
     nome_unico = salvar_documento_upload(arquivo)
     if not nome_unico:
         flash("Falha ao salvar o arquivo.", "danger")
-        return redirect(url_for("admin_documentos"))
+        return redirect(url_for("admin_documentos"), code=303)
 
-    # compat: também guardamos um URL que aponta para /docs/<nome>
     d = Documento(
         titulo=titulo,
         categoria=categoria,
         descricao=descricao,
-        arquivo_url=url_for("serve_documento", nome=nome_unico),  # compat com templates antigos
-        arquivo_nome=nome_unico,  # agora guardamos o NOME ÚNICO persistido
+        arquivo_url=url_for("serve_documento", nome=nome_unico),  # compat
+        arquivo_nome=nome_unico,
         enviado_em=datetime.utcnow(),
     )
     db.session.add(d)
     db.session.commit()
     flash("Documento enviado.", "success")
-    return redirect(url_for("admin_documentos"))
+    return redirect(url_for("admin_documentos"), code=303)
 
 
-@app.get("/admin/documentos/<int:doc_id>/delete")
+@app.post("/admin/documentos/<int:doc_id>/delete")
 @admin_required
 def admin_delete_documento(doc_id):
     d = Documento.query.get_or_404(doc_id)
+
+    # remove arquivo físico (persistente e legado)
     try:
-        # === NOVO: tenta deletar do armazenamento persistente pelo nome salvo ===
         p = resolve_document_path(d.arquivo_nome)
         if p and os.path.exists(p):
             os.remove(p)
-        # Fallback (legado): se sobrou um caminho em /static/uploads/docs/ no arquivo_url, remove também
         if d.arquivo_url and d.arquivo_url.startswith("/static/uploads/docs/"):
             legacy_path = os.path.join(BASE_DIR, d.arquivo_url.lstrip("/"))
             if os.path.exists(legacy_path):
@@ -4965,7 +4964,7 @@ def admin_delete_documento(doc_id):
     db.session.delete(d)
     db.session.commit()
     flash("Documento removido.", "success")
-    return redirect(url_for("admin_documentos"))
+    return redirect(url_for("admin_documentos"), code=303)
 
 
 @app.route("/documentos")
@@ -4977,19 +4976,13 @@ def documentos_publicos():
     return render_template("documentos_publicos.html", documentos=documentos)
 
 
-@app.route('/documentos/<int:doc_id>/baixar')
+@app.route("/documentos/<int:doc_id>/baixar")
 def baixar_documento(doc_id):
     doc = Documento.query.get_or_404(doc_id)
-    # === NOVO: resolve caminho persistente pelo nome salvo ===
     path = resolve_document_path(doc.arquivo_nome)
     if not path or not os.path.exists(path):
         abort(404)
-    # força download (independente do tipo)
-    return send_file(
-        path,
-        as_attachment=True,
-        download_name=os.path.basename(doc.arquivo_nome)
-    )
+    return send_file(path, as_attachment=True, download_name=os.path.basename(doc.arquivo_nome))
 
 # =========================
 # Inicialização automática do DB em servidores (Gunicorn/Render)
