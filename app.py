@@ -822,10 +822,6 @@ from werkzeug.utils import secure_filename
 import time
 
 def salvar_tabela_upload(file_storage) -> str | None:
-    """
-    Salva o arquivo de TABELA dentro do diretório persistente (TABELAS_DIR)
-    e retorna APENAS o nome do arquivo (para guardar no banco em Tabela.arquivo_nome).
-    """
     if not file_storage or not file_storage.filename:
         return None
     fname = secure_filename(file_storage.filename)
@@ -833,7 +829,7 @@ def salvar_tabela_upload(file_storage) -> str | None:
     unique = f"{base}_{time.strftime('%Y%m%d_%H%M%S')}{ext.lower()}"
     destino = os.path.join(TABELAS_DIR, unique)
     file_storage.save(destino)
-    return unique  # <- guarde este em Tabela.arquivo_nome
+    return unique  # <- guarde este em Tabela.arquivo_url
 
 
 def resolve_tabela_path(nome_arquivo: str) -> str | None:
@@ -5151,7 +5147,6 @@ def admin_upload_tabela():
     titulo    = (f.get("titulo") or "").strip()
     descricao = (f.get("descricao") or "").strip() or None
 
-    # aceita vários nomes possíveis do input file
     arquivo = (
         request.files.get("arquivo")
         or request.files.get("file")
@@ -5162,25 +5157,17 @@ def admin_upload_tabela():
         flash("Preencha o título e selecione o arquivo.", "warning")
         return redirect(url_for("admin_tabelas"))
 
-    base_dir = _tabelas_base_dir()
-
-    # nome seguro + timestamp pra não colidir
-    raw = secure_filename(arquivo.filename)
-    stem, ext = os.path.splitext(raw)
-    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    safe_stem = re.sub(r"[^A-Za-z0-9_.-]+", "-", stem) or "arquivo"
-    final_name = f"{safe_stem}_{ts}{ext or ''}"
-
-    dest = base_dir / final_name
-    arquivo.save(str(dest))
+    # salva no diretório PERSISTENTE e retorna SÓ o nome
+    nome_arquivo = salvar_tabela_upload(arquivo)
+    if not nome_arquivo:
+        flash("Falha ao salvar o arquivo.", "danger")
+        return redirect(url_for("admin_tabelas"))
 
     t = Tabela(
         titulo=titulo,
         descricao=descricao,
-        # Importante: gravar apenas o NOME, não o caminho.
-        # O _serve_tabela_or_redirect vai resolver para TABELAS_DIR.
-        arquivo_url=final_name,
-        arquivo_nome=arquivo.filename,
+        arquivo_url=nome_arquivo,        # << SÓ o nome!
+        arquivo_nome=arquivo.filename,   # nome “bonito” p/ download
         enviado_em=datetime.utcnow(),
     )
     db.session.add(t)
