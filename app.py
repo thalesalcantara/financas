@@ -6,6 +6,7 @@ from datetime import datetime, date, timedelta, time as dtime
 from collections import defaultdict, namedtuple
 from functools import wraps
 from types import SimpleNamespace
+from pathlib import Path  # <-- (adicionado)
 
 # MIME types (fixes p/ Office)
 import mimetypes
@@ -43,8 +44,11 @@ PERSIST_ROOT = os.environ.get("PERSIST_ROOT", "/var/data")
 if not os.path.isdir(PERSIST_ROOT):
     PERSIST_ROOT = os.path.join(BASE_DIR, "data")
 os.makedirs(PERSIST_ROOT, exist_ok=True)
-TABELAS_DIR = os.path.join(PERSIST_ROOT, "tabelas")
-os.makedirs(TABELAS_DIR, exist_ok=True)
+
+# >>> ALTERADO: usar Path para permitir operador "/" no resto do código
+TABELAS_DIR = Path(PERSIST_ROOT) / "tabelas"
+TABELAS_DIR.mkdir(parents=True, exist_ok=True)
+
 STATIC_TABLES = os.path.join(BASE_DIR, "static", "uploads", "tabelas")
 os.makedirs(STATIC_TABLES, exist_ok=True)
 # 🔹 Documentos (persistente em disco)
