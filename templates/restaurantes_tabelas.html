@@ -38,9 +38,9 @@
     .navmenu{ margin-top:18px; display:flex; flex-direction:column; gap:6px; }
     .navmenu a{
       color:#fff; padding:9px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600;
-      position:relative; font-size:.96rem;  /* mesmo tamanho menor */
+      position:relative; font-size:.96rem;
     }
-    .navmenu a span{ text-decoration:underline; } /* nomes sublinhados */
+    .navmenu a span{ text-decoration:underline; }
     .navmenu a.active, .navmenu a:hover{ background:rgba(255,255,255,.14); }
 
     /* bolinha de contagem de avisos (igual ao painel) */
@@ -239,10 +239,11 @@
     document.getElementById('linkAvisos')?.addEventListener('mouseenter', e=>prefetch(e.currentTarget.href));
     document.getElementById('linkTabelas')?.addEventListener('mouseenter', e=>prefetch(e.currentTarget.href));
 
-    /* ===== Visualização da tabela ===== */
+    /* ===== Visualização da tabela (fecha com Botão Voltar sem travar) ===== */
     (function(){
       const modalEl = document.getElementById('modalTabela');
-      const modal = new bootstrap.Modal(modalEl);
+      const modal = new bootstrap.Modal(modalEl, { backdrop: true, focus: false });
+
       const lbl = document.getElementById('modalTabelaLabel');
       const frame = document.getElementById('modalFrame');
       const img = document.getElementById('modalImg');
@@ -250,11 +251,16 @@
       const baixar = document.getElementById('modalBaixar');
       const novaAba = document.getElementById('modalAbrirNovaAba');
 
+      let modalOpen = false;
+      let pushedState = false;
+      let closingFromPop = false;
+
       function openViewer(viewUrl, downloadUrl, title, ext){
         lbl.textContent = title || '';
-        baixar.href = downloadUrl || viewUrl;
-        novaAba.href = viewUrl || downloadUrl;
+        baixar.href = downloadUrl || viewUrl || '#';
+        novaAba.href = viewUrl || downloadUrl || '#';
 
+        // reset UI
         frame.classList.add('d-none'); img.classList.add('d-none'); aviso.classList.add('d-none');
 
         const e = (ext || '').toLowerCase();
@@ -267,14 +273,27 @@
         } else {
           aviso.classList.remove('d-none');
         }
+
         modal.show();
+        modalOpen = true;
+
+        // empurra um estado para capturar o botão Voltar
+        try { history.pushState({ modalTabela:true }, '', location.href); pushedState = true; } catch(_) {}
       }
 
+      // Delegação: abre o modal ao clicar no card ou no botão data-open (mas ignora cliques em links/botões internos não marcados)
       document.addEventListener('click', function(ev){
-        const btn = ev.target.closest('[data-open]');
-        const card = btn ? btn.closest('.doc-row') : ev.target.closest('.doc-row');
+        const card = ev.target.closest('.doc-row');
         if (!card) return;
-        if (!btn && ev.target.closest('a,button,[role="button"]')) return;
+
+        // não abrir quando clicar em download direto, links ou botões que não sejam o [data-open]
+        if (!ev.target.closest('[data-open]') && ev.target.closest('a,button,[role="button"]')) {
+          // se for o botão de Baixar (data-direct-download), deixa seguir
+          return;
+        }
+
+        // evita abrir múltiplas vezes
+        if (modalOpen) return;
 
         const viewUrl = card.dataset.view || '#';
         const downUrl = card.dataset.download || viewUrl;
@@ -283,10 +302,32 @@
         openViewer(viewUrl, downUrl, title, ext);
       });
 
-      modalEl.addEventListener('hidden.bs.modal', ()=>{ frame.src=''; img.src=''; });
+      // Fecha via botão Voltar do navegador
+      window.addEventListener('popstate', function(){
+        if (modalOpen) {
+          closingFromPop = true;    // indica que o fechamento veio do "Voltar"
+          modal.hide();
+        }
+      });
+
+      // Quando o modal é escondido, limpar e sincronizar histórico
+      modalEl.addEventListener('hidden.bs.modal', ()=>{
+        // limpar mídias para liberar memória/perf
+        frame.src=''; img.src='';
+
+        // se abrimos via pushState e NÃO foi o popstate que fechou, damos um back para remover o estado "extra"
+        if (pushedState && !closingFromPop) {
+          try { history.back(); } catch(_) {}
+        }
+
+        // reset flags
+        modalOpen = false;
+        pushedState = false;
+        closingFromPop = false;
+      });
     })();
 
-    /* ===== Badge de avisos na lateral atualiza se existir contagem no contexto ===== */
+    /* ===== Badge de avisos na lateral ===== */
     (function syncBadge(){
       const badgeSidebar=document.getElementById('badgeSidebar');
       if(!badgeSidebar) return;
