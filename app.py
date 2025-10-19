@@ -830,21 +830,26 @@ import os
 TABELAS_DIR = Path(os.environ.get("TABELAS_DIR", "storage/tabelas"))  # ajuste se já existir
 
 def salvar_tabela_upload(file_storage) -> str | None:
+    """
+    Salva o arquivo de TABELA dentro do diretório persistente (TABELAS_DIR)
+    e retorna APENAS o nome do arquivo (para guardar no banco).
+    """
     if not file_storage or not file_storage.filename:
         return None
 
     fname = secure_filename(file_storage.filename)
     base, ext = os.path.splitext(fname)
 
-    # usa datetime.utcnow() pra evitar colisão com 'time'
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    unique = f"{base}_{timestamp}{ext.lower()}" if ext else f"{base}_{timestamp}"
+    # usa datetime para evitar conflito com 'time'
+    ts = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+    unique = f"{base}_{ts}{(ext or '').lower()}"
 
-    destino = TABELAS_DIR / unique
-    destino.parent.mkdir(parents=True, exist_ok=True)  # garante que o diretório existe
-    file_storage.save(str(destino))
+    # TABELAS_DIR é str -> usar os.path.join
+    destino = os.path.join(TABELAS_DIR, unique)
+    os.makedirs(os.path.dirname(destino), exist_ok=True)
 
-    return unique  # <- guarde em Tabela.arquivo_url
+    file_storage.save(destino)
+    return unique  # <- guarde isto no campo que você usa para montar a URL/serve
 
 
 def resolve_tabela_path(nome_arquivo: str) -> str | None:
@@ -5162,6 +5167,7 @@ def admin_upload_tabela():
     titulo    = (f.get("titulo") or "").strip()
     descricao = (f.get("descricao") or "").strip() or None
 
+    # aceita vários nomes possíveis do input file
     arquivo = (
         request.files.get("arquivo")
         or request.files.get("file")
@@ -5172,6 +5178,7 @@ def admin_upload_tabela():
         flash("Preencha o título e selecione o arquivo.", "warning")
         return redirect(url_for("admin_tabelas"))
 
+    # salva no diretório PERSISTENTE e retorna SÓ o nome
     nome_arquivo = salvar_tabela_upload(arquivo)
     if not nome_arquivo:
         flash("Falha ao salvar o arquivo.", "danger")
@@ -5180,8 +5187,8 @@ def admin_upload_tabela():
     t = Tabela(
         titulo=titulo,
         descricao=descricao,
-        arquivo_url=nome_arquivo,        # SÓ o nome salvo
-        arquivo_nome=arquivo.filename,   # nome original para exibir/baixar
+        arquivo_url=nome_arquivo,        # <- SÓ o nome salvo em disco
+        arquivo_nome=arquivo.filename,   # <- nome original “bonito” p/ exibir/baixar
         enviado_em=datetime.utcnow(),
     )
     db.session.add(t)
