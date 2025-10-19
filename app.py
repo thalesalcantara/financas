@@ -818,18 +818,29 @@ def _save_upload(file_storage) -> str | None:
     return f"/static/uploads/{fname}"
 
 
+from pathlib import Path
+from datetime import datetime
 from werkzeug.utils import secure_filename
-import time
+import os
+
+TABELAS_DIR = Path(os.environ.get("TABELAS_DIR", "storage/tabelas"))  # ajuste se já existir
 
 def salvar_tabela_upload(file_storage) -> str | None:
     if not file_storage or not file_storage.filename:
         return None
+
     fname = secure_filename(file_storage.filename)
     base, ext = os.path.splitext(fname)
-    unique = f"{base}_{time.strftime('%Y%m%d_%H%M%S')}{ext.lower()}"
-    destino = os.path.join(TABELAS_DIR, unique)
-    file_storage.save(destino)
-    return unique  # <- guarde este em Tabela.arquivo_url
+
+    # usa datetime.utcnow() pra evitar colisão com 'time'
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    unique = f"{base}_{timestamp}{ext.lower()}" if ext else f"{base}_{timestamp}"
+
+    destino = TABELAS_DIR / unique
+    destino.parent.mkdir(parents=True, exist_ok=True)  # garante que o diretório existe
+    file_storage.save(str(destino))
+
+    return unique  # <- guarde em Tabela.arquivo_url
 
 
 def resolve_tabela_path(nome_arquivo: str) -> str | None:
@@ -5157,7 +5168,6 @@ def admin_upload_tabela():
         flash("Preencha o título e selecione o arquivo.", "warning")
         return redirect(url_for("admin_tabelas"))
 
-    # salva no diretório PERSISTENTE e retorna SÓ o nome
     nome_arquivo = salvar_tabela_upload(arquivo)
     if not nome_arquivo:
         flash("Falha ao salvar o arquivo.", "danger")
@@ -5166,8 +5176,8 @@ def admin_upload_tabela():
     t = Tabela(
         titulo=titulo,
         descricao=descricao,
-        arquivo_url=nome_arquivo,        # << SÓ o nome!
-        arquivo_nome=arquivo.filename,   # nome “bonito” p/ download
+        arquivo_url=nome_arquivo,        # SÓ o nome salvo
+        arquivo_nome=arquivo.filename,   # nome original para exibir/baixar
         enviado_em=datetime.utcnow(),
     )
     db.session.add(t)
