@@ -2232,14 +2232,6 @@ def admin_dashboard():
 # =========================
 # Navegação/Export util
 # =========================
-@app.route("/filtrar_lancamentos")
-@admin_required
-def filtrar_lancamentos():
-    qs = request.query_string.decode("utf-8")
-    base = url_for("admin_dashboard")
-    joiner = "&" if qs else ""
-    return redirect(f"{base}?tab=lancamentos{joiner}{qs}")
-
 @app.route("/exportar_lancamentos")
 @admin_required
 def exportar_lancamentos():
@@ -2272,12 +2264,7 @@ def exportar_lancamentos():
         inss = v * 0.045
         liq = v - inss
         w.writerow([
-            l.restaurante.nome, l.restaurante.periodo, l.cooperado.nome, l.descricao,
-            f"{v:.2f}", l.data.strftime("%d/%m/%Y") if l.data else "",
-            l.hora_inicio or "", l.hora_fim or "", f"{inss:.2f}", f"{liq:.2f}"
-        ])
-    mem = io.BytesIO(buf.getvalue().encode("utf-8-sig"))
-    return send_file(mem, as_attachment=True, download_name="lancamentos.csv", mimetype="text/csv")
+            l.restaurante.nome,
 
 # =========================
 # CRUD Lançamentos (Admin)
