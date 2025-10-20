@@ -827,7 +827,13 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 import os
 
-TABELAS_DIR = Path(os.environ.get("TABELAS_DIR", "storage/tabelas"))  # ajuste se já existir
+TABELAS_DIR = Path(PERSIST_ROOT) / "tabelas"
+TABELAS_DIR.mkdir(parents=True, exist_ok=True)
+
+# 2) Upload: salva sempre dentro de TABELAS_DIR e grava só o NOME no banco
+from werkzeug.utils import secure_filename
+from datetime import datetime
+import os
 
 def salvar_tabela_upload(file_storage) -> str | None:
     """
@@ -839,18 +845,13 @@ def salvar_tabela_upload(file_storage) -> str | None:
 
     fname = secure_filename(file_storage.filename)
     base, ext = os.path.splitext(fname)
-
-    # usa datetime para evitar conflito com 'time'
     ts = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
     unique = f"{base}_{ts}{(ext or '').lower()}"
 
-    # TABELAS_DIR é str -> usar os.path.join
-    destino = os.path.join(TABELAS_DIR, unique)
+    destino = str(TABELAS_DIR / unique)  # <- Path -> str
     os.makedirs(os.path.dirname(destino), exist_ok=True)
-
     file_storage.save(destino)
-    return unique  # <- guarde isto no campo que você usa para montar a URL/serve
-
+    return unique  # <- esse valor vai para Tabela.arquivo_url
 
 def resolve_tabela_path(nome_arquivo: str) -> str | None:
     """
@@ -5088,67 +5089,27 @@ def _enforce_restaurante_titulo(tabela, restaurante):
         abort(403)
 
 def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
-    """
-    Resolve e serve o arquivo da Tabela:
-    - http(s) => redirect
-    - sempre tenta primeiro static/uploads/tabelas/<arquivo>
-    - aceita absoluto, relativo e só o nome
-    - ignora querystring/fragments (ex.: foo.pdf?v=123#x)
-    """
     url = (tabela.arquivo_url or "").strip()
     if not url:
         abort(404)
-
-    # URL externa
     if url.startswith(("http://", "https://")):
         return redirect(url)
 
-    base_dir    = Path(BASE_DIR)
-    tabelas_dir = _tabelas_base_dir()
-
-    # normaliza: remove "/" inicial, query e fragment
-    raw = url.lstrip("/")
-    raw_no_q = raw.split("?", 1)[0].split("#", 1)[0]
-    fname = (raw_no_q.split("/")[-1] if raw_no_q else "").strip()
-
-    candidates = []
-
-    # 1) SEMPRE prioriza nosso diretório oficial
-    if fname:
-        candidates.append(tabelas_dir / fname)
-
-    # 2) Como veio, relativo ao BASE_DIR (compat c/ legado: static/uploads/tabelas/...)
-    candidates.append(base_dir / raw_no_q)
-
-    # 3) Absoluto (se alguém gravou caminho completo por engano)
-    p = Path(url)
-    if p.is_absolute():
-        candidates.append(p)
-
-    # 4) Mais dois legados comuns
-    if fname:
-        candidates.append(base_dir / "uploads" / "tabelas" / fname)
-        candidates.append(base_dir / "static" / "uploads" / "tabelas" / fname)
-
-    file_path = next((c for c in candidates if c.exists() and c.is_file()), None)
-    if not file_path:
-        try:
-            log.warning(
-                "Arquivo de Tabela não encontrado. id=%s titulo=%r arquivo_url=%r tents=%r",
-                getattr(tabela, "id", None),
-                getattr(tabela, "titulo", None),
-                tabela.arquivo_url,
-                [str(c) for c in candidates],
-            )
-        except Exception:
-            pass
+    path = resolve_tabela_path(url)  # usa seu helper persistente
+    if not path:
+        current_app.logger.warning(
+            "Tabela não encontrada. id=%s titulo=%r url=%r",
+            getattr(tabela, "id", None), getattr(tabela, "titulo", None), url
+        )
         abort(404)
 
+    mime, _ = mimetypes.guess_type(path)
     return send_file(
-        str(file_path),
+        path,
+        mimetype=mime or "application/octet-stream",
         as_attachment=as_attachment,
-        download_name=(tabela.arquivo_nome or file_path.name),
-        mimetype=_guess_mimetype_from_path(str(file_path)),
+        download_name=(tabela.arquivo_nome or os.path.basename(path)),
+        conditional=True,
     )
 
 # ---------------------------------------------------------------------------
