@@ -6,7 +6,6 @@ from datetime import datetime, date, timedelta, time as dtime
 from collections import defaultdict, namedtuple
 from functools import wraps
 from types import SimpleNamespace
-from pathlib import Path  # <-- (adicionado)
 
 # MIME types (fixes p/ Office)
 import mimetypes
@@ -32,7 +31,7 @@ from sqlalchemy.pool import QueuePool
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
-# ============ App / DB (trecho de diretórios) ============
+# ============ App / DB ============
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
@@ -44,16 +43,10 @@ PERSIST_ROOT = os.environ.get("PERSIST_ROOT", "/var/data")
 if not os.path.isdir(PERSIST_ROOT):
     PERSIST_ROOT = os.path.join(BASE_DIR, "data")
 os.makedirs(PERSIST_ROOT, exist_ok=True)
-
-# Sempre Path: evita TypeError ao usar operador "/"
-TABELAS_DIR: Path = (Path(PERSIST_ROOT) / "tabelas")
-TABELAS_DIR.mkdir(parents=True, exist_ok=True)
-TABELAS_DIR = TABELAS_DIR.resolve()  # blinda contra reatribuições
-
-# Legado (estático) também como Path
-STATIC_TABLES: Path = (Path(BASE_DIR) / "static" / "uploads" / "tabelas")
-STATIC_TABLES.mkdir(parents=True, exist_ok=True)
-
+TABELAS_DIR = os.path.join(PERSIST_ROOT, "tabelas")
+os.makedirs(TABELAS_DIR, exist_ok=True)
+STATIC_TABLES = os.path.join(BASE_DIR, "static", "uploads", "tabelas")
+os.makedirs(STATIC_TABLES, exist_ok=True)
 # 🔹 Documentos (persistente em disco)
 DOCS_PERSIST_DIR = os.path.join(PERSIST_ROOT, "docs")
 os.makedirs(DOCS_PERSIST_DIR, exist_ok=True)
@@ -825,76 +818,44 @@ def _save_upload(file_storage) -> str | None:
     return f"/static/uploads/{fname}"
 
 
-from pathlib import Path
-from datetime import datetime
 from werkzeug.utils import secure_filename
-import os
+import time
 
-# 2) Upload: salva sempre dentro de TABELAS_DIR e grava só o NOME no banco
-from werkzeug.utils import secure_filename
-from datetime import datetime
-import os
-
-# ============ Upload / Resolução de Caminho de Tabelas ============
 def salvar_tabela_upload(file_storage) -> str | None:
     """
     Salva o arquivo de TABELA dentro do diretório persistente (TABELAS_DIR)
-    e retorna APENAS o nome do arquivo (para guardar no banco).
+    e retorna APENAS o nome do arquivo (para guardar no banco em Tabela.arquivo_nome).
     """
-    if not file_storage or not getattr(file_storage, "filename", ""):
+    if not file_storage or not file_storage.filename:
         return None
-
-    fname = secure_filename(file_storage.filename or "")
-    if not fname:
-        return None
-
+    fname = secure_filename(file_storage.filename)
     base, ext = os.path.splitext(fname)
-    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    unique = f"{base}_{ts}{(ext or '').lower()}"
-
-    # Garante Path mesmo que alguém tenha reatribuído TABELAS_DIR em outro lugar
-    destino_path: Path = Path(TABELAS_DIR) / unique
-    destino_path.parent.mkdir(parents=True, exist_ok=True)
-    file_storage.save(str(destino_path))  # .save espera string
-    return destino_path.name              # grava só o nome no banco
+    unique = f"{base}_{time.strftime('%Y%m%d_%H%M%S')}{ext.lower()}"
+    destino = os.path.join(TABELAS_DIR, unique)
+    file_storage.save(destino)
+    return unique  # <- guarde este em Tabela.arquivo_nome
 
 
 def resolve_tabela_path(nome_arquivo: str) -> str | None:
     """
     Resolve o caminho real de uma TABELA:
-      1) /var/data/tabelas (persistente)
-      2) static/uploads/tabelas (legado)
-      3) caminho absoluto (se gravaram completo)
-    Retorna o caminho ABSOLUTO como string, ou None se não existir.
+      1) /var/data/tabelas   (persistente)
+      2) static/uploads/...  (legado)
     """
-    raw = (nome_arquivo or "").strip()
-    if not raw:
+    if not nome_arquivo:
         return None
-
-    # remove query/fragment e pega somente o nome (evita traversal)
-    raw_no_q = raw.split("?", 1)[0].split("#", 1)[0]
-    fname = os.path.basename(raw_no_q)
-
-    candidatos: list[Path] = []
-    if fname:
-        candidatos.append(Path(TABELAS_DIR) / fname)   # persistente (Path garantido)
-        candidatos.append(Path(STATIC_TABLES) / fname) # legado
-
-    if raw_no_q.startswith("/"):                       # absoluto (fallback)
-        candidatos.append(Path(raw_no_q))
-
+    candidatos = [
+        os.path.join(TABELAS_DIR, nome_arquivo),
+        os.path.join(STATIC_TABLES, nome_arquivo),  # legado
+        # último fallback: se por acaso gravaram caminho completo em arquivo_url
+        _abs_path_from_url(nome_arquivo) if nome_arquivo.startswith("/") else None,
+    ]
     for p in candidatos:
-        try:
-            if p.is_file():
-                return str(p)
-        except Exception:
-            # ignora paths inválidos
-            pass
-
-    current_app.logger.warning(
-        "Arquivo de Tabela não encontrado. nome=%r tents=%r",
-        nome_arquivo, [str(c) for c in candidatos]
-    )
+        if p and os.path.isfile(p):
+            return p
+    # log amigável (vai parar com o WARNING que você viu)
+    app.logger.warning("Arquivo de Tabela não encontrado. nome='%s' tents=%s",
+                       nome_arquivo, [c for c in candidatos if c])
     return None
 
 # ========= Helpers de DOCUMENTOS (PDFs, etc.) =========
@@ -4961,38 +4922,39 @@ def admin_upload_documento():
 
     if not titulo or not (arquivo and arquivo.filename):
         flash("Preencha o título e selecione o arquivo.", "warning")
-        return redirect(url_for("admin_documentos"), code=303)
+        return redirect(url_for("admin_documentos"))
 
-    # Salva e retorna nome único persistente
+    # === NOVO: salva em diretório persistente e retorna NOME ÚNICO ===
     nome_unico = salvar_documento_upload(arquivo)
     if not nome_unico:
         flash("Falha ao salvar o arquivo.", "danger")
-        return redirect(url_for("admin_documentos"), code=303)
+        return redirect(url_for("admin_documentos"))
 
+    # compat: também guardamos um URL que aponta para /docs/<nome>
     d = Documento(
         titulo=titulo,
         categoria=categoria,
         descricao=descricao,
-        arquivo_url=url_for("serve_documento", nome=nome_unico),  # compat
-        arquivo_nome=nome_unico,
+        arquivo_url=url_for("serve_documento", nome=nome_unico),  # compat com templates antigos
+        arquivo_nome=nome_unico,  # agora guardamos o NOME ÚNICO persistido
         enviado_em=datetime.utcnow(),
     )
     db.session.add(d)
     db.session.commit()
     flash("Documento enviado.", "success")
-    return redirect(url_for("admin_documentos"), code=303)
+    return redirect(url_for("admin_documentos"))
 
 
-@app.post("/admin/documentos/<int:doc_id>/delete")
+@app.get("/admin/documentos/<int:doc_id>/delete")
 @admin_required
 def admin_delete_documento(doc_id):
     d = Documento.query.get_or_404(doc_id)
-
-    # remove arquivo físico (persistente e legado)
     try:
+        # === NOVO: tenta deletar do armazenamento persistente pelo nome salvo ===
         p = resolve_document_path(d.arquivo_nome)
         if p and os.path.exists(p):
             os.remove(p)
+        # Fallback (legado): se sobrou um caminho em /static/uploads/docs/ no arquivo_url, remove também
         if d.arquivo_url and d.arquivo_url.startswith("/static/uploads/docs/"):
             legacy_path = os.path.join(BASE_DIR, d.arquivo_url.lstrip("/"))
             if os.path.exists(legacy_path):
@@ -5003,7 +4965,7 @@ def admin_delete_documento(doc_id):
     db.session.delete(d)
     db.session.commit()
     flash("Documento removido.", "success")
-    return redirect(url_for("admin_documentos"), code=303)
+    return redirect(url_for("admin_documentos"))
 
 
 @app.route("/documentos")
@@ -5015,13 +4977,19 @@ def documentos_publicos():
     return render_template("documentos_publicos.html", documentos=documentos)
 
 
-@app.route("/documentos/<int:doc_id>/baixar")
+@app.route('/documentos/<int:doc_id>/baixar')
 def baixar_documento(doc_id):
     doc = Documento.query.get_or_404(doc_id)
+    # === NOVO: resolve caminho persistente pelo nome salvo ===
     path = resolve_document_path(doc.arquivo_nome)
     if not path or not os.path.exists(path):
         abort(404)
-    return send_file(path, as_attachment=True, download_name=os.path.basename(doc.arquivo_nome))
+    # força download (independente do tipo)
+    return send_file(
+        path,
+        as_attachment=True,
+        download_name=os.path.basename(doc.arquivo_nome)
+    )
 
 # =========================
 # Inicialização automática do DB em servidores (Gunicorn/Render)
@@ -5111,27 +5079,67 @@ def _enforce_restaurante_titulo(tabela, restaurante):
         abort(403)
 
 def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
+    """
+    Resolve e serve o arquivo da Tabela:
+    - http(s) => redirect
+    - sempre tenta primeiro static/uploads/tabelas/<arquivo>
+    - aceita absoluto, relativo e só o nome
+    - ignora querystring/fragments (ex.: foo.pdf?v=123#x)
+    """
     url = (tabela.arquivo_url or "").strip()
     if not url:
         abort(404)
+
+    # URL externa
     if url.startswith(("http://", "https://")):
         return redirect(url)
 
-    path = resolve_tabela_path(url)  # usa seu helper persistente
-    if not path:
-        current_app.logger.warning(
-            "Tabela não encontrada. id=%s titulo=%r url=%r",
-            getattr(tabela, "id", None), getattr(tabela, "titulo", None), url
-        )
+    base_dir    = Path(BASE_DIR)
+    tabelas_dir = _tabelas_base_dir()
+
+    # normaliza: remove "/" inicial, query e fragment
+    raw = url.lstrip("/")
+    raw_no_q = raw.split("?", 1)[0].split("#", 1)[0]
+    fname = (raw_no_q.split("/")[-1] if raw_no_q else "").strip()
+
+    candidates = []
+
+    # 1) SEMPRE prioriza nosso diretório oficial
+    if fname:
+        candidates.append(tabelas_dir / fname)
+
+    # 2) Como veio, relativo ao BASE_DIR (compat c/ legado: static/uploads/tabelas/...)
+    candidates.append(base_dir / raw_no_q)
+
+    # 3) Absoluto (se alguém gravou caminho completo por engano)
+    p = Path(url)
+    if p.is_absolute():
+        candidates.append(p)
+
+    # 4) Mais dois legados comuns
+    if fname:
+        candidates.append(base_dir / "uploads" / "tabelas" / fname)
+        candidates.append(base_dir / "static" / "uploads" / "tabelas" / fname)
+
+    file_path = next((c for c in candidates if c.exists() and c.is_file()), None)
+    if not file_path:
+        try:
+            log.warning(
+                "Arquivo de Tabela não encontrado. id=%s titulo=%r arquivo_url=%r tents=%r",
+                getattr(tabela, "id", None),
+                getattr(tabela, "titulo", None),
+                tabela.arquivo_url,
+                [str(c) for c in candidates],
+            )
+        except Exception:
+            pass
         abort(404)
 
-    mime, _ = mimetypes.guess_type(path)
     return send_file(
-        path,
-        mimetype=mime or "application/octet-stream",
+        str(file_path),
         as_attachment=as_attachment,
-        download_name=(tabela.arquivo_nome or os.path.basename(path)),
-        conditional=True,
+        download_name=(tabela.arquivo_nome or file_path.name),
+        mimetype=_guess_mimetype_from_path(str(file_path)),
     )
 
 # ---------------------------------------------------------------------------
@@ -5161,17 +5169,25 @@ def admin_upload_tabela():
         flash("Preencha o título e selecione o arquivo.", "warning")
         return redirect(url_for("admin_tabelas"))
 
-    # salva no diretório PERSISTENTE e retorna SÓ o nome
-    nome_arquivo = salvar_tabela_upload(arquivo)
-    if not nome_arquivo:
-        flash("Falha ao salvar o arquivo.", "danger")
-        return redirect(url_for("admin_tabelas"))
+    base_dir = _tabelas_base_dir()
+
+    # nome seguro + timestamp pra não colidir
+    raw = secure_filename(arquivo.filename)
+    stem, ext = os.path.splitext(raw)
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    safe_stem = re.sub(r"[^A-Za-z0-9_.-]+", "-", stem) or "arquivo"
+    final_name = f"{safe_stem}_{ts}{ext or ''}"
+
+    dest = base_dir / final_name
+    arquivo.save(str(dest))
 
     t = Tabela(
         titulo=titulo,
         descricao=descricao,
-        arquivo_url=nome_arquivo,        # <- SÓ o nome salvo em disco
-        arquivo_nome=arquivo.filename,   # <- nome original “bonito” p/ exibir/baixar
+        # Importante: gravar apenas o NOME, não o caminho.
+        # O _serve_tabela_or_redirect vai resolver para TABELAS_DIR.
+        arquivo_url=final_name,
+        arquivo_nome=arquivo.filename,
         enviado_em=datetime.utcnow(),
     )
     db.session.add(t)
