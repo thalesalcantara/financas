@@ -31,6 +31,10 @@ from sqlalchemy.pool import QueuePool
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
+# 👉 Novo: para gerar XLSX em memória
+from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
+
 # ============ App / DB ============
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -55,10 +59,12 @@ def _build_db_uri() -> str:
     url = os.environ.get("DATABASE_URL")
     if not url:
         return "sqlite:///" + os.path.join(BASE_DIR, "app.db")
+    # força driver novo psycopg
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql+psycopg://", 1)
     elif url.startswith("postgresql://") and "+psycopg" not in url:
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+    # SSL obrigatório no Render/managed PG
     if url.startswith("postgresql+psycopg://") and "sslmode=" not in url:
         url += ("&" if "?" in url else "?") + "sslmode=require"
     return url
@@ -81,8 +87,8 @@ app.config.update(
         "pool_size": 5,
         "max_overflow": 5,
         "pool_timeout": 10,
-        "pool_pre_ping": True,
-        "pool_recycle": 1800,
+        "pool_pre_ping": True,   # evita conexões mortas
+        "pool_recycle": 1800,    # recicla após 30 min (pode reduzir p/ 300 se necessário)
         "connect_args": {
             "connect_timeout": 5,
             "options": "-c statement_timeout=15000",
