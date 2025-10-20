@@ -2235,12 +2235,16 @@ def admin_dashboard():
 @app.route("/exportar_lancamentos")
 @admin_required
 def exportar_lancamentos():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.utils import get_column_letter
+
     args = request.args
     restaurante_id = args.get("restaurante_id", type=int)
-    cooperado_id = args.get("cooperado_id", type=int)
-    data_inicio = _parse_date(args.get("data_inicio"))
-    data_fim = _parse_date(args.get("data_fim"))
-    dows = set(args.getlist("dow"))
+    cooperado_id   = args.get("cooperado_id", type=int)
+    data_inicio    = _parse_date(args.get("data_inicio"))
+    data_fim       = _parse_date(args.get("data_fim"))
+    dows           = set(args.getlist("dow"))
 
     q = Lancamento.query
     if restaurante_id:
@@ -2256,15 +2260,93 @@ def exportar_lancamentos():
     if dows:
         lancs = [l for l in lancs if l.data and _dow(l.data) in dows]
 
-    buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";")
-    w.writerow(["Restaurante", "Periodo", "Cooperado", "Descricao", "Valor", "Data", "HoraInicio", "HoraFim", "INSS", "Liquido"])
+    # ---- Monta o Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Lançamentos"
+
+    header = [
+        "Restaurante", "Periodo", "Cooperado", "Descricao",
+        "Valor", "Data", "HoraInicio", "HoraFim", "INSS", "Liquido",
+    ]
+    ws.append(header)
+
+    # Estilo do header
+    bold = Font(bold=True)
+    center = Alignment(horizontal="center", vertical="center")
+    fill = PatternFill("solid", fgColor="DDDDDD")
+    thin = Side(border_style="thin", color="CCCCCC")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    for col_idx, _ in enumerate(header, start=1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.font = bold
+        cell.alignment = center
+        cell.fill = fill
+        cell.border = border
+
+    # Linhas
     for l in lancs:
-        v = l.valor or 0.0
+        v = float(l.valor or 0.0)
         inss = v * 0.045
         liq = v - inss
-        w.writerow([
-            l.restaurante.nome,
+
+        row = [
+            l.restaurante.nome if l.restaurante else "",
+            l.restaurante.periodo if l.restaurante else "",
+            l.cooperado.nome if l.cooperado else "",
+            (l.descricao or ""),
+            v,
+            l.data,  # se None, vai vazio
+            (l.hora_inicio or ""),
+            (l.hora_fim or ""),
+            inss,
+            liq,
+        ]
+        ws.append(row)
+
+    # Formatos de número/data e largura das colunas
+    # Índices das colunas (1-based): Valor=5, Data=6, INSS=9, Liquido=10
+    currency_fmt = "0.00"
+    date_fmt = "DD/MM/YYYY"
+
+    for r in range(2, ws.max_row + 1):
+        ws.cell(row=r, column=5).number_format = currency_fmt
+        ws.cell(row=r, column=6).number_format = date_fmt
+        ws.cell(row=r, column=9).number_format = currency_fmt
+        ws.cell(row=r, column=10).number_format = currency_fmt
+
+    # Ajuste simples de largura (auto-fit aproximado)
+    for col_idx in range(1, ws.max_column + 1):
+        max_len = 0
+        col_letter = get_column_letter(col_idx)
+        for cell in ws[col_letter]:
+            try:
+                txt = str(cell.value) if cell.value is not None else ""
+            except Exception:
+                txt = ""
+            max_len = max(max_len, len(txt))
+        ws.column_dimensions[col_letter].width = min(max(10, max_len + 2), 50)
+
+    # Congelar cabeçalho
+    ws.freeze_panes = "A2"
+
+    # Borda nas células de dados
+    for r in range(2, ws.max_row + 1):
+        for c in range(1, ws.max_column + 1):
+            ws.cell(row=r, column=c).border = border
+
+    # ---- Retorna como download .xlsx
+    mem = io.BytesIO()
+    wb.save(mem)
+    mem.seek(0)
+
+    return send_file(
+        mem,
+        as_attachment=True,
+        download_name="lancamentos.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 # =========================
 # CRUD Lançamentos (Admin)
