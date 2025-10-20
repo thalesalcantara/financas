@@ -2232,6 +2232,14 @@ def admin_dashboard():
 # =========================
 # Navegação/Export util
 # =========================
+@app.route("/filtrar_lancamentos")
+@admin_required
+def filtrar_lancamentos():
+    qs = request.query_string.decode("utf-8")
+    base = url_for("admin_dashboard", tab="lancamentos")
+    joiner = "&" if qs else ""
+    return redirect(f"{base}{joiner}{qs}")
+    
 @app.route("/exportar_lancamentos")
 @admin_required
 def exportar_lancamentos():
