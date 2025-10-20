@@ -4238,8 +4238,8 @@ def portal_cooperado():
 
     ql = in_range(Lancamento.query.filter_by(cooperado_id=coop.id), Lancamento.data)
     producoes = ql.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
-    
-        # --- Marca se o cooperado já avaliou cada produção ---
+
+    # --- Marca se o cooperado já avaliou cada produção ---
     ids = [l.id for l in producoes]
     minhas = {}
     if ids:
@@ -4295,6 +4295,7 @@ def portal_cooperado():
         "dias_para_prazo": dias_para_3112(),
     }
 
+    # ---------- ESCALA (dedupe + ordenação cronológica robusta) ----------
     raw_escala = (Escala.query
                   .filter_by(cooperado_id=coop.id)
                   .order_by(Escala.id.asc())
@@ -4310,17 +4311,9 @@ def portal_cooperado():
         h = (e.horario or "").strip()
         return (1 if h else 0, len(h), e.id)
 
-    best = {}
-    for e in raw_escala:
-        key = (_norm_c(e.data), _norm_c(e.turno), _norm_c(e.contrato))
-        cur = best.get(key)
-        if not cur or _score(e) > _score(cur):
-            best[key] = e
-
-    minha_escala = sorted(best.values(), key=lambda x: x.id)
-
-    def _parse_data_escala_local(s: str):
-        m = re.search(r'(\d{1,2})/(\d{1,2})/(\d{2,4})', str(s or ''))
+    # helper: parse data "dd/mm/aaaa"
+    def _to_date_from_str(s: str):
+        m = _re.search(r'(\d{1,2})/(\d{1,2})/(\d{2,4})', str(s or ''))
         if not m:
             return None
         d_, mth, y = map(int, m.groups())
@@ -4331,8 +4324,46 @@ def portal_cooperado():
         except Exception:
             return None
 
+    # helper: minutos do horário "HH:MM"
+    def _mins(h):
+        m = _re.search(r'(\d{1,2}):(\d{2})', str(h or ''))
+        if not m:
+            return 24*60 + 59  # empurra vazios pro fim do dia
+        hh, mm = map(int, m.groups())
+        return hh*60 + mm
+
+    # helper: bucket para ordenar dia antes de noite
+    def _bucket_idx(turno, horario):
+        b = (_turno_bucket(turno, horario) or "").lower()
+        if "dia" in b:
+            return 1
+        if "noite" in b:
+            return 2
+        # fallback pelo horário
+        mins = _mins(horario)
+        return 2 if (mins >= 17*60 or mins <= 6*60) else 1
+
+    # Escolhe “melhor” registro por (data/turno/contrato)
+    best = {}
+    for e in raw_escala:
+        key = (_norm_c(e.data), _norm_c(e.turno), _norm_c(e.contrato))
+        cur = best.get(key)
+        if not cur or _score(e) > _score(cur):
+            best[key] = e
+
+    # Ordena cronologicamente (não por id!)
+    cand = list(best.values())
+    for e in cand:
+        d = _to_date_from_str(e.data) or date.min
+        mins = _mins(e.horario or "")
+        bidx = _bucket_idx(e.turno, e.horario)
+        e._ord = (d.toordinal(), bidx, mins, (e.contrato or ""), e.id)
+
+    minha_escala = sorted(cand, key=lambda x: x._ord)
+
+    # ---------- Status/cores por data ----------
     for e in minha_escala:
-        dt = _parse_data_escala_local(e.data)
+        dt = _to_date_from_str(e.data)
         if dt is None:
             status = 'unknown'
         else:
@@ -4352,6 +4383,7 @@ def portal_cooperado():
             'transparent'
         )
 
+    # ---------- versão JSON já na MESMA ORDEM ----------
     minha_escala_json = []
     for e in minha_escala:
         minha_escala_json.append({
@@ -4364,6 +4396,7 @@ def portal_cooperado():
             "turno_bucket": _turno_bucket(e.turno, e.horario),
         })
 
+    # ---------- Trocas ----------
     coops = (Cooperado.query
              .filter(Cooperado.id != coop.id)
              .order_by(Cooperado.nome.asc())
