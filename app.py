@@ -32,7 +32,7 @@ from sqlalchemy.pool import QueuePool
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
-# ============ App / DB ============
+# ============ App / DB (trecho de diretórios) ============
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
@@ -45,13 +45,14 @@ if not os.path.isdir(PERSIST_ROOT):
     PERSIST_ROOT = os.path.join(BASE_DIR, "data")
 os.makedirs(PERSIST_ROOT, exist_ok=True)
 
-# >>> ALTERADO: usar Path para permitir operador "/" no resto do código
-TABELAS_DIR = Path(PERSIST_ROOT) / "tabelas"
+# Sempre Path: evita TypeError ao usar operador "/"
+TABELAS_DIR: Path = (Path(PERSIST_ROOT) / "tabelas")
 TABELAS_DIR.mkdir(parents=True, exist_ok=True)
-TABELAS_DIR = Path(TABELAS_DIR)
+TABELAS_DIR = TABELAS_DIR.resolve()  # blinda contra reatribuições
 
-STATIC_TABLES = os.path.join(BASE_DIR, "static", "uploads", "tabelas")
-os.makedirs(STATIC_TABLES, exist_ok=True)
+# Legado (estático) também como Path
+STATIC_TABLES: Path = (Path(BASE_DIR) / "static" / "uploads" / "tabelas")
+STATIC_TABLES.mkdir(parents=True, exist_ok=True)
 
 # 🔹 Documentos (persistente em disco)
 DOCS_PERSIST_DIR = os.path.join(PERSIST_ROOT, "docs")
@@ -834,31 +835,37 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 import os
 
+# ============ Upload / Resolução de Caminho de Tabelas ============
 def salvar_tabela_upload(file_storage) -> str | None:
     """
     Salva o arquivo de TABELA dentro do diretório persistente (TABELAS_DIR)
     e retorna APENAS o nome do arquivo (para guardar no banco).
     """
-    if not file_storage or not file_storage.filename:
+    if not file_storage or not getattr(file_storage, "filename", ""):
         return None
 
-    fname = secure_filename(file_storage.filename)
+    fname = secure_filename(file_storage.filename or "")
+    if not fname:
+        return None
+
     base, ext = os.path.splitext(fname)
-    ts = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     unique = f"{base}_{ts}{(ext or '').lower()}"
 
-    # --- Path puro (sem os.path.*)
-    destino_path = TABELAS_DIR / unique           # TABELAS_DIR deve ser Path
+    # Garante Path mesmo que alguém tenha reatribuído TABELAS_DIR em outro lugar
+    destino_path: Path = Path(TABELAS_DIR) / unique
     destino_path.parent.mkdir(parents=True, exist_ok=True)
-    file_storage.save(str(destino_path))          # .save() espera string
-    return destino_path.name                      # grava só o nome no banco
+    file_storage.save(str(destino_path))  # .save espera string
+    return destino_path.name              # grava só o nome no banco
+
 
 def resolve_tabela_path(nome_arquivo: str) -> str | None:
     """
     Resolve o caminho real de uma TABELA:
       1) /var/data/tabelas (persistente)
-      2) static/uploads/... (legado)
+      2) static/uploads/tabelas (legado)
       3) caminho absoluto (se gravaram completo)
+    Retorna o caminho ABSOLUTO como string, ou None se não existir.
     """
     raw = (nome_arquivo or "").strip()
     if not raw:
@@ -868,12 +875,12 @@ def resolve_tabela_path(nome_arquivo: str) -> str | None:
     raw_no_q = raw.split("?", 1)[0].split("#", 1)[0]
     fname = os.path.basename(raw_no_q)
 
-    candidatos = []
+    candidatos: list[Path] = []
     if fname:
-        candidatos.append(TABELAS_DIR / fname)              # persistente
-        candidatos.append(Path(STATIC_TABLES) / fname)      # legado
+        candidatos.append(Path(TABELAS_DIR) / fname)   # persistente (Path garantido)
+        candidatos.append(Path(STATIC_TABLES) / fname) # legado
 
-    if raw_no_q.startswith("/"):                            # absoluto
+    if raw_no_q.startswith("/"):                       # absoluto (fallback)
         candidatos.append(Path(raw_no_q))
 
     for p in candidatos:
@@ -881,6 +888,7 @@ def resolve_tabela_path(nome_arquivo: str) -> str | None:
             if p.is_file():
                 return str(p)
         except Exception:
+            # ignora paths inválidos
             pass
 
     current_app.logger.warning(
