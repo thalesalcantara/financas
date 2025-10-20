@@ -48,6 +48,7 @@ os.makedirs(PERSIST_ROOT, exist_ok=True)
 # >>> ALTERADO: usar Path para permitir operador "/" no resto do código
 TABELAS_DIR = Path(PERSIST_ROOT) / "tabelas"
 TABELAS_DIR.mkdir(parents=True, exist_ok=True)
+TABELAS_DIR = Path(TABELAS_DIR)
 
 STATIC_TABLES = os.path.join(BASE_DIR, "static", "uploads", "tabelas")
 os.makedirs(STATIC_TABLES, exist_ok=True)
@@ -828,9 +829,6 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 import os
 
-TABELAS_DIR = Path(PERSIST_ROOT) / "tabelas"
-TABELAS_DIR.mkdir(parents=True, exist_ok=True)
-
 # 2) Upload: salva sempre dentro de TABELAS_DIR e grava só o NOME no banco
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -849,31 +847,46 @@ def salvar_tabela_upload(file_storage) -> str | None:
     ts = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
     unique = f"{base}_{ts}{(ext or '').lower()}"
 
-    destino = str(TABELAS_DIR / unique)  # <- Path -> str
-    os.makedirs(os.path.dirname(destino), exist_ok=True)
-    file_storage.save(destino)
-    return unique  # <- esse valor vai para Tabela.arquivo_url
+    # --- Path puro (sem os.path.*)
+    destino_path = TABELAS_DIR / unique           # TABELAS_DIR deve ser Path
+    destino_path.parent.mkdir(parents=True, exist_ok=True)
+    file_storage.save(str(destino_path))          # .save() espera string
+    return destino_path.name                      # grava só o nome no banco
 
 def resolve_tabela_path(nome_arquivo: str) -> str | None:
     """
     Resolve o caminho real de uma TABELA:
-      1) /var/data/tabelas   (persistente)
-      2) static/uploads/...  (legado)
+      1) /var/data/tabelas (persistente)
+      2) static/uploads/... (legado)
+      3) caminho absoluto (se gravaram completo)
     """
-    if not nome_arquivo:
+    raw = (nome_arquivo or "").strip()
+    if not raw:
         return None
-    candidatos = [
-        os.path.join(TABELAS_DIR, nome_arquivo),
-        os.path.join(STATIC_TABLES, nome_arquivo),  # legado
-        # último fallback: se por acaso gravaram caminho completo em arquivo_url
-        _abs_path_from_url(nome_arquivo) if nome_arquivo.startswith("/") else None,
-    ]
+
+    # remove query/fragment e pega somente o nome (evita traversal)
+    raw_no_q = raw.split("?", 1)[0].split("#", 1)[0]
+    fname = os.path.basename(raw_no_q)
+
+    candidatos = []
+    if fname:
+        candidatos.append(TABELAS_DIR / fname)              # persistente
+        candidatos.append(Path(STATIC_TABLES) / fname)      # legado
+
+    if raw_no_q.startswith("/"):                            # absoluto
+        candidatos.append(Path(raw_no_q))
+
     for p in candidatos:
-        if p and os.path.isfile(p):
-            return p
-    # log amigável (vai parar com o WARNING que você viu)
-    app.logger.warning("Arquivo de Tabela não encontrado. nome='%s' tents=%s",
-                       nome_arquivo, [c for c in candidatos if c])
+        try:
+            if p.is_file():
+                return str(p)
+        except Exception:
+            pass
+
+    current_app.logger.warning(
+        "Arquivo de Tabela não encontrado. nome=%r tents=%r",
+        nome_arquivo, [str(c) for c in candidatos]
+    )
     return None
 
 # ========= Helpers de DOCUMENTOS (PDFs, etc.) =========
