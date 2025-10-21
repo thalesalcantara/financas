@@ -145,10 +145,6 @@ def _is_sqlite() -> bool:
 # =========================
 # Models
 # =========================
-# models.py
-from yourpackage import db  # ou: from app import db, se for assim no seu projeto
-from werkzeug.security import generate_password_hash, check_password_hash
-
 class Usuario(db.Model):
     __tablename__ = "usuarios"
     id = db.Column(db.Integer, primary_key=True)
