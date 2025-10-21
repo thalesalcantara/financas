@@ -2075,7 +2075,8 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
               <th style="width:60px;">Foto</th>
               <th>Nome</th>
               <th>Usuário</th>
-              <th class="text-center" style="width:180px;">Ações</th>
+              <th style="width:120px;" class="text-center">Status</th>
+              <th class="text-center" style="width:220px;">Ações</th>
             </tr>
           </thead>
           <tbody id="tbodyCooperados">
@@ -2088,33 +2089,58 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                 </td>
                 <td class="fw-medium">{{ coop.nome }}</td>
                 <td class="text-muted">{{ coop.usuario_ref.usuario }}</td>
+
+                <!-- Badge de status -->
+                <td class="text-center">
+                  <span id="badge-ativo-{{ coop.id }}"
+                        class="badge {{ 'bg-success' if coop.usuario_ref.ativo else 'bg-secondary' }}">
+                    {{ 'Ativo' if coop.usuario_ref.ativo else 'Inativo' }}
+                  </span>
+                </td>
+
                 <td class="text-center">
                   <div class="btn-group btn-group-sm" role="group">
+                    <!-- Toggle ativo/inativo -->
+                    <button class="btn {{ 'btn-outline-danger' if coop.usuario_ref.ativo else 'btn-outline-success' }}"
+                            type="button"
+                            title="{{ 'Desativar' if coop.usuario_ref.ativo else 'Ativar' }}"
+                            data-id="{{ coop.id }}"
+                            data-ativo="{{ 1 if coop.usuario_ref.ativo else 0 }}"
+                            onclick="toggleAtivoCooperado(this)">
+                      <i class="bi {{ 'bi-person-dash' if coop.usuario_ref.ativo else 'bi-person-check' }}"></i>
+                      <span class="d-none d-sm-inline">{{ 'Desativar' if coop.usuario_ref.ativo else 'Ativar' }}</span>
+                    </button>
+
+                    <!-- Editar -->
                     <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalEditCooperado"
                             data-id="{{ coop.id }}" data-nome="{{ coop.nome }}" data-usuario="{{ coop.usuario_ref.usuario }}"
                             data-url="{{ url_for('edit_cooperado', id=coop.id) }}" title="Editar">
                       <i class="bi bi-pencil"></i>
                     </button>
+
+                    <!-- Resetar senha -->
                     <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalResetSenhaCooperado"
                             data-id="{{ coop.id }}" data-url="{{ url_for('reset_senha_cooperado', id=coop.id) }}" title="Redefinir senha">
                       <i class="bi bi-key"></i>
                     </button>
-                   <form action="{{ url_for('delete_cooperado', id=coop.id) }}"
-      method="POST"
-      class="d-inline"
-      onsubmit="return confirm('Excluir {{ coop.nome }}? Esta ação não pode ser desfeita.');">
-  {% if csrf_token is defined %}
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  {% endif %}
-  <button type="submit" class="btn btn-danger btn-del" title="Excluir">
-    <i class="bi bi-trash"></i>
-  </button>
-</form>
+
+                    <!-- Excluir -->
+                    <form action="{{ url_for('delete_cooperado', id=coop.id) }}"
+                          method="POST"
+                          class="d-inline"
+                          onsubmit="return confirm('Excluir {{ coop.nome }}? Esta ação não pode ser desfeita.');">
+                      {% if csrf_token is defined %}
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      {% endif %}
+                      <button type="submit" class="btn btn-danger btn-del" title="Excluir">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
                   </div>
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="4" class="text-center text-muted">Nenhum cooperado</td></tr>
+              <tr><td colspan="5" class="text-center text-muted">Nenhum cooperado</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -2161,6 +2187,52 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         btn.innerHTML = isPwd ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
       });
     })();
+
+    // alternar ativo/inativo
+    async function toggleAtivoCooperado(btn) {
+      const id = btn.dataset.id;
+
+      const headers = { 'X-Requested-With': 'fetch' };
+      {% if csrf_token is defined %}
+        headers['X-CSRFToken'] = '{{ csrf_token() }}';
+      {% endif %}
+
+      try {
+        const resp = await fetch(`/admin/cooperados/${id}/toggle-status`, {
+          method: 'POST',
+          headers
+        });
+        const data = await resp.json();
+
+        if (!data.ok) {
+          alert(data.error || 'Falha ao alternar status');
+          return;
+        }
+
+        const ativo = !!data.ativo;
+
+        // Badge
+        const badge = document.getElementById(`badge-ativo-${id}`);
+        if (badge) {
+          badge.textContent = ativo ? 'Ativo' : 'Inativo';
+          badge.classList.toggle('bg-success', ativo);
+          badge.classList.toggle('bg-secondary', !ativo);
+        }
+
+        // Botão
+        btn.dataset.ativo = ativo ? 1 : 0;
+        btn.title = ativo ? 'Desativar' : 'Ativar';
+        btn.classList.toggle('btn-outline-danger', ativo);
+        btn.classList.toggle('btn-outline-success', !ativo);
+        btn.innerHTML = ativo
+          ? '<i class="bi bi-person-dash"></i> <span class="d-none d-sm-inline">Desativar</span>'
+          : '<i class="bi bi-person-check"></i> <span class="d-none d-sm-inline">Ativar</span>';
+
+      } catch (e) {
+        console.error(e);
+        alert('Erro de rede ao alternar status');
+      }
+    }
   </script>
 </section>
 
