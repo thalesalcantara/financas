@@ -151,6 +151,7 @@ class Usuario(db.Model):
     usuario = db.Column(db.String(80), unique=True, nullable=False)
     senha_hash = db.Column(db.String(200), nullable=False)
     tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
+    ativo = db.Column(db.Boolean, default=True, nullable=False)  # <— novo campo
 
     def set_password(self, raw: str):
         self.senha_hash = generate_password_hash(raw)
@@ -482,6 +483,23 @@ def init_db():
             db.session.commit()
     except Exception:
         db.session.rollback()
+
+    # 4.x) coluna 'ativo' em usuarios
+try:
+    if _is_sqlite():
+        cols = db.session.execute(sa_text("PRAGMA table_info(usuarios);")).fetchall()
+        colnames = {row[1] for row in cols}
+        if "ativo" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE usuarios ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1"))
+        db.session.commit()
+    else:
+        db.session.execute(sa_text(
+            "ALTER TABLE IF NOT EXISTS public.usuarios "
+            "ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE"
+        ))
+        db.session.commit()
+except Exception:
+    db.session.rollback()
 
     # 4.1) cooperado_nome em escalas
     try:
