@@ -414,7 +414,6 @@ class AvisoLeitura(db.Model):
     lido_em = db.Column(db.DateTime, default=datetime.utcnow)
     __table_args__ = (db.UniqueConstraint("aviso_id", "cooperado_id", "restaurante_id", name="uq_aviso_dest"), )
 
-
 # =========================
 # Helpers
 # =========================
@@ -705,7 +704,6 @@ def init_db():
 
 # === Bootstrap do banco no start (Render/Gunicorn) ===
 try:
-    # Opcional: controle por variável de ambiente para evitar lentidão no boot
     if os.environ.get("INIT_DB_ON_START", "1") == "1":
         _t0 = datetime.utcnow()
         with app.app_context():
@@ -721,19 +719,7 @@ try:
             pass
 except Exception as e:
     try:
-        app.logger.warning(f"init_db pulado: {e}")
-    except Exception:
-        pass
-
-    else:
-        try:
-            app.logger.info("INIT_DB_ON_START=0: pulando init_db no boot.")
-        except Exception:
-            pass
-except Exception as e:
-    # Evita derrubar o serviço se a inicialização falhar por motivo não crítico
-    try:
-        app.logger.warning(f"init_db pulado: {e}")
+        app.logger.warning(f"init_db falhou/pulado: {e}")
     except Exception:
         pass
 
@@ -873,10 +859,6 @@ def _save_upload(file_storage) -> str | None:
     file_storage.save(path)
     return f"/static/uploads/{fname}"
 
-
-from werkzeug.utils import secure_filename
-import time
-
 def salvar_tabela_upload(file_storage) -> str | None:
     """
     Salva o arquivo de TABELA dentro do diretório persistente (TABELAS_DIR)
@@ -913,43 +895,6 @@ def resolve_tabela_path(nome_arquivo: str) -> str | None:
     app.logger.warning("Arquivo de Tabela não encontrado. nome='%s' tents=%s",
                        nome_arquivo, [c for c in candidatos if c])
     return None
-
-# ========= Helpers de DOCUMENTOS (PDFs, etc.) =========
-def salvar_documento_upload(file_storage) -> str | None:
-    """
-    Salva o arquivo em disco persistente (/var/data/docs) e
-    retorna APENAS o nome do arquivo (para guardar no banco).
-    """
-    if not file_storage or not file_storage.filename:
-        return None
-    fname = secure_filename(file_storage.filename)
-    base, ext = os.path.splitext(fname)
-    unique = f"{base}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}{ext.lower()}"
-    destino = os.path.join(DOCS_PERSIST_DIR, unique)
-    file_storage.save(destino)
-    return unique  # guarde em Documento.arquivo_nome
-
-def resolve_documento_path(nome_arquivo: str) -> str | None:
-    """
-    Procura o arquivo nesta ordem:
-      1) persistente (/var/data/docs)
-      2) legado (DOCS_DIR em static/uploads/docs se você já usava)
-      3) caminho absoluto derivado de '/static/...'
-    """
-    if not nome_arquivo:
-        return None
-    candidatos = [
-        os.path.join(DOCS_PERSIST_DIR, nome_arquivo),
-        os.path.join(DOCS_DIR, nome_arquivo),  # legado (você já tinha DOCS_DIR)
-        _abs_path_from_url(nome_arquivo) if str(nome_arquivo).startswith("/") else None,
-    ]
-    for p in candidatos:
-        if p and os.path.isfile(p):
-            return p
-    app.logger.warning("Documento não encontrado. nome='%s' tents=%s",
-                       nome_arquivo, [c for c in candidatos if c])
-    return None
-
 
 def _save_foto_to_db(entidade, file_storage, *, is_cooperado: bool) -> str | None:
     """
@@ -1042,6 +987,15 @@ def resolve_documento_path(nome_arquivo: str) -> str | None:
     app.logger.warning("Documento não encontrado. nome='%s' tents=%s",
                        nome_arquivo, [c for c in candidatos if c])
     return None
+
+def _assert_cooperado_ativo(cooperado_id: int):
+    c = (Cooperado.query
+         .join(Usuario, Cooperado.usuario_id == Usuario.id)
+         .filter(Cooperado.id == cooperado_id, Usuario.ativo.is_(True))
+         .first())
+    if not c:
+        abort(400, description="Cooperado inativo ou inexistente.")
+    return c
 
 # ========= ROTA: /docs/<nome> (abre inline PDF; baixa outros tipos) =========
 @app.get("/docs/<path:nome>")
@@ -1677,21 +1631,27 @@ def index():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     erro_login = None
+
     if request.method == "POST":
-        usuario = request.form.get("usuario", "").strip()
-        senha = request.form.get("senha", "")
+        usuario = (request.form.get("usuario") or "").strip()
+        senha   = request.form.get("senha") or ""
 
         u = Usuario.query.filter_by(usuario=usuario).first()
 
-        # fallback: aceitar login pelo nome do restaurante
+        # Fallback: permitir login usando o NOME do restaurante
         if not u:
-            r = Restaurante.query.filter(Restaurante.nome.ilike(usuario)).first()
-            if not r:
-                r = Restaurante.query.filter(Restaurante.nome.ilike(f"%{usuario}%")).first()
+            r = (Restaurante.query.filter(Restaurante.nome.ilike(usuario)).first()
+                 or Restaurante.query.filter(Restaurante.nome.ilike(f"%{usuario}%")).first())
             if r and r.usuario_ref:
                 u = r.usuario_ref
 
         if u and u.check_password(senha):
+            # 🔴 BLOQUEIO: não permite login se a conta estiver inativa
+            if not getattr(u, "ativo", True):
+                flash("Conta desativada. Fale com o administrador.", "danger")
+                return redirect(url_for("login"))
+
+            # Autentica e direciona de acordo com o tipo
             session["user_id"] = u.id
             session["user_tipo"] = u.tipo
             if u.tipo == "admin":
@@ -1700,12 +1660,15 @@ def login():
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
                 return redirect(url_for("portal_restaurante"))
+
         erro_login = "Usuário/senha inválidos."
         flash(erro_login, "danger")
 
+    # Renderização do formulário (template se existir; fallback simples se não)
     login_tpl = os.path.join("templates", "login.html")
     if os.path.exists(login_tpl):
         return render_template("login.html", erro_login=erro_login)
+
     return """
     <form method="POST" style="max-width:320px;margin:80px auto;font-family:Arial">
       <h3>Login</h3>
@@ -1714,6 +1677,7 @@ def login():
       <button style="padding:10px 16px">Entrar</button>
     </form>
     """
+
 
 @app.route("/logout")
 def logout():
