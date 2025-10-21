@@ -145,13 +145,21 @@ def _is_sqlite() -> bool:
 # =========================
 # Models
 # =========================
-class Usuario(db.Model):
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+
+class Usuario(db.Model, UserMixin):
     __tablename__ = "usuarios"
     id = db.Column(db.Integer, primary_key=True)
     usuario = db.Column(db.String(80), unique=True, nullable=False)
     senha_hash = db.Column(db.String(200), nullable=False)
     tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
     ativo = db.Column(db.Boolean, nullable=False, default=True)
+
+    @property
+    def is_active(self) -> bool:
+        # Flask-Login usa isso para bloquear login de usuário inativo
+        return bool(self.ativo)
 
     def set_password(self, raw: str):
         self.senha_hash = generate_password_hash(raw)
@@ -1034,6 +1042,36 @@ def resolve_documento_path(nome_arquivo: str) -> str | None:
     app.logger.warning("Documento não encontrado. nome='%s' tents=%s",
                        nome_arquivo, [c for c in candidatos if c])
     return None
+
+# 1) imports básicos + criação do app e db
+app = Flask(__name__)
+db  = SQLAlchemy(app)
+
+# 2) models
+from flask_login import UserMixin
+class Usuario(db.Model, UserMixin):
+    ...
+
+# 3) LoginManager (SEU BLOCO)
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+
+login_manager = LoginManager()
+login_manager.login_view = "login"
+login_manager.init_app(app)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return Usuario.query.get(int(user_id))
+
+# 4) rotas/views
+@app.route("/login", methods=["GET","POST"])
+def login():
+    ...
+
+@app.route("/alguma-rota-protegida")
+@login_required
+def protegida():
+    ...
 
 # ========= ROTA: /docs/<nome> (abre inline PDF; baixa outros tipos) =========
 @app.get("/docs/<path:nome>")
