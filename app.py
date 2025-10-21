@@ -64,16 +64,28 @@ def _build_db_uri() -> str:
         url = url.replace("postgres://", "postgresql+psycopg://", 1)
     elif url.startswith("postgresql://") and "+psycopg" not in url:
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
-    # SSL obrigatório no Render/managed PG
-    if url.startswith("postgresql+psycopg://") and "sslmode=" not in url:
-        url += ("&" if "?" in url else "?") + "sslmode=require"
+
+    # SSL + keepalive (libpq lê do URI)
+    # se já tiver "?", usa "&"
+    sep = "&" if "?" in url else "?"
+    url = (
+        f"{url}{sep}"
+        "sslmode=require&"
+        "keepalives=1&keepalives_idle=30&keepalives_interval=10&keepalives_count=5"
+    )
     return url
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "coopex-secret")
 
+URI = _build_db_uri()
+
+# 🚫 Guard: impede cair em SQLite em produção se DATABASE_URL não existir
+if "sqlite" in URI and os.environ.get("FLASK_ENV") == "production":
+    raise RuntimeError("DATABASE_URL ausente em produção")
+
 app.config.update(
-    SQLALCHEMY_DATABASE_URI=_build_db_uri(),
+    SQLALCHEMY_DATABASE_URI=URI,
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     JSON_SORT_KEYS=False,
     MAX_CONTENT_LENGTH=32 * 1024 * 1024,  # 32MB
@@ -88,7 +100,7 @@ app.config.update(
         "max_overflow": 5,
         "pool_timeout": 10,
         "pool_pre_ping": True,   # evita conexões mortas
-        "pool_recycle": 1800,    # recicla após 30 min (pode reduzir p/ 300 se necessário)
+        "pool_recycle": 300,     # recicla cedo (antes do provedor derrubar)
         "connect_args": {
             "connect_timeout": 5,
             "options": "-c statement_timeout=15000",
@@ -1548,29 +1560,59 @@ def get_avisos_for_restaurante(rest: Restaurante):
 # =========================
 # Rotas de mídia (fotos armazenadas no banco)
 # =========================
+from flask import Response
+
+def _send_bytes_with_cache(data: bytes, mime: str, filename: str):
+    """Envia bytes com Cache-Control/ETag para evitar hits repetidos no banco."""
+    if not data:
+        abort(404)
+    rv = send_file(
+        io.BytesIO(data),
+        mimetype=(mime or "application/octet-stream"),
+        as_attachment=False,
+        download_name=filename,
+        max_age=60 * 60 * 24 * 7,  # 7 dias
+        conditional=True,          # habilita ETag/If-None-Match
+        last_modified=None,
+        etag=True,
+    )
+    # Cache explícito (defensivo)
+    rv.headers["Cache-Control"] = "public, max-age=604800, immutable"
+    return rv
+
 @app.get("/media/coop/<int:coop_id>")
 def media_coop(coop_id: int):
-    c = Cooperado.query.get_or_404(coop_id)
+    # Retry simples para conexões quebradas (evita 500 pontual)
+    try:
+        c = Cooperado.query.get_or_404(coop_id)
+    except OperationalError:
+        db.session.rollback()
+        c = Cooperado.query.get_or_404(coop_id)
+
     if c.foto_bytes:
-        return send_file(
-            io.BytesIO(c.foto_bytes),
-            mimetype=(c.foto_mime or "application/octet-stream"),
-            as_attachment=False,
-            download_name=(c.foto_filename or f"coop_{coop_id}.bin"),
+        return _send_bytes_with_cache(
+            c.foto_bytes,
+            c.foto_mime or "image/jpeg",
+            c.foto_filename or f"coop_{coop_id}.jpg",
         )
-    abort(404)
+    # fallback para imagem padrão (não bate no banco novamente)
+    return redirect(url_for("static", filename="img/default.png"))
 
 @app.get("/media/rest/<int:rest_id>")
 def media_rest(rest_id: int):
-    r = Restaurante.query.get_or_404(rest_id)
+    try:
+        r = Restaurante.query.get_or_404(rest_id)
+    except OperationalError:
+        db.session.rollback()
+        r = Restaurante.query.get_or_404(rest_id)
+
     if r.foto_bytes:
-        return send_file(
-            io.BytesIO(r.foto_bytes),
-            mimetype=(r.foto_mime or "application/octet-stream"),
-            as_attachment=False,
-            download_name=(r.foto_filename or f"rest_{rest_id}.bin"),
+        return _send_bytes_with_cache(
+            r.foto_bytes,
+            r.foto_mime or "image/jpeg",
+            r.foto_filename or f"rest_{rest_id}.jpg",
         )
-    abort(404)
+    return redirect(url_for("static", filename="img/default.png"))
 
 # =========================
 # Rota raiz
