@@ -1043,32 +1043,6 @@ def resolve_documento_path(nome_arquivo: str) -> str | None:
                        nome_arquivo, [c for c in candidatos if c])
     return None
 
-# 2) models
-from flask_login import UserMixin
-class Usuario(db.Model, UserMixin):
-    ...
-
-# 3) LoginManager (SEU BLOCO)
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-
-login_manager = LoginManager()
-login_manager.login_view = "login"
-login_manager.init_app(app)
-
-@login_manager.user_loader
-def load_user(user_id):
-    return Usuario.query.get(int(user_id))
-
-# 4) rotas/views
-@app.route("/login", methods=["GET","POST"])
-def login():
-    ...
-
-@app.route("/alguma-rota-protegida")
-@login_required
-def protegida():
-    ...
-
 # ========= ROTA: /docs/<nome> (abre inline PDF; baixa outros tipos) =========
 @app.get("/docs/<path:nome>")
 def serve_documento(nome: str):
