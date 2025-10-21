@@ -151,14 +151,13 @@ class Usuario(db.Model):
     usuario = db.Column(db.String(80), unique=True, nullable=False)
     senha_hash = db.Column(db.String(200), nullable=False)
     tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
-    ativo = db.Column(db.Boolean, default=True, nullable=False)  # <— novo campo
+    ativo = db.Column(db.Boolean, default=True, nullable=False)  # ✅ novo
 
     def set_password(self, raw: str):
         self.senha_hash = generate_password_hash(raw)
 
     def check_password(self, raw: str) -> bool:
         return check_password_hash(self.senha_hash, raw)
-
 
 class Cooperado(db.Model):
     __tablename__ = "cooperados"
@@ -1714,18 +1713,23 @@ from flask import jsonify, request
 @app.post("/admin/cooperados/<int:id>/toggle-status")
 def toggle_status_cooperado(id):
     try:
-        # Ajuste para o seu modelo real --------------------------
-        # Exemplo: Cooperado tem relação .usuario_ref com campo .ativo
         coop = db.session.get(Cooperado, id)
         if not coop or not coop.usuario_ref:
             return jsonify(ok=False, error="Cooperado não encontrado"), 404
 
-        atual = bool(coop.usuario_ref.ativo)
-        coop.usuario_ref.ativo = not atual
-        db.session.commit()
+        user = coop.usuario_ref
 
-        return jsonify(ok=True, ativo=bool(coop.usuario_ref.ativo))
-    except SQLAlchemyError as e:
+        # se o atributo não existe (código antigo em produção), trate como True
+        atual = bool(getattr(user, "ativo", True))
+        if not hasattr(user, "ativo"):
+            # tenta criar no ar (não persiste coluna, só evita quebrar)
+            # mas avisa o caller para você rodar a migração
+            return jsonify(ok=False, error="Campo 'ativo' ausente no modelo/DB. Faça deploy com o modelo atualizado e a migração."), 500
+
+        user.ativo = not atual
+        db.session.commit()
+        return jsonify(ok=True, ativo=bool(user.ativo))
+    except SQLAlchemyError:
         db.session.rollback()
         return jsonify(ok=False, error="Falha ao salvar no banco"), 500
 
