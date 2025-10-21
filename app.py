@@ -1043,10 +1043,6 @@ def resolve_documento_path(nome_arquivo: str) -> str | None:
                        nome_arquivo, [c for c in candidatos if c])
     return None
 
-# 1) imports básicos + criação do app e db
-app = Flask(__name__)
-db  = SQLAlchemy(app)
-
 # 2) models
 from flask_login import UserMixin
 class Usuario(db.Model, UserMixin):
