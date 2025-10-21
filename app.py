@@ -151,14 +151,14 @@ class Usuario(db.Model):
     usuario = db.Column(db.String(80), unique=True, nullable=False)
     senha_hash = db.Column(db.String(200), nullable=False)
     tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
-    ativo = db.Column(db.Boolean, default=True, nullable=False)  # ✅ novo
+    ativo = db.Column(db.Boolean, nullable=False, server_default=sa_text("TRUE"))  # novo
 
     def set_password(self, raw: str):
         self.senha_hash = generate_password_hash(raw)
 
     def check_password(self, raw: str) -> bool:
         return check_password_hash(self.senha_hash, raw)
-
+        
 class Cooperado(db.Model):
     __tablename__ = "cooperados"
     id = db.Column(db.Integer, primary_key=True)
@@ -416,14 +416,41 @@ def _is_sqlite() -> bool:
         return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
 
 
+# =========================
+# Models essenciais
+# =========================
+class Usuario(db.Model):
+    __tablename__ = "usuarios"
+    id = db.Column(db.Integer, primary_key=True)
+    usuario = db.Column(db.String(80), unique=True, nullable=False)
+    senha_hash = db.Column(db.String(200), nullable=False)
+    tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
+    # novo campo
+    ativo = db.Column(db.Boolean, nullable=False, default=True)  # DB default é garantido via migração no init_db()
+
+    def set_password(self, raw: str):
+        self.senha_hash = generate_password_hash(raw)
+
+    def check_password(self, raw: str) -> bool:
+        return check_password_hash(self.senha_hash, raw)
+
+
+# Se você tiver outros models (Cooperado, Restaurante, Config etc.),
+# mantenha-os abaixo/ao redor. O init_db() abaixo tenta fazer bootstrap leve
+# de admin e config apenas se esses modelos existirem.
+
+
+# =========================
+# Init DB / Migração leve
+# =========================
 def init_db():
     """
     Versão unificada e idempotente:
       1) Ajustes de performance para SQLite (WAL/synchronous)
       2) Criação de todas as tabelas (create_all)
       3) Índices úteis (cooperado/restaurante/criado_em)
-      4) Migrações leves de colunas/tabelas (qtd_entregas, fotos, escalas, avaliacoes_restaurante)
-      5) Bootstrap mínimo (admin e config)
+      4) Migrações leves (qtd_entregas, ativo em usuarios, colunas de escalas, fotos, tabela avaliacoes_restaurante)
+      5) Bootstrap mínimo (admin e config) — só se os modelos existirem
     """
     # 1) Perf no SQLite
     try:
@@ -483,22 +510,25 @@ def init_db():
     except Exception:
         db.session.rollback()
 
-    # 4.x) coluna 'ativo' em usuarios
-try:
-    if _is_sqlite():
-        cols = db.session.execute(sa_text("PRAGMA table_info(usuarios);")).fetchall()
-        colnames = {row[1] for row in cols}
-        if "ativo" not in colnames:
-            db.session.execute(sa_text("ALTER TABLE usuarios ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1"))
-        db.session.commit()
-    else:
-        db.session.execute(sa_text(
-            "ALTER TABLE IF NOT EXISTS public.usuarios "
-            "ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE"
-        ))
-        db.session.commit()
-except Exception:
-    db.session.rollback()
+    # 4.x) coluna 'ativo' em usuarios (para refletir o model novo)
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(usuarios);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "ativo" not in colnames:
+                # Boolean em SQLite é INTEGER 0/1
+                db.session.execute(sa_text(
+                    "ALTER TABLE usuarios ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1"
+                ))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS public.usuarios "
+                "ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE"
+            ))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
     # 4.1) cooperado_nome em escalas
     try:
@@ -510,7 +540,7 @@ except Exception:
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF EXISTS escalas "
+                "ALTER TABLE IF NOT EXISTS escalas "
                 "ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"
             ))
             db.session.commit()
@@ -527,7 +557,7 @@ except Exception:
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF EXISTS escalas "
+                "ALTER TABLE IF NOT EXISTS escalas "
                 "ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"
             ))
             db.session.commit()
@@ -643,28 +673,25 @@ except Exception:
     except Exception:
         db.session.rollback()
 
-    # 5) Bootstrap mínimo (admin e config)
-    # Observação: se os modelos ainda não estiverem importados neste ponto,
-    # engolimos o erro e a criação poderá ocorrer numa próxima chamada ao init_db().
+    # 5) Bootstrap mínimo (admin e config) — só se os modelos existirem
     try:
-        from models import Usuario, Config  # se você usa modelos em outro módulo
-    except Exception:
-        # Se os modelos estiverem no mesmo arquivo, ignore este import.
-        pass
+        # se houver um model Config definido em outro lugar, este bloco funciona;
+        # senão, apenas ignora silenciosamente
+        _ = Usuario  # garante que o model está acessível
 
-    # Admin
-    try:
-        # Tenta acessar Usuario; se não existir ainda, NameError cai no except
-        _ = Usuario  # noqa: F401
-        if not Usuario.query.filter_by(tipo="admin").first():
+        # Admin
+        try:
+            tem_admin = Usuario.query.filter_by(tipo="admin").first()
+        except Exception:
+            tem_admin = None
+
+        if not tem_admin:
             admin_user = os.environ.get("ADMIN_USER", "admin")
             admin_pass = os.environ.get("ADMIN_PASS", os.urandom(8).hex())
             admin = Usuario(usuario=admin_user, tipo="admin", senha_hash="")
-            # Precisa que Usuario tenha método set_password
             try:
                 admin.set_password(admin_pass)
             except Exception:
-                # fallback: se não houver helper, gerar hash direto
                 try:
                     admin.senha_hash = generate_password_hash(admin_pass)
                 except Exception:
@@ -674,14 +701,30 @@ except Exception:
     except Exception:
         db.session.rollback()
 
-    # Config default (id=1)
     try:
-        _ = Config  # noqa: F401
-        if not Config.query.get(1):
-            db.session.add(Config(id=1, salario_minimo=0.0))
-            db.session.commit()
+        # Se o model Config existir, cria default
+        from sqlalchemy.exc import InvalidRequestError
+        try:
+            Config  # type: ignore[name-defined]
+            has_config_model = True
+        except NameError:
+            has_config_model = False
+
+        if has_config_model:
+            if not Config.query.get(1):  # type: ignore[name-defined]
+                db.session.add(Config(id=1, salario_minimo=0.0))  # type: ignore[name-defined]
+                db.session.commit()
     except Exception:
         db.session.rollback()
+
+
+# =========================
+# Chamada em contexto
+# =========================
+# Evita: "Error: Working outside of application context."
+with app.app_context():
+    init_db()
+
 
 
 # === Bootstrap do banco no start (Render/Gunicorn) ===
