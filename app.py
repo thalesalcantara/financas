@@ -4868,6 +4868,7 @@ def portal_restaurante():
                              else (lanc.hora_fim.strftime("%H:%M") if lanc.hora_fim else "")),
                 "qtd_entregas": lanc.qtd_entregas or 0,
                 "valor": float(lanc.valor or 0.0),  # já em R$
+                "descricao": (lanc.descricao or ""),   # <<< NOVO: leva a descrição para o template
                 "cooperado_id": coop.id,
                 "cooperado_nome": coop.nome,
                 "contrato_nome": rest.nome,
@@ -4925,11 +4926,15 @@ def lancar_producao():
         abort(403)
     f = request.form
 
+    # NOVO: captura a descrição do formulário (somente para o estabelecimento)
+    desc_raw = (f.get("descricao") or "").strip()
+    desc_val = desc_raw or None  # salva None se vazio
+
     # 1) cria o lançamento
     l = Lancamento(
         restaurante_id=rest.id,
         cooperado_id=f.get("cooperado_id", type=int),
-        descricao="produção",
+        descricao=desc_val,                            # <<< NOVO: salvar descrição
         valor=f.get("valor", type=float),
         data=_parse_date(f.get("data")) or date.today(),
         hora_inicio=f.get("hora_inicio"),
@@ -4995,6 +5000,9 @@ def editar_lancamento(id):
         l.hora_inicio = f.get("hora_inicio")
         l.hora_fim = f.get("hora_fim")
         l.qtd_entregas = f.get("qtd_entregas", type=int)
+        # NOVO: permitir atualizar descrição se o form de edição trouxer o campo
+        if "descricao" in f:
+            l.descricao = (f.get("descricao") or "").strip() or None
         db.session.commit()
         flash("Lançamento atualizado.", "success")
         return redirect(url_for("portal_restaurante", view="lancamentos",
