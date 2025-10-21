@@ -30,6 +30,8 @@ from sqlalchemy.inspection import inspect as sa_inspect
 from sqlalchemy.pool import QueuePool
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError
+from sqlalchemy import delete as sa_delete
 
 # 👉 Novo: para gerar XLSX em memória
 from openpyxl import Workbook
@@ -1690,7 +1692,6 @@ def logout():
 # =========================
 # app.py
 from flask import jsonify, request
-from sqlalchemy.exc import SQLAlchemyError
 
 @app.post("/admin/cooperados/<int:id>/toggle-status")
 def toggle_status_cooperado(id):
@@ -3311,7 +3312,6 @@ def edit_cooperado(id):
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
 from sqlalchemy import or_
-from sqlalchemy.exc import IntegrityError
 
 @app.route("/cooperados/<int:id>/delete", methods=["POST"])
 @admin_required
@@ -3442,8 +3442,6 @@ def edit_restaurante(id):
     flash("Estabelecimento atualizado.", "success")
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
 
-from sqlalchemy import delete as sa_delete
-from sqlalchemy.exc import IntegrityError
 from flask import current_app
 
 @app.route("/restaurantes/<int:id>/delete", methods=["POST"])
