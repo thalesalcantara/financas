@@ -145,19 +145,24 @@ def _is_sqlite() -> bool:
 # =========================
 # Models
 # =========================
+# models.py
+from yourpackage import db  # ou: from app import db, se for assim no seu projeto
+from werkzeug.security import generate_password_hash, check_password_hash
+
 class Usuario(db.Model):
     __tablename__ = "usuarios"
     id = db.Column(db.Integer, primary_key=True)
     usuario = db.Column(db.String(80), unique=True, nullable=False)
     senha_hash = db.Column(db.String(200), nullable=False)
     tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
-    ativo = db.Column(db.Boolean, nullable=False, server_default=sa_text("TRUE"))  # novo
+    ativo = db.Column(db.Boolean, nullable=False, default=True)
 
     def set_password(self, raw: str):
         self.senha_hash = generate_password_hash(raw)
 
     def check_password(self, raw: str) -> bool:
         return check_password_hash(self.senha_hash, raw)
+
         
 class Cooperado(db.Model):
     __tablename__ = "cooperados"
@@ -414,30 +419,6 @@ def _is_sqlite() -> bool:
         return db.session.get_bind().dialect.name == "sqlite"
     except Exception:
         return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
-
-
-# =========================
-# Models essenciais
-# =========================
-class Usuario(db.Model):
-    __tablename__ = "usuarios"
-    id = db.Column(db.Integer, primary_key=True)
-    usuario = db.Column(db.String(80), unique=True, nullable=False)
-    senha_hash = db.Column(db.String(200), nullable=False)
-    tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
-    # novo campo
-    ativo = db.Column(db.Boolean, nullable=False, default=True)  # DB default é garantido via migração no init_db()
-
-    def set_password(self, raw: str):
-        self.senha_hash = generate_password_hash(raw)
-
-    def check_password(self, raw: str) -> bool:
-        return check_password_hash(self.senha_hash, raw)
-
-
-# Se você tiver outros models (Cooperado, Restaurante, Config etc.),
-# mantenha-os abaixo/ao redor. O init_db() abaixo tenta fazer bootstrap leve
-# de admin e config apenas se esses modelos existirem.
 
 
 # =========================
@@ -716,15 +697,6 @@ def init_db():
                 db.session.commit()
     except Exception:
         db.session.rollback()
-
-
-# =========================
-# Chamada em contexto
-# =========================
-# Evita: "Error: Working outside of application context."
-with app.app_context():
-    init_db()
-
 
 
 # === Bootstrap do banco no start (Render/Gunicorn) ===
