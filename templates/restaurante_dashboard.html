@@ -253,422 +253,431 @@
       </section>
 
       <!-- ===== AVISOS (carregado localmente ou via fetch da rota) ===== -->
-      <section data-view="avisos">
-        {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
-        {% set _unread_from_list = (_avisos | selectattr('lido','equalto',False) | list | length) %}
-        {% set _unread_from_ctx = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
-        {% set _badgeN = (_unread_from_list if _unread_from_list>0 else _unread_from_ctx) %}
-        <div class="section-title">
-          <i class="bi bi-megaphone-fill"></i> Avisos
-          <span id="badgeTitulo" class="badge {{ 'text-bg-danger' if _badgeN>0 else 'text-bg-success' }} ms-2">
-            {{ _badgeN>0 and (_badgeN ~ ' não lido(s)') or 'Tudo lido' }}
-          </span>
-        </div>
+<section data-view="avisos">
+  {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
+  {% set _unread_from_list = (_avisos | selectattr('lido','equalto',False) | list | length) %}
+  {% set _unread_from_ctx = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
+  {% set _badgeN = (_unread_from_list if _unread_from_list>0 else _unread_from_ctx) %}
+  <div class="section-title">
+    <i class="bi bi-megaphone-fill"></i> Avisos
+    <span id="badgeTitulo" class="badge {{ 'text-bg-danger' if _badgeN>0 else 'text-bg-success' }} ms-2">
+      {{ _badgeN>0 and (_badgeN ~ ' não lido(s)') or 'Tudo lido' }}
+    </span>
+  </div>
 
-        <div class="card card-body">
-          <div class="d-flex align-items-center gap-2">
-            <form method="POST" action="{{ url_for('marcar_todos_avisos_lidos_restaurante') }}" class="m-0">
-              <button class="btn btn-royal" type="submit" {% if _badgeN == 0 %}disabled{% endif %}><i class="bi bi-check2-circle me-1"></i> Marcar todos como lidos</button>
-            </form>
-            <div class="form-check ms-auto">
-              <input class="form-check-input" type="checkbox" id="toggleNaoLidos">
-              <label class="form-check-label" for="toggleNaoLidos">Mostrar apenas não lidos</label>
+  <div class="card card-body">
+    <div class="d-flex align-items-center gap-2">
+      <form method="POST" action="{{ url_for('marcar_todos_avisos_lidos_restaurante') }}" class="m-0">
+        <button class="btn btn-royal" type="submit" {% if _badgeN == 0 %}disabled{% endif %}><i class="bi bi-check2-circle me-1"></i> Marcar todos como lidos</button>
+      </form>
+      <div class="form-check ms-auto">
+        <input class="form-check-input" type="checkbox" id="toggleNaoLidos">
+        <label class="form-check-label" for="toggleNaoLidos">Mostrar apenas não lidos</label>
+      </div>
+    </div>
+  </div>
+
+  <div id="avisosListContainer">
+    {% if _avisos and (_avisos | length) > 0 %}
+      {% for a in _avisos %}
+      <div id="aviso-{{ a.id }}" class="card card-body my-2 aviso-card {% if a.lido %}lido{% endif %} {% if a.prioridade_alta %}prioridade{% endif %}" data-lido="{{ '1' if a.lido else '0' }}">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="fw-bold">
+              {{ a.titulo or 'Aviso' }}
+              {% if a.prioridade_alta %}
+                <span class="badge text-bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Prioridade</span>
+              {% endif %}
             </div>
+            <div class="text-muted small">
+              Publicado em {{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em }}
+              {% if a.atualizado_em %} · Atualizado {{ a.atualizado_em.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+              {% if a.lido %} • <span class="text-success">Lido</span>{% else %} • <span class="text-danger">Não lido</span>{% endif %}
+            </div>
+          </div>
+          <div class="ms-3">
+            {% if not a.lido %}
+            <button class="btn btn-outline-royal btn-sm"
+                    data-acao="marcar-lido"
+                    data-url="{{ url_for('marcar_aviso_lido_universal', aviso_id=a.id) }}">
+              <i class="bi bi-check2"></i> Marcar como lido
+            </button>
+            {% endif %}
           </div>
         </div>
 
-        <div id="avisosListContainer">
-          {% if _avisos and (_avisos | length) > 0 %}
-            {% for a in _avisos %}
-            <div id="aviso-{{ a.id }}" class="card card-body my-2 aviso-card {% if a.lido %}lido{% endif %} {% if a.prioridade_alta %}prioridade{% endif %}" data-lido="{{ '1' if a.lido else '0' }}">
-              <div class="d-flex justify-content-between align-items-start">
-                <div>
-                  <div class="fw-bold">
-                    {{ a.titulo or 'Aviso' }}
-                    {% if a.prioridade_alta %}
-                      <span class="badge text-bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Prioridade</span>
-                    {% endif %}
-                  </div>
-                  <div class="text-muted small">
-                    Publicado em {{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em }}
-                    {% if a.atualizado_em %} · Atualizado {{ a.atualizado_em.strftime('%d/%m/%Y %H:%M') }}{% endif %}
-                    {% if a.lido %} • <span class="text-success">Lido</span>{% else %} • <span class="text-danger">Não lido</span>{% endif %}
-                  </div>
-                </div>
-                <div class="ms-3">
-                  {% if not a.lido %}
-                  <button class="btn btn-outline-royal btn-sm"
-                          data-acao="marcar-lido"
-                          data-url="{{ url_for('marcar_aviso_lido_universal', aviso_id=a.id) }}">
-                    <i class="bi bi-check2"></i> Marcar como lido
-                  </button>
-                  {% endif %}
-                </div>
-              </div>
+        <hr class="my-2">
 
-              <hr class="my-2">
+        <!-- CORPO DO AVISO (robusto) -->
+        <div class="aviso-body">
+          {% set html = (
+            a.corpo_html or a.conteudo_html or a.mensagem_html or a.descricao_html or a.body_html or a.recado_html
+            or (a.dados and (a.dados.corpo_html or a.dados.conteudo_html or a.dados.mensagem_html or a.dados.descricao_html or a.dados.body_html or a.dados.recado_html))
+          ) %}
+          {% if html and html|trim %}
+            {{ html|safe }}
+          {% else %}
+            {% set txt = (
+              a.corpo or a.conteudo or a.mensagem or a.texto or a.descricao or a.body or a.message or a.content or a.recado
+              or (a.dados and (a.dados.corpo or a.dados.conteudo or a.dados.mensagem or a.dados.texto or a.dados.descricao or a.dados.body or a.dados.message or a.dados.content or a.dados.recado))
+            ) %}
+            {% if txt and txt|trim %}
+              <p class="mb-0">{{ txt|e|replace('\r\n','\n')|replace('\n','<br>')|safe }}</p>
+            {% else %}
+              <p class="text-muted mb-0"><em>(sem conteúdo)</em></p>
+            {% endif %}
+          {% endif %}
+        </div>
+        <!-- /CORPO DO AVISO -->
+      </div>
+      {% endfor %}
+    {% else %}
+      <!-- Se não vier avisos no contexto, o JS vai buscar na rota e injetar -->
+      <div class="card card-body text-muted">Carregando avisos…</div>
+    {% endif %}
+  </div>
+</section>
+<!-- ===== /AVISOS ===== -->
 
-              <!-- CORPO DO AVISO (robusto) -->
-              <div class="aviso-body">
-                {% set html = (
-                  a.corpo_html or a.conteudo_html or a.mensagem_html or a.descricao_html or a.body_html or a.recado_html
-                  or (a.dados and (a.dados.corpo_html or a.dados.conteudo_html or a.dados.mensagem_html or a.dados.descricao_html or a.dados.body_html or a.dados.recado_html))
-                ) %}
-                {% if html and html|trim %}
-                  {{ html|safe }}
-                {% else %}
-                  {% set txt = (
-                    a.corpo or a.conteudo or a.mensagem or a.texto or a.descricao or a.body or a.message or a.content or a.recado
-                    or (a.dados and (a.dados.corpo or a.dados.conteudo or a.dados.mensagem or a.dados.texto or a.dados.descricao or a.dados.body or a.dados.message or a.dados.content or a.dados.recado))
-                  ) %}
-                  {% if txt and txt|trim %}
-                    <p class="mb-0">{{ txt|e|replace('\r\n','\n')|replace('\n','<br>')|safe }}</p>
-                  {% else %}
-                    <p class="text-muted mb-0"><em>(sem conteúdo)</em></p>
-                  {% endif %}
-                {% endif %}
+<!-- ===== LANCAMENTOS ===== -->
+<section data-view="lancamentos">
+  <div class="section-title"><i class="bi bi-receipt"></i> Lançamentos</div>
+  <div class="row g-3">
+    <div class="col-lg-3">
+      <div class="card card-body sticky-tools">
+        <form id="formFiltroLanc" method="GET" action="{{ url_for('portal_restaurante') }}" class="row g-2 align-items-end">
+          <input type="hidden" name="view" value="lancamentos">
+
+          <div class="col-12">
+            <label class="form-label">Início</label>
+            <input type="date" class="form-control" name="data_inicio" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Fim</label>
+            <input type="date" class="form-control" name="data_fim" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Mês (opcional)</label>
+            <input type="month" class="form-control" name="mes" value="{{ filtro_mes or '' }}"
+                   oninput="if(this.value){ const f=this.form; f.data_inicio.value=''; f.data_fim.value=''; }">
+            <div class="form-text">Se escolher um mês, as datas serão ignoradas.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Digite o nome do cooperado (visual)</label>
+            <input type="text" class="form-control" name="q" placeholder="Filtrar por nome...">
+          </div>
+
+          <div class="col-12 d-grid"><button class="btn btn-royal" type="submit"><i class="bi bi-funnel"></i> Aplicar</button></div>
+          <div class="col-12 d-grid"><a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='lancamentos') }}"><i class="bi bi-arrow-counterclockwise"></i> Limpar</a></div>
+
+          <hr class="my-2">
+          <div class="kpi mb-2"><div class="small text-muted">Total no período</div><div class="v">R$ <span id="kpiTotalValor">0,00</span></div></div>
+          <div class="kpi mb-2"><div class="small text-muted">Entregas no período</div><div class="v"><span id="kpiTotalEntregas">0</span></div></div>
+
+          <!-- Export azul sempre -->
+          <div class="d-grid"><button class="btn btn-royal" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV</button></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="col-lg-9">
+      <div class="card card-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="chip">Período: <span id="txtPeriodo">
+            {{ filtro_inicio and filtro_inicio.strftime('%d/%m/%Y') or '' }}
+            {% if filtro_inicio and filtro_fim %} a {% endif %}
+            {{ filtro_fim and filtro_fim.strftime('%d/%m/%Y') or '' }}
+          </span></div>
+        </div>
+
+        <table class="table table-bordered table-hover align-middle table-compact" id="tblLanc">
+          <thead>
+            <tr>
+              <th class="text-center" style="width:110px;">Data</th>
+              <th>Cooperado</th>
+              <th>Contrato</th>
+              <th class="text-center" style="width:160px;">Horário</th>
+              <th>Descrição</th> <!-- NOVO: visível só aqui -->
+              <th class="text-center" style="width:120px;">Entregas</th>
+              <th class="text-end" style="width:140px;">Valor (R$)</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyLanc">
+            {% for x in _lancamentos_periodo %}
+            <tr data-coop="{{ x.cooperado_id or x.coop_id }}"
+                data-coopnome="{{ x.cooperado_nome or x.coop_nome }}"
+                data-contrato="{{ x.contrato_nome or x.contrato }}">
+              <td class="text-center">{{ (x.data.strftime('%d/%m/%Y') if x.data) if x.data is not string else x.data }}</td>
+              <td class="fw-semibold coop-name">{{ x.cooperado_nome or x.coop_nome }}</td>
+              <td>{{ x.contrato_nome or x.contrato or '—' }}</td>
+              <td class="text-center">
+                {% if x.hora_inicio or x.hora_fim %}
+                  {{ x.hora_inicio or '' }}{% if x.hora_inicio or x.hora_fim %} às {% endif %}{{ x.hora_fim or '' }}
+                {% else %}—{% endif %}
+              </td>
+              <td class="desc">{{ x.descricao or '-' }}</td> <!-- NOVO -->
+              <td class="text-center entregas">{{ x.qtd_entregas if x.qtd_entregas is not none else '-' }}</td>
+              <td class="text-end valor" data-valor="{{ '%.2f'|format(x.valor or 0) }}">R$ {{ '%.2f'|format(x.valor or 0) }}</td>
+            </tr>
+            {% else %}{% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-secondary">
+              <th colspan="5" class="text-end">Totais</th>
+              <th class="text-center" id="ftEntregas">0</th>
+              <th class="text-end" id="ftValor">R$ 0,00</th>
+            </tr>
+          </tfoot>
+        </table>
+
+        <hr class="my-3">
+        <h6 class="mb-2"><i class="bi bi-people"></i> Totais por cooperado</h6>
+        <div id="gridCoop" class="row g-2"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== LANÇAR ===== -->
+<section data-view="lancar">
+  <div class="section-title"><i class="bi bi-plus-circle"></i> Lançar Produção Diária</div>
+
+  <div class="card card-body">
+    <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
+      <input type="hidden" name="view" value="lancar">
+      <div class="col-md-3"><label class="form-label">Início</label><input type="date" name="data_inicio" class="form-control" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}"></div>
+      <div class="col-md-3"><label class="form-label">Fim</label><input type="date" name="data_fim" class="form-control" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}"></div>
+      <div class="col-md-3"><div class="small text-muted mb-1">Período em uso</div><div class="chip">{% if filtro_inicio and filtro_fim %}{{ filtro_inicio.strftime('%d/%m/%Y') }} a {{ filtro_fim.strftime('%d/%m/%Y') }}{% else %} — {% endif %}</div></div>
+      <div class="col-md-3 text-end">
+        <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-arrow-counterclockwise"></i> Limpar</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="row g-3 mt-1">
+    <div class="col-lg-4">
+      <div class="card card-body">
+        <div class="input-group mb-2">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input id="buscaCoop" type="text" class="form-control" placeholder="Buscar cooperado..." list="cooperadosList">
+          <datalist id="cooperadosList">{% for coop in _cooperados %}<option value="{{ coop.nome }}"></option>{% endfor %}</datalist>
+          <select id="selectCoop" class="form-select"><option value="">Lista...</option>{% for coop in _cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}</select>
+        </div>
+        <div id="listaCooperados" style="max-height:60vh; overflow:auto;">
+          {% for coop in _cooperados %}
+          <div class="cooperado-item" data-id="{{ coop.id }}" data-nome="{{ coop.nome }}"
+               data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
+               data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}">
+            <img src="{{ url_for('media_coop', coop_id=coop.id) if coop.foto_bytes else url_for('static', filename='img/default.png') }}" class="cooperado-avatar" alt="Foto do cooperado">
+            <div class="d-flex flex-column">
+              <span class="fw-bold">{{ coop.nome }}</span>
+              <small class="text-muted">No período: R$ {{ '%.2f'|format(coop.total_periodo or 0) }}</small>
+            </div>
+          </div>
+          {% else %}<div class="text-muted small">Nenhum cooperado encontrado.</div>{% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card card-body" id="blocoLancamento">
+        <div class="selected-header text-center mb-2" id="selectedHeader" style="display:none;">
+          <img id="selFoto" src="" class="big" alt="">
+          <div class="fw-bold fs-5 mt-2" id="selNome"></div>
+          <div class="text-muted">Total no período: R$ <span id="selTotal">0,00</span></div>
+        </div>
+
+        <div class="alert alert-info py-2 px-3 mb-2" id="hintSelecione">Selecione um cooperado para lançar.</div>
+
+        <form id="formLancamento" method="POST" action="{{ _url_lancar_producao }}" class="row g-2 align-items-end mb-1" style="display:none;">
+          <input type="hidden" name="cooperado_id" id="inputCooperadoId" value="">
+          <div class="col-md-3"><label class="form-label">Valor (R$)</label><input type="number" class="form-control" name="valor" step="0.01" required></div>
+          <div class="col-md-3"><label class="form-label">Data</label><input type="date" class="form-control" name="data" required></div>
+          <div class="col-md-3"><label class="form-label">Hora Início</label><input type="time" class="form-control" name="hora_inicio"></div>
+          <div class="col-md-3"><label class="form-label">Hora Fim</label><input type="time" class="form-control" name="hora_fim"></div>
+          <div class="col-md-3"><label class="form-label">Entregas</label><input type="number" class="form-control" name="qtd_entregas" min="0" step="1"></div>
+
+          <!-- Descrição (opcional) — exclusiva do Portal do Estabelecimento -->
+          <div class="col-12">
+            <label class="form-label">Descrição (opcional)</label>
+            <textarea class="form-control" name="descricao" rows="2"
+                      placeholder="Ex.: motivo do valor, observações, contrato especial…"></textarea>
+          </div>
+
+          <div class="col-12"><hr class="my-2"></div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="chkAvaliar"
+                onclick="document.getElementById('boxAval').style.display=this.checked?'block':'none'; document.getElementById('inputAvaliar').value=this.checked?'1':'0';">
+              <label class="form-check-label" for="chkAvaliar">Registrar avaliação agora</label>
+            </div>
+            <input type="hidden" name="avaliar" id="inputAvaliar" value="0">
+          </div>
+
+          <div id="boxAval" class="row g-2" style="display:none;">
+            {% for nm,titulo in [('av_pontualidade','Pontualidade'),('av_educacao','Educação'),('av_eficiencia','Eficiência / Cuidado'),('av_apresentacao','Apresentação')] %}
+            <div class="col-md-6">
+              <div class="rating-group" data-name="{{ nm }}">
+                <div class="rating-label">{{ titulo }}</div>
+                <div class="stars">
+                  <i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i>
+                </div>
+                <input type="hidden" name="{{ nm }}" value="">
               </div>
-              <!-- /CORPO DO AVISO -->
             </div>
             {% endfor %}
-          {% else %}
-            <!-- Se não vier avisos no contexto, o JS vai buscar na rota e injetar -->
-            <div class="card card-body text-muted">Carregando avisos…</div>
-          {% endif %}
-        </div>
-      </section>
-      <!-- ===== /AVISOS ===== -->
-
-      <!-- ===== LANCAMENTOS ===== -->
-      <section data-view="lancamentos">
-        <div class="section-title"><i class="bi bi-receipt"></i> Lançamentos</div>
-        <div class="row g-3">
-          <div class="col-lg-3">
-            <div class="card card-body sticky-tools">
-              <form id="formFiltroLanc" method="GET" action="{{ url_for('portal_restaurante') }}" class="row g-2 align-items-end">
-                <input type="hidden" name="view" value="lancamentos">
-
-                <div class="col-12">
-                  <label class="form-label">Início</label>
-                  <input type="date" class="form-control" name="data_inicio" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Fim</label>
-                  <input type="date" class="form-control" name="data_fim" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Mês (opcional)</label>
-                  <input type="month" class="form-control" name="mes" value="{{ filtro_mes or '' }}"
-                         oninput="if(this.value){ const f=this.form; f.data_inicio.value=''; f.data_fim.value=''; }">
-                  <div class="form-text">Se escolher um mês, as datas serão ignoradas.</div>
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Digite o nome do cooperado (visual)</label>
-                  <input type="text" class="form-control" name="q" placeholder="Filtrar por nome...">
-                </div>
-
-                <div class="col-12 d-grid"><button class="btn btn-royal" type="submit"><i class="bi bi-funnel"></i> Aplicar</button></div>
-                <div class="col-12 d-grid"><a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='lancamentos') }}"><i class="bi bi-arrow-counterclockwise"></i> Limpar</a></div>
-
-                <hr class="my-2">
-                <div class="kpi mb-2"><div class="small text-muted">Total no período</div><div class="v">R$ <span id="kpiTotalValor">0,00</span></div></div>
-                <div class="kpi mb-2"><div class="small text-muted">Entregas no período</div><div class="v"><span id="kpiTotalEntregas">0</span></div></div>
-
-                <!-- Export azul sempre -->
-                <div class="d-grid"><button class="btn btn-royal" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar CSV</button></div>
-              </form>
+            <div class="col-md-6">
+              <div class="rating-group" data-name="av_geral" data-auto="true">
+                <div class="rating-label">Geral (média automática)</div>
+                <div class="stars"><i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i></div>
+                <input type="hidden" name="av_geral" value="">
+              </div>
             </div>
+            <div class="col-12"><label class="form-label">Comentário (opcional)</label><textarea class="form-control" name="av_comentario" rows="2" placeholder="Conte rapidamente como foi a experiência..."></textarea></div>
           </div>
 
-          <div class="col-lg-9">
-            <div class="card card-body">
-              <div class="d-flex align-items-center justify-content-between mb-2">
-                <div class="chip">Período: <span id="txtPeriodo">
-                  {{ filtro_inicio and filtro_inicio.strftime('%d/%m/%Y') or '' }}
-                  {% if filtro_inicio and filtro_fim %} a {% endif %}
-                  {{ filtro_fim and filtro_fim.strftime('%d/%m/%Y') or '' }}
-                </span></div>
-              </div>
-
-              <table class="table table-bordered table-hover align-middle table-compact" id="tblLanc">
-                <thead>
-                  <tr>
-                    <th class="text-center" style="width:110px;">Data</th>
-                    <th>Cooperado</th>
-                    <th>Contrato</th>
-                    <th class="text-center" style="width:160px;">Horário</th>
-                    <th class="text-center" style="width:120px;">Entregas</th>
-                    <th class="text-end" style="width:140px;">Valor (R$)</th>
-                  </tr>
-                </thead>
-                <tbody id="tbodyLanc">
-                  {% for x in _lancamentos_periodo %}
-                  <tr data-coop="{{ x.cooperado_id or x.coop_id }}"
-                      data-coopnome="{{ x.cooperado_nome or x.coop_nome }}"
-                      data-contrato="{{ x.contrato_nome or x.contrato }}">
-                    <td class="text-center">{{ (x.data.strftime('%d/%m/%Y') if x.data) if x.data is not string else x.data }}</td>
-                    <td class="fw-semibold coop-name">{{ x.cooperado_nome or x.coop_nome }}</td>
-                    <td>{{ x.contrato_nome or x.contrato or '—' }}</td>
-                    <td class="text-center">
-                      {% if x.hora_inicio or x.hora_fim %}
-                        {{ x.hora_inicio or '' }}{% if x.hora_inicio or x.hora_fim %} às {% endif %}{{ x.hora_fim or '' }}
-                      {% else %}—{% endif %}
-                    </td>
-                    <td class="text-center">{{ x.qtd_entregas if x.qtd_entregas is not none else '-' }}</td>
-                    <td class="text-end valor" data-valor="{{ '%.2f'|format(x.valor or 0) }}">R$ {{ '%.2f'|format(x.valor or 0) }}</td>
-                  </tr>
-                  {% else %}{% endfor %}
-                </tbody>
-                <tfoot>
-                  <tr class="table-secondary">
-                    <th colspan="4" class="text-end">Totais</th>
-                    <th class="text-center" id="ftEntregas">0</th>
-                    <th class="text-end" id="ftValor">R$ 0,00</th>
-                  </tr>
-                </tfoot>
-              </table>
-
-              <hr class="my-3">
-              <h6 class="mb-2"><i class="bi bi-people"></i> Totais por cooperado</h6>
-              <div id="gridCoop" class="row g-2"></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ===== LANÇAR ===== -->
-      <section data-view="lancar">
-        <div class="section-title"><i class="bi bi-plus-circle"></i> Lançar Produção Diária</div>
-
-        <div class="card card-body">
-          <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
-            <input type="hidden" name="view" value="lancar">
-            <div class="col-md-3"><label class="form-label">Início</label><input type="date" name="data_inicio" class="form-control" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}"></div>
-            <div class="col-md-3"><label class="form-label">Fim</label><input type="date" name="data_fim" class="form-control" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}"></div>
-            <div class="col-md-3"><div class="small text-muted mb-1">Período em uso</div><div class="chip">{% if filtro_inicio and filtro_fim %}{{ filtro_inicio.strftime('%d/%m/%Y') }} a {{ filtro_fim.strftime('%d/%m/%Y') }}{% else %} — {% endif %}</div></div>
-            <div class="col-md-3 text-end">
-              <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
-              <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-arrow-counterclockwise"></i> Limpar</a>
-            </div>
-          </form>
-        </div>
-
-        <div class="row g-3 mt-1">
-          <div class="col-lg-4">
-            <div class="card card-body">
-              <div class="input-group mb-2">
-                <span class="input-group-text"><i class="bi bi-search"></i></span>
-                <input id="buscaCoop" type="text" class="form-control" placeholder="Buscar cooperado..." list="cooperadosList">
-                <datalist id="cooperadosList">{% for coop in _cooperados %}<option value="{{ coop.nome }}"></option>{% endfor %}</datalist>
-                <select id="selectCoop" class="form-select"><option value="">Lista...</option>{% for coop in _cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}</select>
-              </div>
-              <div id="listaCooperados" style="max-height:60vh; overflow:auto;">
-                {% for coop in _cooperados %}
-                <div class="cooperado-item" data-id="{{ coop.id }}" data-nome="{{ coop.nome }}"
-                     data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
-                     data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}">
-                  <img src="{{ url_for('media_coop', coop_id=coop.id) if coop.foto_bytes else url_for('static', filename='img/default.png') }}" class="cooperado-avatar" alt="Foto do cooperado">
-                  <div class="d-flex flex-column">
-                    <span class="fw-bold">{{ coop.nome }}</span>
-                    <small class="text-muted">No período: R$ {{ '%.2f'|format(coop.total_periodo or 0) }}</small>
-                  </div>
-                </div>
-                {% else %}<div class="text-muted small">Nenhum cooperado encontrado.</div>{% endfor %}
-              </div>
-            </div>
-          </div>
-
-          <div class="col-lg-8">
-            <div class="card card-body" id="blocoLancamento">
-              <div class="selected-header text-center mb-2" id="selectedHeader" style="display:none;">
-                <img id="selFoto" src="" class="big" alt="">
-                <div class="fw-bold fs-5 mt-2" id="selNome"></div>
-                <div class="text-muted">Total no período: R$ <span id="selTotal">0,00</span></div>
-              </div>
-
-              <div class="alert alert-info py-2 px-3 mb-2" id="hintSelecione">Selecione um cooperado para lançar.</div>
-
-              <form id="formLancamento" method="POST" action="{{ _url_lancar_producao }}" class="row g-2 align-items-end mb-1" style="display:none;">
-                <input type="hidden" name="cooperado_id" id="inputCooperadoId" value="">
-                <div class="col-md-3"><label class="form-label">Valor (R$)</label><input type="number" class="form-control" name="valor" step="0.01" required></div>
-                <div class="col-md-3"><label class="form-label">Data</label><input type="date" class="form-control" name="data" required></div>
-                <div class="col-md-3"><label class="form-label">Hora Início</label><input type="time" class="form-control" name="hora_inicio"></div>
-                <div class="col-md-3"><label class="form-label">Hora Fim</label><input type="time" class="form-control" name="hora_fim"></div>
-                <div class="col-md-3"><label class="form-label">Entregas</label><input type="number" class="form-control" name="qtd_entregas" min="0" step="1"></div>
-
-                <div class="col-12"><hr class="my-2"></div>
-                <div class="col-12">
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="chkAvaliar"
-                      onclick="document.getElementById('boxAval').style.display=this.checked?'block':'none'; document.getElementById('inputAvaliar').value=this.checked?'1':'0';">
-                    <label class="form-check-label" for="chkAvaliar">Registrar avaliação agora</label>
-                  </div>
-                  <input type="hidden" name="avaliar" id="inputAvaliar" value="0">
-                </div>
-
-                <div id="boxAval" class="row g-2" style="display:none;">
-                  {% for nm,titulo in [('av_pontualidade','Pontualidade'),('av_educacao','Educação'),('av_eficiencia','Eficiência / Cuidado'),('av_apresentacao','Apresentação')] %}
-                  <div class="col-md-6">
-                    <div class="rating-group" data-name="{{ nm }}">
-                      <div class="rating-label">{{ titulo }}</div>
-                      <div class="stars">
-                        <i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i>
-                      </div>
-                      <input type="hidden" name="{{ nm }}" value="">
-                    </div>
-                  </div>
-                  {% endfor %}
-                  <div class="col-md-6">
-                    <div class="rating-group" data-name="av_geral" data-auto="true">
-                      <div class="rating-label">Geral (média automática)</div>
-                      <div class="stars"><i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i></div>
-                      <input type="hidden" name="av_geral" value="">
-                    </div>
-                  </div>
-                  <div class="col-12"><label class="form-label">Comentário (opcional)</label><textarea class="form-control" name="av_comentario" rows="2" placeholder="Conte rapidamente como foi a experiência..."></textarea></div>
-                </div>
-
-                <div class="col-12 text-end mt-2"><button class="btn btn-royal"><i class="bi bi-plus-circle"></i> Lançar</button></div>
-              </form>
-            </div>
-
-            <!-- Tabelas por cooperado (mostra/oculta pelo selecionado) -->
-            <div id="blocoTabelas" class="mt-2">
-              {% for coop in _cooperados %}
-              <div id="tabela-{{ coop.id }}" class="card card-body lancamentos-table" style="display:none;">
-                <table class="table table-bordered table-hover align-middle table-compact">
-                  <thead><tr><th>Valor</th><th>Data</th><th>Horário</th><th>Entregas</th><th>Editar</th><th>Excluir</th></tr></thead>
-                  <tbody>
-                    {% for lanc in coop.lancamentos %}
-                    <tr>
-                      <td>R$ {{ '%.2f'|format(lanc.valor or 0) }}</td>
-                      <td>{{ lanc.data.strftime('%d/%m/%Y') if lanc.data }}</td>
-                      <td>{{ lanc.hora_inicio or '' }}{% if lanc.hora_inicio or lanc.hora_fim %} às {% endif %}{{ lanc.hora_fim or '' }}</td>
-                      <td>{{ lanc.qtd_entregas if lanc.qtd_entregas is not none else '-' }}</td>
-                      <td>{% if has_editar_lanc %}<a href="{{ url_for('editar_lancamento', id=lanc.id) }}" class="btn btn-outline-royal btn-sm"><i class="bi bi-pencil"></i></a>{% endif %}</td>
-                      <td><a href="{{ url_for('excluir_lancamento', id=lanc.id) }}" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></a></td>
-                    </tr>
-                    {% else %}<tr><td colspan="6" class="text-center text-muted">Nenhum lançamento no período selecionado</td></tr>{% endfor %}
-                  </tbody>
-                </table>
-              </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ===== TABELAS (carregada da rota e exibida aqui) ===== -->
-      <section data-view="tabelas">
-        <div class="section-title"><i class="bi bi-table"></i> Minhas Tabelas</div>
-        <div id="tabelasContainer">
-          {% if tabela %}
-            {% set titulo = tabela.titulo or login_nome %}
-            {% set nome_arquivo = tabela.arquivo_nome or '' %}
-            {% set ext = nome_arquivo.split('.')[-1]|lower if '.' in nome_arquivo else '' %}
-            <article class="doc-row my-2"
-                     data-view="{{ url_for('rest_tabela_abrir', tabela_id=tabela.id) }}"
-                     data-download="{{ url_for('rest_tabela_download', tabela_id=tabela.id) }}"
-                     data-title-full="{{ titulo }}" data-ext="{{ ext }}">
-              <div class="d-flex justify-content-between align-items-start">
-                <div class="pe-2">
-                  <div class="doc-cat">TABELA</div>
-                  <div class="doc-title d-flex align-items-center gap-2"><i class="bi bi-journal-text"></i> {{ titulo }}</div>
-                  <div class="doc-date">{{ tabela.enviado_em.strftime('%d/%m/%Y %H:%M') if tabela.enviado_em else '' }}</div>
-                  {% if tabela.descricao %}<div class="doc-desc mt-2">{{ tabela.descricao }}</div>{% endif %}
-                  <div class="mt-2 d-flex flex-wrap gap-2">
-                    <span class="chip"><i class="bi bi-file-earmark"></i> {{ nome_arquivo or '—' }}</span>
-                    {% if ext %}<span class="chip"><i class="bi bi-tag"></i> {{ ext|upper }}</span>{% endif %}
-                  </div>
-                </div>
-                <div class="ms-2 d-flex flex-column gap-2">
-                  <button class="btn btn-royal" data-open title="Visualizar"><i class="bi bi-journal-bookmark-fill"></i></button>
-                  <a class="btn btn-outline-secondary btn-sm" data-direct-download href="{{ url_for('rest_tabela_download', tabela_id=tabela.id) }}"><i class="bi bi-download"></i></a>
-                </div>
-              </div>
-              <div class="text-muted small mt-2">Clique para visualizar em tela cheia ou baixe o arquivo.</div>
-            </article>
-          {% else %}
-            <div class="card card-body text-muted">Carregando tabelas…</div>
-          {% endif %}
-        </div>
-      </section>
-      <!-- /sections -->
-    </main>
-  </div>
-
-  <!-- TOAST PERSISTENTE (TOPO DIREITO) -->
-  {% set _avisos_for_toast = avisos if avisos is defined and avisos is not none else [] %}
-  {% set _unread_from_list_t = (_avisos_for_toast | selectattr('lido','equalto',False) | list | length) %}
-  {% set _unread_from_ctx_t = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
-  {% set _toast_unread = _unread_from_list_t if _unread_from_list_t>0 else _unread_from_ctx_t %}
-  <div class="position-fixed top-0 end-0 p-3" style="z-index:1060;">
-    <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false">
-      <div class="toast-header">
-        <i class="bi bi-megaphone-fill me-2"></i><strong class="me-auto">Novos avisos</strong><small>agora</small>
-        <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
+          <div class="col-12 text-end mt-2"><button class="btn btn-royal"><i class="bi bi-plus-circle"></i> Lançar</button></div>
+        </form>
       </div>
-      <div class="toast-body">
-        Você tem <b id="toastCount">{{ _toast_unread }}</b> aviso(s) não lido(s).
-        <a id="toastVerAgora" href="{{ url_for('portal_restaurante_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
+
+      <!-- Tabelas por cooperado (mostra/oculta pelo selecionado) -->
+      <div id="blocoTabelas" class="mt-2">
+        {% for coop in _cooperados %}
+        <div id="tabela-{{ coop.id }}" class="card card-body lancamentos-table" style="display:none;">
+          <table class="table table-bordered table-hover align-middle table-compact">
+            <thead><tr><th>Valor</th><th>Data</th><th>Horário</th><th>Entregas</th><th>Editar</th><th>Excluir</th></tr></thead>
+            <tbody>
+              {% for lanc in coop.lancamentos %}
+              <tr>
+                <td>R$ {{ '%.2f'|format(lanc.valor or 0) }}</td>
+                <td>{{ lanc.data.strftime('%d/%m/%Y') if lanc.data }}</td>
+                <td>{{ lanc.hora_inicio or '' }}{% if lanc.hora_inicio or lanc.hora_fim %} às {% endif %}{{ lanc.hora_fim or '' }}</td>
+                <td>{{ lanc.qtd_entregas if lanc.qtd_entregas is not none else '-' }}</td>
+                <td>{% if has_editar_lanc %}<a href="{{ url_for('editar_lancamento', id=lanc.id) }}" class="btn btn-outline-royal btn-sm"><i class="bi bi-pencil"></i></a>{% endif %}</td>
+                <td><a href="{{ url_for('excluir_lancamento', id=lanc.id) }}" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></a></td>
+              </tr>
+              {% else %}<tr><td colspan="6" class="text-center text-muted">Nenhum lançamento no período selecionado</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endfor %}
       </div>
     </div>
   </div>
+</section>
 
-  <!-- TOAST OK -->
-  <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1056;">
-    <div id="toastOK" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="2200">
-      <div class="toast-header">
-        <i class="bi bi-check2-circle text-success me-2"></i><strong class="me-auto">Pronto</strong><small>agora</small>
-        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Fechar"></button>
-      </div>
-      <div class="toast-body">Aviso marcado como lido.</div>
-    </div>
-  </div>
-
-  <!-- MODAL FULLSCREEN TABELAS -->
-  <div class="modal fade" id="modalTabela" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-fullscreen">
-      <div class="modal-content">
-        <div class="modal-header">
-          <div><div class="doc-cat mb-0">TABELA</div><h5 class="modal-title" id="modalTabelaLabel"></h5></div>
-          <div class="d-flex align-items-center gap-2">
-            <a id="modalAbrirNovaAba" href="#" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-up-right"></i> Abrir em nova aba</a>
-            <a id="modalBaixar" href="#" class="btn btn-primary btn-sm"><i class="bi bi-download"></i> Baixar</a>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+<!-- ===== TABELAS (carregada da rota e exibida aqui) ===== -->
+<section data-view="tabelas">
+  <div class="section-title"><i class="bi bi-table"></i> Minhas Tabelas</div>
+  <div id="tabelasContainer">
+    {% if tabela %}
+      {% set titulo = tabela.titulo or login_nome %}
+      {% set nome_arquivo = tabela.arquivo_nome or '' %}
+      {% set ext = nome_arquivo.split('.')[-1]|lower if '.' in nome_arquivo else '' %}
+      <article class="doc-row my-2"
+               data-view="{{ url_for('rest_tabela_abrir', tabela_id=tabela.id) }}"
+               data-download="{{ url_for('rest_tabela_download', tabela_id=tabela.id) }}"
+               data-title-full="{{ titulo }}" data-ext="{{ ext }}">
+        <div class="d-flex justify-content-between align-items-start">
+          <div class="pe-2">
+            <div class="doc-cat">TABELA</div>
+            <div class="doc-title d-flex align-items-center gap-2"><i class="bi bi-journal-text"></i> {{ titulo }}</div>
+            <div class="doc-date">{{ tabela.enviado_em.strftime('%d/%m/%Y %H:%M') if tabela.enviado_em else '' }}</div>
+            {% if tabela.descricao %}<div class="doc-desc mt-2">{{ tabela.descricao }}</div>{% endif %}
+            <div class="mt-2 d-flex flex-wrap gap-2">
+              <span class="chip"><i class="bi bi-file-earmark"></i> {{ nome_arquivo or '—' }}</span>
+              {% if ext %}<span class="chip"><i class="bi bi-tag"></i> {{ ext|upper }}</span>{% endif %}
+            </div>
+          </div>
+          <div class="ms-2 d-flex flex-column gap-2">
+            <button class="btn btn-royal" data-open title="Visualizar"><i class="bi bi-journal-bookmark-fill"></i></button>
+            <a class="btn btn-outline-secondary btn-sm" data-direct-download href="{{ url_for('rest_tabela_download', tabela_id=tabela.id) }}"><i class="bi bi-download"></i></a>
           </div>
         </div>
-        <div class="modal-body p-2">
-          <iframe id="modalFrame" class="w-100" style="height:82vh; border:0" allowfullscreen></iframe>
-          <div id="modalAviso" class="small text-muted mt-2 d-none">Se o arquivo não abrir, use “Abrir em nova aba” ou “Baixar”.</div>
+        <div class="text-muted small mt-2">Clique para visualizar em tela cheia ou baixe o arquivo.</div>
+      </article>
+    {% else %}
+      <div class="card card-body text-muted">Carregando tabelas…</div>
+    {% endif %}
+  </div>
+</section>
+<!-- /sections -->
+</main>
+</div>
+
+<!-- TOAST PERSISTENTE (TOPO DIREITO) -->
+{% set _avisos_for_toast = avisos if avisos is defined and avisos is not none else [] %}
+{% set _unread_from_list_t = (_avisos_for_toast | selectattr('lido','equalto',False) | list | length) %}
+{% set _unread_from_ctx_t = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
+{% set _toast_unread = _unread_from_list_t if _unread_from_list_t>0 else _unread_from_ctx_t %}
+<div class="position-fixed top-0 end-0 p-3" style="z-index:1060;">
+  <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false">
+    <div class="toast-header">
+      <i class="bi bi-megaphone-fill me-2"></i><strong class="me-auto">Novos avisos</strong><small>agora</small>
+      <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
+    </div>
+    <div class="toast-body">
+      Você tem <b id="toastCount">{{ _toast_unread }}</b> aviso(s) não lido(s).
+      <a id="toastVerAgora" href="{{ url_for('portal_restaurante_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST OK -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:1056;">
+  <div id="toastOK" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="2200">
+    <div class="toast-header">
+      <i class="bi bi-check2-circle text-success me-2"></i><strong class="me-auto">Pronto</strong><small>agora</small>
+      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Fechar"></button>
+    </div>
+    <div class="toast-body">Aviso marcado como lido.</div>
+  </div>
+</div>
+
+<!-- MODAL FULLSCREEN TABELAS -->
+<div class="modal fade" id="modalTabela" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-fullscreen">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div><div class="doc-cat mb-0">TABELA</div><h5 class="modal-title" id="modalTabelaLabel"></h5></div>
+        <div class="d-flex align-items-center gap-2">
+          <a id="modalAbrirNovaAba" href="#" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-up-right"></i> Abrir em nova aba</a>
+          <a id="modalBaixar" href="#" class="btn btn-primary btn-sm"><i class="bi bi-download"></i> Baixar</a>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
         </div>
+      </div>
+      <div class="modal-body p-2">
+        <iframe id="modalFrame" class="w-100" style="height:82vh; border:0" allowfullscreen></iframe>
+        <div id="modalAviso" class="small text-muted mt-2 d-none">Se o arquivo não abrir, use “Abrir em nova aba” ou “Baixar”.</div>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- ======================= -->
-  <!-- MODAL AVALIAR (NOVO) -->
-  <!-- ======================= -->
-  <div class="modal fade" id="modalAvaliar" tabindex="-1" aria-labelledby="modalAvaliarLabel" aria-hidden="true"> <!-- [NOVO] -->
-    <div class="modal-dialog modal-dialog-centered"> <!-- [NOVO] -->
-      <div class="modal-content"> <!-- [NOVO] -->
-        <div class="modal-header"> <!-- [NOVO] -->
-          <h5 class="modal-title" id="modalAvaliarLabel"><i class="bi bi-star-half me-2"></i>Deseja avaliar o motoboy agora?</h5> <!-- [NOVO] -->
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button> <!-- [NOVO] -->
-        </div>
-        <div class="modal-body"> <!-- [NOVO] -->
-          <p class="mb-0">Você pode registrar a avaliação agora ou <b>pular</b> e lançar apenas os dados.</p> <!-- [NOVO] -->
-        </div>
-        <div class="modal-footer"> <!-- [NOVO] -->
-          <button type="button" class="btn btn-outline-secondary" id="btnPularAval"><i class="bi bi-skip-forward"></i> Pular e lançar</button> <!-- [NOVO] -->
-          <button type="button" class="btn btn-royal" id="btnAvaliarAgora"><i class="bi bi-star-fill"></i> Avaliar agora</button> <!-- [NOVO] -->
-        </div>
+<!-- ======================= -->
+<!-- MODAL AVALIAR (NOVO) -->
+<!-- ======================= -->
+<div class="modal fade" id="modalAvaliar" tabindex="-1" aria-labelledby="modalAvaliarLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalAvaliarLabel"><i class="bi bi-star-half me-2"></i>Deseja avaliar o motoboy agora?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">Você pode registrar a avaliação agora ou <b>pular</b> e lançar apenas os dados.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" id="btnPularAval"><i class="bi bi-skip-forward"></i> Pular e lançar</button>
+        <button type="button" class="btn btn-royal" id="btnAvaliarAgora"><i class="bi bi-star-fill"></i> Avaliar agora</button>
       </div>
     </div>
   </div>
-  <!-- /MODAL AVALIAR -->
+</div>
+<!-- /MODAL AVALIAR -->
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   /* ===== Tema ===== */
   const THEME_KEY='portal_theme';
@@ -864,7 +873,8 @@
       rows().forEach(tr=>{
         if(tr.style.display==='none') return;
         const v=Number(tr.querySelector('.valor')?.dataset.valor||0);
-        const eTxt=tr.cells[4]?.textContent?.trim()||'0'; const e=eTxt==='-'?0:Number(eTxt.replace(/\D+/g,''));
+        const eTxt = tr.querySelector('.entregas')?.textContent?.trim() || '0'; // AJUSTE
+        const e = eTxt === '-' ? 0 : Number(eTxt.replace(/\D+/g,''));
         totV+=v; totE+=e;
         const id=tr.dataset.coop, nm=tr.dataset.coopnome;
         per[id]=per[id]||{nome:nm,valor:0,ent:0}; per[id].valor+=v; per[id].ent+=e;
@@ -881,19 +891,34 @@
       recompute();
     });
     f?.addEventListener('submit', ()=>{ sessionStorage.setItem('scrollY', String(window.scrollY)); });
+
+    // CSV com coluna Descrição
     document.getElementById('btnExportCsv')?.addEventListener('click', ()=>{
       const rowsVis=rows().filter(r=>r.style.display!=='none');
-      const header=['Data','Cooperado','Contrato','Horário','Entregas','Valor (R$)'];
+      const header=['Data','Cooperado','Contrato','Horário','Descrição','Entregas','Valor (R$)']; // NOVO
       const linhas=[header]; let totE=0, totV=0;
+
+      function csvEscape(t){ return '"' + String(t||'').replace(/"/g,'""') + '"'; }
+
       rowsVis.forEach(r=>{
-        const c=r.cells; const entregas=(c[4].textContent.trim()==='-')?0:Number(c[4].textContent.replace(/\D+/g,'')); const valorNum=Number(r.querySelector('.valor')?.dataset.valor||0);
-        linhas.push([c[0].textContent.trim(),c[1].textContent.trim(),c[2].textContent.trim(),c[3].textContent.trim(),String(entregas),valorNum.toFixed(2).replace('.',',')]);
+        const c=r.cells;
+        const data=c[0]?.textContent.trim()||'';
+        const coop=c[1]?.textContent.trim()||'';
+        const contrato=c[2]?.textContent.trim()||'';
+        const horario=c[3]?.textContent.trim()||'';
+        const desc=(r.querySelector('.desc')?.textContent||'').replace(/\s+/g,' ').trim(); // NOVO
+        const eTxt=(r.querySelector('.entregas')?.textContent.trim()||'0');
+        const entregas=(eTxt==='-')?0:Number(eTxt.replace(/\D+/g,''));
+        const valorNum=Number(r.querySelector('.valor')?.dataset.valor||0);
+
+        linhas.push([data,coop,contrato,horario,csvEscape(desc),String(entregas),valorNum.toFixed(2).replace('.',',')]);
         totE+=entregas; totV+=valorNum;
       });
-      linhas.push(['Totais','','','',String(totE),totV.toFixed(2).replace('.',',')]);
+      linhas.push(['Totais','','','', '', String(totE), String(totV.toFixed(2)).replace('.',',')]);
       const csv='\uFEFF'+linhas.map(l=>l.join(';')).join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
       const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='lancamentos.csv'; a.click(); URL.revokeObjectURL(a.href);
     });
+
     recompute();
     const savedQ=sessionStorage.getItem('lanc_q')||''; if(savedQ && f?.q){ f.q.value=savedQ; f.q.dispatchEvent(new Event('input')); }
 
@@ -932,7 +957,6 @@
   }
 
   /* ===== Helpers para avaliação ===== */
-  // Desabilita/habilita inputs de avaliação removendo/restaurando name (para não enviar no POST quando pular)
   function setAvalInputsEnabled(enabled){
     const boxAval = document.getElementById('boxAval');
     if(!boxAval) return;
@@ -963,10 +987,8 @@
       try{ el?.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
     }
 
-    // estado inicial: sem avaliação => não envia campos
     setAvalInputsEnabled(false);
 
-    // Toggle manual do checkbox também habilita/desabilita os campos
     chkAvaliar?.addEventListener('change', ()=>{
       const on = chkAvaliar.checked;
       inputAvaliar.value = on ? '1':'0';
@@ -975,24 +997,20 @@
       if(on){ autoGeral(); }
     });
 
-    // Intercepta submit para perguntar se deseja avaliar
     form.addEventListener('submit', function(ev){
       if(!form.checkValidity()){
         form.reportValidity?.();
         return;
       }
-      // Se já escolheu avaliar, garante que inputs estão habilitados
       if(chkAvaliar.checked || inputAvaliar.value === '1' || (boxAval && boxAval.style.display === 'block')){
         setAvalInputsEnabled(true);
         autoGeral();
         return;
       }
-      // Caso contrário, abre o modal
       ev.preventDefault();
       modal.show();
     });
 
-    // Clique em "Avaliar agora"
     btnAvaliarAgora?.addEventListener('click', ()=>{
       chkAvaliar.checked = true;
       inputAvaliar.value = '1';
@@ -1006,7 +1024,6 @@
       }, 150);
     });
 
-    // Clique em "Pular e lançar" -> envia o form sem avaliação
     btnPularAval?.addEventListener('click', ()=>{
       chkAvaliar.checked = false;
       inputAvaliar.value = '0';
@@ -1025,7 +1042,7 @@
   }
   function wireAvalLanc(){
     const tbody = document.getElementById('tbodyLanc');
-    const modalEl = document.getElementById('modalAvalLanc'); // precisa existir no HTML
+    const modalEl = document.getElementById('modalAvalLanc'); // opcional: se existir no HTML
     if(!tbody || !modalEl) return;
 
     const modal = new bootstrap.Modal(modalEl);
@@ -1049,7 +1066,6 @@
       inputLancId.value = lancId;
       info.textContent = `${tr.cells[0].textContent.trim()} • ${tr.dataset.coopnome}`;
 
-      // limpa campos
       modalEl.querySelectorAll('input[name^="av_"]').forEach(i=>i.value='');
       modalEl.querySelector('textarea[name="av_comentario"]').value='';
 
@@ -1074,7 +1090,7 @@
             if(ta) ta.value = d.comentario || '';
           }
         }
-      }catch(e){ /* silencioso */ }
+      }catch(e){}
 
       initStarsInModal();
       modal.show();
@@ -1139,3 +1155,4 @@
 </script>
 </body>
 </html>
+
