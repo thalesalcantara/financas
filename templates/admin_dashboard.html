@@ -201,7 +201,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       <i class="bi bi-person-badge"></i> <span>Cooperados</span>
     </a>
 
-   <!-- Estabelecimentos (tab) -->
+    <!-- Estabelecimentos (tab) -->
     <a class="nav-link {{ 'active' if _tab=='restaurantes' else '' }}"
        data-bs-toggle="tab"
        data-bs-target="#restaurantes"
@@ -2012,7 +2012,14 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <span class="badge-soft">Total: <b>{{ qtd_coops }}</b></span>
   </div>
 
- <!-- Novo cooperado -->
+  <section class="container-fluid px-0">
+
+{# ====== quem pode ver telefone? ajuste as props conforme seu app ====== #}
+{% set can_view_phone = True %}
+                         and (getattr(current_user, 'is_admin', False)
+                              or getattr(current_user, 'tipo', '') == 'restaurante')) %}
+
+<!-- Novo cooperado -->
 <div class="card border-0 shadow-sm rounded-3 mb-3">
   <div class="card-body">
     <form method="POST"
@@ -3020,10 +3027,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         </div>
       </section>
 
-    </div>
-  </main>
-
-  <!-- MODAIS =================================================== -->
+     <!-- MODAIS =================================================== -->
   <div class="modal fade" id="modalEditLancamento" tabindex="-1">
     <div class="modal-dialog modal-lg">
       <form method="POST" class="modal-content">
