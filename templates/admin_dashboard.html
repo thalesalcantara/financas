@@ -33,7 +33,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   border-radius: 16px;
   box-shadow: none !important;
 }
-.brand h3 {
+.brand h5 {
   font-family: 'Orbitron', sans-serif;
   font-size: 1.6rem;
   margin: 0;
@@ -60,14 +60,11 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     .text-tight{line-height:1.15}
     @media(max-width:900px){
       :root{--sidebar-w:64px}
-      .brand h3,.brand img{display:none}
+      .brand h8,.brand img{display:none}
       .main{margin-left:var(--sidebar-w);max-width:calc(100vw - var(--sidebar-w))}
       .sidebar .nav-link span{display:none}
     }
-
  </style>
-{# <link rel="stylesheet"
-      href="{{ url_for('static', filename='css/corporate-coopex.css', v=1) }}">
 </head>
 <body>
 {# -----------------------------------------
@@ -213,7 +210,15 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </a>
 
     <!-- Escalas (tab) -->
-    <a class="nav-link" data-bs-toggle="tab" href="#escalas"><i class="bi bi-calendar2-week"></i> <span>Escalas</span></a>
+   <a class="nav-link {{ 'active' if _tab=='escalas' else '' }}"
+   data-bs-toggle="tab"
+   data-bs-target="#escalas"
+   href="#escalas"
+   role="tab"
+   aria-controls="escalas"
+   aria-selected="{{ 'true' if _tab=='escalas' else 'false' }}">
+  <i class="bi bi-calendar2-week"></i> <span>Escalas</span>
+</a>
 
     <!-- Páginas dedicadas (rotas próprias, não tabs) -->
     <a class="nav-link {% if request.endpoint == 'admin_documentos' %}active{% endif %}"
@@ -754,7 +759,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div> <!-- /container -->
 </section>
 
-<!-- Chart.js (fallback via CDN se não estiver na base) -->
+<!-- Chart.js (assumimos que já foi importado no fim da página) -->
 <script>
   window.addEventListener('load', function(){
     // Botão "Este mês (1–último)"
@@ -774,29 +779,24 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     })();
 
     (function initChart(){
-      const ensureChartJS = () => new Promise((resolve)=>{
-        if (window.Chart) return resolve();
-        const s = document.createElement('script');
-        s.src = "https://cdn.jsdelivr.net/npm/chart.js";
-        s.onload = () => resolve();
-        document.head.appendChild(s);
-      });
-
       const dataTop = {{ chart_top|tojson }};
       const el = document.getElementById('chartTop');
-      if (!el || !dataTop || !dataTop.labels || !dataTop.labels.length) return;
 
-      ensureChartJS().then(()=>{
+      // Garante que existe canvas e dados, e que Chart já está carregado
+      if (el && dataTop && dataTop.labels && dataTop.labels.length && window.Chart) {
         new Chart(el, {
           type: 'bar',
-          data: { labels: dataTop.labels, datasets: [{ label: 'Média Geral', data: dataTop.values }] },
+          data: {
+            labels: dataTop.labels,
+            datasets: [{ label: 'Média Geral', data: dataTop.values }]
+          },
           options: {
             responsive: true,
             scales: { y: { beginAtZero: true, max: 5 } },
             plugins: { legend: { display: false } }
           }
         });
-      });
+      }
     })();
   });
 </script>
@@ -2015,7 +2015,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   <section class="container-fluid px-0">
 
 {# ====== quem pode ver telefone? ajuste as props conforme seu app ====== #}
-{% set can_view_phone = True %}
+{% set can_view_phone = (getattr(current_user, 'is_admin', False) or getattr(current_user, 'tipo', '') == 'restaurante') %}
                          and (getattr(current_user, 'is_admin', False)
                               or getattr(current_user, 'tipo', '') == 'restaurante')) %}
 
@@ -3145,21 +3145,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
   </div>
 
-  <div class="modal fade" id="modalEditCooperado" tabindex="-1">
-    <div class="modal-dialog">
-      <form method="POST" enctype="multipart/form-data" class="modal-content">
-        <div class="modal-header"><h5 class="modal-title">Editar Cooperado</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body row g-2 px-3">
-          <input type="hidden" name="id">
-          <div class="col-12"><input type="text" class="form-control" name="nome" required></div>
-          <div class="col-12"><input type="text" class="form-control" name="usuario" required></div>
-          <div class="col-12"><input type="file" class="form-control" name="foto"></div>
-        </div>
-        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
-      </form>
-    </div>
-  </div>
-
   <div class="modal fade" id="modalResetSenhaCooperado" tabindex="-1">
     <div class="modal-dialog">
       <form method="POST" class="modal-content">
@@ -3291,7 +3276,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           if(!id) return;
           const p = new URLSearchParams(location.search);
           p.set('tab', id);
-          history.replaceState(null, '', location.pathname + '?' + p.toString() + e.target.getAttribute('href'));
+          history.replaceState(null, '', location.pathname + '?' + p.toString());
         });
       });
 
