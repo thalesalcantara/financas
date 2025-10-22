@@ -2015,7 +2015,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   <section class="container-fluid px-0">
 
 {# ====== quem pode ver telefone? ajuste as props conforme seu app ====== #}
-{% set can_view_phone = (getattr(current_user, 'is_admin', False) or getattr(current_user, 'tipo', '') == 'restaurante') %}
+{% set can_view_phone = (current_user.is_authenticated and (current_user.is_admin|default(false) or current_user.tipo|default('') == 'restaurante')) %}
 
 <!-- Novo cooperado -->
 <div class="card border-0 shadow-sm rounded-3 mb-3">
