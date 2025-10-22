@@ -130,15 +130,12 @@ app.config.update(
 
 db = SQLAlchemy(app)
 
-# Health checks
-@app.get("/healthz")
-def healthz():
-    return "ok", 200
-
 @app.get("/readyz")
 def readyz():
     try:
-        db.session.execute(sa_text("SELECT 1"))
+        # usa conexão curta no engine, sem prender a sessão global
+        with db.engine.connect() as con:
+            con.execute(sa_text("SELECT 1"))
         return "ready", 200
     except Exception:
         return "not-ready", 503
@@ -182,23 +179,32 @@ class Usuario(db.Model, UserMixin):
     def check_password(self, raw: str) -> bool:
         return check_password_hash(self.senha_hash, raw)
 
-        
+
 class Cooperado(db.Model):
     __tablename__ = "cooperados"
+
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)
+
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
     usuario_ref = db.relationship("Usuario", backref="coop_account", uselist=False)
-    # Foto: agora guardada no banco (bytea no Postgres / BLOB no SQLite)
+
+    # ✅ Telefone (para aparecer no contrato)
+    telefone = db.Column(db.String(32))
+
+    # Foto
     foto_bytes = db.Column(db.LargeBinary)
     foto_mime = db.Column(db.String(100))
     foto_filename = db.Column(db.String(255))
-    # Para manter compatibilidade com os templates existentes que usam 'foto_url'
+    # Compatibilidade com templates antigos
     foto_url = db.Column(db.String(255))
+
+    # Documentos
     cnh_numero = db.Column(db.String(50))
     cnh_validade = db.Column(db.Date)
     placa = db.Column(db.String(20))
     placa_validade = db.Column(db.Date)
+
     ultima_atualizacao = db.Column(db.DateTime)
 
 
@@ -513,6 +519,23 @@ def init_db():
             db.session.execute(sa_text(
                 "ALTER TABLE IF NOT EXISTS public.usuarios "
                 "ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE"
+            ))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # 4.y) telefone em cooperados
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "telefone" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN telefone VARCHAR(32)"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS public.cooperados "
+                "ADD COLUMN IF NOT EXISTS telefone VARCHAR(32)"
             ))
             db.session.commit()
     except Exception:
@@ -1178,7 +1201,6 @@ def _cooperado_atual() -> Cooperado | None:
         return None
     return Cooperado.query.filter_by(usuario_id=uid).first()
 
-    # --- Blueprint Portal (topo do arquivo, depois de criar `app`) ---
 portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
 
 @portal_bp.get("/avisos", endpoint="portal_cooperado_avisos")
@@ -1302,9 +1324,6 @@ def register_blueprints_once(app):
         app.register_blueprint(portal_bp)
 
 register_blueprints_once(app)
-
-# --- Alias para compatibilidade com o template (endpoint esperado: 'portal_cooperado_avisos')
-from flask import redirect, url_for
 
 def _portal_cooperado_avisos_alias():
     # redireciona para a rota real dentro do blueprint 'portal'
@@ -1526,7 +1545,7 @@ def get_avisos_for_restaurante(rest: Restaurante):
                     Aviso.tipo == "restaurante",
                     or_(
                         ~Aviso.restaurantes.any(),                  # broadcast
-                        Aviso.restaurantes.any(Restaurante.id == rest.id),  # específico
+                        Aviso.restaurantes.any(id=rest.id),
                     ),
                 ),
             )
@@ -1537,7 +1556,6 @@ def get_avisos_for_restaurante(rest: Restaurante):
             Aviso.criado_em.desc(),
         )
     )
-
     return q.all()
 
 # =========================
@@ -1707,6 +1725,55 @@ def admin_dashboard():
     # --- Controle de abas
     active_tab = args.get("tab", "lancamentos")
 
+    # ===== Defaults p/ todas as abas (evita quebrar template) =====
+    lancamentos = []
+    total_producoes = 0.0
+    total_inss = 0.0
+
+    receitas = []
+    despesas = []
+    total_receitas = 0.0
+    total_despesas = 0.0
+
+    receitas_coop = []
+    despesas_coop = []
+    total_receitas_coop = 0.0
+    total_despesas_coop = 0.0
+
+    # folha
+    FolhaItem = namedtuple("FolhaItem", "cooperado lancamentos receitas despesas bruto inss outras_desp liquido")
+    folha_por_coop = []
+    folha_inicio = None
+    folha_fim = None
+
+    # escalas/contagens
+    escalas_all = []
+    esc_by_int = {}
+    esc_by_str = {}
+    qtd_escalas_map = {}
+    qtd_escalas_sem_cadastro = 0
+
+    # gráficos
+    chart_data_lancamentos_coop = {"labels": [], "values": []}
+    chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
+
+    # trocas
+    trocas_pendentes = []
+    trocas_historico = []
+    trocas_historico_flat = []
+
+    # benefícios
+    historico_beneficios = []
+    beneficios_view = []
+
+    # doc status
+    docinfo_map = {}
+    status_doc_por_coop = {}
+
+    # auxiliares já usados no template
+    current_date = date.today()
+    data_limite = date(current_date.year, 12, 31)
+
     # --- Helper: escolhe a primeira data válida de uma lista de chaves
     def _pick_date(*keys):
         for k in keys:
@@ -1723,7 +1790,7 @@ def admin_dashboard():
 
     restaurante_id = args.get("restaurante_id", type=int)
     cooperado_id   = args.get("cooperado_id", type=int)
-    considerar_periodo = bool(args.get("considerar_periodo"))
+    considerar_periodo = (args.get("considerar_periodo") or "").strip().lower() in {"1","true","on","yes","y"}
     dows = set(args.getlist("dow"))  # {"1","2",...}
 
     # ---- Lançamentos (com filtros + DOW)
@@ -2217,7 +2284,7 @@ def admin_delete_lancamento(id):
 @app.route("/admin/avaliacoes", methods=["GET"])
 @admin_required
 def admin_avaliacoes():
-    tipo = (request.args.get("tipo", "restaurante") or "restaurante").strip().lower()
+    tipo = (request.args.get("tipo", "cooperado") or "cooperado").strip().lower()
 
     restaurante_id = request.args.get("restaurante_id", type=int)
     cooperado_id   = request.args.get("cooperado_id", type=int)
@@ -2608,7 +2675,7 @@ def delete_despesa(id):
 def avisos_publicos():
     t = session.get("user_tipo")
     if t == "cooperado":
-        return redirect(url_for("portal_cooperado_avisos"))
+        return redirect(url_for("portal.portal_cooperado_avisos"))
     if t == "restaurante":
         return redirect(url_for("portal_restaurante"))
     return redirect(url_for("login"))
@@ -2866,6 +2933,7 @@ def add_cooperado():
     db.session.flush()
 
     c = Cooperado(nome=nome, usuario_id=u.id, ultima_atualizacao=datetime.now())
+    c.telefone = (f.get("telefone") or "").strip()
     db.session.add(c)
     db.session.flush()  # garante c.id
 
@@ -3029,22 +3097,44 @@ def delete_restaurante(id):
     u = r.usuario_ref
     try:
         # 1) Coletar IDs das escalas do restaurante
-        escala_ids = [e.id for e in Escala.query.with_entities(Escala.id)
+        escala_ids = [e.id for (e,) in db.session.query(Escala.id)
                       .filter(Escala.restaurante_id == id).all()]
 
         if escala_ids:
             # 2) Apagar trocas que referenciam essas escalas
-            db.session.execute(sa_delete(TrocaSolicitacao)
-                               .where(TrocaSolicitacao.origem_escala_id.in_(escala_ids)))
+            db.session.execute(
+                sa_delete(TrocaSolicitacao)
+                .where(TrocaSolicitacao.origem_escala_id.in_(escala_ids))
+            )
             # 3) Apagar as escalas
-            db.session.execute(sa_delete(Escala)
-                               .where(Escala.restaurante_id == id))
+            db.session.execute(
+                sa_delete(Escala)
+                .where(Escala.id.in_(escala_ids))
+            )
 
-        # 4) Apagar lançamentos do restaurante
-        db.session.execute(sa_delete(Lancamento)
-                           .where(Lancamento.restaurante_id == id))
+        # 4) Apagar avaliações relacionadas ao restaurante (defensivo mesmo com CASCADE por lançamento)
+        db.session.execute(
+            sa_delete(AvaliacaoCooperado)
+            .where(AvaliacaoCooperado.restaurante_id == id)
+        )
+        db.session.execute(
+            sa_delete(AvaliacaoRestaurante)
+            .where(AvaliacaoRestaurante.restaurante_id == id)
+        )
 
-        # 5) Agora apaga o restaurante e o usuário vinculado
+        # 5) Apagar lançamentos do restaurante
+        db.session.execute(
+            sa_delete(Lancamento)
+            .where(Lancamento.restaurante_id == id)
+        )
+
+        # 6) Apagar confirmações/leitura de avisos vinculadas ao restaurante
+        db.session.execute(
+            sa_delete(AvisoLeitura)
+            .where(AvisoLeitura.restaurante_id == id)
+        )
+
+        # 7) Finalmente, remover o restaurante e o usuário vinculado
         db.session.delete(r)
         if u:
             db.session.delete(u)
@@ -3056,6 +3146,7 @@ def delete_restaurante(id):
         current_app.logger.exception(e)
         flash("Não foi possível excluir: existem vínculos ativos.", "danger")
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
+
 
 @app.route("/restaurantes/<int:id>/reset_senha", methods=["POST"])
 @admin_required
@@ -3070,9 +3161,8 @@ def reset_senha_restaurante(id):
     db.session.commit()
     flash("Senha do restaurante atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
-# app.py (ou onde ficam suas rotas)
-from flask import request, redirect, url_for, flash, session
-from werkzeug.security import check_password_hash, generate_password_hash
+
+
 @app.route("/rest/alterar-senha", methods=["POST"], endpoint="rest_alterar_senha")
 @role_required("restaurante")
 def alterar_senha_rest():
@@ -3107,6 +3197,7 @@ def alterar_senha_rest():
     flash("Senha alterada com sucesso!", "success")
     return redirect(url_for("portal_restaurante", view="config"))
 
+
 @app.route("/config/update", methods=["POST"])
 @admin_required
 def update_config():
@@ -3115,6 +3206,7 @@ def update_config():
     db.session.commit()
     flash("Configuração atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="config"))
+
 
 @app.route("/admin/alterar_admin", methods=["POST"])
 @admin_required
@@ -3176,45 +3268,114 @@ def delete_receita_coop(id):
 @admin_required
 def add_despesa_coop():
     f = request.form
-    ids = request.form.getlist("cooperado_ids[]")
-    descricao = f.get("descricao", "").strip()
-    valor_total = f.get("valor", type=float) or 0.0
-    d = _parse_date(f.get("data"))
 
+    # --- Destinatários ---
+    ids = request.form.getlist("cooperado_ids[]")
     cooperados = Cooperado.query.order_by(Cooperado.nome).all()
-    dest_ids = [c.id for c in cooperados] if "all" in ids else [int(i) for i in ids if i.isdigit()]
+    dest_ids = [c.id for c in cooperados] if "all" in ids else [int(i) for i in ids if str(i).isdigit()]
     if not dest_ids:
         flash("Selecione pelo menos um cooperado.", "warning")
         return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
-    valor_unit = round(valor_total / max(1, len(dest_ids)), 2)
-    for cid in dest_ids:
-        db.session.add(DespesaCooperado(cooperado_id=cid, descricao=descricao, valor=valor_unit, data=d))
-    db.session.commit()
-    flash("Despesa(s) lançada(s).", "success")
-    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+    descricao = (f.get("descricao") or "").strip()
+    data_ref  = _parse_date(f.get("data")) or date.today()
 
-@app.route("/coop/despesas/<int:id>/edit", methods=["POST"])
-@admin_required
-def edit_despesa_coop(id):
-    dc = DespesaCooperado.query.get_or_404(id)
-    f = request.form
-    dc.cooperado_id = f.get("cooperado_id", type=int)
-    dc.descricao = f.get("descricao", "").strip()
-    dc.valor = f.get("valor", type=float)
-    dc.data = _parse_date(f.get("data"))
-    db.session.commit()
-    flash("Despesa do cooperado atualizada.", "success")
-    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+    # --- Modo de aplicação ---
+    # valores aceitos: "valor" (default) ou "percentual"
+    modo = (f.get("modo") or "valor").strip().lower()
 
-@app.route("/coop/despesas/<int:id>/delete")
-@admin_required
-def delete_despesa_coop(id):
-    dc = DespesaCooperado.query.get_or_404(id)
-    db.session.delete(dc)
-    db.session.commit()
-    flash("Despesa do cooperado excluída.", "success")
-    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+    # --------------------------------------------------------------------
+    # MODO "VALOR": duas formas
+    #   a) valor_unit > 0  -> aplica esse mesmo valor para cada cooperado
+    #   b) valor_total > 0 -> divide igualmente (rateio)
+    #
+    # Compatibilidade: se vier apenas "valor" (seu form atual), tratamos como valor_total (rateio).
+    # --------------------------------------------------------------------
+    if modo == "valor":
+        valor_unit  = f.get("valor_unit",  type=float)
+        valor_total = f.get("valor_total", type=float)
+
+        # compat: seu form antigo mandava "valor"
+        if not valor_total:
+            valor_total = f.get("valor", type=float)
+
+        if valor_unit and valor_unit > 0:
+            aplicados = 0
+            for cid in dest_ids:
+                db.session.add(DespesaCooperado(
+                    cooperado_id=cid,
+                    descricao=descricao,
+                    valor=round(valor_unit, 2),
+                    data=data_ref
+                ))
+                aplicados += 1
+            db.session.commit()
+            flash(f"Despesa aplicada: R$ {valor_unit:.2f} para {aplicados} cooperado(s).", "success")
+            return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+        if not valor_total or valor_total <= 0:
+            flash("Informe um valor total (para rateio) ou um valor unitário por cooperado.", "warning")
+            return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+        valor_rateado = round(valor_total / max(1, len(dest_ids)), 2)
+        for cid in dest_ids:
+            db.session.add(DespesaCooperado(
+                cooperado_id=cid,
+                descricao=descricao,
+                valor=valor_rateado,
+                data=data_ref
+            ))
+        db.session.commit()
+        flash(f"Despesa(s) lançada(s) por rateio. Valor unitário R$ {valor_rateado:.2f}.", "success")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    # --------------------------------------------------------------------
+    # MODO "PERCENTUAL": aplica % sobre o bruto (Lancamento.valor)
+    # no período [data_inicio, data_fim] de cada cooperado.
+    # Se não vier período, usa últimos 30 dias.
+    # --------------------------------------------------------------------
+    elif modo == "percentual":
+        percentual = f.get("percentual", type=float)
+        if not percentual or percentual <= 0:
+            flash("Informe um percentual válido (> 0).", "warning")
+            return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+        di = _parse_date(f.get("data_inicio")) or (date.today() - timedelta(days=30))
+        df = _parse_date(f.get("data_fim"))    or date.today()
+
+        total_aplicado = 0.0
+        aplicados = 0
+
+        for cid in dest_ids:
+            bruto = (db.session.query(func.coalesce(func.sum(Lancamento.valor), 0.0))
+                     .filter(Lancamento.cooperado_id == cid,
+                             Lancamento.data >= di,
+                             Lancamento.data <= df)
+                     .scalar() or 0.0)
+            valor = round(bruto * (percentual / 100.0), 2)
+            if valor <= 0:
+                continue
+
+            db.session.add(DespesaCooperado(
+                cooperado_id=cid,
+                descricao=(descricao or f"Despesa {percentual:.2f}% ref {di.strftime('%d/%m/%Y')}–{df.strftime('%d/%m/%Y')}"),
+                valor=valor,
+                data=data_ref
+            ))
+            total_aplicado += valor
+            aplicados += 1
+
+        db.session.commit()
+        flash(
+            f"Despesa percentual aplicada ({percentual:.2f}%) para {aplicados} cooperado(s) no período "
+            f"{di.strftime('%d/%m/%Y')}–{df.strftime('%d/%m/%Y')}. Total R$ {total_aplicado:.2f}.",
+            "success"
+        )
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    else:
+        flash("Modo inválido. Use 'valor' ou 'percentual'.", "danger")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
 # =========================
 # Benefícios — Rateio (Admin)
@@ -4102,7 +4263,6 @@ def portal_cooperado():
         trocas_enviadas=trocas_enviadas,
     )
 
-from flask import request, redirect, url_for, flash, abort, session
 
 @app.post("/coop/avaliar/restaurante/<int:lanc_id>")
 @role_required("cooperado")
@@ -4165,7 +4325,7 @@ def coop_avaliar_restaurante(lanc_id):
 @role_required("cooperado")
 def producoes_avaliar(lanc_id):
     # IMPORTANTÍSSIMO: retornar o que a função real retorna
-    return coop_avaliar_restaurante(lanc_id)
+     return coop_avaliar_restaurante(lanc_id)
 
 @app.route("/painel/cooperado")
 @role_required("cooperado")
@@ -4182,8 +4342,9 @@ def solicitar_troca():
 
     from_escala_id = request.form.get("from_escala_id", type=int)
     to_cooperado_id = request.form.get("to_cooperado_id", type=int)
-    mensagem = (request.form.get("mensagem") or "").strip()
+    mensagem = (request.form.get("mensagem") or "").strip() or None
 
+    # Validações básicas
     if not from_escala_id or not to_cooperado_id:
         flash("Selecione a escala e o cooperado de destino.", "warning")
         return redirect(url_for("portal_cooperado"))
@@ -4198,17 +4359,31 @@ def solicitar_troca():
         flash("Cooperado de destino inválido.", "danger")
         return redirect(url_for("portal_cooperado"))
 
+    # Antiduplicata: já existe pedido pendente idêntico?
+    ja = (TrocaSolicitacao.query
+          .filter_by(solicitante_id=me.id,
+                     destino_id=destino.id,
+                     origem_escala_id=origem.id,
+                     status="pendente")
+          .first())
+    if ja:
+        flash("Você já tem uma solicitação pendente para esse plantão.", "info")
+        return redirect(url_for("portal_cooperado"))
+
+    # Cria solicitação
     t = TrocaSolicitacao(
         solicitante_id=me.id,
         destino_id=destino.id,
         origem_escala_id=origem.id,
-        mensagem=mensagem or None,
+        mensagem=mensagem,
         status="pendente",
     )
     db.session.add(t)
     db.session.commit()
-    flash("Solicitação de troca enviada ao administrador.", "success")
+
+    flash("Solicitação enviada.", "success")
     return redirect(url_for("portal_cooperado"))
+
 
 @app.post("/trocas/<int:troca_id>/aceitar")
 @role_required("cooperado")
@@ -4288,6 +4463,7 @@ def aceitar_troca(troca_id):
     db.session.commit()
     flash("Troca aplicada com sucesso!", "success")
     return redirect(url_for("portal_cooperado"))
+
 
 @app.post("/trocas/<int:troca_id>/recusar")
 @role_required("cooperado")
