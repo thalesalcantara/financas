@@ -64,7 +64,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       .main{margin-left:var(--sidebar-w);max-width:calc(100vw - var(--sidebar-w))}
       .sidebar .nav-link span{display:none}
     }
+
  </style>
+{# <link rel="stylesheet"
+      href="{{ url_for('static', filename='css/corporate-coopex.css', v=1) }}">
 </head>
 <body>
 {# -----------------------------------------
@@ -210,15 +213,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </a>
 
     <!-- Escalas (tab) -->
-   <a class="nav-link {{ 'active' if _tab=='escalas' else '' }}"
-   data-bs-toggle="tab"
-   data-bs-target="#escalas"
-   href="#escalas"
-   role="tab"
-   aria-controls="escalas"
-   aria-selected="{{ 'true' if _tab=='escalas' else 'false' }}">
-  <i class="bi bi-calendar2-week"></i> <span>Escalas</span>
-</a>
+    <a class="nav-link" data-bs-toggle="tab" href="#escalas"><i class="bi bi-calendar2-week"></i> <span>Escalas</span></a>
 
     <!-- Páginas dedicadas (rotas próprias, não tabs) -->
     <a class="nav-link {% if request.endpoint == 'admin_documentos' %}active{% endif %}"
@@ -759,7 +754,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div> <!-- /container -->
 </section>
 
-<!-- Chart.js (assumimos que já foi importado no fim da página) -->
+<!-- Chart.js (fallback via CDN se não estiver na base) -->
 <script>
   window.addEventListener('load', function(){
     // Botão "Este mês (1–último)"
@@ -779,24 +774,29 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     })();
 
     (function initChart(){
+      const ensureChartJS = () => new Promise((resolve)=>{
+        if (window.Chart) return resolve();
+        const s = document.createElement('script');
+        s.src = "https://cdn.jsdelivr.net/npm/chart.js";
+        s.onload = () => resolve();
+        document.head.appendChild(s);
+      });
+
       const dataTop = {{ chart_top|tojson }};
       const el = document.getElementById('chartTop');
+      if (!el || !dataTop || !dataTop.labels || !dataTop.labels.length) return;
 
-      // Garante que existe canvas e dados, e que Chart já está carregado
-      if (el && dataTop && dataTop.labels && dataTop.labels.length && window.Chart) {
+      ensureChartJS().then(()=>{
         new Chart(el, {
           type: 'bar',
-          data: {
-            labels: dataTop.labels,
-            datasets: [{ label: 'Média Geral', data: dataTop.values }]
-          },
+          data: { labels: dataTop.labels, datasets: [{ label: 'Média Geral', data: dataTop.values }] },
           options: {
             responsive: true,
             scales: { y: { beginAtZero: true, max: 5 } },
             plugins: { legend: { display: false } }
           }
         });
-      }
+      });
     })();
   });
 </script>
@@ -2012,15 +2012,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <span class="badge-soft">Total: <b>{{ qtd_coops }}</b></span>
   </div>
 
-  <section class="container-fluid px-0">
-
-{# ====== quem pode ver telefone? ajuste as props conforme seu app ====== #}
-{# garante um "stub" quando current_user não existir #}
-{% set _cu = current_user if current_user is defined and current_user is not none
-           else namespace(is_authenticated=false, is_admin=false, tipo='') %}
-{% set can_view_phone = (_cu.is_authenticated and (_cu.is_admin|default(false) or _cu.tipo|default('') == 'restaurante')) %}
-
-<!-- Novo cooperado -->
+ <!-- Novo cooperado -->
 <div class="card border-0 shadow-sm rounded-3 mb-3">
   <div class="card-body">
     <form method="POST"
@@ -2371,7 +2363,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   }
 </script>
 
-       <!-- RESTAURANTES (versão profissional / drop-in) -->
+      <!-- RESTAURANTES (versão profissional / drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='restaurantes' else '' }}" id="restaurantes" role="tabpanel">
   {% set qtd_rest = restaurantes|length %}
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
@@ -2992,7 +2984,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           </div>
         </div>
       </section>
-    
+
       <!-- CONFIG -->
       <section class="tab-pane fade {{ 'show active' if _tab=='config' else '' }}" id="config" role="tabpanel">
         <h4 class="mb-3">Configurações</h4>
@@ -3146,6 +3138,21 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
   </div>
 
+  <div class="modal fade" id="modalEditCooperado" tabindex="-1">
+    <div class="modal-dialog">
+      <form method="POST" enctype="multipart/form-data" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Editar Cooperado</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-2 px-3">
+          <input type="hidden" name="id">
+          <div class="col-12"><input type="text" class="form-control" name="nome" required></div>
+          <div class="col-12"><input type="text" class="form-control" name="usuario" required></div>
+          <div class="col-12"><input type="file" class="form-control" name="foto"></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal fade" id="modalResetSenhaCooperado" tabindex="-1">
     <div class="modal-dialog">
       <form method="POST" class="modal-content">
@@ -3277,7 +3284,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           if(!id) return;
           const p = new URLSearchParams(location.search);
           p.set('tab', id);
-          history.replaceState(null, '', location.pathname + '?' + p.toString());
+          history.replaceState(null, '', location.pathname + '?' + p.toString() + e.target.getAttribute('href'));
         });
       });
 
