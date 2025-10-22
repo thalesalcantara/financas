@@ -2572,6 +2572,208 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </script>
 </section>
 
+       <!-- RESTAURANTES (versão profissional / drop-in) -->
+<section class="tab-pane fade {{ 'show active' if _tab=='restaurantes' else '' }}" id="restaurantes" role="tabpanel">
+  {% set qtd_rest = restaurantes|length %}
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+    <h5 class="m-0 d-flex align-items-center gap-2">
+      <i class="bi bi-shop"></i> Cadastro de Estabelecimentos
+    </h5>
+    <span class="badge-soft">Total: <b>{{ qtd_rest }}</b></span>
+  </div>
+
+  <!-- Novo estabelecimento -->
+  <div class="card border-0 shadow-sm rounded-3 mb-3">
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('add_restaurante') }}" enctype="multipart/form-data" class="row g-3 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label">Nome</label>
+          <input type="text" class="form-control form-control-sm" name="nome" placeholder="Ex.: Restaurante Centro" required>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Período</label>
+          <select class="form-select form-select-sm" name="periodo" required>
+            <option value="seg-dom">Seg a Dom</option>
+            <option value="sab-sex">Sáb a Sex</option>
+            <option value="sex-qui">Sex a Qui</option>
+          </select>
+          <small class="text-muted">Usado na competência de lançamentos.</small>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Usuário</label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text"><i class="bi bi-at"></i></span>
+            <input type="text" class="form-control" name="usuario" placeholder="usuario" required>
+          </div>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Senha</label>
+          <div class="input-group input-group-sm">
+            <input type="password" class="form-control" name="senha" id="restSenha" placeholder="********" required>
+            <button class="btn btn-outline-secondary" type="button" id="btnToggleRestSenha" title="Mostrar/ocultar">
+              <i class="bi bi-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Logo (opcional)</label>
+          <input type="file" class="form-control form-control-sm" name="foto" id="restFoto" accept="image/*">
+          <div class="d-flex align-items-center gap-2 mt-2">
+            <img id="restPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt=""
+                 style="width:40px;height:40px;object-fit:cover;">
+            <small class="text-muted">Prévia</small>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <button class="btn btn-royal">
+            <i class="bi bi-save"></i> Cadastrar
+          </button>
+          <button type="reset" class="btn btn-light ms-1">Limpar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Lista de estabelecimentos -->
+  <div class="card border-0 shadow-sm rounded-3">
+    <div class="card-body">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <h6 class="m-0 d-flex align-items-center gap-2">
+          <i class="bi bi-list-ul"></i> Estabelecimentos cadastrados
+        </h6>
+        <div class="input-group input-group-sm" style="max-width:360px;">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text" class="form-control" id="buscaRestaurantes" placeholder="Filtrar por nome, usuário ou período...">
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered table-hover align-middle">
+          <thead class="table-light">
+            <tr class="text-nowrap">
+              <th style="width:60px;">Logo</th>
+              <th>Nome</th>
+              <th>Usuário</th>
+              <th style="width:140px;">Período</th>
+              <th class="text-center" style="width:200px;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyRestaurantes">
+            {% for r in restaurantes %}
+              <tr data-nome="{{ r.nome|lower }}" data-user="{{ r.usuario_ref.usuario|lower }}" data-periodo="{{ r.periodo|lower }}">
+                <td class="text-center">
+                  <img src="{{ r.foto_url or url_for('static', filename='img/default.png') }}"
+                       class="avatar border" alt="{{ r.nome }}"
+                       style="width:40px;height:40px;object-fit:cover;">
+                </td>
+                <td class="fw-medium">{{ r.nome }}</td>
+                <td class="text-muted">{{ r.usuario_ref.usuario }}</td>
+                <td class="text-nowrap">
+                  <span class="badge bg-light text-dark">
+                    {% if r.periodo == 'seg-dom' %}Seg–Dom
+                    {% elif r.periodo == 'sab-sex' %}Sáb–Sex
+                    {% elif r.periodo == 'sex-qui' %}Sex–Qui
+                    {% else %}{{ r.periodo }}{% endif %}
+                  </span>
+                </td>
+                <td class="text-center">
+                  <div class="btn-group btn-group-sm" role="group">
+                    <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalEditRestaurante"
+                            data-id="{{ r.id }}" data-nome="{{ r.nome }}" data-usuario="{{ r.usuario_ref.usuario }}" data-periodo="{{ r.periodo }}"
+                            data-url="{{ url_for('edit_restaurante', id=r.id) }}" title="Editar">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalResetSenhaRestaurante"
+                            data-id="{{ r.id }}" data-url="{{ url_for('reset_senha_restaurante', id=r.id) }}" title="Redefinir senha">
+                      <i class="bi bi-key"></i>
+                    </button>
+                    <form action="{{ url_for('delete_restaurante', id=r.id) }}"
+      method="POST"
+      class="d-inline"
+      onsubmit="return confirm('Excluir {{ r.nome }}? Esta ação não pode ser desfeita.');">
+  {% if csrf_token is defined %}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% endif %}
+  <button type="submit" class="btn btn-danger btn-sm" title="Excluir">
+    <i class="bi bi-trash"></i>
+  </button>
+</form>
+                  </div>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="5" class="text-center text-muted">Nenhum estabelecimento</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- UX Helpers -->
+  <script>
+    // filtro local por nome/usuário/período
+    (function(){
+      const input = document.getElementById('buscaRestaurantes');
+      const tbody = document.getElementById('tbodyRestaurantes');
+      input?.addEventListener('input', () => {
+        const q = (input.value || '').trim().toLowerCase();
+        [...tbody.querySelectorAll('tr')].forEach(tr => {
+          const nome = tr.dataset.nome || '';
+          const user = tr.dataset.user || '';
+          const per  = tr.dataset.periodo || '';
+          tr.style.display = (!q || nome.includes(q) || user.includes(q) || per.includes(q)) ? '' : 'none';
+        });
+      });
+    })();
+
+    // prévia do logo
+    (function(){
+      const file = document.getElementById('restFoto');
+      const prev = document.getElementById('restPreview');
+      file?.addEventListener('change', () => {
+        const f = file.files?.[0];
+        if(!f) return;
+        const reader = new FileReader();
+        reader.onload = e => prev.src = e.target.result;
+        reader.readAsDataURL(f);
+      });
+    })();
+
+    // mostrar/ocultar senha
+    (function(){
+      const btn = document.getElementById('btnToggleRestSenha');
+      const inp = document.getElementById('restSenha');
+      btn?.addEventListener('click', () => {
+        const isPwd = inp.type === 'password';
+        inp.type = isPwd ? 'text' : 'password';
+        btn.innerHTML = isPwd ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+      });
+    })();
+
+    // confirmação de exclusão (somente dentro desta aba)
+    (function(){
+      const section = document.getElementById('restaurantes');
+      section?.addEventListener('click', function(e){
+        const del = e.target.closest('.btn-del');
+        if (!del) return;
+        if (!confirm('Tem certeza que deseja excluir?')) {
+          e.preventDefault();
+          return;
+        }
+        // evita cliques repetidos após confirmar
+        del.classList.add('disabled');
+        del.setAttribute('aria-disabled','true');
+      });
+    })();
+  </script>
+</section>
+
        <!-- ESCALAS -->
       <section class="tab-pane fade" id="escalas">
         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -2656,6 +2858,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           </div>
         </div>
 
+       
         <!-- SOLICITAÇÕES DE TROCA (pendentes) -->
 <div class="card p-3 mb-3">
   <div class="d-flex justify-content-between align-items-center">
