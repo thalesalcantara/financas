@@ -462,20 +462,41 @@
           <span class="input-group-text"><i class="bi bi-search"></i></span>
           <input id="buscaCoop" type="text" class="form-control" placeholder="Buscar cooperado..." list="cooperadosList">
           <datalist id="cooperadosList">{% for coop in _cooperados %}<option value="{{ coop.nome }}"></option>{% endfor %}</datalist>
-          <select id="selectCoop" class="form-select"><option value="">Lista...</option>{% for coop in _cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}</select>
+          <select id="selectCoop" class="form-select">
+            <option value="">Lista...</option>
+            {% for coop in _cooperados %}
+              <option
+                value="{{ coop.id }}"
+                data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
+                data-fone-raw="{{ coop.telefone or '' }}"
+              >
+                {{ coop.nome }}
+              </option>
+            {% endfor %}
+          </select>
         </div>
+
         <div id="listaCooperados" style="max-height:60vh; overflow:auto;">
           {% for coop in _cooperados %}
-          <div class="cooperado-item" data-id="{{ coop.id }}" data-nome="{{ coop.nome }}"
+          <div class="cooperado-item"
+               data-id="{{ coop.id }}"
+               data-nome="{{ coop.nome }}"
                data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
-               data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}">
+               data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}"
+               data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
+               data-fone-raw="{{ coop.telefone or '' }}">
             <img src="{{ url_for('media_coop', coop_id=coop.id) if coop.foto_bytes else url_for('static', filename='img/default.png') }}" class="cooperado-avatar" alt="Foto do cooperado">
             <div class="d-flex flex-column">
               <span class="fw-bold">{{ coop.nome }}</span>
               <small class="text-muted">No período: R$ {{ '%.2f'|format(coop.total_periodo or 0) }}</small>
+              {% if coop.telefone %}
+                <small class="text-muted"><i class="bi bi-telephone"></i> {{ coop.telefone }}</small>
+              {% endif %}
             </div>
           </div>
-          {% else %}<div class="text-muted small">Nenhum cooperado encontrado.</div>{% endfor %}
+          {% else %}
+            <div class="text-muted small">Nenhum cooperado encontrado.</div>
+          {% endfor %}
         </div>
       </div>
     </div>
@@ -484,7 +505,16 @@
       <div class="card card-body" id="blocoLancamento">
         <div class="selected-header text-center mb-2" id="selectedHeader" style="display:none;">
           <img id="selFoto" src="" class="big" alt="">
-          <div class="fw-bold fs-5 mt-2" id="selNome"></div>
+          <div class="fw-bold fs-5 mt-2 d-flex justify-content-center align-items-center gap-2 flex-wrap">
+            <span id="selNome"></span>
+            <!-- 👇 telefone ao lado do nome -->
+            <a id="selPhone"
+               class="badge bg-light text-dark border text-decoration-none"
+               style="font-weight:500;"
+               href="javascript:void(0)">
+              <span class="text-muted">Sem telefone</span>
+            </a>
+          </div>
           <div class="text-muted">Total no período: R$ <span id="selTotal">0,00</span></div>
         </div>
 
@@ -566,6 +596,94 @@
     </div>
   </div>
 </section>
+
+<script>
+  // máscara simples BR
+  function formatPhoneBR(v) {
+    let d = (v || '').replace(/\D/g,'');
+    if (d.length > 11 && d.startsWith('55')) d = d.slice(d.length - 11);
+    d = d.slice(0, 11);
+    if (d.length <= 10) {
+      return d.replace(/^(\d{0,2})(\d{0,4})(\d{0,4}).*$/, (_,a,b,c)=>{
+        let out=''; if(a) out+='('+a; if(a && a.length===2) out+=') ';
+        if(b) out+=b; if(b && b.length===4 && c) out+='-'+c; return out;
+      });
+    }
+    return d.replace(/^(\d{2})(\d{5})(\d{4}).*$/, '($1) $2-$3');
+  }
+
+  (function(){
+    const header     = document.getElementById('selectedHeader');
+    const img        = document.getElementById('selFoto');
+    const nomeEl     = document.getElementById('selNome');
+    const totalEl    = document.getElementById('selTotal');
+    const phoneEl    = document.getElementById('selPhone');
+    const form       = document.getElementById('formLancamento');
+    const hint       = document.getElementById('hintSelecione');
+    const inputId    = document.getElementById('inputCooperadoId');
+
+    function setPhone(digits, raw) {
+      const d = (digits || '').replace(/\D/g,'');
+      if (d) {
+        phoneEl.textContent = formatPhoneBR(d);
+        phoneEl.href = 'https://wa.me/55' + d;
+        phoneEl.target = '_blank';
+        phoneEl.classList.remove('text-muted');
+      } else {
+        phoneEl.innerHTML = '<span class="text-muted">Sem telefone</span>';
+        phoneEl.removeAttribute('href');
+        phoneEl.removeAttribute('target');
+      }
+    }
+
+    function selectCoop({id, nome, foto, total, foneDigits, foneRaw}) {
+      header.style.display = '';
+      form.style.display = '';
+      hint.style.display = 'none';
+
+      img.src = foto || img.src;
+      nomeEl.textContent = nome || '—';
+      totalEl.textContent = (total || '0,00');
+
+      setPhone(foneDigits, foneRaw);
+      inputId.value = id || '';
+      // mostra tabela correspondente
+      document.querySelectorAll('.lancamentos-table').forEach(t => t.style.display = 'none');
+      const table = document.getElementById('tabela-' + id);
+      if (table) table.style.display = '';
+    }
+
+    // clique na lista
+    document.getElementById('listaCooperados')?.addEventListener('click', (e) => {
+      const card = e.target.closest('.cooperado-item');
+      if (!card) return;
+      selectCoop({
+        id: card.dataset.id,
+        nome: card.dataset.nome,
+        foto: card.dataset.foto,
+        total: (parseFloat(card.dataset.total || '0') || 0).toFixed(2).replace('.', ','),
+        foneDigits: card.dataset.fone || '',
+        foneRaw: card.dataset['foneRaw'] || ''
+      });
+    });
+
+    // mudança no select
+    document.getElementById('selectCoop')?.addEventListener('change', (e) => {
+      const opt = e.target.selectedOptions[0];
+      if (!opt || !opt.value) return;
+      // tenta achar o card para pegar foto/total; se não tiver, usa básicos
+      const card = document.querySelector('.cooperado-item[data-id="'+opt.value+'"]');
+      selectCoop({
+        id: opt.value,
+        nome: opt.textContent.trim(),
+        foto: card ? card.dataset.foto : '',
+        total: card ? (parseFloat(card.dataset.total || '0').toFixed(2).replace('.', ',')) : '0,00',
+        foneDigits: opt.getAttribute('data-fone') || (card ? card.dataset.fone : ''),
+        foneRaw: opt.getAttribute('data-fone-raw') || (card ? card.dataset['foneRaw'] : '')
+      });
+    });
+  })();
+</script>
 
 <!-- ===== TABELAS (carregada da rota e exibida aqui) ===== -->
 <section data-view="tabelas">
