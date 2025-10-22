@@ -2572,7 +2572,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </script>
 </section>
 
-       <!-- RESTAURANTES (versão profissional / drop-in) -->
+        <!-- RESTAURANTES (versão profissional / drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='restaurantes' else '' }}" id="restaurantes" role="tabpanel">
   {% set qtd_rest = restaurantes|length %}
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
@@ -2858,6 +2858,136 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           </div>
         </div>
 
+       
+        <!-- SOLICITAÇÕES DE TROCA (pendentes) -->
+<div class="card p-3 mb-3">
+  <div class="d-flex justify-content-between align-items-center">
+    <h5 class="mb-0"><i class="bi bi-arrow-left-right"></i> Solicitações de Troca de Escala</h5>
+    <span class="badge-soft">Pendentes: {{ trocas_pendentes|length if trocas_pendentes else 0 }}</span>
+  </div>
+
+  <div class="table-responsive mt-2">
+    <table class="table table-bordered align-middle">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Solicitante</th>
+          <th>Origem</th>
+          <th>Destino</th>
+          <th>Mensagem</th>
+          <th>Solicitada em</th>
+          <th class="text-center">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in trocas_pendentes or [] %}
+  {% set solicitante = t.solicitante if t.solicitante else None %}
+  {% set origem = t.origem if t.origem else None %}
+  {% set destino = t.destino if t.destino else None %}
+
+  <tr>
+    <td class="text-muted">#{{ t.id|default('-', true) }}</td>
+
+    <td>
+      <div class="text-tight">
+        <b>{{ (solicitante.nome if solicitante else t.solicitante_nome)|default('-', true) }}</b>
+      </div>
+      <small class="text-muted">
+        ID {{ (solicitante.id if solicitante else t.solicitante_id)|default('-', true) }}
+      </small>
+    </td>
+            <td>
+              <div><i class="bi bi-calendar-event"></i>
+                {% if origem and origem.data is defined %}
+                  {{ origem.data }}
+                {% elif t.origem_data is defined %}
+                  {{ t.origem_data }}
+                {% else %} — {% endif %}
+              </div>
+              <div><i class="bi bi-sun"></i>
+                {% if origem and origem.turno is defined %}
+                  {{ origem.turno }}
+                {% elif t.origem_turno is defined %}
+                  {{ t.origem_turno }}
+                {% else %} — {% endif %}
+              </div>
+              <div><i class="bi bi-clock"></i>
+                {% if origem and origem.horario is defined %}
+                  {{ origem.horario }}
+                {% elif t.origem_horario is defined %}
+                  {{ t.origem_horario }}
+                {% else %} — {% endif %}
+              </div>
+              <div><i class="bi bi-briefcase"></i>
+                {% if origem and origem.contrato is defined %}
+                  {{ origem.contrato }}
+                {% elif t.origem_contrato is defined %}
+                  {{ t.origem_contrato }}
+                {% else %} — {% endif %}
+              </div>
+            </td>
+
+            <td>
+              <b>
+                {% if destino and destino.nome is defined %}
+                  {{ destino.nome }}
+                {% elif t.destino_nome is defined %}
+                  {{ t.destino_nome }}
+                {% else %} — {% endif %}
+              </b>
+              <small class="text-muted d-block">
+                ID
+                {% if destino and destino.id is defined %}
+                  {{ destino.id }}
+                {% elif t.destino_id is defined %}
+                  {{ t.destino_id }}
+                {% else %} — {% endif %}
+              </small>
+            </td>
+
+            <td class="text-break">{{ t.mensagem if t.mensagem is defined and t.mensagem else '—' }}</td>
+
+            <td>
+              {% if t.criada_em is defined and t.criada_em %}
+                {% if t.criada_em.strftime is defined %}
+                  {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}
+                {% else %}
+                  {{ t.criada_em }}
+                {% endif %}
+              {% else %} — {% endif %}
+            </td>
+
+            <td class="text-center">
+              <div class="d-flex justify-content-center gap-1">
+                <form method="POST"
+                      action="{{ url_for('admin_aprovar_troca', id=t.id if t.id is defined else none) }}"
+                      onsubmit="return confirm('Confirmar aprovação desta troca?');">
+                  <button type="submit" class="btn btn-success btn-sm">
+                    <i class="bi bi-check2"></i> Aprovar
+                  </button>
+                </form>
+
+                <form method="POST"
+                      action="{{ url_for('admin_recusar_troca', id=t.id if t.id is defined else none) }}"
+                      onsubmit="return confirm('Recusar esta solicitação?');">
+                  <button type="submit" class="btn btn-danger btn-sm">
+                    <i class="bi bi-x"></i> Recusar
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted">Nenhuma solicitação pendente.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <small class="muted">Ao aprovar, os nomes são trocados nas escalas e a ação aparece em “Trocas aplicadas”.</small>
+</div>
        
         <!-- SOLICITAÇÕES DE TROCA (pendentes) -->
 <div class="card p-3 mb-3">
