@@ -1124,7 +1124,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
               <tr>
                 <td>{{ r.data.strftime('%d/%m/%Y') if r.data else '-' }}</td>
                 <td class="text-break">{{ r.descricao }}</td>
-                <td class="text-end">R$ {{ "%.2f"|format(r.valor) }}</td>
+                <td class="text-end">R$ {{ "%.2f"|format((r.valor_total or 0)) }}</td>
                 <td class="text-center text-nowrap">
                   <button class="btn btn-warning btn-sm"
                           data-bs-toggle="modal"
