@@ -2022,39 +2022,20 @@ def admin_dashboard():
         esc_by_int[k_int].append(esc_item)
         esc_by_str[str(k_int)].append(esc_item)
 
-      cont_rows = dict(
-        db.session.query(Escala.cooperado_id, func.count(Escala.id))
-        .group_by(Escala.cooperado_id)
-        .all()
-    )
+         cont_rows = dict(db.session.query(Escala.cooperado_id, func.count(Escala.id)).group_by(Escala.cooperado_id).all())
     qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
     qtd_sem_cadastro = int(cont_rows.get(None, 0))
 
     # gráficos (por mês)
-    if not _is_sqlite():
-        # Postgres: agrega no SQL (YYYY-MM garantido)
-        rows = db.session.execute(sa_text("""
-            SELECT to_char(date_trunc('month', l.data), 'YYYY-MM') AS ym,
-                   COALESCE(SUM(l.valor), 0) AS total
-            FROM lancamentos l
-            GROUP BY 1
-            ORDER BY 1;
-        """)).fetchall()
-        labels_ord = [r.ym for r in rows]
-        labels_fmt = [datetime.strptime(k, "%Y-%m").strftime("%m/%Y") for k in labels_ord]
-        values = [float(r.total or 0.0) for r in rows]
-    else:
-        # SQLite/dev: agrega em Python
-        sums = {}
-        for l in lancamentos:
-            if not l.data:
-                continue
-            key = l.data.strftime("%Y-%m")
-            sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
-        labels_ord = sorted(sums.keys())
-        labels_fmt = [datetime.strptime(k, "%Y-%m").strftime("%m/%Y") for k in labels_ord]
-        values = [round(sums[k], 2) for k in labels_ord]
-
+    sums = {}
+    for l in lancamentos:
+        if not l.data:
+            continue
+        key = l.data.strftime("%Y-%m")
+        sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
+    labels_ord = sorted(sums.keys())
+    labels_fmt = [datetime.strptime(k, "%Y-%m").strftime("%m/%Y") for k in labels_ord]
+    values = [round(sums[k], 2) for k in labels_ord]
     chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
     chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
 
