@@ -1030,7 +1030,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </section>
 
-    <!-- RECEITAS COOP (versão profissional/compacta – drop-in) -->
+   <!-- RECEITAS COOP (versão profissional/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='receitas' else '' }}" id="receitas" role="tabpanel">
   {% set total_receitas_coop_table = (receitas | sum(attribute='valor_total')) if receitas else 0 %}
   {% set qtd_registros = receitas|length if receitas else 0 %}
@@ -1042,7 +1042,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </h5>
     <div class="d-flex flex-wrap gap-2">
       <span class="badge bg-light text-dark border">Registros: <b>{{ qtd_registros }}</b></span>
-      <span class="badge bg-success-subtle text-success border">Total: <b>R$ {{ '%.2f'|format(total_receitas_coop_table) }}</b></span>
+      <span class="badge bg-success-subtle text-success border">Total: <b>R$ {{ '%.2f'|format(total_receitas_coop_table or 0) }}</b></span>
     </div>
   </div>
 
@@ -1089,7 +1089,8 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           <label class="form-label">Valor (R$)</label>
           <div class="input-group input-group-sm">
             <span class="input-group-text">R$</span>
-            <input type="number" step="0.01" class="form-control" name="valor" placeholder="0,00" required>
+            <!-- name corrigido para bater com a coluna usada no backend -->
+            <input type="number" step="0.01" class="form-control" name="valor_total" placeholder="0,00" required>
           </div>
         </div>
         <div class="col-md-3">
@@ -1105,6 +1106,43 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       </form>
     </div>
   </div>
+
+  <!-- Tabela de Receitas -->
+  <div class="card border-0 shadow-sm rounded-3">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle m-0">
+          <thead class="table-light">
+            <tr>
+              <th style="min-width:120px;">Data</th>
+              <th>Descrição</th>
+              <th class="text-end" style="min-width:130px;">Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in receitas %}
+              <tr>
+                <td>{{ r.data.strftime('%d/%m/%Y') if r.data else '' }}</td>
+                <td>{{ r.descricao or '' }}</td>
+                <td class="text-end">R$ {{ '%.2f'|format((r.valor_total or 0) | float) }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="3" class="text-center text-muted py-3">Nenhuma receita encontrada.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light">
+            <tr>
+              <th colspan="2" class="text-end">Total</th>
+              <th class="text-end">R$ {{ '%.2f'|format(total_receitas_coop_table or 0) }}</th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
 
   <!-- Tabela -->
   <div class="card border-0 shadow-sm rounded-3">
