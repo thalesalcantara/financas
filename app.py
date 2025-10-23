@@ -1834,20 +1834,31 @@ def admin_dashboard():
     qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
     qtd_sem_cadastro = int(cont_rows.get(None, 0))
 
-    # gráficos (por mês)
-    sums = {}
-    for l in lancamentos:
-        if not l.data:
-            continue
-        key = l.data.strftime("%Y-%m")
-        sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
-    labels_ord = sorted(sums.keys())
-    labels_fmt = [datetime.strptime(k, "%Y-%m").strftime("%m/%Y") for k in labels_ord]
-    values = [round(sums[k], 2) for k in labels_ord]
-    chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
-    chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
+   # gráficos (por mês)
+sums = {}
+for l in lancamentos:
+    if not l.data:
+        continue
+    key = l.data.strftime("%Y-%m")  # sempre gera YYYY-MM
+    sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
 
-    admin_user = Usuario.query.filter_by(tipo="admin").first()
+labels_ord = sorted(sums.keys())
+
+def _fmt_label(k: str) -> str:
+    # Aceita "YYYY-MM" (ex: 2025-10) ou "YY-MM" (ex: 25-10) e exibe "MM/YY"
+    parts = k.split("-")
+    if len(parts) == 2 and parts[0] and parts[1]:
+        year, month = parts[0], parts[1]
+        return f"{month}/{year[-2:]}"
+    return k  # fallback
+
+labels_fmt = [_fmt_label(k) for k in labels_ord]
+values = [round(sums[k], 2) for k in labels_ord]
+
+chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
+chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
+
+admin_user = Usuario.query.filter_by(tipo="admin").first()
 
     # ---- Folha (últimos 30 dias padrão)
     folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
