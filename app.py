@@ -1830,27 +1830,31 @@ def admin_dashboard():
         esc_by_int[k_int].append(esc_item)
         esc_by_str[str(k_int)].append(esc_item)
 
-    cont_rows = dict(db.session.query(Escala.cooperado_id, func.count(Escala.id)).group_by(Escala.cooperado_id).all())
-    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
-    qtd_sem_cadastro = int(cont_rows.get(None, 0))
+    # dentro da função admin_dashboard(), no mesmo nível de outras variáveis locais
+args = request.args
 
-   # gráficos (por mês)
+folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
+folha_fim = _parse_date(args.get("folha_fim")) or date.today()
+data_inicio = datetime.combine(folha_inicio, time.min)
+data_fim = datetime.combine(folha_fim, time.max)
+
+# gráficos (por mês)
 sums = {}
 for l in lancamentos:
     if not l.data:
         continue
-    key = l.data.strftime("%Y-%m")  # sempre gera YYYY-MM
+    key = l.data.strftime("%Y-%m")  # sempre YYYY-MM
     sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
 
 labels_ord = sorted(sums.keys())
 
 def _fmt_label(k: str) -> str:
-    # Aceita "YYYY-MM" (ex: 2025-10) ou "YY-MM" (ex: 25-10) e exibe "MM/YY"
+    # aceita "YYYY-MM" ou "YY-MM" e mostra "MM/YY"
     parts = k.split("-")
     if len(parts) == 2 and parts[0] and parts[1]:
         year, month = parts[0], parts[1]
         return f"{month}/{year[-2:]}"
-    return k  # fallback
+    return k
 
 labels_fmt = [_fmt_label(k) for k in labels_ord]
 values = [round(sums[k], 2) for k in labels_ord]
