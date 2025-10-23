@@ -410,6 +410,9 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 {# ===================== CONTEÚDO DA ABA "Avaliações" ===================== #}
 <section id="avaliacoes" class="tab-pane fade {{ 'show active' if _tab=='avaliacoes' else '' }}" role="tabpanel">
 
+  {# garante valor padrão para "tipo" #}
+  {% set tipo = (tipo if tipo is defined and tipo in ['restaurante','cooperado'] else request.args.get('tipo','cooperado')) %}
+
   {% set page_title = "Avaliações" %}
   <div class="container py-3">
 
@@ -422,7 +425,8 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 
       <div class="btn-group" role="group" aria-label="Tipo de avaliação">
         <a class="btn btn-sm {{ 'btn-primary' if tipo=='restaurante' else 'btn-outline-primary' }}"
-           href="{{ url_for('admin_avaliacoes',
+           href="{{ url_for('admin_dashboard',
+                            tab='avaliacoes',
                             tipo='restaurante',
                             restaurante_id=_flt.restaurante_id,
                             cooperado_id=_flt.cooperado_id,
@@ -431,7 +435,8 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           Cooperado → Restaurante
         </a>
         <a class="btn btn-sm {{ 'btn-primary' if tipo=='cooperado' else 'btn-outline-primary' }}"
-           href="{{ url_for('admin_avaliacoes',
+           href="{{ url_for('admin_dashboard',
+                            tab='avaliacoes',
                             tipo='cooperado',
                             restaurante_id=_flt.restaurante_id,
                             cooperado_id=_flt.cooperado_id,
@@ -458,7 +463,8 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <!-- Filtros -->
     <div class="card border-0 shadow-sm rounded-3 mb-3">
       <div class="card-body">
-        <form method="GET" action="{{ url_for('admin_avaliacoes') }}" class="row g-2 align-items-end">
+        <form method="GET" action="{{ url_for('admin_dashboard') }}" class="row g-2 align-items-end">
+          <input type="hidden" name="tab" value="avaliacoes">
           <input type="hidden" name="tipo" value="{{ tipo }}">
 
           <div class="col-md-4">
@@ -493,7 +499,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           <div class="col-12 d-flex gap-2">
             <button class="btn btn-royal btn-sm"><i class="bi bi-funnel"></i> Filtrar</button>
             <button type="button" id="btnMesAtual" class="btn btn-light btn-sm">Este mês (1–último)</button>
-            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_avaliacoes', tipo=tipo) }}">Limpar</a>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_dashboard', tab='avaliacoes', tipo=tipo) }}">Limpar</a>
           </div>
         </form>
       </div>
