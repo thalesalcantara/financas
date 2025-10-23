@@ -410,10 +410,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 {# ===================== CONTEÚDO DA ABA "Avaliações" ===================== #}
 <section id="avaliacoes" class="tab-pane fade {{ 'show active' if _tab=='avaliacoes' else '' }}" role="tabpanel">
 
-  {# garante valor padrão para "tipo" #}
-  {% set tipo = tipo if tipo is defined else request.args.get('tipo','cooperado') %}
   {% set page_title = "Avaliações" %}
-
   <div class="container py-3">
 
     <!-- Título + Toggle de Tipo -->
@@ -425,8 +422,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 
       <div class="btn-group" role="group" aria-label="Tipo de avaliação">
         <a class="btn btn-sm {{ 'btn-primary' if tipo=='restaurante' else 'btn-outline-primary' }}"
-           href="{{ url_for('admin_dashboard',
-                            tab='avaliacoes',
+           href="{{ url_for('admin_avaliacoes',
                             tipo='restaurante',
                             restaurante_id=_flt.restaurante_id,
                             cooperado_id=_flt.cooperado_id,
@@ -435,8 +431,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           Cooperado → Restaurante
         </a>
         <a class="btn btn-sm {{ 'btn-primary' if tipo=='cooperado' else 'btn-outline-primary' }}"
-           href="{{ url_for('admin_dashboard',
-                            tab='avaliacoes',
+           href="{{ url_for('admin_avaliacoes',
                             tipo='cooperado',
                             restaurante_id=_flt.restaurante_id,
                             cooperado_id=_flt.cooperado_id,
@@ -463,8 +458,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <!-- Filtros -->
     <div class="card border-0 shadow-sm rounded-3 mb-3">
       <div class="card-body">
-        <form method="GET" action="{{ url_for('admin_dashboard') }}" class="row g-2 align-items-end">
-          <input type="hidden" name="tab" value="avaliacoes">
+        <form method="GET" action="{{ url_for('admin_avaliacoes') }}" class="row g-2 align-items-end">
           <input type="hidden" name="tipo" value="{{ tipo }}">
 
           <div class="col-md-4">
@@ -499,8 +493,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           <div class="col-12 d-flex gap-2">
             <button class="btn btn-royal btn-sm"><i class="bi bi-funnel"></i> Filtrar</button>
             <button type="button" id="btnMesAtual" class="btn btn-light btn-sm">Este mês (1–último)</button>
-            <a class="btn btn-outline-secondary btn-sm"
-               href="{{ url_for('admin_dashboard', tab='avaliacoes', tipo=tipo) }}">Limpar</a>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_avaliacoes', tipo=tipo) }}">Limpar</a>
           </div>
         </form>
       </div>
@@ -664,7 +657,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
             <tbody>
               {% if compat and compat|length %}
                 {% set shown = 0 %}
-                {# primeiro os pares com amostra adequada #}
                 {% for row in compat if row.count >= 3 %}
                   {% if shown < 10 %}
                     <tr>
@@ -676,7 +668,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                     {% set shown = shown + 1 %}
                   {% endif %}
                 {% endfor %}
-                {# completa até 10 linhas com pares de amostra baixa, em cinza #}
                 {% if shown < 10 %}
                   {% for row in compat if row.count < 3 %}
                     {% if shown < 10 %}
@@ -758,28 +749,28 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
 
   </div> <!-- /container -->
+</section>
 
-  <!-- Chart.js e helpers locais da aba -->
-  <script>
+<!-- Chart.js (fallback via CDN se não estiver na base) -->
+<script>
+  window.addEventListener('load', function(){
+    // Botão "Este mês (1–último)"
     (function(){
-      // Botão "Este mês (1–último)"
       const btn = document.getElementById('btnMesAtual');
-      if(btn){
-        btn.addEventListener('click', ()=>{
-          const now = new Date();
-          const y = now.getFullYear(), m = now.getMonth();
-          const first = new Date(y, m, 1);
-          const last  = new Date(y, m+1, 0);
-          const pad = n => String(n).padStart(2,'0');
-          const toISO = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-          const fIni = document.querySelector('input[name="data_inicio"]');
-          const fFim = document.querySelector('input[name="data_fim"]');
-          if(fIni) fIni.value = toISO(first);
-          if(fFim) fFim.value = toISO(last);
-        });
-      }
+      if(!btn) return;
+      btn.addEventListener('click', ()=>{
+        const now = new Date();
+        const y = now.getFullYear(), m = now.getMonth();
+        const first = new Date(y, m, 1);
+        const last  = new Date(y, m+1, 0);
+        const pad = n => String(n).padStart(2,'0');
+        const toISO = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+        document.querySelector('input[name="data_inicio"]').value = toISO(first);
+        document.querySelector('input[name="data_fim"]').value    = toISO(last);
+      });
+    })();
 
-      // Garante Chart.js (usa global já carregado no layout)
+    (function initChart(){
       const ensureChartJS = () => new Promise((resolve)=>{
         if (window.Chart) return resolve();
         const s = document.createElement('script');
@@ -788,25 +779,24 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         document.head.appendChild(s);
       });
 
-      // Gráfico Top Médias (usa chart_top vindo da view)
       const dataTop = {{ chart_top|tojson }};
       const el = document.getElementById('chartTop');
-      if (el && dataTop && dataTop.labels && dataTop.labels.length) {
-        ensureChartJS().then(()=>{
-          new Chart(el, {
-            type: 'bar',
-            data: { labels: dataTop.labels, datasets: [{ label: 'Média Geral', data: dataTop.values }] },
-            options: {
-              responsive: true,
-              scales: { y: { beginAtZero: true, max: 5 } },
-              plugins: { legend: { display: false } }
-            }
-          });
+      if (!el || !dataTop || !dataTop.labels || !dataTop.labels.length) return;
+
+      ensureChartJS().then(()=>{
+        new Chart(el, {
+          type: 'bar',
+          data: { labels: dataTop.labels, datasets: [{ label: 'Média Geral', data: dataTop.values }] },
+          options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true, max: 5 } },
+            plugins: { legend: { display: false } }
+          }
         });
-      }
+      });
     })();
-  </script>
-</section>
+  });
+</script>
 
      <!-- LANÇAMENTOS (versão profissional/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='lancamentos' else '' }}" id="lancamentos" role="tabpanel">
