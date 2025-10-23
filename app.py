@@ -2022,24 +2022,27 @@ def admin_dashboard():
         esc_by_int[k_int].append(esc_item)
         esc_by_str[str(k_int)].append(esc_item)
 
-    cont_rows = dict(db.session.query(Escala.cooperado_id, func.count(Escala.id)).group_by(Escala.cooperado_id).all())
-    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
-    qtd_sem_cadastro = int(cont_rows.get(None, 0))
+   cont_rows = dict(db.session.query(Escala.cooperado_id, func.count(Escala.id)).group_by(Escala.cooperado_id).all())
+qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
+qtd_sem_cadastro = int(cont_rows.get(None, 0))
 
-    # gráficos (por mês)
-    sums = {}
-    for l in lancamentos:
-        if not l.data:
-            continue
-        key = l.data.strftime("%Y-%m")
-        sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
-    labels_ord = sorted(sums.keys())
-    labels_fmt = [datetime.strptime(k, "%Y-%m").strftime("%m/%Y") for k in labels_ord]
-    values = [round(sums[k], 2) for k in labels_ord]
-    chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
-    chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
+# gráficos (por mês) — usa agregação SQL para garantir 'YYYY-MM'
+rows = db.session.execute(sa_text("""
+    SELECT to_char(date_trunc('month', l.data), 'YYYY-MM') AS ym,
+           COALESCE(SUM(l.valor), 0) AS total
+    FROM lancamentos l
+    WHERE l.data IS NOT NULL
+    GROUP BY 1
+    ORDER BY 1
+""")).fetchall()
 
-    admin_user = Usuario.query.filter_by(tipo="admin").first()
+labels_ord = [r.ym for r in rows]  # 'YYYY-MM'
+labels_fmt = [datetime.strptime(k, "%Y-%m").strftime("%m/%Y") for k in labels_ord]
+values = [round(float(r.total or 0), 2) for r in rows]
+chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
+chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
+
+admin_user = Usuario.query.filter_by(tipo="admin").first()
 
     # ---- Folha (últimos 30 dias padrão)
     folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
