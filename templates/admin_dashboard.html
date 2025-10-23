@@ -1032,7 +1032,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 
     <!-- RECEITAS COOP (versão profissional/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='receitas' else '' }}" id="receitas" role="tabpanel">
-  {% set total_receitas_coop_table = (receitas|sum(attribute='valor')) if receitas else 0 %}
+  {% set total_receitas_coop_table = (receitas | sum(attribute='valor_total')) if receitas else 0 %}
   {% set qtd_registros = receitas|length if receitas else 0 %}
 
   <!-- Header + KPIs -->
