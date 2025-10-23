@@ -78,6 +78,73 @@ os.makedirs(STATIC_TABLES, exist_ok=True)
 DOCS_PERSIST_DIR = os.path.join(PERSIST_ROOT, "docs")
 os.makedirs(DOCS_PERSIST_DIR, exist_ok=True)
 
+# =======================
+# Helpers p/ chaves de mês
+# =======================
+_MONTH_RE_YYYY_MM = re.compile(r"^\s*(\d{4})-(\d{2})\s*$")   # 2025-10
+_MONTH_RE_MM_YYYY = re.compile(r"^\s*(\d{2})-(\d{4})\s*$")   # 10-2025
+_MONTH_RE_2_2     = re.compile(r"^\s*(\d{2})[-/](\d{2})\s*$")  # 25-10 ou 10-25, aceita '-' ou '/'
+
+def normalize_month_key(s: str) -> str:
+    """
+    Recebe strings variadas ('2025-10', '10-2025', '25-10', '10-25', '10/2025', etc.)
+    e retorna SEMPRE 'YYYY-MM'. Assume século 2000 p/ anos com 2 dígitos.
+    Levanta ValueError se não der p/ interpretar.
+    """
+    if not s:
+        raise ValueError("Chave vazia de mês")
+
+    s = s.strip().replace("/", "-")
+
+    # YYYY-MM
+    m = _MONTH_RE_YYYY_MM.fullmatch(s)
+    if m:
+        y, mm = int(m.group(1)), int(m.group(2))
+        if not (1 <= mm <= 12):
+            raise ValueError(f"Mês inválido em {s!r}")
+        return f"{y:04d}-{mm:02d}"
+
+    # MM-YYYY
+    m = _MONTH_RE_MM_YYYY.fullmatch(s)
+    if m:
+        mm, y = int(m.group(1)), int(m.group(2))
+        if not (1 <= mm <= 12):
+            raise ValueError(f"Mês inválido em {s!r}")
+        return f"{y:04d}-{mm:02d}"
+
+    # 2-2 (pode ser YY-MM ou MM-YY)
+    m = _MONTH_RE_2_2.fullmatch(s)
+    if m:
+        a, b = int(m.group(1)), int(m.group(2))
+        # Heurística:
+        # - se 'a' > 12, tratamos 'a' como ano YY e 'b' como mês
+        # - senão, tratamos 'a' como mês e 'b' como ano YY
+        if a > 12:  # YY-MM
+            y = 2000 + a
+            mm = b
+        else:       # MM-YY
+            y = 2000 + b
+            mm = a
+        if not (1 <= mm <= 12):
+            raise ValueError(f"Mês inválido em {s!r}")
+        return f"{y:04d}-{mm:02d}"
+
+    raise ValueError(f"Formato de mês inválido: {s!r}")
+
+def month_label_mm_yyyy(key_yyyy_mm: str) -> str:
+    """Converte 'YYYY-MM' em 'MM/YYYY' para exibição."""
+    y, m = key_yyyy_mm.split("-")
+    return f"{m}/{y}"
+
+def sort_month_keys(keys: list[str]) -> list[str]:
+    """
+    Ordena uma lista de chaves (talvez mistas) cronologicamente.
+    Retorna todas em 'YYYY-MM'.
+    """
+    norm = [normalize_month_key(k) for k in keys]
+    norm.sort()  # 'YYYY-MM' ordena lexicograficamente igual à ordem cronológica
+    return norm
+
 # --- Helper p/ unir caminhos com segurança (anti path traversal) ---
 def _safe_join(base: str, *paths: str) -> str | None:
     base_real = os.path.realpath(base)
