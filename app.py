@@ -39,7 +39,7 @@ from openpyxl.utils import get_column_letter
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 
 
-# ============ App / Paths ============
+# ============ App / DB ============
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
@@ -51,71 +51,40 @@ PERSIST_ROOT = os.environ.get("PERSIST_ROOT", "/var/data")
 if not os.path.isdir(PERSIST_ROOT):
     PERSIST_ROOT = os.path.join(BASE_DIR, "data")
 os.makedirs(PERSIST_ROOT, exist_ok=True)
-
 TABELAS_DIR = os.path.join(PERSIST_ROOT, "tabelas")
 os.makedirs(TABELAS_DIR, exist_ok=True)
-
 STATIC_TABLES = os.path.join(BASE_DIR, "static", "uploads", "tabelas")
 os.makedirs(STATIC_TABLES, exist_ok=True)
-
-# Documentos (persistente)
+# 🔹 Documentos (persistente em disco)
 DOCS_PERSIST_DIR = os.path.join(PERSIST_ROOT, "docs")
 os.makedirs(DOCS_PERSIST_DIR, exist_ok=True)
-
-# ============ DB URI helpers ============
-def _ensure_psycopg_scheme(url: str) -> str:
-    """Garante o driver psycopg3 no SQLAlchemy URI."""
-    if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+psycopg://", 1)
-    if url.startswith("postgresql://") and "+psycopg" not in url:
-        return url.replace("postgresql://", "postgresql+psycopg://", 1)
-    return url
-
-def _append_qs_if_missing(url: str, kv: dict) -> str:
-    """Acrescenta pares de query apenas se não existirem (evita duplicar)."""
-    pu = urlparse(url)
-    q = dict(parse_qsl(pu.query, keep_blank_values=True))
-    changed = False
-    for k, v in kv.items():
-        if k not in q:
-            q[k] = str(v)
-            changed = True
-    if not changed:
-        return url
-    return urlunparse(pu._replace(query=urlencode(q)))
 
 def _build_db_uri() -> str:
     url = os.environ.get("DATABASE_URL")
     if not url:
-        # fallback local para dev
         return "sqlite:///" + os.path.join(BASE_DIR, "app.db")
+    # força driver novo psycopg
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif url.startswith("postgresql://") and "+psycopg" not in url:
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
 
-    url = _ensure_psycopg_scheme(url)
-
-    # SSL e keepalives — ideal p/ Postgres gerenciado (pago) no Render
-    url = _append_qs_if_missing(
-        url,
-        {
-            "sslmode": "require",
-            "keepalives": "1",
-            "keepalives_idle": "30",
-            "keepalives_interval": "10",
-            "keepalives_count": "5",
-            # Fail-fast no handshake:
-            "connect_timeout": "5",
-            # Limite de 15s por statement no servidor:
-            "options": "-c statement_timeout=15000",
-        },
+    # SSL + keepalive (libpq lê do URI)
+    # se já tiver "?", usa "&"
+    sep = "&" if "?" in url else "?"
+    url = (
+        f"{url}{sep}"
+        "sslmode=require&"
+        "keepalives=1&keepalives_idle=30&keepalives_interval=10&keepalives_count=5"
     )
     return url
 
-# ============ Flask / SQLAlchemy ============
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "coopex-secret")
 
 URI = _build_db_uri()
 
-# 🚫 Guard: não usar SQLite em produção (você usa Postgres pago)
+# 🚫 Guard: impede cair em SQLite em produção se DATABASE_URL não existir
 if "sqlite" in URI and os.environ.get("FLASK_ENV") == "production":
     raise RuntimeError("DATABASE_URL ausente em produção")
 
@@ -123,29 +92,29 @@ app.config.update(
     SQLALCHEMY_DATABASE_URI=URI,
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     JSON_SORT_KEYS=False,
-    MAX_CONTENT_LENGTH=32 * 1024 * 1024,  # 32MB uploads
+    MAX_CONTENT_LENGTH=32 * 1024 * 1024,  # 32MB
     SESSION_COOKIE_HTTPONLY=True,
     REMEMBER_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.environ.get("FLASK_SECURE_COOKIES", "1") == "1",
     PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
-
-    # Pool afinado para plano Starter (Render) + Postgres gerenciado
     SQLALCHEMY_ENGINE_OPTIONS={
         "poolclass": QueuePool,
-        "pool_size": 5,          # 3~5 é saudável p/ instância pequena
+        "pool_size": 5,
         "max_overflow": 5,
         "pool_timeout": 10,
-        "pool_pre_ping": True,   # valida conexões antes de usar
-        "pool_recycle": 300,     # recicla antes do provedor derrubar
-        # Psycopg3 lê timeouts e "options" do URI; manter vazio evita conflito
-        "connect_args": {},
+        "pool_pre_ping": True,   # evita conexões mortas
+        "pool_recycle": 300,     # recicla cedo (antes do provedor derrubar)
+        "connect_args": {
+            "connect_timeout": 5,
+            "options": "-c statement_timeout=15000",
+        },
     },
 )
 
 db = SQLAlchemy(app)
 
-# ============ Health checks ============
+# Health checks
 @app.get("/healthz")
 def healthz():
     return "ok", 200
@@ -158,17 +127,22 @@ def readyz():
     except Exception:
         return "not-ready", 503
 
-# ============ SQLite PRAGMA (só quando for SQLite local) ============
+# Liga foreign_keys no SQLite
 @event.listens_for(Engine, "connect")
 def _set_sqlite_pragma(dbapi_con, con_record):
     try:
-        # roda apenas no driver sqlite3 (evita tocar em conexões Postgres)
-        if dbapi_con.__class__.__module__.startswith("sqlite3"):
+        if app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"):
             cur = dbapi_con.cursor()
             cur.execute("PRAGMA foreign_keys=ON")
             cur.close()
     except Exception:
         pass
+
+def _is_sqlite() -> bool:
+    try:
+        return db.session.get_bind().dialect.name == "sqlite"
+    except Exception:
+        return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
 
 # =========================
 # Models
