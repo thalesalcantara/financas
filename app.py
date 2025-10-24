@@ -38,7 +38,6 @@ from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 
-
 # ============ App / DB ============
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -70,7 +69,6 @@ def _build_db_uri() -> str:
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
 
     # SSL + keepalive (libpq lê do URI)
-    # se já tiver "?", usa "&"
     sep = "&" if "?" in url else "?"
     url = (
         f"{url}{sep}"
@@ -88,6 +86,17 @@ URI = _build_db_uri()
 if "sqlite" in URI and os.environ.get("FLASK_ENV") == "production":
     raise RuntimeError("DATABASE_URL ausente em produção")
 
+# ===== Pool “sem travar”, mas seguro =====
+# - Você pode dizer quantas conexões quer ALVO no total com DB_TARGET_CONNS (padrão 60).
+# - A gente divide por WEB_CONCURRENCY (nº de workers) para calcular por-worker.
+# - Se quiser forçar manualmente, use DB_POOL_SIZE / DB_MAX_OVERFLOW.
+workers = int(os.environ.get("WEB_CONCURRENCY", "1") or "1")
+target_total = int(os.environ.get("DB_TARGET_CONNS", "60") or "60")
+per_worker_target = max(5, target_total // max(1, workers))
+
+pool_size = int(os.environ.get("DB_POOL_SIZE", str(per_worker_target)))
+max_overflow = int(os.environ.get("DB_MAX_OVERFLOW", str(max(5, per_worker_target // 2))))
+
 app.config.update(
     SQLALCHEMY_DATABASE_URI=URI,
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
@@ -100,13 +109,16 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
     SQLALCHEMY_ENGINE_OPTIONS={
         "poolclass": QueuePool,
-        "pool_size": 5,
-        "max_overflow": 5,
-        "pool_timeout": 10,
-        "pool_pre_ping": True,   # evita conexões mortas
-        "pool_recycle": 300,     # recicla cedo (antes do provedor derrubar)
+        # 🔹 Tamanho do pool efetivo por *worker*:
+        "pool_size": pool_size,
+        "max_overflow": max_overflow,
+        "pool_timeout": 15,
+        "pool_pre_ping": True,       # testa conexão antes de usar (evita 500 de conn morta)
+        "pool_use_lifo": True,       # reduz churn de conexões sob carga
+        # 👉 sem pool_recycle (como você pediu)
         "connect_args": {
             "connect_timeout": 5,
+            # tempo máx. por statement no servidor (defensivo)
             "options": "-c statement_timeout=15000",
         },
     },
