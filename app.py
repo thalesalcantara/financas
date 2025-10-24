@@ -3522,17 +3522,23 @@ def edit_beneficio(id):
     return redirect(url_for("admin_dashboard", tab="beneficios"))
 
 
-@app.post("/beneficios/delete", endpoint="excluir_beneficio")
+@app.post("/beneficios/delete-bulk", endpoint="excluir_beneficio_bulk")
 @admin_required
-def excluir_beneficio():
-    bid = request.form.get("beneficio_id", type=int)
-    if not bid:
-        flash("ID do benefício ausente.", "warning")
+def excluir_beneficio_bulk():
+    # recebe vários <input name="ids" value="...">
+    raw_ids = request.form.getlist("ids")
+    ids = {int(x) for x in raw_ids if str(x).isdigit()}
+    if not ids:
+        flash("Selecione ao menos um benefício.", "warning")
         return redirect(url_for("admin_dashboard", tab="beneficios"))
-    b = BeneficioRegistro.query.get_or_404(bid)
-    db.session.delete(b)
+
+    q = BeneficioRegistro.query.filter(BeneficioRegistro.id.in_(ids)).all()
+    count = 0
+    for b in q:
+        db.session.delete(b)
+        count += 1
     db.session.commit()
-    flash("Registro de benefício excluído.", "info")
+    flash(f"{count} registro(s) de benefício excluído(s).", "info")
     return redirect(url_for("admin_dashboard", tab="beneficios"))
 
 # =========================
