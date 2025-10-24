@@ -211,15 +211,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </a>
 
     <!-- Escalas (tab) -->
-<a class="nav-link {{ 'active' if _tab=='escalas' else '' }}"
-   data-bs-toggle="tab"
-   data-bs-target="#escalas"
-   href="#escalas"
-   role="tab"
-   aria-controls="escalas"
-   aria-selected="{{ 'true' if _tab=='escalas' else 'false' }}">
-  <i class="bi bi-calendar2-week"></i> <span>Escalas</span>
-</a>
+    <a class="nav-link" data-bs-toggle="tab" href="#escalas"><i class="bi bi-calendar2-week"></i> <span>Escalas</span></a>
 
     <!-- Páginas dedicadas (rotas próprias, não tabs) -->
     <a class="nav-link {% if request.endpoint == 'admin_documentos' %}active{% endif %}"
@@ -759,6 +751,53 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div> <!-- /container -->
 </section>
 
+<!-- Chart.js (fallback via CDN se não estiver na base) -->
+<script>
+  window.addEventListener('load', function(){
+    // Botão "Este mês (1–último)"
+    (function(){
+      const btn = document.getElementById('btnMesAtual');
+      if(!btn) return;
+      btn.addEventListener('click', ()=>{
+        const now = new Date();
+        const y = now.getFullYear(), m = now.getMonth();
+        const first = new Date(y, m, 1);
+        const last  = new Date(y, m+1, 0);
+        const pad = n => String(n).padStart(2,'0');
+        const toISO = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+        document.querySelector('input[name="data_inicio"]').value = toISO(first);
+        document.querySelector('input[name="data_fim"]').value    = toISO(last);
+      });
+    })();
+
+    (function initChart(){
+      const ensureChartJS = () => new Promise((resolve)=>{
+        if (window.Chart) return resolve();
+        const s = document.createElement('script');
+        s.src = "https://cdn.jsdelivr.net/npm/chart.js";
+        s.onload = () => resolve();
+        document.head.appendChild(s);
+      });
+
+      const dataTop = {{ chart_top|tojson }};
+      const el = document.getElementById('chartTop');
+      if (!el || !dataTop || !dataTop.labels || !dataTop.labels.length) return;
+
+      ensureChartJS().then(()=>{
+        new Chart(el, {
+          type: 'bar',
+          data: { labels: dataTop.labels, datasets: [{ label: 'Média Geral', data: dataTop.values }] },
+          options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true, max: 5 } },
+            plugins: { legend: { display: false } }
+          }
+        });
+      });
+    })();
+  });
+</script>
+
      <!-- LANÇAMENTOS (versão profissional/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='lancamentos' else '' }}" id="lancamentos" role="tabpanel">
   {% set soma_valor = (lancamentos|sum(attribute='valor')) if lancamentos else 0 %}
@@ -921,7 +960,77 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
   </div>
 
-     <!-- RECEITAS COOP (versão profissional/compacta – drop-in) -->
+  <!-- Tabela -->
+  <div class="card border-0 shadow-sm rounded-3">
+    <div class="card-body p-2 p-md-3">
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered table-hover align-middle">
+          <thead class="table-light">
+            <tr class="text-nowrap">
+              <th>Restaurante</th>
+              <th>Período</th>
+              <th>Cooperado</th>
+              <th>Descrição</th>
+              <th class="text-end">Valor</th>
+              <th>Data</th>
+              <th>Horário</th>
+              <th class="text-end">INSS (4,5%)</th>
+              <th class="text-end">Líquido</th>
+              <th class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for l in lancamentos %}
+              {% set inss = (l.valor or 0)*0.045 %}
+              {% set liq  = (l.valor or 0) - inss %}
+              <tr>
+                <td>{{ l.restaurante.nome }}</td>
+                <td class="text-nowrap">
+                  <span class="badge bg-light text-dark border">{{ l.restaurante.periodo }}</span>
+                </td>
+                <td>{{ l.cooperado.nome }}</td>
+                <td class="text-break">{{ l.descricao }}</td>
+                <td class="text-end">R$ {{ "%.2f"|format(l.valor) }}</td>
+                <td>{{ l.data.strftime('%d/%m/%Y') }}</td>
+                <td class="text-nowrap">
+                  {{ l.hora_inicio }}{% if l.hora_fim %} às {{ l.hora_fim }}{% endif %}
+                </td>
+                <td class="text-end">R$ {{ "%.2f"|format(inss) }}</td>
+                <td class="text-end">R$ {{ "%.2f"|format(liq) }}</td>
+                <td class="text-center text-nowrap">
+                  <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalEditLancamento"
+                          data-id="{{ l.id }}" data-restaurante="{{ l.restaurante.id }}" data-cooperado="{{ l.cooperado.id }}"
+                          data-descricao="{{ l.descricao }}" data-valor="{{ l.valor }}" data-data="{{ l.data.strftime('%Y-%m-%d') }}"
+                          data-hora_inicio="{{ l.hora_inicio }}" data-hora_fim="{{ l.hora_fim }}"
+                          data-url="{{ url_for('admin_edit_lancamento', id=l.id) }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <a class="btn btn-danger btn-sm btn-del" href="{{ url_for('admin_delete_lancamento', id=l.id) }}">
+                    <i class="bi bi-trash"></i>
+                  </a>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="10" class="text-center text-muted">Nenhum lançamento encontrado</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-light">
+              <th colspan="4" class="text-end">Totais do Filtro:</th>
+              <th class="text-end">R$ {{ "%.2f"|format(soma_valor) }}</th>
+              <th></th><th></th>
+              <th class="text-end">R$ {{ "%.2f"|format(soma_inss) }}</th>
+              <th class="text-end">R$ {{ "%.2f"|format(soma_liq) }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+   <!-- RECEITAS COOP (versão profissional/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='receitas' else '' }}" id="receitas" role="tabpanel">
   {% set total_receitas_coop_table = (receitas | sum(attribute='valor_total')) if receitas else 0 %}
   {% set qtd_registros = receitas|length if receitas else 0 %}
@@ -1035,6 +1144,59 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </section>
 
+  <!-- Tabela -->
+  <div class="card border-0 shadow-sm rounded-3">
+    <div class="card-body p-2 p-md-3">
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered table-hover align-middle">
+          <thead class="table-light">
+            <tr class="text-nowrap">
+              <th style="width:120px">Data</th>
+              <th>Descrição</th>
+              <th class="text-end" style="width:160px">Valor</th>
+              <th class="text-center" style="width:140px">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in receitas %}
+              <tr>
+                <td>{{ r.data.strftime('%d/%m/%Y') if r.data else '-' }}</td>
+                <td class="text-break">{{ r.descricao }}</td>
+                <td class="text-end">R$ {{ "%.2f"|format((r.valor_total or 0)) }}</td>
+                <td class="text-center text-nowrap">
+                  <button class="btn btn-warning btn-sm"
+                          data-bs-toggle="modal"
+                          data-bs-target="#modalEditReceita"
+                          data-id="{{ r.id }}"
+                          data-descricao="{{ r.descricao }}"
+                          data-valor="{{ r.valor }}"
+                          data-data="{{ r.data.strftime('%Y-%m-%d') if r.data else '' }}"
+                          data-url="{{ url_for('edit_receita', id=r.id) }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <a class="btn btn-danger btn-sm btn-del"
+                     href="{{ url_for('delete_receita', id=r.id) }}">
+                    <i class="bi bi-trash"></i>
+                  </a>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4" class="text-center text-muted">Nenhuma receita</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-light">
+              <th colspan="2" class="text-end">Total</th>
+              <th class="text-end">R$ {{ "%.2f"|format(total_receitas_coop_table) }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
      <!-- DESPESAS COOP (versão profissional/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='despesas' else '' }}" id="despesas" role="tabpanel">
   {% set total_despesas_coop_table = (despesas|sum(attribute='valor')) if despesas else 0 %}
@@ -1111,75 +1273,58 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
   </div>
 
-  <!-- Toolbar acima da tabela -->
-<div class="d-flex flex-wrap justify-content-end gap-2 mb-2">
-  <button type="button" id="btnBulkDeleteCoopDesp" class="btn btn-danger btn-sm">
-    <i class="bi bi-trash3"></i> Excluir selecionados
-  </button>
-</div>
-
-<!-- Tabela -->
-<div class="card border-0 shadow-sm rounded-3">
-  <div class="card-body p-2 p-md-3">
-    <div class="table-responsive">
-      <table id="tbl-despesas-coop" class="table table-sm table-bordered table-hover align-middle">
-        <thead class="table-light">
-          <tr class="text-nowrap">
-            <th style="width:36px" class="text-center">
-              <input type="checkbox" id="selAllCoopDesp">
-            </th>
-            <th style="width:120px">Data</th>
-            <th style="width:260px">Cooperado</th>
-            <th>Descrição</th>
-            <th class="text-end" style="width:160px">Valor</th>
-            <th class="text-center" style="width:140px">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for dc in despesas_coop %}
-            <tr>
-              <td class="text-center">
-                <input type="checkbox"
-                       class="sel-coop-desp"
-                       data-del-url="{{ url_for('delete_despesa_coop', id=dc.id) }}">
-              </td>
-              <td>{{ dc.data.strftime('%d/%m/%Y') if dc.data else '-' }}</td>
-              <td class="text-break">{{ dc.cooperado.nome if dc.cooperado else 'Todos' }}</td>
-              <td class="text-break">{{ dc.descricao }}</td>
-              <td class="text-end">R$ {{ '%.2f'|format(dc.valor) }}</td>
-              <td class="text-center text-nowrap">
-                <button class="btn btn-warning btn-sm"
-                        data-bs-toggle="modal"
-                        data-bs-target="#modalEditDespesaCoop"
-                        data-id="{{ dc.id }}"
-                        data-cooperado="{{ dc.cooperado.id if dc.cooperado else '' }}"
-                        data-descricao="{{ dc.descricao }}"
-                        data-valor="{{ dc.valor }}"
-                        data-data="{{ dc.data.strftime('%Y-%m-%d') if dc.data else '' }}"
-                        data-url="{{ url_for('edit_despesa_coop', id=dc.id) }}">
-                  <i class="bi bi-pencil"></i>
-                </button>
-                <a class="btn btn-danger btn-sm btn-del"
-                   href="{{ url_for('delete_despesa_coop', id=dc.id) }}">
-                  <i class="bi bi-trash"></i>
-                </a>
-              </td>
+  <!-- Tabela -->
+  <div class="card border-0 shadow-sm rounded-3">
+    <div class="card-body p-2 p-md-3">
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered table-hover align-middle">
+          <thead class="table-light">
+            <tr class="text-nowrap">
+              <th style="width:120px">Data</th>
+              <th>Descrição</th>
+              <th class="text-end" style="width:160px">Valor</th>
+              <th class="text-center" style="width:140px">Ações</th>
             </tr>
-          {% else %}
-            <tr><td colspan="6" class="text-center text-muted">Nenhuma despesa</td></tr>
-          {% endfor %}
-        </tbody>
-        <tfoot>
-          <tr class="table-light">
-            <th colspan="4" class="text-end">Total</th>
-            <th class="text-end" id="coop-desp-total">R$ {{ '%.2f'|format(total_despesas_coop_table) }}</th>
-            <th></th>
-          </tr>
-        </tfoot>
-      </table>
+          </thead>
+          <tbody>
+            {% for d in despesas %}
+              <tr>
+                <td>{{ d.data.strftime('%d/%m/%Y') if d.data else '-' }}</td>
+                <td class="text-break">{{ d.descricao }}</td>
+                <td class="text-end">R$ {{ "%.2f"|format(d.valor) }}</td>
+                <td class="text-center text-nowrap">
+                  <button class="btn btn-warning btn-sm"
+                          data-bs-toggle="modal"
+                          data-bs-target="#modalEditDespesa"
+                          data-id="{{ d.id }}"
+                          data-descricao="{{ d.descricao }}"
+                          data-valor="{{ d.valor }}"
+                          data-data="{{ d.data.strftime('%Y-%m-%d') if d.data else '' }}"
+                          data-url="{{ url_for('edit_despesa', id=d.id) }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <a class="btn btn-danger btn-sm btn-del"
+                     href="{{ url_for('delete_despesa', id=d.id) }}">
+                    <i class="bi bi-trash"></i>
+                  </a>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4" class="text-center text-muted">Nenhuma despesa</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-light">
+              <th colspan="2" class="text-end">Total</th>
+              <th class="text-end">R$ {{ '%.2f'|format(total_despesas_coop_table) }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   </div>
-</div>
+</section>
 
      <!-- RECEITAS COOPERADOS (versão profissional/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='coop_receitas' else '' }}" id="coop_receitas" role="tabpanel">
@@ -2221,56 +2366,53 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     }
   </script>
 
-  <!-- Modal de edição do cooperado (ÚNICO) -->
-<div class="modal fade" id="modalEditCooperado" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <form method="POST" enctype="multipart/form-data" class="modal-content">
-      {% if csrf_token is defined %}
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      {% endif %}
-      <input type="hidden" name="id">
-
-      <div class="modal-header">
-        <h5 class="modal-title">Editar Cooperado</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-      </div>
-
-      <div class="modal-body">
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label">Nome</label>
-            <input type="text" class="form-control form-control-sm" name="nome" required>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Usuário</label>
-            <input type="text" class="form-control form-control-sm" name="usuario" required>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Telefone (WhatsApp)</label>
-            <input type="tel"
-                   class="form-control form-control-sm"
-                   name="telefone"
-                   id="editTelefone"
-                   inputmode="numeric"
-                   placeholder="(00) 00000-0000">
-            <small class="text-muted">Só dígitos; formatamos automaticamente.</small>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Foto (opcional)</label>
-            <input type="file" class="form-control form-control-sm" name="foto" accept="image/*">
+  {# Modal de edição do cooperado (adiciona telefone) #}
+  <div class="modal fade" id="modalEditCooperado" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <form method="POST" class="modal-content">
+        {% if csrf_token is defined %}
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% endif %}
+        <div class="modal-header">
+          <h5 class="modal-title">Editar Cooperado</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Nome</label>
+              <input type="text" class="form-control form-control-sm" name="nome" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Usuário</label>
+              <input type="text" class="form-control form-control-sm" name="usuario" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Telefone (WhatsApp)</label>
+              <input type="tel"
+                     class="form-control form-control-sm"
+                     name="telefone"
+                     id="editTelefone"
+                     inputmode="numeric"
+                     placeholder="(00) 00000-0000">
+              <small class="text-muted">Só dígitos; formatamos automaticamente.</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Foto (opcional)</label>
+              <input type="file" class="form-control form-control-sm" name="foto" accept="image/*">
+            </div>
           </div>
         </div>
-      </div>
-
-      <div class="modal-footer">
-        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-        <button type="submit" class="btn btn-royal">
-          <i class="bi bi-save"></i> Salvar
-        </button>
-      </div>
-    </form>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-royal">
+            <i class="bi bi-save"></i> Salvar
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
-</div>
+</section>
 
       <!-- RESTAURANTES (versão profissional / drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='restaurantes' else '' }}" id="restaurantes" role="tabpanel">
@@ -3044,6 +3186,21 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
   </div>
 
+  <div class="modal fade" id="modalEditCooperado" tabindex="-1">
+    <div class="modal-dialog">
+      <form method="POST" enctype="multipart/form-data" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Editar Cooperado</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-2 px-3">
+          <input type="hidden" name="id">
+          <div class="col-12"><input type="text" class="form-control" name="nome" required></div>
+          <div class="col-12"><input type="text" class="form-control" name="usuario" required></div>
+          <div class="col-12"><input type="file" class="form-control" name="foto"></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal fade" id="modalResetSenhaCooperado" tabindex="-1">
     <div class="modal-dialog">
       <form method="POST" class="modal-content">
@@ -3094,418 +3251,383 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
   </div>
 
-  <!-- JS (Bootstrap + Chart.js) -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-
-<script>
-  // ===================== Ações gerais =====================
-
-  // Confirmar exclusão (qualquer .btn-del)
-  document.addEventListener('click', function(e){
-    if(e.target.closest('.btn-del')){
-      if(!confirm('Tem certeza que deseja excluir?')) e.preventDefault();
-    }
-  });
-
-  // Botão "Este mês (1–último)" -> preenche data_inicio e data_fim
-  (function(){
-    const btn = document.getElementById('btnMesAtual');
-    if(!btn) return;
-    btn.addEventListener('click', ()=>{
-      const now = new Date();
-      const y = now.getFullYear(), m = now.getMonth();
-      const first = new Date(y, m, 1);
-      const last  = new Date(y, m+1, 0);
-      const pad = n => String(n).padStart(2,'0');
-      const toISO = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-      const ini = document.querySelector('input[name="data_inicio"]');
-      const fim = document.querySelector('input[name="data_fim"]');
-      if (ini) ini.value = toISO(first);
-      if (fim) fim.value = toISO(last);
+  <!-- JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    // Confirmar exclusão
+    document.addEventListener('click', function(e){
+      if(e.target.closest('.btn-del')){
+        if(!confirm('Tem certeza que deseja excluir?')) e.preventDefault();
+      }
     });
-  })();
 
-  // Preenche modais a partir dos data-* do botão que abriu o modal
-  function bindModal(modalId, mapFields){
-    const el = document.getElementById(modalId);
-    if(!el) return;
-    el.addEventListener('show.bs.modal', (ev)=>{
-      const btn = ev.relatedTarget;
-      const form = el.querySelector('form');
-      const ds = btn?.dataset || {};
-      if(ds.url) form.setAttribute('action', ds.url);
-      Object.keys(mapFields).forEach(k=>{
-        const name = mapFields[k];
-        const input = form.querySelector(`[name="${name}"]`);
-        if(!input) return;
-        const val = ds[k] ?? '';
-        if(input.tagName === 'SELECT'){
-          [...input.options].forEach(o => o.selected = (String(o.value) === String(val)));
-        }else{
-          input.value = val;
+    // Preenche modais a partir dos data-*
+    function bindModal(modalId, mapFields){
+      const el = document.getElementById(modalId);
+      if(!el) return;
+      el.addEventListener('show.bs.modal', (ev)=>{
+        const btn = ev.relatedTarget;
+        const form = el.querySelector('form');
+        const ds = btn?.dataset || {};
+        if(ds.url) form.setAttribute('action', ds.url);
+        Object.keys(mapFields).forEach(k=>{
+          const name = mapFields[k];
+          const input = form.querySelector(`[name="${name}"]`);
+          if(!input) return;
+          const val = ds[k] ?? '';
+          if(input.tagName === 'SELECT'){
+            [...input.options].forEach(o => o.selected = (String(o.value) === String(val)));
+          }else{
+            input.value = val;
+          }
+        });
+      });
+    }
+    bindModal('modalEditLancamento',   {id:'id', restaurante:'restaurante_id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', hora_inicio:'hora_inicio', hora_fim:'hora_fim'});
+    bindModal('modalEditReceita',      {id:'id', descricao:'descricao', valor:'valor', data:'data'});
+    bindModal('modalEditDespesa',      {id:'id', descricao:'descricao', valor:'valor', data:'data'});
+    bindModal('modalEditReceitaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
+    bindModal('modalEditDespesaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
+    bindModal('modalEditCooperado',    {id:'id', nome:'nome', usuario:'usuario'});
+    bindModal('modalResetSenhaCooperado', {id:'id'});
+    bindModal('modalEditRestaurante',  {id:'id', nome:'nome', periodo:'periodo', usuario:'usuario'});
+    bindModal('modalResetSenhaRestaurante', {id:'id'});
+
+    // ===== Gráficos =====
+    const rawLancCoop   = {{ (chart_data_lancamentos_coop or {'labels':[], 'values':[]}) | tojson }};
+    const rawLancCooper = {{ (chart_data_lancamentos_cooperados or {'labels':[], 'values':[]}) | tojson }};
+    const fallbackLancCoop   = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
+    const fallbackLancCooper = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
+    const dataLancCoop   = (rawLancCoop.labels && rawLancCoop.labels.length && rawLancCoop.values && rawLancCoop.values.length) ? rawLancCoop : fallbackLancCoop;
+    const dataLancCooper = (rawLancCooper.labels && rawLancCooper.labels.length && rawLancCooper.values && rawLancCooper.values.length) ? rawLancCooper : fallbackLancCooper;
+
+    function buildLineChart(canvasId, labels, values, label){
+      const ctx = document.getElementById(canvasId);
+      if(!ctx) return;
+      new Chart(ctx, {
+        type:'line',
+        data:{ labels: labels, datasets:[{ label: label, data: values, tension:.25, borderWidth:2, pointRadius:3, fill:false }] },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          scales:{ y:{beginAtZero:true,ticks:{callback:(v)=>'R$ '+Number(v).toLocaleString('pt-BR')}} },
+          plugins:{ legend:{display:true}, tooltip:{callbacks:{label:(c)=>'R$ '+Number(c.parsed.y).toLocaleString('pt-BR',{minimumFractionDigits:2})}} }
         }
       });
-    });
-  }
-  bindModal('modalEditLancamento',   {id:'id', restaurante:'restaurante_id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', hora_inicio:'hora_inicio', hora_fim:'hora_fim'});
-  bindModal('modalEditReceita',      {id:'id', descricao:'descricao', valor:'valor', data:'data'});
-  bindModal('modalEditDespesa',      {id:'id', descricao:'descricao', valor:'valor', data:'data'});
-  bindModal('modalEditReceitaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
-  bindModal('modalEditDespesaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
-  bindModal('modalResetSenhaCooperado', {id:'id'});
-  bindModal('modalEditRestaurante',  {id:'id', nome:'nome', periodo:'periodo', usuario:'usuario'});
-  bindModal('modalResetSenhaRestaurante', {id:'id'});
-
-  // ===================== Gráficos (Chart.js) =====================
-
-  // Dados vindos do backend (com fallback seguro)
-  const rawLancCoop   = {{ (chart_data_lancamentos_coop or {'labels':[], 'values':[]}) | tojson }};
-  const rawLancCooper = {{ (chart_data_lancamentos_cooperados or {'labels':[], 'values':[]}) | tojson }};
-  const fallbackLancCoop   = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
-  const fallbackLancCooper = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
-  const dataLancCoop   = (rawLancCoop.labels && rawLancCoop.labels.length && rawLancCoop.values && rawLancCoop.values.length) ? rawLancCoop : fallbackLancCoop;
-  const dataLancCooper = (rawLancCooper.labels && rawLancCooper.labels.length && rawLancCooper.values && rawLancCooper.values.length) ? rawLancCooper : fallbackLancCooper;
-
-  function buildLineChart(canvasId, labels, values, label){
-    const ctx = document.getElementById(canvasId);
-    if(!ctx) return;
-    new Chart(ctx, {
-      type:'line',
-      data:{ labels: labels, datasets:[{ label: label, data: values, tension:.25, borderWidth:2, pointRadius:3, fill:false }] },
-      options:{
-        responsive:true, maintainAspectRatio:false,
-        scales:{ y:{beginAtZero:true,ticks:{callback:(v)=>'R$ '+Number(v).toLocaleString('pt-BR')}} },
-        plugins:{ legend:{display:true}, tooltip:{callbacks:{label:(c)=>'R$ '+Number(c.parsed.y).toLocaleString('pt-BR',{minimumFractionDigits:2})}} }
-      }
-    });
-  }
-
-  // Cria os dois line charts existentes
-  buildLineChart('chartLancCoop', dataLancCoop.labels, dataLancCoop.values, 'Lançamentos/Produções');
-  buildLineChart('chartLancCooperados', dataLancCooper.labels, dataLancCooper.values, 'Lançamentos/Produções');
-
-  // NOVO: Gráfico de barras do ranking/topo (equivalente ao do outro bloco)
-  (function(){
-    const dataTop = {{ chart_top|tojson }};
-    const el = document.getElementById('chartTop');
-    if (!el || !dataTop || !dataTop.labels || !dataTop.labels.length) return;
-
-    new Chart(el, {
-      type: 'bar',
-      data: { labels: dataTop.labels, datasets: [{ label: 'Média Geral', data: dataTop.values }] },
-      options: {
-        responsive: true,
-        scales: { y: { beginAtZero: true, max: 5 } },
-        plugins: { legend: { display: false } }
-      }
-    });
-  })();
-
-  // ===================== Abas & contagem regressiva =====================
-
-  document.addEventListener('DOMContentLoaded', () => {
-    // Preservar aba ativa via ?tab=
-    const params = new URLSearchParams(location.search);
-    const targetTab = params.get('tab');
-    if(targetTab){
-      const link = document.querySelector(`.sidebar .nav-link[href="#${targetTab}"]`);
-      if(link){ new bootstrap.Tab(link).show(); }
     }
-    document.querySelectorAll('.sidebar .nav-link[data-bs-toggle="tab"]').forEach(a => {
-      a.addEventListener('shown.bs.tab', (e) => {
-        const id = e.target.getAttribute('href')?.slice(1) || '';
-        if(!id) return;
-        const p = new URLSearchParams(location.search);
-        p.set('tab', id);
-        history.replaceState(null, '', location.pathname + '?' + p.toString() + e.target.getAttribute('href'));
+    buildLineChart('chartLancCoop', dataLancCoop.labels, dataLancCoop.values, 'Lançamentos/Produções');
+    buildLineChart('chartLancCooperados', dataLancCooper.labels, dataLancCooper.values, 'Lançamentos/Produções');
+
+    // ===== Preservar aba ativa via ?tab= =====
+    document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(location.search);
+      const targetTab = params.get('tab');
+      if(targetTab){
+        const link = document.querySelector(`.sidebar .nav-link[href="#${targetTab}"]`);
+        if(link){ new bootstrap.Tab(link).show(); }
+      }
+      document.querySelectorAll('.sidebar .nav-link[data-bs-toggle="tab"]').forEach(a => {
+        a.addEventListener('shown.bs.tab', (e) => {
+          const id = e.target.getAttribute('href')?.slice(1) || '';
+          if(!id) return;
+          const p = new URLSearchParams(location.search);
+          p.set('tab', id);
+          history.replaceState(null, '', location.pathname + '?' + p.toString() + e.target.getAttribute('href'));
+        });
       });
+
+      // Contagem regressiva até 31/12 (aba Escalas)
+      const anoSpan = document.getElementById('prazoAno');
+      const diasSpan = document.getElementById('prazoDias');
+      function updatePrazo() {
+        const now = new Date();
+        let target = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+        if (now > target) target = new Date(now.getFullYear()+1, 11, 31, 23, 59, 59);
+        const diff = target - now;
+        const dias = Math.max(0, Math.ceil(diff / (1000*60*60*24)));
+        if (anoSpan) anoSpan.textContent = target.getFullYear();
+        if (diasSpan) diasSpan.textContent = dias;
+      }
+      updatePrazo();
+      setInterval(updatePrazo, 60*1000);
     });
+  </script>
 
-    // Contagem regressiva até 31/12 (aba Escalas)
-    const anoSpan = document.getElementById('prazoAno');
-    const diasSpan = document.getElementById('prazoDias');
-    function updatePrazo() {
-      const now = new Date();
-      let target = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
-      if (now > target) target = new Date(now.getFullYear()+1, 11, 31, 23, 59, 59);
-      const diff = target - now;
-      const dias = Math.max(0, Math.ceil(diff / (1000*60*60*24)));
-      if (anoSpan) anoSpan.textContent = target.getFullYear();
-      if (diasSpan) diasSpan.textContent = dias;
-    }
-    updatePrazo();
-    setInterval(updatePrazo, 60*1000);
-  });
-</script>
+  <!-- ==== ESCALAS: horário & cores (robusto) ==== -->
+  <script>
+    const ESCALAS = {{ escalas_por_coop|default({})|tojson }};
+    const modalEsc = document.getElementById('modalEscalas');
 
-<!-- ===================== ESCALAS: horário & cores ===================== -->
-<script>
-  const ESCALAS = {{ escalas_por_coop|default({})|tojson }};
-  const modalEsc = document.getElementById('modalEscalas');
+    const norm = (s) => String(s||'')
+      .normalize('NFD').replace(/\p{Diacritic}/gu,'')
+      .toLowerCase().replace(/[^a-z0-9]/g,'');
 
-  const norm = (s) => String(s||'')
-    .normalize('NFD').replace(/\p{Diacritic}/gu,'')
-    .toLowerCase().replace(/[^a-z0-9]/g,'');
-
-  function pick(obj, aliases){
-    const keys = Object.keys(obj||{});
-    for(const name of aliases){
-      const target = norm(name);
-      for(const k of keys){
-        if(norm(k).includes(target)){
-          const v = obj[k];
-          if(v !== undefined && v !== null && String(v).trim() !== '') return v;
-        }
-      }
-    }
-    return '';
-  }
-
-  function guessHorario(obj){
-    for(const [k,v] of Object.entries(obj||{})){
-      const s = String(v??'').trim();
-      if(!s) continue;
-      if(/\b\d{1,2}:\d{2}/.test(s)) return s;
-    }
-    return '';
-  }
-
-  function formatHorarioCell(v){
-    if(!v) return '';
-    let s = String(v).trim();
-    s = s.replace(/\s*–\s*/g,'-');
-    s = s.replace(/\s*-\s*/g,'-');
-    const parts = s.split(/\s*\/\s*/).map(seg=>{
-      seg = seg.trim();
-      seg = seg.replace(/\s*(?:-|a|as|às)\s*/i,' às ');
-      return seg;
-    });
-    return parts.join(' / ');
-  }
-
-  function resolveCores(row){
-    const spec = pick(row, ['cor_linha','cores','cor','color','row_color','linha_cor','bg','background','style']) || '';
-    function normColor(c){
-      if(!c) return null;
-      c = String(c).trim();
-      if (/^[0-9A-Fa-f]{8}$/.test(c)) {
-        const a = parseInt(c.slice(0,2),16)/255;
-        const r = parseInt(c.slice(2,4),16);
-        const g = parseInt(c.slice(4,6),16);
-        const b = parseInt(c.slice(6,8),16);
-        return `rgba(${r},${g},${b},${a.toFixed(3)})`;
-      }
-      if (/^[0-9A-Fa-f]{6}$/.test(c)) return `#${c}`;
-      if (/^#[0-9A-Fa-f]{6,8}$/.test(c)) {
-        if (c.length === 9) {
-          const a = parseInt(c.slice(1,3),16)/255;
-          const r = parseInt(c.slice(3,5),16);
-          const g = parseInt(c.slice(5,7),16);
-          const b = parseInt(c.slice(7,9),16);
-          return `rgba(${r},${g},${b},${a.toFixed(3)})`;
-        }
-        return c;
-      }
-      const map = { 'amarelo':'#fff3cd','vermelho':'#f8d7da','verde':'#d1e7dd','azul':'#cfe2ff','cinza':'#e9ecef','laranja':'#ffe5b4','roxo':'#e0d1ff','rosa':'#ffd6e7' };
-      const low = c.toLowerCase();
-      if (map[low]) return map[low];
-      return c;
-    }
-    function parseColorSpec(spec){
-      const out = { rowBg:null, rowFg:null, colBg:[null,null,null,null], colFg:[null,null,null,null] };
-      if(!spec) return out;
-      if (Array.isArray(spec)) {
-        const parts = spec.map(normColor);
-        if (parts.length === 1){ out.rowBg = parts[0]; return out; }
-        if (parts.length === 2){ out.rowBg = parts[0]; out.rowFg = parts[1]; return out; }
-        if (parts.length >= 4){
-          out.colBg = [parts[0],parts[1],parts[2],parts[3]];
-          if (parts.length >= 8) out.colFg = [parts[4],parts[5],parts[6],parts[7]];
-          return out;
-        }
-      }
-      if (typeof spec === 'string') {
-        try { if (spec.trim().startsWith('[') || spec.trim().startsWith('{')) return parseColorSpec(JSON.parse(spec)); } catch(_) {}
-        const parts = spec.split('|').map(s=>normColor(s.trim())).filter(Boolean);
-        if (parts.length === 1){ out.rowBg = parts[0]; return out; }
-        if (parts.length === 2){ out.rowBg = parts[0]; out.rowFg = parts[1]; return out; }
-        if (parts.length >= 4){
-          out.colBg = [parts[0],parts[1],parts[2],parts[3]];
-          if (parts.length >= 8) out.colFg = [parts[4],parts[5],parts[6],parts[7]];
-          return out;
-        }
-        out.rowBg = normColor(spec);
-        return out;
-      }
-      if (typeof spec === 'object') {
-        if (spec.rowBg || spec.rowFg || spec.colBg || spec.colFg) {
-          out.rowBg = normColor(spec.rowBg);
-          out.rowFg = normColor(spec.rowFg);
-          out.colBg = (spec.colBg||[]).map(normColor).concat([null,null,null,null]).slice(0,4);
-          out.colFg = (spec.colFg||[]).map(normColor).concat([null,null,null,null]).slice(0,4);
-          return out;
-        }
-        const bgData     = normColor(spec.bgData||spec.data||spec.bg_data);
-        const bgTurno    = normColor(spec.bgTurno||spec.turno||spec.bg_turno);
-        const bgHorario  = normColor(spec.bgHorario||spec.horario||spec.bg_horario||spec.hora);
-        const bgContrato = normColor(spec.bgContrato||spec.contrato||spec.bg_contrato);
-        const fgData     = normColor(spec.fgData||spec.textData);
-        const fgTurno    = normColor(spec.fgTurno||spec.textTurno);
-        const fgHorario  = normColor(spec.fgHorario||spec.textHorario||spec.textHora);
-        const fgContrato = normColor(spec.fgContrato||spec.textContrato);
-        if (bgData || bgTurno || bgHorario || bgContrato) {
-          out.colBg = [bgData,bgTurno,bgHorario,bgContrato];
-          out.colFg = [fgData,fgTurno,fgHorario,fgContrato];
-        }
-        return out;
-      }
-      return out;
-    }
-    return parseColorSpec(spec);
-  }
-
-  if (modalEsc) {
-    modalEsc.addEventListener('show.bs.modal', (ev) => {
-      const coopId = ev.relatedTarget?.dataset?.coopid;
-      const tbody = modalEsc.querySelector('#tbody-escala');
-      tbody.innerHTML = '';
-
-      const raw = ESCALAS[String(coopId)] || [];
-      if (!raw.length) {
-        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhuma escala</td></tr>`;
-        return;
-      }
-
-      const grouped = new Map();
-      for (const e of raw) {
-        const data     = pick(e, ['data','dt','dia','date']) || '';
-        const turno    = pick(e, ['turno','periodo','shift']) || '';
-        const contrato = pick(e, ['contrato','setor','unidade','contr','local']) || '';
-        let horario  = pick(e, ['horário','horario','hora','horas','turno/horario','escala','jornada']);
-        if(!horario){
-          for(const [k,v] of Object.entries(e||{})){
-            const s = String(v??'').trim(); if(s && /\b\d{1,2}:\d{2}/.test(s)){ horario = s; break; }
+    function pick(obj, aliases){
+      const keys = Object.keys(obj||{});
+      for(const name of aliases){
+        const target = norm(name);
+        for(const k of keys){
+          if(norm(k).includes(target)){
+            const v = obj[k];
+            if(v !== undefined && v !== null && String(v).trim() !== '') return v;
           }
         }
-        const fmtHorario = (h)=>{
-          if(!h) return '';
-          let s = String(h).trim().replace(/\s*–\s*/g,'-').replace(/\s*-\s*/g,'-');
-          return s.split(/\s*\/\s*/).map(seg=>seg.trim().replace(/\s*(?:-|a|as|às)\s*/i,' às ')).join(' / ');
-        };
-        const key = [data, turno, contrato].map(v=>String(v).toLowerCase()).join('|');
-        const cur = grouped.get(key);
-        const val = { data, turno, contrato, horario: fmtHorario(horario), src: e };
-        if (!cur) grouped.set(key, val);
-        else if (!cur.horario && val.horario) grouped.set(key, val);
       }
+      return '';
+    }
 
-      for (const { data, turno, contrato, horario, src } of grouped.values()) {
-        const cores = resolveCores(src);
-        const tr = document.createElement('tr');
-        if (cores.rowBg) tr.style.background = cores.rowBg;
-        if (cores.rowFg) tr.style.color = cores.rowFg;
-        tr.innerHTML = `
-          <td class="cel-data">${data}</td>
-          <td class="cel-turno">${turno}</td>
-          <td class="cel-horario">${horario || ''}</td>
-          <td class="cel-contrato">${contrato}</td>
-        `;
-        const cols = [
-          tr.querySelector('.cel-data'),
-          tr.querySelector('.cel-turno'),
-          tr.querySelector('.cel-horario'),
-          tr.querySelector('.cel-contrato')
-        ];
-        cols.forEach((td,i)=>{
-          if (cores.colBg[i]) td.style.background = cores.colBg[i];
-          if (cores.colFg[i]) td.style.color = cores.colFg[i];
-          if (cores.colBg[i] || cores.colFg[i]) { td.style.borderRadius = '6px'; td.style.padding = '6px 8px'; }
-        });
-        tbody.appendChild(tr);
+    function guessHorario(obj){
+      for(const [k,v] of Object.entries(obj||{})){
+        const s = String(v??'').trim();
+        if(!s) continue;
+        if(/\b\d{1,2}:\d{2}/.test(s)) return s;
       }
-    });
-  }
-</script>
-
-<!-- ===================== BENEFÍCIOS: prévia + total antes de enviar ===================== -->
-<script>
-  (function(){
-    const TOTAL_COOPS = {{ cooperados|length or 0 }};
-
-    function idsFromSelect(sel){
-      return Array.from(sel?.selectedOptions || []).map(o => String(o.value));
-    }
-    function valNum(inp){
-      const n = parseFloat(String(inp?.value ?? '').replace(',','.'));
-      return isFinite(n) ? n : 0;
-    }
-    function setBadge(el, txt){ if(el) el.textContent = txt; }
-    function money(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}); }
-
-    function calcPreview(prefix){
-      const unit    = document.getElementById(`${prefix}_valor_unit`);
-      const bensSel = document.getElementById(`${prefix}_beneficiarios`);
-      const isenSel = document.getElementById(`${prefix}_isencoes`);
-      const badge   = document.getElementById(`${prefix}_badge`);
-
-      if(!unit || !bensSel || !isenSel || !badge) return;
-
-      const vUnit = Math.max(0, valNum(unit));
-      const bens  = idsFromSelect(bensSel);
-      const isen  = idsFromSelect(isenSel);
-
-      const unique = new Set([...bens, ...isen]); // quem não paga
-      const numBens = bens.length;
-      const numIsen = isen.length;
-      const pagantes = Math.max(0, TOTAL_COOPS - unique.size);
-      const total = vUnit * numBens;
-      const porPag = pagantes > 0 ? (total / pagantes) : 0;
-
-      setBadge(badge,
-        `Recebem: ${numBens} · Isentos: ${numIsen} · Pagantes: ${pagantes} · Total a ratear: ${money(total)} · Cobrança por pagante: ${money(porPag)}`
-      );
+      return '';
     }
 
-    ['hosp','farm','alim'].forEach(p=>{
-      ['change','keyup'].forEach(ev=>{
-        document.getElementById(`${p}_valor_unit`)?.addEventListener(ev, ()=>calcPreview(p));
-        document.getElementById(`${p}_beneficiarios`)?.addEventListener(ev, ()=>calcPreview(p));
-        document.getElementById(`${p}_isencoes`)?.addEventListener(ev, ()=>calcPreview(p));
+    function formatHorarioCell(v){
+      if(!v) return '';
+      let s = String(v).trim();
+      s = s.replace(/\s*–\s*/g,'-');
+      s = s.replace(/\s*-\s*/g,'-');
+      const parts = s.split(/\s*\/\s*/).map(seg=>{
+        seg = seg.trim();
+        seg = seg.replace(/\s*(?:-|a|as|às)\s*/i,' às ');
+        return seg;
       });
-      calcPreview(p);
-    });
+      return parts.join(' / ');
+    }
 
-    // CÁLCULO DOS TOTAIS ANTES DE ENVIAR
-    const form = document.getElementById('form-beneficios');
-    if(form){
-      form.addEventListener('submit', function(){
-        function setTotal(prefix){
-          const unit = document.getElementById(`${prefix}_valor_unit`);
-          const bensSel = document.getElementById(`${prefix}_beneficiarios`);
-          const finalHidden =
-              document.getElementById(`${prefix}_valor_total`)
-           || document.querySelector(`input[name="${prefix}_valor"]`);
-          const count = (bensSel && bensSel.selectedOptions) ? bensSel.selectedOptions.length : 0;
-          const total = Math.max(0, valNum(unit) * count);
-          if(finalHidden) finalHidden.value = total.toFixed(2);
+    function resolveCores(row){
+      const spec = pick(row, ['cor_linha','cores','cor','color','row_color','linha_cor','bg','background','style']) || '';
+      function normColor(c){
+        if(!c) return null;
+        c = String(c).trim();
+        if (/^[0-9A-Fa-f]{8}$/.test(c)) {
+          const a = parseInt(c.slice(0,2),16)/255;
+          const r = parseInt(c.slice(2,4),16);
+          const g = parseInt(c.slice(4,6),16);
+          const b = parseInt(c.slice(6,8),16);
+          return `rgba(${r},${g},${b},${a.toFixed(3)})`;
         }
-        ['hosp','farm','alim'].forEach(setTotal);
+        if (/^[0-9A-Fa-f]{6}$/.test(c)) return `#${c}`;
+        if (/^#[0-9A-Fa-f]{6,8}$/.test(c)) {
+          if (c.length === 9) {
+            const a = parseInt(c.slice(1,3),16)/255;
+            const r = parseInt(c.slice(3,5),16);
+            const g = parseInt(c.slice(5,7),16);
+            const b = parseInt(c.slice(7,9),16);
+            return `rgba(${r},${g},${b},${a.toFixed(3)})`;
+          }
+          return c;
+        }
+        const map = { 'amarelo':'#fff3cd','vermelho':'#f8d7da','verde':'#d1e7dd','azul':'#cfe2ff','cinza':'#e9ecef','laranja':'#ffe5b4','roxo':'#e0d1ff','rosa':'#ffd6e7' };
+        const low = c.toLowerCase();
+        if (map[low]) return map[low];
+        return c;
+      }
+      function parseColorSpec(spec){
+        const out = { rowBg:null, rowFg:null, colBg:[null,null,null,null], colFg:[null,null,null,null] };
+        if(!spec) return out;
+        if (Array.isArray(spec)) {
+          const parts = spec.map(normColor);
+          if (parts.length === 1){ out.rowBg = parts[0]; return out; }
+          if (parts.length === 2){ out.rowBg = parts[0]; out.rowFg = parts[1]; return out; }
+          if (parts.length >= 4){
+            out.colBg = [parts[0],parts[1],parts[2],parts[3]];
+            if (parts.length >= 8) out.colFg = [parts[4],parts[5],parts[6],parts[7]];
+            return out;
+          }
+        }
+        if (typeof spec === 'string') {
+          try { if (spec.trim().startsWith('[') || spec.trim().startsWith('{')) return parseColorSpec(JSON.parse(spec)); } catch(_) {}
+          const parts = spec.split('|').map(s=>normColor(s.trim())).filter(Boolean);
+          if (parts.length === 1){ out.rowBg = parts[0]; return out; }
+          if (parts.length === 2){ out.rowBg = parts[0]; out.rowFg = parts[1]; return out; }
+          if (parts.length >= 4){
+            out.colBg = [parts[0],parts[1],parts[2],parts[3]];
+            if (parts.length >= 8) out.colFg = [parts[4],parts[5],parts[6],parts[7]];
+            return out;
+          }
+          out.rowBg = normColor(spec);
+          return out;
+        }
+        if (typeof spec === 'object') {
+          if (spec.rowBg || spec.rowFg || spec.colBg || spec.colFg) {
+            out.rowBg = normColor(spec.rowBg);
+            out.rowFg = normColor(spec.rowFg);
+            out.colBg = (spec.colBg||[]).map(normColor).concat([null,null,null,null]).slice(0,4);
+            out.colFg = (spec.colFg||[]).map(normColor).concat([null,null,null,null]).slice(0,4);
+            return out;
+          }
+          const bgData     = normColor(spec.bgData||spec.data||spec.bg_data);
+          const bgTurno    = normColor(spec.bgTurno||spec.turno||spec.bg_turno);
+          const bgHorario  = normColor(spec.bgHorario||spec.horario||spec.bg_horario||spec.hora);
+          const bgContrato = normColor(spec.bgContrato||spec.contrato||spec.bg_contrato);
+          const fgData     = normColor(spec.fgData||spec.textData);
+          const fgTurno    = normColor(spec.fgTurno||spec.textTurno);
+          const fgHorario  = normColor(spec.fgHorario||spec.textHorario||spec.textHora);
+          const fgContrato = normColor(spec.fgContrato||spec.textContrato);
+          if (bgData || bgTurno || bgHorario || bgContrato) {
+            out.colBg = [bgData,bgTurno,bgHorario,bgContrato];
+            out.colFg = [fgData,fgTurno,fgHorario,fgContrato];
+          }
+          return out;
+        }
+        return out;
+      }
+      return parseColorSpec(spec);
+    }
+
+    if (modalEsc) {
+      modalEsc.addEventListener('show.bs.modal', (ev) => {
+        const coopId = ev.relatedTarget?.dataset?.coopid;
+        const tbody = modalEsc.querySelector('#tbody-escala');
+        tbody.innerHTML = '';
+
+        const raw = ESCALAS[String(coopId)] || [];
+        if (!raw.length) {
+          tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhuma escala</td></tr>`;
+          return;
+        }
+
+        const grouped = new Map();
+        for (const e of raw) {
+          const data     = pick(e, ['data','dt','dia','date']) || '';
+          const turno    = pick(e, ['turno','periodo','shift']) || '';
+          const contrato = pick(e, ['contrato','setor','unidade','contr','local']) || '';
+          let horario  = pick(e, ['horário','horario','hora','horas','turno/horario','escala','jornada']);
+          if(!horario){
+            for(const [k,v] of Object.entries(e||{})){
+              const s = String(v??'').trim(); if(s && /\b\d{1,2}:\d{2}/.test(s)){ horario = s; break; }
+            }
+          }
+          const fmtHorario = (h)=>{
+            if(!h) return '';
+            let s = String(h).trim().replace(/\s*–\s*/g,'-').replace(/\s*-\s*/g,'-');
+            return s.split(/\s*\/\s*/).map(seg=>seg.trim().replace(/\s*(?:-|a|as|às)\s*/i,' às ')).join(' / ');
+          };
+          const key = [data, turno, contrato].map(v=>String(v).toLowerCase()).join('|');
+          const cur = grouped.get(key);
+          const val = { data, turno, contrato, horario: fmtHorario(horario), src: e };
+          if (!cur) grouped.set(key, val);
+          else if (!cur.horario && val.horario) grouped.set(key, val);
+        }
+
+        for (const { data, turno, contrato, horario, src } of grouped.values()) {
+          const cores = resolveCores(src);
+          const tr = document.createElement('tr');
+          if (cores.rowBg) tr.style.background = cores.rowBg;
+          if (cores.rowFg) tr.style.color = cores.rowFg;
+          tr.innerHTML = `
+            <td class="cel-data">${data}</td>
+            <td class="cel-turno">${turno}</td>
+            <td class="cel-horario">${horario || ''}</td>
+            <td class="cel-contrato">${contrato}</td>
+          `;
+          const cols = [
+            tr.querySelector('.cel-data'),
+            tr.querySelector('.cel-turno'),
+            tr.querySelector('.cel-horario'),
+            tr.querySelector('.cel-contrato')
+          ];
+          cols.forEach((td,i)=>{
+            if (cores.colBg[i]) td.style.background = cores.colBg[i];
+            if (cores.colFg[i]) td.style.color = cores.colFg[i];
+            if (cores.colBg[i] || cores.colFg[i]) { td.style.borderRadius = '6px'; td.style.padding = '6px 8px'; }
+          });
+          tbody.appendChild(tr);
+        }
+      });
+    }
+  </script>
+
+  <!-- ==== BENEFÍCIOS: prévia + cálculo do TOTAL antes de enviar ==== -->
+  <script>
+    (function(){
+      const TOTAL_COOPS = {{ cooperados|length or 0 }};
+
+      function idsFromSelect(sel){
+        return Array.from(sel?.selectedOptions || []).map(o => String(o.value));
+      }
+      function valNum(inp){
+        const n = parseFloat(String(inp?.value ?? '').replace(',','.'));
+        return isFinite(n) ? n : 0;
+      }
+      function setBadge(el, txt){ if(el) el.textContent = txt; }
+      function money(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+      function calcPreview(prefix){
+        const unit    = document.getElementById(`${prefix}_valor_unit`);
+        const bensSel = document.getElementById(`${prefix}_beneficiarios`);
+        const isenSel = document.getElementById(`${prefix}_isencoes`);
+        const badge   = document.getElementById(`${prefix}_badge`);
+
+        if(!unit || !bensSel || !isenSel || !badge) return;
+
+        const vUnit = Math.max(0, valNum(unit));
+        const bens  = idsFromSelect(bensSel);
+        const isen  = idsFromSelect(isenSel);
+
+        const unique = new Set([...bens, ...isen]); // quem não paga
+        const numBens = bens.length;
+        const numIsen = isen.length;
+        const pagantes = Math.max(0, TOTAL_COOPS - unique.size);
+        const total = vUnit * numBens;
+        const porPag = pagantes > 0 ? (total / pagantes) : 0;
+
+        setBadge(badge,
+          `Recebem: ${numBens} · Isentos: ${numIsen} · Pagantes: ${pagantes} · Total a ratear: ${money(total)} · Cobrança por pagante: ${money(porPag)}`
+        );
+      }
+
+      ['hosp','farm','alim'].forEach(p=>{
+        ['change','keyup'].forEach(ev=>{
+          document.getElementById(`${p}_valor_unit`)?.addEventListener(ev, ()=>calcPreview(p));
+          document.getElementById(`${p}_beneficiarios`)?.addEventListener(ev, ()=>calcPreview(p));
+          document.getElementById(`${p}_isencoes`)?.addEventListener(ev, ()=>calcPreview(p));
+        });
+        calcPreview(p);
       });
 
-      // garantir ids corretos dos hidden se vierem apenas por name
-      document.getElementById('hosp_valor_total') || (()=>{
-        const i = document.querySelector('input[name="hosp_valor"]'); if(i) i.id = 'hosp_valor_total';
-      })();
-      document.getElementById('farm_valor_total') || (()=>{
-        const i = document.querySelector('input[name="farm_valor"]'); if(i) i.id = 'farm_valor_total';
-      })();
-      document.getElementById('alim_valor_total') || (()=>{
-        const i = document.querySelector('input[name="alim_valor"]'); if(i) i.id = 'alim_valor_total';
-      })();
-    }
-  })();
-</script>
+      // >>>>>>>>>>>>>>>>> CÁLCULO DOS TOTAIS ANTES DE ENVIAR <<<<<<<<<<<<<<<<<
+      const form = document.getElementById('form-beneficios');
+      if(form){
+        form.addEventListener('submit', function(){
+          ['hosp','farm','alim'].forEach(p=>{
+            const unit = document.getElementById(`${p}_valor_unit`);
+            const bens = document.getElementById(`${p}_beneficiarios`);
+            const totalOut = document.getElementById(`${p}_valor_total`) || document.getElementById(`${p}_valor_total`) || null;
+          });
+
+          function setTotal(prefix){
+            const unit = document.getElementById(`${prefix}_valor_unit`);
+            const bensSel = document.getElementById(`${prefix}_beneficiarios`);
+            const hiddenTotal = document.getElementById(`${prefix}_valor_total`) || document.getElementById(`${prefix}_valor_total`);
+            // nossos hidden têm id `${prefix}_valor_total`
+            const ht = document.getElementById(`${prefix}_valor_total`);
+            const ht2 = document.getElementById(`${prefix}_valor_total`); // apenas garantia
+            const finalHidden = ht || ht2 || document.querySelector(`input[name="${prefix}_valor"]`);
+            const count = (bensSel && bensSel.selectedOptions) ? bensSel.selectedOptions.length : 0;
+            const total = Math.max(0, valNum(unit) * count);
+            if(finalHidden) finalHidden.value = total.toFixed(2);
+          }
+          ['hosp','farm','alim'].forEach(setTotal);
+        });
+
+        // garantir ids corretos dos hidden
+        document.getElementById('hosp_valor_total') || (()=>{
+          const i = document.querySelector('input[name="hosp_valor"]'); if(i) i.id = 'hosp_valor_total';
+        })();
+        document.getElementById('farm_valor_total') || (()=>{
+          const i = document.querySelector('input[name="farm_valor"]'); if(i) i.id = 'farm_valor_total';
+        })();
+        document.getElementById('alim_valor_total') || (()=>{
+          const i = document.querySelector('input[name="alim_valor"]'); if(i) i.id = 'alim_valor_total';
+        })();
+      }
+    })();
+  </script>
 
 <a href="{{ url_for('admin_documentos') }}" class="btn btn-outline-primary btn-sm">Documentos</a>
 </body>
