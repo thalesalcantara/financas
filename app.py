@@ -641,6 +641,7 @@ try:
 except Exception:
     db.session.rollback()
 
+    
     # 4.4) tabela avaliacoes_restaurante (se não existir)
     try:
         if _is_sqlite():
