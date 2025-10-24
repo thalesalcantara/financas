@@ -36,6 +36,8 @@ from sqlalchemy import delete as sa_delete
 # 👉 Novo: para gerar XLSX em memória
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
+from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+
 
 # ============ App / Paths ============
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
