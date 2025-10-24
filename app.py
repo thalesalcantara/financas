@@ -3522,14 +3522,14 @@ def edit_beneficio(id):
     return redirect(url_for("admin_dashboard", tab="beneficios"))
 
 
-@app.post("/beneficios/<int:id>/delete", endpoint="excluir_beneficio")
+@app.post("/beneficios/delete", endpoint="excluir_beneficio")
 @admin_required
-def delete_beneficio(id):
-    """
-    Exclui o registro de benefício do histórico.
-    (Não remove lançamentos de rateio em DespesaCooperado.)
-    """
-    b = BeneficioRegistro.query.get_or_404(id)
+def excluir_beneficio():
+    bid = request.form.get("beneficio_id", type=int)
+    if not bid:
+        flash("ID do benefício ausente.", "warning")
+        return redirect(url_for("admin_dashboard", tab="beneficios"))
+    b = BeneficioRegistro.query.get_or_404(bid)
     db.session.delete(b)
     db.session.commit()
     flash("Registro de benefício excluído.", "info")
