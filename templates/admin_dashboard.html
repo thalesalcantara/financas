@@ -169,7 +169,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <!-- Folha (tab) -->
     <a class="nav-link {{ 'active' if _tab=='folha' else '' }}"
        data-bs-toggle="tab"
-       data-bs-target="#folha"
        href="#folha"
        role="tab"
        aria-controls="folha"
@@ -180,7 +179,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <!-- Benefícios (tab) -->
     <a class="nav-link {{ 'active' if _tab=='beneficios' else '' }}"
        data-bs-toggle="tab"
-       data-bs-target="#beneficios"
        href="#beneficios"
        role="tab"
        aria-controls="beneficios"
@@ -191,7 +189,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <!-- Cooperados (tab) -->
     <a class="nav-link {{ 'active' if _tab=='cooperados' else '' }}"
        data-bs-toggle="tab"
-       data-bs-target="#cooperados"
        href="#cooperados"
        role="tab"
        aria-controls="cooperados"
@@ -202,7 +199,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <!-- Estabelecimentos (tab) -->
     <a class="nav-link {{ 'active' if _tab=='restaurantes' else '' }}"
        data-bs-toggle="tab"
-       data-bs-target="#restaurantes"
        href="#restaurantes"
        role="tab"
        aria-controls="restaurantes"
@@ -211,7 +207,14 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </a>
 
     <!-- Escalas (tab) -->
-    <a class="nav-link" data-bs-toggle="tab" href="#escalas"><i class="bi bi-calendar2-week"></i> <span>Escalas</span></a>
+    <a class="nav-link {{ 'active' if _tab=='escalas' else '' }}"
+   data-bs-toggle="tab"
+   href="#escalas"
+   role="tab"
+   aria-controls="escalas"
+   aria-selected="{{ 'true' if _tab=='escalas' else 'false' }}">
+  <i class="bi bi-calendar2-week"></i> <span>Escalas</span>
+</a>
 
     <!-- Páginas dedicadas (rotas próprias, não tabs) -->
     <a class="nav-link {% if request.endpoint == 'admin_documentos' %}active{% endif %}"
@@ -232,7 +235,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <!-- Config (tab) -->
     <a class="nav-link {{ 'active' if _tab=='config' else '' }}"
        data-bs-toggle="tab"
-       data-bs-target="#config"
        href="#config"
        role="tab"
        aria-controls="config"
@@ -1134,7 +1136,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           </tbody>
           <tfoot class="table-light">
             <tr>
-              <th colspan="2" class="text-end">Total</th>
+              <th colspan="3" class="text-end">Total</th>
               <th class="text-end">R$ {{ '%.2f'|format(total_receitas_coop_table or 0) }}</th>
             </tr>
           </tfoot>
@@ -2701,9 +2703,8 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     })();
   </script>
 </section>
-
        <!-- ESCALAS -->
-      <section class="tab-pane fade" id="escalas">
+      <section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h4 class="mb-0">Escalas</h4>
           <div class="alert alert-info py-1 px-2 mb-0">
@@ -3425,7 +3426,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if(!id) return;
       const p = new URLSearchParams(location.search);
       p.set('tab', id);
-      history.replaceState(null, '', location.pathname + '?' + p.toString() + e.target.getAttribute('href'));
+      history.replaceState(null, '', location.pathname + '?' + p.toString() + '#' + id);
     });
   });
 
