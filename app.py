@@ -2230,31 +2230,81 @@ def admin_dashboard():
             bruto=bruto_total, inss=inss, outras_desp=outras_desp, liquido=liquido
         ))
 
-    # Benefícios para template
-    def _tokenize(s: str):
-        return [x.strip() for x in re.split(r"[;,]", s or "") if x.strip()]
+    # ----------------------------
+# Benefícios para template (com filtros + id)
+# ----------------------------
+def _tokenize(s: str):
+    return [x.strip() for x in re.split(r"[;,]", s or "") if x.strip()]
 
-    historico_beneficios = BeneficioRegistro.query.order_by(BeneficioRegistro.id.desc()).all()
-    beneficios_view = []
-    for b in historico_beneficios:
-        nomes = _tokenize(b.recebedores_nomes or "")
-        ids = _tokenize(b.recebedores_ids or "")
-        recs = []
-        for i, nome in enumerate(nomes):
-            rid = ids[i] if i < len(ids) else None
+def _d(s):
+    if not s:
+        return None
+    s = s.strip()
+    try:
+        if "/" in s:  # dd/mm/yyyy
+            d, m, y = s.split("/")
+            return date(int(y), int(m), int(d))
+        # yyyy-mm-dd
+        y, m, d = s.split("-")
+        return date(int(y), int(m), int(d))
+    except Exception:
+        return None
+
+# filtros vindos da querystring da própria aba (já existem no seu HTML)
+b_ini = _d(request.args.get("b_ini"))
+b_fim = _d(request.args.get("b_fim"))
+coop_filter = request.args.get("coop_benef_id", type=int)
+
+q = BeneficioRegistro.query
+
+# sobreposição de intervalo:
+# inclui o benefício se [data_inicial, data_final] INTERSECTA o filtro
+if b_ini and b_fim:
+    q = q.filter(
+        BeneficioRegistro.data_inicial <= b_fim,
+        BeneficioRegistro.data_final   >= b_ini,
+    )
+elif b_ini:
+    q = q.filter(BeneficioRegistro.data_final >= b_ini)
+elif b_fim:
+    q = q.filter(BeneficioRegistro.data_inicial <= b_fim)
+
+historico_beneficios = q.order_by(BeneficioRegistro.id.desc()).all()
+
+beneficios_view = []
+for b in historico_beneficios:
+    nomes = _tokenize(b.recebedores_nomes or "")
+    ids   = _tokenize(b.recebedores_ids or "")
+
+    recs = []
+    for i, nome in enumerate(nomes):
+        rid = None
+        if i < len(ids) and str(ids[i]).isdigit():
             try:
-                rid = int(rid) if rid and str(rid).isdigit() else None
+                rid = int(ids[i])
             except Exception:
                 rid = None
-            recs.append({"id": rid, "nome": nome})
-        beneficios_view.append({
-            "data_inicial": b.data_inicial,
-            "data_final": b.data_final,
-            "data_lancamento": b.data_lancamento,
-            "tipo": b.tipo,
-            "valor_total": b.valor_total or 0.0,
-            "recebedores": recs,
-        })
+
+        # se o filtro por cooperado estiver ativo, só mantém o recebedor alvo
+        if coop_filter and (rid is not None) and (rid != coop_filter):
+            continue
+
+        recs.append({"id": rid, "nome": nome})
+
+    # se o filtro por cooperado estiver ativo e nenhum recebedor bateu, pula o registro
+    if coop_filter and not recs:
+        continue
+
+    beneficios_view.append({
+        "id": b.id,  # <<< necessário para editar/excluir
+        "data_inicial": b.data_inicial,
+        "data_final": b.data_final,
+        "data_lancamento": b.data_lancamento,
+        "tipo": b.tipo,
+        "valor_total": b.valor_total or 0.0,
+        "recebedores": recs,
+    })
+
 
     # ======== Trocas no admin ========
     def _escala_desc(e: Escala | None) -> str:
@@ -3614,6 +3664,30 @@ def delete_despesa_coop(id):
 # Benefícios — Editar / Excluir (Admin)
 # =========================
 
+from datetime import date
+
+def _split_field(form, key_list, key_str):
+    """
+    Lê uma lista do form (key[]) ou uma string separada por , ; (key_str).
+    Retorna lista de strings já stripadas e sem vazios.
+    """
+    vals = form.getlist(key_list) if key_list.endswith("[]") else []
+    if not vals:
+        raw = (form.get(key_str) or "").replace(",", ";")
+        vals = [x.strip() for x in raw.split(";") if x.strip()]
+    return vals
+
+def _ensure_periodo_ok(di: date | None, df: date | None) -> tuple[date | None, date | None]:
+    if di and df and df < di:
+        di, df = df, di  # inverte para garantir di <= df
+    return di, df
+
+TIPO_MAP = {
+    "hosp": "hospitalar", "hospitalar": "hospitalar",
+    "farm": "farmaceutico","farmacêutico":"farmaceutico","farmaceutico":"farmaceutico",
+    "alim": "alimentar",  "alimentar": "alimentar",
+}
+
 @app.post("/beneficios/<int:id>/edit")
 @admin_required
 def edit_beneficio(id):
@@ -3622,59 +3696,61 @@ def edit_beneficio(id):
     Espera (via form):
       - data_inicial (YYYY-MM-DD ou DD/MM/YYYY)
       - data_final   (YYYY-MM-DD ou DD/MM/YYYY)
-      - data_lancamento (opcional; se vazio mantém a atual)
-      - tipo  (aceita: hospitalar | farmaceutico | alimentar | hosp | farm | alim)
-      - valor_total
-      - recebedores_ids[] (lista) OU recebedores_ids (string separada por ; ou ,)
-      - recebedores_nomes[] (lista) OU recebedores_nomes (string separada por ; ou ,)
+      - data_lancamento (opcional)
+      - tipo  (hospitalar|farmaceutico|alimentar ou siglas: hosp|farm|alim)
+      - valor_total (float)
+      - recebedores_ids[]  ou recebedores_ids  (string: "1;2;3")
+      - recebedores_nomes[] ou recebedores_nomes (string: "Ana;Bia;…")
     """
     b = BeneficioRegistro.query.get_or_404(id)
     f = request.form
 
-    # Datas
-    b.data_inicial = _parse_date(f.get("data_inicial"))
-    b.data_final   = _parse_date(f.get("data_final"))
+    # --- Datas ---
+    di = _parse_date(f.get("data_inicial"))
+    df = _parse_date(f.get("data_final"))
+    di, df = _ensure_periodo_ok(di, df)
+
+    if di: b.data_inicial = di
+    if df: b.data_final   = df
+
     dl = _parse_date(f.get("data_lancamento"))
     if dl:
-        b.data_lancamento = dl  # mantém a antiga se não vier nada
+        b.data_lancamento = dl
 
-    # Tipo (normaliza siglas)
+    # --- Tipo ---
     tipo_in = (f.get("tipo") or "").strip().lower()
-    tipo_map = {
-        "hosp": "hospitalar", "hospitalar": "hospitalar",
-        "farm": "farmaceutico","farmacêutico":"farmaceutico","farmaceutico":"farmaceutico",
-        "alim": "alimentar",  "alimentar": "alimentar",
-    }
-    if tipo_in in tipo_map:
-        b.tipo = tipo_map[tipo_in]  # só troca se reconhecido
+    if tipo_in in TIPO_MAP:
+        b.tipo = TIPO_MAP[tipo_in]
 
-    # Valor
-    b.valor_total = f.get("valor_total", type=float) if (f.get("valor_total") is not None) else b.valor_total
+    # --- Valor total ---
+    val_raw = f.get("valor_total")
+    if val_raw is not None and val_raw != "":
+        try:
+            b.valor_total = float(str(val_raw).replace(",", "."))
+        except ValueError:
+            flash("Valor total inválido.", "warning")
+            return redirect(url_for("admin_dashboard", tab="beneficios"))
 
-    # ---------- Recebedores (IDs e nomes) ----------
-    # 1) IDs: aceita lista recebedores_ids[] ou campo único "recebedores_ids" (separado por ; ou ,)
-    ids_list = f.getlist("recebedores_ids[]")
-    if not ids_list:
-        raw_ids = (f.get("recebedores_ids") or "").replace(",", ";")
-        ids_list = [x.strip() for x in raw_ids.split(";") if x.strip()]
+    # --- Recebedores ---
+    ids_list   = _split_field(f, "recebedores_ids[]",   "recebedores_ids")
+    nomes_list = _split_field(f, "recebedores_nomes[]", "recebedores_nomes")
 
-    # 2) Nomes: aceita lista recebedores_nomes[] ou campo único "recebedores_nomes"
-    nomes_list = f.getlist("recebedores_nomes[]")
-    if not nomes_list:
-        raw_nomes = (f.get("recebedores_nomes") or "").replace(",", ";")
-        nomes_list = [x.strip() for x in raw_nomes.split(";") if x.strip()]
+    # Se vierem só IDs, tenta resolver nomes
+    if ids_list and not nomes_list:
+        ids_int = [int(x) for x in ids_list if str(x).isdigit()]
+        if ids_int:
+            coops = Cooperado.query.filter(Cooperado.id.in_(ids_int)).all()
+            m = {str(c.id): c.nome for c in coops}
+            nomes_list = [m.get(str(i), "") for i in ids_int]
 
-    # 3) Se vierem só IDs, tentamos resolver nomes pelo banco (quando possível)
-    only_ids = ids_list and not nomes_list
-    ids_int = [int(i) for i in ids_list if str(i).isdigit()]
-    if only_ids and ids_int:
-        coops = Cooperado.query.filter(Cooperado.id.in_(ids_int)).all()
-        name_map = {str(c.id): c.nome for c in coops}
-        nomes_list = [name_map.get(str(i), "") for i in ids_int]
+    # Sanitiza; mantém alinhamento por índice
+    ids_sane   = [str(int(x)) for x in ids_list if str(x).isdigit()]
+    nomes_sane = [n for n in nomes_list if n is not None]
 
-    # Sanitiza e grava
-    ids_sane   = [str(int(i)) for i in ids_list if str(i).isdigit()]
-    nomes_sane = [n for n in nomes_list if n]
+    # Alinha tamanhos (corta o excedente do maior)
+    n = min(len(ids_sane), len(nomes_sane)) if ids_sane and nomes_sane else max(len(ids_sane), len(nomes_sane))
+    ids_sane   = ids_sane[:n]
+    nomes_sane = (nomes_sane[:n] if nomes_sane else [""] * n)
 
     b.recebedores_ids   = ";".join(ids_sane)
     b.recebedores_nomes = ";".join(nomes_sane)
