@@ -2338,7 +2338,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   {# Modal de edição do cooperado (adiciona telefone) #}
   <div class="modal fade" id="modalEditCooperado" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-      <form method="POST" class="modal-content">
+      <form method="POST" class="modal-content" enctype="multipart/form-data">
         {% if csrf_token is defined %}
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         {% endif %}
