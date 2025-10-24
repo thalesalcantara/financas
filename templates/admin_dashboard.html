@@ -169,6 +169,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <!-- Folha (tab) -->
     <a class="nav-link {{ 'active' if _tab=='folha' else '' }}"
        data-bs-toggle="tab"
+       data-bs-target="#folha"
        href="#folha"
        role="tab"
        aria-controls="folha"
@@ -179,6 +180,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <!-- Benefícios (tab) -->
     <a class="nav-link {{ 'active' if _tab=='beneficios' else '' }}"
        data-bs-toggle="tab"
+       data-bs-target="#beneficios"
        href="#beneficios"
        role="tab"
        aria-controls="beneficios"
@@ -189,6 +191,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <!-- Cooperados (tab) -->
     <a class="nav-link {{ 'active' if _tab=='cooperados' else '' }}"
        data-bs-toggle="tab"
+       data-bs-target="#cooperados"
        href="#cooperados"
        role="tab"
        aria-controls="cooperados"
@@ -199,6 +202,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <!-- Estabelecimentos (tab) -->
     <a class="nav-link {{ 'active' if _tab=='restaurantes' else '' }}"
        data-bs-toggle="tab"
+       data-bs-target="#restaurantes"
        href="#restaurantes"
        role="tab"
        aria-controls="restaurantes"
@@ -207,14 +211,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </a>
 
     <!-- Escalas (tab) -->
-    <a class="nav-link {{ 'active' if _tab=='escalas' else '' }}"
-   data-bs-toggle="tab"
-   href="#escalas"
-   role="tab"
-   aria-controls="escalas"
-   aria-selected="{{ 'true' if _tab=='escalas' else 'false' }}">
-  <i class="bi bi-calendar2-week"></i> <span>Escalas</span>
-</a>
+    <a class="nav-link" data-bs-toggle="tab" href="#escalas"><i class="bi bi-calendar2-week"></i> <span>Escalas</span></a>
 
     <!-- Páginas dedicadas (rotas próprias, não tabs) -->
     <a class="nav-link {% if request.endpoint == 'admin_documentos' %}active{% endif %}"
@@ -235,6 +232,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <!-- Config (tab) -->
     <a class="nav-link {{ 'active' if _tab=='config' else '' }}"
        data-bs-toggle="tab"
+       data-bs-target="#config"
        href="#config"
        role="tab"
        aria-controls="config"
@@ -247,7 +245,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </a>
   </nav>
 </aside>
-
+  
   <!-- Main -->
   <main class="main">
     <div class="tab-content">
