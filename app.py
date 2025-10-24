@@ -516,86 +516,82 @@ def init_db():
     except Exception:
         db.session.rollback()
 
-    # 4.x) período em despesas_cooperado (data_inicio / data_fim) + backfill
-try:
-    if _is_sqlite():
-        cols = db.session.execute(sa_text("PRAGMA table_info(despesas_cooperado);")).fetchall()
-        colnames = {row[1] for row in cols}
+       # 4.x) período em despesas_cooperado (data_inicio / data_fim) + backfill
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(despesas_cooperado);")).fetchall()
+            colnames = {row[1] for row in cols}
 
-        if "data_inicio" not in colnames:
-            db.session.execute(sa_text("ALTER TABLE despesas_cooperado ADD COLUMN data_inicio DATE"))
-        if "data_fim" not in colnames:
-            db.session.execute(sa_text("ALTER TABLE despesas_cooperado ADD COLUMN data_fim DATE"))
-        db.session.commit()
-
-        # Retropreenche linhas antigas: quando só 'data' existe,
-        # copia para data_inicio e data_fim (intervalo de 1 dia)
-        db.session.execute(sa_text("""
-            UPDATE despesas_cooperado
-               SET data_inicio = COALESCE(data_inicio, data),
-                   data_fim    = COALESCE(data_fim,    data)
-             WHERE data IS NOT NULL
-               AND (data_inicio IS NULL OR data_fim IS NULL)
-        """))
-        db.session.commit()
-
-    else:
-        db.session.execute(sa_text("""
-            ALTER TABLE IF NOT EXISTS public.despesas_cooperado
-            ADD COLUMN IF NOT EXISTS data_inicio DATE
-        """))
-        db.session.execute(sa_text("""
-            ALTER TABLE IF NOT EXISTS public.despesas_cooperado
-            ADD COLUMN IF NOT EXISTS data_fim DATE
-        """))
-        db.session.commit()
-
-        # Retropreenche linhas antigas no Postgres
-        db.session.execute(sa_text("""
-            UPDATE public.despesas_cooperado
-               SET data_inicio = COALESCE(data_inicio, data),
-                   data_fim    = COALESCE(data_fim,    data)
-             WHERE data IS NOT NULL
-               AND (data_inicio IS NULL OR data_fim IS NULL)
-        """))
-        db.session.commit()
-
-except Exception:
-    db.session.rollback()
-
-    # 4.1) cooperado_nome em escalas
-try:
-    if _is_sqlite():
-         cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-         colnames = {row[1] for row in cols}
-         if "cooperado_nome" not in colnames:
-            db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
+            if "data_inicio" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE despesas_cooperado ADD COLUMN data_inicio DATE"))
+            if "data_fim" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE despesas_cooperado ADD COLUMN data_fim DATE"))
             db.session.commit()
-    else:
-            db.session.execute(sa_text(
-         "ALTER TABLE IF NOT EXISTS escalas "
-         "ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"
-            ))
+
+            # Retropreenche linhas antigas
+            db.session.execute(sa_text("""
+                UPDATE despesas_cooperado
+                   SET data_inicio = COALESCE(data_inicio, data),
+                       data_fim    = COALESCE(data_fim,    data)
+                 WHERE data IS NOT NULL
+                   AND (data_inicio IS NULL OR data_fim IS NULL)
+            """))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("""
+                ALTER TABLE IF NOT EXISTS public.despesas_cooperado
+                ADD COLUMN IF NOT EXISTS data_inicio DATE
+            """))
+            db.session.execute(sa_text("""
+                ALTER TABLE IF NOT EXISTS public.despesas_cooperado
+                ADD COLUMN IF NOT EXISTS data_fim DATE
+            """))
+            db.session.commit()
+
+            db.session.execute(sa_text("""
+                UPDATE public.despesas_cooperado
+                   SET data_inicio = COALESCE(data_inicio, data),
+                       data_fim    = COALESCE(data_fim,    data)
+                 WHERE data IS NOT NULL
+                   AND (data_inicio IS NULL OR data_fim IS NULL)
+            """))
             db.session.commit()
     except Exception:
-           db.session.rollback()
+        db.session.rollback()
 
-    # 4.2) restaurante_id em escalas
-try:
-    if _is_sqlite():
-        cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-        colnames = {row[1] for row in cols}
-        if "restaurante_id" not in colnames:
-            db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
+    # 4.1) cooperado_nome em escalas
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "cooperado_nome" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
             db.session.commit()
         else:
             db.session.execute(sa_text(
-        "ALTER TABLE IF NOT EXISTS escalas "
-        "ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"
+                "ALTER TABLE IF NOT EXISTS escalas "
+                "ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"
             ))
             db.session.commit()
     except Exception:
-            db.session.rollback()
+        db.session.rollback()
+
+    # 4.2) restaurante_id em escalas
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "restaurante_id" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS escalas "
+                "ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"
+            ))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
     # 4.3) fotos no banco (cooperados)
     try:
@@ -624,24 +620,23 @@ try:
     except Exception:
         db.session.rollback()
 
-     # 4.3.x) telefone em cooperados
-try:
-    if _is_sqlite():
-        cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
-        colnames = {row[1] for row in cols}
-        if "telefone" not in colnames:
-            db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN telefone VARCHAR(30)"))
+    # 4.3.x) telefone em cooperados
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "telefone" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN telefone VARCHAR(30)"))
             db.session.commit()
-      else:
-             db.session.execute(sa_text(
-         "ALTER TABLE IF NOT EXISTS cooperados "
-         "ADD COLUMN IF NOT EXISTS telefone VARCHAR(30)"
+        else:
+            db.session.execute(sa_text(
+                "ALTER TABLE IF NOT EXISTS cooperados "
+                "ADD COLUMN IF NOT EXISTS telefone VARCHAR(30)"
             ))
-                db.session.commit()
-        except Exception:
-                db.session.rollback()
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
-    
     # 4.4) tabela avaliacoes_restaurante (se não existir)
     try:
         if _is_sqlite():
@@ -723,6 +718,7 @@ try:
             db.session.commit()
     except Exception:
         db.session.rollback()
+
 
     # 5) Bootstrap mínimo (admin e config) — só se os modelos existirem
     try:
