@@ -301,7 +301,12 @@ class DespesaCooperado(db.Model):
     cooperado = db.relationship("Cooperado")
     descricao = db.Column(db.String(200), nullable=False)
     valor = db.Column(db.Float, default=0.0)
+    # legado (pontual)
     data = db.Column(db.Date)
+
+    # novo (período)
+    data_inicio = db.Column(db.Date)
+    data_fim    = db.Column(db.Date)
 
 
 class BeneficioRegistro(db.Model):
@@ -511,25 +516,52 @@ def init_db():
     except Exception:
         db.session.rollback()
 
-    # 4.x) coluna 'ativo' em usuarios (para refletir o model novo)
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(usuarios);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "ativo" not in colnames:
-                # Boolean em SQLite é INTEGER 0/1
-                db.session.execute(sa_text(
-                    "ALTER TABLE usuarios ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1"
-                ))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS public.usuarios "
-                "ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE"
-            ))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
+    # 4.x) período em despesas_cooperado (data_inicio / data_fim) + backfill
+try:
+    if _is_sqlite():
+        cols = db.session.execute(sa_text("PRAGMA table_info(despesas_cooperado);")).fetchall()
+        colnames = {row[1] for row in cols}
+
+        if "data_inicio" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE despesas_cooperado ADD COLUMN data_inicio DATE"))
+        if "data_fim" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE despesas_cooperado ADD COLUMN data_fim DATE"))
+        db.session.commit()
+
+        # Retropreenche linhas antigas: quando só 'data' existe,
+        # copia para data_inicio e data_fim (intervalo de 1 dia)
+        db.session.execute(sa_text("""
+            UPDATE despesas_cooperado
+               SET data_inicio = COALESCE(data_inicio, data),
+                   data_fim    = COALESCE(data_fim,    data)
+             WHERE data IS NOT NULL
+               AND (data_inicio IS NULL OR data_fim IS NULL)
+        """))
+        db.session.commit()
+
+    else:
+        db.session.execute(sa_text("""
+            ALTER TABLE IF NOT EXISTS public.despesas_cooperado
+            ADD COLUMN IF NOT EXISTS data_inicio DATE
+        """))
+        db.session.execute(sa_text("""
+            ALTER TABLE IF NOT EXISTS public.despesas_cooperado
+            ADD COLUMN IF NOT EXISTS data_fim DATE
+        """))
+        db.session.commit()
+
+        # Retropreenche linhas antigas no Postgres
+        db.session.execute(sa_text("""
+            UPDATE public.despesas_cooperado
+               SET data_inicio = COALESCE(data_inicio, data),
+                   data_fim    = COALESCE(data_fim,    data)
+             WHERE data IS NOT NULL
+               AND (data_inicio IS NULL OR data_fim IS NULL)
+        """))
+        db.session.commit()
+
+except Exception:
+    db.session.rollback()
 
     # 4.1) cooperado_nome em escalas
     try:
