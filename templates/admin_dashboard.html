@@ -1764,7 +1764,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   {% endfor %}
 </section>
 
-      <!-- BENEFÍCIOS (versão profissional / sem alterar backend) -->
+     <!-- BENEFÍCIOS (versão profissional / sem alterar backend) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='beneficios' else '' }}" id="beneficios" role="tabpanel">
   <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
     <h5 class="m-0 d-flex align-items-center gap-2">
@@ -1857,7 +1857,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           <h6 class="mb-0 d-flex align-items-center gap-2">
             <i class="bi bi-basket"></i> Benefício Alimentar
           </h6>
-          <div class="d-flex flex-wrap gap-2">
+        <div class="d-flex flex-wrap gap-2">
             <span class="badge-soft" id="alim_badge">Prévia: —</span>
           </div>
         </div>
@@ -1890,62 +1890,56 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 
   <!-- Registros de benefícios recebidos -->
-<div class="card border-0 shadow-sm rounded-3">
-  <div class="card-body">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-      <h6 class="m-0 d-flex align-items-center gap-2">
-        <i class="bi bi-journal-medical"></i> Registros de Benefícios Recebidos
-      </h6>
+  <div class="card border-0 shadow-sm rounded-3">
+    <div class="card-body">
 
-      <!-- Filtros -->
-      <form method="GET" class="row g-2 align-items-end">
-        <input type="hidden" name="tab" value="beneficios">
-        <div class="col-md-3">
-          <label class="form-label">De</label>
-          <input type="date" class="form-control form-control-sm" name="b_ini" value="{{ request.args.get('b_ini','') }}">
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Até</label>
-          <input type="date" class="form-control form-control-sm" name="b_fim" value="{{ request.args.get('b_fim','') }}">
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Cooperado</label>
-          <select class="form-select form-select-sm" name="coop_benef_id">
-            <option value="">Todos</option>
-            {% set coop_benef_id = request.args.get('coop_benef_id') %}
-            {% for coop in cooperados %}
-              <option value="{{ coop.id }}" {{ 'selected' if coop_benef_id and coop_benef_id|int == coop.id else '' }}>{{ coop.nome }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-md-2">
-          <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
-        </div>
-      </form>
-    </div>
-
-    <!-- Ações em massa -->
-    <form method="POST" action="{{ url_for('excluir_beneficio_bulk') }}" id="form-bulk-beneficios" class="mt-2">
-      {# <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> #}
-
-      <div class="d-flex gap-3 align-items-center mb-2">
-        <div class="form-check m-0">
-          <input class="form-check-input" type="checkbox" id="chk_all_beneficios">
-          <label class="form-check-label" for="chk_all_beneficios">Selecionar todos</label>
-        </div>
-        <button type="submit" class="btn btn-danger btn-sm" id="btn_bulk_delete" disabled>
-          <i class="bi bi-trash"></i> Excluir selecionados
-        </button>
-        <small class="text-muted">
-          A exclusão remove o <b>registro do benefício</b> inteiro (impacta todos os recebedores daquele registro).
-        </small>
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h6 class="m-0 d-flex align-items-center gap-2">
+          <i class="bi bi-journal-medical"></i> Registros de Benefícios Recebidos
+        </h6>
+        <form method="GET" class="row g-2 align-items-end">
+          <input type="hidden" name="tab" value="beneficios">
+          <div class="col-md-3">
+            <label class="form-label">De</label>
+            <input type="date" class="form-control form-control-sm" name="b_ini" value="{{ request.args.get('b_ini','') }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Até</label>
+            <input type="date" class="form-control form-control-sm" name="b_fim" value="{{ request.args.get('b_fim','') }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Cooperado</label>
+            <select class="form-select form-select-sm" name="coop_benef_id">
+              <option value="">Todos</option>
+              {% set coop_benef_id = request.args.get('coop_benef_id') %}
+              {% for coop in cooperados %}
+                                <option value="{{ coop.id }}" {{ 'selected' if coop_benef_id and coop_benef_id|int == coop.id else '' }}>{{ coop.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+          </div>
+        </form>
       </div>
 
-      <div class="table-responsive mt-2">
-        <table class="table table-sm table-bordered table-hover align-middle">
+      <!-- Ações em massa -->
+      <form id="form-bulk-beneficios" method="POST" action="/beneficios/delete" class="d-flex align-items-center gap-2 mt-2">
+        {# <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> #}
+        <input type="hidden" name="tab" value="beneficios">
+        <button type="submit" class="btn btn-outline-danger btn-sm" id="btn-bulk-delete" disabled>
+          <i class="bi bi-trash"></i> Excluir selecionados
+        </button>
+        <span class="text-muted small">Selecione vários e exclua de uma vez.</span>
+      </form>
+
+      <div class="table-responsive mt-3">
+        <table class="table table-sm table-bordered table-hover align-middle" id="tabela-beneficios">
           <thead class="table-light">
             <tr class="text-nowrap">
-              <th class="text-center" style="width:32px;"></th> <!-- checkbox -->
+              <th class="text-center" style="width:36px;">
+                <input type="checkbox" id="check_all">
+              </th>
               <th>Referência</th>
               <th>Data Lançamento</th>
               <th>Tipo</th>
@@ -1969,26 +1963,21 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                 {% if _bfim %}{% set mostrar = mostrar and (b.data_inicial.strftime('%Y-%m-%d') <= _bfim) %}{% endif %}
 
                 {% if mostrar %}
-                  <tr>
+                  <tr data-bid="{{ b.id }}">
                     <td class="text-center">
-                      <input class="form-check-input chk-beneficio" type="checkbox" name="ids" value="{{ b.id }}">
-                    </td>
-                    <td>{{ b.data_inicial.strftime('%d/%m/%Y') }} – {{ b.data_final.strftime('%d/%m/%Y') }}</td>
-                    <td>
-                      {% if b.data_lancamento %}
-                        {{ b.data_lancamento.strftime('%d/%m/%Y') }}
-                      {% else %}
-                        <span class="text-muted">—</span>
+                      {% if loop.first %}
+                        <input type="checkbox" class="chk-beneficio" name="ids[]" form="form-bulk-beneficios" value="{{ b.id }}">
                       {% endif %}
                     </td>
+                    <td>{{ b.data_inicial.strftime('%d/%m/%Y') }} – {{ b.data_final.strftime('%d/%m/%Y') }}</td>
+                    <td>{% if b.data_lancamento %}{{ b.data_lancamento.strftime('%d/%m/%Y') }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
                     <td class="text-capitalize">{{ b.tipo }}</td>
                     <td class="text-break">{{ rec.nome }}</td>
                     <td class="text-end">R$ {{ '%.2f'|format(vpb) }}</td>
                     <td class="text-center">
-                      <!-- Excluir individual (abre modal) -->
                       <button
                         type="button"
-                        class="btn btn-outline-danger btn-sm"
+                        class="btn btn-outline-danger btn-sm btn-del-one"
                         data-bs-toggle="modal"
                         data-bs-target="#modalExcluirBeneficio"
                         data-beneficio-id="{{ b.id }}"
@@ -2005,16 +1994,15 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           </tbody>
         </table>
       </div>
-    </form>
+    </div>
   </div>
-</div>
+</section>
 
-<!-- Modal: Excluir 1 benefício -->
+<!-- Modal: Excluir benefício (único) -->
 <div class="modal fade" id="modalExcluirBeneficio" tabindex="-1" aria-labelledby="modalExcluirBeneficioLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <form method="POST" action="{{ url_for('excluir_beneficio') }}" class="modal-content">
+    <form method="POST" class="modal-content" id="form-del-one">
       {# <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> #}
-      <input type="hidden" name="beneficio_id" id="beneficio_id_hidden">
       <div class="modal-header">
         <h5 class="modal-title" id="modalExcluirBeneficioLabel">
           <i class="bi bi-exclamation-triangle text-danger"></i> Confirmar exclusão
@@ -2022,58 +2010,50 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
       <div class="modal-body">
-        <p class="mb-0">Tem certeza que deseja excluir o benefício: <b id="beneficio_label_preview">—</b>?</p>
+        <p class="mb-0">
+          Tem certeza que deseja excluir o benefício: <b id="beneficio_label_preview">—</b>?
+        </p>
         <small class="text-muted">Esta ação não pode ser desfeita.</small>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-        <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i> Excluir</button>
+        <button type="submit" class="btn btn-danger">
+          <i class="bi bi-trash"></i> Excluir
+        </button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- JS: modal + seleção em massa -->
+<!-- JS: checagens/bulk + modal -->
 <script>
 (function(){
-  // Modal: injeta ID e label
+  // Enable/disable bulk delete
+  function toggleBulkBtn(){
+    const any = document.querySelectorAll('.chk-beneficio:checked').length > 0;
+    document.getElementById('btn-bulk-delete').disabled = !any;
+  }
+  document.getElementById('check_all')?.addEventListener('change', function(){
+    document.querySelectorAll('.chk-beneficio').forEach(ch => ch.checked = this.checked);
+    toggleBulkBtn();
+  });
+  document.addEventListener('change', function(e){
+    if(e.target.classList?.contains('chk-beneficio')) toggleBulkBtn();
+  });
+
+  // Single delete modal: set action + label
   const modal = document.getElementById('modalExcluirBeneficio');
-  if (modal) {
-    modal.addEventListener('show.bs.modal', function (ev) {
-      const btn = ev.relatedTarget;
-      const id  = btn?.getAttribute('data-beneficio-id');
-      const txt = btn?.getAttribute('data-beneficio-label') || '—';
-      document.getElementById('beneficio_id_hidden').value = id || '';
-      document.getElementById('beneficio_label_preview').textContent = txt;
-    });
-  }
-
-  // Bulk: selecionar todos / habilitar botão
-  const form   = document.getElementById('form-bulk-beneficios');
-  const master = document.getElementById('chk_all_beneficios');
-  const btnDel = document.getElementById('btn_bulk_delete');
-
-  function items(){ return Array.from(document.querySelectorAll('.chk-beneficio')); }
-  function refreshBtn(){ if(btnDel) btnDel.disabled = !items().some(i => i.checked); }
-
-  if (master) {
-    master.addEventListener('change', () => {
-      items().forEach(i => i.checked = master.checked);
-      refreshBtn();
-    });
-  }
-  items().forEach(i => i.addEventListener('change', refreshBtn));
-
-  if (form) {
-    form.addEventListener('submit', (e)=>{
-      if (!items().some(i => i.checked)) { e.preventDefault(); alert('Selecione ao menos um benefício.'); return; }
-      if (!confirm('Confirmar exclusão dos benefícios selecionados?')) e.preventDefault();
-    });
-  }
-
-  refreshBtn();
+  modal?.addEventListener('show.bs.modal', function (ev) {
+    const btn   = ev.relatedTarget;
+    const id    = btn?.getAttribute('data-beneficio-id');
+    const label = btn?.getAttribute('data-beneficio-label') || '—';
+    document.getElementById('beneficio_label_preview').textContent = label;
+    // rota individual: /beneficios/<id>/delete
+    const form = document.getElementById('form-del-one');
+    if (id && form) form.action = `/beneficios/${id}/delete`;
+  });
 })();
-</script>               
+</script>       
 
     <!-- COOPERADOS (versão profissional / drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
