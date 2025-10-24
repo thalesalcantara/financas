@@ -564,38 +564,38 @@ except Exception:
     db.session.rollback()
 
     # 4.1) cooperado_nome em escalas
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "cooperado_nome" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
+try:
+    if _is_sqlite():
+         cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+         colnames = {row[1] for row in cols}
+         if "cooperado_nome" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN cooperado_nome VARCHAR(120)"))
             db.session.commit()
-        else:
+    else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS escalas "
-                "ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"
+         "ALTER TABLE IF NOT EXISTS escalas "
+         "ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"
             ))
             db.session.commit()
     except Exception:
-        db.session.rollback()
+           db.session.rollback()
 
     # 4.2) restaurante_id em escalas
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "restaurante_id" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
+try:
+    if _is_sqlite():
+        cols = db.session.execute(sa_text("PRAGMA table_info(escalas);")).fetchall()
+        colnames = {row[1] for row in cols}
+        if "restaurante_id" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE escalas ADD COLUMN restaurante_id INTEGER"))
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS escalas "
-                "ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"
+        "ALTER TABLE IF NOT EXISTS escalas "
+        "ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"
             ))
             db.session.commit()
     except Exception:
-        db.session.rollback()
+            db.session.rollback()
 
     # 4.3) fotos no banco (cooperados)
     try:
@@ -631,15 +631,15 @@ try:
         colnames = {row[1] for row in cols}
         if "telefone" not in colnames:
             db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN telefone VARCHAR(30)"))
-        db.session.commit()
-    else:
-        db.session.execute(sa_text(
-            "ALTER TABLE IF NOT EXISTS cooperados "
-            "ADD COLUMN IF NOT EXISTS telefone VARCHAR(30)"
-        ))
-        db.session.commit()
-except Exception:
-    db.session.rollback()
+            db.session.commit()
+      else:
+             db.session.execute(sa_text(
+         "ALTER TABLE IF NOT EXISTS cooperados "
+         "ADD COLUMN IF NOT EXISTS telefone VARCHAR(30)"
+            ))
+                db.session.commit()
+        except Exception:
+                db.session.rollback()
 
     
     # 4.4) tabela avaliacoes_restaurante (se não existir)
