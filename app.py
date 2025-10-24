@@ -1881,7 +1881,7 @@ def admin_dashboard():
         for c in cooperados
     }
 
-    # -------- Escalas agrupadas e contagem por cooperado ----------
+      # -------- Escalas agrupadas e contagem por cooperado ----------
     escalas_all = Escala.query.order_by(Escala.id.asc()).all()
     esc_by_int: dict[int, list] = defaultdict(list)
     esc_by_str: dict[str, list] = defaultdict(list)
@@ -1991,108 +1991,80 @@ def admin_dashboard():
             )
         )
 
-    # Benefícios para template
+    # ----------------------------
+    # Benefícios para template (com filtros + id)
+    # ----------------------------
     def _tokenize(s: str):
         return [x.strip() for x in re.split(r"[;,]", s or "") if x.strip()]
 
-    historico_beneficios = BeneficioRegistro.query.order_by(BeneficioRegistro.id.desc()).all()
+    def _d(s):
+        if not s:
+            return None
+        s = s.strip()
+        try:
+            if "/" in s:  # dd/mm/yyyy
+                d, m, y = s.split("/")
+                return date(int(y), int(m), int(d))
+            # yyyy-mm-dd
+            y, m, d = s.split("-")
+            return date(int(y), int(m), int(d))
+        except Exception:
+            return None
+
+    # filtros vindos da querystring da própria aba (já existem no seu HTML)
+    b_ini = _d(request.args.get("b_ini"))
+    b_fim = _d(request.args.get("b_fim"))
+    coop_filter = request.args.get("coop_benef_id", type=int)
+
+    q = BeneficioRegistro.query
+
+    # sobreposição de intervalo:
+    # inclui o benefício se [data_inicial, data_final] INTERSECTA o filtro
+    if b_ini and b_fim:
+        q = q.filter(
+            BeneficioRegistro.data_inicial <= b_fim,
+            BeneficioRegistro.data_final   >= b_ini,
+        )
+    elif b_ini:
+        q = q.filter(BeneficioRegistro.data_final >= b_ini)
+    elif b_fim:
+        q = q.filter(BeneficioRegistro.data_inicial <= b_fim)
+
+    historico_beneficios = q.order_by(BeneficioRegistro.id.desc()).all()
+
     beneficios_view = []
     for b in historico_beneficios:
         nomes = _tokenize(b.recebedores_nomes or "")
-        ids = _tokenize(b.recebedores_ids or "")
+        ids   = _tokenize(b.recebedores_ids or "")
+
         recs = []
         for i, nome in enumerate(nomes):
-            rid = ids[i] if i < len(ids) else None
-            try:
-                rid = int(rid) if rid and str(rid).isdigit() else None
-            except Exception:
-                rid = None
+            rid = None
+            if i < len(ids) and str(ids[i]).isdigit():
+                try:
+                    rid = int(ids[i])
+                except Exception:
+                    rid = None
+
+            # se o filtro por cooperado estiver ativo, só mantém o recebedor alvo
+            if coop_filter and (rid is not None) and (rid != coop_filter):
+                continue
+
             recs.append({"id": rid, "nome": nome})
-        beneficios_view.append(
-            {
-                "data_inicial": b.data_inicial,
-                "data_final": b.data_final,
-                "data_lancamento": b.data_lancamento,
-                "tipo": b.tipo,
-                "valor_total": b.valor_total or 0.0,
-                "recebedores": recs,
-            }
-        )
 
-    # ----------------------------
-# Benefícios para template (com filtros + id)
-# ----------------------------
-def _tokenize(s: str):
-    return [x.strip() for x in re.split(r"[;,]", s or "") if x.strip()]
-
-def _d(s):
-    if not s:
-        return None
-    s = s.strip()
-    try:
-        if "/" in s:  # dd/mm/yyyy
-            d, m, y = s.split("/")
-            return date(int(y), int(m), int(d))
-        # yyyy-mm-dd
-        y, m, d = s.split("-")
-        return date(int(y), int(m), int(d))
-    except Exception:
-        return None
-
-# filtros vindos da querystring da própria aba (já existem no seu HTML)
-b_ini = _d(request.args.get("b_ini"))
-b_fim = _d(request.args.get("b_fim"))
-coop_filter = request.args.get("coop_benef_id", type=int)
-
-q = BeneficioRegistro.query
-
-# sobreposição de intervalo:
-# inclui o benefício se [data_inicial, data_final] INTERSECTA o filtro
-if b_ini and b_fim:
-    q = q.filter(
-        BeneficioRegistro.data_inicial <= b_fim,
-        BeneficioRegistro.data_final   >= b_ini,
-    )
-elif b_ini:
-    q = q.filter(BeneficioRegistro.data_final >= b_ini)
-elif b_fim:
-    q = q.filter(BeneficioRegistro.data_inicial <= b_fim)
-
-historico_beneficios = q.order_by(BeneficioRegistro.id.desc()).all()
-
-beneficios_view = []
-for b in historico_beneficios:
-    nomes = _tokenize(b.recebedores_nomes or "")
-    ids   = _tokenize(b.recebedores_ids or "")
-
-    recs = []
-    for i, nome in enumerate(nomes):
-        rid = None
-        if i < len(ids) and str(ids[i]).isdigit():
-            try:
-                rid = int(ids[i])
-            except Exception:
-                rid = None
-
-        # se o filtro por cooperado estiver ativo, só mantém o recebedor alvo
-        if coop_filter and (rid is not None) and (rid != coop_filter):
+        # se o filtro por cooperado estiver ativo e nenhum recebedor bateu, pula o registro
+        if coop_filter and not recs:
             continue
 
-        recs.append({"id": rid, "nome": nome})
-
-    # se o filtro por cooperado estiver ativo e nenhum recebedor bateu, pula o registro
-    if coop_filter and not recs:
-        continue
-
-    beneficios_view.append({
-        "id": b.id,  # <<< necessário para editar/excluir
-        "data_inicial": b.data_inicial,
-        "data_final": b.data_final,
-        "data_lancamento": b.data_lancamento,
-        "tipo": b.tipo,
-        "valor_total": b.valor_total or 0.0,
-        "recebedores": recs,
-    })
+        beneficios_view.append({
+            "id": b.id,  # <<< necessário para editar/excluir
+            "data_inicial": b.data_inicial,
+            "data_final": b.data_final,
+            "data_lancamento": b.data_lancamento,
+            "tipo": b.tipo,
+            "valor_total": b.valor_total or 0.0,
+            "recebedores": recs,
+        })
 
     # ======== Trocas no admin ========
     def _escala_desc(e: Escala | None) -> str:
@@ -2196,213 +2168,6 @@ for b in historico_beneficios:
     return render_template(
         "admin_dashboard.html",
         tab=active_tab,  # <- mantém a aba ativa na UI
-        total_producoes=total_producoes,
-        total_inss=total_inss,
-        total_receitas=total_receitas,
-        total_despesas=total_despesas,
-        total_receitas_coop=total_receitas_coop,
-        total_despesas_coop=total_despesas_coop,
-        salario_minimo=cfg.salario_minimo or 0.0,
-        lancamentos=lancamentos,
-        receitas=receitas,
-        despesas=despesas,
-        receitas_coop=receitas_coop,
-        despesas_coop=despesas_coop,
-        cooperados=cooperados,
-        restaurantes=restaurantes,
-        beneficios_view=beneficios_view,
-        historico_beneficios=historico_beneficios,
-        current_date=current_date,
-        data_limite=data_limite,
-        admin=admin_user,
-        docinfo_map=docinfo_map,
-        escalas_por_coop=esc_by_int,
-        escalas_por_coop_json=esc_by_str,
-        qtd_escalas_map=qtd_escalas_map,
-        qtd_escalas_sem_cadastro=qtd_sem_cadastro,
-        status_doc_por_coop=status_doc_por_coop,
-        chart_data_lancamentos_coop=chart_data_lancamentos_coop,
-        chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
-        folha_inicio=folha_inicio,
-        folha_fim=folha_fim,
-        folha_por_coop=folha_por_coop,
-        trocas_pendentes=trocas_pendentes,
-        trocas_historico=trocas_historico,
-        trocas_historico_flat=trocas_historico_flat,
-    )
-
-    # -------- Escalas agrupadas e contagem por cooperado ----------
-    escalas_all = Escala.query.order_by(Escala.id.asc()).all()
-
-    esc_by_int: dict[int, list] = defaultdict(list)
-    esc_by_str: dict[str, list] = defaultdict(list)
-    for e in escalas_all:
-        k_int = e.cooperado_id if e.cooperado_id is not None else 0  # 0 = sem cadastro
-        esc_item = {
-            "data": e.data, "turno": e.turno, "horario": e.horario,
-            "contrato": e.contrato, "cor": e.cor, "nome_planilha": e.cooperado_nome
-        }
-        esc_by_int[k_int].append(esc_item)
-        esc_by_str[str(k_int)].append(esc_item)
-
-    cont_rows = dict(db.session.query(Escala.cooperado_id, func.count(Escala.id)).group_by(Escala.cooperado_id).all())
-    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
-    qtd_sem_cadastro = int(cont_rows.get(None, 0))
-
-    # gráficos (por mês)
-    sums = {}
-    for l in lancamentos:
-        if not l.data:
-            continue
-        key = l.data.strftime("%Y-%m")
-        sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
-    labels_ord = sorted(sums.keys())
-    labels_fmt = [datetime.strptime(k, "%Y-%m").strftime("%m/%Y") for k in labels_ord]
-    values = [round(sums[k], 2) for k in labels_ord]
-    chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
-    chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
-
-    admin_user = Usuario.query.filter_by(tipo="admin").first()
-
-    # ---- Folha (últimos 30 dias padrão)
-    folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
-    folha_fim = _parse_date(args.get("folha_fim")) or date.today()
-    FolhaItem = namedtuple("FolhaItem", "cooperado lancamentos receitas despesas bruto inss outras_desp liquido")
-    folha_por_coop = []
-    for c in cooperados:
-        l = (Lancamento.query
-             .filter(Lancamento.cooperado_id == c.id,
-                     Lancamento.data >= folha_inicio,
-                     Lancamento.data <= folha_fim)
-             .order_by(Lancamento.data.asc(), Lancamento.id.asc())
-             .all())
-        r = (ReceitaCooperado.query
-             .filter(ReceitaCooperado.cooperado_id == c.id,
-                     ReceitaCooperado.data >= folha_inicio,
-                     ReceitaCooperado.data <= folha_fim)
-             .order_by(ReceitaCooperado.data.asc(), ReceitaCooperado.id.asc())
-             .all())
-        d = (DespesaCooperado.query
-             .filter((DespesaCooperado.cooperado_id == c.id) | (DespesaCooperado.cooperado_id.is_(None)),
-                     DespesaCooperado.data >= folha_inicio,
-                     DespesaCooperado.data <= folha_fim)
-             .order_by(DespesaCooperado.data.asc(), DespesaCooperado.id.asc())
-             .all())
-        bruto_lanc = sum(x.valor or 0 for x in l)
-        inss = round(bruto_lanc * 0.045, 2)
-        outras_desp = sum(x.valor or 0 for x in d)
-        bruto_total = bruto_lanc + sum(x.valor or 0 for x in r)
-        liquido = bruto_total - inss - outras_desp
-        for x in l:
-            x.conta_inss = True
-            x.isento_benef = False
-            x.inss = round((x.valor or 0) * 0.045, 2)
-
-        folha_por_coop.append(FolhaItem(
-            cooperado=c, lancamentos=l, receitas=r, despesas=d,
-            bruto=bruto_total, inss=inss, outras_desp=outras_desp, liquido=liquido
-        ))
-
-    # ======== Trocas no admin ========
-    def _escala_desc(e: Escala | None) -> str:
-        return _escala_label(e)
-
-    def _split_turno_horario(s: str) -> tuple[str, str]:
-        if not s:
-            return "", ""
-        parts = [p.strip() for p in s.split("•")]
-        if len(parts) == 2:
-            return parts[0], parts[1]
-        return s.strip(), ""
-
-    def _linha_from_escala(e: Escala, saiu: str, entrou: str) -> dict:
-        return {
-            "dia": _escala_label(e).split(" • ")[0],
-            "turno_horario": " • ".join([x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]),
-            "contrato": (e.contrato or "").strip(),
-            "saiu": saiu,
-            "entrou": entrou,
-        }
-
-    trocas_all = TrocaSolicitacao.query.order_by(TrocaSolicitacao.id.desc()).all()
-    trocas_pendentes, trocas_historico = [], []
-    trocas_historico_flat = []
-
-    for t in trocas_all:
-        solicitante = Cooperado.query.get(t.solicitante_id)
-        destinatario = Cooperado.query.get(t.destino_id)
-        orig = Escala.query.get(t.origem_escala_id)
-
-        linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
-
-        if t.status == "aprovada" and not linhas_afetadas and orig and solicitante and destinatario:
-            linhas_afetadas.append(_linha_from_escala(
-                orig, saiu=solicitante.nome, entrou=destinatario.nome
-            ))
-            wd_o = _weekday_from_data_str(orig.data)
-            buck_o = _turno_bucket(orig.turno, orig.horario)
-            candidatas = (Escala.query
-                          .filter_by(cooperado_id=solicitante.id)
-                          .all())
-            best = None
-            for e in candidatas:
-                if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
-                    if (orig.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
-                        best = e
-                        break
-                    if best is None:
-                        best = e
-            if best:
-                linhas_afetadas.append(_linha_from_escala(
-                    best, saiu=destinatario.nome, entrou=solicitante.nome
-                ))
-
-        item = {
-            "id": t.id,
-            "status": t.status,
-            "mensagem": t.mensagem,
-            "criada_em": t.criada_em,
-            "aplicada_em": t.aplicada_em,
-            "solicitante": solicitante,
-            "destinatario": destinatario,
-            "origem": orig,
-            "destino": destinatario,
-            "origem_desc": _escala_desc(orig),
-            "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
-            "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
-            "linhas_afetadas": linhas_afetadas,
-        }
-
-        if t.status == "aprovada" and linhas_afetadas:
-            itens = []
-            for r in linhas_afetadas:
-                turno_txt, horario_txt = _split_turno_horario(r.get("turno_horario", ""))
-                itens.append({
-                    "data": r.get("dia", ""),
-                    "turno": turno_txt,
-                    "horario": horario_txt,
-                    "contrato": r.get("contrato", ""),
-                    "saiu_nome": r.get("saiu", ""),
-                    "entrou_nome": r.get("entrou", ""),
-                })
-                trocas_historico_flat.append({
-                    "data": r.get("dia", ""),
-                    "turno": turno_txt,
-                    "horario": horario_txt,
-                    "contrato": r.get("contrato", ""),
-                    "saiu_nome": r.get("saiu", ""),
-                    "entrou_nome": r.get("entrou", ""),
-                    "aplicada_em": t.aplicada_em,
-                })
-            item["itens"] = itens
-
-        (trocas_pendentes if t.status == "pendente" else trocas_historico).append(item)
-
-    current_date = date.today()
-    data_limite = date(current_date.year, 12, 31)
-
-    return render_template(
-        "admin_dashboard.html",
         total_producoes=total_producoes,
         total_inss=total_inss,
         total_receitas=total_receitas,
