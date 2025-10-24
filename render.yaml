@@ -5,7 +5,7 @@ services:
     plan: starter
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --worker-class gthread --workers 3 --threads 8 --timeout 120 --graceful-timeout 30 --keep-alive 10 --worker-tmp-dir /dev/shm --access-logfile /dev/null --error-logfile - --log-level warning
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --worker-class gthread --workers 2 --threads 4 --timeout 120 --graceful-timeout 30 --keep-alive 10 --max-requests 1000 --max-requests-jitter 200 --worker-tmp-dir /dev/shm --access-logfile /dev/null --error-logfile - --log-level warning
     healthCheckPath: /healthz
     envVars:
       - key: TZ
