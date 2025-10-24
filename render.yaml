@@ -3,9 +3,22 @@ services:
     name: financas-coopex
     env: python
     plan: starter
-    autoDeploy: true
+    autoDeploy: false
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --worker-class gthread --workers 2 --threads 4 --timeout 120 --graceful-timeout 30 --keep-alive 10 --max-requests 1000 --max-requests-jitter 200 --worker-tmp-dir /dev/shm --access-logfile /dev/null --error-logfile - --log-level warning
+    startCommand: >
+      gunicorn app:app
+      --bind 0.0.0.0:$PORT
+      --workers ${WEB_CONCURRENCY:-2}
+      --threads 1
+      --timeout 120
+      --graceful-timeout 30
+      --keep-alive 5
+      --max-requests 2000
+      --max-requests-jitter 200
+      --preload
+      --access-logfile /dev/null
+      --error-logfile -
+      --log-level info
     healthCheckPath: /healthz
     envVars:
       - key: TZ
@@ -16,6 +29,8 @@ services:
         value: production
       - key: PYTHONUTF8
         value: "1"
+      - key: WEB_CONCURRENCY          # opcional: ajuste conforme CPU
+        value: "2"
       - key: SECRET_KEY
         sync: false
       - key: DATABASE_URL
