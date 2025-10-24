@@ -624,21 +624,22 @@ except Exception:
     except Exception:
         db.session.rollback()
 
-     try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "telefone" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN telefone VARCHAR(30)"))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados "
-                "ADD COLUMN IF NOT EXISTS telefone VARCHAR(30)"
-            ))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
+     # 4.3.x) telefone em cooperados
+try:
+    if _is_sqlite():
+        cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
+        colnames = {row[1] for row in cols}
+        if "telefone" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN telefone VARCHAR(30)"))
+        db.session.commit()
+    else:
+        db.session.execute(sa_text(
+            "ALTER TABLE IF NOT EXISTS cooperados "
+            "ADD COLUMN IF NOT EXISTS telefone VARCHAR(30)"
+        ))
+        db.session.commit()
+except Exception:
+    db.session.rollback()
 
     # 4.4) tabela avaliacoes_restaurante (se não existir)
     try:
