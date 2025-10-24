@@ -1032,7 +1032,13 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 
     <!-- RECEITAS COOP (versão profissional/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='receitas' else '' }}" id="receitas" role="tabpanel">
-  {% set total_receitas_coop_table = (receitas|sum(attribute='valor')) if receitas else 0 %}
+  {# total defensivo: aceita r.valor OU r.valor_total #}
+  {% set ns_total = namespace(v=0) %}
+  {% for r in receitas or [] %}
+    {% set v_item = r.valor|default(r.valor_total, true)|default(0, true) %}
+    {% set ns_total.v = ns_total.v + (v_item or 0) %}
+  {% endfor %}
+  {% set total_receitas_coop_table = ns_total.v %}
   {% set qtd_registros = receitas|length if receitas else 0 %}
 
   <!-- Header + KPIs -->
@@ -1121,17 +1127,18 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           </thead>
           <tbody>
             {% for r in receitas %}
+              {% set v_row = r.valor|default(r.valor_total, true)|default(0, true) %}
               <tr>
                 <td>{{ r.data.strftime('%d/%m/%Y') if r.data else '-' }}</td>
                 <td class="text-break">{{ r.descricao }}</td>
-                <td class="text-end">R$ {{ "%.2f"|format(r.valor) }}</td>
+                <td class="text-end">R$ {{ '%.2f'|format(v_row) }}</td>
                 <td class="text-center text-nowrap">
                   <button class="btn btn-warning btn-sm"
                           data-bs-toggle="modal"
                           data-bs-target="#modalEditReceita"
                           data-id="{{ r.id }}"
                           data-descricao="{{ r.descricao }}"
-                          data-valor="{{ r.valor }}"
+                          data-valor="{{ v_row }}"
                           data-data="{{ r.data.strftime('%Y-%m-%d') if r.data else '' }}"
                           data-url="{{ url_for('edit_receita', id=r.id) }}">
                     <i class="bi bi-pencil"></i>
@@ -1149,7 +1156,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           <tfoot>
             <tr class="table-light">
               <th colspan="2" class="text-end">Total</th>
-              <th class="text-end">R$ {{ "%.2f"|format(total_receitas_coop_table) }}</th>
+              <th class="text-end">R$ {{ '%.2f'|format(total_receitas_coop_table) }}</th>
               <th></th>
             </tr>
           </tfoot>
