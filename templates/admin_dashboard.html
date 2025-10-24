@@ -2394,137 +2394,137 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 
   <!-- Novo estabelecimento -->
-  <div class="card border-0 shadow-sm rounded-3 mb-3">
-    <div class="card-body">
-      <form method="POST" action="{{ url_for('add_restaurante') }}" enctype="multipart/form-data" class="row g-3 align-items-end">
-        <div class="col-md-3">
-          <label class="form-label">Nome</label>
-          <input type="text" class="form-control form-control-sm" name="nome" placeholder="Ex.: Restaurante Centro" required>
-        </div>
+<div class="card border-0 shadow-sm rounded-3 mb-3">
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('add_restaurante') }}" enctype="multipart/form-data" class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label">Nome</label>
+        <input type="text" class="form-control form-control-sm" name="nome" placeholder="Ex.: Restaurante Centro" required>
+      </div>
 
-        <div class="col-md-3">
-          <label class="form-label">Período</label>
-          <select class="form-select form-select-sm" name="periodo" required>
-            <option value="seg-dom">Seg a Dom</option>
-            <option value="sab-sex">Sáb a Sex</option>
-            <option value="sex-qui">Sex a Qui</option>
-          </select>
-          <small class="text-muted">Usado na competência de lançamentos.</small>
-        </div>
+      <div class="col-md-3">
+        <label class="form-label">Período</label>
+        <select class="form-select form-select-sm" name="periodo" required>
+          <option value="seg-dom">Seg a Dom</option>
+          <option value="sab-sex">Sáb a Sex</option>
+          <option value="sex-qui">Sex a Qui</option>
+        </select>
+        <small class="text-muted">Usado na competência de lançamentos.</small>
+      </div>
 
-        <div class="col-md-2">
-          <label class="form-label">Usuário</label>
-          <div class="input-group input-group-sm">
-            <span class="input-group-text"><i class="bi bi-at"></i></span>
-            <input type="text" class="form-control" name="usuario" placeholder="usuario" required>
-          </div>
+      <div class="col-md-2">
+        <label class="form-label">Usuário</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><i class="bi bi-at"></i></span>
+          <input type="text" class="form-control" name="usuario" placeholder="usuario" required>
         </div>
+      </div>
 
-        <div class="col-md-2">
-          <label class="form-label">Senha</label>
-          <div class="input-group input-group-sm">
-            <input type="password" class="form-control" name="senha" id="restSenha" placeholder="********" required>
-            <button class="btn btn-outline-secondary" type="button" id="btnToggleRestSenha" title="Mostrar/ocultar">
-              <i class="bi bi-eye"></i>
-            </button>
-          </div>
-        </div>
-
-        <div class="col-md-2">
-          <label class="form-label">Logo (opcional)</label>
-          <input type="file" class="form-control form-control-sm" name="foto" id="restFoto" accept="image/*">
-          <div class="d-flex align-items-center gap-2 mt-2">
-            <img id="restPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt=""
-                 style="width:40px;height:40px;object-fit:cover;">
-            <small class="text-muted">Prévia</small>
-          </div>
-        </div>
-
-        <div class="col-12">
-          <button class="btn btn-royal">
-            <i class="bi bi-save"></i> Cadastrar
+      <div class="col-md-2">
+        <label class="form-label">Senha</label>
+        <div class="input-group input-group-sm">
+          <input type="password" class="form-control" name="senha" id="restSenha" placeholder="********" required>
+          <button class="btn btn-outline-secondary" type="button" id="btnToggleRestSenha" title="Mostrar/ocultar">
+            <i class="bi bi-eye"></i>
           </button>
-          <button type="reset" class="btn btn-light ms-1">Limpar</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Lista de estabelecimentos -->
-  <div class="card border-0 shadow-sm rounded-3">
-    <div class="card-body">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-        <h6 class="m-0 d-flex align-items-center gap-2">
-          <i class="bi bi-list-ul"></i> Estabelecimentos cadastrados
-        </h6>
-        <div class="input-group input-group-sm" style="max-width:360px;">
-          <span class="input-group-text"><i class="bi bi-search"></i></span>
-          <input type="text" class="form-control" id="buscaRestaurantes" placeholder="Filtrar por nome, usuário ou período...">
         </div>
       </div>
 
-      <div class="table-responsive">
-        <table class="table table-sm table-bordered table-hover align-middle">
-          <thead class="table-light">
-            <tr class="text-nowrap">
-              <th style="width:60px;">Logo</th>
-              <th>Nome</th>
-              <th>Usuário</th>
-              <th style="width:140px;">Período</th>
-              <th class="text-center" style="width:200px;">Ações</th>
+      <div class="col-md-2">
+        <label class="form-label">Logo (opcional)</label>
+        <input type="file" class="form-control form-control-sm" name="foto" id="restFoto" accept="image/*">
+        <div class="d-flex align-items-center gap-2 mt-2">
+          <img id="restPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt=""
+               style="width:40px;height:40px;object-fit:cover;">
+          <small class="text-muted">Prévia</small>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <button class="btn btn-royal">
+          <i class="bi bi-save"></i> Cadastrar
+        </button>
+        <button type="reset" class="btn btn-light ms-1">Limpar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Lista de estabelecimentos -->
+<div class="card border-0 shadow-sm rounded-3">
+  <div class="card-body">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+      <h6 class="m-0 d-flex align-items-center gap-2">
+        <i class="bi bi-list-ul"></i> Estabelecimentos cadastrados
+      </h6>
+      <div class="input-group input-group-sm" style="max-width:360px;">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" id="buscaRestaurantes" placeholder="Filtrar por nome, usuário ou período...">
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered table-hover align-middle">
+        <thead class="table-light">
+          <tr class="text-nowrap">
+            <th style="width:60px;">Logo</th>
+            <th>Nome</th>
+            <th>Usuário</th>
+            <th style="width:140px;">Período</th>
+            <th class="text-center" style="width:200px;">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyRestaurantes">
+          {% for r in restaurantes %}
+            <tr data-nome="{{ r.nome|lower }}" data-user="{{ r.usuario_ref.usuario|lower }}" data-periodo="{{ r.periodo|lower }}">
+              <td class="text-center">
+                <img src="{{ r.foto_url or url_for('static', filename='img/default.png') }}"
+                     class="avatar border" alt="{{ r.nome }}"
+                     style="width:40px;height:40px;object-fit:cover;">
+              </td>
+              <td class="fw-medium">{{ r.nome }}</td>
+              <td class="text-muted">{{ r.usuario_ref.usuario }}</td>
+              <td class="text-nowrap">
+                <span class="badge bg-light text-dark">
+                  {% if r.periodo == 'seg-dom' %}Seg–Dom
+                  {% elif r.periodo == 'sab-sex' %}Sáb–Sex
+                  {% elif r.periodo == 'sex-qui' %}Sex–Qui
+                  {% else %}{{ r.periodo }}{% endif %}
+                </span>
+              </td>
+              <td class="text-center">
+                <div class="btn-group btn-group-sm" role="group">
+                  <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalEditRestaurante"
+                          data-id="{{ r.id }}" data-nome="{{ r.nome }}" data-usuario="{{ r.usuario_ref.usuario }}" data-periodo="{{ r.periodo }}"
+                          data-url="{{ url_for('edit_restaurante', id=r.id) }}" title="Editar">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalResetSenhaRestaurante"
+                          data-id="{{ r.id }}" data-url="{{ url_for('reset_senha_restaurante', id=r.id) }}" title="Redefinir senha">
+                    <i class="bi bi-key"></i>
+                  </button>
+                  <form action="{{ url_for('delete_restaurante', id=r.id) }}"
+                        method="POST"
+                        class="d-inline"
+                        onsubmit="return confirm('Excluir {{ r.nome }}? Esta ação não pode ser desfeita.');">
+                    {% if csrf_token is defined %}
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% endif %}
+                    <button type="submit" class="btn btn-danger btn-sm btn-del" title="Excluir">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </div>
+              </td>
             </tr>
-          </thead>
-          <tbody id="tbodyRestaurantes">
-            {% for r in restaurantes %}
-              <tr data-nome="{{ r.nome|lower }}" data-user="{{ r.usuario_ref.usuario|lower }}" data-periodo="{{ r.periodo|lower }}">
-                <td class="text-center">
-                  <img src="{{ r.foto_url or url_for('static', filename='img/default.png') }}"
-                       class="avatar border" alt="{{ r.nome }}"
-                       style="width:40px;height:40px;object-fit:cover;">
-                </td>
-                <td class="fw-medium">{{ r.nome }}</td>
-                <td class="text-muted">{{ r.usuario_ref.usuario }}</td>
-                <td class="text-nowrap">
-                  <span class="badge bg-light text-dark">
-                    {% if r.periodo == 'seg-dom' %}Seg–Dom
-                    {% elif r.periodo == 'sab-sex' %}Sáb–Sex
-                    {% elif r.periodo == 'sex-qui' %}Sex–Qui
-                    {% else %}{{ r.periodo }}{% endif %}
-                  </span>
-                </td>
-                <td class="text-center">
-                  <div class="btn-group btn-group-sm" role="group">
-                    <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalEditRestaurante"
-                            data-id="{{ r.id }}" data-nome="{{ r.nome }}" data-usuario="{{ r.usuario_ref.usuario }}" data-periodo="{{ r.periodo }}"
-                            data-url="{{ url_for('edit_restaurante', id=r.id) }}" title="Editar">
-                      <i class="bi bi-pencil"></i>
-                    </button>
-                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalResetSenhaRestaurante"
-                            data-id="{{ r.id }}" data-url="{{ url_for('reset_senha_restaurante', id=r.id) }}" title="Redefinir senha">
-                      <i class="bi bi-key"></i>
-                    </button>
-                    <form action="{{ url_for('delete_restaurante', id=r.id) }}"
-      method="POST"
-      class="d-inline"
-      onsubmit="return confirm('Excluir {{ r.nome }}? Esta ação não pode ser desfeita.');">
-  {% if csrf_token is defined %}
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  {% endif %}
-  <button type="submit" class="btn btn-danger btn-sm" title="Excluir">
-    <i class="bi bi-trash"></i>
-  </button>
-</form>
-                  </div>
-                </td>
-              </tr>
-            {% else %}
-              <tr><td colspan="5" class="text-center text-muted">Nenhum estabelecimento</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+          {% else %}
+            <tr><td colspan="5" class="text-center text-muted">Nenhum estabelecimento</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
+</div>
 
   <!-- UX Helpers -->
   <script>
@@ -3155,21 +3155,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
   </div>
 
-  <div class="modal fade" id="modalEditCooperado" tabindex="-1">
-    <div class="modal-dialog">
-      <form method="POST" enctype="multipart/form-data" class="modal-content">
-        <div class="modal-header"><h5 class="modal-title">Editar Cooperado</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body row g-2 px-3">
-          <input type="hidden" name="id">
-          <div class="col-12"><input type="text" class="form-control" name="nome" required></div>
-          <div class="col-12"><input type="text" class="form-control" name="usuario" required></div>
-          <div class="col-12"><input type="file" class="form-control" name="foto"></div>
-        </div>
-        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
-      </form>
-    </div>
-  </div>
-
   <div class="modal fade" id="modalResetSenhaCooperado" tabindex="-1">
     <div class="modal-dialog">
       <form method="POST" class="modal-content">
@@ -3512,53 +3497,66 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </script>
 
   <!-- ==== BENEFÍCIOS: prévia + cálculo do TOTAL antes de enviar ==== -->
-  <script>
-    (function(){
-      const TOTAL_COOPS = {{ cooperados|length or 0 }};
+<script>
+  (function(){
+    const TOTAL_COOPS = {{ cooperados|length or 0 }};
 
-      function idsFromSelect(sel){
-        return Array.from(sel?.selectedOptions || []).map(o => String(o.value));
-      }
-      function valNum(inp){
-        const n = parseFloat(String(inp?.value ?? '').replace(',','.'));
-        return isFinite(n) ? n : 0;
-      }
-      function setBadge(el, txt){ if(el) el.textContent = txt; }
-      function money(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+    function idsFromSelect(sel){
+      return Array.from(sel?.selectedOptions || []).map(o => String(o.value));
+    }
+    function valNum(inp){
+      const n = parseFloat(String(inp?.value ?? '').replace(',','.'));
+      return isFinite(n) ? n : 0;
+    }
+    function setBadge(el, txt){ if(el) el.textContent = txt; }
+    function money(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+    function setHidden(prefix, total){
+      const hidden = document.getElementById(`${prefix}_valor_total`);
+      if(hidden) hidden.value = Number(total||0).toFixed(2);
+    }
 
-      function calcPreview(prefix){
-        const unit    = document.getElementById(`${prefix}_valor_unit`);
-        const bensSel = document.getElementById(`${prefix}_beneficiarios`);
-        const isenSel = document.getElementById(`${prefix}_isencoes`);
-        const badge   = document.getElementById(`${prefix}_badge`);
+    function calcPreview(prefix){
+      const unit    = document.getElementById(`${prefix}_valor_unit`);
+      const bensSel = document.getElementById(`${prefix}_beneficiarios`);
+      const isenSel = document.getElementById(`${prefix}_isencoes`);
+      const badge   = document.getElementById(`${prefix}_badge`);
 
-        if(!unit || !bensSel || !isenSel || !badge) return;
+      if(!unit || !bensSel || !isenSel || !badge) return;
 
-        const vUnit = Math.max(0, valNum(unit));
-        const bens  = idsFromSelect(bensSel);
-        const isen  = idsFromSelect(isenSel);
+      const vUnit = Math.max(0, valNum(unit));
+      const bens  = idsFromSelect(bensSel);
+      const isen  = idsFromSelect(isenSel);
 
-        const unique = new Set([...bens, ...isen]); // quem não paga
-        const numBens = bens.length;
-        const numIsen = isen.length;
-        const pagantes = Math.max(0, TOTAL_COOPS - unique.size);
-        const total = vUnit * numBens;
-        const porPag = pagantes > 0 ? (total / pagantes) : 0;
+      // pagantes = todos - (beneficiados ∪ isentos)
+      const unique = new Set([...bens, ...isen]);
+      const numBens = bens.length;
+      const numIsen = isen.length;
+      const pagantes = Math.max(0, TOTAL_COOPS - unique.size);
+      const total = vUnit * numBens;
+      const porPag = pagantes > 0 ? (total / pagantes) : 0;
 
-        setBadge(badge,
-          `Recebem: ${numBens} · Isentos: ${numIsen} · Pagantes: ${pagantes} · Total a ratear: ${money(total)} · Cobrança por pagante: ${money(porPag)}`
-        );
-      }
+      setHidden(prefix, total);
+      setBadge(badge,
+        `Recebem: ${numBens} · Isentos: ${numIsen} · Pagantes: ${pagantes} · Total a ratear: ${money(total)} · Cobrança por pagante: ${money(porPag)}`
+      );
+    }
 
-      ['hosp','farm','alim'].forEach(p=>{
-        ['change','keyup'].forEach(ev=>{
-          document.getElementById(`${p}_valor_unit`)?.addEventListener(ev, ()=>calcPreview(p));
-          document.getElementById(`${p}_beneficiarios`)?.addEventListener(ev, ()=>calcPreview(p));
-          document.getElementById(`${p}_isencoes`)?.addEventListener(ev, ()=>calcPreview(p));
-        });
-        calcPreview(p);
+    ['hosp','farm','alim'].forEach(p=>{
+      ['change','keyup'].forEach(ev=>{
+        document.getElementById(`${p}_valor_unit`)?.addEventListener(ev, ()=>calcPreview(p));
+        document.getElementById(`${p}_beneficiarios`)?.addEventListener(ev, ()=>calcPreview(p));
+        document.getElementById(`${p}_isencoes`)?.addEventListener(ev, ()=>calcPreview(p));
       });
+      calcPreview(p);
+    });
 
+    // garante que os hidden totals estejam atualizados ao enviar
+    document.getElementById('form-beneficios')?.addEventListener('submit', ()=>{
+      ['hosp','farm','alim'].forEach(p=>calcPreview(p));
+    });
+  })();
+</script>
+                      
       // >>>>>>>>>>>>>>>>> CÁLCULO DOS TOTAIS ANTES DE ENVIAR <<<<<<<<<<<<<<<<<
       const form = document.getElementById('form-beneficios');
       if(form){
