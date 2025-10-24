@@ -1806,7 +1806,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <div class="col-md-3">
           <label class="form-label">Valor por beneficiado (R$)</label>
           <input type="number" step="0.01" class="form-control form-control-sm" name="hosp_valor_unit" id="hosp_valor_unit" placeholder="0,00">
-          <!-- TOTAL para o back-end -->
           <input type="hidden" name="hosp_valor" id="hosp_valor_total">
         </div>
         <div class="col-md-5">
@@ -1932,6 +1931,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
               <th>Tipo</th>
               <th>Recebedor</th>
               <th class="text-end">Valor p/ Recebedor</th>
+              <th class="text-center">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -1955,17 +1955,60 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                     <td class="text-capitalize">{{ b.tipo }}</td>
                     <td class="text-break">{{ rec.nome }}</td>
                     <td class="text-end">R$ {{ '%.2f'|format(vpb) }}</td>
+                    <td class="text-center">
+                      <!-- Botão que abre o modal e injeta o ID -->
+                      <button
+                        type="button"
+                        class="btn btn-outline-danger btn-sm"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalExcluirBeneficio"
+                        data-beneficio-id="{{ b.id }}"
+                        data-beneficio-label="{{ b.tipo|capitalize }} ({{ b.data_inicial.strftime('%d/%m/%Y') }}–{{ b.data_final.strftime('%d/%m/%Y') }})">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </td>
                   </tr>
                 {% endif %}
               {% endfor %}
             {% else %}
-              <tr><td colspan="5" class="text-center text-muted">Sem registros</td></tr>
+              <tr><td colspan="6" class="text-center text-muted">Sem registros</td></tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
     </div>
   </div>
+</section>
+
+<!-- Modal: Excluir benefício -->
+<div class="modal fade" id="modalExcluirBeneficio" tabindex="-1" aria-labelledby="modalExcluirBeneficioLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="POST" action="{{ url_for('excluir_beneficio') }}" class="modal-content">
+      <!-- Se usar Flask-WTF, descomente: -->
+      {# <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> #}
+      <input type="hidden" name="beneficio_id" id="beneficio_id_hidden">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalExcluirBeneficioLabel">
+          <i class="bi bi-exclamation-triangle text-danger"></i> Confirmar exclusão
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">
+          Tem certeza que deseja excluir o benefício:
+          <b id="beneficio_label_preview">—</b>?
+        </p>
+        <small class="text-muted">Esta ação não pode ser desfeita.</small>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-danger">
+          <i class="bi bi-trash"></i> Excluir
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
 
   <!-- JS de prévia dos rateios (sem dependências) -->
   <script>
@@ -2005,6 +2048,128 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     })();
   </script>
 </section>
+
+    <!-- JS de prévia + validação dos rateios (standalone, sem dependências externas) -->
+<script>
+(function () {
+  // ===== Helpers =====
+  const BRL = v => Number.isFinite(v) ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—';
+  const num = v => parseFloat(String(v).replace(',', '.')) || 0;
+
+  function el(id){ return document.getElementById(id); }
+  function selCount(id){ return Array.from(el(id)?.selectedOptions || []).length; }
+  function optCount(id){ return el(id)?.options?.length || 0; }
+
+  // Atualiza prévia e hidden total para 1 bloco (hosp|farm|alim)
+  function calc(block) {
+    const unit       = num(el(block + '_valor_unit')?.value);
+    const benSel     = selCount(block + '_beneficiarios');
+    const isenSel    = selCount(block + '_isencoes');
+    const totalCoops = optCount(block + '_beneficiarios');
+
+    const total      = unit * benSel;
+    const pagantes   = Math.max(totalCoops - benSel - isenSel, 0);
+    const porPagante = pagantes > 0 ? (total / pagantes) : NaN;
+
+    const badge = el(block + '_badge');
+    if (badge) {
+      badge.textContent =
+        `Beneficiados: ${benSel} · Isentos: ${isenSel} · ` +
+        `Pagantes: ${pagantes} · Total: ${BRL(total)} · ` +
+        `Rateio/pagante: ${BRL(porPagante)}`;
+    }
+
+    const hiddenTotal = el(block + '_valor_total');
+    if (hiddenTotal) hiddenTotal.value = Number.isFinite(total) ? total.toFixed(2) : '0.00';
+  }
+
+  // Valida período (obrigatório e coerente)
+  function validaPeriodo() {
+    const ini = el('form-beneficios')?.elements['data_inicial']?.value;
+    const fim = el('form-beneficios')?.elements['data_final']?.value;
+
+    if (!ini || !fim) return { ok:false, msg:'Informe Data inicial e Data final.' };
+
+    const dIni = new Date(ini + 'T00:00:00');
+    const dFim = new Date(fim + 'T00:00:00');
+
+    if (isNaN(dIni) || isNaN(dFim)) return { ok:false, msg:'Datas inválidas.' };
+    if (dIni > dFim) return { ok:false, msg:'Data inicial não pode ser maior que a final.' };
+
+    // semana (opcional): exige no máx 7 dias — ajuste se quiser outro limite
+    const dias = Math.floor((dFim - dIni) / 86400000) + 1;
+    if (dias > 7) return { ok:false, msg:'O período deve ser semanal (até 7 dias).' };
+
+    return { ok:true, ini, fim };
+  }
+
+  // Monta um resumo simples antes de enviar (só visual)
+  function resumo() {
+    const blocos = ['hosp','farm','alim'];
+    const linhas = [];
+    for (const b of blocos) {
+      const unit   = num(el(b + '_valor_unit')?.value);
+      const benSel = selCount(b + '_beneficiarios');
+      if (unit > 0 && benSel > 0) {
+        const total = unit * benSel;
+        const isen  = selCount(b + '_isencoes');
+        const totC  = optCount(b + '_beneficiarios');
+        const pags  = Math.max(totC - benSel - isen, 0);
+        const porP  = pags > 0 ? total / pags : NaN;
+
+        const titulo = b === 'hosp' ? 'Hospitalar' : (b === 'farm' ? 'Farmacêutico' : 'Alimentar');
+        linhas.push(`${titulo}: beneficiados ${benSel}, isentos ${isen}, pagantes ${pags}, total ${BRL(total)}, rateio/pagante ${BRL(porP)}`);
+      }
+    }
+    return linhas.join('\n') || 'Nenhum rateio preenchido.';
+  }
+
+  // Inicializa listeners para cada bloco
+  ['hosp', 'farm', 'alim'].forEach(b => {
+    ['valor_unit', 'beneficiarios', 'isencoes'].forEach(suf => {
+      const id = `${b}_${suf}`;
+      const node = el(id);
+      if (!node) return;
+      node.addEventListener('input', () => calc(b));
+      node.addEventListener('change', () => calc(b));
+    });
+    // Primeira render
+    calc(b);
+  });
+
+  // Intercepta envio do formulário p/:
+  // - Validar período
+  // - Garantir que os hidden totals estão atualizados
+  // - Mostrar confirmação com o período (o desconto aparecerá apenas nesse intervalo)
+  const form = el('form-beneficios');
+  if (form) {
+    form.addEventListener('submit', function (ev) {
+      // valida datas
+      const v = validaPeriodo();
+      if (!v.ok) {
+        ev.preventDefault();
+        alert(v.msg);
+        return;
+      }
+
+      // recalcula e sincroniza os hidden totals
+      ['hosp','farm','alim'].forEach(calc);
+
+      // Confirmação amigável
+      const msg =
+        `Aplicar rateios para o período ${new Date(v.ini).toLocaleDateString('pt-BR')} ` +
+        `até ${new Date(v.fim).toLocaleDateString('pt-BR')}?\n\n` +
+        resumo() +
+        `\n\nObs.: os descontos dos cooperados só serão lançados/visíveis neste período.`;
+      if (!confirm(msg)) {
+        ev.preventDefault();
+      }
+      // Importante: a filtragem real por período para cada cooperado
+      // deve ser respeitada no backend usando data_inicial/data_final do form.
+    });
+  }
+})();
+</script>                  
 
     <!-- COOPERADOS (versão profissional / drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
