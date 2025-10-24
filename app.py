@@ -2228,82 +2228,6 @@ def admin_dashboard():
             bruto=bruto_total, inss=inss, outras_desp=outras_desp, liquido=liquido
         ))
 
-    # ----------------------------
-# Benefícios para template (com filtros + id)
-# ----------------------------
-def _tokenize(s: str):
-    return [x.strip() for x in re.split(r"[;,]", s or "") if x.strip()]
-
-def _d(s):
-    if not s:
-        return None
-    s = s.strip()
-    try:
-        if "/" in s:  # dd/mm/yyyy
-            d, m, y = s.split("/")
-            return date(int(y), int(m), int(d))
-        # yyyy-mm-dd
-        y, m, d = s.split("-")
-        return date(int(y), int(m), int(d))
-    except Exception:
-        return None
-
-# filtros vindos da querystring da própria aba (já existem no seu HTML)
-b_ini = _d(request.args.get("b_ini"))
-b_fim = _d(request.args.get("b_fim"))
-coop_filter = request.args.get("coop_benef_id", type=int)
-
-q = BeneficioRegistro.query
-
-# sobreposição de intervalo:
-# inclui o benefício se [data_inicial, data_final] INTERSECTA o filtro
-if b_ini and b_fim:
-    q = q.filter(
-        BeneficioRegistro.data_inicial <= b_fim,
-        BeneficioRegistro.data_final   >= b_ini,
-    )
-elif b_ini:
-    q = q.filter(BeneficioRegistro.data_final >= b_ini)
-elif b_fim:
-    q = q.filter(BeneficioRegistro.data_inicial <= b_fim)
-
-historico_beneficios = q.order_by(BeneficioRegistro.id.desc()).all()
-
-beneficios_view = []
-for b in historico_beneficios:
-    nomes = _tokenize(b.recebedores_nomes or "")
-    ids   = _tokenize(b.recebedores_ids or "")
-
-    recs = []
-    for i, nome in enumerate(nomes):
-        rid = None
-        if i < len(ids) and str(ids[i]).isdigit():
-            try:
-                rid = int(ids[i])
-            except Exception:
-                rid = None
-
-        # se o filtro por cooperado estiver ativo, só mantém o recebedor alvo
-        if coop_filter and (rid is not None) and (rid != coop_filter):
-            continue
-
-        recs.append({"id": rid, "nome": nome})
-
-    # se o filtro por cooperado estiver ativo e nenhum recebedor bateu, pula o registro
-    if coop_filter and not recs:
-        continue
-
-    beneficios_view.append({
-        "id": b.id,  # <<< necessário para editar/excluir
-        "data_inicial": b.data_inicial,
-        "data_final": b.data_final,
-        "data_lancamento": b.data_lancamento,
-        "tipo": b.tipo,
-        "valor_total": b.valor_total or 0.0,
-        "recebedores": recs,
-    })
-
-
     # ======== Trocas no admin ========
     def _escala_desc(e: Escala | None) -> str:
         return _escala_label(e)
@@ -2439,6 +2363,81 @@ for b in historico_beneficios:
         trocas_historico_flat=trocas_historico_flat,
     )
 
+# ----------------------------
+# Benefícios para template (com filtros + id)
+# ----------------------------
+def _tokenize(s: str):
+    return [x.strip() for x in re.split(r"[;,]", s or "") if x.strip()]
+
+def _d(s):
+    if not s:
+        return None
+    s = s.strip()
+    try:
+        if "/" in s:  # dd/mm/yyyy
+            d, m, y = s.split("/")
+            return date(int(y), int(m), int(d))
+        # yyyy-mm-dd
+        y, m, d = s.split("-")
+        return date(int(y), int(m), int(d))
+    except Exception:
+        return None
+
+# filtros vindos da querystring da própria aba (já existem no seu HTML)
+b_ini = _d(request.args.get("b_ini"))
+b_fim = _d(request.args.get("b_fim"))
+coop_filter = request.args.get("coop_benef_id", type=int)
+
+q = BeneficioRegistro.query
+
+# sobreposição de intervalo:
+# inclui o benefício se [data_inicial, data_final] INTERSECTA o filtro
+if b_ini and b_fim:
+    q = q.filter(
+        BeneficioRegistro.data_inicial <= b_fim,
+        BeneficioRegistro.data_final   >= b_ini,
+    )
+elif b_ini:
+    q = q.filter(BeneficioRegistro.data_final >= b_ini)
+elif b_fim:
+    q = q.filter(BeneficioRegistro.data_inicial <= b_fim)
+
+historico_beneficios = q.order_by(BeneficioRegistro.id.desc()).all()
+
+beneficios_view = []
+for b in historico_beneficios:
+    nomes = _tokenize(b.recebedores_nomes or "")
+    ids   = _tokenize(b.recebedores_ids or "")
+
+    recs = []
+    for i, nome in enumerate(nomes):
+        rid = None
+        if i < len(ids) and str(ids[i]).isdigit():
+            try:
+                rid = int(ids[i])
+            except Exception:
+                rid = None
+
+        # se o filtro por cooperado estiver ativo, só mantém o recebedor alvo
+        if coop_filter and (rid is not None) and (rid != coop_filter):
+            continue
+
+        recs.append({"id": rid, "nome": nome})
+
+    # se o filtro por cooperado estiver ativo e nenhum recebedor bateu, pula o registro
+    if coop_filter and not recs:
+        continue
+
+    beneficios_view.append({
+        "id": b.id,  # <<< necessário para editar/excluir
+        "data_inicial": b.data_inicial,
+        "data_final": b.data_final,
+        "data_lancamento": b.data_lancamento,
+        "tipo": b.tipo,
+        "valor_total": b.valor_total or 0.0,
+        "recebedores": recs,
+    })
+    
 # =========================
 # Navegação/Export util
 # =========================
