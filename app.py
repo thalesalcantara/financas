@@ -3522,7 +3522,7 @@ def edit_beneficio(id):
     return redirect(url_for("admin_dashboard", tab="beneficios"))
 
 
-@app.post("/beneficios/<int:id>/delete")
+@app.post("/beneficios/<int:id>/delete", endpoint="excluir_beneficio")
 @admin_required
 def delete_beneficio(id):
     """
