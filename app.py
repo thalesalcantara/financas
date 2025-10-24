@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # ============ Stdlib ============
-import os, io, csv, re, json, time, difflib, urllib.parse, unicodedata
+import os, io, csv, re, json, time, difflib, unicodedata
 from datetime import datetime, date, timedelta, time as dtime
 from collections import defaultdict, namedtuple
 from functools import wraps
