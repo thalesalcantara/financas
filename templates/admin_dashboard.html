@@ -245,7 +245,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </a>
   </nav>
 </aside>
-  
+
   <!-- Main -->
   <main class="main">
     <div class="tab-content">
@@ -1030,9 +1030,9 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </section>
 
-   <!-- RECEITAS COOP (versão profissional/compacta – drop-in) -->
+    <!-- RECEITAS COOP (versão profissional/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='receitas' else '' }}" id="receitas" role="tabpanel">
-  {% set total_receitas_coop_table = (receitas | sum(attribute='valor_total')) if receitas else 0 %}
+  {% set total_receitas_coop_table = (receitas|sum(attribute='valor')) if receitas else 0 %}
   {% set qtd_registros = receitas|length if receitas else 0 %}
 
   <!-- Header + KPIs -->
@@ -1042,7 +1042,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </h5>
     <div class="d-flex flex-wrap gap-2">
       <span class="badge bg-light text-dark border">Registros: <b>{{ qtd_registros }}</b></span>
-      <span class="badge bg-success-subtle text-success border">Total: <b>R$ {{ '%.2f'|format(total_receitas_coop_table or 0) }}</b></span>
+      <span class="badge bg-success-subtle text-success border">Total: <b>R$ {{ '%.2f'|format(total_receitas_coop_table) }}</b></span>
     </div>
   </div>
 
@@ -1089,8 +1089,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           <label class="form-label">Valor (R$)</label>
           <div class="input-group input-group-sm">
             <span class="input-group-text">R$</span>
-            <!-- name corrigido para bater com a coluna usada no backend -->
-            <input type="number" step="0.01" class="form-control" name="valor_total" placeholder="0,00" required>
+            <input type="number" step="0.01" class="form-control" name="valor" placeholder="0,00" required>
           </div>
         </div>
         <div class="col-md-3">
@@ -1107,35 +1106,51 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
   </div>
 
-  <!-- Tabela de Receitas -->
+  <!-- Tabela -->
   <div class="card border-0 shadow-sm rounded-3">
-    <div class="card-body p-0">
+    <div class="card-body p-2 p-md-3">
       <div class="table-responsive">
-        <table class="table table-sm table-striped align-middle m-0">
+        <table class="table table-sm table-bordered table-hover align-middle">
           <thead class="table-light">
-            <tr>
-              <th style="min-width:120px;">Data</th>
+            <tr class="text-nowrap">
+              <th style="width:120px">Data</th>
               <th>Descrição</th>
-              <th class="text-end" style="min-width:130px;">Valor</th>
+              <th class="text-end" style="width:160px">Valor</th>
+              <th class="text-center" style="width:140px">Ações</th>
             </tr>
           </thead>
           <tbody>
             {% for r in receitas %}
               <tr>
-                <td>{{ r.data.strftime('%d/%m/%Y') if r.data else '' }}</td>
-                <td>{{ r.descricao or '' }}</td>
-                <td class="text-end">R$ {{ '%.2f'|format((r.valor_total or 0) | float) }}</td>
+                <td>{{ r.data.strftime('%d/%m/%Y') if r.data else '-' }}</td>
+                <td class="text-break">{{ r.descricao }}</td>
+                <td class="text-end">R$ {{ "%.2f"|format(r.valor) }}</td>
+                <td class="text-center text-nowrap">
+                  <button class="btn btn-warning btn-sm"
+                          data-bs-toggle="modal"
+                          data-bs-target="#modalEditReceita"
+                          data-id="{{ r.id }}"
+                          data-descricao="{{ r.descricao }}"
+                          data-valor="{{ r.valor }}"
+                          data-data="{{ r.data.strftime('%Y-%m-%d') if r.data else '' }}"
+                          data-url="{{ url_for('edit_receita', id=r.id) }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <a class="btn btn-danger btn-sm btn-del"
+                     href="{{ url_for('delete_receita', id=r.id) }}">
+                    <i class="bi bi-trash"></i>
+                  </a>
+                </td>
               </tr>
             {% else %}
-              <tr>
-                <td colspan="3" class="text-center text-muted py-3">Nenhuma receita encontrada.</td>
-              </tr>
+              <tr><td colspan="4" class="text-center text-muted">Nenhuma receita</td></tr>
             {% endfor %}
           </tbody>
-          <tfoot class="table-light">
-            <tr>
-              <th colspan="3" class="text-end">Total</th>
-              <th class="text-end">R$ {{ '%.2f'|format(total_receitas_coop_table or 0) }}</th>
+          <tfoot>
+            <tr class="table-light">
+              <th colspan="2" class="text-end">Total</th>
+              <th class="text-end">R$ {{ "%.2f"|format(total_receitas_coop_table) }}</th>
+              <th></th>
             </tr>
           </tfoot>
         </table>
@@ -1379,16 +1394,16 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                 <td class="text-end">R$ {{ "%.2f"|format(rc.valor) }}</td>
                 <td class="text-center text-nowrap">
                   <button class="btn btn-warning btn-sm"
-        data-bs-toggle="modal"
-        data-bs-target="#modalEditReceitaCoop"
-        data-id="{{ rc.id }}"
-        data-cooperado="{{ rc.cooperado.id if rc.cooperado else '' }}"
-        data-descricao="{{ rc.descricao }}"
-        data-valor="{{ rc.valor }}"
-        data-data="{{ rc.data.strftime('%Y-%m-%d') if rc.data else '' }}"
-        data-url="{{ url_for('edit_receita_coop', id=rc.id) }}">
-  <i class="bi bi-pencil"></i>
-</button>
+                          data-bs-toggle="modal"
+                          data-bs-target="#modalEditReceitaCoop"
+                          data-id="{{ rc.id }}"
+                          data-cooperado="{{ rc.cooperado.id }}"
+                          data-descricao="{{ rc.descricao }}"
+                          data-valor="{{ rc.valor }}"
+                          data-data="{{ rc.data.strftime('%Y-%m-%d') if rc.data else '' }}"
+                          data-url="{{ url_for('edit_receita_coop', id=rc.id) }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
                   <a class="btn btn-danger btn-sm btn-del"
                      href="{{ url_for('delete_receita_coop', id=rc.id) }}">
                     <i class="bi bi-trash"></i>
@@ -1497,199 +1512,60 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 
   <!-- Tabela -->
-<div class="card border-0 shadow-sm rounded-3">
-  <div class="card-body p-2 p-md-3">
-
-    <!-- Ações em massa -->
-    <div class="d-flex flex-wrap gap-2 mb-2">
-      <button id="btnBulkDelDespCoop" class="btn btn-danger btn-sm" disabled>
-        <i class="bi bi-trash"></i> Excluir selecionadas
-      </button>
-      <span class="text-muted small" id="bulkCountDespCoop">0 selecionadas</span>
-    </div>
-
-    <div class="table-responsive">
-      <table class="table table-sm table-bordered table-hover align-middle">
-        <thead class="table-light">
-          <tr class="text-nowrap">
-            <th style="width:34px" class="text-center">
-              <input type="checkbox" id="chkAllDespCoop" class="form-check-input">
-            </th>
-            <th style="width:120px">Data</th>
-            <th style="width:260px">Cooperado</th>
-            <th>Descrição</th>
-            <th class="text-end" style="width:160px">Valor</th>
-            <th class="text-center" style="width:140px">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for dc in despesas_coop %}
-            <tr data-id="{{ dc.id }}">
-              <td class="text-center">
-                <input type="checkbox"
-                       class="form-check-input chk-despesa-coop"
-                       data-id="{{ dc.id }}"
-                       data-url="{{ url_for('delete_despesa_coop', id=dc.id) }}">
-              </td>
-              <td>{{ dc.data.strftime('%d/%m/%Y') if dc.data else '-' }}</td>
-              <td class="text-break">{{ dc.cooperado.nome if dc.cooperado else 'Todos' }}</td>
-              <td class="text-break">{{ dc.descricao }}</td>
-              <td class="text-end col-valor">R$ {{ "%.2f"|format(dc.valor) }}</td>
-              <td class="text-center text-nowrap">
-                <button class="btn btn-warning btn-sm"
-                        data-bs-toggle="modal"
-                        data-bs-target="#modalEditDespesaCoop"
-                        data-id="{{ dc.id }}"
-                        data-cooperado="{{ dc.cooperado.id if dc.cooperado else '' }}"
-                        data-descricao="{{ dc.descricao }}"
-                        data-valor="{{ dc.valor }}"
-                        data-data="{{ dc.data.strftime('%Y-%m-%d') if dc.data else '' }}"
-                        data-url="{{ url_for('edit_despesa_coop', id=dc.id) }}">
-                  <i class="bi bi-pencil"></i>
-                </button>
-                <a class="btn btn-danger btn-sm btn-del"
-                   href="{{ url_for('delete_despesa_coop', id=dc.id) }}">
-                  <i class="bi bi-trash"></i>
-                </a>
-              </td>
+  <div class="card border-0 shadow-sm rounded-3">
+    <div class="card-body p-2 p-md-3">
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered table-hover align-middle">
+          <thead class="table-light">
+            <tr class="text-nowrap">
+              <th style="width:120px">Data</th>
+              <th style="width:260px">Cooperado</th>
+              <th>Descrição</th>
+              <th class="text-end" style="width:160px">Valor</th>
+              <th class="text-center" style="width:140px">Ações</th>
             </tr>
-          {% else %}
-            <tr><td colspan="6" class="text-center text-muted">Nenhuma despesa</td></tr>
-          {% endfor %}
-        </tbody>
-        <tfoot>
-          <tr class="table-light">
-            <th></th>
-            <th colspan="2" class="text-end">Total</th>
-            <th class="text-end" data-total>R$ {{ '%.2f'|format(total_despesas_coop_table) }}</th>
-            <th></th>
-          </tr>
-        </tfoot>
-      </table>
+          </thead>
+          <tbody>
+            {% for dc in despesas_coop %}
+              <tr>
+                <td>{{ dc.data.strftime('%d/%m/%Y') if dc.data else '-' }}</td>
+                <td class="text-break">{{ dc.cooperado.nome if dc.cooperado else 'Todos' }}</td>
+                <td class="text-break">{{ dc.descricao }}</td>
+                <td class="text-end">R$ {{ "%.2f"|format(dc.valor) }}</td>
+                <td class="text-center text-nowrap">
+                  <button class="btn btn-warning btn-sm"
+                          data-bs-toggle="modal"
+                          data-bs-target="#modalEditDespesaCoop"
+                          data-id="{{ dc.id }}"
+                          data-cooperado="{{ dc.cooperado.id if dc.cooperado else '' }}"
+                          data-descricao="{{ dc.descricao }}"
+                          data-valor="{{ dc.valor }}"
+                          data-data="{{ dc.data.strftime('%Y-%m-%d') if dc.data else '' }}"
+                          data-url="{{ url_for('edit_despesa_coop', id=dc.id) }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <a class="btn btn-danger btn-sm btn-del"
+                     href="{{ url_for('delete_despesa_coop', id=dc.id) }}">
+                    <i class="bi bi-trash"></i>
+                  </a>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="5" class="text-center text-muted">Nenhuma despesa</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-light">
+              <th colspan="3" class="text-end">Total</th>
+              <th class="text-end">R$ {{ '%.2f'|format(total_despesas_coop_table) }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   </div>
-</div>
-
-<!-- JS: seleção e exclusão em massa (rápido, sem recarregar) -->
-<script>
-(function(){
-  const section  = document.getElementById('coop_despesas');
-  if(!section) return;
-
-  const chkAll   = section.querySelector('#chkAllDespCoop');
-  const btnBulk  = section.querySelector('#btnBulkDelDespCoop');
-  const lblCount = section.querySelector('#bulkCountDespCoop');
-  const tbody    = section.querySelector('tbody');
-  const totalCell= section.querySelector('tfoot [data-total]');
-
-  const headers = { 'X-Requested-With': 'fetch' };
-  {% if csrf_token is defined %}
-    headers['X-CSRFToken'] = '{{ csrf_token() }}';
-  {% endif %}
-
-  function listChecks(){
-    return Array.from(section.querySelectorAll('.chk-despesa-coop'));
-  }
-  function listChecked(){
-    return listChecks().filter(c => c.checked);
-  }
-  function updateState(){
-    const checked = listChecked().length;
-    if(lblCount) lblCount.textContent = `${checked} selecionada${checked===1?'':'s'}`;
-    if(btnBulk) btnBulk.disabled = checked === 0;
-
-    const all = listChecks();
-    if(chkAll){
-      chkAll.checked = checked > 0 && checked === all.length;
-      chkAll.indeterminate = checked > 0 && checked < all.length;
-    }
-  }
-
-  function currencyToNumber(str){
-    if(typeof str !== 'string') return 0;
-    // remove separadores de milhar e troca vírgula por ponto
-    const s = str.replace(/[^\d,.-]/g,'').replace(/\.(?=\d{3}(?:\D|$))/g,'').replace(',', '.');
-    const n = parseFloat(s);
-    return isFinite(n) ? n : 0;
-  }
-  function numberToCurrencyBR(n){
-    return 'R$ ' + Number(n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
-  }
-  function recalcFooterTotal(){
-    if(!tbody || !totalCell) return;
-    let sum = 0;
-    tbody.querySelectorAll('td.col-valor').forEach(td=>{
-      sum += currencyToNumber(td.textContent || '');
-    });
-    totalCell.textContent = numberToCurrencyBR(sum);
-  }
-
-  // Selecionar / desmarcar todos
-  chkAll?.addEventListener('change', () => {
-    const checked = chkAll.checked;
-    listChecks().forEach(c => { c.checked = checked; });
-    updateState();
-  });
-
-  // Seleção individual
-  section.addEventListener('change', (e)=>{
-    if(e.target.classList.contains('chk-despesa-coop')){
-      updateState();
-    }
-  });
-
-  // Exclusão em massa
-  btnBulk?.addEventListener('click', async ()=>{
-    const sel = listChecked();
-    if(sel.length === 0) return;
-
-    if(!confirm(`Excluir ${sel.length} despesa${sel.length===1?'':'s'} selecionada${sel.length===1?'':'s'}?`)) return;
-
-    btnBulk.disabled = true;
-    btnBulk.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Excluindo...';
-
-    try {
-      // Dispara todas as exclusões em paralelo, reutilizando a mesma rota de cada linha (GET)
-      const tasks = sel.map(chk => {
-        const url = chk.dataset.url;
-        return fetch(url, { method: 'GET', headers })
-          .then(r => ({ ok: r.ok, chk }))
-          .catch(() => ({ ok:false, chk }));
-      });
-
-      const results = await Promise.allSettled(tasks);
-
-      // Remove do DOM as que foram OK
-      let removed = 0;
-      results.forEach(res=>{
-        if(res.status === 'fulfilled' && res.value.ok){
-          const row = res.value.chk.closest('tr');
-          if(row){ row.remove(); removed++; }
-        }
-      });
-
-      // Limpa seleção e atualiza totais
-      chkAll.checked = false;
-      chkAll.indeterminate = false;
-      updateState();
-      recalcFooterTotal();
-
-      if(removed === 0){
-        alert('Nenhum registro foi excluído. Verifique sua conexão.');
-      }
-    } catch(err){
-      console.error(err);
-      alert('Falha ao excluir em massa.');
-    } finally {
-      btnBulk.innerHTML = '<i class="bi bi-trash"></i> Excluir selecionadas';
-      btnBulk.disabled = listChecked().length === 0;
-    }
-  });
-
-  // Inicializa contagem
-  updateState();
-})();
-</script>
+</section>
 
      <!-- FOLHA DE PAGAMENTO (versão profissional/compacta – drop-in) -->
 {% set folha_list = folha_por_coop if folha_por_coop is defined else [] %}
@@ -2455,7 +2331,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   {# Modal de edição do cooperado (adiciona telefone) #}
   <div class="modal fade" id="modalEditCooperado" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-      <form method="POST" enctype="multipart/form-data" class="modal-content">
+      <form method="POST" class="modal-content">
         {% if csrf_token is defined %}
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         {% endif %}
@@ -2701,8 +2577,9 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     })();
   </script>
 </section>
+
        <!-- ESCALAS -->
-      <section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
+      <section class="tab-pane fade" id="escalas">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h4 class="mb-0">Escalas</h4>
           <div class="alert alert-info py-1 px-2 mb-0">
@@ -3202,32 +3079,19 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 
   <div class="modal fade" id="modalEditReceita" tabindex="-1">
-  <div class="modal-dialog">
-    <form method="POST" class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Editar Receita (Cooperativa)</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-
-      <div class="modal-body row g-2 px-3">
-        <input type="hidden" name="id">
-        <div class="col-12">
-          <input type="text" class="form-control" name="descricao" required>
+    <div class="modal-dialog">
+      <form method="POST" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Editar Receita (Cooperativa)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-2 px-3">
+          <input type="hidden" name="id">
+          <div class="col-12"><input type="text" class="form-control" name="descricao" required></div>
+          <div class="col-12"><input type="number" step="0.01" class="form-control" name="valor" required></div>
+          <div class="col-12"><input type="date" class="form-control" name="data" required></div>
         </div>
-        <div class="col-12">
-          <input type="number" step="0.01" class="form-control" name="valor_total" required>
-        </div>
-        <div class="col-12">
-          <input type="date" class="form-control" name="data" required>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button>
-      </div>
-    </form>
+        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
+      </form>
+    </div>
   </div>
-</div>
 
   <div class="modal fade" id="modalEditDespesa" tabindex="-1">
     <div class="modal-dialog">
@@ -3278,6 +3142,21 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           <div class="col-12"><input type="text" class="form-control" name="descricao" required></div>
           <div class="col-12"><input type="number" step="0.01" class="form-control" name="valor" required></div>
           <div class="col-12"><input type="date" class="form-control" name="data" required></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalEditCooperado" tabindex="-1">
+    <div class="modal-dialog">
+      <form method="POST" enctype="multipart/form-data" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Editar Cooperado</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body row g-2 px-3">
+          <input type="hidden" name="id">
+          <div class="col-12"><input type="text" class="form-control" name="nome" required></div>
+          <div class="col-12"><input type="text" class="form-control" name="usuario" required></div>
+          <div class="col-12"><input type="file" class="form-control" name="foto"></div>
         </div>
         <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
       </form>
@@ -3335,115 +3214,106 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 
   <!-- JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script>
-  // Confirmar exclusão
-  document.addEventListener('click', function(e){
-    if(e.target.closest('.btn-del')){
-      if(!confirm('Tem certeza que deseja excluir?')) e.preventDefault();
-    }
-  });
-
-  // Preenche modais a partir dos data-*
-  function bindModal(modalId, mapFields){
-    const el = document.getElementById(modalId);
-    if(!el) return;
-    el.addEventListener('show.bs.modal', (ev)=>{
-      const btn = ev.relatedTarget;
-      const form = el.querySelector('form');
-      const ds = btn?.dataset || {};
-      if(ds.url) form.setAttribute('action', ds.url);
-      Object.keys(mapFields).forEach(k=>{
-        const name = mapFields[k];
-        const input = form.querySelector(`[name="${name}"]`);
-        if(!input) return;
-        const val = ds[k] ?? '';
-        if(input.tagName === 'SELECT'){
-          [...input.options].forEach(o => o.selected = (String(o.value) === String(val)));
-        } else {
-          input.value = val;
-        }
-      });
-    });
-  }
-
-  bindModal('modalEditLancamento',   {id:'id', restaurante:'restaurante_id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', hora_inicio:'hora_inicio', hora_fim:'hora_fim'});
-
-// Cooperativa (usa valor_total)
-bindModal('modalEditReceita',      {id:'id', descricao:'descricao', valor_total:'valor_total', data:'data'});
-
-bindModal('modalEditDespesa',      {id:'id', descricao:'descricao', valor:'valor', data:'data'});
-
-// Cooperado (usa valor e cooperado_id)
-bindModal('modalEditReceitaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
-bindModal('modalEditDespesaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
-
-bindModal('modalResetSenhaCooperado', {id:'id'});
-bindModal('modalEditRestaurante',  {id:'id', nome:'nome', periodo:'periodo', usuario:'usuario'});
-bindModal('modalResetSenhaRestaurante', {id:'id'});
-</script>
-
-   <script>
-  // ===== Gráficos =====
-  const rawLancCoop   = {{ (chart_data_lancamentos_coop or {'labels':[], 'values':[]}) | tojson }};
-  const rawLancCooper = {{ (chart_data_lancamentos_cooperados or {'labels':[], 'values':[]}) | tojson }};
-  const fallbackLancCoop   = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
-  const fallbackLancCooper = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
-  const dataLancCoop   = (rawLancCoop.labels && rawLancCoop.labels.length && rawLancCoop.values && rawLancCoop.values.length) ? rawLancCoop : fallbackLancCoop;
-  const dataLancCooper = (rawLancCooper.labels && rawLancCooper.labels.length && rawLancCooper.values && rawLancCooper.values.length) ? rawLancCooper : fallbackLancCooper;
-
-  function buildLineChart(canvasId, labels, values, label){
-    const ctx = document.getElementById(canvasId);
-    if(!ctx) return;
-    new Chart(ctx, {
-      type:'line',
-      data:{ labels, datasets:[{ label, data: values, tension:.25, borderWidth:2, pointRadius:3, fill:false }] },
-      options:{
-        responsive:true, maintainAspectRatio:false,
-        scales:{ y:{beginAtZero:true,ticks:{callback:(v)=>'R$ '+Number(v).toLocaleString('pt-BR')}} },
-        plugins:{ legend:{display:true}, tooltip:{callbacks:{label:(c)=>'R$ '+Number(c.parsed.y).toLocaleString('pt-BR',{minimumFractionDigits:2})}} }
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    // Confirmar exclusão
+    document.addEventListener('click', function(e){
+      if(e.target.closest('.btn-del')){
+        if(!confirm('Tem certeza que deseja excluir?')) e.preventDefault();
       }
     });
-  }
-  buildLineChart('chartLancCoop', dataLancCoop.labels, dataLancCoop.values, 'Lançamentos/Produções');
-  buildLineChart('chartLancCooperados', dataLancCooper.labels, dataLancCooper.values, 'Lançamentos/Produções');
-</script>
-    <script>
-// ===== Preservar aba ativa via ?tab= =====
-document.addEventListener('DOMContentLoaded', () => {
-  const params = new URLSearchParams(location.search);
-  const targetTab = params.get('tab');
-  if(targetTab){
-    const link = document.querySelector(`.sidebar .nav-link[href="#${targetTab}"]`);
-    if(link){ new bootstrap.Tab(link).show(); }
-  }
-  document.querySelectorAll('.sidebar .nav-link[data-bs-toggle="tab"]').forEach(a => {
-    a.addEventListener('shown.bs.tab', (e) => {
-      const id = e.target.getAttribute('href')?.slice(1) || '';
-      if(!id) return;
-      const p = new URLSearchParams(location.search);
-      p.set('tab', id);
-      history.replaceState(null, '', location.pathname + '?' + p.toString() + '#' + id);
-    });
-  });
 
-  // Contagem regressiva até 31/12 (aba Escalas)
-  const anoSpan = document.getElementById('prazoAno');
-  const diasSpan = document.getElementById('prazoDias');
-  function updatePrazo() {
-    const now = new Date();
-    let target = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
-    if (now > target) target = new Date(now.getFullYear()+1, 11, 31, 23, 59, 59);
-    const diff = target - now;
-    const dias = Math.max(0, Math.ceil(diff / (1000*60*60*24)));
-    if (anoSpan) anoSpan.textContent = target.getFullYear();
-    if (diasSpan) diasSpan.textContent = dias;
-  }
-  updatePrazo();
-  setInterval(updatePrazo, 60*1000);
-});
-</script>
+    // Preenche modais a partir dos data-*
+    function bindModal(modalId, mapFields){
+      const el = document.getElementById(modalId);
+      if(!el) return;
+      el.addEventListener('show.bs.modal', (ev)=>{
+        const btn = ev.relatedTarget;
+        const form = el.querySelector('form');
+        const ds = btn?.dataset || {};
+        if(ds.url) form.setAttribute('action', ds.url);
+        Object.keys(mapFields).forEach(k=>{
+          const name = mapFields[k];
+          const input = form.querySelector(`[name="${name}"]`);
+          if(!input) return;
+          const val = ds[k] ?? '';
+          if(input.tagName === 'SELECT'){
+            [...input.options].forEach(o => o.selected = (String(o.value) === String(val)));
+          }else{
+            input.value = val;
+          }
+        });
+      });
+    }
+    bindModal('modalEditLancamento',   {id:'id', restaurante:'restaurante_id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', hora_inicio:'hora_inicio', hora_fim:'hora_fim'});
+    bindModal('modalEditReceita',      {id:'id', descricao:'descricao', valor:'valor', data:'data'});
+    bindModal('modalEditDespesa',      {id:'id', descricao:'descricao', valor:'valor', data:'data'});
+    bindModal('modalEditReceitaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
+    bindModal('modalEditDespesaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
+    bindModal('modalEditCooperado',    {id:'id', nome:'nome', usuario:'usuario'});
+    bindModal('modalResetSenhaCooperado', {id:'id'});
+    bindModal('modalEditRestaurante',  {id:'id', nome:'nome', periodo:'periodo', usuario:'usuario'});
+    bindModal('modalResetSenhaRestaurante', {id:'id'});
+
+    // ===== Gráficos =====
+    const rawLancCoop   = {{ (chart_data_lancamentos_coop or {'labels':[], 'values':[]}) | tojson }};
+    const rawLancCooper = {{ (chart_data_lancamentos_cooperados or {'labels':[], 'values':[]}) | tojson }};
+    const fallbackLancCoop   = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
+    const fallbackLancCooper = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
+    const dataLancCoop   = (rawLancCoop.labels && rawLancCoop.labels.length && rawLancCoop.values && rawLancCoop.values.length) ? rawLancCoop : fallbackLancCoop;
+    const dataLancCooper = (rawLancCooper.labels && rawLancCooper.labels.length && rawLancCooper.values && rawLancCooper.values.length) ? rawLancCooper : fallbackLancCooper;
+
+    function buildLineChart(canvasId, labels, values, label){
+      const ctx = document.getElementById(canvasId);
+      if(!ctx) return;
+      new Chart(ctx, {
+        type:'line',
+        data:{ labels: labels, datasets:[{ label: label, data: values, tension:.25, borderWidth:2, pointRadius:3, fill:false }] },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          scales:{ y:{beginAtZero:true,ticks:{callback:(v)=>'R$ '+Number(v).toLocaleString('pt-BR')}} },
+          plugins:{ legend:{display:true}, tooltip:{callbacks:{label:(c)=>'R$ '+Number(c.parsed.y).toLocaleString('pt-BR',{minimumFractionDigits:2})}} }
+        }
+      });
+    }
+    buildLineChart('chartLancCoop', dataLancCoop.labels, dataLancCoop.values, 'Lançamentos/Produções');
+    buildLineChart('chartLancCooperados', dataLancCooper.labels, dataLancCooper.values, 'Lançamentos/Produções');
+
+    // ===== Preservar aba ativa via ?tab= =====
+    document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(location.search);
+      const targetTab = params.get('tab');
+      if(targetTab){
+        const link = document.querySelector(`.sidebar .nav-link[href="#${targetTab}"]`);
+        if(link){ new bootstrap.Tab(link).show(); }
+      }
+      document.querySelectorAll('.sidebar .nav-link[data-bs-toggle="tab"]').forEach(a => {
+        a.addEventListener('shown.bs.tab', (e) => {
+          const id = e.target.getAttribute('href')?.slice(1) || '';
+          if(!id) return;
+          const p = new URLSearchParams(location.search);
+          p.set('tab', id);
+          history.replaceState(null, '', location.pathname + '?' + p.toString() + e.target.getAttribute('href'));
+        });
+      });
+
+      // Contagem regressiva até 31/12 (aba Escalas)
+      const anoSpan = document.getElementById('prazoAno');
+      const diasSpan = document.getElementById('prazoDias');
+      function updatePrazo() {
+        const now = new Date();
+        let target = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+        if (now > target) target = new Date(now.getFullYear()+1, 11, 31, 23, 59, 59);
+        const diff = target - now;
+        const dias = Math.max(0, Math.ceil(diff / (1000*60*60*24)));
+        if (anoSpan) anoSpan.textContent = target.getFullYear();
+        if (diasSpan) diasSpan.textContent = dias;
+      }
+      updatePrazo();
+      setInterval(updatePrazo, 60*1000);
+    });
+  </script>
 
   <!-- ==== ESCALAS: horário & cores (robusto) ==== -->
   <script>
@@ -3682,42 +3552,45 @@ document.addEventListener('DOMContentLoaded', () => {
         calcPreview(p);
       });
 
-      <script>
-// >>>>>>>>>>>>>>>>> CÁLCULO DOS TOTAIS ANTES DE ENVIAR <<<<<<<<<<<<<<<<<
-(function(){
-  const prefixes = ['hosp','farm','alim'];
-  const form = document.getElementById('form-beneficios');
-  if(!form) return;
+      // >>>>>>>>>>>>>>>>> CÁLCULO DOS TOTAIS ANTES DE ENVIAR <<<<<<<<<<<<<<<<<
+      const form = document.getElementById('form-beneficios');
+      if(form){
+        form.addEventListener('submit', function(){
+          ['hosp','farm','alim'].forEach(p=>{
+            const unit = document.getElementById(`${p}_valor_unit`);
+            const bens = document.getElementById(`${p}_beneficiarios`);
+            const totalOut = document.getElementById(`${p}_valor_total`) || document.getElementById(`${p}_valor_total`) || null;
+          });
 
-  // Helper para número
-  function valNum(inp){
-    const n = parseFloat(String(inp?.value ?? '').replace(',','.'));
-    return isFinite(n) ? n : 0;
-  }
+          function setTotal(prefix){
+            const unit = document.getElementById(`${prefix}_valor_unit`);
+            const bensSel = document.getElementById(`${prefix}_beneficiarios`);
+            const hiddenTotal = document.getElementById(`${prefix}_valor_total`) || document.getElementById(`${prefix}_valor_total`);
+            // nossos hidden têm id `${prefix}_valor_total`
+            const ht = document.getElementById(`${prefix}_valor_total`);
+            const ht2 = document.getElementById(`${prefix}_valor_total`); // apenas garantia
+            const finalHidden = ht || ht2 || document.querySelector(`input[name="${prefix}_valor"]`);
+            const count = (bensSel && bensSel.selectedOptions) ? bensSel.selectedOptions.length : 0;
+            const total = Math.max(0, valNum(unit) * count);
+            if(finalHidden) finalHidden.value = total.toFixed(2);
+          }
+          ['hosp','farm','alim'].forEach(setTotal);
+        });
 
-  // Garantir IDs dos inputs hidden (caso venham só com name)
-  prefixes.forEach(p=>{
-    const hidden = document.querySelector(`input[name="${p}_valor"]`);
-    if (hidden && !hidden.id) hidden.id = `${p}_valor_total`;
-  });
+        // garantir ids corretos dos hidden
+        document.getElementById('hosp_valor_total') || (()=>{
+          const i = document.querySelector('input[name="hosp_valor"]'); if(i) i.id = 'hosp_valor_total';
+        })();
+        document.getElementById('farm_valor_total') || (()=>{
+          const i = document.querySelector('input[name="farm_valor"]'); if(i) i.id = 'farm_valor_total';
+        })();
+        document.getElementById('alim_valor_total') || (()=>{
+          const i = document.querySelector('input[name="alim_valor"]'); if(i) i.id = 'alim_valor_total';
+        })();
+      }
+    })();
+  </script>
 
-  // Preenche o total: unitário × nº de beneficiados
-  function setTotal(prefix){
-    const unit    = document.getElementById(`${prefix}_valor_unit`);
-    const bensSel = document.getElementById(`${prefix}_beneficiarios`);
-    const hidden  = document.getElementById(`${prefix}_valor_total`) || document.querySelector(`input[name="${prefix}_valor"]`);
-
-    const count = (bensSel && bensSel.selectedOptions) ? bensSel.selectedOptions.length : 0;
-    const total = Math.max(0, valNum(unit) * count);
-
-    if (hidden) hidden.value = total.toFixed(2);
-  }
-
-  // Antes de enviar o formulário, calcular e preencher todos os totais
-  form.addEventListener('submit', function(){
-    prefixes.forEach(setTotal);
-  });
-})();
-</script>
+<a href="{{ url_for('admin_documentos') }}" class="btn btn-outline-primary btn-sm">Documentos</a>
 </body>
 </html>
