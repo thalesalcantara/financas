@@ -188,11 +188,14 @@ class Cooperado(db.Model):
     nome = db.Column(db.String(120), nullable=False)
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
     usuario_ref = db.relationship("Usuario", backref="coop_account", uselist=False)
-    # Foto: agora guardada no banco (bytea no Postgres / BLOB no SQLite)
+
+    # NOVO
+    telefone = db.Column(db.String(30))
+
+    # Foto no banco
     foto_bytes = db.Column(db.LargeBinary)
     foto_mime = db.Column(db.String(100))
     foto_filename = db.Column(db.String(255))
-    # Para manter compatibilidade com os templates existentes que usam 'foto_url'
     foto_url = db.Column(db.String(255))
     cnh_numero = db.Column(db.String(50))
     cnh_validade = db.Column(db.Date)
@@ -588,6 +591,23 @@ def init_db():
             db.session.commit()
     except Exception:
         db.session.rollback()
+
+    # 4.3.x) telefone em cooperados
+try:
+    if _is_sqlite():
+        cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
+        colnames = {row[1] for row in cols}
+        if "telefone" not in colnames:
+            db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN telefone VARCHAR(30)"))
+        db.session.commit()
+    else:
+        db.session.execute(sa_text(
+            "ALTER TABLE IF NOT EXISTS cooperados "
+            "ADD COLUMN IF NOT EXISTS telefone VARCHAR(30)"
+        ))
+        db.session.commit()
+except Exception:
+    db.session.rollback()
 
     # 4.4) tabela avaliacoes_restaurante (se não existir)
     try:
@@ -2528,9 +2548,6 @@ from sqlalchemy import func, literal, and_
 from types import SimpleNamespace
 import io, csv
 
-# =========================
-# /admin/avaliacoes — Lista + KPIs + Ranking (sempre na aba "Avaliações")
-# =========================
 @app.route("/admin/avaliacoes", methods=["GET"])
 @admin_required
 def admin_avaliacoes():
@@ -2587,7 +2604,6 @@ def admin_avaliacoes():
     # Datas como intervalo [>= di, < df+1dia] para usar índice de datetime
     di = datetime.strptime(data_inicio, "%Y-%m-%d") if data_inicio else None
     df = (datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)) if data_fim else None
-
     if di:
         filtros.append(Model.criado_em >= di)
     if df:
@@ -2620,7 +2636,7 @@ def admin_avaliacoes():
         has_next=(page < pages),
     )
 
-    # ===== Achatar para o template
+    # ===== Achata para o template
     avaliacoes = []
     for a, rest_id, rest_nome, coop_id, coop_nome in rows:
         item = {
@@ -2638,11 +2654,13 @@ def admin_avaliacoes():
         }
 
         if tipo == "restaurante":
+            # Cooperado -> Restaurante (com fallbacks)
             trat = getattr(a, "estrelas_tratamento", None) or getattr(a, "estrelas_pontualidade", None)
             amb  = getattr(a, "estrelas_ambiente",   None) or getattr(a, "estrelas_educacao", None)
             sup  = getattr(a, "estrelas_suporte",    None) or getattr(a, "estrelas_eficiencia", None)
             item.update({"trat": trat or 0, "amb": amb or 0, "sup": sup or 0})
         else:
+            # Restaurante -> Cooperado
             item.update({
                 "pont":  getattr(a, "estrelas_pontualidade", 0) or 0,
                 "educ":  getattr(a, "estrelas_educacao", 0) or 0,
@@ -2662,7 +2680,6 @@ def admin_avaliacoes():
         return float(q.scalar() or 0.0)
 
     kpis = {"qtd": total, "geral": avg_or_zero(f_geral)}
-
     if tipo == "restaurante":
         kpis.update({
             "trat": avg_or_zero(f_trat),
@@ -2731,165 +2748,6 @@ def admin_avaliacoes():
         top = sorted([x for x in ranking if x["qtd"] >= 3], key=lambda x: x["m_geral"], reverse=True)[:10]
         chart_top = {"labels": [r["coop_nome"] for r in top], "values": [round(r["m_geral"], 2) for r in top]}
 
-    # ===== Compatibilidade Cooperado × Restaurante
-    compat_map = {}
-    for a in avaliacoes:
-        key = (a.coop_id, a.rest_id)
-        d = compat_map.get(key)
-        if not d:
-            d = {"coop": a.coop_nome, "rest": a.rest_nome, "sum": 0.0, "count": 0}
-        d["sum"] += (a.geral or 0)
-        d["count"] += 1
-        compat_map[key] = d
-    compat = []
-    for d in compat_map.values():
-        avg = (d["sum"] / d["count"]) if d["count"] else 0.0
-        compat.append({"coop": d["coop"], "rest": d["rest"], "avg": avg, "count": d["count"]})
-    compat.sort(key=lambda x: (-(x["avg"] or 0), -(x["count"] or 0), x["coop"], x["rest"]))
-
-    # Filtros p/ repopular o form
-    _flt = SimpleNamespace(
-        restaurante_id=restaurante_id,
-        cooperado_id=cooperado_id,
-        data_inicio=data_inicio or "",
-        data_fim=data_fim or "",
-    )
-
-    # Preservar filtros para a paginação
-    preserve = request.args.to_dict(flat=True)
-    preserve.pop("page", None)
-
-    # Renderiza o dashboard com a aba "avaliacoes" ativa
-    return render_template(
-        "admin_dashboard.html",
-        tab="avaliacoes",
-        tipo=tipo,
-        avaliacoes=avaliacoes,
-        kpis=kpis,
-        ranking=ranking,
-        chart_top=chart_top,
-        compat=compat,
-        _flt=_flt,
-        restaurantes=Restaurante.query.order_by(Restaurante.nome).all(),
-        cooperados=Cooperado.query.order_by(Cooperado.nome).all(),
-        pager=pager,
-        page=pager.page,
-        per_page=pager.per_page,
-        preserve=preserve,
-    )
-
-    # ===== Achata nos nomes que o SEU TEMPLATE usa
-    avaliacoes = []
-    for a, rest_id, rest_nome, coop_id, coop_nome in rows:
-        # comuns
-        item = {
-            "criado_em": a.criado_em,
-            "rest_id":   rest_id,
-            "rest_nome": rest_nome,
-            "coop_id":   coop_id,
-            "coop_nome": coop_nome,
-            "geral":     getattr(a, "estrelas_geral", 0) or 0,
-            "comentario": (getattr(a, "comentario", "") or "").strip(),
-            "media":       getattr(a, "media_ponderada", None),
-            "sentimento":  getattr(a, "sentimento", None),
-            "temas":       getattr(a, "temas", None),
-            "alerta":      bool(getattr(a, "alerta_crise", False)),
-        }
-
-        if tipo == "restaurante":
-            # Cooperado -> Restaurante: Trat/Amb/Sup (com fallbacks)
-            trat = getattr(a, "estrelas_tratamento", None)
-            amb  = getattr(a, "estrelas_ambiente", None)
-            sup  = getattr(a, "estrelas_suporte", None)
-            if trat is None: trat = getattr(a, "estrelas_pontualidade", None)
-            if amb  is None: amb  = getattr(a, "estrelas_educacao", None)
-            if sup  is None: sup  = getattr(a, "estrelas_eficiencia", None)
-            item.update({"trat": trat or 0, "amb": amb or 0, "sup": sup or 0})
-        else:
-            # Restaurante -> Cooperado
-            item.update({
-                "pont":  getattr(a, "estrelas_pontualidade", 0) or 0,
-                "educ":  getattr(a, "estrelas_educacao", 0) or 0,
-                "efic":  getattr(a, "estrelas_eficiencia", 0) or 0,
-                "apres": getattr(a, "estrelas_apresentacao", 0) or 0,
-            })
-
-        avaliacoes.append(SimpleNamespace(**item))
-
-    # ===== KPIs
-    def avg_or_zero(coluna):
-        if coluna is None:
-            return 0.0
-        q = db.session.query(func.coalesce(func.avg(coluna), 0.0))
-        if filtros: q = q.filter(and_(*filtros))
-        return float(q.scalar() or 0.0)
-
-    total_qtd = (db.session.query(func.count(Model.id)).filter(and_(*filtros)).scalar()
-                 if filtros else db.session.query(func.count(Model.id)).scalar())
-    kpis = {"qtd": int(total_qtd or 0), "geral": avg_or_zero(f_geral)}
-
-    if tipo == "restaurante":
-        kpis.update({
-            "trat": avg_or_zero(f_trat),
-            "amb":  avg_or_zero(f_amb),
-            "sup":  avg_or_zero(f_sup),
-        })
-    else:
-        kpis.update({
-            "pont":  avg_or_zero(f_pont),
-            "educ":  avg_or_zero(f_educ),
-            "efic":  avg_or_zero(f_efic),
-            "apres": avg_or_zero(f_apres),
-        })
-
-    # ===== Ranking
-    if tipo == "restaurante":
-        q_rank = (db.session.query(
-                    Restaurante.id.label("id"),
-                    Restaurante.nome.label("nome"),
-                    func.count(Model.id).label("qtd"),
-                    func.coalesce(func.avg(f_geral), 0.0).label("m_geral"),
-                    (func.coalesce(func.avg(f_trat), 0.0) if f_trat is not None else literal(0.0)).label("m_trat"),
-                    (func.coalesce(func.avg(f_amb),  0.0) if f_amb  is not None else literal(0.0)).label("m_amb"),
-                    (func.coalesce(func.avg(f_sup),  0.0) if f_sup  is not None else literal(0.0)).label("m_sup"),
-                 )
-                 .join(Model, Model.restaurante_id == Restaurante.id))
-        if filtros: q_rank = q_rank.filter(and_(*filtros))
-        ranking_rows = q_rank.group_by(Restaurante.id, Restaurante.nome).all()
-        ranking = [{
-            "rest_nome": r.nome, "qtd": int(r.qtd or 0),
-            "m_geral": float(r.m_geral or 0),
-            "m_trat":  float(r.m_trat or 0),
-            "m_amb":   float(r.m_amb or 0),
-            "m_sup":   float(r.m_sup or 0),
-        } for r in ranking_rows]
-        top = sorted([x for x in ranking if x["qtd"] >= 3], key=lambda x: x["m_geral"], reverse=True)[:10]
-        chart_top = {"labels": [r["rest_nome"] for r in top], "values": [round(r["m_geral"], 2) for r in top]}
-    else:
-        q_rank = (db.session.query(
-                    Cooperado.id.label("id"),
-                    Cooperado.nome.label("nome"),
-                    func.count(Model.id).label("qtd"),
-                    func.coalesce(func.avg(f_geral), 0.0).label("m_geral"),
-                    (func.coalesce(func.avg(f_pont), 0.0) if f_pont is not None else literal(0.0)).label("m_pont"),
-                    (func.coalesce(func.avg(f_educ), 0.0) if f_educ is not None else literal(0.0)).label("m_educ"),
-                    (func.coalesce(func.avg(f_efic), 0.0) if f_efic is not None else literal(0.0)).label("m_efic"),
-                    (func.coalesce(func.avg(f_apres),0.0) if f_apres is not None else literal(0.0)).label("m_apres"),
-                 )
-                 .join(Model, Model.cooperado_id == Cooperado.id))
-        if filtros: q_rank = q_rank.filter(and_(*filtros))
-        ranking_rows = q_rank.group_by(Cooperado.id, Cooperado.nome).all()
-        ranking = [{
-            "coop_nome": r.nome, "qtd": int(r.qtd or 0),
-            "m_geral": float(r.m_geral or 0),
-            "m_pont":  float(r.m_pont or 0),
-            "m_educ":  float(r.m_educ or 0),
-            "m_efic":  float(r.m_efic or 0),
-            "m_apres": float(r.m_apres or 0),
-        } for r in ranking_rows]
-        top = sorted([x for x in ranking if x["qtd"] >= 3], key=lambda x: x["m_geral"], reverse=True)[:10]
-        chart_top = {"labels": [r["coop_nome"] for r in top], "values": [round(r["m_geral"], 2) for r in top]}
-
     # ===== Compatibilidade Cooperado × Restaurante (média de "geral" por par)
     compat_map = {}
     for a in avaliacoes:
@@ -2904,7 +2762,6 @@ def admin_avaliacoes():
     for d in compat_map.values():
         avg = (d["sum"] / d["count"]) if d["count"] else 0.0
         compat.append({"coop": d["coop"], "rest": d["rest"], "avg": avg, "count": d["count"]})
-    # pré-ordena por média desc e, em caso de empate, por qtd desc
     compat.sort(key=lambda x: (-(x["avg"] or 0), -(x["count"] or 0), x["coop"], x["rest"]))
 
     # Filtros p/ repopular o form
@@ -2915,12 +2772,16 @@ def admin_avaliacoes():
         data_fim=data_fim or "",
     )
 
-    # >>> IMPORTANTÍSSIMO: renderiza o DASHBOARD com a aba "avaliacoes" ativa
+    # Preservar filtros para a paginação/links
+    preserve = request.args.to_dict(flat=True)
+    preserve.pop("page", None)
+
+    # >>> Renderiza o DASHBOARD com a aba "avaliacoes" ativa
     return render_template(
         "admin_dashboard.html",
-        tab="avaliacoes",        # <- garante que a UI fique na aba Avaliações
+        tab="avaliacoes",      # <- garante que a UI fique na aba Avaliações
         tipo=tipo,
-        avaliacoes=avaliacoes,   # lista de SimpleNamespace com campos *planos* esperados no seu template
+        avaliacoes=avaliacoes, # lista de SimpleNamespace com campos planos
         kpis=kpis,
         ranking=ranking,
         chart_top=chart_top,
@@ -2928,10 +2789,15 @@ def admin_avaliacoes():
         _flt=_flt,
         restaurantes=Restaurante.query.order_by(Restaurante.nome).all(),
         cooperados=Cooperado.query.order_by(Cooperado.nome).all(),
+        pager=pager,
+        page=pager.page,
+        per_page=pager.per_page,
+        preserve=preserve,
     )
 
+
 # =========================
-# /admin/avaliacoes/export.csv — Exportação CSV (combina com o template)
+# /admin/avaliacoes/export.csv — Exportação CSV (alinhada ao template)
 # =========================
 @app.route("/admin/avaliacoes/export.csv", methods=["GET"])
 @admin_required
@@ -3335,24 +3201,34 @@ def marcar_aviso_lido_universal(aviso_id: int):
 @admin_required
 def add_cooperado():
     f = request.form
-    nome = f.get("nome", "").strip()
-    usuario_login = f.get("usuario", "").strip()
-    senha = f.get("senha", "")
+    nome = (f.get("nome") or "").strip()
+    usuario_login = (f.get("usuario") or "").strip()
+    senha = f.get("senha") or ""
+    telefone = (f.get("telefone") or "").strip()   # <- NOVO
     foto = request.files.get("foto")
 
+    # evita usuário duplicado
     if Usuario.query.filter_by(usuario=usuario_login).first():
         flash("Usuário já existente.", "warning")
         return redirect(url_for("admin_dashboard", tab="cooperados"))
 
+    # cria usuário do cooperado
     u = Usuario(usuario=usuario_login, tipo="cooperado", senha_hash="")
     u.set_password(senha)
     db.session.add(u)
-    db.session.flush()
+    db.session.flush()  # garante u.id
 
-    c = Cooperado(nome=nome, usuario_id=u.id, ultima_atualizacao=datetime.now())
+    # cria o cooperado com telefone
+    c = Cooperado(
+        nome=nome,
+        usuario_id=u.id,
+        telefone=telefone,                     # <- NOVO
+        ultima_atualizacao=datetime.now(),
+    )
     db.session.add(c)
     db.session.flush()  # garante c.id
 
+    # salva foto (no banco)
     if foto and foto.filename:
         _save_foto_to_db(c, foto, is_cooperado=True)
 
@@ -3360,22 +3236,25 @@ def add_cooperado():
     flash("Cooperado cadastrado.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
+
 @app.route("/cooperados/<int:id>/edit", methods=["POST"])
 @admin_required
 def edit_cooperado(id):
     c = Cooperado.query.get_or_404(id)
     f = request.form
-    c.nome = f.get("nome", "").strip()
-    c.usuario_ref.usuario = f.get("usuario", "").strip()
+
+    c.nome = (f.get("nome") or "").strip()
+    c.usuario_ref.usuario = (f.get("usuario") or "").strip()
+    c.telefone = (f.get("telefone") or "").strip()  # <- NOVO
+
     foto = request.files.get("foto")
     if foto and foto.filename:
         _save_foto_to_db(c, foto, is_cooperado=True)
+
     c.ultima_atualizacao = datetime.now()
     db.session.commit()
     flash("Cooperado atualizado.", "success")
     return redirect(url_for("admin_dashboard", tab="cooperados"))
-
-from sqlalchemy import or_
 
 @app.route("/cooperados/<int:id>/delete", methods=["POST"])
 @admin_required
@@ -3703,51 +3582,90 @@ def delete_despesa_coop(id):
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
 # =========================
-# Benefícios — Rateio (Admin)
+# Benefícios — Editar / Excluir (Admin)
 # =========================
-@app.route("/beneficios/ratear", methods=["POST"])
+
+@app.post("/beneficios/<int:id>/edit")
 @admin_required
-def ratear_beneficios():
+def edit_beneficio(id):
+    """
+    Atualiza um registro de benefício existente.
+    Espera (via form):
+      - data_inicial (YYYY-MM-DD ou DD/MM/YYYY)
+      - data_final   (YYYY-MM-DD ou DD/MM/YYYY)
+      - data_lancamento (opcional; se vazio mantém a atual)
+      - tipo  (aceita: hospitalar | farmaceutico | alimentar | hosp | farm | alim)
+      - valor_total
+      - recebedores_ids[] (lista) OU recebedores_ids (string separada por ; ou ,)
+      - recebedores_nomes[] (lista) OU recebedores_nomes (string separada por ; ou ,)
+    """
+    b = BeneficioRegistro.query.get_or_404(id)
     f = request.form
-    di = _parse_date(f.get("data_inicial"))
-    df = _parse_date(f.get("data_final"))
-    hoje = date.today()
 
-    cooperados = Cooperado.query.order_by(Cooperado.nome).all()
-    coop_map = {c.id: c for c in cooperados}
+    # Datas
+    b.data_inicial = _parse_date(f.get("data_inicial"))
+    b.data_final   = _parse_date(f.get("data_final"))
+    dl = _parse_date(f.get("data_lancamento"))
+    if dl:
+        b.data_lancamento = dl  # mantém a antiga se não vier nada
 
-    def proc(tipo_key: str, valor_key: str):
-        valor_total = f.get(valor_key, type=float) or 0.0
-        if valor_total <= 0:
-            return
-        ids_selected = request.form.getlist(f"{tipo_key}_beneficiarios[]")
-        sel_ids = [int(x) for x in ids_selected if x.isdigit()]
-        nomes = [coop_map[i].nome for i in sel_ids if i in coop_map]
+    # Tipo (normaliza siglas)
+    tipo_in = (f.get("tipo") or "").strip().lower()
+    tipo_map = {
+        "hosp": "hospitalar", "hospitalar": "hospitalar",
+        "farm": "farmaceutico","farmacêutico":"farmaceutico","farmaceutico":"farmaceutico",
+        "alim": "alimentar",  "alimentar": "alimentar",
+    }
+    if tipo_in in tipo_map:
+        b.tipo = tipo_map[tipo_in]  # só troca se reconhecido
 
-        b = BeneficioRegistro(
-            data_inicial=di, data_final=df, data_lancamento=hoje,
-            tipo={"hosp": "hospitalar", "farm": "farmaceutico", "alim": "alimentar"}[tipo_key],
-            valor_total=valor_total,
-            recebedores_nomes=";".join(nomes),
-            recebedores_ids=";".join(str(i) for i in sel_ids)
-        )
-        db.session.add(b)
+    # Valor
+    b.valor_total = f.get("valor_total", type=float) if (f.get("valor_total") is not None) else b.valor_total
 
-        todos_ids = {c.id for c in cooperados}
-        nao_recebem_ids = sorted(list(todos_ids.difference(sel_ids)))
-        if nao_recebem_ids:
-            valor_unit = round(valor_total / len(nao_recebem_ids), 2)
-            ref = di.strftime("%m/%Y") if di else ""
-            desc = f"Benefício {b.tipo} (rateio ref {ref})"
-            for cid in nao_recebem_ids:
-                db.session.add(DespesaCooperado(cooperado_id=cid, descricao=desc, valor=valor_unit, data=hoje))
+    # ---------- Recebedores (IDs e nomes) ----------
+    # 1) IDs: aceita lista recebedores_ids[] ou campo único "recebedores_ids" (separado por ; ou ,)
+    ids_list = f.getlist("recebedores_ids[]")
+    if not ids_list:
+        raw_ids = (f.get("recebedores_ids") or "").replace(",", ";")
+        ids_list = [x.strip() for x in raw_ids.split(";") if x.strip()]
 
-    proc("hosp", "hosp_valor")
-    proc("farm", "farm_valor")
-    proc("alim", "alim_valor")
+    # 2) Nomes: aceita lista recebedores_nomes[] ou campo único "recebedores_nomes"
+    nomes_list = f.getlist("recebedores_nomes[]")
+    if not nomes_list:
+        raw_nomes = (f.get("recebedores_nomes") or "").replace(",", ";")
+        nomes_list = [x.strip() for x in raw_nomes.split(";") if x.strip()]
+
+    # 3) Se vierem só IDs, tentamos resolver nomes pelo banco (quando possível)
+    only_ids = ids_list and not nomes_list
+    ids_int = [int(i) for i in ids_list if str(i).isdigit()]
+    if only_ids and ids_int:
+        coops = Cooperado.query.filter(Cooperado.id.in_(ids_int)).all()
+        name_map = {str(c.id): c.nome for c in coops}
+        nomes_list = [name_map.get(str(i), "") for i in ids_int]
+
+    # Sanitiza e grava
+    ids_sane   = [str(int(i)) for i in ids_list if str(i).isdigit()]
+    nomes_sane = [n for n in nomes_list if n]
+
+    b.recebedores_ids   = ";".join(ids_sane)
+    b.recebedores_nomes = ";".join(nomes_sane)
 
     db.session.commit()
-    flash("Rateios aplicados.", "success")
+    flash("Benefício atualizado.", "success")
+    return redirect(url_for("admin_dashboard", tab="beneficios"))
+
+
+@app.post("/beneficios/<int:id>/delete")
+@admin_required
+def delete_beneficio(id):
+    """
+    Exclui o registro de benefício do histórico.
+    (Não remove lançamentos de rateio em DespesaCooperado.)
+    """
+    b = BeneficioRegistro.query.get_or_404(id)
+    db.session.delete(b)
+    db.session.commit()
+    flash("Registro de benefício excluído.", "info")
     return redirect(url_for("admin_dashboard", tab="beneficios"))
 
 # =========================
@@ -4036,7 +3954,6 @@ def escalas_purge_restaurante(rest_id):
     db.session.commit()
     flash(f"Escalas do restaurante #{rest_id} excluídas ({res.rowcount or 0}).", "info")
     return redirect(url_for("admin_dashboard", tab="escalas"))
-
 
 # =========================
 # Trocas (Admin aprovar/recusar)
