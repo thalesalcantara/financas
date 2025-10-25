@@ -172,85 +172,152 @@
         </div>
       </section>
 
-      <!-- ===== ESCALAS ===== -->
-      <section data-view="escalas">
-        <div class="section-title"><i class="bi bi-calendar-week"></i> Escala semanal</div>
-        <div class="card card-body">
-          <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
-            <input type="hidden" name="view" value="escalas">
-            <div class="col-md-3">
-              <label class="form-label">Ver</label>
-              <select name="modo" class="form-select">
-                <option value="semana" {{ 'selected' if (_modo=='semana') }}>Semana completa</option>
-                <option value="dia" {{ 'selected' if (_modo=='dia') }}>Somente 1 dia</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Referência</label>
-              <input type="date" name="ref" class="form-control" value="{{ _ref_data and _ref_data.strftime('%Y-%m-%d') }}">
-            </div>
-            <div class="col-md-6 text-end">
-              <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
-              <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-arrow-counterclockwise"></i> Hoje</a>
-            </div>
-          </form>
+     <!-- ===== ESCALAS ===== -->
+<section data-view="escalas">
+  <div class="section-title"><i class="bi bi-calendar-week"></i> Escala semanal</div>
+  <div class="card card-body">
+    <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
+      <input type="hidden" name="view" value="escalas">
+      <div class="col-md-3">
+        <label class="form-label">Ver</label>
+        <select name="modo" class="form-select">
+          <option value="semana" {{ 'selected' if (_modo=='semana') }}>Semana completa</option>
+          <option value="dia" {{ 'selected' if (_modo=='dia') }}>Somente 1 dia</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Referência</label>
+        <input type="date" name="ref" class="form-control" value="{{ _ref_data and _ref_data.strftime('%Y-%m-%d') }}">
+      </div>
+      <div class="col-md-6 text-end">
+        <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-arrow-counterclockwise"></i> Hoje</a>
+      </div>
+    </form>
 
-          {% if _modo == 'semana' %}
-          <hr class="my-3">
-          <div class="row g-3">
-            {% for dia in _dias_list %}
-            <div class="col-md-6 col-lg-4">
-              <div class="card-soft">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <span class="badge text-bg-primary fw-semibold">{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][dia.weekday()] }} — {{ dia.strftime('%d/%m/%Y') }}</span>
-                  <i class="bi bi-people"></i>
-                </div>
-                <div style="max-height:360px; overflow:auto; border-top:1px dashed var(--border);">
-                  {% set lista = _agenda.get(dia, []) %}
-                  {% if lista %}
-                    {% for grupo in (lista | groupby('contrato')) %}
-                      {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                      <div class="fw-bold mt-2">{{ contrato_nome }}</div>
-                      {% for item in grupo.list %}
-                        <div class="py-2 border-bottom">
-                          <div class="fw-bold">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
-                          <div class="text-muted small">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
-                        </div>
-                      {% endfor %}
-                    {% endfor %}
-                  {% else %}
-                    <div class="text-muted small py-2">Sem escala registrada.</div>
+    {% if _modo == 'semana' %}
+    <hr class="my-3">
+    <div class="row g-3">
+      {% for dia in _dias_list %}
+      <div class="col-md-6 col-lg-4">
+        <div class="card-soft">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="badge text-bg-primary fw-semibold">{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][dia.weekday()] }} — {{ dia.strftime('%d/%m/%Y') }}</span>
+            <i class="bi bi-people"></i>
+          </div>
+          <div style="max-height:360px; overflow:auto; border-top:1px dashed var(--border);">
+            {% set lista = _agenda.get(dia, []) %}
+            {% if lista %}
+              {% for grupo in (lista | groupby('contrato')) %}
+                {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                <div class="fw-bold mt-2">{{ contrato_nome }}</div>
+
+                {# --- 1) Turnos de DIA --- #}
+                {% for item in grupo.list %}
+                  {% set t = (item.turno or '')|lower %}
+                  {% if 'noite' not in t and ( 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t ) %}
+                  <div class="py-2 border-bottom">
+                    <div class="fw-bold">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
+                    <div class="text-muted small">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
+                  </div>
                   {% endif %}
-                </div>
-              </div>
-            </div>
-            {% endfor %}
+                {% endfor %}
+
+                {# --- 2) Turnos de NOITE --- #}
+                {% for item in grupo.list %}
+                  {% set t = (item.turno or '')|lower %}
+                  {% if 'noite' in t %}
+                  <div class="py-2 border-bottom">
+                    <div class="fw-bold">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
+                    <div class="text-muted small">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
+                  </div>
+                  {% endif %}
+                {% endfor %}
+
+                {# --- 3) Turnos INDEFINIDOS (nem dia nem noite) --- #}
+                {% for item in grupo.list %}
+                  {% set t = (item.turno or '')|lower %}
+                  {% if not ('noite' in t or 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
+                  <div class="py-2 border-bottom">
+                    <div class="fw-bold">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
+                    <div class="text-muted small">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
+                  </div>
+                  {% endif %}
+                {% endfor %}
+
+              {% endfor %}
+            {% else %}
+              <div class="text-muted small py-2">Sem escala registrada.</div>
+            {% endif %}
           </div>
-          {% else %}
-          <hr class="my-3">
-          <div class="card-soft">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <span class="badge text-bg-primary fw-semibold">{{ _ref_data and ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][_ref_data.weekday()] }} — {{ _ref_data and _ref_data.strftime('%d/%m/%Y') }}</span>
-              <i class="bi bi-calendar-day"></i>
-            </div>
-            <table class="table table-bordered table-hover align-middle table-compact">
-              <thead><tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr></thead>
-              <tbody>
-                {% set lista = _agenda.get(_ref_data, []) if _ref_data else [] %}
-                {% if lista %}
-                  {% for grupo in (lista | groupby('contrato')) %}
-                    {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                    {% for item in grupo.list %}
-                    <tr><td>{{ contrato_nome }}</td><td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td><td>{{ item.turno or '—' }}</td><td>{{ item.horario or '—' }}</td></tr>
-                    {% endfor %}
-                  {% endfor %}
-                {% else %}<tr><td colspan="4" class="text-center text-muted">Sem escala registrada.</td></tr>{% endif %}
-              </tbody>
-            </table>
-          </div>
-          {% endif %}
         </div>
-      </section>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <hr class="my-3">
+    <div class="card-soft">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="badge text-bg-primary fw-semibold">{{ _ref_data and ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][_ref_data.weekday()] }} — {{ _ref_data and _ref_data.strftime('%d/%m/%Y') }}</span>
+        <i class="bi bi-calendar-day"></i>
+      </div>
+      <table class="table table-bordered table-hover align-middle table-compact">
+        <thead><tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr></thead>
+        <tbody>
+          {% set lista = _agenda.get(_ref_data, []) if _ref_data else [] %}
+          {% if lista %}
+            {% for grupo in (lista | groupby('contrato')) %}
+              {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+
+              {# --- 1) DIA --- #}
+              {% for item in grupo.list %}
+                {% set t = (item.turno or '')|lower %}
+                {% if 'noite' not in t and ( 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t ) %}
+                <tr>
+                  <td>{{ contrato_nome }}</td>
+                  <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
+                  <td>{{ item.turno or '—' }}</td>
+                  <td>{{ item.horario or '—' }}</td>
+                </tr>
+                {% endif %}
+              {% endfor %}
+
+              {# --- 2) NOITE --- #}
+              {% for item in grupo.list %}
+                {% set t = (item.turno or '')|lower %}
+                {% if 'noite' in t %}
+                <tr>
+                  <td>{{ contrato_nome }}</td>
+                  <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
+                  <td>{{ item.turno or '—' }}</td>
+                  <td>{{ item.horario or '—' }}</td>
+                </tr>
+                {% endif %}
+              {% endfor %}
+
+              {# --- 3) INDEFINIDOS --- #}
+              {% for item in grupo.list %}
+                {% set t = (item.turno or '')|lower %}
+                {% if not ('noite' in t or 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
+                <tr>
+                  <td>{{ contrato_nome }}</td>
+                  <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
+                  <td>{{ item.turno or '—' }}</td>
+                  <td>{{ item.horario or '—' }}</td>
+                </tr>
+                {% endif %}
+              {% endfor %}
+
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="4" class="text-center text-muted">Sem escala registrada.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</section>
 
       <!-- ===== AVISOS (carregado localmente ou via fetch da rota) ===== -->
 <section data-view="avisos">
