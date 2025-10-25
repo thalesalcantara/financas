@@ -2015,69 +2015,77 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </div>
       
-<!-- JS: seleção em massa + modal de exclusão (adicional) -->
+<!-- JS: seleção em massa + modal de exclusão (blindado) -->
 <script>
 (function(){
-  const tbl = document.getElementById('tabela-beneficios');
-  const checkAll = document.getElementById('check_all');
-  const bulkBtn = document.getElementById('btn-bulk-delete');
+  try {
+    const tbl      = document.getElementById('tabela-beneficios');
+    const checkAll = document.getElementById('check_all');
+    const bulkBtn  = document.getElementById('btn-bulk-delete');
+    const modal    = document.getElementById('modalExcluirBeneficio');
 
-  function allChecks(){
-    return tbl ? tbl.querySelectorAll('tbody .chk-beneficio') : [];
-  }
-  function checkedCount(){
-    return tbl ? tbl.querySelectorAll('tbody .chk-beneficio:checked').length : 0;
-  }
-  function toggleBulkBtn(){
-    if (bulkBtn) bulkBtn.disabled = checkedCount() === 0;
-  }
-  function updateHeaderState(){
-    const items = allChecks();
-    const total = items.length;
-    const checked = checkedCount();
-    if (!checkAll) return;
-    if (checked === 0){
-      checkAll.checked = false;
-      checkAll.indeterminate = false;
-    } else if (checked === total){
-      checkAll.checked = true;
-      checkAll.indeterminate = false;
-    } else {
-      checkAll.checked = false;
-      checkAll.indeterminate = true;
+    // Se nada do Benefícios existir nesta página/aba, sai silenciosamente.
+    if (!tbl && !checkAll && !bulkBtn && !modal) return;
+
+    const allChecks = () => tbl ? tbl.querySelectorAll('tbody .chk-beneficio') : [];
+    const checkedCount = () => tbl ? tbl.querySelectorAll('tbody .chk-beneficio:checked').length : 0;
+
+    function toggleBulkBtn(){
+      if (bulkBtn) bulkBtn.disabled = checkedCount() === 0;
     }
-  }
+    function updateHeaderState(){
+      if (!checkAll) return;
+      const items   = allChecks();
+      const total   = items.length;
+      const checked = checkedCount();
+      if (checked === 0){
+        checkAll.checked = false; checkAll.indeterminate = false;
+      } else if (checked === total){
+        checkAll.checked = true;  checkAll.indeterminate = false;
+      } else {
+        checkAll.checked = false; checkAll.indeterminate = true;
+      }
+    }
 
-  // Marcar/desmarcar todos
-  checkAll?.addEventListener('change', function(){
-    allChecks().forEach(ch => { ch.checked = checkAll.checked; });
+    // Marcar/desmarcar todos
+    if (checkAll) {
+      checkAll.addEventListener('change', function(){
+        allChecks().forEach(ch => { ch.checked = checkAll.checked; });
+        toggleBulkBtn();
+        updateHeaderState();
+      });
+    }
+
+    // Mudança em qualquer checkbox de linha
+    if (tbl) {
+      tbl.addEventListener('change', function(e){
+        if (e.target && e.target.classList && e.target.classList.contains('chk-beneficio')){
+          toggleBulkBtn();
+          updateHeaderState();
+        }
+      });
+    }
+
+    // Estado inicial (só se existirem os elementos)
     toggleBulkBtn();
     updateHeaderState();
-  });
 
-  // Mudança em qualquer checkbox de linha
-  tbl?.addEventListener('change', function(e){
-    if (e.target && e.target.classList && e.target.classList.contains('chk-beneficio')){
-      toggleBulkBtn();
-      updateHeaderState();
+    // Modal individual: preenche label + hidden
+    if (modal) {
+      modal.addEventListener('show.bs.modal', function (ev) {
+        const btn   = ev.relatedTarget;
+        const id    = btn ? btn.getAttribute('data-beneficio-id') : '';
+        const label = btn ? (btn.getAttribute('data-beneficio-label') || '—') : '—';
+        const labelNode = document.getElementById('beneficio_label_preview');
+        if (labelNode) labelNode.textContent = label;
+        const hidden = document.getElementById('beneficio_id_hidden');
+        if (hidden) hidden.value = id || '';
+      });
     }
-  });
-
-  // Estado inicial
-  toggleBulkBtn();
-  updateHeaderState();
-
-  // Modal individual: preenche label + hidden
-  const modal = document.getElementById('modalExcluirBeneficio');
-  modal?.addEventListener('show.bs.modal', function (ev) {
-    const btn   = ev.relatedTarget;
-    const id    = btn?.getAttribute('data-beneficio-id');
-    const label = btn?.getAttribute('data-beneficio-label') || '—';
-    const labelNode = document.getElementById('beneficio_label_preview');
-    if (labelNode) labelNode.textContent = label;
-    const hidden = document.getElementById('beneficio_id_hidden');
-    if (hidden) hidden.value = id || '';
-  });
+  } catch (err) {
+    // Qualquer erro daqui NÃO derruba o resto do site nem as abas
+    console.error('[beneficios-bulk-js]', err);
+  }
 })();
 </script>
 
