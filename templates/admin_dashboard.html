@@ -3289,236 +3289,250 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 <script>
 // =================== Confirmar exclusão (cliques em qualquer .btn-del) ===================
 document.addEventListener('click', function(e){
-  if(e.target.closest('.btn-del')){
-    if(!confirm('Tem certeza que deseja excluir?')) e.preventDefault();
+  if (e.target.closest('.btn-del')) {
+    if (!confirm('Tem certeza que deseja excluir?')) e.preventDefault();
   }
 });
 
 // =================== Helper: preencher modais via data-* ===================
-function bindModal(modalId, mapFields){
-  const el = document.getElementById(modalId);
-  if(!el) return;
-  el.addEventListener('show.bs.modal', (ev)=>{
-    const btn  = ev.relatedTarget;
-    const form = el.querySelector('form');
-    const ds   = btn?.dataset || {};
-    if(ds.url && form) form.setAttribute('action', ds.url);
-    if(!form) return;
+(function(){
+  function bindModal(modalId, mapFields){
+    const el = document.getElementById(modalId);
+    if(!el) return;
+    el.addEventListener('show.bs.modal', (ev)=>{
+      const btn  = ev.relatedTarget;
+      const form = el.querySelector('form');
+      const ds   = btn?.dataset || {};
+      if (ds.url && form) form.setAttribute('action', ds.url);
+      if (!form) return;
 
-    Object.keys(mapFields).forEach(k=>{
-      const name  = mapFields[k];
-      const input = form.querySelector(`[name="${name}"]`);
-      if(!input) return;
-      const val = ds[k] ?? '';
-      if(input.tagName === 'SELECT'){
-        [...input.options].forEach(o => o.selected = (String(o.value) === String(val)));
-      }else{
-        input.value = val;
-      }
+      Object.keys(mapFields).forEach(k=>{
+        const name  = mapFields[k];
+        const input = form.querySelector(`[name="${name}"]`);
+        if(!input) return;
+        const val = ds[k] ?? '';
+        if (input.tagName === 'SELECT') {
+          [...input.options].forEach(o => o.selected = (String(o.value) === String(val)));
+        } else {
+          input.value = val;
+        }
+      });
     });
-  });
-}
+  }
 
-bindModal('modalEditLancamento',   {id:'id', restaurante:'restaurante_id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', hora_inicio:'hora_inicio', hora_fim:'hora_fim'});
-bindModal('modalEditReceita',      {id:'id', descricao:'descricao', valor:'valor', data:'data'});
-bindModal('modalEditDespesa',      {id:'id', descricao:'descricao', valor:'valor', data:'data'});
-bindModal('modalEditReceitaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
-bindModal('modalEditDespesaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
-bindModal('modalEditCooperado',    {id:'id', nome:'nome', usuario:'usuario'});
-bindModal('modalResetSenhaCooperado', {id:'id'});
-bindModal('modalEditRestaurante',  {id:'id', nome:'nome', periodo:'periodo', usuario:'usuario'});
-bindModal('modalResetSenhaRestaurante', {id:'id'});
+  bindModal('modalEditLancamento',   {id:'id', restaurante:'restaurante_id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', hora_inicio:'hora_inicio', hora_fim:'hora_fim'});
+  bindModal('modalEditReceita',      {id:'id', descricao:'descricao', valor:'valor', data:'data'});
+  bindModal('modalEditDespesa',      {id:'id', descricao:'descricao', valor:'valor', data:'data'});
+  bindModal('modalEditReceitaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
+  bindModal('modalEditDespesaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
+  bindModal('modalEditCooperado',    {id:'id', nome:'nome', usuario:'usuario'});
+  bindModal('modalResetSenhaCooperado', {id:'id'});
+  bindModal('modalEditRestaurante',  {id:'id', nome:'nome', periodo:'periodo', usuario:'usuario'});
+  bindModal('modalResetSenhaRestaurante', {id:'id'});
+})();
 
 // =================== Gráficos (Chart.js) ===================
-function buildLineChart(canvasId, labels, values, label){
-  const ctx = document.getElementById(canvasId);
-  if(!ctx || !window.Chart) return;
-  new Chart(ctx, {
-    type:'line',
-    data:{
-      labels: labels,
-      datasets:[{
-        label: label,
-        data: values,
-        tension:.25,
-        borderWidth:2,
-        pointRadius:3,
-        fill:false
-      }]
-    },
-    options:{
-      responsive:true,
-      maintainAspectRatio:false,
-      scales:{ y:{ beginAtZero:true, ticks:{ callback:(v)=>'R$ '+Number(v).toLocaleString('pt-BR') } } },
-      plugins:{
-        legend:{ display:true },
-        tooltip:{ callbacks:{ label:(c)=>'R$ '+Number(c.parsed.y).toLocaleString('pt-BR',{minimumFractionDigits:2}) } }
+(function(){
+  function buildLineChart(canvasId, labels, values, label){
+    const ctx = document.getElementById(canvasId);
+    if(!ctx || !window.Chart) return;
+    new Chart(ctx, {
+      type:'line',
+      data:{
+        labels: labels,
+        datasets:[{
+          label: label,
+          data: values,
+          tension:.25,
+          borderWidth:2,
+          pointRadius:3,
+          fill:false
+        }]
+      },
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        scales:{ y:{ beginAtZero:true, ticks:{ callback:(v)=>'R$ '+Number(v).toLocaleString('pt-BR') } } },
+        plugins:{
+          legend:{ display:true },
+          tooltip:{ callbacks:{ label:(c)=>'R$ '+Number(c.parsed.y).toLocaleString('pt-BR',{minimumFractionDigits:2}) } }
+        }
       }
-    }
+    });
+  }
+
+  window.addEventListener('load', function(){
+    const rawLancCoop   = {{ (chart_data_lancamentos_coop or {'labels':[], 'values':[]}) | tojson }};
+    const rawLancCooper = {{ (chart_data_lancamentos_cooperados or {'labels':[], 'values':[]}) | tojson }};
+    const fallbackLancCoop   = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
+    const fallbackLancCooper = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
+    const dataLancCoop   = (rawLancCoop.labels?.length && rawLancCoop.values?.length) ? rawLancCoop : fallbackLancCoop;
+    const dataLancCooper = (rawLancCooper.labels?.length && rawLancCooper.values?.length) ? rawLancCooper : fallbackLancCooper;
+
+    buildLineChart('chartLancCoop',        dataLancCoop.labels,   dataLancCoop.values,   'Lançamentos/Produções');
+    buildLineChart('chartLancCooperados',  dataLancCooper.labels, dataLancCooper.values, 'Lançamentos/Produções');
   });
-}
-
-window.addEventListener('load', function(){
-  const rawLancCoop   = {{ (chart_data_lancamentos_coop or {'labels':[], 'values':[]}) | tojson }};
-  const rawLancCooper = {{ (chart_data_lancamentos_cooperados or {'labels':[], 'values':[]}) | tojson }};
-  const fallbackLancCoop   = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
-  const fallbackLancCooper = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
-  const dataLancCoop   = (rawLancCoop.labels && rawLancCoop.labels.length && rawLancCoop.values && rawLancCoop.values.length) ? rawLancCoop : fallbackLancCoop;
-  const dataLancCooper = (rawLancCooper.labels && rawLancCooper.labels.length && rawLancCooper.values && rawLancCooper.values.length) ? rawLancCooper : fallbackLancCooper;
-
-  buildLineChart('chartLancCoop',        dataLancCoop.labels,   dataLancCoop.values,   'Lançamentos/Produções');
-  buildLineChart('chartLancCooperados',  dataLancCooper.labels, dataLancCooper.values, 'Lançamentos/Produções');
-});
+})();
 
 // =================== Preservar aba ativa via ?tab= e contador 31/12 ===================
-document.addEventListener('DOMContentLoaded', () => {
-  const params = new URLSearchParams(location.search);
-  const targetTab = params.get('tab');
-  if(targetTab){
-    const link = document.querySelector(`.sidebar .nav-link[href="#${targetTab}"]`);
-    if(link && window.bootstrap?.Tab){ new bootstrap.Tab(link).show(); }
-  }
-  document.querySelectorAll('.sidebar .nav-link[data-bs-toggle="tab"]').forEach(a => {
-    a.addEventListener('shown.bs.tab', (e) => {
-      const id = e.target.getAttribute('href')?.slice(1) || '';
-      if(!id) return;
-      const p = new URLSearchParams(location.search);
-      p.set('tab', id);
-      history.replaceState(null, '', location.pathname + '?' + p.toString() + e.target.getAttribute('href'));
-    });
-  });
-
-  // Contagem regressiva até 31/12 (aba Escalas)
-  const anoSpan = document.getElementById('prazoAno');
-  const diasSpan = document.getElementById('prazoDias');
-  function updatePrazo() {
-    const now = new Date();
-    let target = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
-    if (now > target) target = new Date(now.getFullYear()+1, 11, 31, 23, 59, 59);
-    const diff = target - now;
-    const dias = Math.max(0, Math.ceil(diff / (1000*60*60*24)));
-    if (anoSpan)  anoSpan.textContent  = target.getFullYear();
-    if (diasSpan) diasSpan.textContent = dias;
-  }
-  updatePrazo();
-  setInterval(updatePrazo, 60*1000);
-});
-
-// =================== ESCALAS: normalização de horário & cores ===================
-const ESCALAS = {{ escalas_por_coop|default({})|tojson }};
-const modalEsc = document.getElementById('modalEscalas');
-
-const norm = (s) => String(s||'')
-  .normalize('NFD').replace(/\p{Diacritic}/gu,'')
-  .toLowerCase().replace(/[^a-z0-9]/g,'');
-
-function pick(obj, aliases){
-  const keys = Object.keys(obj||{});
-  for(const name of aliases){
-    const target = norm(name);
-    for(const k of keys){
-      if(norm(k).includes(target)){
-        const v = obj[k];
-        if(v !== undefined && v !== null && String(v).trim() !== '') return v;
+(function(){
+  document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(location.search);
+    const targetTab = params.get('tab');
+    if (targetTab) {
+      const link = document.querySelector(`.sidebar .nav-link[href="#${targetTab}"]`);
+      if (link && window.bootstrap?.Tab) {
+        bootstrap.Tab.getOrCreateInstance(link).show();
       }
     }
-  }
-  return '';
-}
+    document.querySelectorAll('.sidebar .nav-link[data-bs-toggle="tab"]').forEach(a => {
+      a.addEventListener('shown.bs.tab', (e) => {
+        const id = e.target.getAttribute('href')?.slice(1) || '';
+        if (!id) return;
+        const p = new URLSearchParams(location.search);
+        p.set('tab', id);
+        // Atualiza query + hash limpo (sem duplicar)
+        history.replaceState(null, '', `${location.pathname}?${p.toString()}#${id}`);
+      });
+    });
 
-function resolveCores(row){
-  const spec = pick(row, ['cor_linha','cores','cor','color','row_color','linha_cor','bg','background','style']) || '';
-
-  function normColor(c){
-    if(!c) return null;
-    c = String(c).trim();
-    if (/^[0-9A-Fa-f]{8}$/.test(c)) {
-      const a = parseInt(c.slice(0,2),16)/255;
-      const r = parseInt(c.slice(2,4),16);
-      const g = parseInt(c.slice(4,6),16);
-      const b = parseInt(c.slice(6,8),16);
-      return `rgba(${r},${g},${b},${a.toFixed(3)})`;
+    // Contagem regressiva até 31/12 (aba Escalas)
+    const anoSpan = document.getElementById('prazoAno');
+    const diasSpan = document.getElementById('prazoDias');
+    function updatePrazo() {
+      const now = new Date();
+      let target = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+      if (now > target) target = new Date(now.getFullYear()+1, 11, 31, 23, 59, 59);
+      const diff = target - now;
+      const dias = Math.max(0, Math.ceil(diff / (1000*60*60*24)));
+      if (anoSpan)  anoSpan.textContent  = target.getFullYear();
+      if (diasSpan) diasSpan.textContent = dias;
     }
-    if (/^[0-9A-Fa-f]{6}$/.test(c)) return `#${c}`;
-    if (/^#[0-9A-Fa-f]{6,8}$/.test(c)) {
-      if (c.length === 9) {
-        const a = parseInt(c.slice(1,3),16)/255;
-        const r = parseInt(c.slice(3,5),16);
-        const g = parseInt(c.slice(5,7),16);
-        const b = parseInt(c.slice(7,9),16);
+    updatePrazo();
+    setInterval(updatePrazo, 60*1000);
+  });
+})();
+
+// =================== ESCALAS: normalização de horário & cores (isolado) ===================
+(function(){
+  const ESCALAS = {{ escalas_por_coop|default({})|tojson }};
+  const modalEsc = document.getElementById('modalEscalas');
+  if (!modalEsc) return;
+
+  // Remoção de acentos compatível
+  const stripDia = (s)=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const norm = (s)=> stripDia(String(s||'')).toLowerCase().replace(/[^a-z0-9]/g,'');
+
+  function pick(obj, aliases){
+    const keys = Object.keys(obj||{});
+    for(const name of aliases){
+      const target = norm(name);
+      for(const k of keys){
+        if (norm(k).includes(target)) {
+          const v = obj[k];
+          if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+        }
+      }
+    }
+    return '';
+  }
+
+  function resolveCores(row){
+    const spec = pick(row, ['cor_linha','cores','cor','color','row_color','linha_cor','bg','background','style']) || '';
+
+    function normColor(c){
+      if(!c) return null;
+      c = String(c).trim();
+      // ARGB/hex8 (AARRGGBB)
+      if (/^[0-9A-Fa-f]{8}$/.test(c)) {
+        const a = parseInt(c.slice(0,2),16)/255;
+        const r = parseInt(c.slice(2,4),16);
+        const g = parseInt(c.slice(4,6),16);
+        const b = parseInt(c.slice(6,8),16);
         return `rgba(${r},${g},${b},${a.toFixed(3)})`;
       }
-      return c;
-    }
-    const map = { amarelo:'#fff3cd', vermelho:'#f8d7da', verde:'#d1e7dd', azul:'#cfe2ff', cinza:'#e9ecef', laranja:'#ffe5b4', roxo:'#e0d1ff', rosa:'#ffd6e7' };
-    const low = c.toLowerCase();
-    return map[low] || c;
-  }
-
-  function parseColorSpec(spec){
-    const out = { rowBg:null, rowFg:null, colBg:[null,null,null,null], colFg:[null,null,null,null] };
-    if(!spec) return out;
-
-    if (Array.isArray(spec)) {
-      const parts = spec.map(normColor);
-      if (parts.length === 1){ out.rowBg = parts[0]; return out; }
-      if (parts.length === 2){ out.rowBg = parts[0]; out.rowFg = parts[1]; return out; }
-      if (parts.length >= 4){
-        out.colBg = [parts[0],parts[1],parts[2],parts[3]];
-        if (parts.length >= 8) out.colFg = [parts[4],parts[5],parts[6],parts[7]];
-        return out;
+      // hex6
+      if (/^[0-9A-Fa-f]{6}$/.test(c)) return `#${c}`;
+      // #RRGGBB / #AARRGGBB
+      if (/^#[0-9A-Fa-f]{6,8}$/.test(c)) {
+        if (c.length === 9) {
+          const a = parseInt(c.slice(1,3),16)/255;
+          const r = parseInt(c.slice(3,5),16);
+          const g = parseInt(c.slice(5,7),16);
+          const b = parseInt(c.slice(7,9),16);
+          return `rgba(${r},${g},${b},${a.toFixed(3)})`;
+        }
+        return c;
       }
+      const map = { amarelo:'#fff3cd', vermelho:'#f8d7da', verde:'#d1e7dd', azul:'#cfe2ff', cinza:'#e9ecef', laranja:'#ffe5b4', roxo:'#e0d1ff', rosa:'#ffd6e7' };
+      const low = c.toLowerCase();
+      return map[low] || c;
     }
 
-    if (typeof spec === 'string') {
-      try {
-        const trimmed = spec.trim();
-        if (trimmed.startsWith('[') || trimmed.startsWith('{')) return parseColorSpec(JSON.parse(trimmed));
-      } catch(_){}
-      const parts = spec.split('|').map(s=>normColor(s.trim())).filter(Boolean);
-      if (parts.length === 1){ out.rowBg = parts[0]; return out; }
-      if (parts.length === 2){ out.rowBg = parts[0]; out.rowFg = parts[1]; return out; }
-      if (parts.length >= 4){
-        out.colBg = [parts[0],parts[1],parts[2],parts[3]];
-        if (parts.length >= 8) out.colFg = [parts[4],parts[5],parts[6],parts[7]];
+    function parseColorSpec(spec){
+      const out = { rowBg:null, rowFg:null, colBg:[null,null,null,null], colFg:[null,null,null,null] };
+      if(!spec) return out;
+
+      if (Array.isArray(spec)) {
+        const parts = spec.map(normColor);
+        if (parts.length === 1){ out.rowBg = parts[0]; return out; }
+        if (parts.length === 2){ out.rowBg = parts[0]; out.rowFg = parts[1]; return out; }
+        if (parts.length >= 4){
+          out.colBg = [parts[0],parts[1],parts[2],parts[3]];
+          if (parts.length >= 8) out.colFg = [parts[4],parts[5],parts[6],parts[7]];
+          return out;
+        }
+      }
+
+      if (typeof spec === 'string') {
+        try {
+          const t = spec.trim();
+          if (t.startsWith('[') || t.startsWith('{')) return parseColorSpec(JSON.parse(t));
+        } catch(_){}
+        const parts = spec.split('|').map(s=>normColor(s.trim())).filter(Boolean);
+        if (parts.length === 1){ out.rowBg = parts[0]; return out; }
+        if (parts.length === 2){ out.rowBg = parts[0]; out.rowFg = parts[1]; return out; }
+        if (parts.length >= 4){
+          out.colBg = [parts[0],parts[1],parts[2],parts[3]];
+          if (parts.length >= 8) out.colFg = [parts[4],parts[5],parts[6],parts[7]];
+          return out;
+        }
+        out.rowBg = normColor(spec);
         return out;
       }
-      out.rowBg = normColor(spec);
+
+      if (typeof spec === 'object') {
+        if (spec.rowBg || spec.rowFg || spec.colBg || spec.colFg) {
+          out.rowBg = normColor(spec.rowBg);
+          out.rowFg = normColor(spec.rowFg);
+          out.colBg = (spec.colBg||[]).map(normColor).concat([null,null,null,null]).slice(0,4);
+          out.colFg = (spec.colFg||[]).map(normColor).concat([null,null,null,null]).slice(0,4);
+          return out;
+        }
+        const bgData     = normColor(spec.bgData||spec.data||spec.bg_data);
+        const bgTurno    = normColor(spec.bgTurno||spec.turno||spec.bg_turno);
+        const bgHorario  = normColor(spec.bgHorario||spec.horario||spec.bg_horario||spec.hora);
+        const bgContrato = normColor(spec.bgContrato||spec.contrato||spec.bg_contrato);
+        const fgData     = normColor(spec.fgData||spec.textData);
+        const fgTurno    = normColor(spec.fgTurno||spec.textTurno);
+        const fgHorario  = normColor(spec.fgHorario||spec.textHorario||spec.textHora);
+        const fgContrato = normColor(spec.fgContrato||spec.textContrato);
+        if (bgData || bgTurno || bgHorario || bgContrato) {
+          out.colBg = [bgData,bgTurno,bgHorario,bgContrato];
+          out.colFg = [fgData,fgTurno,fgHorario,fgContrato];
+        }
+        return out;
+      }
       return out;
     }
 
-    if (typeof spec === 'object') {
-      if (spec.rowBg || spec.rowFg || spec.colBg || spec.colFg) {
-        out.rowBg = normColor(spec.rowBg);
-        out.rowFg = normColor(spec.rowFg);
-        out.colBg = (spec.colBg||[]).map(normColor).concat([null,null,null,null]).slice(0,4);
-        out.colFg = (spec.colFg||[]).map(normColor).concat([null,null,null,null]).slice(0,4);
-        return out;
-      }
-      const bgData     = normColor(spec.bgData||spec.data||spec.bg_data);
-      const bgTurno    = normColor(spec.bgTurno||spec.turno||spec.bg_turno);
-      const bgHorario  = normColor(spec.bgHorario||spec.horario||spec.bg_horario||spec.hora);
-      const bgContrato = normColor(spec.bgContrato||spec.contrato||spec.bg_contrato);
-      const fgData     = normColor(spec.fgData||spec.textData);
-      const fgTurno    = normColor(spec.fgTurno||spec.textTurno);
-      const fgHorario  = normColor(spec.fgHorario||spec.textHorario||spec.textHora);
-      const fgContrato = normColor(spec.fgContrato||spec.textContrato);
-      if (bgData || bgTurno || bgHorario || bgContrato) {
-        out.colBg = [bgData,bgTurno,bgHorario,bgContrato];
-        out.colFg = [fgData,fgTurno,fgHorario,fgContrato];
-      }
-      return out;
-    }
-    return out;
+    return parseColorSpec(spec);
   }
 
-  return parseColorSpec(spec);
-}
-
-if (modalEsc) {
   modalEsc.addEventListener('show.bs.modal', (ev) => {
     const coopId = ev.relatedTarget?.dataset?.coopid;
     const tbody  = modalEsc.querySelector('#tbody-escala');
+    if (!tbody) return;
     tbody.innerHTML = '';
 
     const raw = ESCALAS[String(coopId)] || [];
@@ -3535,9 +3549,9 @@ if (modalEsc) {
       const contrato = pick(e, ['contrato','setor','unidade','contr','local']) || '';
       let   horario  = pick(e, ['horário','horario','hora','horas','turno/horario','escala','jornada']);
       if(!horario){
-        for(const [k,v] of Object.entries(e||{})){
+        for (const v of Object.values(e||{})) {
           const s = String(v??'').trim();
-          if(s && /\b\d{1,2}:\d{2}/.test(s)){ horario = s; break; }
+          if (s && /\b\d{1,2}:\d{2}/.test(s)) { horario = s; break; }
         }
       }
       const fmtHorario = (h)=>{
@@ -3578,7 +3592,7 @@ if (modalEsc) {
       tbody.appendChild(tr);
     }
   });
-}
+})();
 
 // =================== BENEFÍCIOS: prévia + cálculo de totais antes de enviar ===================
 (function(){
