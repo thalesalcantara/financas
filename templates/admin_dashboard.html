@@ -188,18 +188,33 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       <i class="bi bi-heart-pulse"></i> <span>Benefícios</span>
     </a>
 
-    <!-- Cooperados -->
-<a class="nav-link" data-bs-toggle="tab" href="#cooperados" role="tab" aria-controls="cooperados">
+   <!-- Cooperados -->
+<a class="nav-link {{ 'active' if _tab=='cooperados' else '' }}"
+   data-bs-toggle="tab"
+   href="#cooperados"
+   role="tab"
+   aria-controls="cooperados"
+   aria-selected="{{ 'true' if _tab=='cooperados' else 'false' }}">
   <i class="bi bi-person-badge"></i> <span>Cooperados</span>
 </a>
 
-   <!-- Estabelecimentos -->
-<a class="nav-link" data-bs-toggle="tab" href="#restaurantes" role="tab" aria-controls="restaurantes">
+  <!-- Estabelecimentos -->
+<a class="nav-link {{ 'active' if _tab=='restaurantes' else '' }}"
+   data-bs-toggle="tab"
+   href="#restaurantes"
+   role="tab"
+   aria-controls="restaurantes"
+   aria-selected="{{ 'true' if _tab=='restaurantes' else 'false' }}">
   <i class="bi bi-shop"></i> <span>Estabelecimentos</span>
 </a>
 
-   <!-- Escalas -->
-<a class="nav-link" data-bs-toggle="tab" href="#escalas" role="tab" aria-controls="escalas">
+ <!-- Escalas -->
+<a class="nav-link {{ 'active' if _tab=='escalas' else '' }}"
+   data-bs-toggle="tab"
+   href="#escalas"
+   role="tab"
+   aria-controls="escalas"
+   aria-selected="{{ 'true' if _tab=='escalas' else 'false' }}">
   <i class="bi bi-calendar2-week"></i> <span>Escalas</span>
 </a>
 
@@ -219,10 +234,11 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       <i class="bi bi-megaphone"></i> <span>Avisos</span>
     </a>
 
-   <!-- Config (tab) -->
+  <!-- Config (tab) -->
 <a id="tab-config"
    class="nav-link {{ 'active' if _tab=='config' else '' }}"
    data-bs-toggle="tab"
+   data-bs-target="#config"
    href="#config"
    role="tab"
    aria-controls="config"
@@ -2663,7 +2679,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </script>
 </section>
        <!-- ESCALAS -->
-      <section class="tab-pane fade" id="escalas">
+      <section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h4 class="mb-0">Escalas</h4>
           <div class="alert alert-info py-1 px-2 mb-0">
