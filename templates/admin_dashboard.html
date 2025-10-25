@@ -1923,8 +1923,8 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         </form>
       </div>
 
-      <!-- Ações em massa -->
-<form id="form-bulk-beneficios" method="POST" action="{{ url_for('excluir_beneficio_bulk') }}" class="d-flex align-items-center gap-2 mt-2">
+     <!-- Ações em massa -->
+<form id="form-bulk-beneficios" method="POST" action="/beneficios/delete-bulk" class="d-flex align-items-center gap-2 mt-2">
   {# <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> #}
   <input type="hidden" name="tab" value="beneficios">
   <button type="submit" class="btn btn-outline-danger btn-sm" id="btn-bulk-delete" disabled>
@@ -1938,7 +1938,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <thead class="table-light">
       <tr class="text-nowrap">
         <th class="text-center" style="width:36px;">
-          <input type="checkbox" id="check_all">
+          <input type="checkbox" id="check_all" aria-label="Marcar todos">
         </th>
         <th>Referência</th>
         <th>Data Lançamento</th>
@@ -1965,9 +1965,9 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           {% if mostrar %}
             <tr data-bid="{{ b.id }}">
               <td class="text-center">
-                {# 1 checkbox por benefício (primeira linha do grupo) #}
+                {# 1 checkbox por benefício (na 1ª linha de cada grupo) #}
                 {% if loop.first %}
-                  <input type="checkbox" class="chk-beneficio" name="ids" form="form-bulk-beneficios" value="{{ b.id }}">
+                  <input type="checkbox" class="chk-beneficio" name="ids[]" form="form-bulk-beneficios" value="{{ b.id }}">
                 {% endif %}
               </td>
               <td>{{ b.data_inicial.strftime('%d/%m/%Y') }} – {{ b.data_final.strftime('%d/%m/%Y') }}</td>
@@ -1999,7 +1999,8 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 <!-- Modal: Excluir benefício (único) -->
 <div class="modal fade" id="modalExcluirBeneficio" tabindex="-1" aria-labelledby="modalExcluirBeneficioLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <form method="POST" action="{{ url_for('excluir_beneficio') }}" class="modal-content" id="form-del-one">
+    <!-- IMPORTANTE: action literal para evitar BuildError; JS troca o hidden -->
+    <form method="POST" action="/beneficios/delete" class="modal-content" id="form-del-one">
       {# <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> #}
       <input type="hidden" name="beneficio_id" id="beneficio_id_hidden">
       <div class="modal-header">
@@ -2009,124 +2010,77 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
       <div class="modal-body">
-        <p class="mb-0">Tem certeza que deseja excluir o benefício: <b id="beneficio_label_preview">—</b>?</p>
+        <p class="mb-0">
+          Tem certeza que deseja excluir o benefício: <b id="beneficio_label_preview">—</b>?
+        </p>
         <small class="text-muted">Esta ação não pode ser desfeita.</small>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-        <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i> Excluir</button>
+        <button type="submit" class="btn btn-danger">
+          <i class="bi bi-trash"></i> Excluir
+        </button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- JS de prévia dos rateios (sem dependências) -->
+<!-- JS: checagens/bulk + modal -->
 <script>
-  (function(){
-    const fmt = v => isFinite(v) ? v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—';
+(function(){
+  // ============ Selecionar todos / habilitar botão ============
+  const bulkForm = document.getElementById('form-bulk-beneficios');
+  const checkAll = document.getElementById('check_all');
+  const bulkBtn  = document.getElementById('btn-bulk-delete');
 
-    function calc(block){
-      const unit   = parseFloat((document.getElementById(block+'_valor_unit')?.value || '').replace(',', '.')) || 0;
-      const benSel = Array.from(document.getElementById(block+'_beneficiarios')?.selectedOptions || []).length;
-      const isenSel= Array.from(document.getElementById(block+'_isencoes')?.selectedOptions || []).length;
-      const totalCoops = document.getElementById(block+'_beneficiarios')?.options.length || 0;
+  function toggleBulkBtn(){
+    const any = document.querySelectorAll('.chk-beneficio:checked').length > 0;
+    if (bulkBtn) bulkBtn.disabled = !any;
+  }
 
-      const total = unit * benSel;
-      const pagantes = Math.max(totalCoops - benSel - isenSel, 0);
-      const porPagante = pagantes > 0 ? (total / pagantes) : NaN;
-
-      // badge
-      const badge = document.getElementById(block+'_badge');
-      if(badge){
-        badge.textContent = `Beneficiados: ${benSel} · Isentos: ${isenSel} · Pagantes: ${pagantes} · Total: ${fmt(total)} · Rateio/pagante: ${fmt(porPagante)}`;
-      }
-      // hidden total p/ backend
-      const hidden = document.getElementById(block+'_valor_total');
-      if(hidden) hidden.value = isFinite(total) ? total.toFixed(2) : '0.00';
-    }
-
-    ['hosp','farm','alim'].forEach(b=>{
-      ['hosp','farm','alim'].includes(b);
-      ['valor_unit','beneficiarios','isencoes'].forEach(suf=>{
-        const el = document.getElementById(`${b}_${suf}`);
-        if(!el) return;
-        el.addEventListener('input', ()=>calc(b));
-        el.addEventListener('change', ()=>calc(b));
-      });
-      calc(b); // inicial
-    });
-  })();
-</script>
-</section>
-
-<!-- JS de exclusão (individual e em massa) -->
-<script>
-  (function(){
-    // --- Habilita/desabilita botão de exclusão em massa
-    function toggleBulkBtn(){
-      const anyChecked = document.querySelectorAll('.chk-beneficio:checked').length > 0;
-      const btn = document.getElementById('btn-bulk-delete');
-      if (btn) btn.disabled = !anyChecked;
-    }
-
-    // "Selecionar todos"
-    const checkAll = document.getElementById('check_all');
-    if (checkAll) {
-      checkAll.addEventListener('change', function(){
-        document.querySelectorAll('.chk-beneficio').forEach(ch => { ch.checked = checkAll.checked; });
-        toggleBulkBtn();
-      });
-    }
-
-    // Mudança em qualquer checkbox individual
-    document.addEventListener('change', function(e){
-      if (e.target && e.target.classList && e.target.classList.contains('chk-beneficio')) {
-        // Se algum for desmarcado, desmarca o "select all"
-        if (!e.target.checked && checkAll) checkAll.checked = false;
-        // Se todos estão marcados, marca o "select all"
-        if (checkAll) {
-          const all = document.querySelectorAll('.chk-beneficio');
-          const allChecked = Array.from(all).length > 0 && Array.from(all).every(ch => ch.checked);
-          checkAll.checked = allChecked;
-        }
-        toggleBulkBtn();
-      }
-    });
-
-    // --- Modal de exclusão individual: injeta action e label
-    const modal = document.getElementById('modalExcluirBeneficio');
-    if (modal) {
-      modal.addEventListener('show.bs.modal', function (ev) {
-        const btn   = ev.relatedTarget;
-        const id    = btn?.getAttribute('data-beneficio-id');
-        const label = btn?.getAttribute('data-beneficio-label') || '—';
-
-        const lbl = document.getElementById('beneficio_label_preview');
-        if (lbl) lbl.textContent = label;
-
-        // Define a rota individual correta: /beneficios/<id>/delete
-        const form = document.getElementById('form-del-one');
-        if (form && id) form.action = `/beneficios/${id}/delete`;
-      });
-    }
-
-    // --- Garante que o form de bulk aponte para a rota de bulk
-    const formBulk = document.getElementById('form-bulk-beneficios');
-    if (formBulk) {
-      // backend de bulk: /beneficios/delete-bulk
-      formBulk.action = '/beneficios/delete-bulk';
-      formBulk.addEventListener('submit', function(e){
-        // Se nada selecionado, evita submit
-        if (document.querySelectorAll('.chk-beneficio:checked').length === 0) {
-          e.preventDefault();
-          alert('Selecione ao menos um benefício para excluir.');
-        }
-      });
-    }
-
-    // Estado inicial do botão
+  checkAll?.addEventListener('change', function(){
+    const all = document.querySelectorAll('.chk-beneficio');
+    all.forEach(ch => { ch.checked = checkAll.checked; });
     toggleBulkBtn();
-  })();
+  });
+
+  document.addEventListener('change', function(e){
+    if(e.target && e.target.classList && e.target.classList.contains('chk-beneficio')){
+      // se algum desmarcar, desmarca o "marcar todos"
+      if (!e.target.checked && checkAll) checkAll.checked = false;
+      // se todos ficarem marcados, marca o "marcar todos"
+      const all = document.querySelectorAll('.chk-beneficio');
+      const on  = document.querySelectorAll('.chk-beneficio:checked');
+      if (checkAll && all.length && on.length === all.length) checkAll.checked = true;
+      toggleBulkBtn();
+    }
+  });
+
+  // Confirmação no submit em massa
+  bulkForm?.addEventListener('submit', function(ev){
+    const total = document.querySelectorAll('.chk-beneficio:checked').length;
+    if (total === 0){
+      ev.preventDefault();
+      return;
+    }
+    if(!confirm(`Excluir ${total} registro(s) de benefício?`)){
+      ev.preventDefault();
+    }
+  });
+
+  // ============ Exclusão individual (modal) ============
+  const modal = document.getElementById('modalExcluirBeneficio');
+  modal?.addEventListener('show.bs.modal', function (ev) {
+    const btn   = ev.relatedTarget;
+    const id    = btn?.getAttribute('data-beneficio-id');
+    const label = btn?.getAttribute('data-beneficio-label') || '—';
+    document.getElementById('beneficio_label_preview').textContent = label;
+
+    // Preenche hidden e mantém action fixa em /beneficios/delete (POST)
+    const hid = document.getElementById('beneficio_id_hidden');
+    if (hid && id) hid.value = id;
+  });
+})();
 </script>
 
     <!-- COOPERADOS (versão profissional / drop-in) -->
