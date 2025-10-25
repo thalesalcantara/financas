@@ -1924,7 +1924,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       </div>
 
      <!-- Ações em massa -->
-<form id="form-bulk-beneficios" method="POST" action="/beneficios/delete-bulk" class="d-flex align-items-center gap-2 mt-2">
+<form id="form-bulk-beneficios" method="POST" action="{{ url_for('excluir_beneficio_bulk') }}" class="d-flex align-items-center gap-2 mt-2">
   {# <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> #}
   <input type="hidden" name="tab" value="beneficios">
   <button type="submit" class="btn btn-outline-danger btn-sm" id="btn-bulk-delete" disabled>
@@ -1938,7 +1938,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <thead class="table-light">
       <tr class="text-nowrap">
         <th class="text-center" style="width:36px;">
-          <input type="checkbox" id="check_all" aria-label="Marcar todos">
+          <input type="checkbox" id="check_all">
         </th>
         <th>Referência</th>
         <th>Data Lançamento</th>
@@ -1965,9 +1965,13 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           {% if mostrar %}
             <tr data-bid="{{ b.id }}">
               <td class="text-center">
-                {# 1 checkbox por benefício (na 1ª linha de cada grupo) #}
+                {# Mostra 1 checkbox por benefício (na primeira linha daquele benefício) #}
                 {% if loop.first %}
-                  <input type="checkbox" class="chk-beneficio" name="ids[]" form="form-bulk-beneficios" value="{{ b.id }}">
+                  <input type="checkbox"
+                         class="chk-beneficio"
+                         name="ids[]"
+                         form="form-bulk-beneficios"
+                         value="{{ b.id }}">
                 {% endif %}
               </td>
               <td>{{ b.data_inicial.strftime('%d/%m/%Y') }} – {{ b.data_final.strftime('%d/%m/%Y') }}</td>
@@ -1999,8 +2003,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 <!-- Modal: Excluir benefício (único) -->
 <div class="modal fade" id="modalExcluirBeneficio" tabindex="-1" aria-labelledby="modalExcluirBeneficioLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <!-- IMPORTANTE: action literal para evitar BuildError; JS troca o hidden -->
-    <form method="POST" action="/beneficios/delete" class="modal-content" id="form-del-one">
+    <form method="POST" class="modal-content" id="form-del-one" action="{{ url_for('excluir_beneficio_one') }}">
       {# <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> #}
       <input type="hidden" name="beneficio_id" id="beneficio_id_hidden">
       <div class="modal-header">
@@ -2025,60 +2028,68 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </div>
 
-<!-- JS: checagens/bulk + modal -->
+<!-- JS: seleção em massa + modal de exclusão (adicional) -->
 <script>
 (function(){
-  // ============ Selecionar todos / habilitar botão ============
-  const bulkForm = document.getElementById('form-bulk-beneficios');
+  const tbl = document.getElementById('tabela-beneficios');
   const checkAll = document.getElementById('check_all');
-  const bulkBtn  = document.getElementById('btn-bulk-delete');
+  const bulkBtn = document.getElementById('btn-bulk-delete');
 
+  function allChecks(){
+    return tbl ? tbl.querySelectorAll('tbody .chk-beneficio') : [];
+  }
+  function checkedCount(){
+    return tbl ? tbl.querySelectorAll('tbody .chk-beneficio:checked').length : 0;
+  }
   function toggleBulkBtn(){
-    const any = document.querySelectorAll('.chk-beneficio:checked').length > 0;
-    if (bulkBtn) bulkBtn.disabled = !any;
+    if (bulkBtn) bulkBtn.disabled = checkedCount() === 0;
+  }
+  function updateHeaderState(){
+    const items = allChecks();
+    const total = items.length;
+    const checked = checkedCount();
+    if (!checkAll) return;
+    if (checked === 0){
+      checkAll.checked = false;
+      checkAll.indeterminate = false;
+    } else if (checked === total){
+      checkAll.checked = true;
+      checkAll.indeterminate = false;
+    } else {
+      checkAll.checked = false;
+      checkAll.indeterminate = true;
+    }
   }
 
+  // Cabeçalho: marca/desmarca todas as linhas atuais
   checkAll?.addEventListener('change', function(){
-    const all = document.querySelectorAll('.chk-beneficio');
-    all.forEach(ch => { ch.checked = checkAll.checked; });
+    allChecks().forEach(ch => { ch.checked = checkAll.checked; });
     toggleBulkBtn();
+    updateHeaderState();
   });
 
-  document.addEventListener('change', function(e){
-    if(e.target && e.target.classList && e.target.classList.contains('chk-beneficio')){
-      // se algum desmarcar, desmarca o "marcar todos"
-      if (!e.target.checked && checkAll) checkAll.checked = false;
-      // se todos ficarem marcados, marca o "marcar todos"
-      const all = document.querySelectorAll('.chk-beneficio');
-      const on  = document.querySelectorAll('.chk-beneficio:checked');
-      if (checkAll && all.length && on.length === all.length) checkAll.checked = true;
+  // Delegação: qualquer checkbox de linha
+  tbl?.addEventListener('change', function(e){
+    if (e.target && e.target.classList && e.target.classList.contains('chk-beneficio')){
       toggleBulkBtn();
+      updateHeaderState();
     }
   });
 
-  // Confirmação no submit em massa
-  bulkForm?.addEventListener('submit', function(ev){
-    const total = document.querySelectorAll('.chk-beneficio:checked').length;
-    if (total === 0){
-      ev.preventDefault();
-      return;
-    }
-    if(!confirm(`Excluir ${total} registro(s) de benefício?`)){
-      ev.preventDefault();
-    }
-  });
+  // Estado inicial
+  toggleBulkBtn();
+  updateHeaderState();
 
-  // ============ Exclusão individual (modal) ============
+  // Modal: preenche label + hidden ID (form action fixa no template)
   const modal = document.getElementById('modalExcluirBeneficio');
   modal?.addEventListener('show.bs.modal', function (ev) {
     const btn   = ev.relatedTarget;
     const id    = btn?.getAttribute('data-beneficio-id');
     const label = btn?.getAttribute('data-beneficio-label') || '—';
-    document.getElementById('beneficio_label_preview').textContent = label;
-
-    // Preenche hidden e mantém action fixa em /beneficios/delete (POST)
-    const hid = document.getElementById('beneficio_id_hidden');
-    if (hid && id) hid.value = id;
+    const labelNode = document.getElementById('beneficio_label_preview');
+    if (labelNode) labelNode.textContent = label;
+    const hidden = document.getElementById('beneficio_id_hidden');
+    if (hidden) hidden.value = id || '';
   });
 })();
 </script>
