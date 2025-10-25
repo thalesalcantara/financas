@@ -1075,201 +1075,252 @@
   }
 
   /* ===== Helpers para avaliação ===== */
-  function setAvalInputsEnabled(enabled){
-    const boxAval = document.getElementById('boxAval');
-    if(!boxAval) return;
-    boxAval.querySelectorAll('input[name^="av_"], textarea[name="av_comentario"]').forEach(el=>{
-      if(enabled){
-        if(el.dataset.origName){ el.name = el.dataset.origName; delete el.dataset.origName; }
-      }else{
-        if(!el.dataset.origName) el.dataset.origName = el.name;
-        el.name = '';
-      }
-    });
+function setAvalInputsEnabled(enabled){
+  const boxAval = document.getElementById('boxAval');
+  if(!boxAval) return;
+  // Não mexe em "name" (para não quebrar). Apenas alterna "disabled".
+  boxAval.querySelectorAll('input[name^="av_"], textarea[name="av_comentario"]').forEach(el=>{
+    el.disabled = !enabled;
+  });
+}
+
+/* ===== Fluxo do Modal de Avaliação (Lançar) ===== */
+function wireAvaliacaoFlow(){
+  const form = document.getElementById('formLancamento');
+  if(!form) return;
+
+  const modalEl = document.getElementById('modalAvaliar');
+  const modal = new bootstrap.Modal(modalEl);
+  const btnAvaliarAgora = document.getElementById('btnAvaliarAgora');
+  const btnPularAval = document.getElementById('btnPularAval');
+  const chkAvaliar = document.getElementById('chkAvaliar');
+  const inputAvaliar = document.getElementById('inputAvaliar');
+  const boxAval = document.getElementById('boxAval');
+
+  // ===== NOVO: lock de submissão para não duplicar =====
+  let isSubmitting = false;
+  const submitBtn = form.querySelector('button.btn-royal[type="submit"]');
+
+  function setSubmitting(on){
+    isSubmitting = !!on;
+    if(submitBtn){
+      submitBtn.disabled = on;
+      if(submitBtn.dataset.origText == null) submitBtn.dataset.origText = submitBtn.innerHTML;
+      submitBtn.innerHTML = on
+        ? '<span class="spinner-border spinner-border-sm me-1"></span> Lançando…'
+        : submitBtn.dataset.origText;
+    }
+    // evita cliques em qualquer campo enquanto envia
+    form.style.pointerEvents = on ? 'none' : '';
+    form.classList.toggle('opacity-75', on);
   }
 
-  /* ===== Fluxo do Modal de Avaliação (Lançar) ===== */
-  function wireAvaliacaoFlow(){
-    const form = document.getElementById('formLancamento');
-    if(!form) return;
+  function ensureRequestId(){
+    // cria um request_id único para o backend deduplicar
+    let inp = form.querySelector('input[name="request_id"]');
+    if(!inp){
+      inp = document.createElement('input');
+      inp.type = 'hidden';
+      inp.name = 'request_id';
+      form.appendChild(inp);
+    }
+    // Sempre renova ao tentar enviar (dá pra manter o mesmo se preferir)
+    inp.value = Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+  }
 
-    const modalEl = document.getElementById('modalAvaliar');
-    const modal = new bootstrap.Modal(modalEl);
-    const btnAvaliarAgora = document.getElementById('btnAvaliarAgora');
-    const btnPularAval = document.getElementById('btnPularAval');
-    const chkAvaliar = document.getElementById('chkAvaliar');
-    const inputAvaliar = document.getElementById('inputAvaliar');
-    const boxAval = document.getElementById('boxAval');
+  function scrollIntoViewSmooth(el){
+    try{ el?.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
+  }
 
-    function scrollIntoViewSmooth(el){
-      try{ el?.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
+  // Inicialmente: avaliação desabilitada (não envia nada)
+  setAvalInputsEnabled(false);
+
+  // Marcar/Desmarcar "avaliar agora"
+  chkAvaliar?.addEventListener('change', ()=>{
+    const on = chkAvaliar.checked;
+    inputAvaliar.value = on ? '1':'0';
+    if(boxAval) boxAval.style.display = on ? 'block':'none';
+    setAvalInputsEnabled(on);
+    if(on){ autoGeral(); }
+  });
+
+  // Intercepta submit pra perguntar se quer avaliar (quando ainda não marcou)
+  form.addEventListener('submit', function(ev){
+    if(isSubmitting){ ev.preventDefault(); return; } // já está enviando
+    if(!form.checkValidity()){
+      form.reportValidity?.();
+      return;
     }
 
-    setAvalInputsEnabled(false);
+    const avaliando = chkAvaliar.checked || inputAvaliar.value === '1' || (boxAval && boxAval.style.display === 'block');
 
-    chkAvaliar?.addEventListener('change', ()=>{
-      const on = chkAvaliar.checked;
-      inputAvaliar.value = on ? '1':'0';
-      if(boxAval) boxAval.style.display = on ? 'block':'none';
-      setAvalInputsEnabled(on);
-      if(on){ autoGeral(); }
-    });
-
-    form.addEventListener('submit', function(ev){
-      if(!form.checkValidity()){
-        form.reportValidity?.();
-        return;
-      }
-      if(chkAvaliar.checked || inputAvaliar.value === '1' || (boxAval && boxAval.style.display === 'block')){
-        setAvalInputsEnabled(true);
-        autoGeral();
-        return;
-      }
-      ev.preventDefault();
-      modal.show();
-    });
-
-    btnAvaliarAgora?.addEventListener('click', ()=>{
-      chkAvaliar.checked = true;
-      inputAvaliar.value = '1';
-      if(boxAval) boxAval.style.display = 'block';
+    if(avaliando){
+      // Vai enviar com avaliação
       setAvalInputsEnabled(true);
-      modal.hide();
-      setTimeout(()=>{
-        scrollIntoViewSmooth(boxAval);
-        const firstStar = boxAval.querySelector('.rating-group .star');
-        firstStar?.focus?.();
-      }, 150);
-    });
-
-    btnPularAval?.addEventListener('click', ()=>{
-      chkAvaliar.checked = false;
-      inputAvaliar.value = '0';
-      if(boxAval) boxAval.style.display = 'none';
-      setAvalInputsEnabled(false);
-      modal.hide();
-      setTimeout(()=>form.submit(), 80);
-    });
-  }
-
-  /* ===== Avaliar/Editar na página de Lançamentos (sem sair) ===== */
-  function paintStaticStars(el){
-    const score = Number(el?.dataset?.score||0);
-    if(!el) return;
-    el.textContent = '★★★★★'.slice(0, Math.max(0, Math.min(5, score))).padEnd(5, '☆');
-  }
-  function wireAvalLanc(){
-    const tbody = document.getElementById('tbodyLanc');
-    const modalEl = document.getElementById('modalAvalLanc'); // opcional: se existir no HTML
-    if(!tbody || !modalEl) return;
-
-    const modal = new bootstrap.Modal(modalEl);
-    const form = document.getElementById('formAvalLanc');
-    const info = document.getElementById('avLancInfo');
-    const inputLancId = document.getElementById('avLancId');
-
-    function initStarsInModal(){
-      modalEl.querySelectorAll('.rating-group').forEach(g=>{
-        if(g.dataset.name!=='av_geral') wireStars(g);
-      });
-      autoGeral();
+      autoGeral();          // garante que a média esteja setada
+      ensureRequestId();    // idempotência
+      setSubmitting(true);  // trava UI
+      // deixa o submit continuar
+      return;
     }
 
-    tbody.addEventListener('click', async (ev)=>{
-      const btn = ev.target.closest('[data-open-av]');
-      if(!btn) return;
-      const tr = btn.closest('tr');
-      const lancId = tr.dataset.id;
-      const getUrl = tr.dataset.getavurl;
-      inputLancId.value = lancId;
-      info.textContent = `${tr.cells[0].textContent.trim()} • ${tr.dataset.coopnome}`;
+    // Não avaliando → abre modal de confirmação
+    ev.preventDefault();
+    modal.show();
+  });
 
-      modalEl.querySelectorAll('input[name^="av_"]').forEach(i=>i.value='');
-      modalEl.querySelector('textarea[name="av_comentario"]').value='';
+  // Clicou "Avaliar agora"
+  btnAvaliarAgora?.addEventListener('click', ()=>{
+    chkAvaliar.checked = true;
+    inputAvaliar.value = '1';
+    if(boxAval) boxAval.style.display = 'block';
+    setAvalInputsEnabled(true);
+    modal.hide();
+    setTimeout(()=>{
+      scrollIntoViewSmooth(boxAval);
+      boxAval.querySelector('.rating-group .star')?.focus?.();
+    }, 150);
+  });
 
-      try{
-        const r = await fetch(getUrl, {credentials:'same-origin'});
-        if(r.ok){
-          const j = await r.json();
-          if(j.ok && j.data){
-            const d = j.data;
-            const map = {
-              'av_pontualidade': d.pontualidade,
-              'av_educacao': d.educacao,
-              'av_eficiencia': d.eficiencia,
-              'av_apresentacao': d.apresentacao,
-              'av_geral': d.geral
-            };
-            Object.entries(map).forEach(([k,v])=>{
-              const inp = modalEl.querySelector(`input[name="${k}"]`);
-              if(inp){ inp.value = v || ''; }
-            });
-            const ta = modalEl.querySelector('textarea[name="av_comentario"]');
-            if(ta) ta.value = d.comentario || '';
-          }
-        }
-      }catch(e){}
+  // Clicou "Pular e lançar" (sem avaliação)
+  btnPularAval?.addEventListener('click', ()=>{
+    chkAvaliar.checked = false;
+    inputAvaliar.value = '0';
+    if(boxAval) boxAval.style.display = 'none';
+    setAvalInputsEnabled(false); // garante que nada de av_ vai no POST
+    modal.hide();
+    setTimeout(()=>{
+      if(isSubmitting) return;
+      ensureRequestId();
+      setSubmitting(true);
+      form.submit();
+    }, 80);
+  });
 
-      initStarsInModal();
-      modal.show();
+  // Se voltar de bfcache, destrava o botão
+  window.addEventListener('pageshow', (e)=>{
+    if(e.persisted) setSubmitting(false);
+  });
+}
+
+/* ===== Avaliar/Editar na página de Lançamentos (sem sair) ===== */
+function paintStaticStars(el){
+  const score = Number(el?.dataset?.score||0);
+  if(!el) return;
+  el.textContent = '★★★★★'.slice(0, Math.max(0, Math.min(5, score))).padEnd(5, '☆');
+}
+function wireAvalLanc(){
+  const tbody = document.getElementById('tbodyLanc');
+  const modalEl = document.getElementById('modalAvalLanc'); // opcional
+  if(!tbody || !modalEl) return;
+
+  const modal = new bootstrap.Modal(modalEl);
+  const form = document.getElementById('formAvalLanc');
+  const info = document.getElementById('avLancInfo');
+  const inputLancId = document.getElementById('avLancId');
+
+  function initStarsInModal(){
+    modalEl.querySelectorAll('.rating-group').forEach(g=>{
+      if(g.dataset.name!=='av_geral') wireStars(g);
     });
-
-    form.addEventListener('submit', async (ev)=>{
-      ev.preventDefault();
-      const lancId = inputLancId.value;
-      const tr = tbody.querySelector(`tr[data-id="${CSS.escape(lancId)}"]`);
-      if(!tr) return;
-      const postUrl = tr.dataset.avurl;
-
-      const fd = new FormData(form);
-      autoGeral();
-
-      try{
-        const r = await fetch(postUrl, {method:'POST', body:fd, credentials:'same-origin'});
-        if(!r.ok) throw new Error(r.status);
-        const j = await r.json();
-        if(j.ok){
-          const cell = tr.querySelector('[data-avcell]');
-          if(cell){
-            cell.innerHTML = `<span class="stars-static" data-score="${j.geral||0}">★★★★★</span>
-                              <button class="btn btn-outline-royal btn-sm ms-1" data-open-av>Editar</button>`;
-            paintStaticStars(cell.querySelector('.stars-static'));
-          }
-          modal.hide();
-        }else{
-          alert(j.error || 'Falha ao salvar avaliação.');
-        }
-      }catch(e){
-        alert('Erro de rede ao salvar avaliação.');
-      }
-    });
-
-    document.querySelectorAll('.stars-static').forEach(paintStaticStars);
+    autoGeral();
   }
 
-  /* ===== Eventos do menu ===== */
-  document.getElementById('sideNav')?.addEventListener('click', async (e)=>{
-    const a=e.target.closest('a'); if(!a) return;
-    const t=a.getAttribute('data-target'); if(!t) return; // logout segue normal
-    e.preventDefault();
-    document.querySelectorAll('#sideNav a').forEach(x=>x.classList.remove('active')); a.classList.add('active');
-    showSection(t); pushView(t);
-    if(t==='avisos' || t==='tabelas'){ prefetch(a.href); }
+  tbody.addEventListener('click', async (ev)=>{
+    const btn = ev.target.closest('[data-open-av]');
+    if(!btn) return;
+    const tr = btn.closest('tr');
+    const lancId = tr.dataset.id;
+    const getUrl = tr.dataset.getavurl;
+    inputLancId.value = lancId;
+    info.textContent = `${tr.cells[0].textContent.trim()} • ${tr.dataset.coopnome}`;
+
+    modalEl.querySelectorAll('input[name^="av_"]').forEach(i=>i.value='');
+    modalEl.querySelector('textarea[name="av_comentario"]').value='';
+
+    try{
+      const r = await fetch(getUrl, {credentials:'same-origin'});
+      if(r.ok){
+        const j = await r.json();
+        if(j.ok && j.data){
+          const d = j.data;
+          const map = {
+            'av_pontualidade': d.pontualidade,
+            'av_educacao': d.educacao,
+            'av_eficiencia': d.eficiencia,
+            'av_apresentacao': d.apresentacao,
+            'av_geral': d.geral
+          };
+          Object.entries(map).forEach(([k,v])=>{
+            const inp = modalEl.querySelector(`input[name="${k}"]`);
+            if(inp){ inp.value = v || ''; }
+          });
+          const ta = modalEl.querySelector('textarea[name="av_comentario"]');
+          if(ta) ta.value = d.comentario || '';
+        }
+      }
+    }catch(e){/* silencioso */ }
+
+    initStarsInModal();
+    modal.show();
   });
 
-  document.getElementById('toastVerAgora')?.addEventListener('click', async (e)=>{
-    e.preventDefault();
-    const href=e.currentTarget.getAttribute('href');
-    showSection('avisos'); pushView('avisos');
-    await loadAvisosFromRoute(href);
+  form.addEventListener('submit', async (ev)=>{
+    ev.preventDefault();
+    const lancId = inputLancId.value;
+    const tr = tbody.querySelector(`tr[data-id="${CSS.escape(lancId)}"]`);
+    if(!tr) return;
+    const postUrl = tr.dataset.avurl;
+
+    const fd = new FormData(form);
+    autoGeral();
+
+    try{
+      const r = await fetch(postUrl, {method:'POST', body:fd, credentials:'same-origin'});
+      if(!r.ok) throw new Error(r.status);
+      const j = await r.json();
+      if(j.ok){
+        const cell = tr.querySelector('[data-avcell]');
+        if(cell){
+          cell.innerHTML = `<span class="stars-static" data-score="${j.geral||0}">★★★★★</span>
+                            <button class="btn btn-outline-royal btn-sm ms-1" data-open-av>Editar</button>`;
+          paintStaticStars(cell.querySelector('.stars-static'));
+        }
+        modal.hide();
+      }else{
+        alert(j.error || 'Falha ao salvar avaliação.');
+      }
+    }catch(e){
+      alert('Erro de rede ao salvar avaliação.');
+    }
   });
 
-  /* ===== Inicialização ===== */
-  document.addEventListener('DOMContentLoaded', ()=>{
-    const initial=startView(); showSection(initial);
-    const unread=Number(document.getElementById('toastCount')?.textContent||'0'); setAvisosBadge(unread);
-  });
-  window.addEventListener('popstate',(ev)=>{ const v=(ev.state&&ev.state.view)||startView(); showSection(v); });
+  document.querySelectorAll('.stars-static').forEach(paintStaticStars);
+}
+
+/* ===== Eventos do menu ===== */
+document.getElementById('sideNav')?.addEventListener('click', async (e)=>{
+  const a=e.target.closest('a'); if(!a) return;
+  const t=a.getAttribute('data-target'); if(!t) return; // logout segue normal
+  e.preventDefault();
+  document.querySelectorAll('#sideNav a').forEach(x=>x.classList.remove('active')); a.classList.add('active');
+  showSection(t); pushView(t);
+  if(t==='avisos' || t==='tabelas'){ prefetch(a.href); }
+});
+
+document.getElementById('toastVerAgora')?.addEventListener('click', async (e)=>{
+  e.preventDefault();
+  const href=e.currentTarget.getAttribute('href');
+  showSection('avisos'); pushView('avisos');
+  await loadAvisosFromRoute(href);
+});
+
+/* ===== Inicialização ===== */
+document.addEventListener('DOMContentLoaded', ()=>{
+  const initial=startView(); showSection(initial);
+  const unread=Number(document.getElementById('toastCount')?.textContent||'0'); setAvisosBadge(unread);
+});
+window.addEventListener('popstate',(ev)=>{ const v=(ev.state&&ev.state.view)||startView(); showSection(v); });
 </script>
 </body>
 </html>
