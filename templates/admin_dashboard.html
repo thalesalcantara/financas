@@ -2147,7 +2147,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 })();
 </script>
       
- <!-- COOPERADOS (versão profissional / drop-in) -->
+<!-- COOPERADOS (versão profissional / drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
   {% set qtd_coops = cooperados|length %}
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
@@ -2161,10 +2161,15 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   <div class="card border-0 shadow-sm rounded-3 mb-3">
     <div class="card-body">
       <form method="POST" action="{{ url_for('add_cooperado') }}" enctype="multipart/form-data" class="row g-3 align-items-end">
+        {% if csrf_token is defined %}
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% endif %}
+
         <div class="col-md-3">
           <label class="form-label">Nome</label>
           <input type="text" class="form-control form-control-sm" name="nome" placeholder="Nome completo" required>
         </div>
+
         <div class="col-md-3">
           <label class="form-label">Usuário</label>
           <div class="input-group input-group-sm">
@@ -2173,6 +2178,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           </div>
           <small class="text-muted">Usado no login.</small>
         </div>
+
         <div class="col-md-3">
           <label class="form-label">Senha</label>
           <div class="input-group input-group-sm">
@@ -2182,6 +2188,19 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
             </button>
           </div>
         </div>
+
+        <!-- Telefone (WhatsApp) -->
+        <div class="col-md-3">
+          <label class="form-label">Telefone (WhatsApp)</label>
+          <input type="tel"
+                 class="form-control form-control-sm"
+                 name="telefone"
+                 id="coopTelefone"
+                 inputmode="numeric"
+                 placeholder="(00) 00000-0000">
+          <small class="text-muted">Cole/insira só dígitos; formatamos automaticamente.</small>
+        </div>
+
         <div class="col-md-3">
           <label class="form-label">Foto (opcional)</label>
           <input type="file" class="form-control form-control-sm" name="foto" id="coopFoto" accept="image/*">
@@ -2190,6 +2209,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
             <small class="text-muted">Prévia</small>
           </div>
         </div>
+
         <div class="col-12">
           <button class="btn btn-royal">
             <i class="bi bi-save"></i> Cadastrar
@@ -2209,7 +2229,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         </h6>
         <div class="input-group input-group-sm" style="max-width:340px;">
           <span class="input-group-text"><i class="bi bi-search"></i></span>
-          <input type="text" class="form-control" id="buscaCooperados" placeholder="Filtrar por nome ou usuário...">
+          <input type="text" class="form-control" id="buscaCooperados" placeholder="Filtrar por nome, usuário ou telefone...">
         </div>
       </div>
 
@@ -2220,20 +2240,37 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
               <th style="width:60px;">Foto</th>
               <th>Nome</th>
               <th>Usuário</th>
+              <th style="width:170px;">Telefone</th>
               <th style="width:120px;" class="text-center">Status</th>
-              <th class="text-center" style="width:220px;">Ações</th>
+              <th class="text-center" style="width:260px;">Ações</th>
             </tr>
           </thead>
           <tbody id="tbodyCooperados">
             {% for coop in cooperados %}
-              <tr data-nome="{{ coop.nome|lower }}" data-user="{{ coop.usuario_ref.usuario|lower }}">
+              <tr data-nome="{{ coop.nome|lower }}"
+                  data-user="{{ coop.usuario_ref.usuario|lower }}"
+                  data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','')|lower }}">
                 <td class="text-center">
                   <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
                        class="avatar border" alt="{{ coop.nome }}"
                        style="width:40px;height:40px;object-fit:cover;">
                 </td>
+
                 <td class="fw-medium">{{ coop.nome }}</td>
                 <td class="text-muted">{{ coop.usuario_ref.usuario }}</td>
+
+                <td class="text-monospace">
+                  {% if coop.telefone %}
+                    <span class="fone" data-raw="{{ coop.telefone }}">{{ coop.telefone }}</span>
+                    <a class="ms-1 btn btn-sm btn-outline-success"
+                       target="_blank"
+                       href="https://wa.me/55{{ (coop.telefone|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','')) }}">
+                      <i class="bi bi-whatsapp"></i>
+                    </a>
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
 
                 <!-- Badge de status -->
                 <td class="text-center">
@@ -2256,10 +2293,16 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                       <span class="d-none d-sm-inline">{{ 'Desativar' if coop.usuario_ref.ativo else 'Ativar' }}</span>
                     </button>
 
-                    <!-- Editar -->
-                    <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalEditCooperado"
-                            data-id="{{ coop.id }}" data-nome="{{ coop.nome }}" data-usuario="{{ coop.usuario_ref.usuario }}"
-                            data-url="{{ url_for('edit_cooperado', id=coop.id) }}" title="Editar">
+                    <!-- Editar (passa telefone também) -->
+                    <button class="btn btn-warning"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalEditCooperado"
+                            data-id="{{ coop.id }}"
+                            data-nome="{{ coop.nome }}"
+                            data-usuario="{{ coop.usuario_ref.usuario }}"
+                            data-telefone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
+                            data-url="{{ url_for('edit_cooperado', id=coop.id) }}"
+                            title="Editar">
                       <i class="bi bi-pencil"></i>
                     </button>
 
@@ -2285,7 +2328,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="5" class="text-center text-muted">Nenhum cooperado</td></tr>
+              <tr><td colspan="6" class="text-center text-muted">Nenhum cooperado</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -2295,17 +2338,46 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 
   <!-- UX Helpers -->
   <script>
-    // filtro local por nome/usuário
+    // Formata BR: (00) 0000-0000 ou (00) 00000-0000
+    function formatPhoneBR(v) {
+      let d = (v || '').toString().replace(/\D/g, '');
+      if (d.length > 11 && d.startsWith('55')) d = d.slice(d.length - 11); // remove DDI 55 se vier
+      d = d.slice(0, 11);
+      if (d.length <= 10) {
+        return d.replace(/^(\d{0,2})(\d{0,4})(\d{0,4}).*$/, (_, a, b, c) => {
+          let out = '';
+          if (a) out += '(' + a;
+          if (a && a.length === 2) out += ') ';
+          if (b) out += b;
+          if (b && b.length === 4 && c) out += '-' + c;
+          return out;
+        });
+      }
+      return d.replace(/^(\d{2})(\d{5})(\d{4}).*$/, '($1) $2-$3');
+    }
+
+    // filtro local por nome/usuário e dígitos do telefone
     (function(){
       const input = document.getElementById('buscaCooperados');
       const tbody = document.getElementById('tbodyCooperados');
       input?.addEventListener('input', () => {
-        const q = (input.value || '').trim().toLowerCase();
+        const qRaw = (input.value || '').trim().toLowerCase();
+        const qDigits = qRaw.replace(/\D/g,'');
         [...tbody.querySelectorAll('tr')].forEach(tr => {
           const nome = tr.dataset.nome || '';
           const user = tr.dataset.user || '';
-          tr.style.display = (!q || nome.includes(q) || user.includes(q)) ? '' : 'none';
+          const fone = tr.dataset.fone || '';
+          tr.style.display = (!qRaw || nome.includes(qRaw) || user.includes(qRaw) || (qDigits && fone.includes(qDigits))) ? '' : 'none';
         });
+      });
+    })();
+
+    // Formata todos os <span class="fone" data-raw="..."> renderizados
+    (function(){
+      document.querySelectorAll('span.fone[data-raw]').forEach(span => {
+        const raw = span.getAttribute('data-raw') || '';
+        const formatted = formatPhoneBR(raw);
+        if (formatted) span.textContent = formatted;
       });
     })();
 
@@ -2331,6 +2403,30 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         inp.type = isPwd ? 'text' : 'password';
         btn.innerHTML = isPwd ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
       });
+    })();
+
+    // Preenche o modal de edição (inclui telefone) e aplica máscara no campo
+    (function(){
+      const modal = document.getElementById('modalEditCooperado');
+      modal?.addEventListener('show.bs.modal', (ev) => {
+        const btn = ev.relatedTarget;
+        const form = modal.querySelector('form');
+        const nome = form?.querySelector('[name="nome"]');
+        const usuario = form?.querySelector('[name="usuario"]');
+        const tel = form?.querySelector('[name="telefone"]');
+
+        if (form && btn?.dataset?.url) form.setAttribute('action', btn.dataset.url);
+        if (nome)    nome.value    = btn?.dataset?.nome    || '';
+        if (usuario) usuario.value = btn?.dataset?.usuario || '';
+        if (tel)     tel.value     = formatPhoneBR(btn?.dataset?.telefone || '');
+      });
+
+      const tel = document.getElementById('editTelefone');
+      tel?.addEventListener('input', () => {
+        const f = formatPhoneBR(tel.value);
+        if (tel.value !== f) tel.value = f;
+      });
+      tel?.addEventListener('blur', () => tel.value = formatPhoneBR(tel.value));
     })();
 
     // alternar ativo/inativo
@@ -2379,6 +2475,53 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       }
     }
   </script>
+
+  {# Modal de edição do cooperado (adiciona telefone) #}
+  <div class="modal fade" id="modalEditCooperado" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <form method="POST" class="modal-content">
+        {% if csrf_token is defined %}
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% endif %}
+        <div class="modal-header">
+          <h5 class="modal-title">Editar Cooperado</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Nome</label>
+              <input type="text" class="form-control form-control-sm" name="nome" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Usuário</label>
+              <input type="text" class="form-control form-control-sm" name="usuario" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Telefone (WhatsApp)</label>
+              <input type="tel"
+                     class="form-control form-control-sm"
+                     name="telefone"
+                     id="editTelefone"
+                     inputmode="numeric"
+                     placeholder="(00) 00000-0000">
+              <small class="text-muted">Só dígitos; formatamos automaticamente.</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Foto (opcional)</label>
+              <input type="file" class="form-control form-control-sm" name="foto" accept="image/*">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-royal">
+            <i class="bi bi-save"></i> Salvar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 </section>
 
       <!-- RESTAURANTES (versão profissional / drop-in) -->
