@@ -2027,6 +2027,125 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </form>
   </div>
 </div>
+</section> <!-- FECHA A ABA BENEFÍCIOS -->
+
+      </section> <!-- FECHA A ABA BENEFÍCIOS -->
+
+<!-- ==== BENEFÍCIOS: prévia + total + seleção em massa (escopado) ==== -->
+<script>
+(function(){
+  const sec = document.getElementById('beneficios');
+  if (!sec) return;
+
+  // ===== Utils =====
+  const TOTAL_COOPS = {{ cooperados|length or 0 }};
+  const q = (sel) => sec.querySelector(sel);
+  function idsFromSelect(sel){ return Array.from(sel?.selectedOptions || []).map(o => String(o.value)); }
+  function valNum(inp){ const n = parseFloat(String(inp?.value ?? '').replace(',','.')); return isFinite(n)?n:0; }
+  function money(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+  // ===== Prévia por tipo =====
+  function calcPreview(prefix){
+    const unit    = q(`#${prefix}_valor_unit`);
+    const bensSel = q(`#${prefix}_beneficiarios`);
+    const isenSel = q(`#${prefix}_isencoes`);
+    const badge   = q(`#${prefix}_badge`);
+    if(!unit || !bensSel || !isenSel || !badge) return;
+
+    const vUnit = Math.max(0, valNum(unit));
+    const bens  = idsFromSelect(bensSel);
+    const isen  = idsFromSelect(isenSel);
+    const unique = new Set([...bens, ...isen]); // não pagam
+    const numBens = bens.length;
+    const numIsen = isen.length;
+    const pagantes = Math.max(0, TOTAL_COOPS - unique.size);
+    const total = vUnit * numBens;
+    const porPag = pagantes > 0 ? (total / pagantes) : 0;
+
+    badge.textContent =
+      `Recebem: ${numBens} · Isentos: ${numIsen} · Pagantes: ${pagantes} · ` +
+      `Total a ratear: ${money(total)} · Cobrança por pagante: ${money(porPag)}`;
+  }
+
+  ['hosp','farm','alim'].forEach(p=>{
+    q(`#${p}_valor_unit`)?.addEventListener('input', ()=>calcPreview(p));
+    q(`#${p}_beneficiarios`)?.addEventListener('change', ()=>calcPreview(p));
+    q(`#${p}_isencoes`)?.addEventListener('change', ()=>calcPreview(p));
+    calcPreview(p); // estado inicial
+  });
+
+  // ===== Garantir IDs dos hidden + calcular total no submit =====
+  const form = q('#form-beneficios');
+  if (form){
+    (function ensureHiddenIds(){
+      const map = { hosp:'hosp_valor_total', farm:'farm_valor_total', alim:'alim_valor_total' };
+      Object.entries(map).forEach(([p, id])=>{
+        if (!q('#'+id)) {
+          const i = q(`input[name="${p}_valor"]`);
+          if (i) i.id = id;
+        }
+      });
+    })();
+
+    function setTotal(prefix){
+      const unit = q(`#${prefix}_valor_unit`);
+      const bensSel = q(`#${prefix}_beneficiarios`);
+      const hidden = q(`#${prefix}_valor_total`) || q(`input[name="${prefix}_valor"]`);
+      const count = (bensSel?.selectedOptions?.length) || 0;
+      const total = Math.max(0, valNum(unit) * count);
+      if (hidden) hidden.value = total.toFixed(2);
+    }
+
+    form.addEventListener('submit', function(){
+      ['hosp','farm','alim'].forEach(setTotal);
+    });
+  }
+
+  // ===== Seleção em massa + modal de exclusão =====
+  const tbl      = q('#tabela-beneficios');
+  const checkAll = q('#check_all');
+  const bulkBtn  = document.getElementById('btn-bulk-delete'); // fora da sec
+  const modal    = document.getElementById('modalExcluirBeneficio'); // fora da sec
+
+  const allChecks = () => tbl ? tbl.querySelectorAll('tbody .chk-beneficio') : [];
+  const checkedCount = () => tbl ? tbl.querySelectorAll('tbody .chk-beneficio:checked').length : 0;
+
+  function toggleBulkBtn(){ if (bulkBtn) bulkBtn.disabled = (checkedCount() === 0); }
+  function updateHeaderState(){
+    if (!checkAll || !tbl) return;
+    const total   = allChecks().length;
+    const checked = checkedCount();
+    if (checked === 0){ checkAll.checked = false; checkAll.indeterminate = false; }
+    else if (checked === total){ checkAll.checked = true; checkAll.indeterminate = false; }
+    else { checkAll.checked = false; checkAll.indeterminate = true; }
+  }
+
+  checkAll?.addEventListener('change', ()=>{
+    allChecks().forEach(ch => { ch.checked = checkAll.checked; });
+    toggleBulkBtn(); updateHeaderState();
+  });
+
+  tbl?.addEventListener('change', (e)=>{
+    if (e.target && e.target.classList?.contains('chk-beneficio')){
+      toggleBulkBtn(); updateHeaderState();
+    }
+  });
+
+  toggleBulkBtn(); updateHeaderState();
+
+  if (modal) {
+    modal.addEventListener('show.bs.modal', function (ev) {
+      const btn   = ev.relatedTarget;
+      const id    = btn ? btn.getAttribute('data-beneficio-id') : '';
+      const label = btn ? (btn.getAttribute('data-beneficio-label') || '—') : '—';
+      const labelNode = modal.querySelector('#beneficio_label_preview');
+      if (labelNode) labelNode.textContent = label;
+      const hidden = modal.querySelector('#beneficio_id_hidden');
+      if (hidden) hidden.value = id || '';
+    });
+  }
+})();
+</script>
       
  <!-- COOPERADOS (versão profissional / drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
