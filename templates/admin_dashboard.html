@@ -2293,7 +2293,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                       <span class="d-none d-sm-inline">{{ 'Desativar' if coop.usuario_ref.ativo else 'Ativar' }}</span>
                     </button>
 
-                    <!-- Editar (passa telefone também) -->
+                    <!-- Editar (AGORA passa a foto atual também) -->
                     <button class="btn btn-warning"
                             data-bs-toggle="modal"
                             data-bs-target="#modalEditCooperado"
@@ -2301,6 +2301,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                             data-nome="{{ coop.nome }}"
                             data-usuario="{{ coop.usuario_ref.usuario }}"
                             data-telefone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
+                            data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
                             data-url="{{ url_for('edit_cooperado', id=coop.id) }}"
                             title="Editar">
                       <i class="bi bi-pencil"></i>
@@ -2341,7 +2342,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     // Formata BR: (00) 0000-0000 ou (00) 00000-0000
     function formatPhoneBR(v) {
       let d = (v || '').toString().replace(/\D/g, '');
-      if (d.length > 11 && d.startsWith('55')) d = d.slice(d.length - 11); // remove DDI 55 se vier
+      if (d.length > 11 && d.startsWith('55')) d = d.slice(d.length - 11);
       d = d.slice(0, 11);
       if (d.length <= 10) {
         return d.replace(/^(\d{0,2})(\d{0,4})(\d{0,4}).*$/, (_, a, b, c) => {
@@ -2381,7 +2382,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       });
     })();
 
-    // prévia da foto
+    // prévia da foto (form de NOVO cooperado)
     (function(){
       const file = document.getElementById('coopFoto');
       const prev = document.getElementById('coopPreview');
@@ -2405,7 +2406,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       });
     })();
 
-    // Preenche o modal de edição (inclui telefone) e aplica máscara no campo
+    // Preenche o modal de edição (agora inclui FOTO atual + prévia) e aplica máscara no campo
     (function(){
       const modal = document.getElementById('modalEditCooperado');
       modal?.addEventListener('show.bs.modal', (ev) => {
@@ -2414,19 +2415,41 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         const nome = form?.querySelector('[name="nome"]');
         const usuario = form?.querySelector('[name="usuario"]');
         const tel = form?.querySelector('[name="telefone"]');
+        const file = form?.querySelector('input[type="file"][name="foto"]');
+        const prev = form?.querySelector('#editCoopPreview');
 
         if (form && btn?.dataset?.url) form.setAttribute('action', btn.dataset.url);
         if (nome)    nome.value    = btn?.dataset?.nome    || '';
         if (usuario) usuario.value = btn?.dataset?.usuario || '';
         if (tel)     tel.value     = formatPhoneBR(btn?.dataset?.telefone || '');
+
+        // foto atual (para a prévia do modal)
+        const fotoAtual = btn?.dataset?.foto || '{{ url_for("static", filename="img/default.png") }}';
+        if (prev) prev.src = fotoAtual;
+
+        // limpar input file ao abrir
+        if (file) file.value = '';
       });
 
+      // máscara tel no modal
       const tel = document.getElementById('editTelefone');
       tel?.addEventListener('input', () => {
         const f = formatPhoneBR(tel.value);
         if (tel.value !== f) tel.value = f;
       });
       tel?.addEventListener('blur', () => tel.value = formatPhoneBR(tel.value));
+
+      // prévia da foto no MODAL de edição
+      const modalForm = document.querySelector('#modalEditCooperado form');
+      const fileIn = modalForm?.querySelector('input[type="file"][name="foto"]');
+      const prevImg = modalForm?.querySelector('#editCoopPreview');
+      fileIn?.addEventListener('change', ()=>{
+        const f = fileIn.files?.[0];
+        if(!f) return;
+        const rd = new FileReader();
+        rd.onload = e => { if(prevImg) prevImg.src = e.target.result; };
+        rd.readAsDataURL(f);
+      });
     })();
 
     // alternar ativo/inativo
@@ -2476,10 +2499,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     }
   </script>
 
-  {# Modal de edição do cooperado (adiciona telefone) #}
+  {# Modal de edição do cooperado (agora com enctype e prévia da foto) #}
   <div class="modal fade" id="modalEditCooperado" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-      <form method="POST" class="modal-content">
+      <form method="POST" enctype="multipart/form-data" class="modal-content">
         {% if csrf_token is defined %}
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         {% endif %}
@@ -2510,6 +2533,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
             <div class="col-md-6">
               <label class="form-label">Foto (opcional)</label>
               <input type="file" class="form-control form-control-sm" name="foto" accept="image/*">
+              <div class="d-flex align-items-center gap-2 mt-2">
+                <img id="editCoopPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt="" style="width:40px;height:40px;object-fit:cover;">
+                <small class="text-muted">Prévia</small>
+              </div>
             </div>
           </div>
         </div>
