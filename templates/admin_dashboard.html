@@ -2061,14 +2061,14 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     }
   }
 
-  // Cabeçalho: marca/desmarca todas as linhas atuais
+  // Marcar/desmarcar todos
   checkAll?.addEventListener('change', function(){
     allChecks().forEach(ch => { ch.checked = checkAll.checked; });
     toggleBulkBtn();
     updateHeaderState();
   });
 
-  // Delegação: qualquer checkbox de linha
+  // Mudança em qualquer checkbox de linha
   tbl?.addEventListener('change', function(e){
     if (e.target && e.target.classList && e.target.classList.contains('chk-beneficio')){
       toggleBulkBtn();
@@ -2080,7 +2080,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   toggleBulkBtn();
   updateHeaderState();
 
-  // Modal: preenche label + hidden ID (form action fixa no template)
+  // Modal individual: preenche label + hidden
   const modal = document.getElementById('modalExcluirBeneficio');
   modal?.addEventListener('show.bs.modal', function (ev) {
     const btn   = ev.relatedTarget;
