@@ -2028,89 +2028,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </div>
       
-<!-- JS: seleção em massa + modal de exclusão (blindado) -->
-<script>
-(function(){
-  try {
-    const tbl      = document.getElementById('tabela-beneficios');
-    const checkAll = document.getElementById('check_all');
-    const bulkBtn  = document.getElementById('btn-bulk-delete');
-    const modal    = document.getElementById('modalExcluirBeneficio');
-
-    // Se nada do Benefícios existir nesta página/aba, sai silenciosamente.
-    if (!tbl && !checkAll && !bulkBtn && !modal) return;
-
-    const allChecks = () => tbl ? tbl.querySelectorAll('tbody .chk-beneficio') : [];
-    const checkedCount = () => tbl ? tbl.querySelectorAll('tbody .chk-beneficio:checked').length : 0;
-
-    function toggleBulkBtn(){
-      if (bulkBtn) bulkBtn.disabled = checkedCount() === 0;
-    }
-    function updateHeaderState(){
-      if (!checkAll) return;
-      const items   = allChecks();
-      const total   = items.length;
-      const checked = checkedCount();
-      if (checked === 0){
-        checkAll.checked = false; checkAll.indeterminate = false;
-      } else if (checked === total){
-        checkAll.checked = true;  checkAll.indeterminate = false;
-      } else {
-        checkAll.checked = false; checkAll.indeterminate = true;
-      }
-    }
-
-    // Marcar/desmarcar todos
-    if (checkAll) {
-      checkAll.addEventListener('change', function(){
-        allChecks().forEach(ch => { ch.checked = checkAll.checked; });
-        toggleBulkBtn();
-        updateHeaderState();
-      });
-    }
-
-    // Mudança em qualquer checkbox de linha
-    if (tbl) {
-      tbl.addEventListener('change', function(e){
-        if (e.target && e.target.classList && e.target.classList.contains('chk-beneficio')){
-          toggleBulkBtn();
-          updateHeaderState();
-        }
-      });
-    }
-
-    // Estado inicial (só se existirem os elementos)
-    toggleBulkBtn();
-    updateHeaderState();
-
-    // Modal individual: preenche label + hidden
-    if (modal) {
-      modal.addEventListener('show.bs.modal', function (ev) {
-        const btn   = ev.relatedTarget;
-        const id    = btn ? btn.getAttribute('data-beneficio-id') : '';
-        const label = btn ? (btn.getAttribute('data-beneficio-label') || '—') : '—';
-        const labelNode = document.getElementById('beneficio_label_preview');
-        if (labelNode) labelNode.textContent = label;
-        const hidden = document.getElementById('beneficio_id_hidden');
-        if (hidden) hidden.value = id || '';
-      });
-    }
-  } catch (err) {
-    // Qualquer erro daqui NÃO derruba o resto do site nem as abas
-    console.error('[beneficios-bulk-js]', err);
-  }
-})();
-</script>
-
-    <!-- COOPERADOS (versão profissional / drop-in) -->
-<section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
-  {% set qtd_coops = cooperados|length %}
-  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-    <h5 class="m-0 d-flex align-items-center gap-2">
-      <i class="bi bi-person-badge"></i> Cadastro de Cooperados
-    </h5>
-    <span class="badge-soft">Total: <b>{{ qtd_coops }}</b></span>
-  </div>
  <!-- COOPERADOS (versão profissional / drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
   {% set qtd_coops = cooperados|length %}
@@ -3524,45 +3441,131 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         calcPreview(p);
       });
 
-      // >>>>>>>>>>>>>>>>> CÁLCULO DOS TOTAIS ANTES DE ENVIAR <<<<<<<<<<<<<<<<<
-      const form = document.getElementById('form-beneficios');
-      if(form){
-        form.addEventListener('submit', function(){
-          ['hosp','farm','alim'].forEach(p=>{
-            const unit = document.getElementById(`${p}_valor_unit`);
-            const bens = document.getElementById(`${p}_beneficiarios`);
-            const totalOut = document.getElementById(`${p}_valor_total`) || document.getElementById(`${p}_valor_total`) || null;
-          });
+      <script>
+(function(){
+  const sec = document.getElementById('beneficios');
+  if (!sec) return; // só roda nesta aba
 
-          function setTotal(prefix){
-            const unit = document.getElementById(`${prefix}_valor_unit`);
-            const bensSel = document.getElementById(`${prefix}_beneficiarios`);
-            const hiddenTotal = document.getElementById(`${prefix}_valor_total`) || document.getElementById(`${prefix}_valor_total`);
-            // nossos hidden têm id `${prefix}_valor_total`
-            const ht = document.getElementById(`${prefix}_valor_total`);
-            const ht2 = document.getElementById(`${prefix}_valor_total`); // apenas garantia
-            const finalHidden = ht || ht2 || document.querySelector(`input[name="${prefix}_valor"]`);
-            const count = (bensSel && bensSel.selectedOptions) ? bensSel.selectedOptions.length : 0;
-            const total = Math.max(0, valNum(unit) * count);
-            if(finalHidden) finalHidden.value = total.toFixed(2);
-          }
-          ['hosp','farm','alim'].forEach(setTotal);
-        });
+  // ===== Utils =====
+  const TOTAL_COOPS = {{ cooperados|length or 0 }};
+  function valNum(inp) {
+    const n = parseFloat(String(inp?.value ?? '').replace(',', '.'));
+    return isFinite(n) ? n : 0;
+  }
+  function idsFromSelect(sel) {
+    return Array.from(sel?.selectedOptions || []).map(o => String(o.value));
+  }
+  function money(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function setBadge(el, txt){ if(el) el.textContent = txt; }
 
-        // garantir ids corretos dos hidden
-        document.getElementById('hosp_valor_total') || (()=>{
-          const i = document.querySelector('input[name="hosp_valor"]'); if(i) i.id = 'hosp_valor_total';
-        })();
-        document.getElementById('farm_valor_total') || (()=>{
-          const i = document.querySelector('input[name="farm_valor"]'); if(i) i.id = 'farm_valor_total';
-        })();
-        document.getElementById('alim_valor_total') || (()=>{
-          const i = document.querySelector('input[name="alim_valor"]'); if(i) i.id = 'alim_valor_total';
-        })();
-      }
+  // ===== Prévia por tipo (hosp/farm/alim) =====
+  function calcPreview(prefix){
+    const unit    = sec.querySelector(`#${prefix}_valor_unit`);
+    const bensSel = sec.querySelector(`#${prefix}_beneficiarios`);
+    const isenSel = sec.querySelector(`#${prefix}_isencoes`);
+    const badge   = sec.querySelector(`#${prefix}_badge`);
+    if(!unit || !bensSel || !isenSel || !badge) return;
+
+    const vUnit = Math.max(0, valNum(unit));
+    const bens  = idsFromSelect(bensSel);
+    const isen  = idsFromSelect(isenSel);
+    const unique = new Set([...bens, ...isen]); // não pagam
+    const numBens = bens.length;
+    const numIsen = isen.length;
+    const pagantes = Math.max(0, TOTAL_COOPS - unique.size);
+    const total = vUnit * numBens;
+    const porPag = pagantes > 0 ? (total / pagantes) : 0;
+
+    setBadge(badge, `Recebem: ${numBens} · Isentos: ${numIsen} · Pagantes: ${pagantes} · Total a ratear: ${money(total)} · Cobrança por pagante: ${money(porPag)}`);
+  }
+
+  ['hosp','farm','alim'].forEach(p=>{
+    sec.querySelector(`#${p}_valor_unit`)?.addEventListener('input', ()=>calcPreview(p));
+    sec.querySelector(`#${p}_beneficiarios`)?.addEventListener('change', ()=>calcPreview(p));
+    sec.querySelector(`#${p}_isencoes`)?.addEventListener('change', ()=>calcPreview(p));
+    calcPreview(p); // estado inicial
+  });
+
+  // ===== Cálculo dos totais no submit + garantir IDs dos hidden =====
+  const form = sec.querySelector('#form-beneficios');
+  if (form){
+    // garantir ids dos hidden esperados
+    (function ensureHiddenIds(){
+      const map = { hosp:'hosp_valor_total', farm:'farm_valor_total', alim:'alim_valor_total' };
+      Object.entries(map).forEach(([p, id])=>{
+        if (!sec.querySelector(`#${id}`)) {
+          const i = sec.querySelector(`input[name="${p}_valor"]`);
+          if (i) i.id = id;
+        }
+      });
     })();
-  </script>
 
-<a href="{{ url_for('admin_documentos') }}" class="btn btn-outline-primary btn-sm">Documentos</a>
+    function setTotal(prefix){
+      const unit = sec.querySelector(`#${prefix}_valor_unit`);
+      const bensSel = sec.querySelector(`#${prefix}_beneficiarios`);
+      const hidden = sec.querySelector(`#${prefix}_valor_total`) || sec.querySelector(`input[name="${prefix}_valor"]`);
+      const count = (bensSel && bensSel.selectedOptions) ? bensSel.selectedOptions.length : 0;
+      const total = Math.max(0, valNum(unit) * count);
+      if (hidden) hidden.value = total.toFixed(2);
+    }
+
+    form.addEventListener('submit', function(){
+      ['hosp','farm','alim'].forEach(setTotal);
+    });
+  }
+
+  // ===== Seleção em massa + modal de exclusão (tabela) =====
+  try {
+    const tbl      = sec.querySelector('#tabela-beneficios');
+    const checkAll = sec.querySelector('#check_all');
+    const bulkBtn  = sec.querySelector('#btn-bulk-delete');
+    const modal    = document.getElementById('modalExcluirBeneficio'); // modal fica fora da aba
+
+    if (tbl || checkAll || bulkBtn || modal) {
+      const allChecks = () => tbl ? tbl.querySelectorAll('tbody .chk-beneficio') : [];
+      const checkedCount = () => tbl ? tbl.querySelectorAll('tbody .chk-beneficio:checked').length : 0;
+
+      function toggleBulkBtn(){ if (bulkBtn) bulkBtn.disabled = checkedCount() === 0; }
+      function updateHeaderState(){
+        if (!checkAll) return;
+        const items   = allChecks();
+        const total   = items.length;
+        const checked = checkedCount();
+        if (checked === 0){ checkAll.checked = false; checkAll.indeterminate = false; }
+        else if (checked === total){ checkAll.checked = true; checkAll.indeterminate = false; }
+        else { checkAll.checked = false; checkAll.indeterminate = true; }
+      }
+
+      checkAll?.addEventListener('change', ()=>{
+        allChecks().forEach(ch => { ch.checked = checkAll.checked; });
+        toggleBulkBtn(); updateHeaderState();
+      });
+
+      tbl?.addEventListener('change', (e)=>{
+        if (e.target && e.target.classList?.contains('chk-beneficio')){
+          toggleBulkBtn(); updateHeaderState();
+        }
+      });
+
+      toggleBulkBtn(); updateHeaderState();
+
+      // Modal individual
+      if (modal) {
+        modal.addEventListener('show.bs.modal', function (ev) {
+          const btn   = ev.relatedTarget;
+          const id    = btn ? btn.getAttribute('data-beneficio-id') : '';
+          const label = btn ? (btn.getAttribute('data-beneficio-label') || '—') : '—';
+          const labelNode = modal.querySelector('#beneficio_label_preview');
+          if (labelNode) labelNode.textContent = label;
+          const hidden = modal.querySelector('#beneficio_id_hidden');
+          if (hidden) hidden.value = id || '';
+        });
+      }
+    }
+  } catch (err) {
+    console.error('[beneficios-js]', err);
+  }
+})();
+</script>
 </body>
 </html>
