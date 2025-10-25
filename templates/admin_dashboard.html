@@ -188,29 +188,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       <i class="bi bi-heart-pulse"></i> <span>Benefícios</span>
     </a>
 
-   <!-- Cooperados -->
-<a class="nav-link {{ 'active' if _tab=='cooperados' else '' }}"
-   data-bs-toggle="tab"
-   href="#cooperados"
-   role="tab"
-   aria-controls="cooperados"
-   aria-selected="{{ 'true' if _tab=='cooperados' else 'false' }}">
-  <i class="bi bi-person-badge"></i> <span>Cooperados</span>
-</a>
-
-  <!-- Estabelecimentos -->
-<a class="nav-link {{ 'active' if _tab=='restaurantes' else '' }}"
-   data-bs-toggle="tab"
-   href="#restaurantes"
-   role="tab"
-   aria-controls="restaurantes"
-   aria-selected="{{ 'true' if _tab=='restaurantes' else 'false' }}">
-  <i class="bi bi-shop"></i> <span>Estabelecimentos</span>
-</a>
-
- <!-- Escalas -->
+   <!-- Escalas -->
 <a class="nav-link {{ 'active' if _tab=='escalas' else '' }}"
    data-bs-toggle="tab"
+   data-bs-target="#escalas"
    href="#escalas"
    role="tab"
    aria-controls="escalas"
