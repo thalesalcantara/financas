@@ -2517,22 +2517,24 @@ from datetime import datetime, timedelta
 @app.route("/admin/avaliacoes", methods=["GET"])
 @admin_required
 def admin_avaliacoes():
-    """
-    Dashboard de avaliações.
-    tipo=cooperado   -> Restaurante avalia Cooperado (pont/educ/efic/apres)
-    tipo=restaurante -> Cooperado avalia Restaurante (trat/amb/sup) com fallbacks
-    """
-    # Padrão mantém compatibilidade: cooperado
-    tipo = (request.args.get("tipo", "cooperado") or "cooperado").strip().lower()
+    # tipo=cooperado (padrão): Restaurante avalia Cooperado
+    # tipo=restaurante: Cooperado avalia Restaurante
+    tipo_raw = (request.args.get("tipo") or "cooperado").strip().lower()
+    tipo = "restaurante" if tipo_raw == "restaurante" else "cooperado"
 
     restaurante_id = request.args.get("restaurante_id", type=int)
     cooperado_id   = request.args.get("cooperado_id", type=int)
-    data_inicio    = (request.args.get("data_inicio") or "").strip()  # 'YYYY-MM-DD'
-    data_fim       = (request.args.get("data_fim") or "").strip()     # 'YYYY-MM-DD'
+    data_inicio    = (request.args.get("data_inicio") or "").strip()
+    data_fim       = (request.args.get("data_fim") or "").strip()
 
+    # Datas (aceita YYYY-MM-DD ou DD/MM/YYYY)
+    di = _parse_date(data_inicio)
+    df = _parse_date(data_fim)
+
+    # Model por tipo
     Model = AvaliacaoRestaurante if (tipo == "restaurante") else AvaliacaoCooperado
 
-    # Helper: pega a coluna existente (fallback durante migração)
+    # Helper: checa se coluna existe (migrações)
     def col(*names):
         for n in names:
             if hasattr(Model, n):
@@ -2541,18 +2543,17 @@ def admin_avaliacoes():
 
     f_geral = col("estrelas_geral")
 
-    # Campos por tipo (com fallbacks)
     if tipo == "restaurante":  # Cooperado -> Restaurante
         f_trat = col("estrelas_tratamento", "estrelas_pontualidade")
         f_amb  = col("estrelas_ambiente",   "estrelas_educacao")
         f_sup  = col("estrelas_suporte",    "estrelas_eficiencia")
-    else:                      # Restaurante -> Cooperado
+    else:                       # Restaurante -> Cooperado
         f_pont  = col("estrelas_pontualidade")
         f_educ  = col("estrelas_educacao")
         f_efic  = col("estrelas_eficiencia")
         f_apres = col("estrelas_apresentacao")
 
-    # ===== Query base com nomes (evita relationships no template)
+    # Query base (sem relationships no template)
     base = (
         db.session.query(
             Model,
@@ -2565,31 +2566,29 @@ def admin_avaliacoes():
         .join(Cooperado,   Model.cooperado_id   == Cooperado.id)
     )
 
-    # ----- Filtros (usando índices de datetime) -----
+    # Filtros
     filtros = []
     if restaurante_id:
         filtros.append(Model.restaurante_id == restaurante_id)
     if cooperado_id:
         filtros.append(Model.cooperado_id == cooperado_id)
-
-    di = datetime.strptime(data_inicio, "%Y-%m-%d") if data_inicio else None
-    df = (datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)) if data_fim else None
+    # Para não depender de datetime/time aqui, use func.date() (robusto e simples)
     if di:
-        filtros.append(Model.criado_em >= di)
+        filtros.append(func.date(Model.criado_em) >= di.isoformat())
     if df:
-        filtros.append(Model.criado_em < df)
+        filtros.append(func.date(Model.criado_em) <= df.isoformat())
 
-    base_filtered = base.filter(and_(*filtros)) if filtros else base
+    if filtros:
+        base = base.filter(and_(*filtros))
 
-    # ----- Paginação -----
+    # Paginação
     page = max(1, request.args.get("page", type=int) or 1)
     per_page = min(200, max(1, request.args.get("per_page", type=int) or 50))
     offset = (page - 1) * per_page
 
-    q_ordered = base_filtered.order_by(Model.criado_em.desc())
-    rows = q_ordered.limit(per_page).offset(offset).all()
+    rows = base.order_by(Model.criado_em.desc()).limit(per_page).offset(offset).all()
 
-    # Total (mesmos filtros)
+    # Total
     cnt_q = db.session.query(func.count(Model.id))
     if filtros:
         cnt_q = cnt_q.filter(and_(*filtros))
@@ -2597,15 +2596,11 @@ def admin_avaliacoes():
     pages = max(1, (total + per_page - 1) // per_page)
 
     pager = SimpleNamespace(
-        page=page,
-        per_page=per_page,
-        total=total,
-        pages=pages,
-        has_prev=(page > 1),
-        has_next=(page < pages),
+        page=page, per_page=per_page, total=total, pages=pages,
+        has_prev=(page > 1), has_next=(page < pages)
     )
 
-    # ===== Achata para o template
+    # Achata para o template — **sempre** com todas as chaves usadas na UI
     avaliacoes = []
     for a, rest_id, rest_nome, coop_id, coop_nome in rows:
         item = {
@@ -2614,22 +2609,39 @@ def admin_avaliacoes():
             "rest_nome": rest_nome,
             "coop_id":   coop_id,
             "coop_nome": coop_nome,
-            "geral":     getattr(a, "estrelas_geral", 0) or 0,
+
+            "geral":      getattr(a, "estrelas_geral", 0) or 0,
             "comentario": (getattr(a, "comentario", "") or "").strip(),
             "media":       getattr(a, "media_ponderada", None),
             "sentimento":  getattr(a, "sentimento", None),
             "temas":       getattr(a, "temas", None),
             "alerta":      bool(getattr(a, "alerta_crise", False)),
+
+            # chaves "fixas" para não quebrar JS/Jinja em nenhuma aba
+            "tratamento": 0, "ambiente": 0, "suporte": 0,
+            "trat": 0, "amb": 0, "sup": 0,  # retrocompat
+            "pont": 0, "educ": 0, "efic": 0, "apres": 0,
         }
 
         if tipo == "restaurante":
-            # Cooperado -> Restaurante (exibir sempre TRAT/AMB/SUP; criar aliases)
-            trat = getattr(a, "estrelas_tratamento", None) or getattr(a, "estrelas_pontualidade", None) or 0
-            amb  = getattr(a, "estrelas_ambiente",   None) or getattr(a, "estrelas_educacao", None)     or 0
-            sup  = getattr(a, "estrelas_suporte",    None) or getattr(a, "estrelas_eficiencia", None)   or 0
+            # Cooperado -> Restaurante: garante **Tratamento** visível
+            trat = getattr(a, "estrelas_tratamento", None)
+            if trat is None:
+                # fallback para bases antigas onde "pontualidade" era usado
+                trat = getattr(a, "estrelas_pontualidade", 0)
+            amb  = getattr(a, "estrelas_ambiente", None)
+            if amb is None:
+                amb = getattr(a, "estrelas_educacao", 0)
+            sup  = getattr(a, "estrelas_suporte", None)
+            if sup is None:
+                sup = getattr(a, "estrelas_eficiencia", 0)
+
             item.update({
-                "trat": trat, "amb": amb, "sup": sup,             # usados no template novo
-                "tratamento": trat, "ambiente": amb, "suporte": sup,  # aliases p/ template antigo
+                "tratamento": trat or 0,
+                "ambiente":   amb  or 0,
+                "suporte":    sup  or 0,
+                # retrocompat se o template usar nomes antigos:
+                "trat": trat or 0, "amb": amb or 0, "sup": sup or 0,
             })
         else:
             # Restaurante -> Cooperado
@@ -2642,7 +2654,7 @@ def admin_avaliacoes():
 
         avaliacoes.append(SimpleNamespace(**item))
 
-    # ===== KPIs
+    # KPIs (função local simples para evitar imports extras)
     def avg_or_zero(coluna):
         if coluna is None:
             return 0.0
@@ -2666,7 +2678,8 @@ def admin_avaliacoes():
             "apres": avg_or_zero(f_apres),
         })
 
-    # ===== Ranking (médias por entidade)
+    # Ranking + chart (sempre definidos)
+    ranking, chart_top = [], {"labels": [], "values": []}
     if tipo == "restaurante":
         q_rank = (
             db.session.query(
@@ -2720,7 +2733,7 @@ def admin_avaliacoes():
         top = sorted([x for x in ranking if x["qtd"] >= 3], key=lambda x: x["m_geral"], reverse=True)[:10]
         chart_top = {"labels": [r["coop_nome"] for r in top], "values": [round(r["m_geral"], 2) for r in top]}
 
-    # ===== Compatibilidade Cooperado × Restaurante (média "geral" por par)
+    # Compatibilidade (média de geral por par coop×rest) — não quebra se vazio
     compat_map = {}
     for a in avaliacoes:
         key = (a.coop_id, a.rest_id)
@@ -2730,26 +2743,22 @@ def admin_avaliacoes():
         d["sum"] += (a.geral or 0)
         d["count"] += 1
         compat_map[key] = d
-
     compat = []
     for d in compat_map.values():
         avg = (d["sum"] / d["count"]) if d["count"] else 0.0
         compat.append({"coop": d["coop"], "rest": d["rest"], "avg": avg, "count": d["count"]})
     compat.sort(key=lambda x: (-(x["avg"] or 0), -(x["count"] or 0), x["coop"], x["rest"]))
 
-    # Repassa filtros para o form
+    # Filtros p/ repopular form + preserva args para paginação
     _flt = SimpleNamespace(
         restaurante_id=restaurante_id,
         cooperado_id=cooperado_id,
         data_inicio=data_inicio or "",
         data_fim=data_fim or "",
     )
-
-    # Preserva filtros para paginação/links
     preserve = request.args.to_dict(flat=True)
     preserve.pop("page", None)
 
-    # Render
     return render_template(
         "admin_dashboard.html",
         tab="avaliacoes",
@@ -2769,22 +2778,19 @@ def admin_avaliacoes():
     )
 
 
-# =========================
-# /admin/avaliacoes/export.csv — Exportação CSV (alinhada ao template)
-# =========================
 @app.route("/admin/avaliacoes/export.csv", methods=["GET"])
 @admin_required
 def admin_export_avaliacoes_csv():
-    """
-    Exporta CSV com as mesmas métricas do dashboard.
-    tipo=restaurante -> inclui (Tratamento, Ambiente, Suporte) com fallbacks.
-    tipo=cooperado   -> inclui (Pontualidade, Educação, Eficiência, Apresentação).
-    """
-    tipo = (request.args.get("tipo", "restaurante") or "restaurante").strip().lower()
+    tipo_raw = (request.args.get("tipo") or "restaurante").strip().lower()
+    tipo = "restaurante" if tipo_raw == "restaurante" else "cooperado"
+
     restaurante_id = request.args.get("restaurante_id", type=int)
     cooperado_id   = request.args.get("cooperado_id", type=int)
     data_inicio    = (request.args.get("data_inicio") or "").strip()
     data_fim       = (request.args.get("data_fim") or "").strip()
+
+    di = _parse_date(data_inicio)
+    df = _parse_date(data_fim)
 
     Model = AvaliacaoRestaurante if (tipo == "restaurante") else AvaliacaoCooperado
 
@@ -2798,20 +2804,12 @@ def admin_export_avaliacoes_csv():
         .join(Cooperado,   Model.cooperado_id   == Cooperado.id)
     )
 
-    # Mesma lógica de filtro de datas (intervalo fechado/aberto)
     filtros = []
     if restaurante_id: filtros.append(Model.restaurante_id == restaurante_id)
     if cooperado_id:   filtros.append(Model.cooperado_id   == cooperado_id)
-
-    di = datetime.strptime(data_inicio, "%Y-%m-%d") if data_inicio else None
-    df = (datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)) if data_fim else None
-    if di:
-        filtros.append(Model.criado_em >= di)
-    if df:
-        filtros.append(Model.criado_em < df)
-
-    if filtros:
-        base = base.filter(and_(*filtros))
+    if di: filtros.append(func.date(Model.criado_em) >= di.isoformat())
+    if df: filtros.append(func.date(Model.criado_em) <= df.isoformat())
+    if filtros: base = base.filter(and_(*filtros))
 
     rows = base.order_by(Model.criado_em.desc()).all()
 
@@ -2819,21 +2817,25 @@ def admin_export_avaliacoes_csv():
     w = csv.writer(buf, delimiter=";")
 
     if tipo == "restaurante":
-        # Cooperado -> Restaurante (com fallbacks + aliases)
-        w.writerow([
-            "Data/Hora","Restaurante","Cooperado","Geral",
-            "Tratamento","Ambiente","Suporte",
-            "Comentário","Média Ponderada","Sentimento","Temas","Crítico?"
-        ])
+        # Cooperado -> Restaurante: garante Tratamento no CSV
+        w.writerow(["Data/Hora","Restaurante","Cooperado","Geral","Tratamento","Ambiente","Suporte",
+                    "Comentário","Média Ponderada","Sentimento","Temas","Crítico?"])
         for a, rest_nome, coop_nome in rows:
-            trat = getattr(a, "estrelas_tratamento", None) or getattr(a, "estrelas_pontualidade", None) or 0
-            amb  = getattr(a, "estrelas_ambiente",   None) or getattr(a, "estrelas_educacao", None)     or 0
-            sup  = getattr(a, "estrelas_suporte",    None) or getattr(a, "estrelas_eficiencia", None)   or 0
+            trat = getattr(a, "estrelas_tratamento", None)
+            if trat is None:
+                trat = getattr(a, "estrelas_pontualidade", 0)
+            amb  = getattr(a, "estrelas_ambiente", None)
+            if amb is None:
+                amb = getattr(a, "estrelas_educacao", 0)
+            sup  = getattr(a, "estrelas_suporte", None)
+            if sup is None:
+                sup = getattr(a, "estrelas_eficiencia", 0)
+
             w.writerow([
                 a.criado_em.strftime("%d/%m/%Y %H:%M") if a.criado_em else "",
                 rest_nome, coop_nome,
                 a.estrelas_geral or 0,
-                trat, amb, sup,
+                (trat or 0), (amb or 0), (sup or 0),
                 (getattr(a, "comentario", "") or "").strip(),
                 (getattr(a, "media_ponderada", "") or ""),
                 (getattr(a, "sentimento", "") or ""),
@@ -2842,11 +2844,8 @@ def admin_export_avaliacoes_csv():
             ])
     else:
         # Restaurante -> Cooperado
-        w.writerow([
-            "Data/Hora","Restaurante","Cooperado","Geral",
-            "Pontualidade","Educação","Eficiência","Apresentação",
-            "Comentário","Média Ponderada","Sentimento","Temas","Crítico?"
-        ])
+        w.writerow(["Data/Hora","Restaurante","Cooperado","Geral","Pontualidade","Educação","Eficiência","Apresentação",
+                    "Comentário","Média Ponderada","Sentimento","Temas","Crítico?"])
         for a, rest_nome, coop_nome in rows:
             w.writerow([
                 a.criado_em.strftime("%d/%m/%Y %H:%M") if a.criado_em else "",
@@ -2864,12 +2863,9 @@ def admin_export_avaliacoes_csv():
             ])
 
     mem = io.BytesIO(buf.getvalue().encode("utf-8-sig"))
-    return send_file(
-        mem,
-        as_attachment=True,
-        download_name=f"avaliacoes_{tipo}.csv",
-        mimetype="text/csv"
-    )
+    return send_file(mem, as_attachment=True,
+                     download_name=f"avaliacoes_{tipo}.csv",
+                     mimetype="text/csv")
 
 # =========================
 # CRUD Receitas/Despesas Coop (Admin)
