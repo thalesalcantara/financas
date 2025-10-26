@@ -258,14 +258,15 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   {% set ri = request.args.get('resumo_inicio','') %}
   {% set rf = request.args.get('resumo_fim','') %}
 
-  {# Listas-base com fallback #}
-  {% set producoes        = producoes        if producoes is defined        else [] %}
-  {% set receitas         = receitas         if receitas is defined         else [] %}
-  {% set despesas         = despesas         if despesas is defined         else [] %}
-  {% set receitas_coop    = receitas_coop    if receitas_coop is defined    else [] %}
-  {% set despesas_coop    = despesas_coop    if despesas_coop is defined    else [] %}
+  {# Listas-base com fallback e materialização (evita generators sem len) #}
+  {% set producoes     = (producoes     | default([]) | list) %}
+  {% set receitas      = (receitas      | default([]) | list) %}           {# Cooperativa #}
+  {% set despesas      = (despesas      | default([]) | list) %}           {# Cooperativa #}
+  {% set receitas_coop = (receitas_coop | default([]) | list) %}           {# Cooperados  #}
+  {% set despesas_coop = (despesas_coop | default([]) | list) %}           {# Cooperados  #}
 
-  {# ---- Totais filtrados por período (apenas Jinja) ---- #}
+  {# ---- Totais filtrados por período (somente Jinja) ---- #}
+  {# Produções #}
   {% set ns_prod = namespace(total=0) %}
   {% for p in producoes %}
     {% set d = p.data.strftime('%Y-%m-%d') if p.data else '' %}
@@ -278,24 +279,26 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   {# INSS 4,5% sobre produções do período #}
   {% set total_inss_f = (total_producoes_f * 0.045) %}
 
-  {% set ns_rec = namespace(total=0) %}
+  {# Receitas/Despesas da COOPERATIVA #}
+  {% set ns_rec_corp = namespace(total=0) %}
   {% for r in receitas %}
     {% set d = r.data.strftime('%Y-%m-%d') if r.data else '' %}
     {% if (not ri or d >= ri) and (not rf or d <= rf) %}
-      {% set ns_rec.total = ns_rec.total + (r.valor or 0) %}
+      {% set ns_rec_corp.total = ns_rec_corp.total + (r.valor or 0) %}
     {% endif %}
   {% endfor %}
-  {% set total_receitas_f = ns_rec.total %}
+  {% set total_receitas_corp_f = ns_rec_corp.total %}
 
-  {% set ns_desp = namespace(total=0) %}
+  {% set ns_desp_corp = namespace(total=0) %}
   {% for d in despesas %}
     {% set dt = d.data.strftime('%Y-%m-%d') if d.data else '' %}
     {% if (not ri or dt >= ri) and (not rf or dt <= rf) %}
-      {% set ns_desp.total = ns_desp.total + (d.valor or 0) %}
+      {% set ns_desp_corp.total = ns_desp_corp.total + (d.valor or 0) %}
     {% endif %}
   {% endfor %}
-  {% set total_despesas_f = ns_desp.total %}
+  {% set total_despesas_corp_f = ns_desp_corp.total %}
 
+  {# Receitas/Despesas dos COOPERADOS #}
   {% set ns_rec_coop = namespace(total=0) %}
   {% for r in receitas_coop %}
     {% set d = r.data.strftime('%Y-%m-%d') if r.data else '' %}
@@ -314,7 +317,8 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   {% endfor %}
   {% set total_despesas_coop_f = ns_desp_coop.total %}
 
-  {% set _resultado = (total_receitas_f|default(0)) - (total_despesas_f|default(0)) %}
+  {# Resultado da COOPERATIVA (receitas - despesas) #}
+  {% set _resultado = (total_receitas_corp_f|default(0)) - (total_despesas_corp_f|default(0)) %}
 
   <!-- Filtro de Período -->
   <div class="card border-0 shadow-sm rounded-3 mb-3">
@@ -334,16 +338,13 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         </div>
         {% if ri or rf %}
           <div class="col-md-3">
-            <a class="btn btn-outline-secondary btn-sm w-100" href="{{ url_for('admin_dashboard', tab='resumo') }}">
-              Limpar
-            </a>
+            <a class="btn btn-outline-secondary btn-sm w-100" href="{{ url_for('admin_dashboard', tab='resumo') }}">Limpar</a>
           </div>
         {% endif %}
       </form>
       {% if ri or rf %}
         <div class="mt-2 small text-muted">
-          Período aplicado:
-          <b>{{ ri if ri else 'início' }}</b> a <b>{{ rf if rf else 'hoje' }}</b>
+          Período aplicado: <b>{{ ri if ri else 'início' }}</b> a <b>{{ rf if rf else 'hoje' }}</b>
         </div>
       {% endif %}
     </div>
@@ -365,7 +366,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       </div>
     </div>
 
-    <!-- Total INSS -->
+    <!-- Total INSS (sobre produções) -->
     <div class="col-12 col-sm-6 col-lg-3">
       <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
         <div class="d-flex align-items-center justify-content-between">
@@ -379,13 +380,13 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       </div>
     </div>
 
-    <!-- Receitas Coop -->
+    <!-- Receitas Cooperativa -->
     <div class="col-12 col-sm-6 col-lg-3">
       <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
         <div class="d-flex align-items-center justify-content-between">
           <div class="pe-2">
-            <div class="text-uppercase text-muted small">Receitas Coop</div>
-            <div class="fw-bold fs-5 mb-0 text-success">R$ {{ "%.2f"|format(total_receitas_f) }}</div>
+            <div class="text-uppercase text-muted small">Receitas Cooperativa</div>
+            <div class="fw-bold fs-5 mb-0 text-success">R$ {{ "%.2f"|format(total_receitas_corp_f) }}</div>
             <div class="small text-muted">Entradas da cooperativa</div>
           </div>
           <div class="flex-shrink-0 kpi-icon"><i class="bi bi-cash-coin"></i></div>
@@ -393,13 +394,13 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       </div>
     </div>
 
-    <!-- Despesas Coop -->
+    <!-- Despesas Cooperativa -->
     <div class="col-12 col-sm-6 col-lg-3">
       <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
         <div class="d-flex align-items-center justify-content-between">
           <div class="pe-2">
-            <div class="text-uppercase text-muted small">Despesas Coop</div>
-            <div class="fw-bold fs-5 mb-0 text-danger">R$ {{ "%.2f"|format(total_despesas_f) }}</div>
+            <div class="text-uppercase text-muted small">Despesas Cooperativa</div>
+            <div class="fw-bold fs-5 mb-0 text-danger">R$ {{ "%.2f"|format(total_despesas_corp_f) }}</div>
             <div class="small text-muted">Saídas da cooperativa</div>
           </div>
           <div class="flex-shrink-0 kpi-icon"><i class="bi bi-cart-dash"></i></div>
@@ -435,16 +436,16 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       </div>
     </div>
 
-    <!-- Resultado Coop -->
+    <!-- Resultado Cooperativa -->
     <div class="col-12 col-lg-3">
       <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
         <div class="d-flex align-items-center justify-content-between">
           <div class="pe-2">
-            <div class="text-uppercase text-muted small">Resultado Coop</div>
+            <div class="text-uppercase text-muted small">Resultado Cooperativa</div>
             <div class="fw-bold fs-5 mb-0 {{ 'text-success' if _resultado >= 0 else 'text-danger' }}">
               R$ {{ "%.2f"|format(_resultado) }}
             </div>
-            <div class="small text-muted">Receitas − Despesas</div>
+            <div class="small text-muted">Receitas − Despesas (coop)</div>
           </div>
           <div class="flex-shrink-0 kpi-icon"><i class="bi bi-pie-chart"></i></div>
         </div>
