@@ -377,6 +377,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       <div class="card border-0 shadow-sm rounded-3 p-3 h-100">
         <div class="d-flex justify-content-between align-items-center">
           <h6 class="mb-0"><i class="bi bi-currency-dollar me-1"></i> Parâmetro — Salário Mínimo</h6>
+           </a>
         </div>
         <hr class="my-2">
         <div class="small text-muted">Atual</div>
@@ -408,46 +409,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 </section>
 
 {# ===================== ABA "Avaliações" — ENXUTA (royal & white) ===================== #}
-<section id="avaliacoes" class="tab-pane fade show active" role="tabpanel" aria-labelledby="tab-avaliacoes">
+<section id="avaliacoes" class="tab-pane fade {{ 'show active' if _tab=='avaliacoes' else '' }}" role="tabpanel">
   {% set page_title = "Avaliações" %}
-
-  <style>
-    :root{
-      --royal:#1f3bb3; --royal-600:#1a3196;
-      --ink:#0f172a; --muted:#6b7280; --line:#e5e7eb;
-      --bg:#ffffff; --bg-soft:#f8fafc; --r:10px;
-    }
-
-    .section-head{background:var(--bg); border:1px solid var(--line); border-radius:var(--r); padding:.75rem 1rem}
-    .section-head h4{margin:0; color:var(--ink); font-weight:700; font-size:1.05rem}
-    .scope{color:var(--muted); font-size:.85rem}
-
-    .btn-royal{background:var(--royal); color:#fff; border:1px solid var(--royal); padding:.3rem .55rem}
-    .btn-royal:hover{background:var(--royal-600); border-color:var(--royal-600)}
-    .btn-outline-royal{border:1px solid var(--royal); color:var(--royal); padding:.3rem .55rem; background:transparent}
-    .btn-outline-royal:hover{background:var(--royal); color:#fff}
-
-    .kpi{border:1px solid var(--line); border-radius:var(--r); background:var(--bg); padding:.75rem}
-    .kpi .label{color:var(--muted); font-size:.78rem}
-    .kpi .value{color:var(--ink); font-weight:700; font-size:1.05rem}
-
-    .table-wrap{border:1px solid var(--line); border-radius:var(--r); background:var(--bg)}
-    .table thead th{background:var(--bg-soft); color:var(--ink); border-bottom:1px solid var(--line)}
-    .table tbody tr:hover{background:#f9fbff}
-
-    .rank-n{width:28px; text-align:center; font-weight:700}
-    .medal{display:inline-block; min-width:24px; padding:.05rem .45rem; border-radius:999px; color:#fff; font-weight:700; font-size:.78rem}
-    .m1{background:#f59e0b}.m2{background:#9ca3af}.m3{background:#8b5cf6}
-
-    .progress{height:8px; background:#eef2ff; border-radius:999px}
-    .progress-bar{background:var(--royal); border-radius:999px}
-    .compat-badge{min-width:46px; display:inline-block; font-weight:700; font-size:.9rem}
-
-    .text-muted-2{color:var(--muted)}
-    .py-2-5{padding-top:.6rem; padding-bottom:.6rem}
-  </style>
-
-  <div class="container py-2-5">
+   <div class="container py-3">
+     
     <!-- Cabeçalho -->
     <div class="section-head mb-2">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
