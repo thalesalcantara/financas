@@ -252,9 +252,102 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   <main class="main">
     <div class="tab-content">
 
-      <!-- RESUMO (versão profissional/compacta – drop-in) -->
+      <!-- RESUMO (versão profissional/compacta + filtro de período – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
-  {% set _resultado = (total_receitas|default(0)) - (total_despesas|default(0)) %}
+  {# Parâmetros do filtro (strings yyyy-mm-dd) #}
+  {% set ri = request.args.get('resumo_inicio','') %}
+  {% set rf = request.args.get('resumo_fim','') %}
+
+  {# Listas-base com fallback #}
+  {% set producoes        = producoes        if producoes is defined        else [] %}
+  {% set receitas         = receitas         if receitas is defined         else [] %}
+  {% set despesas         = despesas         if despesas is defined         else [] %}
+  {% set receitas_coop    = receitas_coop    if receitas_coop is defined    else [] %}
+  {% set despesas_coop    = despesas_coop    if despesas_coop is defined    else [] %}
+
+  {# ---- Totais filtrados por período (apenas Jinja) ---- #}
+  {% set ns_prod = namespace(total=0) %}
+  {% for p in producoes %}
+    {% set d = p.data.strftime('%Y-%m-%d') if p.data else '' %}
+    {% if (not ri or d >= ri) and (not rf or d <= rf) %}
+      {% set ns_prod.total = ns_prod.total + (p.valor or 0) %}
+    {% endif %}
+  {% endfor %}
+  {% set total_producoes_f = ns_prod.total %}
+
+  {# INSS 4,5% sobre produções do período #}
+  {% set total_inss_f = (total_producoes_f * 0.045) %}
+
+  {% set ns_rec = namespace(total=0) %}
+  {% for r in receitas %}
+    {% set d = r.data.strftime('%Y-%m-%d') if r.data else '' %}
+    {% if (not ri or d >= ri) and (not rf or d <= rf) %}
+      {% set ns_rec.total = ns_rec.total + (r.valor or 0) %}
+    {% endif %}
+  {% endfor %}
+  {% set total_receitas_f = ns_rec.total %}
+
+  {% set ns_desp = namespace(total=0) %}
+  {% for d in despesas %}
+    {% set dt = d.data.strftime('%Y-%m-%d') if d.data else '' %}
+    {% if (not ri or dt >= ri) and (not rf or dt <= rf) %}
+      {% set ns_desp.total = ns_desp.total + (d.valor or 0) %}
+    {% endif %}
+  {% endfor %}
+  {% set total_despesas_f = ns_desp.total %}
+
+  {% set ns_rec_coop = namespace(total=0) %}
+  {% for r in receitas_coop %}
+    {% set d = r.data.strftime('%Y-%m-%d') if r.data else '' %}
+    {% if (not ri or d >= ri) and (not rf or d <= rf) %}
+      {% set ns_rec_coop.total = ns_rec_coop.total + (r.valor or 0) %}
+    {% endif %}
+  {% endfor %}
+  {% set total_receitas_coop_f = ns_rec_coop.total %}
+
+  {% set ns_desp_coop = namespace(total=0) %}
+  {% for d in despesas_coop %}
+    {% set dt = d.data.strftime('%Y-%m-%d') if d.data else '' %}
+    {% if (not ri or dt >= ri) and (not rf or dt <= rf) %}
+      {% set ns_desp_coop.total = ns_desp_coop.total + (d.valor or 0) %}
+    {% endif %}
+  {% endfor %}
+  {% set total_despesas_coop_f = ns_desp_coop.total %}
+
+  {% set _resultado = (total_receitas_f|default(0)) - (total_despesas_f|default(0)) %}
+
+  <!-- Filtro de Período -->
+  <div class="card border-0 shadow-sm rounded-3 mb-3">
+    <div class="card-body">
+      <form method="GET" class="row g-2 align-items-end">
+        <input type="hidden" name="tab" value="resumo">
+        <div class="col-md-3">
+          <label class="form-label">De</label>
+          <input type="date" class="form-control form-control-sm" name="resumo_inicio" value="{{ ri }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Até</label>
+          <input type="date" class="form-control form-control-sm" name="resumo_fim" value="{{ rf }}">
+        </div>
+        <div class="col-md-3">
+          <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+        </div>
+        {% if ri or rf %}
+          <div class="col-md-3">
+            <a class="btn btn-outline-secondary btn-sm w-100" href="{{ url_for('admin_dashboard', tab='resumo') }}">
+              Limpar
+            </a>
+          </div>
+        {% endif %}
+      </form>
+      {% if ri or rf %}
+        <div class="mt-2 small text-muted">
+          Período aplicado:
+          <b>{{ ri if ri else 'início' }}</b> a <b>{{ rf if rf else 'hoje' }}</b>
+        </div>
+      {% endif %}
+    </div>
+  </div>
 
   <!-- KPIs -->
   <div class="row g-2">
@@ -264,12 +357,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <div class="d-flex align-items-center justify-content-between">
           <div class="pe-2">
             <div class="text-uppercase text-muted small">Total Produções</div>
-            <div class="fw-bold fs-5 mb-0">R$ {{ "%.2f"|format(total_producoes|default(0)) }}</div>
-            <div class="small text-muted">Bruto acumulado</div>
+            <div class="fw-bold fs-5 mb-0">R$ {{ "%.2f"|format(total_producoes_f) }}</div>
+            <div class="small text-muted">Bruto no período</div>
           </div>
-          <div class="flex-shrink-0" style="width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(39,71,217,.10);color:var(--royal-blue)">
-            <i class="bi bi-graph-up"></i>
-          </div>
+          <div class="flex-shrink-0 kpi-icon"><i class="bi bi-graph-up"></i></div>
         </div>
       </div>
     </div>
@@ -280,12 +371,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <div class="d-flex align-items-center justify-content-between">
           <div class="pe-2">
             <div class="text-uppercase text-muted small">Total INSS</div>
-            <div class="fw-bold fs-5 mb-0">R$ {{ "%.2f"|format(total_inss|default(0)) }}</div>
+            <div class="fw-bold fs-5 mb-0">R$ {{ "%.2f"|format(total_inss_f) }}</div>
             <div class="small text-muted">4,5% s/ produções</div>
           </div>
-          <div class="flex-shrink-0" style="width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(39,71,217,.10);color:var(--royal-blue)">
-            <i class="bi bi-shield-check"></i>
-          </div>
+          <div class="flex-shrink-0 kpi-icon"><i class="bi bi-shield-check"></i></div>
         </div>
       </div>
     </div>
@@ -296,12 +385,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <div class="d-flex align-items-center justify-content-between">
           <div class="pe-2">
             <div class="text-uppercase text-muted small">Receitas Coop</div>
-            <div class="fw-bold fs-5 mb-0 text-success">R$ {{ "%.2f"|format(total_receitas|default(0)) }}</div>
+            <div class="fw-bold fs-5 mb-0 text-success">R$ {{ "%.2f"|format(total_receitas_f) }}</div>
             <div class="small text-muted">Entradas da cooperativa</div>
           </div>
-          <div class="flex-shrink-0" style="width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(39,71,217,.10);color:var(--royal-blue)">
-            <i class="bi bi-cash-coin"></i>
-          </div>
+          <div class="flex-shrink-0 kpi-icon"><i class="bi bi-cash-coin"></i></div>
         </div>
       </div>
     </div>
@@ -312,12 +399,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <div class="d-flex align-items-center justify-content-between">
           <div class="pe-2">
             <div class="text-uppercase text-muted small">Despesas Coop</div>
-            <div class="fw-bold fs-5 mb-0 text-danger">R$ {{ "%.2f"|format(total_despesas|default(0)) }}</div>
+            <div class="fw-bold fs-5 mb-0 text-danger">R$ {{ "%.2f"|format(total_despesas_f) }}</div>
             <div class="small text-muted">Saídas da cooperativa</div>
           </div>
-          <div class="flex-shrink-0" style="width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(39,71,217,.10);color:var(--royal-blue)">
-            <i class="bi bi-cart-dash"></i>
-          </div>
+          <div class="flex-shrink-0 kpi-icon"><i class="bi bi-cart-dash"></i></div>
         </div>
       </div>
     </div>
@@ -328,12 +413,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <div class="d-flex align-items-center justify-content-between">
           <div class="pe-2">
             <div class="text-uppercase text-muted small">Receitas Cooperados</div>
-            <div class="fw-bold fs-5 mb-0">R$ {{ "%.2f"|format(total_receitas_coop|default(0)) }}</div>
+            <div class="fw-bold fs-5 mb-0">R$ {{ "%.2f"|format(total_receitas_coop_f) }}</div>
             <div class="small text-muted">Créditos aos cooperados</div>
           </div>
-          <div class="flex-shrink-0" style="width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(39,71,217,.10);color:var(--royal-blue)">
-            <i class="bi bi-currency-exchange"></i>
-          </div>
+          <div class="flex-shrink-0 kpi-icon"><i class="bi bi-currency-exchange"></i></div>
         </div>
       </div>
     </div>
@@ -344,12 +427,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <div class="d-flex align-items-center justify-content-between">
           <div class="pe-2">
             <div class="text-uppercase text-muted small">Despesas Cooperados</div>
-            <div class="fw-bold fs-5 mb-0">R$ {{ "%.2f"|format(total_despesas_coop|default(0)) }}</div>
+            <div class="fw-bold fs-5 mb-0">R$ {{ "%.2f"|format(total_despesas_coop_f) }}</div>
             <div class="small text-muted">Débitos/benefícios</div>
           </div>
-          <div class="flex-shrink-0" style="width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(39,71,217,.10);color:var(--royal-blue)">
-            <i class="bi bi-bank"></i>
-          </div>
+          <div class="flex-shrink-0 kpi-icon"><i class="bi bi-bank"></i></div>
         </div>
       </div>
     </div>
@@ -365,9 +446,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
             </div>
             <div class="small text-muted">Receitas − Despesas</div>
           </div>
-          <div class="flex-shrink-0" style="width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(39,71,217,.10);color:var(--royal-blue)">
-            <i class="bi bi-pie-chart"></i>
-          </div>
+          <div class="flex-shrink-0 kpi-icon"><i class="bi bi-pie-chart"></i></div>
         </div>
       </div>
     </div>
@@ -379,7 +458,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       <div class="card border-0 shadow-sm rounded-3 p-3 h-100">
         <div class="d-flex justify-content-between align-items-center">
           <h6 class="mb-0"><i class="bi bi-currency-dollar me-1"></i> Parâmetro — Salário Mínimo</h6>
-           </a>
         </div>
         <hr class="my-2">
         <div class="small text-muted">Atual</div>
@@ -391,9 +469,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       </div>
     </div>
 
-    <!-- Gráficos (mantém seus IDs para reutilizar o JS existente) -->
+    <!-- Gráficos (IDs mantidos) -->
     <div class="col-12 col-lg-6">
-      <div class="card border-0 shadow-sm rounded-3 p-3 chart-card">
+      <div class="card border-0 shadow-sm rounded-3 p-3 chart-card"
+           data-resumo-inicio="{{ ri }}" data-resumo-fim="{{ rf }}">
         <h6 class="mb-2"><i class="bi bi-graph-up-arrow"></i> Crescimento — Cooperativa</h6>
         <canvas id="chartLancCoop"></canvas>
       </div>
@@ -402,7 +481,8 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 
   <div class="row g-2 mt-1">
     <div class="col-12">
-      <div class="card border-0 shadow-sm rounded-3 p-3 chart-card">
+      <div class="card border-0 shadow-sm rounded-3 p-3 chart-card"
+           data-resumo-inicio="{{ ri }}" data-resumo-fim="{{ rf }}">
         <h6 class="mb-2"><i class="bi bi-graph-up-arrow"></i> Crescimento — Cooperados</h6>
         <canvas id="chartLancCooperados"></canvas>
       </div>
@@ -410,6 +490,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </section>
 
+<style>
+  .kpi-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(39,71,217,.10);color:var(--royal-blue)}
+</style>
+      
 {# ===================== CONTEÚDO DA ABA "Avaliações" ===================== #}
 <section id="avaliacoes" class="tab-pane fade {{ 'show active' if _tab=='avaliacoes' else '' }}" role="tabpanel">
 
@@ -1439,8 +1523,15 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 
       <!-- DESPESAS COOPERADOS (versão profissional/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='coop_despesas' else '' }}" id="coop_despesas" role="tabpanel">
-  {% set total_despesas_coop_table = (despesas_coop|sum(attribute='valor')) if despesas_coop else 0 %}
-  {% set qtd_registros = despesas_coop|length if despesas_coop else 0 %}
+  {# Listas e totais com/sem adiantamento (defensivo) #}
+  {% set _lista_normais  = (despesas_coop|selectattr('adiantamento','equalto',False)) if despesas_coop else [] %}
+  {% set _lista_adiant   = (despesas_coop|selectattr('adiantamento','equalto',True))  if despesas_coop else [] %}
+  {% set _qtd_total      = despesas_coop|length if despesas_coop else 0 %}
+  {% set _qtd_adiant     = _lista_adiant|length %}
+  {% set _qtd_normais    = _lista_normais|length %}
+  {% set _total_normais  = (_lista_normais|sum(attribute='valor')) if _lista_normais else 0 %}
+  {% set _total_adiant   = (_lista_adiant|sum(attribute='valor'))  if _lista_adiant  else 0 %}
+  {% set _total_geral    = (_total_normais + _total_adiant) %}
 
   <!-- Header + KPIs -->
   <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
@@ -1448,16 +1539,29 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       <i class="bi bi-bag-dash"></i> Despesas para Cooperados
     </h5>
     <div class="d-flex flex-wrap gap-2">
-      <span class="badge bg-light text-dark border">Registros: <b>{{ qtd_registros }}</b></span>
-      <span class="badge bg-danger-subtle text-danger border">Total: <b>R$ {{ '%.2f'|format(total_despesas_coop_table) }}</b></span>
+      <span class="badge bg-light text-dark border">
+        Registros: <b>{{ _qtd_total }}</b>
+      </span>
+      <span class="badge bg-danger-subtle text-danger border">
+        Total (exclui adiant.): <b>R$ {{ '%.2f'|format(_total_normais) }}</b>
+      </span>
+      <span class="badge bg-secondary-subtle text-secondary border">
+        Adiant. (fora do total): <b>R$ {{ '%.2f'|format(_total_adiant) }}</b>
+      </span>
     </div>
   </div>
 
-  <!-- Filtros -->
+  <!-- Filtros (somente UI: toggle para esconder adiantamentos na tabela) -->
   <div class="card border-0 shadow-sm rounded-3 mb-3">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
         <h6 class="m-0"><i class="bi bi-funnel"></i> Filtrar</h6>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="toggleOcultarAdiant">
+          <label class="form-check-label small" for="toggleOcultarAdiant">
+            Ocultar adiantamentos
+          </label>
+        </div>
       </div>
       <form method="GET" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="coop_despesas">
@@ -1484,7 +1588,9 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h6 class="m-0"><i class="bi bi-plus-circle"></i> Adicionar Despesa</h6>
-        <span class="text-muted small">Selecione 1, vários cooperados ou “Todos”.</span>
+        <span class="text-muted small">
+          Se marcar como <b>adiantamento</b>, não entra no total de “Despesas Cooperados” e será descontado na Folha.
+        </span>
       </div>
 
       <form method="POST" action="{{ url_for('add_despesa_coop') }}" class="row g-2 align-items-end mt-2">
@@ -1511,11 +1617,15 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           <label class="form-label">Data</label>
           <input type="date" class="form-control form-control-sm" name="data" required>
         </div>
-        <div class="col-md-1">
+        <div class="col-md-1 d-flex flex-column">
           <label class="form-label d-none d-md-block">&nbsp;</label>
-          <button class="btn btn-danger btn-sm w-100">
+          <button class="btn btn-danger btn-sm w-100 mb-2" title="Salvar">
             <i class="bi bi-plus-circle"></i>
           </button>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="adiantamento" value="1" id="switchAdiantamento">
+            <label class="form-check-label small" for="switchAdiantamento">Adiant.</label>
+          </div>
         </div>
       </form>
     </div>
@@ -1525,7 +1635,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   <div class="card border-0 shadow-sm rounded-3">
     <div class="card-body p-2 p-md-3">
       <div class="table-responsive">
-        <table class="table table-sm table-bordered table-hover align-middle">
+        <table class="table table-sm table-bordered table-hover align-middle" id="tblDespesasCoop">
           <thead class="table-light">
             <tr class="text-nowrap">
               <th style="width:120px">Data</th>
@@ -1537,10 +1647,16 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           </thead>
           <tbody>
             {% for dc in despesas_coop %}
-              <tr>
+              {% set _is_ad = (dc.adiantamento if dc.adiantamento is defined else False) %}
+              <tr data-adiant="{{ 1 if _is_ad else 0 }}">
                 <td>{{ dc.data.strftime('%d/%m/%Y') if dc.data else '-' }}</td>
                 <td class="text-break">{{ dc.cooperado.nome if dc.cooperado else 'Todos' }}</td>
-                <td class="text-break">{{ dc.descricao }}</td>
+                <td class="text-break">
+                  {{ dc.descricao }}
+                  {% if _is_ad %}
+                    <span class="badge bg-secondary ms-2">Adiantamento</span>
+                  {% endif %}
+                </td>
                 <td class="text-end">R$ {{ "%.2f"|format(dc.valor) }}</td>
                 <td class="text-center text-nowrap">
                   <button class="btn btn-warning btn-sm"
@@ -1551,6 +1667,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                           data-descricao="{{ dc.descricao }}"
                           data-valor="{{ dc.valor }}"
                           data-data="{{ dc.data.strftime('%Y-%m-%d') if dc.data else '' }}"
+                          data-adiantamento="{{ 1 if _is_ad else 0 }}"
                           data-url="{{ url_for('edit_despesa_coop', id=dc.id) }}">
                     <i class="bi bi-pencil"></i>
                   </button>
@@ -1566,8 +1683,13 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           </tbody>
           <tfoot>
             <tr class="table-light">
-              <th colspan="3" class="text-end">Total</th>
-              <th class="text-end">R$ {{ '%.2f'|format(total_despesas_coop_table) }}</th>
+              <th colspan="3" class="text-end">Total (exclui adiant.)</th>
+              <th class="text-end">R$ {{ '%.2f'|format(_total_normais) }}</th>
+              <th></th>
+            </tr>
+            <tr class="table-light">
+              <th colspan="3" class="text-end text-muted">Adiantamentos (fora do total)</th>
+              <th class="text-end text-muted">R$ {{ '%.2f'|format(_total_adiant) }}</th>
               <th></th>
             </tr>
           </tfoot>
@@ -1577,9 +1699,30 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </section>
 
-     <!-- FOLHA DE PAGAMENTO (versão profissional/compacta – drop-in) -->
+<script>
+  // Toggle "Ocultar adiantamentos" (só front-end)
+  (function(){
+    const chk = document.getElementById('toggleOcultarAdiant');
+    const tbl = document.getElementById('tblDespesasCoop');
+    if(!chk || !tbl) return;
+
+    function apply(){
+      const hide = chk.checked;
+      tbl.querySelectorAll('tbody tr').forEach(tr=>{
+        const isAd = String(tr.getAttribute('data-adiant')||'0') === '1';
+        tr.style.display = (hide && isAd) ? 'none' : '';
+      });
+    }
+    chk.addEventListener('change', apply);
+    apply();
+  })();
+</script>
+
+     <!-- FOLHA DE PAGAMENTO • Modelo Contracheque (drop-in) -->
 {% set folha_list = folha_por_coop if folha_por_coop is defined else [] %}
 <section class="tab-pane fade {{ 'show active' if _tab=='folha' else '' }}" id="folha" role="tabpanel">
+
+  {# Agregados gerais #}
   {% set total_bruto_folha  = folha_list|sum(attribute='bruto') if folha_list else 0 %}
   {% set total_inss_folha   = folha_list|sum(attribute='inss') if folha_list else 0 %}
   {% set total_outras_folha = folha_list|sum(attribute='outras_desp') if folha_list else 0 %}
@@ -1588,7 +1731,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   <!-- Header + KPIs -->
   <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
     <h5 class="m-0 d-flex align-items-center gap-2">
-      <i class="bi bi-receipt"></i> Folha de Pagamento
+      <i class="bi bi-receipt"></i> Folha de Pagamento — Modelo de Contracheque
     </h5>
     <div class="d-flex flex-wrap gap-2">
       <span class="badge bg-light text-dark border">Cooperados: <b>{{ folha_list|length }}</b></span>
@@ -1599,16 +1742,13 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
   </div>
 
-  <!-- Filtros -->
+  <!-- Filtro de período -->
   <div class="card border-0 shadow-sm rounded-3 mb-3">
     <div class="card-body">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-        <h6 class="m-0"><i class="bi bi-funnel"></i> Filtrar período</h6>
-      </div>
       <form method="GET" action="{{ url_for('admin_dashboard') }}" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="folha">
         <div class="col-md-3">
-          <label class="form-label">De</label>
+          <label class="form-label">Competência — De</label>
           <input type="date" class="form-control form-control-sm" name="folha_inicio"
                  value="{{ folha_inicio.strftime('%Y-%m-%d') if folha_inicio else '' }}">
         </div>
@@ -1624,148 +1764,231 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
   </div>
 
-  <!-- Cards por cooperado -->
   {% for f in folha_list %}
-    <div class="card border-0 shadow-sm rounded-3 mb-3">
-      <div class="card-body">
-        <!-- Header do cooperado -->
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-          <div class="d-flex align-items-center gap-2">
-            <img src="{{ f.cooperado.foto_url or url_for('static', filename='img/default.png') }}" class="avatar" alt="">
+    {# Cálculos do contracheque (detalhados a partir dos itens) #}
+    {% set lanc_bruto = (f.lancamentos|selectattr('valor')|sum(attribute='valor')) if f.lancamentos else 0 %}
+    {% set lanc_inss  = (
+         f.lancamentos
+         |selectattr('conta_inss','equalto',True)
+         |sum(attribute='inss')
+       ) if f.lancamentos is defined else (
+         (f.lancamentos|sum(attribute='inss')) if f.lancamentos else 0
+       ) %}
+    {% set receitas_total = (f.receitas|sum(attribute='valor')) if f.receitas else 0 %}
+    {% set despesas_norm = (f.despesas
+         |selectattr('adiantamento','equalto',False)
+         |sum(attribute='valor')) if f.despesas else 0 %}
+    {% set adiant_total  = (f.despesas
+         |selectattr('adiantamento','equalto',True)
+         |sum(attribute='valor')) if f.despesas else 0 %}
+
+    {% set proventos_total  = lanc_bruto + receitas_total %}
+    {% set descontos_total  = lanc_inss + despesas_norm %}
+    {% set liquido_calc     = proventos_total - descontos_total - adiant_total %}
+
+    <div class="card border-0 shadow-sm rounded-3 mb-3 contracheque">
+      <div class="card-body p-3 p-md-4">
+
+        <!-- Cabeçalho do contracheque -->
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 pb-3 border-bottom">
+          <div class="d-flex align-items-center gap-3">
+            <img src="{{ f.cooperado.foto_url or url_for('static', filename='img/default.png') }}"
+                 class="rounded-3" style="width:56px;height:56px;object-fit:cover" alt="">
             <div>
-              <div class="fw-bold">{{ f.cooperado.nome }}</div>
+              <div class="fw-bold fs-5">{{ f.cooperado.nome }}</div>
               <div class="text-muted small">ID: {{ f.cooperado.id }}</div>
+              {% if f.cooperado.cpf %}<div class="text-muted small">CPF: {{ f.cooperado.cpf }}</div>{% endif %}
             </div>
           </div>
-          <div class="d-flex flex-wrap gap-2 text-end">
-            <span class="badge bg-primary-subtle text-primary border">Bruto: <b>R$ {{ '%.2f'|format(f.bruto) }}</b></span>
-            <span class="badge bg-warning-subtle text-warning border">INSS: <b>R$ {{ '%.2f'|format(f.inss) }}</b></span>
-            <span class="badge bg-secondary-subtle text-secondary border">Outras: <b>R$ {{ '%.2f'|format(f.outras_desp) }}</b></span>
-            <span class="badge bg-success-subtle text-success border">Líquido: <b>R$ {{ '%.2f'|format(f.liquido) }}</b></span>
+          <div class="text-end">
+            <div class="fw-bold">CONTRACHEQUE</div>
+            <div class="text-muted small">
+              Competência:
+              {% if folha_inicio and folha_fim %}
+                {{ folha_inicio.strftime('%d/%m/%Y') }} — {{ folha_fim.strftime('%d/%m/%Y') }}
+              {% else %}
+                Período selecionado
+              {% endif %}
+            </div>
+            <div class="mt-2">
+              <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+                <i class="bi bi-printer"></i> Imprimir
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Tabelas -->
+        <!-- Tabelas no padrão de contracheque -->
         <div class="row g-3 mt-3">
+          <!-- PROVENTOS -->
+          <div class="col-lg-6">
+            <div class="cc-box h-100">
+              <div class="cc-box-head bg-success-subtle text-success border">PROVENTOS (GANHOS)</div>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0 align-middle">
+                  <thead class="table-light">
+                    <tr class="text-nowrap">
+                      <th style="width:120px">Data</th>
+                      <th>Descrição</th>
+                      <th class="text-end" style="width:160px">Valor (R$)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for l in f.lancamentos %}
+                      <tr>
+                        <td>{{ l.data.strftime('%d/%m/%Y') }}</td>
+                        <td class="text-break">{{ l.descricao or ('Serviço - ' ~ (l.restaurante.nome if l.restaurante else '')) }}</td>
+                        <td class="text-end">R$ {{ '%.2f'|format(l.valor) }}</td>
+                      </tr>
+                    {% endfor %}
+                    {% for r in f.receitas %}
+                      <tr>
+                        <td>{{ r.data.strftime('%d/%m/%Y') }}</td>
+                        <td class="text-break">{{ r.descricao }}</td>
+                        <td class="text-end">R$ {{ '%.2f'|format(r.valor) }}</td>
+                      </tr>
+                    {% endfor %}
+                    {% if (not f.lancamentos) and (not f.receitas) %}
+                      <tr><td colspan="3" class="text-center text-muted">Sem proventos</td></tr>
+                    {% endif %}
+                  </tbody>
+                  <tfoot>
+                    <tr class="table-light">
+                      <th colspan="2" class="text-end">Total de Proventos</th>
+                      <th class="text-end">R$ {{ '%.2f'|format(proventos_total) }}</th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- DESCONTOS -->
+          <div class="col-lg-6">
+            <div class="cc-box h-100">
+              <div class="cc-box-head bg-danger-subtle text-danger border">DESCONTOS</div>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0 align-middle">
+                  <thead class="table-light">
+                    <tr class="text-nowrap">
+                      <th style="width:120px">Data</th>
+                      <th>Descrição</th>
+                      <th class="text-end" style="width:160px">Valor (R$)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {# INSS #}
+                    {% for l in f.lancamentos %}
+                      {% set conta = (l.conta_inss if l.conta_inss is defined else True) %}
+                      {% if l.inss and conta %}
+                        <tr>
+                          <td>{{ l.data.strftime('%d/%m/%Y') }}</td>
+                          <td class="text-break">INSS sobre "{{ l.descricao or 'Serviço' }}"</td>
+                          <td class="text-end">R$ {{ '%.2f'|format(l.inss) }}</td>
+                        </tr>
+                      {% endif %}
+                    {% endfor %}
+                    {# Outras despesas que NÃO são adiantamento #}
+                    {% for d in f.despesas if (d.adiantamento is not defined or not d.adiantamento) %}
+                      <tr>
+                        <td>{{ d.data.strftime('%d/%m/%Y') }}</td>
+                        <td class="text-break">{{ d.descricao }}</td>
+                        <td class="text-end">R$ {{ '%.2f'|format(d.valor) }}</td>
+                      </tr>
+                    {% endfor %}
+                    {% if (lanc_inss <= 0) and (despesas_norm <= 0) %}
+                      <tr><td colspan="3" class="text-center text-muted">Sem descontos</td></tr>
+                    {% endif %}
+                  </tbody>
+                  <tfoot>
+                    <tr class="table-light">
+                      <th colspan="2" class="text-end">Total de Descontos</th>
+                      <th class="text-end">R$ {{ '%.2f'|format(descontos_total) }}</th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ADIANTAMENTOS (destacado, fora dos descontos) -->
           <div class="col-12">
-            <h6 class="mb-2 d-flex align-items-center gap-2">
-              <i class="bi bi-journal-text"></i>
-              Lançamentos do cooperado <span class="text-muted small">(INSS segue competência)</span>
-            </h6>
-            <div class="table-responsive">
-              <table class="table table-sm table-bordered table-hover align-middle">
-                <thead class="table-light">
-                  <tr class="text-nowrap">
-                    <th style="width:120px">Data</th>
-                    <th style="width:220px">Restaurante</th>
-                    <th>Descrição</th>
-                    <th class="text-end" style="width:140px">Bruto</th>
-                    <th class="text-end" style="width:160px">INSS (4,5%)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for l in f.lancamentos %}
-                    <tr>
-                      <td>{{ l.data.strftime('%d/%m/%Y') }}</td>
-                      <td class="text-break">{{ l.restaurante.nome }}</td>
-                      <td class="text-break">
-                        {{ l.descricao }}
-                        {% if l.isento_benef %}
-                          <span class="badge bg-success-subtle text-success border ms-2">Isento por benefício</span>
-                        {% endif %}
-                      </td>
-                      <td class="text-end">R$ {{ '%.2f'|format(l.valor) }}</td>
-                      <td class="text-end {{ '' if l.conta_inss else 'text-muted' }}">R$ {{ '%.2f'|format(l.inss) }}</td>
+            <div class="cc-box">
+              <div class="cc-box-head bg-secondary-subtle text-secondary border">ADIANTAMENTOS</div>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0 align-middle">
+                  <thead class="table-light">
+                    <tr class="text-nowrap">
+                      <th style="width:120px">Data</th>
+                      <th>Descrição</th>
+                      <th class="text-end" style="width:160px">Valor (R$)</th>
                     </tr>
-                  {% else %}
-                    <tr><td colspan="5" class="text-center text-muted">Sem lançamentos</td></tr>
-                  {% endfor %}
-                </tbody>
-                {% set total_l_bruto = (f.lancamentos|sum(attribute='valor')) if f.lancamentos else 0 %}
-                {% set total_l_inss  = (f.lancamentos|sum(attribute='inss'))  if f.lancamentos else 0 %}
-                <tfoot>
-                  <tr class="table-light">
-                    <th colspan="3" class="text-end">Totais</th>
-                    <th class="text-end">R$ {{ '%.2f'|format(total_l_bruto) }}</th>
-                    <th class="text-end">R$ {{ '%.2f'|format(total_l_inss) }}</th>
-                  </tr>
-                </tfoot>
-              </table>
+                  </thead>
+                  <tbody>
+                    {% for d in f.despesas if d.adiantamento is defined and d.adiantamento %}
+                      <tr>
+                        <td>{{ d.data.strftime('%d/%m/%Y') }}</td>
+                        <td class="text-break">{{ d.descricao }} <span class="badge bg-secondary ms-1">Adiantamento</span></td>
+                        <td class="text-end">R$ {{ '%.2f'|format(d.valor) }}</td>
+                      </tr>
+                    {% else %}
+                      <tr><td colspan="3" class="text-center text-muted">Sem adiantamentos</td></tr>
+                    {% endfor %}
+                  </tbody>
+                  <tfoot>
+                    <tr class="table-light">
+                      <th colspan="2" class="text-end">Total de Adiantamentos</th>
+                      <th class="text-end">R$ {{ '%.2f'|format(adiant_total) }}</th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
           </div>
 
-          <div class="col-lg-6">
-            <h6 class="mb-2"><i class="bi bi-cash"></i> Receitas do cooperado</h6>
-            <div class="table-responsive">
-              <table class="table table-sm table-bordered align-middle">
-                <thead class="table-light">
-                  <tr class="text-nowrap">
-                    <th style="width:120px">Data</th>
-                    <th>Descrição</th>
-                    <th class="text-end" style="width:140px">Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for r in f.receitas %}
-                    <tr>
-                      <td>{{ r.data.strftime('%d/%m/%Y') }}</td>
-                      <td class="text-break">{{ r.descricao }}</td>
-                      <td class="text-end">R$ {{ '%.2f'|format(r.valor) }}</td>
-                    </tr>
-                  {% else %}
-                    <tr><td colspan="3" class="text-center text-muted">Sem receitas</td></tr>
-                  {% endfor %}
-                </tbody>
-                {% set total_r = (f.receitas|sum(attribute='valor')) if f.receitas else 0 %}
-                <tfoot>
-                  <tr class="table-light">
-                    <th colspan="2" class="text-end">Total</th>
-                    <th class="text-end">R$ {{ '%.2f'|format(total_r) }}</th>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-
-          <div class="col-lg-6">
-            <h6 class="mb-2"><i class="bi bi-bag-dash"></i> Despesas do cooperado (inclui benefícios/rateios)</h6>
-            <div class="table-responsive">
-              <table class="table table-sm table-bordered align-middle">
-                <thead class="table-light">
-                  <tr class="text-nowrap">
-                    <th style="width:120px">Data</th>
-                    <th>Descrição</th>
-                    <th class="text-end" style="width:140px">Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for d in f.despesas %}
-                    <tr>
-                      <td>{{ d.data.strftime('%d/%m/%Y') }}</td>
-                      <td class="text-break">{{ d.descricao }}</td>
-                      <td class="text-end">R$ {{ '%.2f'|format(d.valor) }}</td>
-                    </tr>
-                  {% else %}
-                    <tr><td colspan="3" class="text-center text-muted">Sem despesas</td></tr>
-                  {% endfor %}
-                </tbody>
-                {% set total_d = (f.despesas|sum(attribute='valor')) if f.despesas else 0 %}
-                <tfoot>
-                  <tr class="table-light">
-                    <th colspan="2" class="text-end">Total</th>
-                    <th class="text-end">R$ {{ '%.2f'|format(total_d) }}</th>
-                  </tr>
-                </tfoot>
-              </table>
+          <!-- RODAPÉ DO CONTRACHEQUE (Totais) -->
+          <div class="col-12">
+            <div class="rounded-3 border d-flex flex-wrap justify-content-between align-items-center p-3 gap-3 bg-light">
+              <div class="d-flex flex-column gap-1">
+                <div>Proventos: <b>R$ {{ '%.2f'|format(proventos_total) }}</b></div>
+                <div>Descontos: <b>R$ {{ '%.2f'|format(descontos_total) }}</b></div>
+                <div>Adiantamentos: <b>R$ {{ '%.2f'|format(adiant_total) }}</b> <span class="text-muted small">(fora dos descontos)</span></div>
+              </div>
+              <div class="text-end">
+                <div class="fw-bold fs-5">LÍQUIDO A RECEBER</div>
+                <div class="fw-bold fs-4 text-success">R$ {{ '%.2f'|format(liquido_calc) }}</div>
+                {% if f.liquido is defined %}
+                  <div class="text-muted small">Líquido (sistema): R$ {{ '%.2f'|format(f.liquido) }}</div>
+                {% endif %}
+              </div>
             </div>
           </div>
         </div><!-- /row -->
+
+        <!-- Observações legais (opcional) -->
+        <div class="mt-3 text-muted small">
+          <i class="bi bi-info-circle"></i>
+          INSS apurado sobre a competência dos serviços. Adiantamentos são abatidos do líquido e não compõem a base de descontos.
+        </div>
       </div>
     </div>
   {% else %}
     <div class="text-center text-muted">Sem dados na faixa selecionada.</div>
   {% endfor %}
 </section>
+
+<style>
+  /* Aparência de contracheque */
+  .contracheque .cc-box { border:1px solid var(--bs-border-color); border-radius: .75rem; overflow: hidden; }
+  .contracheque .cc-box-head { padding:.5rem .75rem; font-weight:600; border-bottom:1px solid var(--bs-border-color); }
+  @media print {
+    body { background:#fff !important; }
+    .navbar, .btn, .card .btn, .tab-pane .card:first-child { display:none !important; }
+    .contracheque { break-inside: avoid; box-shadow:none !important; }
+    .contracheque .card-body { padding:0 !important; border:none !important; }
+    .contracheque .cc-box { page-break-inside: avoid; }
+  }
+</style>
 
      <!-- BENEFÍCIOS (versão profissional / sem alterar backend) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='beneficios' else '' }}" id="beneficios" role="tabpanel">
