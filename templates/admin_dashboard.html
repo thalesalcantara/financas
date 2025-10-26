@@ -252,7 +252,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   <main class="main">
     <div class="tab-content">
 
-      <!-- === RESUMO (Dashboard Financeiro Completo) === -->
+     <!-- === RESUMO (Dashboard Financeiro Completo) === -->
 <section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
   {# ---------- Helpers de data ---------- #}
   {% macro ymd(x) -%}
@@ -342,8 +342,12 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   {% endfor %}
   {% set total_despesas_coop_f = ns_desp_coop.total %}
 
+  {# Ajustes pedidos: receitas dos cooperados = Produções + Receitas dos cooperados #}
+  {% set total_receitas_coop_full_f = (total_producoes_f|default(0)) + (total_receitas_coop_f|default(0)) %}
+
+  {# Resultado coop e total geral corrigido: Coop + (Prod + Rec cooperados) #}
   {% set _resultado_corp = (total_receitas_corp_f|default(0)) - (total_despesas_corp_f|default(0)) %}
-  {% set _total_receitas_geral = (total_receitas_corp_f|default(0)) + (total_receitas_coop_f|default(0)) %}
+  {% set _total_receitas_geral = (total_receitas_corp_f|default(0)) + (total_receitas_coop_full_f|default(0)) %}
 
   <!-- Filtros -->
   <div class="card border-0 shadow-sm rounded-3 mb-3">
@@ -455,9 +459,9 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
         <div class="d-flex align-items-center justify-content-between">
           <div>
-            <div class="text-uppercase text-muted small">Receitas Cooperados</div>
-            <div class="fw-bold fs-5">R$ {{ '%.2f'|format(total_receitas_coop_f) }}</div>
-            <div class="small text-muted">Créditos aos cooperados</div>
+            <div class="text-uppercase text-muted small">Receitas Cooperados (Prod + Rec)</div>
+            <div class="fw-bold fs-5">R$ {{ '%.2f'|format(total_receitas_coop_full_f) }}</div>
+            <div class="small text-muted">Produções + Receitas</div>
           </div>
           <div class="kpi-icon"><i class="bi bi-currency-exchange"></i></div>
         </div>
@@ -498,7 +502,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           <div>
             <div class="text-uppercase text-muted small">Total de Receitas (Geral)</div>
             <div class="fw-bold fs-5">R$ {{ '%.2f'|format(_total_receitas_geral) }}</div>
-            <div class="small text-muted">Coop + Cooperados</div>
+            <div class="small text-muted">Coop + (Prod + Rec Cooperados)</div>
           </div>
           <div class="kpi-icon"><i class="bi bi-cash-stack"></i></div>
         </div>
@@ -714,6 +718,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     // ---- KPIs (recalcular no front para garantir consistência na exportação) ----
     const kpiProd = sumBy(filteredPROD, x=>x.valor);
     const kpiINSS = kpiProd * 0.045;
+    const kpiRecCoopFull = kpiProd + sumBy(filteredRECp, x=>x.valor); // Prod + Receitas Cooperados
     document.getElementById('kpiTotalProds').textContent = fmtBR(kpiProd);
     document.getElementById('kpiINSS').textContent       = fmtBR(kpiINSS);
 
@@ -890,7 +895,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         ['Receitas Coop (período)',  sumBy(filteredRECc, x=>x.valor)],
         ['Despesas Coop (período)',  sumBy(filteredDESc, x=>x.valor)],
         ['Receitas Cooperados (período)', sumBy(filteredRECp, x=>x.valor)],
-        ['Despesas Cooperados (período)', sumBy(filteredDESp, x=>x.valor)],
+        ['Receitas Cooperados (Prod + Rec)', kpiRecCoopFull], // novo total combinado
       ];
       aoaToSheet('KPIs', k1, wb);
 
