@@ -258,18 +258,34 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   {% set ri = request.args.get('resumo_inicio','') %}
   {% set rf = request.args.get('resumo_fim','') %}
 
+  {# ---------- Normalizador de data ---------- #}
+  {% macro ymd(x) -%}
+    {%- if x and x.strftime is defined -%}
+      {{ x.strftime('%Y-%m-%d') }}
+    {%- elif x -%}
+      {{ x }}          {# supõe string 'YYYY-MM-DD' #}
+    {%- else -%}
+      {{ '' }}
+    {%- endif -%}
+  {%- endmacro %}
+
   {# Listas-base com fallback e materialização (evita generators sem len) #}
-  {% set producoes     = (producoes     | default([]) | list) %}
+  {% set _producoes = (producoes | default([]) | list) %}
+  {% if _producoes|length == 0 %}
+    {% set _producoes = (lancamentos | default([]) | list) %}  {# Fallback real do backend #}
+  {% endif %}
+
   {% set receitas      = (receitas      | default([]) | list) %}           {# Cooperativa #}
   {% set despesas      = (despesas      | default([]) | list) %}           {# Cooperativa #}
   {% set receitas_coop = (receitas_coop | default([]) | list) %}           {# Cooperados  #}
   {% set despesas_coop = (despesas_coop | default([]) | list) %}           {# Cooperados  #}
 
   {# ---- Totais filtrados por período (somente Jinja) ---- #}
-  {# Produções #}
+
+  {# Produções (ou Lançamentos via fallback) #}
   {% set ns_prod = namespace(total=0) %}
-  {% for p in producoes %}
-    {% set d = p.data.strftime('%Y-%m-%d') if p.data else '' %}
+  {% for p in _producoes %}
+    {% set d = ymd(p.data) %}
     {% if (not ri or d >= ri) and (not rf or d <= rf) %}
       {% set ns_prod.total = ns_prod.total + (p.valor or 0) %}
     {% endif %}
@@ -279,38 +295,41 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   {# INSS 4,5% sobre produções do período #}
   {% set total_inss_f = (total_producoes_f * 0.045) %}
 
-  {# Receitas/Despesas da COOPERATIVA #}
+  {# Receitas da COOPERATIVA (aceita .valor ou .valor_total) #}
   {% set ns_rec_corp = namespace(total=0) %}
   {% for r in receitas %}
-    {% set d = r.data.strftime('%Y-%m-%d') if r.data else '' %}
+    {% set d = ymd(r.data or r.data_lancamento) %}
     {% if (not ri or d >= ri) and (not rf or d <= rf) %}
-      {% set ns_rec_corp.total = ns_rec_corp.total + (r.valor or 0) %}
+      {% set v = (r.valor if r.valor is not none else r.valor_total) or 0 %}
+      {% set ns_rec_corp.total = ns_rec_corp.total + v %}
     {% endif %}
   {% endfor %}
   {% set total_receitas_corp_f = ns_rec_corp.total %}
 
+  {# Despesas da COOPERATIVA #}
   {% set ns_desp_corp = namespace(total=0) %}
   {% for d in despesas %}
-    {% set dt = d.data.strftime('%Y-%m-%d') if d.data else '' %}
+    {% set dt = ymd(d.data) %}
     {% if (not ri or dt >= ri) and (not rf or dt <= rf) %}
       {% set ns_desp_corp.total = ns_desp_corp.total + (d.valor or 0) %}
     {% endif %}
   {% endfor %}
   {% set total_despesas_corp_f = ns_desp_corp.total %}
 
-  {# Receitas/Despesas dos COOPERADOS #}
+  {# Receitas dos COOPERADOS #}
   {% set ns_rec_coop = namespace(total=0) %}
   {% for r in receitas_coop %}
-    {% set d = r.data.strftime('%Y-%m-%d') if r.data else '' %}
+    {% set d = ymd(r.data) %}
     {% if (not ri or d >= ri) and (not rf or d <= rf) %}
       {% set ns_rec_coop.total = ns_rec_coop.total + (r.valor or 0) %}
     {% endif %}
   {% endfor %}
   {% set total_receitas_coop_f = ns_rec_coop.total %}
 
+  {# Despesas dos COOPERADOS #}
   {% set ns_desp_coop = namespace(total=0) %}
   {% for d in despesas_coop %}
-    {% set dt = d.data.strftime('%Y-%m-%d') if d.data else '' %}
+    {% set dt = ymd(d.data) %}
     {% if (not ri or dt >= ri) and (not rf or dt <= rf) %}
       {% set ns_desp_coop.total = ns_desp_coop.total + (d.valor or 0) %}
     {% endif %}
