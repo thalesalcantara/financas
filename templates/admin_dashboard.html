@@ -1770,25 +1770,33 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     {% set _receitas = (f.receitas    | default([]) | list) %}
     {% set _despesas = (f.despesas    | default([]) | list) %}
 
-    {% set _desp_adiant = (_despesas | selectattr('adiantamento','equalto',True)  | list) %}
-    {% set _desp_norm   = (_despesas | selectattr('adiantamento','equalto',False) | list) %}
+    {# Sempre materialize em lista primeiro #}
+{% set _lancs    = (f.lancamentos | default([]) | list) %}
+{% set _receitas = (f.receitas    | default([]) | list) %}
+{% set _despesas = (f.despesas    | default([]) | list) %}
 
-    {# Proventos e descontos #}
-    {% set lanc_bruto = (_lancs | sum(attribute='valor')) %}
-    {% set receitas_total = (_receitas | sum(attribute='valor')) %}
-    {# INSS: conta somente quando conta_inss é True; se atributo não existir, assume True #}
-    {% set _lancs_inss_conta = (_lancs | selectattr('conta_inss','equalto',True) | list) %}
-    {% if _lancs_inss_conta|length == 0 %}
-      {% set lanc_inss = (_lancs | sum(attribute='inss')) %}
-    {% else %}
-      {% set lanc_inss = (_lancs_inss_conta | sum(attribute='inss')) %}
-    {% endif %}
-    {% set despesas_norm = (_desp_norm | sum(attribute='valor')) %}
-    {% set adiant_total  = (_desp_adiant | sum(attribute='valor')) %}
+{# Separa despesas em adiantamentos x normais, já como lista #}
+{% set _desp_adiant = (_despesas | selectattr('adiantamento','equalto',True)  | list) %}
+{% set _desp_norm   = (_despesas | selectattr('adiantamento','equalto',False) | list) %}
 
-    {% set proventos_total = lanc_bruto + receitas_total %}
-    {% set descontos_total = lanc_inss + despesas_norm %}
-    {% set liquido_calc    = proventos_total - descontos_total - adiant_total %}
+{# Proventos e descontos #}
+{% set lanc_bruto      = (_lancs    | sum(attribute='valor')) %}
+{% set receitas_total  = (_receitas | sum(attribute='valor')) %}
+
+{# INSS: conta somente quando conta_inss é True; se não houver, soma geral #}
+{% set _lancs_inss_conta = (_lancs | selectattr('conta_inss','equalto',True) | list) %}
+{% if _lancs_inss_conta | length == 0 %}
+  {% set lanc_inss = (_lancs | sum(attribute='inss')) %}
+{% else %}
+  {% set lanc_inss = (_lancs_inss_conta | sum(attribute='inss')) %}
+{% endif %}
+
+{% set despesas_norm = (_desp_norm   | sum(attribute='valor')) %}
+{% set adiant_total  = (_desp_adiant | sum(attribute='valor')) %}
+
+{% set proventos_total = lanc_bruto + receitas_total %}
+{% set descontos_total = lanc_inss + despesas_norm %}
+{% set liquido_calc    = proventos_total - descontos_total - adiant_total %}
 
     <div class="card border-0 shadow-sm rounded-3 mb-3 contracheque">
       <div class="card-body p-3 p-md-4">
