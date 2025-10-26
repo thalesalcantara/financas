@@ -1523,15 +1523,19 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 
       <!-- DESPESAS COOPERADOS (versão profissional/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='coop_despesas' else '' }}" id="coop_despesas" role="tabpanel">
-  {# Listas e totais com/sem adiantamento (defensivo) #}
-  {% set _lista_normais  = (despesas_coop|selectattr('adiantamento','equalto',False)) if despesas_coop else [] %}
-  {% set _lista_adiant   = (despesas_coop|selectattr('adiantamento','equalto',True))  if despesas_coop else [] %}
-  {% set _qtd_total      = despesas_coop|length if despesas_coop else 0 %}
-  {% set _qtd_adiant     = _lista_adiant|length %}
-  {% set _qtd_normais    = _lista_normais|length %}
-  {% set _total_normais  = (_lista_normais|sum(attribute='valor')) if _lista_normais else 0 %}
-  {% set _total_adiant   = (_lista_adiant|sum(attribute='valor'))  if _lista_adiant  else 0 %}
-  {% set _total_geral    = (_total_normais + _total_adiant) %}
+  {% set _despesas = (despesas_coop | default([]) | list) %}
+
+{# Listas e totais com/sem adiantamento (defensivo) #}
+{% set _lista_normais = (_despesas | selectattr('adiantamento','equalto',False) | list) %}
+{% set _lista_adiant  = (_despesas | selectattr('adiantamento','equalto',True)  | list) %}
+
+{% set _qtd_total     = _despesas | length %}
+{% set _qtd_adiant    = _lista_adiant | length %}
+{% set _qtd_normais   = _lista_normais | length %}
+
+{% set _total_normais = (_lista_normais | sum(attribute='valor')) %}
+{% set _total_adiant  = (_lista_adiant  | sum(attribute='valor')) %}
+{% set _total_geral   = (_total_normais + _total_adiant) %}
 
   <!-- Header + KPIs -->
   <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
