@@ -407,362 +407,354 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </section>
 
-{# ===================== ABA "Avaliações" — VERSÃO PROFISSIONAL (Royal & White) ===================== #}
-{% set _tab = 'avaliacoes' %}
-{% set tipo = tipo or 'restaurante' %}
+{# ===================== CONTEÚDO DA ABA "Avaliações" ===================== #}
+<section id="avaliacoes" class="tab-pane fade {{ 'show active' if _tab=='avaliacoes' else '' }}" role="tabpanel">
 
-<section id="avaliacoes" class="tab-pane fade {{ 'show active' if _tab=='avaliacoes' else '' }}" role="tabpanel" aria-labelledby="tab-avaliacoes">
-  <style>
-    :root {
-      /* Cores mantidas */
-      --royal: #1f3bb3;
-      --royal-600: #1a3196;
-      --ink: #0f172a;
-      --muted: #6b7280;
-      --line: #e5e7eb;
-      --bg: #ffffff;
-      --bg-soft: #f8fafc;
-      --radius: 12px;
-      --shadow: 0 6px 16px rgba(31, 59, 179, .08); /* Sombra mais destacada */
-    }
+  {% set page_title = "Avaliações" %}
+  <div class="container py-3">
 
-    /* Ajustes globais e de containers */
-    .container-avaliacoes { padding-top: 1rem; padding-bottom: 1rem; }
-    .card-pro { border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); box-shadow: var(--shadow); padding: 1.5rem; }
+    <!-- Título + Toggle de Tipo -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+      <h4 class="m-0 d-flex align-items-center gap-2">
+        <i class="bi bi-stars"></i> Avaliações
+        <small class="text-muted">| {{ 'Cooperado → Restaurante' if tipo=='restaurante' else 'Restaurante → Cooperado' }}</small>
+      </h4>
 
-    /* Cabeçalho */
-    .section-head-pro { padding: 1.25rem 1.5rem; }
-    .section-head-pro h4 { margin: 0; color: var(--ink); font-weight: 700; }
-    .scope { color: var(--muted); font-size: .95rem; font-weight: 500; }
-
-    /* Botões de tema */
-    .btn-royal { background: var(--royal); color: #fff; border: 1px solid var(--royal); transition: background-color .2s; }
-    .btn-royal:hover { background: var(--royal-600); border-color: var(--royal-600); color: #fff; }
-    .btn-outline-royal { border: 1px solid var(--royal); color: var(--royal); background: transparent; transition: background-color .2s; }
-    .btn-outline-royal:hover { background: var(--royal); color: #fff; }
-
-    /* Cartões KPI com destaque */
-    .kpi-pro { border-radius: var(--radius); background: var(--bg); border: 1px solid var(--line); padding: 1rem; text-align: center; box-shadow: 0 2px 8px rgba(31, 59, 179, .04); }
-    .kpi-pro .label { color: var(--muted); font-size: .85rem; margin-bottom: 0.25rem; }
-    .kpi-pro .value { color: var(--ink); font-weight: 700; font-size: 1.5rem; line-height: 1; }
-
-    /* Tabelas e Ranking */
-    .table-pro thead th { background: var(--bg-soft); color: var(--ink); border-bottom: 2px solid var(--line); font-weight: 600; }
-    .table-pro tbody tr:hover { background: #f9fbff; }
-    
-    /* Ranking: medalhas com fundo sólido */
-    .rank-n { width: 32px; text-align: center; font-weight: 700; }
-    .medal { display: inline-flex; justify-content: center; align-items: center; width: 28px; height: 28px; border-radius: 50%; color: #fff; font-weight: 700; font-size: .85rem; }
-    .m1 { background: #ffc107; color: #333; } /* Ouro */
-    .m2 { background: #adb5bd; color: #333; } /* Prata */
-    .m3 { background: #fd7e14; } /* Bronze - Laranja */
-    
-    /* Compatibilidade: barra simples e clara */
-    .progress-pro { height: 8px; background: #eef2ff; border-radius: 999px; }
-    .progress-bar-pro { background: var(--royal); border-radius: 999px; }
-    .compat-badge { min-width: 55px; font-weight: 700; font-size: 1rem; color: var(--royal); }
-    .small-sample { background-color: var(--bg-soft); color: var(--muted) !important; }
-  </style>
-
-  <div class="container-fluid container-avaliacoes">
-    
-    <div class="card-pro section-head-pro mb-4">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-        <h4 class="d-flex align-items-center gap-2 m-0">
-          <i class="bi bi-stars"></i> Avaliações
-          <span class="scope">
-            {% if tipo=='restaurante' %}Cooperado → Restaurante{% else %}Restaurante → Cooperado{% endif %}
-          </span>
-        </h4>
-        <div class="btn-group" role="group" aria-label="Tipo de avaliação">
-          <a class="btn btn-sm {{ 'btn-royal' if tipo=='restaurante' else 'btn-outline-royal' }}"
-            href="{{ url_for('admin_avaliacoes', tipo='restaurante', restaurante_id=_flt.restaurante_id, cooperado_id=_flt.cooperado_id, data_inicio=_flt.data_inicio, data_fim=_flt.data_fim) }}">
-            Cooperado avalia Restaurante
-          </a>
-          <a class="btn btn-sm {{ 'btn-royal' if tipo=='cooperado' else 'btn-outline-royal' }}"
-            href="{{ url_for('admin_avaliacoes', tipo='cooperado', restaurante_id=_flt.restaurante_id, cooperado_id=_flt.cooperado_id, data_inicio=_flt.data_inicio, data_fim=_flt.data_fim) }}">
-            Restaurante avalia Cooperado
-          </a>
-        </div>
+      <div class="btn-group" role="group" aria-label="Tipo de avaliação">
+        <a class="btn btn-sm {{ 'btn-primary' if tipo=='restaurante' else 'btn-outline-primary' }}"
+           href="{{ url_for('admin_avaliacoes',
+                            tipo='restaurante',
+                            restaurante_id=_flt.restaurante_id,
+                            cooperado_id=_flt.cooperado_id,
+                            data_inicio=_flt.data_inicio,
+                            data_fim=_flt.data_fim) }}">
+          Cooperado → Restaurante
+        </a>
+        <a class="btn btn-sm {{ 'btn-primary' if tipo=='cooperado' else 'btn-outline-primary' }}"
+           href="{{ url_for('admin_avaliacoes',
+                            tipo='cooperado',
+                            restaurante_id=_flt.restaurante_id,
+                            cooperado_id=_flt.cooperado_id,
+                            data_inicio=_flt.data_inicio,
+                            data_fim=_flt.data_fim) }}">
+          Restaurante → Cooperado
+        </a>
       </div>
     </div>
 
-    <div class="card-pro mb-4">
-      <h6 class="mb-3 text-muted">Filtros de Período e Entidade</h6>
-      <form method="GET" action="{{ url_for('admin_avaliacoes') }}" class="row g-3 align-items-end">
-        <input type="hidden" name="tipo" value="{{ tipo }}">
-        <div class="col-md-3">
-          <label class="form-label small text-muted">Restaurante</label>
-          <select class="form-select form-select-sm" name="restaurante_id">
-            <option value="">Todos</option>
-            {% for r in restaurantes %}
-              <option value="{{ r.id }}" {{ 'selected' if (_flt.restaurante_id or 0)==r.id else '' }}>{{ r.nome }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label small text-muted">Cooperado</label>
-          <select class="form-select form-select-sm" name="cooperado_id">
-            <option value="">Todos</option>
-            {% for c in cooperados %}
-              <option value="{{ c.id }}" {{ 'selected' if (_flt.cooperado_id or 0)==c.id else '' }}>{{ c.nome }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-md-2">
-          <label class="form-label small text-muted">De</label>
-          <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ _flt.data_inicio }}">
-        </div>
-        <div class="col-md-2">
-          <label class="form-label small text-muted">Até</label>
-          <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ _flt.data_fim }}">
-        </div>
-        <div class="col-md-2 d-flex gap-2">
-          <button class="btn btn-royal btn-sm"><i class="bi bi-funnel"></i> Aplicar</button>
-          <a class="btn btn-outline-royal btn-sm" href="{{ url_for('admin_avaliacoes', tipo=tipo) }}">Limpar</a>
-        </div>
-        <div class="col-12 d-flex justify-content-between align-items-center">
-          <small class="text-muted">Use os filtros acima para refinar a análise.</small>
-          <button type="button" id="btnMesAtual" class="btn btn-light btn-sm"><i class="bi bi-calendar-check"></i> Este Mês</button>
-        </div>
-      </form>
-      <hr class="my-3 text-muted-2">
-      <a class="btn btn-outline-royal btn-sm"
-          href="{{ url_for('admin_export_avaliacoes_csv', tipo=tipo, restaurante_id=_flt.restaurante_id, cooperado_id=_flt.cooperado_id, data_inicio=_flt.data_inicio, data_fim=_flt.data_fim) }}">
-          <i class="bi bi-download"></i> Exportar Dados (CSV)
+    <!-- Barra de ações -->
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      <a class="btn btn-outline-secondary btn-sm"
+         href="{{ url_for('admin_export_avaliacoes_csv',
+                          tipo=tipo,
+                          restaurante_id=_flt.restaurante_id,
+                          cooperado_id=_flt.cooperado_id,
+                          data_inicio=_flt.data_inicio,
+                          data_fim=_flt.data_fim) }}">
+        <i class="bi bi-download"></i> Exportar CSV
       </a>
     </div>
 
-    <div class="row g-3 mb-4">
-      <div class="col-6 col-md-4 col-lg-2"><div class="kpi-pro h-100"><div class="label">Total de Avaliações</div><div class="value">{{ kpis.qtd|default(0) }}</div></div></div>
-      <div class="col-6 col-md-4 col-lg-2"><div class="kpi-pro h-100"><div class="label">Média Geral</div><div class="value text-royal">{{ '%.2f'|format(kpis.geral|default(0)) }}</div></div></div>
+    <!-- Filtros -->
+    <div class="card border-0 shadow-sm rounded-3 mb-3">
+      <div class="card-body">
+        <form method="GET" action="{{ url_for('admin_avaliacoes') }}" class="row g-2 align-items-end">
+          <input type="hidden" name="tipo" value="{{ tipo }}">
+
+          <div class="col-md-4">
+            <label class="form-label">Restaurante</label>
+            <select class="form-select form-select-sm" name="restaurante_id">
+              <option value="">Todos</option>
+              {% for r in restaurantes %}
+                <option value="{{ r.id }}" {{ 'selected' if (_flt.restaurante_id or 0)==r.id else '' }}>{{ r.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Cooperado</label>
+            <select class="form-select form-select-sm" name="cooperado_id">
+              <option value="">Todos</option>
+              {% for c in cooperados %}
+                <option value="{{ c.id }}" {{ 'selected' if (_flt.cooperado_id or 0)==c.id else '' }}>{{ c.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">De</label>
+            <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ _flt.data_inicio }}">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Até</label>
+            <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ _flt.data_fim }}">
+          </div>
+
+          <div class="col-12 d-flex gap-2">
+            <button class="btn btn-royal btn-sm"><i class="bi bi-funnel"></i> Filtrar</button>
+            <button type="button" id="btnMesAtual" class="btn btn-light btn-sm">Este mês (1–último)</button>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_avaliacoes', tipo=tipo) }}">Limpar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="row g-2 mb-3">
+      <div class="col-6 col-lg-2">
+        <div class="card p-3 text-center h-100">
+          <div class="small text-muted">Avaliações</div>
+          <div class="fs-5 fw-bold">{{ kpis.qtd|default(0) }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-2">
+        <div class="card p-3 text-center h-100">
+          <div class="small text-muted">Média Geral</div>
+          <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.geral|default(0)) }}</div>
+        </div>
+      </div>
+
       {% if tipo=='restaurante' %}
-        <div class="col-6 col-md-4 col-lg-2"><div class="kpi-pro h-100"><div class="label">Tratamento</div><div class="value">{{ '%.2f'|format(kpis.trat|default(0)) }}</div></div></div>
-        <div class="col-6 col-md-4 col-lg-2"><div class="kpi-pro h-100"><div class="label">Ambiente</div><div class="value">{{ '%.2f'|format(kpis.amb|default(0)) }}</div></div></div>
-        <div class="col-6 col-md-4 col-lg-2"><div class="kpi-pro h-100"><div class="label">Suporte</div><div class="value">{{ '%.2f'|format(kpis.sup|default(0)) }}</div></div></div>
+        <div class="col-6 col-lg-2">
+          <div class="card p-3 text-center h-100">
+            <div class="small text-muted">Tratamento</div>
+            <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.trat|default(0)) }}</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="card p-3 text-center h-100">
+            <div class="small text-muted">Ambiente</div>
+            <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.amb|default(0)) }}</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="card p-3 text-center h-100">
+            <div class="small text-muted">Suporte</div>
+            <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.sup|default(0)) }}</div>
+          </div>
+        </div>
       {% else %}
-        <div class="col-6 col-md-4 col-lg-2"><div class="kpi-pro h-100"><div class="label">Pontualidade</div><div class="value">{{ '%.2f'|format(kpis.pont|default(0)) }}</div></div></div>
-        <div class="col-6 col-md-4 col-lg-2"><div class="kpi-pro h-100"><div class="label">Educação</div><div class="value">{{ '%.2f'|format(kpis.educ|default(0)) }}</div></div></div>
-        <div class="col-6 col-md-4 col-lg-2"><div class="kpi-pro h-100"><div class="label">Eficiência</div><div class="value">{{ '%.2f'|format(kpis.efic|default(0)) }}</div></div></div>
-        <div class="col-6 col-md-4 col-lg-2"><div class="kpi-pro h-100"><div class="label">Apresentação</div><div class="value">{{ '%.2f'|format(kpis.apres|default(0)) }}</div></div></div>
+        <div class="col-6 col-lg-2">
+          <div class="card p-3 text-center h-100">
+            <div class="small text-muted">Pontualidade</div>
+            <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.pont|default(0)) }}</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="card p-3 text-center h-100">
+            <div class="small text-muted">Educação</div>
+            <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.educ|default(0)) }}</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="card p-3 text-center h-100">
+            <div class="small text-muted">Eficiência</div>
+            <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.efic|default(0)) }}</div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="card p-3 text-center h-100">
+            <div class="small text-muted">Apresentação</div>
+            <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.apres|default(0)) }}</div>
+          </div>
+        </div>
       {% endif %}
     </div>
 
-    <div class="card-pro mb-4">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="m-0 d-flex align-items-center gap-2 text-royal"><i class="bi bi-trophy"></i> Ranking por {{ 'Restaurante' if tipo=='restaurante' else 'Cooperado' }}</h5>
-        <span class="badge bg-secondary-subtle text-secondary py-1">Exige no mínimo 3 avaliações</span>
-      </div>
+    <!-- Ranking + Gráfico -->
+    <div class="card border-0 shadow-sm rounded-3 mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="m-0">
+            <i class="bi bi-trophy"></i>
+            Ranking por {{ 'restaurante' if tipo=='restaurante' else 'cooperado' }} (mín. 3 avaliações)
+          </h6>
+        </div>
 
-      {% set rank_ok = (ranking | selectattr('qtd', 'ge', 3) | list) %}
-      {% set rank_low = (ranking | selectattr('qtd', 'lt', 3) | list) %}
-
-      <div class="row g-4">
-        <div class="col-lg-7">
-          <div class="table-responsive">
-            <table class="table table-sm table-bordered table-pro align-middle">
-              <thead>
-                <tr class="text-nowrap">
-                  <th class="text-center" style="width:5%">#</th>
-                  <th>Nome</th>
-                  <th class="text-center" style="width:15%">Avaliações</th>
-                  <th class="text-center" style="width:15%">Média Geral</th>
-                  <th class="text-center" style="width:8%">{{ 'Trat.' if tipo=='restaurante' else 'Pont.' }}</th>
-                  <th class="text-center" style="width:8%">{{ 'Amb.' if tipo=='restaurante' else 'Educ.' }}</th>
-                  <th class="text-center" style="width:8%">{{ 'Sup.' if tipo=='restaurante' else 'Efic.' }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% if rank_ok|length %}
-                  {% for r in rank_ok|sort(attribute='m_geral', reverse=True) %}
-                    <tr>
-                      <td class="rank-n">
-                        {% if loop.index==1 %}<span class="medal m1">1</span>
-                        {% elif loop.index==2 %}<span class="medal m2">2</span>
-                        {% elif loop.index==3 %}<span class="medal m3">3</span>
-                        {% else %}{{ loop.index }}{% endif %}
-                      </td>
-                      <td>{% if tipo=='restaurante' %}{{ r.rest_nome }}{% else %}{{ r.coop_nome }}{% endif %}</td>
-                      <td class="text-center text-muted">{{ r.qtd }}</td>
-                      <td class="text-center text-royal fw-bold">{{ '%.2f'|format(r.m_geral) }}</td>
-                      {% if tipo=='restaurante' %}
-                        <td class="text-center">{{ '%.1f'|format(r.m_trat) }}</td>
-                        <td class="text-center">{{ '%.1f'|format(r.m_amb) }}</td>
-                        <td class="text-center">{{ '%.1f'|format(r.m_sup) }}</td>
-                      {% else %}
-                        <td class="text-center">{{ '%.1f'|format(r.m_pont) }}</td>
-                        <td class="text-center">{{ '%.1f'|format(r.m_educ) }}</td>
-                        <td class="text-center">{{ '%.1f'|format(r.m_efic) }}</td>
-                      {% endif %}
-                      <td class="text-center d-none d-lg-table-cell">{{ '%.1f'|format(r.m_apres) if tipo=='cooperado' else '—' }}</td>
-                    </tr>
-                  {% endfor %}
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered table-hover align-middle">
+            <thead class="table-light">
+              <tr class="text-nowrap">
+                {% if tipo=='restaurante' %}
+                  <th>Restaurante</th>
+                  <th class="text-center">Avaliações</th>
+                  <th class="text-center">Média Geral</th>
+                  <th class="text-center">Trat.</th>
+                  <th class="text-center">Amb.</th>
+                  <th class="text-center">Sup.</th>
                 {% else %}
-                  <tr><td colspan="{{ 7 if tipo=='restaurante' else 8 }}" class="text-center text-muted">Sem dados suficientes (mín. 3 avaliações).</td></tr>
+                  <th>Cooperado</th>
+                  <th class="text-center">Avaliações</th>
+                  <th class="text-center">Média Geral</th>
+                  <th class="text-center">Pont.</th>
+                  <th class="text-center">Educ.</th>
+                  <th class="text-center">Efic.</th>
+                  <th class="text-center">Apres.</th>
                 {% endif %}
-
-                {% for r in rank_low|sort(attribute='m_geral', reverse=True) %}
-                  <tr class="text-muted small-sample">
-                    <td class="rank-n">—</td>
-                    <td>{% if tipo=='restaurante' %}{{ r.rest_nome }}{% else %}{{ r.coop_nome }}{% endif %}</td>
+              </tr>
+            </thead>
+            <tbody>
+              {% if tipo=='restaurante' %}
+                {% for r in ranking if r.qtd >= 3 %}
+                  <tr>
+                    <td>{{ r.rest_nome }}</td>
                     <td class="text-center">{{ r.qtd }}</td>
                     <td class="text-center">{{ '%.2f'|format(r.m_geral) }}</td>
-                    {% if tipo=='restaurante' %}
-                      <td class="text-center">—</td>
-                      <td class="text-center">—</td>
-                      <td class="text-center">—</td>
-                    {% else %}
-                      <td class="text-center">—</td>
-                      <td class="text-center">—</td>
-                      <td class="text-center">—</td>
-                    {% endif %}
-                    <td class="text-center d-none d-lg-table-cell">—</td>
+                    <td class="text-center">{{ '%.2f'|format(r.m_trat) }}</td>
+                    <td class="text-center">{{ '%.2f'|format(r.m_amb) }}</td>
+                    <td class="text-center">{{ '%.2f'|format(r.m_sup) }}</td>
                   </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="col-lg-5">
-          <h6 class="text-muted mb-2"><i class="bi bi-graph-up"></i> Top 10 por Média Geral (Gráfico)</h6>
-          <canvas id="chartTop" height="200"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <div class="card-pro mb-4">
-      <h5 class="m-0 mb-3 d-flex align-items-center gap-2 text-royal"><i class="bi bi-heart-fill"></i> Nível de Compatibilidade Cooperado × Restaurante</h5>
-      <div class="table-responsive">
-        <table class="table table-sm table-bordered table-pro align-middle">
-          <thead>
-            <tr class="text-nowrap">
-              <th style="width:25%">Cooperado</th>
-              <th style="width:25%">Restaurante</th>
-              <th class="text-center" style="width:30%">Compatibilidade (Média)</th>
-              <th class="text-center" style="width:20%">Amostra</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% if compat and compat|length %}
-              {% for row in compat|sort(attribute='avg', reverse=True) %}
-                {% set pct = ((row.avg or 0)/5.0*100)|round(0,'floor') %}
-                <tr class="{{ 'text-muted-2 small-sample' if row.count<3 else '' }}">
-                  <td class="text-break fw-bold">{{ row.coop }}</td>
-                  <td class="text-break">{{ row.rest }}</td>
-                  <td class="text-center">
-                    <div class="d-flex align-items-center gap-3 justify-content-center">
-                      <span class="compat-badge">{{ pct|int }}%</span>
-                      <div class="progress-pro flex-grow-1" style="max-width:150px">
-                        <div class="progress-bar-pro" role="progressbar" style="width: {{ pct }}%" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"></div>
-                      </div>
-                    </div>
-                    <div class="small text-muted mt-1">Média: <span class="fw-bold">{{ '%.2f'|format(row.avg) }}</span> ★</div>
-                  </td>
-                  <td class="text-center text-muted">{{ row.count }} avaliação{{ '' if row.count==1 else 'es' }}</td>
-                </tr>
-              {% endfor %}
-            {% else %}
-              <tr><td colspan="4" class="text-center text-muted">Sem dados de compatibilidade suficientes no período.</td></tr>
-            {% endif %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="card-pro">
-      <h5 class="m-0 mb-3 d-flex align-items-center gap-2 text-royal"><i class="bi bi-list-stars"></i> Avaliações Detalhadas (Registros)</h5>
-      <div class="table-responsive">
-        <table class="table table-sm table-bordered table-pro align-middle">
-          <thead>
-            <tr class="text-nowrap">
-              <th>Data</th>
-              <th>Restaurante</th>
-              <th>Cooperado</th>
-              <th class="text-center">Geral</th>
-              {% if tipo=='restaurante' %}
-                <th class="text-center">Trat.</th><th class="text-center">Amb.</th><th class="text-center">Sup.</th>
-              {% else %}
-                <th class="text-center">Pont.</th><th class="text-center">Educ.</th><th class="text-center">Efic.</th><th class="text-center">Apres.</th>
-              {% endif %}
-              <th>Comentário</th>
-              <th class="text-center">Média</th>
-              <th class="text-center">Sentimento</th>
-              <th>Crítico?</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for a in avaliacoes %}
-              <tr>
-                <td class="text-nowrap small text-muted">{{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em else '-' }}</td>
-                <td class="text-break">{{ a.rest_nome }}</td>
-                <td class="text-break">{{ a.coop_nome }}</td>
-                <td class="text-center fw-bold">{{ a.geral }}</td>
-                {% if tipo=='restaurante' %}
-                  <td class="text-center">{{ a.trat }}</td>
-                  <td class="text-center">{{ a.amb }}</td>
-                  <td class="text-center">{{ a.sup }}</td>
                 {% else %}
-                  <td class="text-center">{{ a.pont }}</td>
-                  <td class="text-center">{{ a.educ }}</td>
-                  <td class="text-center">{{ a.efic }}</td>
-                  <td class="text-center">{{ a.apres }}</td>
-                {% endif %}
-                <td class="text-break small">{{ a.comentario }}</td>
-                <td class="text-center small">{{ a.media if a.media is not none else '' }}</td>
-                <td class="text-center">
-                  {% if a.sentimento == 'Positivo' %}
-                    <span class="badge bg-success-subtle text-success">Positivo</span>
-                  {% elif a.sentimento == 'Negativo' %}
-                    <span class="badge bg-danger-subtle text-danger">Negativo</span>
-                  {% else %}
-                    <span class="badge bg-secondary-subtle text-secondary">Neutro</span>
-                  {% endif %}
-                </td>
-                <td class="text-center">
-                  {% if a.alerta %}
-                    <span class="badge bg-danger">SIM</span>
-                  {% else %}
-                    <span class="badge bg-success">NÃO</span>
-                  {% endif %}
-                </td>
-              </tr>
-            {% else %}
-              <tr><td colspan="{{ 12 if tipo=='restaurante' else 13 }}" class="text-center text-muted">Nenhuma avaliação encontrada no período e filtros aplicados.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+                  <tr><td colspan="6" class="text-center text-muted">Sem dados suficientes</td></tr>
+                {% endfor %}
+              {% else %}
+                {% for r in ranking if r.qtd >= 3 %}
+                  <tr>
+                    <td>{{ r.coop_nome }}</td>
+                    <td class="text-center">{{ r.qtd }}</td>
+                    <td class="text-center">{{ '%.2f'|format(r.m_geral) }}</td>
+                    <td class="text-center">{{ '%.2f'|format(r.m_pont) }}</td>
+                    <td class="text-center">{{ '%.2f'|format(r.m_educ) }}</td>
+                    <td class="text-center">{{ '%.2f'|format(r.m_efic) }}</td>
+                    <td class="text-center">{{ '%.2f'|format(r.m_apres) }}</td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="7" class="text-center text-muted">Sem dados suficientes</td></tr>
+                {% endfor %}
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mt-3">
+          <canvas id="chartTop"></canvas>
+        </div>
       </div>
     </div>
 
-    <div class="mt-4 text-end">
-      <a class="btn btn-outline-royal btn-sm"
-          href="{{ url_for('admin_export_avaliacoes_csv', tipo=tipo, restaurante_id=_flt.restaurante_id, cooperado_id=_flt.cooperado_id, data_inicio=_flt.data_inicio, data_fim=_flt.data_fim) }}">
-          <i class="bi bi-download"></i> Exportar Tabela
-      </a>
+    <!-- Compatibilidade Cooperado × Restaurante -->
+    <div class="card border-0 shadow-sm rounded-3 mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+          <h6 class="m-0 d-flex align-items-center gap-2">
+            <i class="bi bi-heart-fill"></i> Compatibilidade Cooperado × Restaurante
+          </h6>
+          <span class="text-muted small">
+            Ordenado por <b>média geral</b> (desempate por nº de avaliações).
+          </span>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered table-hover align-middle">
+            <thead class="table-light">
+              <tr class="text-nowrap">
+                <th style="width:260px">Cooperado</th>
+                <th style="width:260px">Restaurante</th>
+                <th class="text-center" style="width:140px">Média ★</th>
+                <th class="text-center" style="width:140px">Avaliações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if compat and compat|length %}
+                {% set shown = 0 %}
+                {% for row in compat if row.count >= 3 %}
+                  {% if shown < 10 %}
+                    <tr>
+                      <td class="text-break">{{ row.coop }}</td>
+                      <td class="text-break">{{ row.rest }}</td>
+                      <td class="text-center fw-bold">{{ '%.2f'|format(row.avg) }}</td>
+                      <td class="text-center">{{ row.count }}</td>
+                    </tr>
+                    {% set shown = shown + 1 %}
+                  {% endif %}
+                {% endfor %}
+                {% if shown < 10 %}
+                  {% for row in compat if row.count < 3 %}
+                    {% if shown < 10 %}
+                      <tr class="text-muted">
+                        <td class="text-break">{{ row.coop }}</td>
+                        <td class="text-break">{{ row.rest }}</td>
+                        <td class="text-center fw-bold">{{ '%.2f'|format(row.avg) }}</td>
+                        <td class="text-center">{{ row.count }}</td>
+                      </tr>
+                      {% set shown = shown + 1 %}
+                    {% endif %}
+                  {% endfor %}
+                {% endif %}
+              {% else %}
+                <tr><td colspan="4" class="text-center text-muted">Sem dados suficientes.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
-  </div>
+    <!-- Lista detalhada -->
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-body">
+        <h6 class="m-0 mb-2"><i class="bi bi-list-stars"></i> Avaliações (detalhe)</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered table-hover align-middle">
+            <thead class="table-light">
+              <tr class="text-nowrap">
+                <th>Data</th>
+                <th>Restaurante</th>
+                <th>Cooperado</th>
+                <th>Geral</th>
+                {% if tipo=='restaurante' %}
+                  <th>Trat.</th><th>Amb.</th><th>Sup.</th>
+                {% else %}
+                  <th>Pont.</th><th>Educ.</th><th>Efic.</th><th>Apres.</th>
+                {% endif %}
+                <th>Comentário</th>
+                <th>Média</th>
+                <th>Sentimento</th>
+                <th>Temas</th>
+                <th>Crítico?</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in avaliacoes %}
+                <tr>
+                  <td class="text-nowrap">{{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em else '-' }}</td>
+                  <td class="text-break">{{ a.rest_nome }}</td>
+                  <td class="text-break">{{ a.coop_nome }}</td>
+                  <td class="text-center">{{ a.geral }}</td>
+
+                  {% if tipo=='restaurante' %}
+                    <td class="text-center">{{ a.trat }}</td>
+                    <td class="text-center">{{ a.amb }}</td>
+                    <td class="text-center">{{ a.sup }}</td>
+                  {% else %}
+                    <td class="text-center">{{ a.pont }}</td>
+                    <td class="text-center">{{ a.educ }}</td>
+                    <td class="text-center">{{ a.efic }}</td>
+                    <td class="text-center">{{ a.apres }}</td>
+                  {% endif %}
+
+                  <td class="text-break">{{ a.comentario }}</td>
+                  <td class="text-center">{{ a.media if a.media is not none else '' }}</td>
+                  <td class="text-center">{{ a.sentimento or '' }}</td>
+                  <td class="text-break">{{ a.temas or '' }}</td>
+                  <td class="text-center">{{ 'SIM' if a.alerta else 'NÃO' }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="{{ 11 if tipo=='restaurante' else 13 }}" class="text-center text-muted">Nenhuma avaliação</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div> <!-- /container -->
 </section>
 
+<!-- Chart.js (fallback via CDN se não estiver na base) -->
 <script>
-  // Script para garantir que a aba correta e o tipo correto são carregados por padrão (Fallback)
-  (function(){
-    // 1. Forçar hash #avaliacoes
-    if (location.hash !== '#avaliacoes') {
-      history.replaceState(null, '', location.pathname + location.search + '#avaliacoes');
-    }
-    
-    // 2. Forçar tipo=restaurante (atende ao seu pedido de abrir na aba restaurante)
-    const usp = new URLSearchParams(location.search);
-    if (!usp.get('tipo')) {
-      usp.set('tipo','restaurante');
-      // Precisa recarregar ou navegar para aplicar o tipo no Jinja, mas vamos tentar só forçar a URL por UX
-      // history.replaceState(null, '', location.pathname + '?' + usp.toString() + location.hash);
-    }
-  })();
-
   window.addEventListener('load', function(){
-    // Lógica do Botão "Este Mês"
+    // Botão "Este mês (1–último)"
     (function(){
       const btn = document.getElementById('btnMesAtual');
       if(!btn) return;
@@ -774,87 +766,34 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         const pad = n => String(n).padStart(2,'0');
         const toISO = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
         document.querySelector('input[name="data_inicio"]').value = toISO(first);
-        document.querySelector('input[name="data_fim"]').value   = toISO(last);
-        
-        // Opcional: Submeter o formulário automaticamente
-        // btn.closest('form').submit();
+        document.querySelector('input[name="data_fim"]').value    = toISO(last);
       });
     })();
 
-    // Lógica do Gráfico de Ranking (Chart Top)
     (function initChart(){
-      const ensureChartJS = () => new Promise((resolve, reject)=>{
+      const ensureChartJS = () => new Promise((resolve)=>{
         if (window.Chart) return resolve();
         const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+        s.src = "https://cdn.jsdelivr.net/npm/chart.js";
         s.onload = () => resolve();
-        s.onerror = () => reject(new Error('Falha ao carregar Chart.js'));
         document.head.appendChild(s);
       });
 
-      // FIX: garante JSON válido no JS mesmo se chart_top vier vazio/None
-      // **IMPORTANTE**: Garante que o objeto JSON seja um fallback válido para evitar erro de JS.
-      const dataTop = {{ (chart_top or {'labels': [], 'values': []}) | tojson | safe }};
+      const dataTop = {{ chart_top|tojson }};
       const el = document.getElementById('chartTop');
-      if (!el || !dataTop || !dataTop.labels || !dataTop.labels.length) {
-        // Fallback se não houver dados
-        el.closest('.col-lg-5').innerHTML = `<div class="alert alert-info text-center mt-3">Sem dados suficientes para gerar o gráfico.</div>`;
-        return;
-      }
-      
-      try {
-        const combined = dataTop.labels.map((l, i) => ({ label: l, value: (dataTop.values||[])[i]||0 }));
-        combined.sort((a,b)=> b.value - a.value);
-        const top = combined.slice(0, 10);
-        const labels = top.map(x=>x.label);
-        const values = top.map(x=>x.value);
+      if (!el || !dataTop || !dataTop.labels || !dataTop.labels.length) return;
 
-        ensureChartJS().then(()=>{
-          new Chart(el, {
-            type: 'bar',
-            data: { 
-              labels, 
-              datasets: [{ 
-                label: 'Média Geral', 
-                data: values, 
-                backgroundColor: 'rgba(31, 59, 179, 0.8)', // Cor Royal
-                borderColor: 'var(--royal-600)',
-                borderWidth: 1 
-              }] 
-            },
-            options: {
-              indexAxis: 'y', // Gráfico de barras horizontal
-              responsive: true,
-              maintainAspectRatio: false, // Permite que o height=200 seja respeitado
-              scales: { 
-                y: { grid: { display: false } },
-                x: { beginAtZero: true, max: 5 } 
-              },
-              plugins: { 
-                legend: { display: false },
-                tooltip: { callbacks: { label: (context) => `Média: ${context.formattedValue} ★` } }
-              }
-            }
-          });
-        }).catch((err)=>{
-          // Fallback para Tabela se Chart.js falhar
-          console.error("Falha ao carregar Chart.js. Exibindo tabela.", err);
-          const wrap = document.createElement('div');
-          wrap.className = 'table-responsive';
-          wrap.innerHTML = `
-            <div class="alert alert-warning">Não foi possível carregar o gráfico. Exibindo dados na tabela:</div>
-            <table class="table table-sm table-bordered">
-              <thead><tr><th>Nome</th><th class="text-center">Média</th></tr></thead>
-              <tbody>
-                ${top.map(x=>`<tr><td>${x.label}</td><td class='text-center'>${x.value.toFixed(2)}</td></tr>`).join('')}
-              </tbody>
-            </table>
-          `;
-          el.replaceWith(wrap);
+      ensureChartJS().then(()=>{
+        new Chart(el, {
+          type: 'bar',
+          data: { labels: dataTop.labels, datasets: [{ label: 'Média Geral', data: dataTop.values }] },
+          options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true, max: 5 } },
+            plugins: { legend: { display: false } }
+          }
         });
-      } catch(e) { 
-        console.error("Erro ao processar dados do gráfico:", e);
-      }
+      });
     })();
   });
 </script>
