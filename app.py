@@ -294,6 +294,9 @@ class ReceitaCooperado(db.Model):
     data = db.Column(db.Date)
 
 
+# =========================
+# Models
+# =========================
 class DespesaCooperado(db.Model):
     __tablename__ = "despesas_cooperado"
     id = db.Column(db.Integer, primary_key=True)
@@ -308,6 +311,14 @@ class DespesaCooperado(db.Model):
     data_inicio = db.Column(db.Date)
     data_fim    = db.Column(db.Date)
 
+    # NOVO: vínculo forte para sabermos quem gerou a despesa
+    beneficio_id = db.Column(
+        db.Integer,
+        db.ForeignKey("beneficios_registro.id", ondelete="CASCADE"),
+        index=True,
+        nullable=True  # deixa True para migrar suave
+    )
+
 
 class BeneficioRegistro(db.Model):
     __tablename__ = "beneficios_registro"
@@ -319,6 +330,66 @@ class BeneficioRegistro(db.Model):
     valor_total = db.Column(db.Float, default=0.0)
     recebedores_nomes = db.Column(db.Text)  # nomes separados por ';'
     recebedores_ids = db.Column(db.Text)    # ids separados por ';'
+
+    # NOVO: relacionamento reverso (não remove nada seu)
+    despesas = db.relationship(
+        "DespesaCooperado",
+        primaryjoin="BeneficioRegistro.id==DespesaCooperado.beneficio_id",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
+
+# =========================
+# Semana seg→dom + Normalização automática
+# =========================
+from sqlalchemy import event
+
+def semana_bounds(d: date):
+    """
+    Para uma data 'd', retorna (segunda, domingo) da mesma semana.
+    0=segunda .. 6=domingo
+    """
+    dow = d.weekday()
+    ini = d - timedelta(days=dow)     # segunda
+    fim = ini + timedelta(days=6)     # domingo
+    return ini, fim
+
+def normaliza_periodo(data: date|None, data_inicio: date|None, data_fim: date|None):
+    """
+    Regra global para DespesaCooperado:
+      - data_inicio = segunda
+      - data_fim    = domingo
+      - data        = domingo (== data_fim)
+    Se vier só 'data', deriva o período pela semana dessa data.
+    Se vier início/fim, ajusta para seg/dom da(s) semana(s) informada(s).
+    """
+    if data_inicio and data_fim:
+        # garante ordem e aplica bordas semanais
+        if data_fim < data_inicio:
+            data_inicio, data_fim = data_fim, data_inicio
+        ini, _ = semana_bounds(data_inicio)
+        _, fim = semana_bounds(data_fim)
+        return fim, ini, fim
+
+    base = data or date.today()
+    ini, fim = semana_bounds(base)
+    return fim, ini, fim
+
+# === Normalização automática de período em DespesaCooperado ===
+def _ajusta_semana(target: DespesaCooperado):
+    d, di, df = normaliza_periodo(target.data, target.data_inicio, target.data_fim)
+    target.data = d
+    target.data_inicio = di
+    target.data_fim = df
+
+@event.listens_for(DespesaCooperado, "before_insert")
+def _desp_before_insert(mapper, connection, target):
+    _ajusta_semana(target)
+
+@event.listens_for(DespesaCooperado, "before_update")
+def _desp_before_update(mapper, connection, target):
+    _ajusta_semana(target)
+
 
 
 class Escala(db.Model):
@@ -556,6 +627,39 @@ def init_db():
                    AND (data_inicio IS NULL OR data_fim IS NULL)
             """))
             db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # 4.y) beneficio_id em despesas_cooperado (FK p/ beneficios_registro)
+    try:
+        if _is_sqlite():
+           cols = db.session.execute(sa_text("PRAGMA table_info(despesas_cooperado);")).fetchall()
+           colnames = {row[1] for row in cols}
+           if "beneficio_id" not in colnames:
+               db.session.execute(sa_text("ALTER TABLE despesas_cooperado ADD COLUMN beneficio_id INTEGER"))
+           db.session.commit()
+        # OBS: SQLite não permite adicionar uma FK com ON DELETE CASCADE via ALTER TABLE;
+        # para ter a FK de fato, teria que recriar a tabela. Em dev, costuma bastar só a coluna.
+        else:
+            db.session.execute(sa_text("""
+                ALTER TABLE IF NOT EXISTS public.despesas_cooperado
+                ADD COLUMN IF NOT EXISTS beneficio_id INTEGER
+         """))
+            db.session.execute(sa_text("""
+            CREATE INDEX IF NOT EXISTS ix_despesas_beneficio_id
+            ON public.despesas_cooperado (beneficio_id)
+         """))
+            db.session.execute(sa_text("""
+            ALTER TABLE public.despesas_cooperado
+            DROP CONSTRAINT IF EXISTS despesas_cooperado_beneficio_id_fkey
+        """))
+        db.session.execute(sa_text("""
+            ALTER TABLE public.despesas_cooperado
+            ADD CONSTRAINT despesas_cooperado_beneficio_id_fkey
+            FOREIGN KEY (beneficio_id) REFERENCES public.beneficios_registro (id)
+            ON DELETE CASCADE
+        """))
+        db.session.commit()
     except Exception:
         db.session.rollback()
 
@@ -1856,14 +1960,28 @@ def admin_dashboard():
     # ---- Cooperados (pessoa física)
     rq2 = ReceitaCooperado.query
     dq2 = DespesaCooperado.query
+
+    # Receitas (pontuais): filtra por data simples
     if data_inicio:
         rq2 = rq2.filter(ReceitaCooperado.data >= data_inicio)
-        dq2 = dq2.filter(DespesaCooperado.data >= data_inicio)
     if data_fim:
         rq2 = rq2.filter(ReceitaCooperado.data <= data_fim)
-        dq2 = dq2.filter(DespesaCooperado.data <= data_fim)
+
+    # Despesas (semanais): usa sobreposição do intervalo [data_inicio, data_fim]
+    if data_inicio and data_fim:
+        dq2 = dq2.filter(
+            DespesaCooperado.data_inicio <= data_fim,
+            DespesaCooperado.data_fim    >= data_inicio,
+        )
+    elif data_inicio:
+        dq2 = dq2.filter(DespesaCooperado.data_fim >= data_inicio)
+    elif data_fim:
+        dq2 = dq2.filter(DespesaCooperado.data_inicio <= data_fim)
+
     receitas_coop = rq2.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
-    despesas_coop = dq2.order_by(DespesaCooperado.data.desc(), DespesaCooperado.id.desc()).all()
+    # você pode manter por .data (domingo) ou, se preferir, ordenar pelo fim real do período:
+    despesas_coop = dq2.order_by(DespesaCooperado.data_fim.desc().nullslast(), DespesaCooperado.id.desc()).all()
+
     total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
     total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop)
 
@@ -5608,5 +5726,4 @@ if __name__ == "__main__":
     with app.app_context():
         init_db()
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
-
+    
