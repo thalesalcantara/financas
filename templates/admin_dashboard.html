@@ -252,50 +252,54 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   <main class="main">
     <div class="tab-content">
 
-      <!-- RESUMO (versão profissional/compacta + filtro de período – drop-in) -->
+      <!-- === RESUMO (Dashboard Financeiro Completo) === -->
 <section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
-  {# Parâmetros do filtro (strings yyyy-mm-dd) #}
-  {% set ri = request.args.get('resumo_inicio','') %}
-  {% set rf = request.args.get('resumo_fim','') %}
-
-  {# ---------- Normalizador de data ---------- #}
+  {# ---------- Helpers de data ---------- #}
   {% macro ymd(x) -%}
     {%- if x and x.strftime is defined -%}
       {{ x.strftime('%Y-%m-%d') }}
     {%- elif x -%}
-      {{ x }}          {# supõe string 'YYYY-MM-DD' #}
+      {{ x }}
     {%- else -%}
       {{ '' }}
     {%- endif -%}
   {%- endmacro %}
 
-  {# Listas-base com fallback e materialização (evita generators sem len) #}
+  {# ---------- Filtros atuais (querystring) ---------- #}
+  {% set ri  = request.args.get('resumo_inicio','') %}
+  {% set rf  = request.args.get('resumo_fim','') %}
+  {% set rs  = request.args.get('resumo_restaurante_id','') %}
+  {% set cs  = request.args.get('resumo_cooperado_id','') %}
+  {% set rid = rs|int if rs else None %}
+  {% set cid = cs|int if cs else None %}
+
+  {# ---------- Bases com fallback ---------- #}
   {% set _producoes = (producoes | default([]) | list) %}
   {% if _producoes|length == 0 %}
-    {% set _producoes = (lancamentos | default([]) | list) %}  {# Fallback real do backend #}
+    {% set _producoes = (lancamentos | default([]) | list) %}
   {% endif %}
 
-  {% set receitas      = (receitas      | default([]) | list) %}           {# Cooperativa #}
-  {% set despesas      = (despesas      | default([]) | list) %}           {# Cooperativa #}
-  {% set receitas_coop = (receitas_coop | default([]) | list) %}           {# Cooperados  #}
-  {% set despesas_coop = (despesas_coop | default([]) | list) %}           {# Cooperados  #}
+  {% set receitas      = (receitas      | default([]) | list) %}
+  {% set despesas      = (despesas      | default([]) | list) %}
+  {% set receitas_coop = (receitas_coop | default([]) | list) %}
+  {% set despesas_coop = (despesas_coop | default([]) | list) %}
 
-  {# ---- Totais filtrados por período (somente Jinja) ---- #}
-
-  {# Produções (ou Lançamentos via fallback) #}
+  {# ---------- Totais (filtrados por período e, quando aplicável, por coop/rest) ---------- #}
+  {# Produções (considera restaurante/cooperado, se informados) #}
   {% set ns_prod = namespace(total=0) %}
   {% for p in _producoes %}
-    {% set d = ymd(p.data) %}
-    {% if (not ri or d >= ri) and (not rf or d <= rf) %}
+    {% set d   = ymd(p.data) %}
+    {% set okd = (not ri or d >= ri) and (not rf or d <= rf) %}
+    {% set okc = (not cid or (p.cooperado and p.cooperado.id==cid)) %}
+    {% set okr = (not rid or (p.restaurante and p.restaurante.id==rid)) %}
+    {% if okd and okc and okr %}
       {% set ns_prod.total = ns_prod.total + (p.valor or 0) %}
     {% endif %}
   {% endfor %}
   {% set total_producoes_f = ns_prod.total %}
+  {% set total_inss_f      = total_producoes_f * 0.045 %}
 
-  {# INSS 4,5% sobre produções do período #}
-  {% set total_inss_f = (total_producoes_f * 0.045) %}
-
-  {# Receitas da COOPERATIVA (aceita .valor ou .valor_total) #}
+  {# Receitas/Despesas da COOPERATIVA (somente período) #}
   {% set ns_rec_corp = namespace(total=0) %}
   {% for r in receitas %}
     {% set d = ymd(r.data or r.data_lancamento) %}
@@ -306,7 +310,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   {% endfor %}
   {% set total_receitas_corp_f = ns_rec_corp.total %}
 
-  {# Despesas da COOPERATIVA #}
   {% set ns_desp_corp = namespace(total=0) %}
   {% for d in despesas %}
     {% set dt = ymd(d.data) %}
@@ -316,203 +319,646 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   {% endfor %}
   {% set total_despesas_corp_f = ns_desp_corp.total %}
 
-  {# Receitas dos COOPERADOS #}
+  {# Receitas/Despesas dos COOPERADOS (período + cooperado quando filtrado) #}
   {% set ns_rec_coop = namespace(total=0) %}
   {% for r in receitas_coop %}
     {% set d = ymd(r.data) %}
-    {% if (not ri or d >= ri) and (not rf or d <= rf) %}
+    {% set okd = (not ri or d >= ri) and (not rf or d <= rf) %}
+    {% set okc = (not cid or (r.cooperado and r.cooperado.id==cid)) %}
+    {% if okd and okc %}
       {% set ns_rec_coop.total = ns_rec_coop.total + (r.valor or 0) %}
     {% endif %}
   {% endfor %}
   {% set total_receitas_coop_f = ns_rec_coop.total %}
 
-  {# Despesas dos COOPERADOS #}
   {% set ns_desp_coop = namespace(total=0) %}
   {% for d in despesas_coop %}
-    {% set dt = ymd(d.data) %}
-    {% if (not ri or dt >= ri) and (not rf or dt <= rf) %}
+    {% set dt  = ymd(d.data) %}
+    {% set okd = (not ri or dt >= ri) and (not rf or dt <= rf) %}
+    {% set okc = (not cid or (d.cooperado and d.cooperado.id==cid)) %}
+    {% if okd and okc %}
       {% set ns_desp_coop.total = ns_desp_coop.total + (d.valor or 0) %}
     {% endif %}
   {% endfor %}
   {% set total_despesas_coop_f = ns_desp_coop.total %}
 
-  {# Resultado da COOPERATIVA (receitas - despesas) #}
-  {% set _resultado = (total_receitas_corp_f|default(0)) - (total_despesas_corp_f|default(0)) %}
+  {% set _resultado_corp = (total_receitas_corp_f|default(0)) - (total_despesas_corp_f|default(0)) %}
+  {% set _total_receitas_geral = (total_receitas_corp_f|default(0)) + (total_receitas_coop_f|default(0)) %}
 
-  <!-- Filtro de Período -->
+  <!-- Filtros -->
   <div class="card border-0 shadow-sm rounded-3 mb-3">
     <div class="card-body">
       <form method="GET" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="resumo">
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label">De</label>
           <input type="date" class="form-control form-control-sm" name="resumo_inicio" value="{{ ri }}">
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label">Até</label>
           <input type="date" class="form-control form-control-sm" name="resumo_fim" value="{{ rf }}">
         </div>
-        <div class="col-md-3">
-          <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+        <div class="col-md-4">
+          <label class="form-label">Estabelecimento</label>
+          <select class="form-select form-select-sm" name="resumo_restaurante_id">
+            <option value="">Todos</option>
+            {% for r in restaurantes %}
+              <option value="{{ r.id }}" {{ 'selected' if rid and rid==r.id else '' }}>{{ r.nome }}</option>
+            {% endfor %}
+          </select>
         </div>
-        {% if ri or rf %}
-          <div class="col-md-3">
-            <a class="btn btn-outline-secondary btn-sm w-100" href="{{ url_for('admin_dashboard', tab='resumo') }}">Limpar</a>
-          </div>
-        {% endif %}
+        <div class="col-md-4">
+          <label class="form-label">Cooperado</label>
+          <select class="form-select form-select-sm" name="resumo_cooperado_id">
+            <option value="">Todos</option>
+            {% for c in cooperados %}
+              <option value="{{ c.id }}" {{ 'selected' if cid and cid==c.id else '' }}>{{ c.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-12 d-flex flex-wrap gap-2">
+          <button class="btn btn-royal btn-sm"><i class="bi bi-funnel"></i> Filtrar</button>
+          {% if ri or rf or rid or cid %}
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_dashboard', tab='resumo') }}">Limpar</a>
+          {% endif %}
+          <button id="btnExportXLSX" type="button" class="btn btn-outline-success btn-sm">
+            <i class="bi bi-file-earmark-excel"></i> Exportar XLSX (com filtros)
+          </button>
+          {% if ri or rf or rid or cid %}
+            <span class="small text-muted ms-1">
+              Período: <b>{{ ri if ri else 'início' }}</b> a <b>{{ rf if rf else 'hoje' }}</b>
+              {% if rid %} · Estab: <b>{{ (restaurantes|selectattr('id','equalto',rid)|list)[0].nome }}</b>{% endif %}
+              {% if cid %} · Cooperado: <b>{{ (cooperados|selectattr('id','equalto',cid)|list)[0].nome }}</b>{% endif %}
+            </span>
+          {% endif %}
+        </div>
       </form>
-      {% if ri or rf %}
-        <div class="mt-2 small text-muted">
-          Período aplicado: <b>{{ ri if ri else 'início' }}</b> a <b>{{ rf if rf else 'hoje' }}</b>
-        </div>
-      {% endif %}
     </div>
   </div>
 
   <!-- KPIs -->
   <div class="row g-2">
-    <!-- Total Produções -->
     <div class="col-12 col-sm-6 col-lg-3">
       <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
         <div class="d-flex align-items-center justify-content-between">
-          <div class="pe-2">
+          <div>
             <div class="text-uppercase text-muted small">Total Produções</div>
-            <div class="fw-bold fs-5 mb-0">R$ {{ "%.2f"|format(total_producoes_f) }}</div>
+            <div id="kpiTotalProds" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_producoes_f) }}</div>
             <div class="small text-muted">Bruto no período</div>
           </div>
-          <div class="flex-shrink-0 kpi-icon"><i class="bi bi-graph-up"></i></div>
+          <div class="kpi-icon"><i class="bi bi-graph-up"></i></div>
         </div>
       </div>
     </div>
 
-    <!-- Total INSS (sobre produções) -->
     <div class="col-12 col-sm-6 col-lg-3">
       <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
         <div class="d-flex align-items-center justify-content-between">
-          <div class="pe-2">
+          <div>
             <div class="text-uppercase text-muted small">Total INSS</div>
-            <div class="fw-bold fs-5 mb-0">R$ {{ "%.2f"|format(total_inss_f) }}</div>
+            <div id="kpiINSS" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_inss_f) }}</div>
             <div class="small text-muted">4,5% s/ produções</div>
           </div>
-          <div class="flex-shrink-0 kpi-icon"><i class="bi bi-shield-check"></i></div>
+          <div class="kpi-icon"><i class="bi bi-shield-check"></i></div>
         </div>
       </div>
     </div>
 
-    <!-- Receitas Cooperativa -->
     <div class="col-12 col-sm-6 col-lg-3">
       <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
         <div class="d-flex align-items-center justify-content-between">
-          <div class="pe-2">
+          <div>
             <div class="text-uppercase text-muted small">Receitas Cooperativa</div>
-            <div class="fw-bold fs-5 mb-0 text-success">R$ {{ "%.2f"|format(total_receitas_corp_f) }}</div>
-            <div class="small text-muted">Entradas da cooperativa</div>
+            <div class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(total_receitas_corp_f) }}</div>
+            <div class="small text-muted">Entradas da coop</div>
           </div>
-          <div class="flex-shrink-0 kpi-icon"><i class="bi bi-cash-coin"></i></div>
+          <div class="kpi-icon"><i class="bi bi-cash-coin"></i></div>
         </div>
       </div>
     </div>
 
-    <!-- Despesas Cooperativa -->
     <div class="col-12 col-sm-6 col-lg-3">
       <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
         <div class="d-flex align-items-center justify-content-between">
-          <div class="pe-2">
+          <div>
             <div class="text-uppercase text-muted small">Despesas Cooperativa</div>
-            <div class="fw-bold fs-5 mb-0 text-danger">R$ {{ "%.2f"|format(total_despesas_corp_f) }}</div>
-            <div class="small text-muted">Saídas da cooperativa</div>
+            <div class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_despesas_corp_f) }}</div>
+            <div class="small text-muted">Saídas da coop</div>
           </div>
-          <div class="flex-shrink-0 kpi-icon"><i class="bi bi-cart-dash"></i></div>
+          <div class="kpi-icon"><i class="bi bi-cart-dash"></i></div>
         </div>
       </div>
     </div>
 
-    <!-- Receitas Cooperados -->
     <div class="col-12 col-sm-6 col-lg-3">
       <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
         <div class="d-flex align-items-center justify-content-between">
-          <div class="pe-2">
+          <div>
             <div class="text-uppercase text-muted small">Receitas Cooperados</div>
-            <div class="fw-bold fs-5 mb-0">R$ {{ "%.2f"|format(total_receitas_coop_f) }}</div>
+            <div class="fw-bold fs-5">R$ {{ '%.2f'|format(total_receitas_coop_f) }}</div>
             <div class="small text-muted">Créditos aos cooperados</div>
           </div>
-          <div class="flex-shrink-0 kpi-icon"><i class="bi bi-currency-exchange"></i></div>
+          <div class="kpi-icon"><i class="bi bi-currency-exchange"></i></div>
         </div>
       </div>
     </div>
 
-    <!-- Despesas Cooperados -->
     <div class="col-12 col-sm-6 col-lg-3">
       <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
         <div class="d-flex align-items-center justify-content-between">
-          <div class="pe-2">
+          <div>
             <div class="text-uppercase text-muted small">Despesas Cooperados</div>
-            <div class="fw-bold fs-5 mb-0">R$ {{ "%.2f"|format(total_despesas_coop_f) }}</div>
+            <div class="fw-bold fs-5">R$ {{ '%.2f'|format(total_despesas_coop_f) }}</div>
             <div class="small text-muted">Débitos/benefícios</div>
           </div>
-          <div class="flex-shrink-0 kpi-icon"><i class="bi bi-bank"></i></div>
+          <div class="kpi-icon"><i class="bi bi-bank"></i></div>
         </div>
       </div>
     </div>
 
-    <!-- Resultado Cooperativa -->
-    <div class="col-12 col-lg-3">
+    <div class="col-12 col-sm-6 col-lg-3">
       <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
         <div class="d-flex align-items-center justify-content-between">
-          <div class="pe-2">
+          <div>
             <div class="text-uppercase text-muted small">Resultado Cooperativa</div>
-            <div class="fw-bold fs-5 mb-0 {{ 'text-success' if _resultado >= 0 else 'text-danger' }}">
-              R$ {{ "%.2f"|format(_resultado) }}
+            <div class="fw-bold fs-5 {{ 'text-success' if _resultado_corp >= 0 else 'text-danger' }}">
+              R$ {{ '%.2f'|format(_resultado_corp) }}
             </div>
             <div class="small text-muted">Receitas − Despesas (coop)</div>
           </div>
-          <div class="flex-shrink-0 kpi-icon"><i class="bi bi-pie-chart"></i></div>
+          <div class="kpi-icon"><i class="bi bi-pie-chart"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <div class="text-uppercase text-muted small">Total de Receitas (Geral)</div>
+            <div class="fw-bold fs-5">R$ {{ '%.2f'|format(_total_receitas_geral) }}</div>
+            <div class="small text-muted">Coop + Cooperados</div>
+          </div>
+          <div class="kpi-icon"><i class="bi bi-cash-stack"></i></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Parâmetro (Salário Mínimo) -->
-  <div class="row g-2 mt-1">
-    <div class="col-12 col-lg-6">
-      <div class="card border-0 shadow-sm rounded-3 p-3 h-100">
-        <div class="d-flex justify-content-between align-items-center">
-          <h6 class="mb-0"><i class="bi bi-currency-dollar me-1"></i> Parâmetro — Salário Mínimo</h6>
-        </div>
-        <hr class="my-2">
-        <div class="small text-muted">Atual</div>
-        <div class="fs-5 fw-bold">R$ {{ "%.2f"|format(salario_minimo|default(0)) }}</div>
-        <div class="small text-muted mt-1">
-          Base complemento INSS = <b>20%</b> de R$ {{ "%.2f"|format(salario_minimo|default(0)) }}
-          (= {{ "%.2f"|format((salario_minimo|default(0))*0.2) }})
-        </div>
+  <!-- Resumo por Cooperado -->
+  <div class="card border-0 shadow-sm rounded-3 mt-2">
+    <div class="card-body">
+      <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+        <h6 class="m-0 d-flex align-items-center gap-2">
+          <i class="bi bi-people"></i> Resumo por Cooperado (filtro aplicado)
+        </h6>
+        <small class="text-muted">Líquido = Produções + Receitas − INSS − Despesas − Adiant.</small>
       </div>
-    </div>
-
-    <!-- Gráficos (IDs mantidos) -->
-    <div class="col-12 col-lg-6">
-      <div class="card border-0 shadow-sm rounded-3 p-3 chart-card"
-           data-resumo-inicio="{{ ri }}" data-resumo-fim="{{ rf }}">
-        <h6 class="mb-2"><i class="bi bi-graph-up-arrow"></i> Crescimento — Cooperativa</h6>
-        <canvas id="chartLancCoop"></canvas>
+      <div class="table-responsive">
+        <table id="tblResumoCoop" class="table table-sm table-bordered table-hover align-middle">
+          <thead class="table-light">
+            <tr class="text-nowrap">
+              <th>Cooperado</th>
+              <th class="text-end">Produções</th>
+              <th class="text-end">INSS (4,5%)</th>
+              <th class="text-end">Receitas</th>
+              <th class="text-end">Despesas</th>
+              <th class="text-end">Adiant.</th>
+              <th class="text-end">Líquido</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="7" class="text-center text-muted">Carregando…</td></tr>
+          </tbody>
+          <tfoot>
+            <tr class="table-light fw-bold">
+              <td>Total</td>
+              <td class="text-end" id="tProd">R$ 0,00</td>
+              <td class="text-end" id="tINSS">R$ 0,00</td>
+              <td class="text-end" id="tRec">R$ 0,00</td>
+              <td class="text-end" id="tDes">R$ 0,00</td>
+              <td class="text-end" id="tAd">R$ 0,00</td>
+              <td class="text-end" id="tLiq">R$ 0,00</td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
     </div>
   </div>
 
-  <div class="row g-2 mt-1">
+  <!-- Gráficos -->
+  <div class="row g-2 mt-2">
+    <div class="col-12 col-lg-6">
+      <div class="card border-0 shadow-sm rounded-3 p-3">
+        <h6 class="mb-2"><i class="bi bi-graph-up-arrow"></i> Evolução Mensal — Cooperativa</h6>
+        <canvas id="chartCoop"></canvas>
+      </div>
+    </div>
+    <div class="col-12 col-lg-6">
+      <div class="card border-0 shadow-sm rounded-3 p-3">
+        <h6 class="mb-2"><i class="bi bi-graph-up-arrow"></i> Evolução Mensal — Cooperados</h6>
+        <canvas id="chartCooperados"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-2 mt-2">
     <div class="col-12">
-      <div class="card border-0 shadow-sm rounded-3 p-3 chart-card"
-           data-resumo-inicio="{{ ri }}" data-resumo-fim="{{ rf }}">
-        <h6 class="mb-2"><i class="bi bi-graph-up-arrow"></i> Crescimento — Cooperados</h6>
-        <canvas id="chartLancCooperados"></canvas>
+      <div class="card border-0 shadow-sm rounded-3 p-3">
+        <h6 class="mb-2"><i class="bi bi-shop"></i> Top Estabelecimentos (Produções no período)</h6>
+        <canvas id="chartEstabs"></canvas>
       </div>
     </div>
   </div>
-</section>
 
-<style>
-  .kpi-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(39,71,217,.10);color:var(--royal-blue)}
-</style>
+  {% set _has_av = (avaliacoes is defined) and (avaliacoes|length > 0) %}
+  <div class="row g-2 mt-2" {% if not _has_av %}style="display:none"{% endif %}>
+    <div class="col-12 col-lg-6">
+      <div class="card border-0 shadow-sm rounded-3 p-3">
+        <h6 class="mb-2"><i class="bi bi-stars"></i> Avaliações — Média por mês</h6>
+        <canvas id="chartAvaliacao"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .kpi-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(39,71,217,.10);color:var(--royal-blue)}
+  </style>
+
+  <!-- Dados (seguros p/ JS) + Scripts (Chart.js + XLSX) -->
+  <script>
+  (function(){
+    // ---- Filtros atuais (para o JS aplicar nos cálculos e na exportação) ----
+    const FILTER = {
+      ri: "{{ ri }}",
+      rf: "{{ rf }}",
+      rid: {{ rid if rid is not none else 'null' }},
+      cid: {{ cid if cid is not none else 'null' }}
+    };
+
+    // ---- Bases compactas (serializadas manualmente) ----
+    const PRODUCOES = [
+      {% for l in _producoes %}
+        {
+          id: {{ l.id }},
+          data: "{{ ymd(l.data) }}",
+          valor: {{ (l.valor or 0)|float }},
+          cooperado_id: {{ l.cooperado.id if l.cooperado else 'null' }},
+          cooperado_nome: "{{ (l.cooperado.nome if l.cooperado else '')|e }}",
+          restaurante_id: {{ l.restaurante.id if l.restaurante else 'null' }},
+          restaurante_nome: "{{ (l.restaurante.nome if l.restaurante else '')|e }}"
+        }{{ "," if not loop.last }}
+      {% endfor %}
+    ];
+
+    const REC_COOP = [
+      {% for r in receitas_coop %}
+        {
+          id: {{ r.id }},
+          data: "{{ ymd(r.data) }}",
+          valor: {{ (r.valor or 0)|float }},
+          cooperado_id: {{ r.cooperado.id if r.cooperado else 'null' }},
+          cooperado_nome: "{{ (r.cooperado.nome if r.cooperado else '')|e }}",
+          descricao: "{{ (r.descricao or '')|e }}"
+        }{{ "," if not loop.last }}
+      {% endfor %}
+    ];
+
+    const DESP_COOP = [
+      {% for d in despesas_coop %}
+        {
+          id: {{ d.id }},
+          data: "{{ ymd(d.data) }}",
+          valor: {{ (d.valor or 0)|float }},
+          cooperado_id: {{ d.cooperado.id if d.cooperado else 'null' }},
+          cooperado_nome: "{{ (d.cooperado.nome if d.cooperado else (d.cooperado_nome if d.cooperado_nome is defined else ''))|e }}",
+          descricao: "{{ (d.descricao or '')|e }}",
+          adiantamento: {{ 1 if d.adiantamento else 0 }}
+        }{{ "," if not loop.last }}
+      {% endfor %}
+    ];
+
+    const REC_COOP_CORP = [
+      {% for r in receitas %}
+        {
+          id: {{ r.id }},
+          data: "{{ ymd(r.data or r.data_lancamento) }}",
+          valor: {{ ((r.valor if r.valor is not none else r.valor_total) or 0)|float }},
+          descricao: "{{ (r.descricao or '')|e }}"
+        }{{ "," if not loop.last }}
+      {% endfor %}
+    ];
+
+    const DESP_COOP_CORP = [
+      {% for d in despesas %}
+        {
+          id: {{ d.id }},
+          data: "{{ ymd(d.data) }}",
+          valor: {{ (d.valor or 0)|float }},
+          descricao: "{{ (d.descricao or '')|e }}"
+        }{{ "," if not loop.last }}
+      {% endfor %}
+    ];
+
+    const COOPS = [
+      {% for c in cooperados %}
+        { id: {{ c.id }}, nome: "{{ c.nome|e }}" }{{ "," if not loop.last }}
+      {% endfor %}
+    ];
+    const RESTS = [
+      {% for r in restaurantes %}
+        { id: {{ r.id }}, nome: "{{ r.nome|e }}" }{{ "," if not loop.last }}
+      {% endfor %}
+    ];
+
+    const AVALS = [
+      {% for a in avaliacoes or [] %}
+        { data: "{{ a.criado_em.strftime('%Y-%m-%d') if a.criado_em else '' }}", geral: {{ (a.geral or 0)|float }} }{{ "," if not loop.last }}
+      {% endfor %}
+    ];
+
+    // ---- Utils ----
+    const parseISO = s => (!s)?null:new Date(s+'T00:00:00');
+    const fmtBR = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const inRange = (d) => {
+      const di = parseISO(FILTER.ri), df = parseISO(FILTER.rf), x = parseISO(d);
+      if(!x) return true;
+      if(di && x < di) return false;
+      if(df && x > df) return false;
+      return true;
+    };
+    const byMonthKey = d => {
+      if(!d) return '';
+      const dt = parseISO(d);
+      return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
+    };
+    const sumBy = (arr, fn) => arr.reduce((acc,cur)=>acc+(+fn(cur)||0), 0);
+
+    const filteredPROD = PRODUCOES.filter(p =>
+      inRange(p.data) &&
+      (FILTER.cid==null || p.cooperado_id===FILTER.cid) &&
+      (FILTER.rid==null || p.restaurante_id===FILTER.rid)
+    );
+    const filteredRECp = REC_COOP.filter(r =>
+      inRange(r.data) &&
+      (FILTER.cid==null || r.cooperado_id===FILTER.cid)
+    );
+    const filteredDESp = DESP_COOP.filter(d =>
+      inRange(d.data) &&
+      (FILTER.cid==null || d.cooperado_id===FILTER.cid)
+    );
+    const filteredRECc = REC_COOP_CORP.filter(r => inRange(r.data));
+    const filteredDESc = DESP_COOP_CORP.filter(d => inRange(d.data));
+
+    // ---- KPIs (recalcular no front para garantir consistência na exportação) ----
+    const kpiProd = sumBy(filteredPROD, x=>x.valor);
+    const kpiINSS = kpiProd * 0.045;
+    document.getElementById('kpiTotalProds').textContent = fmtBR(kpiProd);
+    document.getElementById('kpiINSS').textContent       = fmtBR(kpiINSS);
+
+    // ---- Tabela Resumo por Cooperado ----
+    (function buildResumoCoop(){
+      const map = new Map(); // id -> item agregado
+      const ensure = (id, nome) => {
+        if(!map.has(id)) map.set(id, {id, nome, prod:0, inss:0, rec:0, des:0, ad:0});
+        return map.get(id);
+      };
+      filteredPROD.forEach(p=>{
+        if(p.cooperado_id==null) return;
+        const row = ensure(p.cooperado_id, p.cooperado_nome);
+        row.prod += p.valor;
+        row.inss += p.valor*0.045;
+      });
+      filteredRECp.forEach(r=>{
+        if(r.cooperado_id==null) return;
+        const row = ensure(r.cooperado_id, r.cooperado_nome);
+        row.rec += r.valor;
+      });
+      filteredDESp.forEach(d=>{
+        if(d.cooperado_id==null) return;
+        const row = ensure(d.cooperado_id, d.cooperado_nome || '—');
+        if(d.adiantamento) row.ad += d.valor; else row.des += d.valor;
+      });
+
+      const rows = Array.from(map.values()).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+      const tbody = document.querySelector('#tblResumoCoop tbody');
+      tbody.innerHTML = rows.length? '' : '<tr><td colspan="7" class="text-center text-muted">Sem dados no filtro.</td></tr>';
+
+      let tProd=0,tINSS=0,tRec=0,tDes=0,tAd=0,tLiq=0;
+      rows.forEach(r=>{
+        const liq = r.prod + r.rec - r.inss - r.des - r.ad;
+        tProd+=r.prod; tINSS+=r.inss; tRec+=r.rec; tDes+=r.des; tAd+=r.ad; tLiq+=liq;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="text-break">${r.nome||'—'}</td>
+          <td class="text-end">${fmtBR(r.prod)}</td>
+          <td class="text-end">${fmtBR(r.inss)}</td>
+          <td class="text-end">${fmtBR(r.rec)}</td>
+          <td class="text-end">${fmtBR(r.des)}</td>
+          <td class="text-end">${fmtBR(r.ad)}</td>
+          <td class="text-end fw-bold">${fmtBR(liq)}</td>`;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('tProd').textContent = fmtBR(tProd);
+      document.getElementById('tINSS').textContent = fmtBR(tINSS);
+      document.getElementById('tRec').textContent  = fmtBR(tRec);
+      document.getElementById('tDes').textContent  = fmtBR(tDes);
+      document.getElementById('tAd').textContent   = fmtBR(tAd);
+      document.getElementById('tLiq').textContent  = fmtBR(tLiq);
+    })();
+
+    // ---- Gráficos (Chart.js via CDN) ----
+    const ensureChart = () => new Promise(res=>{
+      if (window.Chart) return res();
+      const s=document.createElement('script');
+      s.src="https://cdn.jsdelivr.net/npm/chart.js";
+      s.onload=()=>res();
+      document.head.appendChild(s);
+    });
+
+    ensureChart().then(()=>{
+      // Cooperativa: Receitas vs Despesas por mês
+      (function(){
+        const byM = {};
+        filteredRECc.forEach(r=>{ const k=byMonthKey(r.data)||'—'; (byM[k]??=( {r:0,d:0} )).r+=r.valor; });
+        filteredDESc.forEach(d=>{ const k=byMonthKey(d.data)||'—'; (byM[k]??=( {r:0,d:0} )).d+=d.valor; });
+        const labels = Object.keys(byM).sort();
+        const rec = labels.map(k=>byM[k].r);
+        const des = labels.map(k=>byM[k].d);
+        new Chart(document.getElementById('chartCoop'), {
+          type:'bar',
+          data:{ labels, datasets:[
+            {label:'Receitas', data:rec},
+            {label:'Despesas', data:des}
+          ]},
+          options:{responsive:true, plugins:{legend:{position:'top'}}, scales:{y:{beginAtZero:true}}}
+        });
+      })();
+
+      // Cooperados: Produções (bruto) e INSS por mês
+      (function(){
+        const byM = {};
+        filteredPROD.forEach(p=>{
+          const k=byMonthKey(p.data)||'—';
+          (byM[k]??=( {prod:0,inss:0} )).prod+=p.valor;
+          byM[k].inss += p.valor*0.045;
+        });
+        const labels = Object.keys(byM).sort();
+        const prod = labels.map(k=>byM[k].prod);
+        const inss = labels.map(k=>byM[k].inss);
+        new Chart(document.getElementById('chartCooperados'), {
+          type:'line',
+          data:{ labels, datasets:[
+            {label:'Produções (bruto)', data:prod, tension:.2},
+            {label:'INSS (4,5%)', data:inss, tension:.2}
+          ]},
+          options:{responsive:true, plugins:{legend:{position:'top'}}, scales:{y:{beginAtZero:true}}}
+        });
+      })();
+
+      // Estabelecimentos (ranking no período)
+      (function(){
+        const byR = {};
+        filteredPROD.forEach(p=>{
+          if(p.restaurante_id==null) return;
+          byR[p.restaurante_nome] = (byR[p.restaurante_nome]||0) + p.valor;
+        });
+        const entries = Object.entries(byR).sort((a,b)=>b[1]-a[1]).slice(0,20);
+        const labels = entries.map(e=>e[0]);
+        const vals   = entries.map(e=>e[1]);
+        new Chart(document.getElementById('chartEstabs'), {
+          type:'bar',
+          data:{ labels, datasets:[{label:'Produções por Estabelecimento', data:vals}] },
+          options:{responsive:true, indexAxis:'y', scales:{x:{beginAtZero:true}}, plugins:{legend:{display:false}}}
+        });
+      })();
+
+      // Avaliações — média por mês (se houver)
+      (function(){
+        if(!Array.isArray(AVALS) || AVALS.length===0) return;
+        const byM = {};
+        AVALS.filter(a=>inRange(a.data)).forEach(a=>{
+          const k = byMonthKey(a.data)||'—';
+          (byM[k]??=( {s:0,c:0} )).s += (a.geral||0);
+          byM[k].c += 1;
+        });
+        const labels = Object.keys(byM).sort();
+        if(labels.length===0) return;
+        const medias = labels.map(k=> (byM[k].c? byM[k].s/byM[k].c : 0) );
+        new Chart(document.getElementById('chartAvaliacao'), {
+          type:'line',
+          data:{ labels, datasets:[{label:'Média ★', data:medias, tension:.2}] },
+          options:{responsive:true, scales:{y:{beginAtZero:true, max:5}}, plugins:{legend:{display:false}}}
+        });
+      })();
+    });
+
+    // ---- Exportação XLSX (SheetJS via CDN) ----
+    const ensureXLSX = () => new Promise(res=>{
+      if (window.XLSX) return res();
+      const s=document.createElement('script');
+      s.src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+      s.onload=()=>res();
+      document.head.appendChild(s);
+    });
+
+    function aoaToSheet(title, aoa, wb){
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      XLSX.utils.book_append_sheet(wb, ws, title);
+    }
+    function safeSheetName(s){
+      const cleaned = String(s||'').replace(/[:\\/?*\[\]]/g,' ').slice(0,31).trim();
+      return cleaned || 'Planilha';
+    }
+
+    async function exportXLSX(){
+      await ensureXLSX();
+      const wb = XLSX.utils.book_new();
+
+      // KPIs
+      const k1 = [
+        ['Dashboard Financeiro — Filtro'],
+        ['Período', FILTER.ri||'início', '→', FILTER.rf||'hoje'],
+        ['Estabelecimento', FILTER.rid==null ? 'Todos' : (RESTS.find(r=>r.id===FILTER.rid)?.nome||FILTER.rid)],
+        ['Cooperado', FILTER.cid==null ? 'Todos' : (COOPS.find(c=>c.id===FILTER.cid)?.nome||FILTER.cid)],
+        [],
+        ['KPIs'],
+        ['Total Produções', kpiProd],
+        ['INSS (4,5%)',    kpiINSS],
+        ['Receitas Coop (período)',  sumBy(filteredRECc, x=>x.valor)],
+        ['Despesas Coop (período)',  sumBy(filteredDESc, x=>x.valor)],
+        ['Receitas Cooperados (período)', sumBy(filteredRECp, x=>x.valor)],
+        ['Despesas Cooperados (período)', sumBy(filteredDESp, x=>x.valor)],
+      ];
+      aoaToSheet('KPIs', k1, wb);
+
+      // Produções (geral)
+      const prodAOA = [['Data','Cooperado','Estabelecimento','Descrição','Valor','INSS(4,5%)']];
+      filteredPROD.forEach(p=>{
+        prodAOA.push([p.data, p.cooperado_nome||'', p.restaurante_nome||'', 'Produção', p.valor, p.valor*0.045]);
+      });
+      aoaToSheet('Producoes', prodAOA, wb);
+
+      // Receitas/Despesas Coop (Cooperativa)
+      const recCAOA = [['Data','Descrição','Valor']];
+      filteredRECc.forEach(r=>recCAOA.push([r.data, r.descricao||'', r.valor]));
+      aoaToSheet('Receitas_Coop', recCAOA, wb);
+
+      const desCAOA = [['Data','Descrição','Valor']];
+      filteredDESc.forEach(d=>desCAOA.push([d.data, d.descricao||'', d.valor]));
+      aoaToSheet('Despesas_Coop', desCAOA, wb);
+
+      // Estabelecimentos (soma no período)
+      const byR = {};
+      filteredPROD.forEach(p=>{
+        if(p.restaurante_nome) byR[p.restaurante_nome]=(byR[p.restaurante_nome]||0)+p.valor;
+      });
+      const estAOA = [['Estabelecimento','Total Produções (R$)']];
+      Object.entries(byR).sort((a,b)=>b[1]-a[1]).forEach(([nome,v])=>estAOA.push([nome,v]));
+      aoaToSheet('Estabelecimentos', estAOA, wb);
+
+      // Uma aba por Cooperado — Receitas
+      const byC_rec = {};
+      filteredRECp.forEach(r=>{
+        const k = r.cooperado_nome || `ID ${r.cooperado_id}`;
+        (byC_rec[k] ||= []).push(r);
+      });
+      Object.keys(byC_rec).forEach(nome=>{
+        const aoa = [['Data','Descrição','Valor']];
+        byC_rec[nome].forEach(r=>aoa.push([r.data, r.descricao||'', r.valor]));
+        aoaToSheet(safeSheetName('Receita - '+nome), aoa, wb);
+      });
+
+      // Uma aba por Cooperado — Despesas (separando adiant.)
+      const byC_des = {};
+      filteredDESp.forEach(d=>{
+        const k = d.cooperado_nome || `ID ${d.cooperado_id}`;
+        (byC_des[k] ||= []).push(d);
+      });
+      Object.keys(byC_des).forEach(nome=>{
+        const aoa = [['Data','Descrição','Valor','Adiantamento']];
+        byC_des[nome].forEach(d=>aoa.push([d.data, d.descricao||'', d.valor, d.adiantamento? 'SIM':'NÃO']));
+        aoaToSheet(safeSheetName('Despesa - '+nome), aoa, wb);
+      });
+
+      // Avaliações (opcional)
+      if (Array.isArray(AVALS) && AVALS.length){
+        const avAOA = [['Data','Geral']];
+        AVALS.filter(a=>inRange(a.data)).forEach(a=>avAOA.push([a.data, a.geral]));
+        aoaToSheet('Avaliacoes', avAOA, wb);
+      }
+
+      const now = new Date();
+      const ymd = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+      XLSX.writeFile(wb, `Dashboard_Coopex_${ymd}.xlsx`);
+    }
+
+    document.getElementById('btnExportXLSX')?.addEventListener('click', exportXLSX);
+  })();
+  </script>
+</section>
       
 {# ===================== CONTEÚDO DA ABA "Avaliações" ===================== #}
 <section id="avaliacoes" class="tab-pane fade {{ 'show active' if _tab=='avaliacoes' else '' }}" role="tabpanel">
