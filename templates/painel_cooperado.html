@@ -388,149 +388,97 @@ html.printing body {
                 <small class="muted"><i class="bi bi-clock"></i> {{ lanc.hora_inicio }}{% if lanc.hora_fim %} às {{ lanc.hora_fim }}{% endif %}</small>
                 {% endif %}
 
-                <!-- AVALIAÇÃO DO RESTAURANTE -->
-                <div class="rating-wrap">
-                  {% set minha = lanc.minha_avaliacao %}
-                  {% if minha is not none %}
-                    <div class="small text-muted mb-1">Sua avaliação</div>
-                    <div class="rating-stars" aria-label="Sua avaliação: {{ minha }} de 5">
-                      {% for i in range(1,6) %}
-                        <i class="bi {{ 'bi-star-fill' if i <= minha else 'bi-star' }}"></i>
-                      {% endfor %}
-                      <span class="rating-note">{{ ("%.1f"|format(minha)).replace('.',',') }}</span>
-                    </div>
-                  {% else %}
-                    <form method="post"
-                          action="{{ url_for('producoes_avaliar', lanc_id=lanc.id) }}"
-                          class="avaliar-form" aria-label="Formulário de avaliação do restaurante">
-                      <input type="hidden" name="nota" value="">
-                      <input type="hidden" name="av_geral" value="">
-                      <input type="hidden" name="av_apresentacao" value="">
-                      <input type="hidden" name="av_educacao" value="">
-                      <input type="hidden" name="av_eficiencia" value="">
-                      <input type="hidden" name="av_pontualidade" value="">
+               <!-- AVALIAÇÃO DO RESTAURANTE -->
+<div class="rating-wrap">
+  {% set minha = lanc.minha_avaliacao %}
+  {% if minha is not none %}
+    <div class="small text-muted mb-1">Sua avaliação</div>
+    <div class="rating-stars" aria-label="Sua avaliação: {{ minha }} de 5">
+      {% for i in range(1,6) %}
+        <i class="bi {{ 'bi-star-fill' if i <= minha else 'bi-star' }}"></i>
+      {% endfor %}
+      <span class="rating-note">{{ ("%.1f"|format(minha)).replace('.',',') }}</span>
+    </div>
+  {% else %}
+    <form method="post"
+          action="{{ url_for('producoes_avaliar', lanc_id=lanc.id) }}"
+          class="avaliar-form" aria-label="Formulário de avaliação do restaurante">
+      <!-- média e nota -->
+      <input type="hidden" name="nota" value="">
+      <input type="hidden" name="av_geral" value="">
 
-                      <div class="rating-grid">
-                        <div class="mb-1">
-                          <div class="small fw-semibold text-muted">Geral</div>
-                          <div class="rating-stars stars-group" data-field="av_geral" data-readonly="true" aria-label="Média Geral">
-                            {% for i in range(1,6) %}
-                              <button type="button" class="star-btn" data-value="{{ i }}" disabled aria-hidden="true">
-                                <i class="bi bi-star"></i>
-                              </button>
-                            {% endfor %}
-                          </div>
-                        </div>
+      <!-- CAMPOS CANÔNICOS -->
+      <input type="hidden" name="av_ambiente" value="">
+      <input type="hidden" name="av_tratamento" value="">
+      <input type="hidden" name="av_suporte" value="">
 
-                        <div class="mb-1">
-                          <div class="small fw-semibold text-muted">Ambiente</div>
-                          <div class="rating-stars selectable stars-group" data-field="av_apresentacao" role="radiogroup"
-                               aria-label="Avaliar Ambiente de 1 a 5">
-                            {% for i in range(1,6) %}
-                              <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} estrela{% if i>1 %}s{% endif %}">
-                                <i class="bi bi-star"></i>
-                              </button>
-                            {% endfor %}
-                          </div>
-                        </div>
+      <!-- ALIASES LEGADOS (mantidos para compatibilidade) -->
+      <input type="hidden" name="av_apresentacao" value="">
+      <input type="hidden" name="av_educacao" value="">
+      <input type="hidden" name="av_eficiencia" value="">
+      <input type="hidden" name="av_pontualidade" value="">
 
-                        <div class="mb-1">
-                          <div class="small fw-semibold text-muted">Tratamento</div>
-                          <div class="rating-stars selectable stars-group" data-field="av_educacao" role="radiogroup"
-                               aria-label="Avaliar Tratamento de 1 a 5">
-                            {% for i in range(1,6) %}
-                              <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} estrela{% if i>1 %}s{% endif %}">
-                                <i class="bi bi-star"></i>
-                              </button>
-                            {% endfor %}
-                          </div>
-                        </div>
-
-                        <div class="mb-2">
-                          <div class="small fw-semibold text-muted">Suporte</div>
-                          <div class="rating-stars selectable stars-group" data-field="av_eficiencia" role="radiogroup"
-                               aria-label="Avaliar Suporte de 1 a 5">
-                            {% for i in range(1,6) %}
-                              <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} estrela{% if i>1 %}s{% endif %}">
-                                <i class="bi bi-star"></i>
-                              </button>
-                            {% endfor %}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div class="mb-2">
-                        <textarea name="av_comentario" class="form-control form-control-sm" rows="2"
-                                  placeholder="Comentário (opcional)"></textarea>
-                      </div>
-
-                      <div class="d-flex align-items-center gap-2">
-                        <button type="submit" class="btn btn-xs btn-outline-primary" disabled>Enviar</button>
-                        <small class="text-muted">Você só pode avaliar uma vez.</small>
-                      </div>
-                    </form>
-                  {% endif %}
-                </div>
-                <!-- /AVALIAÇÃO -->
-              </div>
-              <div class="text-end">
-                <div class="value mono">R$ {{ "%.2f"|format(lanc.valor) }}</div>
-                <small class="muted">INSS (4,5%): R$ {{ "%.2f"|format((lanc.valor or 0)*0.045) }}</small>
-              </div>
-            </div>
+      <div class="rating-grid">
+        <div class="mb-1">
+          <div class="small fw-semibold text-muted">Geral</div>
+          <div class="rating-stars stars-group" data-field="av_geral" data-readonly="true" aria-label="Média Geral">
+            {% for i in range(1,6) %}
+              <button type="button" class="star-btn" data-value="{{ i }}" disabled aria-hidden="true">
+                <i class="bi bi-star"></i>
+              </button>
+            {% endfor %}
           </div>
-          {% else %}
-          <div class="card p-3 text-center muted">Nenhuma produção neste período.</div>
-          {% endfor %}
+        </div>
+
+        <div class="mb-1">
+          <div class="small fw-semibold text-muted">Ambiente</div>
+          <div class="rating-stars selectable stars-group" data-field="av_ambiente" role="radiogroup"
+               aria-label="Avaliar Ambiente de 1 a 5">
+            {% for i in range(1,6) %}
+              <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} estrela{% if i>1 %}s{% endif %}">
+                <i class="bi bi-star"></i>
+              </button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="mb-1">
+          <div class="small fw-semibold text-muted">Tratamento</div>
+          <div class="rating-stars selectable stars-group" data-field="av_tratamento" role="radiogroup"
+               aria-label="Avaliar Tratamento de 1 a 5">
+            {% for i in range(1,6) %}
+              <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} estrela{% if i>1 %}s{% endif %}">
+                <i class="bi bi-star"></i>
+              </button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="mb-2">
+          <div class="small fw-semibold text-muted">Suporte</div>
+          <div class="rating-stars selectable stars-group" data-field="av_suporte" role="radiogroup"
+               aria-label="Avaliar Suporte de 1 a 5">
+            {% for i in range(1,6) %}
+              <button type="button" class="star-btn" data-value="{{ i }}" aria-label="{{ i }} estrela{% if i>1 %}s{% endif %}">
+                <i class="bi bi-star"></i>
+              </button>
+            {% endfor %}
+          </div>
         </div>
       </div>
 
-      <!-- AJUSTES -->
-      <div class="tab-pane fade" id="ajustes" role="tabpanel">
-        <div class="card p-3 mb-2">
-          <div class="d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">Créditos da Cooperativa</h6>
-            <span class="chip mono">Total: R$ {{ "%.2f"|format((receitas_coop|sum(attribute='valor'))|default(0)) }}</span>
-          </div>
-        </div>
-        <div class="card-list mb-3">
-          {% for rc in receitas_coop %}
-          <div class="card p-3">
-            <div class="d-flex justify-content-between">
-              <div>
-                <div class="list-item-title"><i class="bi bi-plus-circle"></i> {{ rc.descricao }}</div>
-                {% if rc.data %}<small class="muted"><i class="bi bi-calendar-event"></i> {{ rc.data.strftime('%d/%m/%Y') }}</small>{% endif %}
-              </div>
-              <div class="text-end value mono text-success">+ R$ {{ "%.2f"|format(rc.valor) }}</div>
-            </div>
-          </div>
-          {% else %}
-          <div class="card p-3 text-center muted">Nenhum crédito lançado para você.</div>
-          {% endfor %}
-        </div>
-
-        <div class="card p-3 mb-2">
-          <div class="d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">Descontos / Despesas da Cooperativa</h6>
-            <span class="chip mono">Total: R$ {{ "%.2f"|format((despesas_coop|sum(attribute='valor'))|default(0)) }}</span>
-          </div>
-        </div>
-        <div class="card-list">
-          {% for d in despesas_coop %}
-          <div class="card p-3">
-            <div class="d-flex justify-content-between">
-              <div>
-                <div class="list-item-title"><i class="bi bi-dash-circle"></i> {{ d.descricao }}</div>
-                {% if d.data %}<small class="muted"><i class="bi bi-calendar-event"></i> {{ d.data.strftime('%d/%m/%Y') }}</small>{% endif %}
-              </div>
-              <div class="text-end value mono text-danger">− R$ {{ "%.2f"|format(d.valor) }}</div>
-            </div>
-          </div>
-          {% else %}
-          <div class="card p-3 text-center muted">Nenhum desconto aplicado no período.</div>
-          {% endfor %}
-        </div>
+      <div class="mb-2">
+        <textarea name="av_comentario" class="form-control form-control-sm" rows="2"
+                  placeholder="Comentário (opcional)"></textarea>
       </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <button type="submit" class="btn btn-xs btn-outline-primary" disabled>Enviar</button>
+        <small class="text-muted">Você só pode avaliar uma vez.</small>
+      </div>
+    </form>
+  {% endif %}
+</div>
 
       <!-- ESCALAS -->
       <div class="tab-pane fade" id="escalas" role="tabpanel">
