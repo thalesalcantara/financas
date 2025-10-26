@@ -1718,7 +1718,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   })();
 </script>
 
-     <!-- FOLHA DE PAGAMENTO • Modelo Contracheque (drop-in) -->
+    <!-- FOLHA DE PAGAMENTO • Modelo Contracheque (drop-in) -->
 {% set folha_list = folha_por_coop if folha_por_coop is defined else [] %}
 <section class="tab-pane fade {{ 'show active' if _tab=='folha' else '' }}" id="folha" role="tabpanel">
 
@@ -1765,26 +1765,30 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 
   {% for f in folha_list %}
-    {# Cálculos do contracheque (detalhados a partir dos itens) #}
-    {% set lanc_bruto = (f.lancamentos|selectattr('valor')|sum(attribute='valor')) if f.lancamentos else 0 %}
-    {% set lanc_inss  = (
-         f.lancamentos
-         |selectattr('conta_inss','equalto',True)
-         |sum(attribute='inss')
-       ) if f.lancamentos is defined else (
-         (f.lancamentos|sum(attribute='inss')) if f.lancamentos else 0
-       ) %}
-    {% set receitas_total = (f.receitas|sum(attribute='valor')) if f.receitas else 0 %}
-    {% set despesas_norm = (f.despesas
-         |selectattr('adiantamento','equalto',False)
-         |sum(attribute='valor')) if f.despesas else 0 %}
-    {% set adiant_total  = (f.despesas
-         |selectattr('adiantamento','equalto',True)
-         |sum(attribute='valor')) if f.despesas else 0 %}
+    {# Safeguards: sempre transforme coleções em lista #}
+    {% set _lancs    = (f.lancamentos | default([]) | list) %}
+    {% set _receitas = (f.receitas    | default([]) | list) %}
+    {% set _despesas = (f.despesas    | default([]) | list) %}
 
-    {% set proventos_total  = lanc_bruto + receitas_total %}
-    {% set descontos_total  = lanc_inss + despesas_norm %}
-    {% set liquido_calc     = proventos_total - descontos_total - adiant_total %}
+    {% set _desp_adiant = (_despesas | selectattr('adiantamento','equalto',True)  | list) %}
+    {% set _desp_norm   = (_despesas | selectattr('adiantamento','equalto',False) | list) %}
+
+    {# Proventos e descontos #}
+    {% set lanc_bruto = (_lancs | sum(attribute='valor')) %}
+    {% set receitas_total = (_receitas | sum(attribute='valor')) %}
+    {# INSS: conta somente quando conta_inss é True; se atributo não existir, assume True #}
+    {% set _lancs_inss_conta = (_lancs | selectattr('conta_inss','equalto',True) | list) %}
+    {% if _lancs_inss_conta|length == 0 %}
+      {% set lanc_inss = (_lancs | sum(attribute='inss')) %}
+    {% else %}
+      {% set lanc_inss = (_lancs_inss_conta | sum(attribute='inss')) %}
+    {% endif %}
+    {% set despesas_norm = (_desp_norm | sum(attribute='valor')) %}
+    {% set adiant_total  = (_desp_adiant | sum(attribute='valor')) %}
+
+    {% set proventos_total = lanc_bruto + receitas_total %}
+    {% set descontos_total = lanc_inss + despesas_norm %}
+    {% set liquido_calc    = proventos_total - descontos_total - adiant_total %}
 
     <div class="card border-0 shadow-sm rounded-3 mb-3 contracheque">
       <div class="card-body p-3 p-md-4">
@@ -1834,21 +1838,21 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                     </tr>
                   </thead>
                   <tbody>
-                    {% for l in f.lancamentos %}
+                    {% for l in _lancs %}
                       <tr>
-                        <td>{{ l.data.strftime('%d/%m/%Y') }}</td>
+                        <td>{{ l.data.strftime('%d/%m/%Y') if l.data else '-' }}</td>
                         <td class="text-break">{{ l.descricao or ('Serviço - ' ~ (l.restaurante.nome if l.restaurante else '')) }}</td>
                         <td class="text-end">R$ {{ '%.2f'|format(l.valor) }}</td>
                       </tr>
                     {% endfor %}
-                    {% for r in f.receitas %}
+                    {% for r in _receitas %}
                       <tr>
-                        <td>{{ r.data.strftime('%d/%m/%Y') }}</td>
+                        <td>{{ r.data.strftime('%d/%m/%Y') if r.data else '-' }}</td>
                         <td class="text-break">{{ r.descricao }}</td>
                         <td class="text-end">R$ {{ '%.2f'|format(r.valor) }}</td>
                       </tr>
                     {% endfor %}
-                    {% if (not f.lancamentos) and (not f.receitas) %}
+                    {% if (_lancs|length == 0) and (_receitas|length == 0) %}
                       <tr><td colspan="3" class="text-center text-muted">Sem proventos</td></tr>
                     {% endif %}
                   </tbody>
@@ -1878,20 +1882,20 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                   </thead>
                   <tbody>
                     {# INSS #}
-                    {% for l in f.lancamentos %}
+                    {% for l in _lancs %}
                       {% set conta = (l.conta_inss if l.conta_inss is defined else True) %}
                       {% if l.inss and conta %}
                         <tr>
-                          <td>{{ l.data.strftime('%d/%m/%Y') }}</td>
+                          <td>{{ l.data.strftime('%d/%m/%Y') if l.data else '-' }}</td>
                           <td class="text-break">INSS sobre "{{ l.descricao or 'Serviço' }}"</td>
                           <td class="text-end">R$ {{ '%.2f'|format(l.inss) }}</td>
                         </tr>
                       {% endif %}
                     {% endfor %}
                     {# Outras despesas que NÃO são adiantamento #}
-                    {% for d in f.despesas if (d.adiantamento is not defined or not d.adiantamento) %}
+                    {% for d in _desp_norm %}
                       <tr>
-                        <td>{{ d.data.strftime('%d/%m/%Y') }}</td>
+                        <td>{{ d.data.strftime('%d/%m/%Y') if d.data else '-' }}</td>
                         <td class="text-break">{{ d.descricao }}</td>
                         <td class="text-end">R$ {{ '%.2f'|format(d.valor) }}</td>
                       </tr>
@@ -1911,7 +1915,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
             </div>
           </div>
 
-          <!-- ADIANTAMENTOS (destacado, fora dos descontos) -->
+          <!-- ADIANTAMENTOS (em seção própria) -->
           <div class="col-12">
             <div class="cc-box">
               <div class="cc-box-head bg-secondary-subtle text-secondary border">ADIANTAMENTOS</div>
@@ -1925,9 +1929,9 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                     </tr>
                   </thead>
                   <tbody>
-                    {% for d in f.despesas if d.adiantamento is defined and d.adiantamento %}
+                    {% for d in _desp_adiant %}
                       <tr>
-                        <td>{{ d.data.strftime('%d/%m/%Y') }}</td>
+                        <td>{{ d.data.strftime('%d/%m/%Y') if d.data else '-' }}</td>
                         <td class="text-break">{{ d.descricao }} <span class="badge bg-secondary ms-1">Adiantamento</span></td>
                         <td class="text-end">R$ {{ '%.2f'|format(d.valor) }}</td>
                       </tr>
@@ -1979,7 +1983,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
 
 <style>
   /* Aparência de contracheque */
-  .contracheque .cc-box { border:1px solid var(--bs-border-color); border-radius: .75rem; overflow: hidden; }
+  .contracheque .cc-box { border:1px solid var(--bs-border-color); border-radius:.75rem; overflow:hidden; }
   .contracheque .cc-box-head { padding:.5rem .75rem; font-weight:600; border-bottom:1px solid var(--bs-border-color); }
   @media print {
     body { background:#fff !important; }
