@@ -234,38 +234,72 @@ class Lancamento(db.Model):
     # opcional: quantidade de entregas
     qtd_entregas = db.Column(db.Integer)
 
-# === AVALIAÇÕES DE COOPERADO (NOVO) =========================================
-class AvaliacaoCooperado(db.Model):
-    __tablename__ = "avaliacoes"
+# === AVALIAÇÕES: Cooperado -> Restaurante ==============================
+class AvaliacaoRestaurante(db.Model):
+    __tablename__ = "avaliacoes_restaurante"
+
     id = db.Column(db.Integer, primary_key=True)
 
-    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False)
-    cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),  nullable=False)
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False, index=True)
+    cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),  nullable=False, index=True)
 
-    # 🔴 IMPORTANTE: CASCADE na FK para o lançamento
+    # Lançamento associado (produções) com CASCADE
     lancamento_id  = db.Column(
         db.Integer,
         db.ForeignKey("lancamentos.id", ondelete="CASCADE"),
-        nullable=True  # deixe True para permitir trocar para SET NULL futuramente, se quiser
+        nullable=True,
+        index=True
     )
 
-    # notas 1..5
-    estrelas_geral         = db.Column(db.Integer)
+    # Notas 1..5 (o que o COOPERADO avalia no RESTAURANTE)
+    estrelas_geral       = db.Column(db.Float)     # 1 casa decimal (ex.: 4.3)
+    estrelas_tratamento  = db.Column(db.Integer)
+    estrelas_ambiente    = db.Column(db.Integer)
+    estrelas_suporte     = db.Column(db.Integer)
+
+    comentario           = db.Column(db.Text)
+
+    # IA/heurísticas opcionais
+    media_ponderada      = db.Column(db.Float)
+    sentimento           = db.Column(db.String(12))     # positivo | neutro | negativo
+    temas                = db.Column(db.String(255))
+    alerta_crise         = db.Column(db.Boolean, default=False)
+
+    criado_em            = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+
+# === AVALIAÇÕES: Restaurante -> Cooperado ==============================
+class AvaliacaoCooperado(db.Model):
+    __tablename__ = "avaliacoes_cooperado"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False, index=True)
+    cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),  nullable=False, index=True)
+
+    lancamento_id  = db.Column(
+        db.Integer,
+        db.ForeignKey("lancamentos.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True
+    )
+
+    # Notas 1..5 (o que o RESTAURANTE avalia no COOPERADO)
+    estrelas_geral         = db.Column(db.Float)     # 1 casa decimal
     estrelas_pontualidade  = db.Column(db.Integer)
     estrelas_educacao      = db.Column(db.Integer)
     estrelas_eficiencia    = db.Column(db.Integer)
-    estrelas_apresentacao  = db.Column(db.Integer)  # "Bem apresentado"
+    estrelas_apresentacao  = db.Column(db.Integer)
 
     comentario       = db.Column(db.Text)
 
-    # IA/heurísticas
     media_ponderada  = db.Column(db.Float)
-    sentimento       = db.Column(db.String(12))     # positivo | neutro | negativo
-    temas            = db.Column(db.String(255))    # palavras-chave resumidas
+    sentimento       = db.Column(db.String(12))
+    temas            = db.Column(db.String(255))
     alerta_crise     = db.Column(db.Boolean, default=False)
     feedback_motoboy = db.Column(db.Text)
 
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    criado_em        = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
 
 class ReceitaCooperativa(db.Model):
