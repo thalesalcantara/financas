@@ -407,60 +407,78 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </section>
 
-{# ===================== CONTEÚDO DA ABA "Avaliações" ===================== #}
-<section id="avaliacoes" class="tab-pane fade {{ 'show active' if _tab=='avaliacoes' else '' }}" role="tabpanel">
+{# ===================== ABA "Avaliações" — ENXUTA (royal & white) ===================== #}
+{% set _tab = 'avaliacoes' %}
+{% set tipo = tipo or 'restaurante' %}
 
+<section id="avaliacoes" class="tab-pane fade show active" role="tabpanel" aria-labelledby="tab-avaliacoes">
   {% set page_title = "Avaliações" %}
-  <div class="container py-3">
 
-    <!-- Título + Toggle de Tipo -->
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-      <h4 class="m-0 d-flex align-items-center gap-2">
-        <i class="bi bi-stars"></i> Avaliações
-        <small class="text-muted">| {{ 'Cooperado → Restaurante' if tipo=='restaurante' else 'Restaurante → Cooperado' }}</small>
-      </h4>
+  <style>
+    :root{
+      --royal:#1f3bb3; --royal-600:#1a3196;
+      --ink:#0f172a; --muted:#6b7280; --line:#e5e7eb;
+      --bg:#ffffff; --bg-soft:#f8fafc; --r:10px;
+    }
 
-      <div class="btn-group" role="group" aria-label="Tipo de avaliação">
-        <a class="btn btn-sm {{ 'btn-primary' if tipo=='restaurante' else 'btn-outline-primary' }}"
-           href="{{ url_for('admin_avaliacoes',
-                            tipo='restaurante',
-                            restaurante_id=_flt.restaurante_id,
-                            cooperado_id=_flt.cooperado_id,
-                            data_inicio=_flt.data_inicio,
-                            data_fim=_flt.data_fim) }}">
-          Cooperado → Restaurante
-        </a>
-        <a class="btn btn-sm {{ 'btn-primary' if tipo=='cooperado' else 'btn-outline-primary' }}"
-           href="{{ url_for('admin_avaliacoes',
-                            tipo='cooperado',
-                            restaurante_id=_flt.restaurante_id,
-                            cooperado_id=_flt.cooperado_id,
-                            data_inicio=_flt.data_inicio,
-                            data_fim=_flt.data_fim) }}">
-          Restaurante → Cooperado
-        </a>
+    .section-head{background:var(--bg); border:1px solid var(--line); border-radius:var(--r); padding:.75rem 1rem}
+    .section-head h4{margin:0; color:var(--ink); font-weight:700; font-size:1.05rem}
+    .scope{color:var(--muted); font-size:.85rem}
+
+    .btn-royal{background:var(--royal); color:#fff; border:1px solid var(--royal); padding:.3rem .55rem}
+    .btn-royal:hover{background:var(--royal-600); border-color:var(--royal-600)}
+    .btn-outline-royal{border:1px solid var(--royal); color:var(--royal); padding:.3rem .55rem; background:transparent}
+    .btn-outline-royal:hover{background:var(--royal); color:#fff}
+
+    .kpi{border:1px solid var(--line); border-radius:var(--r); background:var(--bg); padding:.75rem}
+    .kpi .label{color:var(--muted); font-size:.78rem}
+    .kpi .value{color:var(--ink); font-weight:700; font-size:1.05rem}
+
+    .table-wrap{border:1px solid var(--line); border-radius:var(--r); background:var(--bg)}
+    .table thead th{background:var(--bg-soft); color:var(--ink); border-bottom:1px solid var(--line)}
+    .table tbody tr:hover{background:#f9fbff}
+
+    .rank-n{width:28px; text-align:center; font-weight:700}
+    .medal{display:inline-block; min-width:24px; padding:.05rem .45rem; border-radius:999px; color:#fff; font-weight:700; font-size:.78rem}
+    .m1{background:#f59e0b}.m2{background:#9ca3af}.m3{background:#8b5cf6}
+
+    .progress{height:8px; background:#eef2ff; border-radius:999px}
+    .progress-bar{background:var(--royal); border-radius:999px}
+    .compat-badge{min-width:46px; display:inline-block; font-weight:700; font-size:.9rem}
+
+    .text-muted-2{color:var(--muted)}
+    .py-2-5{padding-top:.6rem; padding-bottom:.6rem}
+  </style>
+
+  <div class="container py-2-5">
+    <!-- Cabeçalho -->
+    <div class="section-head mb-2">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h4 class="d-flex align-items-center gap-2">
+          <i class="bi bi-stars"></i> Avaliações
+          <span class="scope">{{ 'Cooperado → Restaurante' if tipo=='restaurante' else 'Restaurante → Cooperado' }}</span>
+        </h4>
+        <div class="btn-group" role="group" aria-label="Tipo de avaliação">
+          <a class="btn btn-sm {{ 'btn-royal' if tipo=='restaurante' else 'btn-outline-royal' }}"
+             href="{{ url_for('admin_avaliacoes', tipo='restaurante', restaurante_id=_flt.restaurante_id, cooperado_id=_flt.cooperado_id, data_inicio=_flt.data_inicio, data_fim=_flt.data_fim) }}">Cooperado → Restaurante</a>
+          <a class="btn btn-sm {{ 'btn-royal' if tipo=='cooperado' else 'btn-outline-royal' }}"
+             href="{{ url_for('admin_avaliacoes', tipo='cooperado', restaurante_id=_flt.restaurante_id, cooperado_id=_flt.cooperado_id, data_inicio=_flt.data_inicio, data_fim=_flt.data_fim) }}">Restaurante → Cooperado</a>
+        </div>
       </div>
     </div>
 
-    <!-- Barra de ações -->
-    <div class="d-flex flex-wrap gap-2 mb-3">
-      <a class="btn btn-outline-secondary btn-sm"
-         href="{{ url_for('admin_export_avaliacoes_csv',
-                          tipo=tipo,
-                          restaurante_id=_flt.restaurante_id,
-                          cooperado_id=_flt.cooperado_id,
-                          data_inicio=_flt.data_inicio,
-                          data_fim=_flt.data_fim) }}">
+    <!-- Ações + Filtros -->
+    <div class="d-flex flex-wrap gap-2 mb-2">
+      <a class="btn btn-outline-royal btn-sm"
+         href="{{ url_for('admin_export_avaliacoes_csv', tipo=tipo, restaurante_id=_flt.restaurante_id, cooperado_id=_flt.cooperado_id, data_inicio=_flt.data_inicio, data_fim=_flt.data_fim) }}">
         <i class="bi bi-download"></i> Exportar CSV
       </a>
     </div>
 
-    <!-- Filtros -->
-    <div class="card border-0 shadow-sm rounded-3 mb-3">
-      <div class="card-body">
+    <div class="table-wrap mb-2">
+      <div class="card-body p-2">
         <form method="GET" action="{{ url_for('admin_avaliacoes') }}" class="row g-2 align-items-end">
           <input type="hidden" name="tipo" value="{{ tipo }}">
-
           <div class="col-md-4">
             <label class="form-label">Restaurante</label>
             <select class="form-select form-select-sm" name="restaurante_id">
@@ -470,7 +488,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
               {% endfor %}
             </select>
           </div>
-
           <div class="col-md-4">
             <label class="form-label">Cooperado</label>
             <select class="form-select form-select-sm" name="cooperado_id">
@@ -480,7 +497,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
               {% endfor %}
             </select>
           </div>
-
           <div class="col-md-2">
             <label class="form-label">De</label>
             <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ _flt.data_inicio }}">
@@ -489,200 +505,153 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
             <label class="form-label">Até</label>
             <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ _flt.data_fim }}">
           </div>
-
           <div class="col-12 d-flex gap-2">
             <button class="btn btn-royal btn-sm"><i class="bi bi-funnel"></i> Filtrar</button>
             <button type="button" id="btnMesAtual" class="btn btn-light btn-sm">Este mês (1–último)</button>
-            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_avaliacoes', tipo=tipo) }}">Limpar</a>
+            <a class="btn btn-outline-royal btn-sm" href="{{ url_for('admin_avaliacoes', tipo=tipo) }}">Limpar</a>
           </div>
         </form>
       </div>
     </div>
 
     <!-- KPIs -->
-    <div class="row g-2 mb-3">
-      <div class="col-6 col-lg-2">
-        <div class="card p-3 text-center h-100">
-          <div class="small text-muted">Avaliações</div>
-          <div class="fs-5 fw-bold">{{ kpis.qtd|default(0) }}</div>
-        </div>
-      </div>
-      <div class="col-6 col-lg-2">
-        <div class="card p-3 text-center h-100">
-          <div class="small text-muted">Média Geral</div>
-          <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.geral|default(0)) }}</div>
-        </div>
-      </div>
-
+    <div class="row g-2 mb-2">
+      <div class="col-6 col-lg-2"><div class="kpi h-100"><div class="label">Avaliações</div><div class="value">{{ kpis.qtd|default(0) }}</div></div></div>
+      <div class="col-6 col-lg-2"><div class="kpi h-100"><div class="label">Média Geral</div><div class="value">{{ '%.2f'|format(kpis.geral|default(0)) }}</div></div></div>
       {% if tipo=='restaurante' %}
-        <div class="col-6 col-lg-2">
-          <div class="card p-3 text-center h-100">
-            <div class="small text-muted">Tratamento</div>
-            <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.trat|default(0)) }}</div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-2">
-          <div class="card p-3 text-center h-100">
-            <div class="small text-muted">Ambiente</div>
-            <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.amb|default(0)) }}</div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-2">
-          <div class="card p-3 text-center h-100">
-            <div class="small text-muted">Suporte</div>
-            <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.sup|default(0)) }}</div>
-          </div>
-        </div>
+        <div class="col-6 col-lg-2"><div class="kpi h-100"><div class="label">Tratamento</div><div class="value">{{ '%.2f'|format(kpis.trat|default(0)) }}</div></div></div>
+        <div class="col-6 col-lg-2"><div class="kpi h-100"><div class="label">Ambiente</div><div class="value">{{ '%.2f'|format(kpis.amb|default(0)) }}</div></div></div>
+        <div class="col-6 col-lg-2"><div class="kpi h-100"><div class="label">Suporte</div><div class="value">{{ '%.2f'|format(kpis.sup|default(0)) }}</div></div></div>
       {% else %}
-        <div class="col-6 col-lg-2">
-          <div class="card p-3 text-center h-100">
-            <div class="small text-muted">Pontualidade</div>
-            <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.pont|default(0)) }}</div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-2">
-          <div class="card p-3 text-center h-100">
-            <div class="small text-muted">Educação</div>
-            <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.educ|default(0)) }}</div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-2">
-          <div class="card p-3 text-center h-100">
-            <div class="small text-muted">Eficiência</div>
-            <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.efic|default(0)) }}</div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-2">
-          <div class="card p-3 text-center h-100">
-            <div class="small text-muted">Apresentação</div>
-            <div class="fs-5 fw-bold">{{ '%.2f'|format(kpis.apres|default(0)) }}</div>
-          </div>
-        </div>
+        <div class="col-6 col-lg-2"><div class="kpi h-100"><div class="label">Pontualidade</div><div class="value">{{ '%.2f'|format(kpis.pont|default(0)) }}</div></div></div>
+        <div class="col-6 col-lg-2"><div class="kpi h-100"><div class="label">Educação</div><div class="value">{{ '%.2f'|format(kpis.educ|default(0)) }}</div></div></div>
+        <div class="col-6 col-lg-2"><div class="kpi h-100"><div class="label">Eficiência</div><div class="value">{{ '%.2f'|format(kpis.efic|default(0)) }}</div></div></div>
+        <div class="col-6 col-lg-2"><div class="kpi h-100"><div class="label">Apresentação</div><div class="value">{{ '%.2f'|format(kpis.apres|default(0)) }}</div></div></div>
       {% endif %}
     </div>
 
     <!-- Ranking + Gráfico -->
-    <div class="card border-0 shadow-sm rounded-3 mb-3">
-      <div class="card-body">
+    <div class="table-wrap mb-2">
+      <div class="card-body p-2">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <h6 class="m-0">
-            <i class="bi bi-trophy"></i>
-            Ranking por {{ 'restaurante' if tipo=='restaurante' else 'cooperado' }} (mín. 3 avaliações)
-          </h6>
+          <h6 class="m-0 d-flex align-items-center gap-2"><i class="bi bi-trophy"></i> Ranking por {{ 'restaurante' if tipo=='restaurante' else 'cooperado' }} (mín. 3 avaliações)</h6>
         </div>
+
+        {% set rank_ok = (ranking | selectattr('qtd', 'ge', 3) | list) %}
+        {% set rank_low = (ranking | selectattr('qtd', 'lt', 3) | list) %}
 
         <div class="table-responsive">
           <table class="table table-sm table-bordered table-hover align-middle">
             <thead class="table-light">
               <tr class="text-nowrap">
+                <th class="text-center" style="width:36px">#</th>
                 {% if tipo=='restaurante' %}
                   <th>Restaurante</th>
-                  <th class="text-center">Avaliações</th>
-                  <th class="text-center">Média Geral</th>
-                  <th class="text-center">Trat.</th>
-                  <th class="text-center">Amb.</th>
-                  <th class="text-center">Sup.</th>
                 {% else %}
                   <th>Cooperado</th>
-                  <th class="text-center">Avaliações</th>
-                  <th class="text-center">Média Geral</th>
-                  <th class="text-center">Pont.</th>
-                  <th class="text-center">Educ.</th>
-                  <th class="text-center">Efic.</th>
-                  <th class="text-center">Apres.</th>
+                {% endif %}
+                <th class="text-center">Avaliações</th>
+                <th class="text-center">Média Geral</th>
+                {% if tipo=='restaurante' %}
+                  <th class="text-center">Trat.</th><th class="text-center">Amb.</th><th class="text-center">Sup.</th>
+                {% else %}
+                  <th class="text-center">Pont.</th><th class="text-center">Educ.</th><th class="text-center">Efic.</th><th class="text-center">Apres.</th>
                 {% endif %}
               </tr>
             </thead>
             <tbody>
-              {% if tipo=='restaurante' %}
-                {% for r in ranking if r.qtd >= 3 %}
+              {% if rank_ok|length %}
+                {% for r in rank_ok|sort(attribute='m_geral', reverse=True) %}
                   <tr>
-                    <td>{{ r.rest_nome }}</td>
+                    <td class="rank-n">
+                      {% if loop.index==1 %}<span class="medal m1">1</span>
+                      {% elif loop.index==2 %}<span class="medal m2">2</span>
+                      {% elif loop.index==3 %}<span class="medal m3">3</span>
+                      {% else %}{{ loop.index }}{% endif %}
+                    </td>
+                    {% if tipo=='restaurante' %}<td>{{ r.rest_nome }}</td>{% else %}<td>{{ r.coop_nome }}</td>{% endif %}
                     <td class="text-center">{{ r.qtd }}</td>
                     <td class="text-center">{{ '%.2f'|format(r.m_geral) }}</td>
+                    {% if tipo=='restaurante' %}
+                      <td class="text-center">{{ '%.2f'|format(r.m_trat) }}</td>
+                      <td class="text-center">{{ '%.2f'|format(r.m_amb) }}</td>
+                      <td class="text-center">{{ '%.2f'|format(r.m_sup) }}</td>
+                    {% else %}
+                      <td class="text-center">{{ '%.2f'|format(r.m_pont) }}</td>
+                      <td class="text-center">{{ '%.2f'|format(r.m_educ) }}</td>
+                      <td class="text-center">{{ '%.2f'|format(r.m_efic) }}</td>
+                      <td class="text-center">{{ '%.2f'|format(r.m_apres) }}</td>
+                    {% endif %}
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr><td colspan="8" class="text-center text-muted-2">Sem dados com ≥ 3 avaliações. Abaixo: amostra pequena.</td></tr>
+              {% endif %}
+
+              {% for r in rank_low|sort(attribute='m_geral', reverse=True) %}
+                <tr class="text-muted">
+                  <td class="rank-n">—</td>
+                  {% if tipo=='restaurante' %}<td>{{ r.rest_nome }}</td>{% else %}<td>{{ r.coop_nome }}</td>{% endif %}
+                  <td class="text-center">{{ r.qtd }}</td>
+                  <td class="text-center">{{ '%.2f'|format(r.m_geral) }}</td>
+                  {% if tipo=='restaurante' %}
                     <td class="text-center">{{ '%.2f'|format(r.m_trat) }}</td>
                     <td class="text-center">{{ '%.2f'|format(r.m_amb) }}</td>
                     <td class="text-center">{{ '%.2f'|format(r.m_sup) }}</td>
-                  </tr>
-                {% else %}
-                  <tr><td colspan="6" class="text-center text-muted">Sem dados suficientes</td></tr>
-                {% endfor %}
-              {% else %}
-                {% for r in ranking if r.qtd >= 3 %}
-                  <tr>
-                    <td>{{ r.coop_nome }}</td>
-                    <td class="text-center">{{ r.qtd }}</td>
-                    <td class="text-center">{{ '%.2f'|format(r.m_geral) }}</td>
+                  {% else %}
                     <td class="text-center">{{ '%.2f'|format(r.m_pont) }}</td>
                     <td class="text-center">{{ '%.2f'|format(r.m_educ) }}</td>
                     <td class="text-center">{{ '%.2f'|format(r.m_efic) }}</td>
                     <td class="text-center">{{ '%.2f'|format(r.m_apres) }}</td>
-                  </tr>
-                {% else %}
-                  <tr><td colspan="7" class="text-center text-muted">Sem dados suficientes</td></tr>
-                {% endfor %}
-              {% endif %}
+                  {% endif %}
+                </tr>
+              {% endfor %}
             </tbody>
           </table>
         </div>
 
-        <div class="mt-3">
-          <canvas id="chartTop"></canvas>
-        </div>
+        <div class="mt-2"><canvas id="chartTop" height="96"></canvas></div>
       </div>
     </div>
 
     <!-- Compatibilidade Cooperado × Restaurante -->
-    <div class="card border-0 shadow-sm rounded-3 mb-3">
-      <div class="card-body">
+    <div class="table-wrap mb-2">
+      <div class="card-body p-2">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-          <h6 class="m-0 d-flex align-items-center gap-2">
-            <i class="bi bi-heart-fill"></i> Compatibilidade Cooperado × Restaurante
-          </h6>
-          <span class="text-muted small">
-            Ordenado por <b>média geral</b> (desempate por nº de avaliações).
-          </span>
+          <h6 class="m-0 d-flex align-items-center gap-2"><i class="bi bi-heart-fill"></i> Compatibilidade Cooperado × Restaurante</h6>
+          <span class="text-muted-2 small">Ordenado por <b>média</b>; desempate por nº de avaliações.</span>
         </div>
-
         <div class="table-responsive">
           <table class="table table-sm table-bordered table-hover align-middle">
             <thead class="table-light">
               <tr class="text-nowrap">
                 <th style="width:260px">Cooperado</th>
                 <th style="width:260px">Restaurante</th>
-                <th class="text-center" style="width:140px">Média ★</th>
-                <th class="text-center" style="width:140px">Avaliações</th>
+                <th class="text-center" style="width:170px">Compatibilidade</th>
+                <th class="text-center" style="width:110px">Amostra</th>
               </tr>
             </thead>
             <tbody>
               {% if compat and compat|length %}
-                {% set shown = 0 %}
-                {% for row in compat if row.count >= 3 %}
-                  {% if shown < 10 %}
-                    <tr>
-                      <td class="text-break">{{ row.coop }}</td>
-                      <td class="text-break">{{ row.rest }}</td>
-                      <td class="text-center fw-bold">{{ '%.2f'|format(row.avg) }}</td>
-                      <td class="text-center">{{ row.count }}</td>
-                    </tr>
-                    {% set shown = shown + 1 %}
-                  {% endif %}
+                {% for row in compat|sort(attribute='avg', reverse=True) %}
+                  {% set pct = ((row.avg or 0)/5.0*100)|round(0,'floor') %}
+                  <tr class="{{ '' if row.count>=3 else 'text-muted' }}">
+                    <td class="text-break">{{ row.coop }}</td>
+                    <td class="text-break">{{ row.rest }}</td>
+                    <td class="text-center">
+                      <div class="d-flex align-items-center gap-2 justify-content-center">
+                        <span class="compat-badge">{{ pct|int }}%</span>
+                        <div class="progress" style="width:100px">
+                          <div class="progress-bar" role="progressbar" style="width: {{ pct }}%" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                      </div>
+                      <div class="small text-muted-2">Média ★ {{ '%.2f'|format(row.avg) }}</div>
+                    </td>
+                    <td class="text-center">{{ row.count }} avaliação{{ '' if row.count==1 else 'es' }}</td>
+                  </tr>
                 {% endfor %}
-                {% if shown < 10 %}
-                  {% for row in compat if row.count < 3 %}
-                    {% if shown < 10 %}
-                      <tr class="text-muted">
-                        <td class="text-break">{{ row.coop }}</td>
-                        <td class="text-break">{{ row.rest }}</td>
-                        <td class="text-center fw-bold">{{ '%.2f'|format(row.avg) }}</td>
-                        <td class="text-center">{{ row.count }}</td>
-                      </tr>
-                      {% set shown = shown + 1 %}
-                    {% endif %}
-                  {% endfor %}
-                {% endif %}
               {% else %}
-                <tr><td colspan="4" class="text-center text-muted">Sem dados suficientes.</td></tr>
+                <tr><td colspan="4" class="text-center text-muted-2">Sem dados suficientes.</td></tr>
               {% endif %}
             </tbody>
           </table>
@@ -691,8 +660,8 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
 
     <!-- Lista detalhada -->
-    <div class="card border-0 shadow-sm rounded-3">
-      <div class="card-body">
+    <div class="table-wrap">
+      <div class="card-body p-2">
         <h6 class="m-0 mb-2"><i class="bi bi-list-stars"></i> Avaliações (detalhe)</h6>
         <div class="table-responsive">
           <table class="table table-sm table-bordered table-hover align-middle">
@@ -721,7 +690,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                   <td class="text-break">{{ a.rest_nome }}</td>
                   <td class="text-break">{{ a.coop_nome }}</td>
                   <td class="text-center">{{ a.geral }}</td>
-
                   {% if tipo=='restaurante' %}
                     <td class="text-center">{{ a.trat }}</td>
                     <td class="text-center">{{ a.amb }}</td>
@@ -732,7 +700,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                     <td class="text-center">{{ a.efic }}</td>
                     <td class="text-center">{{ a.apres }}</td>
                   {% endif %}
-
                   <td class="text-break">{{ a.comentario }}</td>
                   <td class="text-center">{{ a.media if a.media is not none else '' }}</td>
                   <td class="text-center">{{ a.sentimento or '' }}</td>
@@ -740,7 +707,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                   <td class="text-center">{{ 'SIM' if a.alerta else 'NÃO' }}</td>
                 </tr>
               {% else %}
-                <tr><td colspan="{{ 11 if tipo=='restaurante' else 13 }}" class="text-center text-muted">Nenhuma avaliação</td></tr>
+                <tr><td colspan="{{ 12 if tipo=='restaurante' else 13 }}" class="text-center text-muted-2">Nenhuma avaliação</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -748,11 +715,22 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       </div>
     </div>
 
-  </div> <!-- /container -->
+  </div>
 </section>
 
-<!-- Chart.js (fallback via CDN se não estiver na base) -->
 <script>
+  // Força aba Avaliações e tipo=restaurante
+  (function(){
+    if (location.hash !== '#avaliacoes') {
+      history.replaceState(null, '', location.pathname + location.search + '#avaliacoes');
+    }
+    const usp = new URLSearchParams(location.search);
+    if (!usp.get('tipo')) {
+      usp.set('tipo','restaurante');
+      history.replaceState(null, '', location.pathname + '?' + usp.toString() + location.hash);
+    }
+  })();
+
   window.addEventListener('load', function(){
     // Botão "Este mês (1–último)"
     (function(){
@@ -770,30 +748,41 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       });
     })();
 
+    // Chart Top (Top 10) com JSON seguro e fallback
     (function initChart(){
-      const ensureChartJS = () => new Promise((resolve)=>{
+      const ensureChartJS = () => new Promise((resolve, reject)=>{
         if (window.Chart) return resolve();
         const s = document.createElement('script');
-        s.src = "https://cdn.jsdelivr.net/npm/chart.js";
+        s.src = 'https://cdn.jsdelivr.net/npm/chart.js';
         s.onload = () => resolve();
+        s.onerror = () => reject(new Error('Falha ao carregar Chart.js'));
         document.head.appendChild(s);
       });
 
-      const dataTop = {{ chart_top|tojson }};
+      const dataTop = {{ (chart_top or {'labels': [], 'values': []}) | tojson | safe }};
       const el = document.getElementById('chartTop');
       if (!el || !dataTop || !dataTop.labels || !dataTop.labels.length) return;
 
-      ensureChartJS().then(()=>{
-        new Chart(el, {
-          type: 'bar',
-          data: { labels: dataTop.labels, datasets: [{ label: 'Média Geral', data: dataTop.values }] },
-          options: {
-            responsive: true,
-            scales: { y: { beginAtZero: true, max: 5 } },
-            plugins: { legend: { display: false } }
-          }
+      try {
+        const combined = dataTop.labels.map((l, i) => ({ label: l, value: (dataTop.values||[])[i]||0 }));
+        combined.sort((a,b)=> b.value - a.value);
+        const top = combined.slice(0, 10);
+        const labels = top.map(x=>x.label);
+        const values = top.map(x=>x.value);
+
+        ensureChartJS().then(()=>{
+          new Chart(el, {
+            type: 'bar',
+            data: { labels, datasets: [{ label: 'Média Geral', data: values }] },
+            options: { responsive: true, scales: { y: { beginAtZero: true, max: 5 } }, plugins: { legend: { display: false } } }
+          });
+        }).catch(()=>{
+          const wrap = document.createElement('div');
+          wrap.className = 'table-responsive';
+          wrap.innerHTML = `<table class="table table-sm table-bordered"><thead><tr><th>Nome</th><th>Média</th></tr></thead><tbody>${top.map(x=>`<tr><td>${x.label}</td><td class='text-center'>${x.value.toFixed(2)}</td></tr>`).join('')}</tbody></table>`;
+          el.replaceWith(wrap);
         });
-      });
+      } catch(e) { console.error(e); }
     })();
   });
 </script>
