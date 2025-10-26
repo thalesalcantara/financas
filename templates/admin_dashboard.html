@@ -279,12 +279,26 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     {% set _producoes = (lancamentos | default([]) | list) %}
   {% endif %}
 
-  {% set receitas      = (receitas      | default([]) | list) %}
-  {% set despesas      = (despesas      | default([]) | list) %}
+  {# Cooperados: receitas/despesas (por pessoa) #}
   {% set receitas_coop = (receitas_coop | default([]) | list) %}
   {% set despesas_coop = (despesas_coop | default([]) | list) %}
 
-  {# ---------- Totais (filtrados por período e, quando aplicável, por coop/rest) ---------- #}
+  {# Cooperativa (geral): tenta várias chaves e faz fallback #}
+  {% set _rec_coop_corp_src =
+       (receita_coop if receita_coop is defined else
+        (receitas_cooperativa if receitas_cooperativa is defined else
+         (receitas_corp if receitas_corp is defined else
+          (receitas if receitas is defined else [])))) %}
+  {% set _desp_coop_corp_src =
+       (despesa_coop if despesa_coop is defined else
+        (despesas_cooperativa if despesas_cooperativa is defined else
+         (despesas_corp if despesas_corp is defined else
+          (despesas if despesas is defined else [])))) %}
+
+  {% set _rec_coop_corp  = (_rec_coop_corp_src  | default([]) | list) %}
+  {% set _desp_coop_corp = (_desp_coop_corp_src | default([]) | list) %}
+
+  {# ---------- Totais (lado servidor, para primeiro paint) ---------- #}
   {# Produções (considera restaurante/cooperado, se informados) #}
   {% set ns_prod = namespace(total=0) %}
   {% for p in _producoes %}
@@ -299,9 +313,9 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   {% set total_producoes_f = ns_prod.total %}
   {% set total_inss_f      = total_producoes_f * 0.045 %}
 
-  {# Receitas/Despesas da COOPERATIVA (somente período) #}
+  {# Coop (geral) #}
   {% set ns_rec_corp = namespace(total=0) %}
-  {% for r in receitas %}
+  {% for r in _rec_coop_corp %}
     {% set d = ymd(r.data or r.data_lancamento) %}
     {% if (not ri or d >= ri) and (not rf or d <= rf) %}
       {% set v = (r.valor if r.valor is not none else r.valor_total) or 0 %}
@@ -311,15 +325,15 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   {% set total_receitas_corp_f = ns_rec_corp.total %}
 
   {% set ns_desp_corp = namespace(total=0) %}
-  {% for d in despesas %}
+  {% for d in _desp_coop_corp %}
     {% set dt = ymd(d.data) %}
     {% if (not ri or dt >= ri) and (not rf or dt <= rf) %}
-      {% set ns_desp_corp.total = ns_desp_corp.total + (d.valor or 0) %}
+      {% set ns_desp_corp.total = ns_desp_corp.total + ((d.valor if d.valor is not none else d.valor_total) or 0) %}
     {% endif %}
   {% endfor %}
   {% set total_despesas_corp_f = ns_desp_corp.total %}
 
-  {# Receitas/Despesas dos COOPERADOS (período + cooperado quando filtrado) #}
+  {# Cooperados (por pessoa) #}
   {% set ns_rec_coop = namespace(total=0) %}
   {% for r in receitas_coop %}
     {% set d = ymd(r.data) %}
@@ -342,10 +356,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   {% endfor %}
   {% set total_despesas_coop_f = ns_desp_coop.total %}
 
-  {# Ajustes pedidos: receitas dos cooperados = Produções + Receitas dos cooperados #}
+  {# Ajuste: Receitas dos cooperados = Produções + Receitas individuais #}
   {% set total_receitas_coop_full_f = (total_producoes_f|default(0)) + (total_receitas_coop_f|default(0)) %}
 
-  {# Resultado coop e total geral corrigido: Coop + (Prod + Rec cooperados) #}
+  {# Resultado coop e Total de Receitas (Geral) #}
   {% set _resultado_corp = (total_receitas_corp_f|default(0)) - (total_despesas_corp_f|default(0)) %}
   {% set _total_receitas_geral = (total_receitas_corp_f|default(0)) + (total_receitas_coop_full_f|default(0)) %}
 
@@ -434,7 +448,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <div class="d-flex align-items-center justify-content-between">
           <div>
             <div class="text-uppercase text-muted small">Receitas Cooperativa</div>
-            <div class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(total_receitas_corp_f) }}</div>
+            <div id="kpiRecCoopCorp" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(total_receitas_corp_f) }}</div>
             <div class="small text-muted">Entradas da coop</div>
           </div>
           <div class="kpi-icon"><i class="bi bi-cash-coin"></i></div>
@@ -447,7 +461,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <div class="d-flex align-items-center justify-content-between">
           <div>
             <div class="text-uppercase text-muted small">Despesas Cooperativa</div>
-            <div class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_despesas_corp_f) }}</div>
+            <div id="kpiDespCoopCorp" class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_despesas_corp_f) }}</div>
             <div class="small text-muted">Saídas da coop</div>
           </div>
           <div class="kpi-icon"><i class="bi bi-cart-dash"></i></div>
@@ -460,7 +474,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <div class="d-flex align-items-center justify-content-between">
           <div>
             <div class="text-uppercase text-muted small">Receitas Cooperados (Prod + Rec)</div>
-            <div class="fw-bold fs-5">R$ {{ '%.2f'|format(total_receitas_coop_full_f) }}</div>
+            <div id="kpiRecCooperadosFull" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(total_receitas_coop_full_f) }}</div>
             <div class="small text-muted">Produções + Receitas</div>
           </div>
           <div class="kpi-icon"><i class="bi bi-currency-exchange"></i></div>
@@ -473,7 +487,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <div class="d-flex align-items-center justify-content-between">
           <div>
             <div class="text-uppercase text-muted small">Despesas Cooperados</div>
-            <div class="fw-bold fs-5">R$ {{ '%.2f'|format(total_despesas_coop_f) }}</div>
+            <div id="kpiDespCooperados" class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_despesas_coop_f) }}</div>
             <div class="small text-muted">Débitos/benefícios</div>
           </div>
           <div class="kpi-icon"><i class="bi bi-bank"></i></div>
@@ -486,8 +500,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <div class="d-flex align-items-center justify-content-between">
           <div>
             <div class="text-uppercase text-muted small">Resultado Cooperativa</div>
-            <div class="fw-bold fs-5 {{ 'text-success' if _resultado_corp >= 0 else 'text-danger' }}">
-              R$ {{ '%.2f'|format(_resultado_corp) }}
+            <div class="fw-bold fs-5">
+              <span id="kpiResultadoCoop" class="{{ 'text-success' if _resultado_corp >= 0 else 'text-danger' }}">
+                R$ {{ '%.2f'|format(_resultado_corp) }}
+              </span>
             </div>
             <div class="small text-muted">Receitas − Despesas (coop)</div>
           </div>
@@ -501,7 +517,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <div class="d-flex align-items-center justify-content-between">
           <div>
             <div class="text-uppercase text-muted small">Total de Receitas (Geral)</div>
-            <div class="fw-bold fs-5">R$ {{ '%.2f'|format(_total_receitas_geral) }}</div>
+            <div id="kpiTotalReceitasGeral" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(_total_receitas_geral) }}</div>
             <div class="small text-muted">Coop + (Prod + Rec Cooperados)</div>
           </div>
           <div class="kpi-icon"><i class="bi bi-cash-stack"></i></div>
@@ -517,7 +533,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <h6 class="m-0 d-flex align-items-center gap-2">
           <i class="bi bi-people"></i> Resumo por Cooperado (filtro aplicado)
         </h6>
-        <small class="text-muted">Líquido = Produções + Receitas − INSS − Despesas − Adiant.</small>
+        <small class="text-muted">Líquido = Produções + <span class="text-success">Receitas</span> − INSS − <span class="text-danger">Despesas</span> − <span class="text-primary">Adiant.</span></small>
       </div>
       <div class="table-responsive">
         <table id="tblResumoCoop" class="table table-sm table-bordered table-hover align-middle">
@@ -540,10 +556,10 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
               <td>Total</td>
               <td class="text-end" id="tProd">R$ 0,00</td>
               <td class="text-end" id="tINSS">R$ 0,00</td>
-              <td class="text-end" id="tRec">R$ 0,00</td>
-              <td class="text-end" id="tDes">R$ 0,00</td>
-              <td class="text-end" id="tAd">R$ 0,00</td>
-              <td class="text-end" id="tLiq">R$ 0,00</td>
+              <td class="text-end text-success" id="tRec">R$ 0,00</td>
+              <td class="text-end text-danger" id="tDes">R$ 0,00</td>
+              <td class="text-end text-primary" id="tAd">R$ 0,00</td>
+              <td class="text-end fw-bold" id="tLiq">R$ 0,00</td>
             </tr>
           </tfoot>
         </table>
@@ -593,7 +609,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   <!-- Dados (seguros p/ JS) + Scripts (Chart.js + XLSX) -->
   <script>
   (function(){
-    // ---- Filtros atuais (para o JS aplicar nos cálculos e na exportação) ----
+    // ---- Filtros atuais ----
     const FILTER = {
       ri: "{{ ri }}",
       rf: "{{ rf }}",
@@ -601,7 +617,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       cid: {{ cid if cid is not none else 'null' }}
     };
 
-    // ---- Bases compactas (serializadas manualmente) ----
+    // ---- Bases compactas ----
     const PRODUCOES = [
       {% for l in _producoes %}
         {
@@ -644,7 +660,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     ];
 
     const REC_COOP_CORP = [
-      {% for r in receitas %}
+      {% for r in _rec_coop_corp %}
         {
           id: {{ r.id }},
           data: "{{ ymd(r.data or r.data_lancamento) }}",
@@ -655,11 +671,11 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     ];
 
     const DESP_COOP_CORP = [
-      {% for d in despesas %}
+      {% for d in _desp_coop_corp %}
         {
           id: {{ d.id }},
           data: "{{ ymd(d.data) }}",
-          valor: {{ (d.valor or 0)|float }},
+          valor: {{ ((d.valor if d.valor is not none else d.valor_total) or 0)|float }},
           descricao: "{{ (d.descricao or '')|e }}"
         }{{ "," if not loop.last }}
       {% endfor %}
@@ -677,7 +693,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     ];
 
     const AVALS = [
-      {% for a in avaliacoes or [] %}
+      {% for a in (avaliacoes or []) %}
         { data: "{{ a.criado_em.strftime('%Y-%m-%d') if a.criado_em else '' }}", geral: {{ (a.geral or 0)|float }} }{{ "," if not loop.last }}
       {% endfor %}
     ];
@@ -699,6 +715,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     };
     const sumBy = (arr, fn) => arr.reduce((acc,cur)=>acc+(+fn(cur)||0), 0);
 
+    // ---- Filtrados ----
     const filteredPROD = PRODUCOES.filter(p =>
       inRange(p.data) &&
       (FILTER.cid==null || p.cooperado_id===FILTER.cid) &&
@@ -715,12 +732,31 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     const filteredRECc = REC_COOP_CORP.filter(r => inRange(r.data));
     const filteredDESc = DESP_COOP_CORP.filter(d => inRange(d.data));
 
-    // ---- KPIs (recalcular no front para garantir consistência na exportação) ----
+    // ---- KPIs (front) ----
     const kpiProd = sumBy(filteredPROD, x=>x.valor);
     const kpiINSS = kpiProd * 0.045;
-    const kpiRecCoopFull = kpiProd + sumBy(filteredRECp, x=>x.valor); // Prod + Receitas Cooperados
-    document.getElementById('kpiTotalProds').textContent = fmtBR(kpiProd);
-    document.getElementById('kpiINSS').textContent       = fmtBR(kpiINSS);
+    const kpiRecCoopCorp = sumBy(filteredRECc, x=>x.valor);
+    const kpiDespCoopCorp = sumBy(filteredDESc, x=>x.valor);
+    const kpiRecCooperadosFull = kpiProd + sumBy(filteredRECp, x=>x.valor);
+    const kpiDespCooperados = sumBy(filteredDESp, x=>x.valor);
+    const kpiResultadoCoop = kpiRecCoopCorp - kpiDespCoopCorp;
+    const kpiTotalReceitasGeral = kpiRecCoopCorp + kpiRecCooperadosFull;
+
+    // aplica
+    document.getElementById('kpiTotalProds').textContent        = fmtBR(kpiProd);
+    document.getElementById('kpiINSS').textContent              = fmtBR(kpiINSS);
+    document.getElementById('kpiRecCoopCorp').textContent       = fmtBR(kpiRecCoopCorp);
+    document.getElementById('kpiDespCoopCorp').textContent      = fmtBR(kpiDespCoopCorp);
+    document.getElementById('kpiRecCooperadosFull').textContent = fmtBR(kpiRecCooperadosFull);
+    document.getElementById('kpiDespCooperados').textContent    = fmtBR(kpiDespCooperados);
+    document.getElementById('kpiTotalReceitasGeral').textContent= fmtBR(kpiTotalReceitasGeral);
+
+    const resEl = document.getElementById('kpiResultadoCoop');
+    if (resEl){
+      resEl.textContent = fmtBR(kpiResultadoCoop);
+      resEl.classList.remove('text-success','text-danger');
+      resEl.classList.add(kpiResultadoCoop < 0 ? 'text-danger' : 'text-success');
+    }
 
     // ---- Tabela Resumo por Cooperado ----
     (function buildResumoCoop(){
@@ -759,19 +795,29 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           <td class="text-break">${r.nome||'—'}</td>
           <td class="text-end">${fmtBR(r.prod)}</td>
           <td class="text-end">${fmtBR(r.inss)}</td>
-          <td class="text-end">${fmtBR(r.rec)}</td>
-          <td class="text-end">${fmtBR(r.des)}</td>
-          <td class="text-end">${fmtBR(r.ad)}</td>
-          <td class="text-end fw-bold">${fmtBR(liq)}</td>`;
+          <td class="text-end text-success">${fmtBR(r.rec)}</td>
+          <td class="text-end text-danger">${fmtBR(r.des)}</td>
+          <td class="text-end text-primary">${fmtBR(r.ad)}</td>
+          <td class="text-end fw-bold ${liq<0?'text-danger':''}">${fmtBR(liq)}</td>`;
         tbody.appendChild(tr);
       });
 
+      // Totais com cores
       document.getElementById('tProd').textContent = fmtBR(tProd);
       document.getElementById('tINSS').textContent = fmtBR(tINSS);
-      document.getElementById('tRec').textContent  = fmtBR(tRec);
-      document.getElementById('tDes').textContent  = fmtBR(tDes);
-      document.getElementById('tAd').textContent   = fmtBR(tAd);
-      document.getElementById('tLiq').textContent  = fmtBR(tLiq);
+
+      const tRecEl = document.getElementById('tRec');
+      const tDesEl = document.getElementById('tDes');
+      const tAdEl  = document.getElementById('tAd');
+      const tLiqEl = document.getElementById('tLiq');
+
+      tRecEl.textContent = fmtBR(tRec);
+      tDesEl.textContent = fmtBR(tDes);
+      tAdEl.textContent  = fmtBR(tAd);
+
+      tLiqEl.textContent = fmtBR(tLiq);
+      tLiqEl.classList.remove('text-danger','text-success');
+      if (tLiq < 0) tLiqEl.classList.add('text-danger'); // negativo em vermelho
     })();
 
     // ---- Gráficos (Chart.js via CDN) ----
@@ -860,7 +906,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       })();
     });
 
-    // ---- Exportação XLSX (SheetJS via CDN) ----
+    // ---- Exportação XLSX ----
     const ensureXLSX = () => new Promise(res=>{
       if (window.XLSX) return res();
       const s=document.createElement('script');
@@ -892,10 +938,12 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         ['KPIs'],
         ['Total Produções', kpiProd],
         ['INSS (4,5%)',    kpiINSS],
-        ['Receitas Coop (período)',  sumBy(filteredRECc, x=>x.valor)],
-        ['Despesas Coop (período)',  sumBy(filteredDESc, x=>x.valor)],
-        ['Receitas Cooperados (período)', sumBy(filteredRECp, x=>x.valor)],
-        ['Receitas Cooperados (Prod + Rec)', kpiRecCoopFull], // novo total combinado
+        ['Receitas Coop (período)',  kpiRecCoopCorp],
+        ['Despesas Coop (período)',  kpiDespCoopCorp],
+        ['Receitas Cooperados (Prod + Rec)', kpiRecCooperadosFull],
+        ['Despesas Cooperados (período)', kpiDespCooperados],
+        ['Total de Receitas (Geral)', kpiTotalReceitasGeral],
+        ['Resultado Cooperativa', kpiResultadoCoop],
       ];
       aoaToSheet('KPIs', k1, wb);
 
