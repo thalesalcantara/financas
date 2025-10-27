@@ -234,38 +234,52 @@ class Lancamento(db.Model):
     # opcional: quantidade de entregas
     qtd_entregas = db.Column(db.Integer)
 
-# === AVALIAÇÕES: Cooperado -> Restaurante ==============================
-class AvaliacaoRestaurante(db.Model):
-    __tablename__ = "avaliacoes_restaurante"
+# === AVALIAÇÕES: Restaurante -> Cooperado ====================================
+class AvaliacaoCooperado(db.Model):
+    __tablename__  = "avaliacoes"                  # mantém tabela legada do cooperado
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 
     restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False, index=True)
     cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),  nullable=False, index=True)
 
-    # Lançamento associado (produções) com CASCADE
-    lancamento_id  = db.Column(
+    # vínculo opcional ao lançamento (1:1)
+    lancamento_id = db.Column(
         db.Integer,
         db.ForeignKey("lancamentos.id", ondelete="CASCADE"),
+        unique=True,
+        index=True,
         nullable=True,
-        index=True
     )
 
-    # Notas 1..5 (o que o COOPERADO avalia no RESTAURANTE)
-    estrelas_geral       = db.Column(db.Float)     # 1 casa decimal (ex.: 4.3)
+    # ⭐ métricas (1..5) — padronizadas
+    estrelas_geral       = db.Column(db.Integer)
     estrelas_tratamento  = db.Column(db.Integer)
     estrelas_ambiente    = db.Column(db.Integer)
     estrelas_suporte     = db.Column(db.Integer)
 
-    comentario           = db.Column(db.Text)
+    comentario       = db.Column(db.Text)
 
-    # IA/heurísticas opcionais
-    media_ponderada      = db.Column(db.Float)
-    sentimento           = db.Column(db.String(12))     # positivo | neutro | negativo
-    temas                = db.Column(db.String(255))
-    alerta_crise         = db.Column(db.Boolean, default=False)
+    # Sinais/IA
+    media_ponderada  = db.Column(db.Float)
+    sentimento       = db.Column(db.String(12))
+    temas            = db.Column(db.String(255))
+    alerta_crise     = db.Column(db.Boolean, default=False)
+    feedback_motoboy = db.Column(db.Text)
 
-    criado_em            = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    # ---- Aliases usados nos templates/admin ----
+    @property
+    def trat(self): return self.estrelas_tratamento
+    @property
+    def amb(self):  return self.estrelas_ambiente
+    @property
+    def sup(self):  return self.estrelas_suporte
+
+    def __repr__(self):
+        return f"<AvaliacaoCooperado id={self.id} rest={self.restaurante_id} coop={self.cooperado_id} geral={self.estrelas_geral}>"
 
 
 class ReceitaCooperativa(db.Model):
@@ -1381,6 +1395,38 @@ def avisos_list():
         avisos_nao_lidos_count=avisos_nao_lidos_count,
         current_year=current_year
     )
+
+# === AVALIAÇÕES: Cooperado -> Restaurante (NOVO) =============================
+class AvaliacaoRestaurante(db.Model):
+    __tablename__ = "avaliacoes_restaurante"
+    id = db.Column(db.Integer, primary_key=True)
+
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False, index=True)
+    cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),   nullable=False, index=True)
+
+    # 🔴 IMPORTANTE: CASCADE ao apagar o lançamento
+    lancamento_id  = db.Column(
+        db.Integer,
+        db.ForeignKey("lancamentos.id", ondelete="CASCADE"),
+        unique=True,
+        index=True,
+        nullable=True
+    )
+
+    # mesmas métricas 1..5
+    estrelas_geral        = db.Column(db.Integer)
+    estrelas_pontualidade = db.Column(db.Integer)
+    estrelas_educacao     = db.Column(db.Integer)
+    estrelas_eficiencia   = db.Column(db.Integer)
+    estrelas_apresentacao = db.Column(db.Integer)
+
+    comentario      = db.Column(db.Text)
+    media_ponderada = db.Column(db.Float)
+    sentimento      = db.Column(db.String(12))
+    temas           = db.Column(db.String(255))
+    alerta_crise    = db.Column(db.Boolean, default=False)
+
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
 @portal_bp.post("/avisos/<int:aviso_id>/lido", endpoint="marcar_aviso_lido")
 @role_required("cooperado")
