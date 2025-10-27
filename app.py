@@ -1382,38 +1382,6 @@ def avisos_list():
         current_year=current_year
     )
 
-# === AVALIAÇÕES: Cooperado -> Restaurante (NOVO) =============================
-class AvaliacaoRestaurante(db.Model):
-    __tablename__ = "avaliacoes_restaurante"
-    id = db.Column(db.Integer, primary_key=True)
-
-    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False, index=True)
-    cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),   nullable=False, index=True)
-
-    # 🔴 IMPORTANTE: CASCADE ao apagar o lançamento
-    lancamento_id  = db.Column(
-        db.Integer,
-        db.ForeignKey("lancamentos.id", ondelete="CASCADE"),
-        unique=True,
-        index=True,
-        nullable=True
-    )
-
-    # mesmas métricas 1..5
-    estrelas_geral        = db.Column(db.Integer)
-    estrelas_pontualidade = db.Column(db.Integer)
-    estrelas_educacao     = db.Column(db.Integer)
-    estrelas_eficiencia   = db.Column(db.Integer)
-    estrelas_apresentacao = db.Column(db.Integer)
-
-    comentario      = db.Column(db.Text)
-    media_ponderada = db.Column(db.Float)
-    sentimento      = db.Column(db.String(12))
-    temas           = db.Column(db.String(255))
-    alerta_crise    = db.Column(db.Boolean, default=False)
-
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-
 @portal_bp.post("/avisos/<int:aviso_id>/lido", endpoint="marcar_aviso_lido")
 @role_required("cooperado")
 def avisos_marcar_lido(aviso_id: int):
