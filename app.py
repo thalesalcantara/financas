@@ -268,40 +268,6 @@ class AvaliacaoRestaurante(db.Model):
     criado_em            = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
 
-# === AVALIAÇÕES: Restaurante -> Cooperado ==============================
-class AvaliacaoCooperado(db.Model):
-    __tablename__ = "avaliacoes_cooperado"
-
-    id = db.Column(db.Integer, primary_key=True)
-
-    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False, index=True)
-    cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),  nullable=False, index=True)
-
-    lancamento_id  = db.Column(
-        db.Integer,
-        db.ForeignKey("lancamentos.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True
-    )
-
-    # Notas 1..5 (o que o RESTAURANTE avalia no COOPERADO)
-    estrelas_geral         = db.Column(db.Float)     # 1 casa decimal
-    estrelas_pontualidade  = db.Column(db.Integer)
-    estrelas_educacao      = db.Column(db.Integer)
-    estrelas_eficiencia    = db.Column(db.Integer)
-    estrelas_apresentacao  = db.Column(db.Integer)
-
-    comentario       = db.Column(db.Text)
-
-    media_ponderada  = db.Column(db.Float)
-    sentimento       = db.Column(db.String(12))
-    temas            = db.Column(db.String(255))
-    alerta_crise     = db.Column(db.Boolean, default=False)
-    feedback_motoboy = db.Column(db.Text)
-
-    criado_em        = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-
-
 class ReceitaCooperativa(db.Model):
     __tablename__ = "receitas_coop"
     id = db.Column(db.Integer, primary_key=True)
