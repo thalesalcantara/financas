@@ -68,20 +68,14 @@ def _build_db_uri() -> str:
     elif url.startswith("postgresql://") and "+psycopg" not in url:
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
 
-    # Mescla/garante params sem duplicar
-    parsed = urlparse(url)
-    q = dict(parse_qsl(parsed.query, keep_blank_values=True))
-
     # SSL + keepalive (libpq lê do URI)
-    q.setdefault("sslmode", "require")
-    q.setdefault("keepalives", "1")
-    q.setdefault("keepalives_idle", "30")
-    q.setdefault("keepalives_interval", "10")
-    q.setdefault("keepalives_count", "5")
-    q.setdefault("application_name", "coopex-app")
-
-    new_query = urlencode(q)
-    return urlunparse(parsed._replace(query=new_query))
+    sep = "&" if "?" in url else "?"
+    url = (
+        f"{url}{sep}"
+        "sslmode=require&"
+        "keepalives=1&keepalives_idle=30&keepalives_interval=10&keepalives_count=5"
+    )
+    return url
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "coopex-secret")
@@ -121,12 +115,11 @@ app.config.update(
         "pool_timeout": 15,
         "pool_pre_ping": True,       # testa conexão antes de usar (evita 500 de conn morta)
         "pool_use_lifo": True,       # reduz churn de conexões sob carga
-        "pool_recycle": 1200,        # recicla após 20min (sockets/TLS antigos)
-        "pool_reset_on_return": "rollback",
+        # 👉 sem pool_recycle (como você pediu)
         "connect_args": {
             "connect_timeout": 5,
-            # tempo máx. por statement e idle em transação (defensivos no servidor)
-            "options": "-c statement_timeout=15000 -c idle_in_transaction_session_timeout=15000",
+            # tempo máx. por statement no servidor (defensivo)
+            "options": "-c statement_timeout=15000",
         },
     },
 )
@@ -159,8 +152,7 @@ def _set_sqlite_pragma(dbapi_con, con_record):
 
 def _is_sqlite() -> bool:
     try:
-        bind = db.session.get_bind()
-        return bool(bind and bind.dialect.name == "sqlite")
+        return db.session.get_bind().dialect.name == "sqlite"
     except Exception:
         return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
 
@@ -3574,34 +3566,13 @@ def edit_despesa_coop(id):
     flash("Despesa do cooperado atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
-from sqlalchemy.exc import IntegrityError
-
-@app.route("/coop/despesas/<int:id>/delete", methods=["POST", "GET"])
+@app.route("/coop/despesas/<int:id>/delete")
 @admin_required
 def delete_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
-
-    # 🔒 Segurança de consistência:
-    # Se a despesa foi gerada por um benefício rateado, não apague por aqui.
-    if getattr(dc, "beneficio_id", None):
-        flash(
-            "Esta despesa foi gerada por um benefício rateado. "
-            "Exclua ou ajuste pelo módulo de Benefícios para manter a consistência.",
-            "warning"
-        )
-        return redirect(url_for("admin_dashboard", tab="beneficios"))
-
-    try:
-        db.session.delete(dc)
-        db.session.commit()
-        flash("Despesa do cooperado excluída.", "success")
-    except IntegrityError:
-        db.session.rollback()
-        flash("Não foi possível excluir a despesa (restrição de banco).", "danger")
-    except Exception as e:
-        db.session.rollback()
-        flash(f"Falha ao excluir a despesa: {e}", "danger")
-
+    db.session.delete(dc)
+    db.session.commit()
+    flash("Despesa do cooperado excluída.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
 # =========================
