@@ -2165,41 +2165,37 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </section>
 
-      <!-- DESPESAS COOPERADOS (versão profissional/compacta – drop-in) -->
-<section class="tab-pane fade {{ 'show active' if _tab=='coop_despesas' else '' }}" id="coop_despesas" role="tabpanel">
-  {% set _despesas = (despesas_coop | default([]) | list) %}
+     <section class="tab-pane fade {{ 'show active' if _tab=='coop_despesas' else '' }}" id="coop_despesas" role="tabpanel">
 
-{# Listas e totais com/sem adiantamento (defensivo) #}
-{% set _lista_normais = (_despesas | selectattr('adiantamento','equalto',False) | list) %}
-{% set _lista_adiant  = (_despesas | selectattr('adiantamento','equalto',True)  | list) %}
+  {# Variável de fácil acesso para os itens da página (máximo 20).
+     A variável despesas_coop agora é a lista de itens paginados. #}
+  {% set _despesas_pagina_atual = (despesas_coop | default([]) | list) %}
+  
+  {# VARIÁVEIS DE TOTAIS GERAIS (Vindas do Python na função admin_dashboard) #}
+  {% set _total_normais_geral = total_normais_coop_geral | default(0) %}
+  {% set _total_adiant_geral = total_adiantamentos_coop_geral | default(0) %}
+  
+  {# Total de registros (obtido do objeto de paginação) #}
+  {% set _qtd_total_geral = pagination_coop_despesas.total if pagination_coop_despesas else _despesas_pagina_atual | length %}
 
-{% set _qtd_total     = _despesas | length %}
-{% set _qtd_adiant    = _lista_adiant | length %}
-{% set _qtd_normais   = _lista_normais | length %}
 
-{% set _total_normais = (_lista_normais | sum(attribute='valor')) %}
-{% set _total_adiant  = (_lista_adiant  | sum(attribute='valor')) %}
-{% set _total_geral   = (_total_normais + _total_adiant) %}
-
-  <!-- Header + KPIs -->
   <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
     <h5 class="m-0 d-flex align-items-center gap-2">
       <i class="bi bi-bag-dash"></i> Despesas para Cooperados
     </h5>
     <div class="d-flex flex-wrap gap-2">
       <span class="badge bg-light text-dark border">
-        Registros: <b>{{ _qtd_total }}</b>
+        Registros: <b>{{ _qtd_total_geral }}</b>
       </span>
       <span class="badge bg-danger-subtle text-danger border">
-        Total (exclui adiant.): <b>R$ {{ '%.2f'|format(_total_normais) }}</b>
+        Total (exclui adiant.): <b>R$ {{ '%.2f'|format(_total_normais_geral) }}</b>
       </span>
       <span class="badge bg-secondary-subtle text-secondary border">
-        Adiant. (fora do total): <b>R$ {{ '%.2f'|format(_total_adiant) }}</b>
+        Adiantamentos (Total): <b>R$ {{ '%.2f'|format(_total_adiant_geral) }}</b>
       </span>
     </div>
   </div>
 
-  <!-- Filtros (somente UI: toggle para esconder adiantamentos na tabela) -->
   <div class="card border-0 shadow-sm rounded-3 mb-3">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
@@ -2226,12 +2222,15 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
         <div class="col-md-3">
           <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
         </div>
-        <div class="col-md-3 d-none d-md-block"></div>
+        <div class="col-md-3">
+             <a href="{{ url_for('admin_dashboard', tab='coop_despesas') }}" class="btn btn-outline-secondary btn-sm w-100">
+                 <i class="bi bi-eraser"></i> Limpar Filtros
+             </a>
+        </div>
       </form>
     </div>
   </div>
 
-  <!-- Adicionar Despesa -->
   <div class="card border-0 shadow-sm rounded-3 mb-3">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -2279,14 +2278,13 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
   </div>
 
-  <!-- Tabela -->
   <div class="card border-0 shadow-sm rounded-3">
     <div class="card-body p-2 p-md-3">
       <div class="table-responsive">
         <table class="table table-sm table-bordered table-hover align-middle" id="tblDespesasCoop">
           <thead class="table-light">
             <tr class="text-nowrap">
-              <th style="width:120px">Data</th>
+              <th style="width:120px">Período/Data</th>
               <th style="width:260px">Cooperado</th>
               <th>Descrição</th>
               <th class="text-end" style="width:160px">Valor</th>
@@ -2294,10 +2292,21 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
             </tr>
           </thead>
           <tbody>
-            {% for dc in despesas_coop %}
-              {% set _is_ad = (dc.adiantamento if dc.adiantamento is defined else False) %}
-              <tr data-adiant="{{ 1 if _is_ad else 0 }}">
-                <td>{{ dc.data.strftime('%d/%m/%Y') if dc.data else '-' }}</td>
+            {# Itera sobre os itens da página atual (máximo 20) #}
+            {% for dc in _despesas_pagina_atual %}
+              {# Verifica se o campo 'adiantamento' existe e é True #}
+              {% set _is_ad = dc.adiantamento is defined and dc.adiantamento %} 
+              <tr data-adiant="{{ 1 if _is_ad else 0 }}" class="{% if _is_ad %}table-secondary-subtle{% endif %}">
+                <td>
+                    {# Mostra data_inicio - data_fim ou apenas data #}
+                    {% if dc.data_inicio and dc.data_fim %}
+                        {{ dc.data_inicio.strftime('%d/%m/%y') }} - {{ dc.data_fim.strftime('%d/%m/%y') }}
+                    {% elif dc.data %}
+                        {{ dc.data.strftime('%d/%m/%Y') }}
+                    {% else %}
+                        '-'
+                    {% endif %}
+                </td>
                 <td class="text-break">{{ dc.cooperado.nome if dc.cooperado else 'Todos' }}</td>
                 <td class="text-break">
                   {{ dc.descricao }}
@@ -2307,6 +2316,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                 </td>
                 <td class="text-end">R$ {{ "%.2f"|format(dc.valor) }}</td>
                 <td class="text-center text-nowrap">
+                  {# Botão de Edição (Passa mais dados de data) #}
                   <button class="btn btn-warning btn-sm"
                           data-bs-toggle="modal"
                           data-bs-target="#modalEditDespesaCoop"
@@ -2314,11 +2324,14 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                           data-cooperado="{{ dc.cooperado.id if dc.cooperado else '' }}"
                           data-descricao="{{ dc.descricao }}"
                           data-valor="{{ dc.valor }}"
+                          data-data_inicio="{{ dc.data_inicio.strftime('%Y-%m-%d') if dc.data_inicio else '' }}"
+                          data-data_fim="{{ dc.data_fim.strftime('%Y-%m-%d') if dc.data_fim else '' }}"
                           data-data="{{ dc.data.strftime('%Y-%m-%d') if dc.data else '' }}"
                           data-adiantamento="{{ 1 if _is_ad else 0 }}"
                           data-url="{{ url_for('edit_despesa_coop', id=dc.id) }}">
                     <i class="bi bi-pencil"></i>
                   </button>
+                  {# Botão de Exclusão #}
                   <a class="btn btn-danger btn-sm btn-del"
                      href="{{ url_for('delete_despesa_coop', id=dc.id) }}">
                     <i class="bi bi-trash"></i>
@@ -2326,23 +2339,63 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="5" class="text-center text-muted">Nenhuma despesa</td></tr>
+              <tr><td colspan="5" class="text-center text-muted">Nenhuma despesa nesta página ou filtro.</td></tr>
             {% endfor %}
           </tbody>
           <tfoot>
             <tr class="table-light">
-              <th colspan="3" class="text-end">Total (exclui adiant.)</th>
-              <th class="text-end">R$ {{ '%.2f'|format(_total_normais) }}</th>
+              <th colspan="3" class="text-end">Total Geral (exclui adiant.)</th>
+              <th class="text-end">R$ {{ '%.2f'|format(_total_normais_geral) }}</th>
               <th></th>
             </tr>
             <tr class="table-light">
-              <th colspan="3" class="text-end text-muted">Adiantamentos (fora do total)</th>
-              <th class="text-end text-muted">R$ {{ '%.2f'|format(_total_adiant) }}</th>
+              <th colspan="3" class="text-end text-muted">Total Geral Adiantamentos</th>
+              <th class="text-end text-muted">R$ {{ '%.2f'|format(_total_adiant_geral) }}</th>
               <th></th>
             </tr>
           </tfoot>
         </table>
       </div>
+
+        {# =============================== INÍCIO DA PAGINAÇÃO =============================== #}
+        {# A paginação só aparece se houver mais de uma página (pagination_coop_despesas.pages > 1) #}
+        {% if pagination_coop_despesas and pagination_coop_despesas.pages > 1 %}
+        <nav aria-label="Navegação das despesas">
+            <ul class="pagination justify-content-center mt-3">
+
+            {# Botão Anterior #}
+            <li class="page-item {{ 'disabled' if not pagination_coop_despesas.has_prev }}">
+                {# Mantém os filtros (request.args.to_dict()) e muda apenas a página #}
+                <a class="page-link" href="{{ url_for('admin_dashboard', tab='coop_despesas', page=pagination_coop_despesas.prev_num, **request.args.to_dict()) }}" aria-label="Anterior">
+                <span aria-hidden="true">&laquo;</span>
+                </a>
+            </li>
+
+            {# Números das Páginas #}
+            {% for page_num in pagination_coop_despesas.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                {% if page_num %}
+                <li class="page-item {{ 'active' if page_num == pagination_coop_despesas.page else '' }}">
+                    <a class="page-link" href="{{ url_for('admin_dashboard', tab='coop_despesas', page=page_num, **request.args.to_dict()) }}">{{ page_num }}</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+            {% endfor %}
+
+            {# Botão Próximo #}
+            <li class="page-item {{ 'disabled' if not pagination_coop_despesas.has_next }}">
+                <a class="page-link" href="{{ url_for('admin_dashboard', tab='coop_despesas', page=pagination_coop_despesas.next_num, **request.args.to_dict()) }}" aria-label="Próximo">
+                <span aria-hidden="true">&raquo;</span>
+                </a>
+            </li>
+            </ul>
+        </nav>
+        <div class="text-center text-muted small mb-3">
+            Página {{ pagination_coop_despesas.page }} de {{ pagination_coop_despesas.pages }} (Total de {{ pagination_coop_despesas.total }} registros)
+        </div>
+        {% endif %}
+        {# ================================ FIM DA PAGINAÇÃO ================================ #}
+      
     </div>
   </div>
 </section>
@@ -2357,12 +2410,16 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     function apply(){
       const hide = chk.checked;
       tbl.querySelectorAll('tbody tr').forEach(tr=>{
+        // Verifica se o atributo data-adiant é '1'
         const isAd = String(tr.getAttribute('data-adiant')||'0') === '1';
-        tr.style.display = (hide && isAd) ? 'none' : '';
+        // Define o display da linha baseado no checkbox e se é adiantamento
+        tr.style.display = (hide && isAd) ? 'none' : ''; 
       });
     }
+    // Aplica a lógica quando o checkbox muda
     chk.addEventListener('change', apply);
-    apply();
+    // Aplica a lógica ao carregar a página
+    apply(); 
   })();
 </script>
 
