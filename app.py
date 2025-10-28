@@ -2897,14 +2897,25 @@ def edit_despesa(id):
     flash("Despesa atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="despesas"))
 
-@app.route("/despesas/<int:id>/delete")
+@app.route("/despesas/<int:id>/delete", methods=["POST"])
 @admin_required
 def delete_despesa(id):
+    # Recomendação: Usar POST para operações de alteração de estado (exclusão)
+    # e GET para a página de confirmação (se houver).
     d = DespesaCooperativa.query.get_or_404(id)
-    db.session.delete(d)
-    db.session.commit()
-    flash("Despesa excluída.", "success")
+
+    try:
+        db.session.delete(d)
+        db.session.commit()
+        flash(f"Despesa #{id} excluída com sucesso.", "success")
+    except Exception as e:
+        db.session.rollback() # Garante que a sessão volte a um estado limpo em caso de erro
+        current_app.logger.error(f"Erro ao excluir despesa {id}: {e}") # Loga o erro
+        flash("Erro ao excluir despesa. Verifique se ela está sendo usada em outro lugar.", "danger")
+        
+    # Redireciona de volta para o dashboard, garantindo que o tab correto esteja selecionado
     return redirect(url_for("admin_dashboard", tab="despesas"))
+
 
 # =========================
 # Avisos (admin + públicos)
