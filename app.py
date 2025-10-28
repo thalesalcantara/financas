@@ -50,52 +50,83 @@ PERSIST_ROOT = os.environ.get("PERSIST_ROOT", "/var/data")
 if not os.path.isdir(PERSIST_ROOT):
     PERSIST_ROOT = os.path.join(BASE_DIR, "data")
 os.makedirs(PERSIST_ROOT, exist_ok=True)
+
 TABELAS_DIR = os.path.join(PERSIST_ROOT, "tabelas")
 os.makedirs(TABELAS_DIR, exist_ok=True)
+
 STATIC_TABLES = os.path.join(BASE_DIR, "static", "uploads", "tabelas")
 os.makedirs(STATIC_TABLES, exist_ok=True)
+
 # 🔹 Documentos (persistente em disco)
 DOCS_PERSIST_DIR = os.path.join(PERSIST_ROOT, "docs")
 os.makedirs(DOCS_PERSIST_DIR, exist_ok=True)
 
-def _build_db_uri() -> str:
-    url = os.environ.get("DATABASE_URL")
+
+def _choose_db_url() -> tuple[str, bool]:
+    """
+    Retorna (db_url, usando_pooler?).
+    Se houver PgBouncer no Render, defina DATABASE_POOLER_URL.
+    Senão, usa DATABASE_URL (conexão direta).
+    """
+    pooler = os.environ.get("DATABASE_POOLER_URL")  # URL do PgBouncer, se existir
+    url = pooler or os.environ.get("DATABASE_URL")
+    using_pooler = bool(pooler)
+
     if not url:
-        return "sqlite:///" + os.path.join(BASE_DIR, "app.db")
-    # força driver novo psycopg
+        # Ambiente local sem DB → usa SQLite (permite subir sem 502)
+        return "sqlite:///" + os.path.join(BASE_DIR, "app.db"), False
+
+    # Força driver psycopg3
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql+psycopg://", 1)
     elif url.startswith("postgresql://") and "+psycopg" not in url:
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
 
-    # SSL + keepalive (libpq lê do URI)
+    # SSL + keepalives via URI
     sep = "&" if "?" in url else "?"
     url = (
         f"{url}{sep}"
         "sslmode=require&"
         "keepalives=1&keepalives_idle=30&keepalives_interval=10&keepalives_count=5"
     )
-    return url
+    return url, using_pooler
+
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "coopex-secret")
 
-URI = _build_db_uri()
+URI, USING_POOLER = _choose_db_url()
 
-# 🚫 Guard: impede cair em SQLite em produção se DATABASE_URL não existir
+# 🚫 Guard: impede cair em SQLite em produção se não houver DB configurado
 if "sqlite" in URI and os.environ.get("FLASK_ENV") == "production":
-    raise RuntimeError("DATABASE_URL ausente em produção")
+    raise RuntimeError("DATABASE_URL (ou DATABASE_POOLER_URL) ausente em produção")
 
-# ===== Pool “sem travar”, mas seguro =====
-# - Você pode dizer quantas conexões quer ALVO no total com DB_TARGET_CONNS (padrão 60).
-# - A gente divide por WEB_CONCURRENCY (nº de workers) para calcular por-worker.
-# - Se quiser forçar manualmente, use DB_POOL_SIZE / DB_MAX_OVERFLOW.
+# ===== Pool =====
+# Se estiver atrás do PgBouncer, **não** mantenha pool no app (NullPool).
 workers = int(os.environ.get("WEB_CONCURRENCY", "1") or "1")
 target_total = int(os.environ.get("DB_TARGET_CONNS", "60") or "60")
 per_worker_target = max(5, target_total // max(1, workers))
 
 pool_size = int(os.environ.get("DB_POOL_SIZE", str(per_worker_target)))
 max_overflow = int(os.environ.get("DB_MAX_OVERFLOW", str(max(5, per_worker_target // 2))))
+
+engine_opts: dict = {
+    "pool_timeout": 15,
+    "pool_pre_ping": True,  # evita 500 por conexão morta
+    "connect_args": {
+        "connect_timeout": 5,                 # timeout de conexão
+        "options": "-c statement_timeout=15000",  # timeout por statement (15s)
+    },
+}
+
+if USING_POOLER:
+    # PgBouncer gerencia o pool → evite um segundo pool aqui
+    engine_opts["poolclass"] = NullPool
+else:
+    engine_opts["poolclass"] = QueuePool
+    engine_opts["pool_size"] = pool_size
+    engine_opts["max_overflow"] = max_overflow
+    engine_opts["pool_use_lifo"] = True  # reduz churn sob carga
 
 app.config.update(
     SQLALCHEMY_DATABASE_URI=URI,
@@ -107,21 +138,7 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.environ.get("FLASK_SECURE_COOKIES", "1") == "1",
     PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
-    SQLALCHEMY_ENGINE_OPTIONS={
-        "poolclass": QueuePool,
-        # 🔹 Tamanho do pool efetivo por *worker*:
-        "pool_size": pool_size,
-        "max_overflow": max_overflow,
-        "pool_timeout": 15,
-        "pool_pre_ping": True,       # testa conexão antes de usar (evita 500 de conn morta)
-        "pool_use_lifo": True,       # reduz churn de conexões sob carga
-        # 👉 sem pool_recycle (como você pediu)
-        "connect_args": {
-            "connect_timeout": 5,
-            # tempo máx. por statement no servidor (defensivo)
-            "options": "-c statement_timeout=15000",
-        },
-    },
+    SQLALCHEMY_ENGINE_OPTIONS=engine_opts,
 )
 
 db = SQLAlchemy(app)
@@ -129,15 +146,21 @@ db = SQLAlchemy(app)
 # Health checks
 @app.get("/healthz")
 def healthz():
+    # Barato e sem tocar no DB → evita 502 por cold start demorado
     return "ok", 200
+
 
 @app.get("/readyz")
 def readyz():
+    # Toca no DB com proteção de erro para não derrubar a app
     try:
+        # Execução rápida; se travar, cai no except e retorna 503
         db.session.execute(sa_text("SELECT 1"))
         return "ready", 200
-    except Exception:
+    except Exception as e:
+        app.logger.warning("readyz DB check failed: %s", e)
         return "not-ready", 503
+
 
 # Liga foreign_keys no SQLite
 @event.listens_for(Engine, "connect")
@@ -148,13 +171,17 @@ def _set_sqlite_pragma(dbapi_con, con_record):
             cur.execute("PRAGMA foreign_keys=ON")
             cur.close()
     except Exception:
+        # Não falha a app por causa do PRAGMA
         pass
+
 
 def _is_sqlite() -> bool:
     try:
-        return db.session.get_bind().dialect.name == "sqlite"
+        bind = db.session.get_bind()
+        return (bind is not None) and (bind.dialect.name == "sqlite")
     except Exception:
         return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
+
 
 # =========================
 # Models
