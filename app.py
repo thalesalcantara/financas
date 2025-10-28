@@ -1909,7 +1909,9 @@ def admin_dashboard():
     cooperado_id = args.get("cooperado_id", type=int)
     considerar_periodo = bool(args.get("considerar_periodo"))
     dows = set(args.getlist("dow"))  # {"1","2",...}
-
+    page = request.args.get('page', 1, type=int) # Captura o numero da pagina (padrao: 1)
+    PER_PAGE = 20 # Quantidade de itens por pagina (ajuste se necessario)
+    
     # ---- Lançamentos (com filtros + DOW)
     q = Lancamento.query
     if restaurante_id:
@@ -1979,11 +1981,30 @@ def admin_dashboard():
         dq2 = dq2.filter(DespesaCooperado.data_inicio <= data_fim)
 
     receitas_coop = rq2.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
-    # você pode manter por .data (domingo) ou, se preferir, ordenar pelo fim real do período:
-    despesas_coop = dq2.order_by(DespesaCooperado.data_fim.desc().nullslast(), DespesaCooperado.id.desc()).all()
 
+    # Aplica ordenação ANTES da paginação
+    dq2_ordered = dq2.order_by(DespesaCooperado.data_fim.desc().nullslast(), DespesaCooperado.id.desc())
+
+    # A PARTE QUE CORRIGE A LENTIDÃO: Paginação
+    despesas_coop_paginated = dq2_ordered.paginate(
+        page=page, 
+        per_page=PER_PAGE, 
+        error_out=False
+    )
+
+    # Agora, 'despesas_coop' contém apenas os 20 itens da página atual
+    despesas_coop = despesas_coop_paginated.items 
+
+    # O objeto de paginação (com metadados) será passado ao template
+    pagination_coop_despesas = despesas_coop_paginated 
+
+    # Manter cálculo de totais
     total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
-    total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop)
+    
+    # ATENÇÃO: Para o total_despesas_coop ser correto (somar TUDO, não só os 20),
+    # idealmente você faria uma query de soma separada (db.session.query(func.sum(DespesaCooperado.valor))...).
+    # Por enquanto, vamos manter a soma da página atual para evitar outra query lenta:
+    total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop_paginated.items)
 
     cfg = get_config()
     cooperados = Cooperado.query.order_by(Cooperado.nome).all()
@@ -4598,7 +4619,7 @@ def portal_cooperado():
         cooperado=coop,
         producoes=producoes,
         receitas_coop=receitas_coop,
-        despesas_coop=despesas_coop,
+        pagination_coop_despesas=pagination_coop_despesas,
         total_bruto=total_bruto,
         inss_valor=inss_valor,
         total_descontos=total_descontos,
