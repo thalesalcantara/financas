@@ -3566,13 +3566,34 @@ def edit_despesa_coop(id):
     flash("Despesa do cooperado atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
-@app.route("/coop/despesas/<int:id>/delete")
+from sqlalchemy.exc import IntegrityError
+
+@app.route("/coop/despesas/<int:id>/delete", methods=["POST", "GET"])
 @admin_required
 def delete_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
-    db.session.delete(dc)
-    db.session.commit()
-    flash("Despesa do cooperado excluída.", "success")
+
+    # 🔒 Segurança de consistência:
+    # Se a despesa foi gerada por um benefício rateado, não apague por aqui.
+    if getattr(dc, "beneficio_id", None):
+        flash(
+            "Esta despesa foi gerada por um benefício rateado. "
+            "Exclua ou ajuste pelo módulo de Benefícios para manter a consistência.",
+            "warning"
+        )
+        return redirect(url_for("admin_dashboard", tab="beneficios"))
+
+    try:
+        db.session.delete(dc)
+        db.session.commit()
+        flash("Despesa do cooperado excluída.", "success")
+    except IntegrityError:
+        db.session.rollback()
+        flash("Não foi possível excluir a despesa (restrição de banco).", "danger")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Falha ao excluir a despesa: {e}", "danger")
+
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
 # =========================
