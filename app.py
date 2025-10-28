@@ -2897,25 +2897,69 @@ def edit_despesa(id):
     flash("Despesa atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="despesas"))
 
-@app.route("/despesas/<int:id>/delete", methods=["POST"])
+from flask import request, flash, redirect, url_for, current_app
+from sqlalchemy import delete, select
+
+@app.route("/despesas/bulk-delete", methods=["POST"])
 @admin_required
-def delete_despesa(id):
-    # Recomendação: Usar POST para operações de alteração de estado (exclusão)
-    # e GET para a página de confirmação (se houver).
-    d = DespesaCooperativa.query.get_or_404(id)
+def bulk_delete_despesas():
+    # Coleta os IDs do form ou JSON
+    if request.is_json:
+        ids = request.json.get("ids", [])
+    else:
+        # funciona com <input name="ids"> ou <input name="ids[]">
+        ids = request.form.getlist("ids") or request.form.getlist("ids[]")
+
+    # Normaliza para inteiros e remove duplicados
+    try:
+        ids = list({int(x) for x in ids})
+    except (ValueError, TypeError):
+        flash("IDs inválidos para exclusão.", "danger")
+        return redirect(url_for("admin_dashboard", tab="despesas"))
+
+    if not ids:
+        flash("Nenhuma despesa selecionada.", "warning")
+        return redirect(url_for("admin_dashboard", tab="despesas"))
 
     try:
-        db.session.delete(d)
-        db.session.commit()
-        flash(f"Despesa #{id} excluída com sucesso.", "success")
-    except Exception as e:
-        db.session.rollback() # Garante que a sessão volte a um estado limpo em caso de erro
-        current_app.logger.error(f"Erro ao excluir despesa {id}: {e}") # Loga o erro
-        flash("Erro ao excluir despesa. Verifique se ela está sendo usada em outro lugar.", "danger")
-        
-    # Redireciona de volta para o dashboard, garantindo que o tab correto esteja selecionado
-    return redirect(url_for("admin_dashboard", tab="despesas"))
+        # (Opcional) Confere quais existem para feedback amigável
+        existing_ids = [
+            row[0]
+            for row in db.session.execute(
+                select(DespesaCooperativa.id).where(DespesaCooperativa.id.in_(ids))
+            ).all()
+        ]
+        if not existing_ids:
+            flash("Nenhuma despesa encontrada para os IDs informados.", "warning")
+            return redirect(url_for("admin_dashboard", tab="despesas"))
 
+        # ---------- Escolha UMA das estratégias abaixo ----------
+
+        # 1) MAIS RÁPIDA (não carrega objetos; depende de cascade no banco)
+        db.session.execute(
+            delete(DespesaCooperativa).where(DespesaCooperativa.id.in_(existing_ids))
+        )
+
+        # 2) MAIS SEGURA (carrega objetos; respeita cascades/eventos do ORM)
+        # for obj in DespesaCooperativa.query.filter(
+        #     DespesaCooperativa.id.in_(existing_ids)
+        # ).all():
+        #     db.session.delete(obj)
+
+        db.session.commit()
+
+        faltantes = set(ids) - set(existing_ids)
+        msg = f"{len(existing_ids)} despesa(s) excluída(s) com sucesso."
+        if faltantes:
+            msg += " IDs inexistentes: " + ", ".join(map(str, sorted(faltantes))) + "."
+        flash(msg, "success")
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.exception(f"Erro no bulk delete de despesas: {e}")
+        flash("Erro ao excluir despesas selecionadas. Verifique vínculos/uso em outros locais.", "danger")
+
+    return redirect(url_for("admin_dashboard", tab="despesas"))
 
 # =========================
 # Avisos (admin + públicos)
