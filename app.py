@@ -342,6 +342,7 @@ class BeneficioRegistro(db.Model):
 # =========================
 # Semana seg→dom + Normalização automática
 # =========================
+from sqlalchemy import event
 
 def semana_bounds(d: date):
     """
@@ -2500,6 +2501,11 @@ def admin_delete_lancamento(id):
     flash("Lançamento excluído.", "success")
     return redirect(url_for("admin_dashboard", tab="lancamentos"))
 
+# ===== IMPORTS =====
+from flask import request, render_template, send_file, url_for
+from sqlalchemy import func, literal, and_
+from types import SimpleNamespace
+import io, csv
 
 # ===== IMPORTS =====
 from flask import request, render_template, send_file, url_for
@@ -3560,40 +3566,13 @@ def edit_despesa_coop(id):
     flash("Despesa do cooperado atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
-from sqlalchemy.exc import IntegrityError
-# se usar Flask-WTF:
-# from flask_wtf.csrf import CSRFError
-
-from sqlalchemy.exc import IntegrityError
-
-@app.route("/coop/despesas/<int:id>/delete", methods=["GET", "POST", "DELETE"])
+@app.route("/coop/despesas/<int:id>/delete")
 @admin_required
 def delete_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
-    try:
-        db.session.delete(dc)
-        db.session.commit()
-        msg = "Despesa do cooperado excluída."
-
-        # Se vier via DELETE/AJAX, responde JSON; senão, flash + redirect
-        if request.method == "DELETE" or request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return jsonify({"ok": True, "message": msg})
-        flash(msg, "success")
-
-    except IntegrityError:
-        db.session.rollback()
-        msg = "Não foi possível excluir: há registros vinculados."
-        if request.method == "DELETE" or request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return jsonify({"ok": False, "message": msg}), 409
-        flash(msg, "danger")
-
-    except Exception:
-        db.session.rollback()
-        msg = "Erro inesperado ao excluir a despesa."
-        if request.method == "DELETE" or request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return jsonify({"ok": False, "message": msg}), 500
-        flash(msg, "danger")
-
+    db.session.delete(dc)
+    db.session.commit()
+    flash("Despesa do cooperado excluída.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
 # =========================
