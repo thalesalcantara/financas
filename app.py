@@ -4443,9 +4443,11 @@ def portal_cooperado():
     def _avg_col(col):
         if col is None:
             return None
-        q = (db.session.query(func.avg(col))
-             .join(Lancamento, AvaliacaoRestaurante.lancamento_id == Lancamento.id)
-             .filter(AvaliacaoRestaurante.cooperado_id == coop.id))
+        q = (
+            db.session.query(func.avg(col))
+            .join(Lancamento, AvaliacaoRestaurante.lancamento_id == Lancamento.id)
+            .filter(AvaliacaoRestaurante.cooperado_id == coop.id)
+        )
         q = in_range(q, Lancamento.data)  # aplica o mesmo período do portal
         v = q.scalar()
         return round(float(v), 2) if v is not None else None
@@ -4454,13 +4456,19 @@ def portal_cooperado():
     media_geral_avaliacoes = _avg_col(getattr(AvaliacaoRestaurante, "estrelas_geral", None)) or 0.0
 
     # fallbacks para esquemas antigos
-    trat_col = (getattr(AvaliacaoRestaurante, "estrelas_tratamento", None)
-                or getattr(AvaliacaoRestaurante, "estrelas_pontualidade", None))
-    amb_col  = (getattr(AvaliacaoRestaurante, "estrelas_ambiente", None)
-                or getattr(AvaliacaoRestaurante, "estrelas_educacao", None))
-    sup_col  = (getattr(AvaliacaoRestaurante, "estrelas_suporte", None)
-                or getattr(AvaliacaoRestaurante, "estrelas_eficiencia", None))
-    mp_col   = getattr(AvaliacaoRestaurante, "media_ponderada", None)
+    trat_col = (
+        getattr(AvaliacaoRestaurante, "estrelas_tratamento", None)
+        or getattr(AvaliacaoRestaurante, "estrelas_pontualidade", None)
+    )
+    amb_col = (
+        getattr(AvaliacaoRestaurante, "estrelas_ambiente", None)
+        or getattr(AvaliacaoRestaurante, "estrelas_educacao", None)
+    )
+    sup_col = (
+        getattr(AvaliacaoRestaurante, "estrelas_suporte", None)
+        or getattr(AvaliacaoRestaurante, "estrelas_eficiencia", None)
+    )
+    mp_col = getattr(AvaliacaoRestaurante, "media_ponderada", None)
 
     tratamento_avg = _avg_col(trat_col)
     ambiente_avg   = _avg_col(amb_col)
@@ -4673,7 +4681,7 @@ def portal_cooperado():
         trocas_recebidas_historico=trocas_recebidas_historico,
         trocas_enviadas=trocas_enviadas,
 
-        # --- novas variáveis de média do cooperado ---
+        # --- novas variáveis visíveis ao cooperado ---
         media_geral_avaliacoes=media_geral_avaliacoes,
         media_final_avaliacoes=media_final_avaliacoes,
         tratamento_avg=tratamento_avg,
