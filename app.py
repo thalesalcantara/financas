@@ -4418,6 +4418,7 @@ def portal_cooperado():
     inss_complemento = salario_minimo * 0.20
 
     today = date.today()
+
     def dias_para_3112():
         alvo = date(today.year, 12, 31)
         if today > alvo:
@@ -4499,6 +4500,7 @@ def portal_cooperado():
                   .all())
 
     import unicodedata as _u, re as _re
+
     def _norm_c(s: str) -> str:
         s = _u.normalize("NFD", str(s or "").lower())
         s = "".join(ch for ch in s if _u.category(ch) != "Mn")
@@ -4659,7 +4661,7 @@ def portal_cooperado():
             "linhas_afetadas": linhas_afetadas,
         })
 
-       return render_template(
+    return render_template(
         "painel_cooperado.html",
         cooperado=coop,
         producoes=producoes,
