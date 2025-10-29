@@ -288,23 +288,26 @@ html.printing body {
 
       <!-- Ações à direita -->
 <div class="d-flex align-items-center gap-2 flex-shrink-0">
-  {# usa a média calculada no portal; se não houver, cai para cooperado_score; senão, mostra — #}
-  {% set _score = (
+  {# Se houver avaliações no período (qtd_minhas_avaliacoes > 0), mostra a média real.
+     Caso contrário, mostra 5,00 como padrão inicial. #}
+  {% set has_av = (qtd_minhas_avaliacoes|default(0)|int) > 0 %}
+
+  {# Prioridade: ponderada > geral > cooperado_score (se vier do admin).
+     Obs.: só usamos se has_av for True; senão caímos para 5.00. #}
+  {% set base_media = (
         media_final_avaliacoes if media_final_avaliacoes is not none
         else (media_geral_avaliacoes if media_geral_avaliacoes is not none
               else (cooperado_score if cooperado_score is not none else none))
      ) %}
 
-  <span class="score-pill" title="Sua média de avaliações">
+  {% set _score = (base_media if has_av and base_media is not none else 5.0) %}
+
+  <span class="score-pill"
+        title="{{ 'Média das suas avaliações no período selecionado' if has_av else 'Sem avaliações no período — exibindo 5,00 por padrão' }}">
     <i class="bi bi-star-fill" aria-hidden="true"></i>
-    {% if _score is not none %}
-      <span class="mono">{{ ("%.2f"|format(_score)).replace('.', ',') }}</span>
-    {% else %}
-      <span class="mono">—</span>
-    {% endif %}
+    <span class="mono">{{ ('%.2f'|format(_score)).replace('.', ',') }}</span>
   </span>
 </div>
-
 
 <!-- BANNER: novos avisos -->
 {% if unread > 0 %}
