@@ -287,18 +287,24 @@ html.printing body {
       </span>
 
       <!-- Ações à direita -->
-      <div class="d-flex align-items-center gap-2 flex-shrink-0">
-        {% set _score = cooperado_score|default(5.0) %}
-        <span class="score-pill" title="Sua pontuação como cooperado">
-          <i class="bi bi-star-fill" aria-hidden="true"></i>
-          <span class="mono">{{ ("%.1f"|format(_score)).replace('.',',') }}</span>
-          {% if qtd_minhas_avaliacoes %}<small class="text-muted">({{ qtd_minhas_avaliacoes }})</small>{% endif %}
-        </span>
-        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-light">Sair</a>
-      </div>
-    </div>
-  </nav>
+<div class="d-flex align-items-center gap-2 flex-shrink-0">
+  {# usa a média calculada no portal; se não houver, cai para cooperado_score; senão, mostra — #}
+  {% set _score = (
+        media_final_avaliacoes if media_final_avaliacoes is not none
+        else (media_geral_avaliacoes if media_geral_avaliacoes is not none
+              else (cooperado_score if cooperado_score is not none else none))
+     ) %}
+
+  <span class="score-pill" title="Sua média de avaliações">
+    <i class="bi bi-star-fill" aria-hidden="true"></i>
+    {% if _score is not none %}
+      <span class="mono">{{ ("%.2f"|format(_score)).replace('.', ',') }}</span>
+    {% else %}
+      <span class="mono">—</span>
+    {% endif %}
+  </span>
 </div>
+
 
 <!-- BANNER: novos avisos -->
 {% if unread > 0 %}
