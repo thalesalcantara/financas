@@ -286,17 +286,15 @@ html.printing body {
         {% endif %}
       </span>
 
-      <!-- Ações à direita -->
-      <div class="d-flex align-items-center gap-2 flex-shrink-0">
-        {% set _score = cooperado_score|default(5.0) %}
-        <span class="score-pill" title="Sua pontuação como cooperado">
-          <i class="bi bi-star-fill" aria-hidden="true"></i>
-          <span class="mono">{{ ("%.1f"|format(_score)).replace('.',',') }}</span>
-        </span>
-        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-light">Sair</a>
-      </div>
-    </div>
-  </nav>
+     <!-- Ações à direita -->
+<div class="d-flex align-items-center gap-2 flex-shrink-0">
+  <span class="score-pill" title="Sua pontuação como cooperado">
+    <i class="bi bi-star-fill" aria-hidden="true"></i>
+    <span class="mono">{{ "%.2f"|format(media_final_avaliacoes).replace('.',',') }}</span>
+  </span>
+  <a href="{{ url_for('logout') }}" class="btn btn-sm btn-light">Sair</a>
+</div>
+</nav>
 </div>
 
 <!-- BANNER: novos avisos -->
