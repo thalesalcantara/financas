@@ -2165,21 +2165,21 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </section>
 
-     <!-- DESPESAS COOPERADOS (versão profissional/compacta – drop-in) -->
+      <!-- DESPESAS COOPERADOS (versão profissional/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='coop_despesas' else '' }}" id="coop_despesas" role="tabpanel">
   {% set _despesas = (despesas_coop | default([]) | list) %}
 
-  {# Listas e totais com/sem adiantamento (defensivo) #}
-  {% set _lista_normais = (_despesas | selectattr('adiantamento','equalto',False) | list) %}
-  {% set _lista_adiant  = (_despesas | selectattr('adiantamento','equalto',True)  | list) %}
+{# Listas e totais com/sem adiantamento (defensivo) #}
+{% set _lista_normais = (_despesas | selectattr('adiantamento','equalto',False) | list) %}
+{% set _lista_adiant  = (_despesas | selectattr('adiantamento','equalto',True)  | list) %}
 
-  {% set _qtd_total     = _despesas | length %}
-  {% set _qtd_adiant    = _lista_adiant | length %}
-  {% set _qtd_normais   = _lista_normais | length %}
+{% set _qtd_total     = _despesas | length %}
+{% set _qtd_adiant    = _lista_adiant | length %}
+{% set _qtd_normais   = _lista_normais | length %}
 
-  {% set _total_normais = (_lista_normais | sum(attribute='valor')) %}
-  {% set _total_adiant  = (_lista_adiant  | sum(attribute='valor')) %}
-  {% set _total_geral   = (_total_normais + _total_adiant) %}
+{% set _total_normais = (_lista_normais | sum(attribute='valor')) %}
+{% set _total_adiant  = (_lista_adiant  | sum(attribute='valor')) %}
+{% set _total_geral   = (_total_normais + _total_adiant) %}
 
   <!-- Header + KPIs -->
   <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
@@ -2187,20 +2187,28 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       <i class="bi bi-bag-dash"></i> Despesas para Cooperados
     </h5>
     <div class="d-flex flex-wrap gap-2">
-      <span class="badge bg-light text-dark border">Registros: <b>{{ _qtd_total }}</b></span>
-      <span class="badge bg-danger-subtle text-danger border">Total (exclui adiant.): <b>R$ {{ '%.2f'|format(_total_normais) }}</b></span>
-      <span class="badge bg-secondary-subtle text-secondary border">Adiant. (fora do total): <b>R$ {{ '%.2f'|format(_total_adiant) }}</b></span>
+      <span class="badge bg-light text-dark border">
+        Registros: <b>{{ _qtd_total }}</b>
+      </span>
+      <span class="badge bg-danger-subtle text-danger border">
+        Total (exclui adiant.): <b>R$ {{ '%.2f'|format(_total_normais) }}</b>
+      </span>
+      <span class="badge bg-secondary-subtle text-secondary border">
+        Adiant. (fora do total): <b>R$ {{ '%.2f'|format(_total_adiant) }}</b>
+      </span>
     </div>
   </div>
 
-  <!-- Filtros -->
+  <!-- Filtros (somente UI: toggle para esconder adiantamentos na tabela) -->
   <div class="card border-0 shadow-sm rounded-3 mb-3">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
         <h6 class="m-0"><i class="bi bi-funnel"></i> Filtrar</h6>
         <div class="form-check form-switch">
           <input class="form-check-input" type="checkbox" id="toggleOcultarAdiant">
-          <label class="form-check-label small" for="toggleOcultarAdiant">Ocultar adiantamentos</label>
+          <label class="form-check-label small" for="toggleOcultarAdiant">
+            Ocultar adiantamentos
+          </label>
         </div>
       </div>
       <form method="GET" class="row g-2 align-items-end">
@@ -2234,7 +2242,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
       </div>
 
       <form method="POST" action="{{ url_for('add_despesa_coop') }}" class="row g-2 align-items-end mt-2">
-        {# {{ csrf_token() }} #}
         <div class="col-md-4">
           <label class="form-label">Cooperados</label>
           <select class="form-select form-select-sm" name="cooperado_ids[]" multiple size="5">
@@ -2272,39 +2279,13 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     </div>
   </div>
 
-  <!-- Tabela + BULK DELETE -->
+  <!-- Tabela -->
   <div class="card border-0 shadow-sm rounded-3">
     <div class="card-body p-2 p-md-3">
-
-      <!-- Toolbar de seleção e exclusão em massa -->
-      <form id="formBulkDelete" method="POST" action="{{ url_for('bulk_delete_despesas_coop') }}" class="d-flex flex-wrap align-items-center gap-2 mb-2">
-        {# {{ csrf_token() }} #}
-        <div class="btn-group btn-group-sm me-2" role="group" aria-label="seleção">
-          <button type="button" class="btn btn-outline-secondary" id="btnSelectAll">
-            <i class="bi bi-check2-square"></i> Selecionar todos
-          </button>
-          <button type="button" class="btn btn-outline-secondary" id="btnClear">
-            <i class="bi bi-x-square"></i> Limpar seleção
-          </button>
-        </div>
-
-        <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
-          <div class="small text-muted" id="selResumo">
-            Selecionadas: <b id="selQtd">0</b> —
-            Despesas (exclui adiant.): <b>R$ <span id="selTotalNormais">0,00</span></b> —
-            Adiant.: <b>R$ <span id="selTotalAdiant">0,00</span></b>
-          </div>
-          <button type="submit" class="btn btn-danger btn-sm" id="btnBulkDelete" disabled>
-            <i class="bi bi-trash"></i> Excluir selecionadas
-          </button>
-        </div>
-      </form>
-
       <div class="table-responsive">
         <table class="table table-sm table-bordered table-hover align-middle" id="tblDespesasCoop">
           <thead class="table-light">
             <tr class="text-nowrap">
-              <th style="width:36px" class="text-center">#</th>
               <th style="width:120px">Data</th>
               <th style="width:260px">Cooperado</th>
               <th>Descrição</th>
@@ -2315,10 +2296,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
           <tbody>
             {% for dc in despesas_coop %}
               {% set _is_ad = (dc.adiantamento if dc.adiantamento is defined else False) %}
-              <tr data-adiant="{{ 1 if _is_ad else 0 }}" data-valor="{{ dc.valor }}">
-                <td class="text-center">
-                  <input type="checkbox" class="form-check-input chkRow" form="formBulkDelete" name="ids" value="{{ dc.id }}">
-                </td>
+              <tr data-adiant="{{ 1 if _is_ad else 0 }}">
                 <td>{{ dc.data.strftime('%d/%m/%Y') if dc.data else '-' }}</td>
                 <td class="text-break">{{ dc.cooperado.nome if dc.cooperado else 'Todos' }}</td>
                 <td class="text-break">
@@ -2329,7 +2307,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                 </td>
                 <td class="text-end">R$ {{ "%.2f"|format(dc.valor) }}</td>
                 <td class="text-center text-nowrap">
-                  <!-- Editar -->
                   <button class="btn btn-warning btn-sm"
                           data-bs-toggle="modal"
                           data-bs-target="#modalEditDespesaCoop"
@@ -2342,29 +2319,24 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
                           data-url="{{ url_for('edit_despesa_coop', id=dc.id) }}">
                     <i class="bi bi-pencil"></i>
                   </button>
-
-                  <!-- Exclusão individual (POST correto) -->
-                  <form method="POST" action="{{ url_for('delete_despesa_coop', id=dc.id) }}" class="d-inline">
-                    {# {{ csrf_token() }} #}
-                    <button class="btn btn-danger btn-sm"
-                            onclick="return confirm('Excluir esta despesa #{{ dc.id }}?')">
-                      <i class="bi bi-trash"></i>
-                    </button>
-                  </form>
+                  <a class="btn btn-danger btn-sm btn-del"
+                     href="{{ url_for('delete_despesa_coop', id=dc.id) }}">
+                    <i class="bi bi-trash"></i>
+                  </a>
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="6" class="text-center text-muted">Nenhuma despesa</td></tr>
+              <tr><td colspan="5" class="text-center text-muted">Nenhuma despesa</td></tr>
             {% endfor %}
           </tbody>
           <tfoot>
             <tr class="table-light">
-              <th colspan="4" class="text-end">Total (exclui adiant.)</th>
+              <th colspan="3" class="text-end">Total (exclui adiant.)</th>
               <th class="text-end">R$ {{ '%.2f'|format(_total_normais) }}</th>
               <th></th>
             </tr>
             <tr class="table-light">
-              <th colspan="4" class="text-end text-muted">Adiantamentos (fora do total)</th>
+              <th colspan="3" class="text-end text-muted">Adiantamentos (fora do total)</th>
               <th class="text-end text-muted">R$ {{ '%.2f'|format(_total_adiant) }}</th>
               <th></th>
             </tr>
@@ -2375,105 +2347,23 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </section>
 
-<!-- JS: toggle "Ocultar adiantamentos" -->
 <script>
-(function(){
-  const chk = document.getElementById('toggleOcultarAdiant');
-  const tbl = document.getElementById('tblDespesasCoop');
-  if(!chk || !tbl) return;
+  // Toggle "Ocultar adiantamentos" (só front-end)
+  (function(){
+    const chk = document.getElementById('toggleOcultarAdiant');
+    const tbl = document.getElementById('tblDespesasCoop');
+    if(!chk || !tbl) return;
 
-  function apply(){
-    const hide = chk.checked;
-    tbl.querySelectorAll('tbody tr').forEach(tr=>{
-      const isAd = String(tr.getAttribute('data-adiant')||'0') === '1';
-      tr.style.display = (hide && isAd) ? 'none' : '';
-    });
-  }
-  chk.addEventListener('change', apply);
-  apply();
-})();
-</script>
-
-<!-- JS: seleção, totais por seleção e integração com o toggle -->
-<script>
-(function(){
-  const tbl = document.getElementById('tblDespesasCoop');
-  const form = document.getElementById('formBulkDelete');
-  const btnSelectAll = document.getElementById('btnSelectAll');
-  const btnClear = document.getElementById('btnClear');
-  const btnBulkDelete = document.getElementById('btnBulkDelete');
-
-  const selQtd = document.getElementById('selQtd');
-  const selTotalNormais = document.getElementById('selTotalNormais');
-  const selTotalAdiant = document.getElementById('selTotalAdiant');
-
-  const chkHideAd = document.getElementById('toggleOcultarAdiant');
-
-  if(!tbl || !form) return;
-
-  const nf = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  function isVisible(tr){ return tr.style.display !== 'none'; }
-  function rows(){ return Array.from(tbl.querySelectorAll('tbody tr')); }
-  function visibleRows(){ return rows().filter(isVisible); }
-  function rowCheckbox(tr){ return tr.querySelector('.chkRow'); }
-
-  function updateResumo(){
-    const checks = rows().map(rowCheckbox).filter(Boolean);
-    const checked = checks.filter(c => c.checked);
-
-    let totalNormais = 0;
-    let totalAdiant  = 0;
-
-    checked.forEach(c => {
-      const tr = c.closest('tr');
-      const valor = parseFloat(tr.getAttribute('data-valor') || '0') || 0;
-      const isAd  = String(tr.getAttribute('data-adiant') || '0') === '1';
-      if(isAd) totalAdiant += valor; else totalNormais += valor;
-    });
-
-    selQtd.textContent = checked.length;
-    selTotalNormais.textContent = nf.format(totalNormais);
-    selTotalAdiant.textContent  = nf.format(totalAdiant);
-
-    btnBulkDelete.disabled = checked.length === 0;
-  }
-
-  btnSelectAll?.addEventListener('click', () => {
-    visibleRows().forEach(tr => {
-      const c = rowCheckbox(tr);
-      if(c) c.checked = true;
-    });
-    updateResumo();
-  });
-
-  btnClear?.addEventListener('click', () => {
-    rows().forEach(tr => {
-      const c = rowCheckbox(tr);
-      if(c) c.checked = false;
-    });
-    updateResumo();
-  });
-
-  tbl.addEventListener('change', (e) => {
-    if(e.target.classList.contains('chkRow')) updateResumo();
-  });
-
-  chkHideAd?.addEventListener('change', () => { updateResumo(); });
-
-  form.addEventListener('submit', (e) => {
-    const count = parseInt(selQtd.textContent || '0', 10);
-    if(!count){
-      e.preventDefault();
-      return;
+    function apply(){
+      const hide = chk.checked;
+      tbl.querySelectorAll('tbody tr').forEach(tr=>{
+        const isAd = String(tr.getAttribute('data-adiant')||'0') === '1';
+        tr.style.display = (hide && isAd) ? 'none' : '';
+      });
     }
-    if(!confirm(`Excluir ${count} despesa(s) selecionada(s)?`)){
-      e.preventDefault();
-    }
-  });
-
-  updateResumo();
-})();
+    chk.addEventListener('change', apply);
+    apply();
+  })();
 </script>
 
    <!-- FOLHA DE PAGAMENTO • Modelo Contracheque (drop-in) -->
