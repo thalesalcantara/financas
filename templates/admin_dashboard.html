@@ -2165,7 +2165,7 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   </div>
 </section>
 
-      <!-- DESPESAS COOPERADOS (versão profissional/compacta – drop-in) -->
+     <!-- DESPESAS COOPERADOS (versão profissional/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='coop_despesas' else '' }}" id="coop_despesas" role="tabpanel">
   {% set _despesas = (despesas_coop | default([]) | list) %}
 
@@ -2277,102 +2277,124 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     <div class="card-body p-2 p-md-3">
 
       <!-- Toolbar de seleção e exclusão em massa -->
-<form id="formBulkDelete" method="POST" action="{{ url_for('bulk_delete_despesas_coop') }}" class="d-flex flex-wrap align-items-center gap-2 mb-2">
-  {# {{ csrf_token() }} #}
-  <div class="btn-group btn-group-sm me-2" role="group" aria-label="seleção">
-    <button type="button" class="btn btn-outline-secondary" id="btnSelectAll">
-      <i class="bi bi-check2-square"></i> Selecionar todos
-    </button>
-    <button type="button" class="btn btn-outline-secondary" id="btnClear">
-      <i class="bi bi-x-square"></i> Limpar seleção
-    </button>
-  </div>
+      <form id="formBulkDelete" method="POST" action="{{ url_for('bulk_delete_despesas_coop') }}" class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        {# {{ csrf_token() }} #}
+        <div class="btn-group btn-group-sm me-2" role="group" aria-label="seleção">
+          <button type="button" class="btn btn-outline-secondary" id="btnSelectAll">
+            <i class="bi bi-check2-square"></i> Selecionar todos
+          </button>
+          <button type="button" class="btn btn-outline-secondary" id="btnClear">
+            <i class="bi bi-x-square"></i> Limpar seleção
+          </button>
+        </div>
 
-  <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
-    <div class="small text-muted" id="selResumo">
-      Selecionadas: <b id="selQtd">0</b> —
-      Despesas (exclui adiant.): <b>R$ <span id="selTotalNormais">0,00</span></b> —
-      Adiant.: <b>R$ <span id="selTotalAdiant">0,00</span></b>
+        <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
+          <div class="small text-muted" id="selResumo">
+            Selecionadas: <b id="selQtd">0</b> —
+            Despesas (exclui adiant.): <b>R$ <span id="selTotalNormais">0,00</span></b> —
+            Adiant.: <b>R$ <span id="selTotalAdiant">0,00</span></b>
+          </div>
+          <button type="submit" class="btn btn-danger btn-sm" id="btnBulkDelete" disabled>
+            <i class="bi bi-trash"></i> Excluir selecionadas
+          </button>
+        </div>
+      </form>
+
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered table-hover align-middle" id="tblDespesasCoop">
+          <thead class="table-light">
+            <tr class="text-nowrap">
+              <th style="width:36px" class="text-center">#</th>
+              <th style="width:120px">Data</th>
+              <th style="width:260px">Cooperado</th>
+              <th>Descrição</th>
+              <th class="text-end" style="width:160px">Valor</th>
+              <th class="text-center" style="width:140px">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for dc in despesas_coop %}
+              {% set _is_ad = (dc.adiantamento if dc.adiantamento is defined else False) %}
+              <tr data-adiant="{{ 1 if _is_ad else 0 }}" data-valor="{{ dc.valor }}">
+                <td class="text-center">
+                  <input type="checkbox" class="form-check-input chkRow" form="formBulkDelete" name="ids" value="{{ dc.id }}">
+                </td>
+                <td>{{ dc.data.strftime('%d/%m/%Y') if dc.data else '-' }}</td>
+                <td class="text-break">{{ dc.cooperado.nome if dc.cooperado else 'Todos' }}</td>
+                <td class="text-break">
+                  {{ dc.descricao }}
+                  {% if _is_ad %}
+                    <span class="badge bg-secondary ms-2">Adiantamento</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">R$ {{ "%.2f"|format(dc.valor) }}</td>
+                <td class="text-center text-nowrap">
+                  <!-- Editar -->
+                  <button class="btn btn-warning btn-sm"
+                          data-bs-toggle="modal"
+                          data-bs-target="#modalEditDespesaCoop"
+                          data-id="{{ dc.id }}"
+                          data-cooperado="{{ dc.cooperado.id if dc.cooperado else '' }}"
+                          data-descricao="{{ dc.descricao }}"
+                          data-valor="{{ dc.valor }}"
+                          data-data="{{ dc.data.strftime('%Y-%m-%d') if dc.data else '' }}"
+                          data-adiantamento="{{ 1 if _is_ad else 0 }}"
+                          data-url="{{ url_for('edit_despesa_coop', id=dc.id) }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+
+                  <!-- Exclusão individual (POST correto) -->
+                  <form method="POST" action="{{ url_for('delete_despesa_coop', id=dc.id) }}" class="d-inline">
+                    {# {{ csrf_token() }} #}
+                    <button class="btn btn-danger btn-sm"
+                            onclick="return confirm('Excluir esta despesa #{{ dc.id }}?')">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="6" class="text-center text-muted">Nenhuma despesa</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-light">
+              <th colspan="4" class="text-end">Total (exclui adiant.)</th>
+              <th class="text-end">R$ {{ '%.2f'|format(_total_normais) }}</th>
+              <th></th>
+            </tr>
+            <tr class="table-light">
+              <th colspan="4" class="text-end text-muted">Adiantamentos (fora do total)</th>
+              <th class="text-end text-muted">R$ {{ '%.2f'|format(_total_adiant) }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
-    <button type="submit" class="btn btn-danger btn-sm" id="btnBulkDelete" disabled>
-      <i class="bi bi-trash"></i> Excluir selecionadas
-    </button>
   </div>
-</form>
+</section>
 
-<div class="table-responsive">
-  <table class="table table-sm table-bordered table-hover align-middle" id="tblDespesasCoop">
-    <thead class="table-light">
-      <tr class="text-nowrap">
-        <th style="width:36px" class="text-center">#</th>
-        <th style="width:120px">Data</th>
-        <th style="width:260px">Cooperado</th>
-        <th>Descrição</th>
-        <th class="text-end" style="width:160px">Valor</th>
-        <th class="text-center" style="width:140px">Ações</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for dc in despesas_coop %}
-        {% set _is_ad = (dc.adiantamento if dc.adiantamento is defined else False) %}
-        <tr data-adiant="{{ 1 if _is_ad else 0 }}" data-valor="{{ dc.valor }}">
-          <td class="text-center">
-            <input type="checkbox" class="form-check-input chkRow" form="formBulkDelete" name="ids" value="{{ dc.id }}">
-          </td>
-          <td>{{ dc.data.strftime('%d/%m/%Y') if dc.data else '-' }}</td>
-          <td class="text-break">{{ dc.cooperado.nome if dc.cooperado else 'Todos' }}</td>
-          <td class="text-break">
-            {{ dc.descricao }}
-            {% if _is_ad %}
-              <span class="badge bg-secondary ms-2">Adiantamento</span>
-            {% endif %}
-          </td>
-          <td class="text-end">R$ {{ "%.2f"|format(dc.valor) }}</td>
-          <td class="text-center text-nowrap">
-            <!-- Editar -->
-            <button class="btn btn-warning btn-sm"
-                    data-bs-toggle="modal"
-                    data-bs-target="#modalEditDespesaCoop"
-                    data-id="{{ dc.id }}"
-                    data-cooperado="{{ dc.cooperado.id if dc.cooperado else '' }}"
-                    data-descricao="{{ dc.descricao }}"
-                    data-valor="{{ dc.valor }}"
-                    data-data="{{ dc.data.strftime('%Y-%m-%d') if dc.data else '' }}"
-                    data-adiantamento="{{ 1 if _is_ad else 0 }}"
-                    data-url="{{ url_for('edit_despesa_coop', id=dc.id) }}">
-              <i class="bi bi-pencil"></i>
-            </button>
+<!-- JS: toggle "Ocultar adiantamentos" -->
+<script>
+(function(){
+  const chk = document.getElementById('toggleOcultarAdiant');
+  const tbl = document.getElementById('tblDespesasCoop');
+  if(!chk || !tbl) return;
 
-            <!-- Exclusão individual (POST correto) -->
-            <form method="POST" action="{{ url_for('delete_despesa_coop', id=dc.id) }}" class="d-inline">
-              {# {{ csrf_token() }} #}
-              <button class="btn btn-danger btn-sm"
-                      onclick="return confirm('Excluir esta despesa #{{ dc.id }}?')">
-                <i class="bi bi-trash"></i>
-              </button>
-            </form>
-          </td>
-        </tr>
-      {% else %}
-        <tr><td colspan="6" class="text-center text-muted">Nenhuma despesa</td></tr>
-      {% endfor %}
-    </tbody>
-    <tfoot>
-      <tr class="table-light">
-        <th colspan="4" class="text-end">Total (exclui adiant.)</th>
-        <th class="text-end">R$ {{ '%.2f'|format(_total_normais) }}</th>
-        <th></th>
-      </tr>
-      <tr class="table-light">
-        <th colspan="4" class="text-end text-muted">Adiantamentos (fora do total)</th>
-        <th class="text-end text-muted">R$ {{ '%.2f'|format(_total_adiant) }}</th>
-        <th></th>
-      </tr>
-    </tfoot>
-  </table>
-</div>
+  function apply(){
+    const hide = chk.checked;
+    tbl.querySelectorAll('tbody tr').forEach(tr=>{
+      const isAd = String(tr.getAttribute('data-adiant')||'0') === '1';
+      tr.style.display = (hide && isAd) ? 'none' : '';
+    });
+  }
+  chk.addEventListener('change', apply);
+  apply();
+})();
+</script>
 
-<!-- JS: seleção, totais por seleção e integração com "Ocultar adiantamentos" -->
+<!-- JS: seleção, totais por seleção e integração com o toggle -->
 <script>
 (function(){
   const tbl = document.getElementById('tblDespesasCoop');
@@ -2385,27 +2407,16 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
   const selTotalNormais = document.getElementById('selTotalNormais');
   const selTotalAdiant = document.getElementById('selTotalAdiant');
 
-  const chkHideAd = document.getElementById('toggleOcultarAdiant'); // já existe no seu filtro
+  const chkHideAd = document.getElementById('toggleOcultarAdiant');
 
   if(!tbl || !form) return;
 
   const nf = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  function isVisible(tr){
-    return tr.style.display !== 'none';
-  }
-
-  function rows(){
-    return Array.from(tbl.querySelectorAll('tbody tr'));
-  }
-
-  function visibleRows(){
-    return rows().filter(isVisible);
-  }
-
-  function rowCheckbox(tr){
-    return tr.querySelector('.chkRow');
-  }
+  function isVisible(tr){ return tr.style.display !== 'none'; }
+  function rows(){ return Array.from(tbl.querySelectorAll('tbody tr')); }
+  function visibleRows(){ return rows().filter(isVisible); }
+  function rowCheckbox(tr){ return tr.querySelector('.chkRow'); }
 
   function updateResumo(){
     const checks = rows().map(rowCheckbox).filter(Boolean);
@@ -2428,7 +2439,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     btnBulkDelete.disabled = checked.length === 0;
   }
 
-  // Selecionar todos (apenas os visíveis no momento)
   btnSelectAll?.addEventListener('click', () => {
     visibleRows().forEach(tr => {
       const c = rowCheckbox(tr);
@@ -2437,7 +2447,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     updateResumo();
   });
 
-  // Limpar seleção (todas as linhas)
   btnClear?.addEventListener('click', () => {
     rows().forEach(tr => {
       const c = rowCheckbox(tr);
@@ -2446,17 +2455,12 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     updateResumo();
   });
 
-  // Mudanças de seleção dentro da tabela
   tbl.addEventListener('change', (e) => {
     if(e.target.classList.contains('chkRow')) updateResumo();
   });
 
-  // Quando o usuário esconder/mostrar adiantamentos, apenas atualizamos o resumo.
-  chkHideAd?.addEventListener('change', () => {
-    updateResumo();
-  });
+  chkHideAd?.addEventListener('change', () => { updateResumo(); });
 
-  // Confirmação antes do bulk delete
   form.addEventListener('submit', (e) => {
     const count = parseInt(selQtd.textContent || '0', 10);
     if(!count){
@@ -2468,7 +2472,6 @@ body{font-family:'Roboto',sans-serif;background:#f5f7fa;overflow-x:hidden}
     }
   });
 
-  // Inicializa
   updateResumo();
 })();
 </script>
