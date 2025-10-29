@@ -2871,149 +2871,40 @@ def delete_receita(id):
     flash("Receita excluída.", "success")
     return redirect(url_for("admin_dashboard", tab="receitas"))
 
-@app.route("/coop/despesas/add", methods=["POST"])
+@app.route("/despesas/add", methods=["POST"])
 @admin_required
-def add_despesa_coop():
-    try:
-        f = request.form
-        ids = f.getlist("cooperado_ids[]")
-        descricao = (f.get("descricao") or "").strip()
-        valor_total = f.get("valor", type=float) or 0.0
-        d = _parse_date(f.get("data"))
-        adiant = bool(f.get("adiantamento"))  # checkbox "adiantamento"
+def add_despesa():
+    f = request.form
+    d = DespesaCooperativa(
+        descricao=f.get("descricao", "").strip(),
+        valor=f.get("valor", type=float),
+        data=_parse_date(f.get("data"))
+    )
+    db.session.add(d)
+    db.session.commit()
+    flash("Despesa adicionada.", "success")
+    return redirect(url_for("admin_dashboard", tab="despesas"))
 
-        if not descricao or valor_total <= 0 or not d:
-            flash("Preencha descrição, valor e data.", "warning")
-            return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-        # "Todos" ou lista específica
-        if "all" in ids:
-            dest_ids = [c.id for c in Cooperado.query.with_entities(Cooperado.id).all()]
-        else:
-            dest_ids = [int(i) for i in ids if str(i).isdigit()]
-
-        if not dest_ids:
-            flash("Selecione pelo menos um cooperado.", "warning")
-            return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-        n = len(dest_ids)
-        valor_unit = round(valor_total / n, 2)
-        ajuste = round(valor_total - (valor_unit * n), 2)  # corrige centavos
-
-        for idx, cid in enumerate(dest_ids):
-            v = valor_unit + (ajuste if idx == n - 1 else 0.0)
-            db.session.add(DespesaCooperado(
-                cooperado_id=cid,
-                descricao=descricao,
-                valor=v,
-                data=d,
-                adiantamento=adiant
-            ))
-        db.session.commit()
-        flash("Despesa(s) lançada(s).", "success")
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.exception(f"Erro ao lançar despesa(s): {e}")
-        flash("Erro ao lançar despesa(s).", "danger")
-    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-# -------------------------
-# EDIT
-# -------------------------
-@app.route("/coop/despesas/<int:id>/edit", methods=["POST"])
+@app.route("/despesas/<int:id>/edit", methods=["POST"])
 @admin_required
-def edit_despesa_coop(id):
-    dc = DespesaCooperado.query.get_or_404(id)
-    try:
-        f = request.form
-        dc.cooperado_id = f.get("cooperado_id", type=int) or dc.cooperado_id
-        dc.descricao = (f.get("descricao") or "").strip()
-        dc.valor = f.get("valor", type=float) or 0.0
-        dc.data = _parse_date(f.get("data")) or dc.data
-        dc.adiantamento = bool(f.get("adiantamento"))
-        db.session.commit()
-        flash("Despesa do cooperado atualizada.", "success")
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.exception(f"Erro ao atualizar despesa coop #{id}: {e}")
-        flash("Erro ao atualizar despesa.", "danger")
-    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+def edit_despesa(id):
+    d = DespesaCooperativa.query.get_or_404(id)
+    f = request.form
+    d.descricao = f.get("descricao", "").strip()
+    d.valor = f.get("valor", type=float)
+    d.data = _parse_date(f.get("data"))
+    db.session.commit()
+    flash("Despesa atualizada.", "success")
+    return redirect(url_for("admin_dashboard", tab="despesas"))
 
-# -------------------------
-# DELETE individual (POST)
-# -------------------------
-@app.route("/coop/despesas/<int:id>/delete", methods=["POST"])
-@admin_required
-def delete_despesa_coop(id):
-    try:
-        dc = DespesaCooperado.query.get_or_404(id)
-        db.session.delete(dc)
-        db.session.commit()
-        flash(f"Despesa #{id} excluída.", "success")
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.exception(f"Erro ao excluir despesa coop #{id}: {e}")
-        flash("Erro ao excluir despesa.", "danger")
-    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-# -------------------------
-# BULK DELETE (POST)
-# -------------------------
-@app.route("/coop/despesas/bulk-delete", methods=["POST"])
-@admin_required
-def bulk_delete_despesas_coop():
-    ids = request.form.getlist("ids") or []
-    try:
-        ids = list({int(x) for x in ids})
-    except Exception:
-        flash("IDs inválidos para exclusão.", "danger")
-        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-    if not ids:
-        flash("Nenhuma despesa selecionada.", "warning")
-        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-    try:
-        existing = [r[0] for r in db.session.execute(
-            select(DespesaCooperado.id).where(DespesaCooperado.id.in_(ids))
-        ).all()]
-
-        if not existing:
-            flash("Nenhuma despesa encontrada para os IDs informados.", "warning")
-            return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-        db.session.execute(delete(DespesaCooperado).where(DespesaCooperado.id.in_(existing)))
-        db.session.commit()
-
-        faltantes = set(ids) - set(existing)
-        msg = f"{len(existing)} despesa(s) excluída(s)."
-        if faltantes:
-            msg += " IDs inexistentes: " + ", ".join(map(str, sorted(faltantes))) + "."
-        flash(msg, "success")
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.exception(f"Erro no bulk delete de despesas coop: {e}")
-        flash("Erro ao excluir selecionadas.", "danger")
-
-    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-# -------------------------------------------------------
-# ALIAS p/ evitar o 500 (templates legados: delete_despesa)
-# -------------------------------------------------------
-# Se ainda existir em algum lugar do HTML: url_for('delete_despesa', id=...)
-# este alias garante que a página renderize e a ação funcione.
-@app.route("/despesas/<int:id>/delete", methods=["GET", "POST"])
+@app.route("/despesas/<int:id>/delete")
 @admin_required
 def delete_despesa(id):
-    # Se vier POST de um form antigo, delega de vez:
-    if request.method == "POST":
-        return delete_despesa_coop(id)
-    # Se vier via GET de link antigo, faz auto-submit para POST correto:
-    html = """
-    <form id="f" method="post" action="{{ url_for('delete_despesa_coop', id=id) }}"></form>
-    <script>document.getElementById('f').submit();</script>
-    """
-    return render_template_string(html, id=id)
+    d = DespesaCooperativa.query.get_or_404(id)
+    db.session.delete(d)
+    db.session.commit()
+    flash("Despesa excluída.", "success")
+    return redirect(url_for("admin_dashboard", tab="despesas"))
 
 # =========================
 # Avisos (admin + públicos)
