@@ -4438,43 +4438,38 @@ def portal_cooperado():
         "dias_para_prazo": dias_para_3112(),
     }
 
-    # ---------- MÉDIAS DAS MINHAS AVALIAÇÕES (usa di..df) ----------
+    # ---------- MÉDIAS DAS AVALIAÇÕES RECEBIDAS PELO COOPERADO ----------
     from sqlalchemy import func  # se já importou no topo, pode remover esta linha
 
-    def _avg_col(col):
+    def _avg_col_coop(col):
         if col is None:
             return None
-        q = (
-            db.session.query(func.avg(col))
-            .join(Lancamento, AvaliacaoRestaurante.lancamento_id == Lancamento.id)
-            .filter(AvaliacaoRestaurante.cooperado_id == coop.id)
-        )
-        q = in_range(q, Lancamento.data)  # aplica o mesmo período do portal
+        q = db.session.query(func.avg(col)).filter(AvaliacaoCooperado.cooperado_id == coop.id)
         v = q.scalar()
         return round(float(v), 2) if v is not None else None
 
-    # média geral (campo obrigatório do form)
-    media_geral_avaliacoes = _avg_col(getattr(AvaliacaoRestaurante, "estrelas_geral", None)) or 0.0
+    # média geral recebida (campo obrigatório)
+    media_geral_avaliacoes = _avg_col_coop(getattr(AvaliacaoCooperado, "estrelas_geral", None)) or 0.0
 
-    # fallbacks para esquemas antigos
+    # Fallbacks para esquemas antigos (mantendo compatibilidade)
     trat_col = (
-        getattr(AvaliacaoRestaurante, "estrelas_tratamento", None)
-        or getattr(AvaliacaoRestaurante, "estrelas_pontualidade", None)
+        getattr(AvaliacaoCooperado, "estrelas_tratamento", None)
+        or getattr(AvaliacaoCooperado, "estrelas_pontualidade", None)
     )
     amb_col = (
-        getattr(AvaliacaoRestaurante, "estrelas_ambiente", None)
-        or getattr(AvaliacaoRestaurante, "estrelas_educacao", None)
+        getattr(AvaliacaoCooperado, "estrelas_ambiente", None)
+        or getattr(AvaliacaoCooperado, "estrelas_educacao", None)
     )
     sup_col = (
-        getattr(AvaliacaoRestaurante, "estrelas_suporte", None)
-        or getattr(AvaliacaoRestaurante, "estrelas_eficiencia", None)
+        getattr(AvaliacaoCooperado, "estrelas_suporte", None)
+        or getattr(AvaliacaoCooperado, "estrelas_eficiencia", None)
     )
-    mp_col = getattr(AvaliacaoRestaurante, "media_ponderada", None)
+    mp_col = getattr(AvaliacaoCooperado, "media_ponderada", None)
 
-    tratamento_avg = _avg_col(trat_col)
-    ambiente_avg   = _avg_col(amb_col)
-    suporte_avg    = _avg_col(sup_col)
-    media_pond_avg = _avg_col(mp_col)
+    tratamento_avg = _avg_col_coop(trat_col)
+    ambiente_avg   = _avg_col_coop(amb_col)
+    suporte_avg    = _avg_col_coop(sup_col)
+    media_pond_avg = _avg_col_coop(mp_col)
 
     # preferência: ponderada > média das subnotas > geral
     criterios = [x for x in (tratamento_avg, ambiente_avg, suporte_avg) if x is not None]
@@ -4485,12 +4480,10 @@ def portal_cooperado():
     else:
         media_final_avaliacoes = media_geral_avaliacoes
 
-    # quantidade de avaliações no período
+    # quantidade de avaliações recebidas
     qtd_minhas_avaliacoes = (
-        db.session.query(AvaliacaoRestaurante.id)
-        .join(Lancamento, AvaliacaoRestaurante.lancamento_id == Lancamento.id)
-        .filter(AvaliacaoRestaurante.cooperado_id == coop.id)
-        .filter(Lancamento.data >= di, Lancamento.data <= df)
+        db.session.query(AvaliacaoCooperado.id)
+        .filter(AvaliacaoCooperado.cooperado_id == coop.id)
     ).count()
 
     # ---------- ESCALA (dedupe + ordenação cronológica robusta) ----------
@@ -4661,7 +4654,7 @@ def portal_cooperado():
             "linhas_afetadas": linhas_afetadas,
         })
 
-    return render_template(
+     return render_template(
         "painel_cooperado.html",
         cooperado=coop,
         producoes=producoes,
