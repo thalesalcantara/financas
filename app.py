@@ -4654,7 +4654,7 @@ def portal_cooperado():
             "linhas_afetadas": linhas_afetadas,
         })
 
-     return render_template(
+    return render_template(
         "painel_cooperado.html",
         cooperado=coop,
         producoes=producoes,
