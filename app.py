@@ -47,20 +47,9 @@ os.makedirs(DOCS_DIR, exist_ok=True)
 
 # Persistência real (Render Disk)
 PERSIST_ROOT = os.environ.get("PERSIST_ROOT", "/var/data")
-
-# 🔒 NÃO fazer fallback em produção: exija Disk montado
-_IS_PROD = (os.environ.get("RENDER") == "true") or (os.environ.get("FLASK_ENV") == "production")
 if not os.path.isdir(PERSIST_ROOT):
-    if _IS_PROD:
-        raise RuntimeError(
-            f"PERSIST_ROOT='{PERSIST_ROOT}' não encontrado. "
-            "No Render, anexe um Disk e configure o Mount Path (ex.: /var/data) e a env PERSIST_ROOT."
-        )
-    # Dev/Local: pode usar fallback
     PERSIST_ROOT = os.path.join(BASE_DIR, "data")
-
 os.makedirs(PERSIST_ROOT, exist_ok=True)
-
 TABELAS_DIR = os.path.join(PERSIST_ROOT, "tabelas")
 os.makedirs(TABELAS_DIR, exist_ok=True)
 STATIC_TABLES = os.path.join(BASE_DIR, "static", "uploads", "tabelas")
