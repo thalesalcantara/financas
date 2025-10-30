@@ -4418,7 +4418,6 @@ def portal_cooperado():
     inss_complemento = salario_minimo * 0.20
 
     today = date.today()
-
     def dias_para_3112():
         alvo = date(today.year, 12, 31)
         if today > alvo:
@@ -4438,54 +4437,6 @@ def portal_cooperado():
         "dias_para_prazo": dias_para_3112(),
     }
 
-    # ---------- MÉDIAS DAS AVALIAÇÕES RECEBIDAS PELO COOPERADO ----------
-    from sqlalchemy import func  # se já importou no topo, pode remover esta linha
-
-    def _avg_col_coop(col):
-        if col is None:
-            return None
-        q = db.session.query(func.avg(col)).filter(AvaliacaoCooperado.cooperado_id == coop.id)
-        v = q.scalar()
-        return round(float(v), 2) if v is not None else None
-
-    # média geral recebida (campo obrigatório)
-    media_geral_avaliacoes = _avg_col_coop(getattr(AvaliacaoCooperado, "estrelas_geral", None)) or 0.0
-
-    # Fallbacks para esquemas antigos (mantendo compatibilidade)
-    trat_col = (
-        getattr(AvaliacaoCooperado, "estrelas_tratamento", None)
-        or getattr(AvaliacaoCooperado, "estrelas_pontualidade", None)
-    )
-    amb_col = (
-        getattr(AvaliacaoCooperado, "estrelas_ambiente", None)
-        or getattr(AvaliacaoCooperado, "estrelas_educacao", None)
-    )
-    sup_col = (
-        getattr(AvaliacaoCooperado, "estrelas_suporte", None)
-        or getattr(AvaliacaoCooperado, "estrelas_eficiencia", None)
-    )
-    mp_col = getattr(AvaliacaoCooperado, "media_ponderada", None)
-
-    tratamento_avg = _avg_col_coop(trat_col)
-    ambiente_avg   = _avg_col_coop(amb_col)
-    suporte_avg    = _avg_col_coop(sup_col)
-    media_pond_avg = _avg_col_coop(mp_col)
-
-    # preferência: ponderada > média das subnotas > geral
-    criterios = [x for x in (tratamento_avg, ambiente_avg, suporte_avg) if x is not None]
-    if media_pond_avg is not None and media_pond_avg > 0:
-        media_final_avaliacoes = media_pond_avg
-    elif criterios:
-        media_final_avaliacoes = round(sum(criterios) / len(criterios), 2)
-    else:
-        media_final_avaliacoes = media_geral_avaliacoes
-
-    # quantidade de avaliações recebidas
-    qtd_minhas_avaliacoes = (
-        db.session.query(AvaliacaoCooperado.id)
-        .filter(AvaliacaoCooperado.cooperado_id == coop.id)
-    ).count()
-
     # ---------- ESCALA (dedupe + ordenação cronológica robusta) ----------
     raw_escala = (Escala.query
                   .filter_by(cooperado_id=coop.id)
@@ -4493,7 +4444,6 @@ def portal_cooperado():
                   .all())
 
     import unicodedata as _u, re as _re
-
     def _norm_c(s: str) -> str:
         s = _u.normalize("NFD", str(s or "").lower())
         s = "".join(ch for ch in s if _u.category(ch) != "Mn")
@@ -4675,18 +4625,7 @@ def portal_cooperado():
         trocas_recebidas_pendentes=trocas_recebidas_pendentes,
         trocas_recebidas_historico=trocas_recebidas_historico,
         trocas_enviadas=trocas_enviadas,
-
-        # --- novas variáveis visíveis ao cooperado ---
-        media_geral_avaliacoes=media_geral_avaliacoes,
-        media_final_avaliacoes=media_final_avaliacoes,
-        tratamento_avg=tratamento_avg,
-        ambiente_avg=ambiente_avg,
-        suporte_avg=suporte_avg,
-        qtd_minhas_avaliacoes=qtd_minhas_avaliacoes,
-        periodo_di=di,
-        periodo_df=df,
     )
-
 
 from datetime import datetime
 from flask import request, redirect, url_for, flash, abort, session
