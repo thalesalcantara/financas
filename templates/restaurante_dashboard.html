@@ -902,6 +902,101 @@
   const todayStr = ()=>{ const d=new Date(); const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return d.getFullYear()+'-'+mm+'-'+dd; };
   function prefetch(href){ try{ const l=document.createElement('link'); l.rel='prefetch'; l.href=href; document.head.appendChild(l);}catch(e){} }
 
+  /* =======================================================================
+     SUPER BOOST (só JS, sem mexer no Python):
+     - Desmonta TODAS as tabelas de lançamentos e guarda em cache (Map)
+     - Monta SOMENTE a do cooperado selecionado => clique imediato
+     - Filtro de cooperados ultra-rápido (index pré-calculado + debounce)
+     - Lazy-load de fotos e content-visibility para pintar instantâneo
+     ======================================================================= */
+  (function setupFastUI(){
+    /* -------- Tabelas (blocoTabelas) -------- */
+    const cont = document.getElementById('blocoTabelas');
+    if(cont){
+      const cache = new Map();
+      let lastKey = null;
+
+      // guarda todas as tabelas fora do DOM (e otimiza para repintar)
+      cont.querySelectorAll('.lancamentos-table').forEach(tb=>{
+        tb.style.contentVisibility = 'auto';           // só pinta quando visível (Chrome/Edge)
+        tb.style.containIntrinsicSize = '1000px 600px';// reserva espaço, evita layout thrash
+        cache.set(tb.id, tb);
+        tb.remove();                                   // DOM fica levinho
+      });
+
+      // helper global para usar no initLancar()
+      window.__showTabelaCoop = function(coopId){
+        if(!cont) return;
+        const key = 'tabela-' + String(coopId);
+        if(lastKey === key && cont.firstElementChild?.id === key) return; // já exibida
+
+        cont.innerHTML = '<div class="card card-body text-muted">Carregando…</div>';
+        requestAnimationFrame(()=>{
+          const node = cache.get(key);
+          cont.replaceChildren();
+          if(node){
+            cont.appendChild(node);
+            lastKey = key;
+          }else{
+            const vazio = document.createElement('div');
+            vazio.className = 'card card-body text-muted';
+            vazio.textContent = 'Nenhum lançamento no período selecionado';
+            cont.appendChild(vazio);
+            lastKey = null;
+          }
+        });
+      };
+    }
+
+    /* -------- Lazy-load para fotos dos cooperados -------- */
+    const coopList = document.getElementById('listaCooperados');
+    if('IntersectionObserver' in window && coopList){
+      const io = new IntersectionObserver((entries)=>{
+        entries.forEach(e=>{
+          if(e.isIntersecting){
+            const img = e.target.querySelector('img.cooperado-avatar');
+            if(img && img.dataset.src){ img.src = img.dataset.src; delete img.dataset.src; }
+            io.unobserve(e.target);
+          }
+        });
+      },{root: coopList, rootMargin:'100px'});
+      coopList.querySelectorAll('.cooperado-item').forEach(item=>{
+        const img = item.querySelector('img.cooperado-avatar');
+        if(img){ img.dataset.src = img.getAttribute('src'); img.src = ''; } // posterga carregamento
+        io.observe(item);
+      });
+    }
+
+    /* -------- Index de busca para filtro instantâneo -------- */
+    const busca = document.getElementById('buscaCoop');
+    if(busca && coopList){
+      const itens = Array.from(coopList.querySelectorAll('.cooperado-item'));
+      const index = itens.map(el=>({
+        el,
+        txt: (el.dataset.nome||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase()
+      }));
+      let tId=null;
+      busca.addEventListener('input', function(){
+        const q = (this.value||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase().trim();
+        if(tId) clearTimeout(tId);
+        tId = setTimeout(()=>{
+          window.requestAnimationFrame(()=>{
+            let firstVisible=null;
+            index.forEach(({el,txt})=>{
+              const ok = !q || txt.includes(q);
+              el.style.display = ok ? '' : 'none';
+              if(ok && !firstVisible) firstVisible = el;
+            });
+            // se o atual sumiu, seleciona o primeiro visível e monta só UMA tabela
+            if(firstVisible){
+              // não mexe no header aqui; initLancar já garante seleção inicial
+            }
+          });
+        }, 80); // debounce curto
+      });
+    }
+  })();
+
   /* ===== Toast & badge de Avisos ===== */
   let toastAvisosInst=null;
   function ensureToastInstance(){ const el=document.getElementById('toastAvisos'); if(!el) return null; if(!toastAvisosInst) toastAvisosInst = new bootstrap.Toast(el,{autohide:false}); return toastAvisosInst; }
@@ -993,15 +1088,20 @@
       itens.forEach(i=>i.classList.remove('selected')); el.classList.add('selected');
       inputCoopId.value=el.dataset.id; selFoto.src=el.dataset.foto; selNome.textContent=el.dataset.nome; selTotal.textContent=el.dataset.total;
       header.style.display='block'; form.style.display='flex'; hint.style.display='none';
-      document.querySelectorAll('.lancamentos-table').forEach(t=>t.style.display='none');
-      const t=document.getElementById('tabela-'+el.dataset.id); if(t) t.style.display='block';
+
+      // >>> TABELA instantânea: monta apenas a do cooperado selecionado
+      __showTabelaCoop(el.dataset.id);
+
       document.querySelectorAll('.rating-group').forEach(g=>{ if(g.dataset.name!=='av_geral') wireStars(g); });
       autoGeral();
     }
     itens.forEach(el=>el.addEventListener('click',()=>mostrarCooperado(el)));
-    busca?.addEventListener('input',function(){ const q=this.value.trim().toLowerCase(); itens.forEach(el=>el.style.display=(el.dataset.nome||'').toLowerCase().includes(q)?'':'none'); });
+    busca?.addEventListener('keydown', (ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); }});
     select?.addEventListener('change',function(){ const el=itens.find(x=>x.dataset.id===this.value); if(el) mostrarCooperado(el); });
-    if(itens[0]) mostrarCooperado(itens[0]);
+
+    // Seleciona e monta o primeiro visível para UX imediata
+    const firstVisible = itens.find(el=>el.style.display!=='none');
+    if(firstVisible){ mostrarCooperado(firstVisible); }
 
     wireAvaliacaoFlow(); // ligar fluxo do modal de avaliação
   }
@@ -1058,7 +1158,7 @@
       rows().forEach(tr=>{
         if(tr.style.display==='none') return;
         const v=Number(tr.querySelector('.valor')?.dataset.valor||0);
-        const eTxt = tr.querySelector('.entregas')?.textContent?.trim() || '0'; // AJUSTE
+        const eTxt = tr.querySelector('.entregas')?.textContent?.trim() || '0';
         const e = eTxt === '-' ? 0 : Number(eTxt.replace(/\D+/g,''));
         totV+=v; totE+=e;
         const id=tr.dataset.coop, nm=tr.dataset.coopnome;
@@ -1080,7 +1180,7 @@
     // CSV com coluna Descrição
     document.getElementById('btnExportCsv')?.addEventListener('click', ()=>{
       const rowsVis=rows().filter(r=>r.style.display!=='none');
-      const header=['Data','Cooperado','Contrato','Horário','Descrição','Entregas','Valor (R$)']; // NOVO
+      const header=['Data','Cooperado','Contrato','Horário','Descrição','Entregas','Valor (R$)'];
       const linhas=[header]; let totE=0, totV=0;
 
       function csvEscape(t){ return '"' + String(t||'').replace(/"/g,'""') + '"'; }
@@ -1091,7 +1191,7 @@
         const coop=c[1]?.textContent.trim()||'';
         const contrato=c[2]?.textContent.trim()||'';
         const horario=c[3]?.textContent.trim()||'';
-        const desc=(r.querySelector('.desc')?.textContent||'').replace(/\s+/g,' ').trim(); // NOVO
+        const desc=(r.querySelector('.desc')?.textContent||'').replace(/\s+/g,' ').trim();
         const eTxt=(r.querySelector('.entregas')?.textContent.trim()||'0');
         const entregas=(eTxt==='-')?0:Number(eTxt.replace(/\D+/g,''));
         const valorNum=Number(r.querySelector('.valor')?.dataset.valor||0);
@@ -1142,252 +1242,238 @@
   }
 
   /* ===== Helpers para avaliação ===== */
-function setAvalInputsEnabled(enabled){
-  const boxAval = document.getElementById('boxAval');
-  if(!boxAval) return;
-  // Não mexe em "name" (para não quebrar). Apenas alterna "disabled".
-  boxAval.querySelectorAll('input[name^="av_"], textarea[name="av_comentario"]').forEach(el=>{
-    el.disabled = !enabled;
-  });
-}
-
-/* ===== Fluxo do Modal de Avaliação (Lançar) ===== */
-function wireAvaliacaoFlow(){
-  const form = document.getElementById('formLancamento');
-  if(!form) return;
-
-  const modalEl = document.getElementById('modalAvaliar');
-  const modal = new bootstrap.Modal(modalEl);
-  const btnAvaliarAgora = document.getElementById('btnAvaliarAgora');
-  const btnPularAval = document.getElementById('btnPularAval');
-  const chkAvaliar = document.getElementById('chkAvaliar');
-  const inputAvaliar = document.getElementById('inputAvaliar');
-  const boxAval = document.getElementById('boxAval');
-
-  // ===== NOVO: lock de submissão para não duplicar =====
-  let isSubmitting = false;
-  const submitBtn = form.querySelector('button.btn-royal[type="submit"]');
-
-  function setSubmitting(on){
-    isSubmitting = !!on;
-    if(submitBtn){
-      submitBtn.disabled = on;
-      if(submitBtn.dataset.origText == null) submitBtn.dataset.origText = submitBtn.innerHTML;
-      submitBtn.innerHTML = on
-        ? '<span class="spinner-border spinner-border-sm me-1"></span> Lançando…'
-        : submitBtn.dataset.origText;
-    }
-    // evita cliques em qualquer campo enquanto envia
-    form.style.pointerEvents = on ? 'none' : '';
-    form.classList.toggle('opacity-75', on);
-  }
-
-  function ensureRequestId(){
-    // cria um request_id único para o backend deduplicar
-    let inp = form.querySelector('input[name="request_id"]');
-    if(!inp){
-      inp = document.createElement('input');
-      inp.type = 'hidden';
-      inp.name = 'request_id';
-      form.appendChild(inp);
-    }
-    // Sempre renova ao tentar enviar (dá pra manter o mesmo se preferir)
-    inp.value = Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
-  }
-
-  function scrollIntoViewSmooth(el){
-    try{ el?.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
-  }
-
-  // Inicialmente: avaliação desabilitada (não envia nada)
-  setAvalInputsEnabled(false);
-
-  // Marcar/Desmarcar "avaliar agora"
-  chkAvaliar?.addEventListener('change', ()=>{
-    const on = chkAvaliar.checked;
-    inputAvaliar.value = on ? '1':'0';
-    if(boxAval) boxAval.style.display = on ? 'block':'none';
-    setAvalInputsEnabled(on);
-    if(on){ autoGeral(); }
-  });
-
-  // Intercepta submit pra perguntar se quer avaliar (quando ainda não marcou)
-  form.addEventListener('submit', function(ev){
-    if(isSubmitting){ ev.preventDefault(); return; } // já está enviando
-    if(!form.checkValidity()){
-      form.reportValidity?.();
-      return;
-    }
-
-    const avaliando = chkAvaliar.checked || inputAvaliar.value === '1' || (boxAval && boxAval.style.display === 'block');
-
-    if(avaliando){
-      // Vai enviar com avaliação
-      setAvalInputsEnabled(true);
-      autoGeral();          // garante que a média esteja setada
-      ensureRequestId();    // idempotência
-      setSubmitting(true);  // trava UI
-      // deixa o submit continuar
-      return;
-    }
-
-    // Não avaliando → abre modal de confirmação
-    ev.preventDefault();
-    modal.show();
-  });
-
-  // Clicou "Avaliar agora"
-  btnAvaliarAgora?.addEventListener('click', ()=>{
-    chkAvaliar.checked = true;
-    inputAvaliar.value = '1';
-    if(boxAval) boxAval.style.display = 'block';
-    setAvalInputsEnabled(true);
-    modal.hide();
-    setTimeout(()=>{
-      scrollIntoViewSmooth(boxAval);
-      boxAval.querySelector('.rating-group .star')?.focus?.();
-    }, 150);
-  });
-
-  // Clicou "Pular e lançar" (sem avaliação)
-  btnPularAval?.addEventListener('click', ()=>{
-    chkAvaliar.checked = false;
-    inputAvaliar.value = '0';
-    if(boxAval) boxAval.style.display = 'none';
-    setAvalInputsEnabled(false); // garante que nada de av_ vai no POST
-    modal.hide();
-    setTimeout(()=>{
-      if(isSubmitting) return;
-      ensureRequestId();
-      setSubmitting(true);
-      form.submit();
-    }, 80);
-  });
-
-  // Se voltar de bfcache, destrava o botão
-  window.addEventListener('pageshow', (e)=>{
-    if(e.persisted) setSubmitting(false);
-  });
-}
-
-/* ===== Avaliar/Editar na página de Lançamentos (sem sair) ===== */
-function paintStaticStars(el){
-  const score = Number(el?.dataset?.score||0);
-  if(!el) return;
-  el.textContent = '★★★★★'.slice(0, Math.max(0, Math.min(5, score))).padEnd(5, '☆');
-}
-function wireAvalLanc(){
-  const tbody = document.getElementById('tbodyLanc');
-  const modalEl = document.getElementById('modalAvalLanc'); // opcional
-  if(!tbody || !modalEl) return;
-
-  const modal = new bootstrap.Modal(modalEl);
-  const form = document.getElementById('formAvalLanc');
-  const info = document.getElementById('avLancInfo');
-  const inputLancId = document.getElementById('avLancId');
-
-  function initStarsInModal(){
-    modalEl.querySelectorAll('.rating-group').forEach(g=>{
-      if(g.dataset.name!=='av_geral') wireStars(g);
+  function setAvalInputsEnabled(enabled){
+    const boxAval = document.getElementById('boxAval');
+    if(!boxAval) return;
+    boxAval.querySelectorAll('input[name^="av_"], textarea[name="av_comentario"]').forEach(el=>{
+      el.disabled = !enabled;
     });
-    autoGeral();
   }
 
-  tbody.addEventListener('click', async (ev)=>{
-    const btn = ev.target.closest('[data-open-av]');
-    if(!btn) return;
-    const tr = btn.closest('tr');
-    const lancId = tr.dataset.id;
-    const getUrl = tr.dataset.getavurl;
-    inputLancId.value = lancId;
-    info.textContent = `${tr.cells[0].textContent.trim()} • ${tr.dataset.coopnome}`;
+  /* ===== Fluxo do Modal de Avaliação (Lançar) ===== */
+  function wireAvaliacaoFlow(){
+    const form = document.getElementById('formLancamento');
+    if(!form) return;
 
-    modalEl.querySelectorAll('input[name^="av_"]').forEach(i=>i.value='');
-    modalEl.querySelector('textarea[name="av_comentario"]').value='';
+    const modalEl = document.getElementById('modalAvaliar');
+    const modal = new bootstrap.Modal(modalEl);
+    const btnAvaliarAgora = document.getElementById('btnAvaliarAgora');
+    const btnPularAval = document.getElementById('btnPularAval');
+    const chkAvaliar = document.getElementById('chkAvaliar');
+    const inputAvaliar = document.getElementById('inputAvaliar');
+    const boxAval = document.getElementById('boxAval');
 
-    try{
-      const r = await fetch(getUrl, {credentials:'same-origin'});
-      if(r.ok){
-        const j = await r.json();
-        if(j.ok && j.data){
-          const d = j.data;
-          const map = {
-            'av_pontualidade': d.pontualidade,
-            'av_educacao': d.educacao,
-            'av_eficiencia': d.eficiencia,
-            'av_apresentacao': d.apresentacao,
-            'av_geral': d.geral
-          };
-          Object.entries(map).forEach(([k,v])=>{
-            const inp = modalEl.querySelector(`input[name="${k}"]`);
-            if(inp){ inp.value = v || ''; }
-          });
-          const ta = modalEl.querySelector('textarea[name="av_comentario"]');
-          if(ta) ta.value = d.comentario || '';
-        }
+    let isSubmitting = false;
+    const submitBtn = form.querySelector('button.btn-royal[type="submit"]');
+
+    function setSubmitting(on){
+      isSubmitting = !!on;
+      if(submitBtn){
+        submitBtn.disabled = on;
+        if(submitBtn.dataset.origText == null) submitBtn.dataset.origText = submitBtn.innerHTML;
+        submitBtn.innerHTML = on
+          ? '<span class="spinner-border spinner-border-sm me-1"></span> Lançando…'
+          : submitBtn.dataset.origText;
       }
-    }catch(e){/* silencioso */ }
-
-    initStarsInModal();
-    modal.show();
-  });
-
-  form.addEventListener('submit', async (ev)=>{
-    ev.preventDefault();
-    const lancId = inputLancId.value;
-    const tr = tbody.querySelector(`tr[data-id="${CSS.escape(lancId)}"]`);
-    if(!tr) return;
-    const postUrl = tr.dataset.avurl;
-
-    const fd = new FormData(form);
-    autoGeral();
-
-    try{
-      const r = await fetch(postUrl, {method:'POST', body:fd, credentials:'same-origin'});
-      if(!r.ok) throw new Error(r.status);
-      const j = await r.json();
-      if(j.ok){
-        const cell = tr.querySelector('[data-avcell]');
-        if(cell){
-          cell.innerHTML = `<span class="stars-static" data-score="${j.geral||0}">★★★★★</span>
-                            <button class="btn btn-outline-royal btn-sm ms-1" data-open-av>Editar</button>`;
-          paintStaticStars(cell.querySelector('.stars-static'));
-        }
-        modal.hide();
-      }else{
-        alert(j.error || 'Falha ao salvar avaliação.');
-      }
-    }catch(e){
-      alert('Erro de rede ao salvar avaliação.');
+      form.style.pointerEvents = on ? 'none' : '';
+      form.classList.toggle('opacity-75', on);
     }
+
+    function ensureRequestId(){
+      let inp = form.querySelector('input[name="request_id"]');
+      if(!inp){
+        inp = document.createElement('input');
+        inp.type = 'hidden';
+        inp.name = 'request_id';
+        form.appendChild(inp);
+      }
+      inp.value = Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+    }
+
+    function scrollIntoViewSmooth(el){
+      try{ el?.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
+    }
+
+    setAvalInputsEnabled(false);
+
+    chkAvaliar?.addEventListener('change', ()=>{
+      const on = chkAvaliar.checked;
+      inputAvaliar.value = on ? '1':'0';
+      if(boxAval) boxAval.style.display = on ? 'block':'none';
+      setAvalInputsEnabled(on);
+      if(on){ autoGeral(); }
+    });
+
+    form.addEventListener('submit', function(ev){
+      if(isSubmitting){ ev.preventDefault(); return; }
+      if(!form.checkValidity()){
+        form.reportValidity?.();
+        return;
+      }
+
+      const avaliando = chkAvaliar.checked || inputAvaliar.value === '1' || (boxAval && boxAval.style.display === 'block');
+
+      if(avaliando){
+        setAvalInputsEnabled(true);
+        autoGeral();
+        ensureRequestId();
+        setSubmitting(true);
+        return;
+      }
+
+      ev.preventDefault();
+      modal.show();
+    });
+
+    btnAvaliarAgora?.addEventListener('click', ()=>{
+      chkAvaliar.checked = true;
+      inputAvaliar.value = '1';
+      if(boxAval) boxAval.style.display = 'block';
+      setAvalInputsEnabled(true);
+      modal.hide();
+      setTimeout(()=>{
+        scrollIntoViewSmooth(boxAval);
+        boxAval.querySelector('.rating-group .star')?.focus?.();
+      }, 150);
+    });
+
+    btnPularAval?.addEventListener('click', ()=>{
+      chkAvaliar.checked = false;
+      inputAvaliar.value = '0';
+      if(boxAval) boxAval.style.display = 'none';
+      setAvalInputsEnabled(false);
+      modal.hide();
+      setTimeout(()=>{
+        if(isSubmitting) return;
+        ensureRequestId();
+        setSubmitting(true);
+        form.submit();
+      }, 80);
+    });
+
+    window.addEventListener('pageshow', (e)=>{
+      if(e.persisted) setSubmitting(false);
+    });
+  }
+
+  /* ===== Avaliar/Editar na página de Lançamentos (sem sair) ===== */
+  function paintStaticStars(el){
+    const score = Number(el?.dataset?.score||0);
+    if(!el) return;
+    el.textContent = '★★★★★'.slice(0, Math.max(0, Math.min(5, score))).padEnd(5, '☆');
+  }
+  function wireAvalLanc(){
+    const tbody = document.getElementById('tbodyLanc');
+    const modalEl = document.getElementById('modalAvalLanc'); // opcional
+    if(!tbody || !modalEl) return;
+
+    const modal = new bootstrap.Modal(modalEl);
+    const form = document.getElementById('formAvalLanc');
+    const info = document.getElementById('avLancInfo');
+    const inputLancId = document.getElementById('avLancId');
+
+    function initStarsInModal(){
+      modalEl.querySelectorAll('.rating-group').forEach(g=>{
+        if(g.dataset.name!=='av_geral') wireStars(g);
+      });
+      autoGeral();
+    }
+
+    tbody.addEventListener('click', async (ev)=>{
+      const btn = ev.target.closest('[data-open-av]');
+      if(!btn) return;
+      const tr = btn.closest('tr');
+      const lancId = tr.dataset.id;
+      const getUrl = tr.dataset.getavurl;
+      inputLancId.value = lancId;
+      info.textContent = `${tr.cells[0].textContent.trim()} • ${tr.dataset.coopnome}`;
+
+      modalEl.querySelectorAll('input[name^="av_"]').forEach(i=>i.value='');
+      modalEl.querySelector('textarea[name="av_comentario"]').value='';
+
+      try{
+        const r = await fetch(getUrl, {credentials:'same-origin'});
+        if(r.ok){
+          const j = await r.json();
+          if(j.ok && j.data){
+            const d = j.data;
+            const map = {
+              'av_pontualidade': d.pontualidade,
+              'av_educacao': d.educacao,
+              'av_eficiencia': d.eficiencia,
+              'av_apresentacao': d.apresentacao,
+              'av_geral': d.geral
+            };
+            Object.entries(map).forEach(([k,v])=>{
+              const inp = modalEl.querySelector(`input[name="${k}"]`);
+              if(inp){ inp.value = v || ''; }
+            });
+            const ta = modalEl.querySelector('textarea[name="av_comentario"]');
+            if(ta) ta.value = d.comentario || '';
+          }
+        }
+      }catch(e){/* silencioso */ }
+
+      initStarsInModal();
+      modal.show();
+    });
+
+    form.addEventListener('submit', async (ev)=>{
+      ev.preventDefault();
+      const lancId = inputLancId.value;
+      const tr = tbody.querySelector(`tr[data-id="${CSS.escape(lancId)}"]`);
+      if(!tr) return;
+      const postUrl = tr.dataset.avurl;
+
+      const fd = new FormData(form);
+      autoGeral();
+
+      try{
+        const r = await fetch(postUrl, {method:'POST', body:fd, credentials:'same-origin'});
+        if(!r.ok) throw new Error(r.status);
+        const j = await r.json();
+        if(j.ok){
+          const cell = tr.querySelector('[data-avcell]');
+          if(cell){
+            cell.innerHTML = `<span class="stars-static" data-score="${j.geral||0}">★★★★★</span>
+                              <button class="btn btn-outline-royal btn-sm ms-1" data-open-av>Editar</button>`;
+            paintStaticStars(cell.querySelector('.stars-static'));
+          }
+          modal.hide();
+        }else{
+          alert(j.error || 'Falha ao salvar avaliação.');
+        }
+      }catch(e){
+        alert('Erro de rede ao salvar avaliação.');
+      }
+    });
+
+    document.querySelectorAll('.stars-static').forEach(paintStaticStars);
+  }
+
+  /* ===== Eventos do menu ===== */
+  document.getElementById('sideNav')?.addEventListener('click', async (e)=>{
+    const a=e.target.closest('a'); if(!a) return;
+    const t=a.getAttribute('data-target'); if(!t) return; // logout segue normal
+    e.preventDefault();
+    document.querySelectorAll('#sideNav a').forEach(x=>x.classList.remove('active')); a.classList.add('active');
+    showSection(t); pushView(t);
+    if(t==='avisos' || t==='tabelas'){ prefetch(a.href); }
   });
 
-  document.querySelectorAll('.stars-static').forEach(paintStaticStars);
-}
+  document.getElementById('toastVerAgora')?.addEventListener('click', async (e)=>{
+    e.preventDefault();
+    const href=e.currentTarget.getAttribute('href');
+    showSection('avisos'); pushView('avisos');
+    await loadAvisosFromRoute(href);
+  });
 
-/* ===== Eventos do menu ===== */
-document.getElementById('sideNav')?.addEventListener('click', async (e)=>{
-  const a=e.target.closest('a'); if(!a) return;
-  const t=a.getAttribute('data-target'); if(!t) return; // logout segue normal
-  e.preventDefault();
-  document.querySelectorAll('#sideNav a').forEach(x=>x.classList.remove('active')); a.classList.add('active');
-  showSection(t); pushView(t);
-  if(t==='avisos' || t==='tabelas'){ prefetch(a.href); }
-});
-
-document.getElementById('toastVerAgora')?.addEventListener('click', async (e)=>{
-  e.preventDefault();
-  const href=e.currentTarget.getAttribute('href');
-  showSection('avisos'); pushView('avisos');
-  await loadAvisosFromRoute(href);
-});
-
-/* ===== Inicialização ===== */
-document.addEventListener('DOMContentLoaded', ()=>{
-  const initial=startView(); showSection(initial);
-  const unread=Number(document.getElementById('toastCount')?.textContent||'0'); setAvisosBadge(unread);
-});
-window.addEventListener('popstate',(ev)=>{ const v=(ev.state&&ev.state.view)||startView(); showSection(v); });
+  /* ===== Inicialização ===== */
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const initial=startView(); showSection(initial);
+    const unread=Number(document.getElementById('toastCount')?.textContent||'0'); setAvisosBadge(unread);
+  });
+  window.addEventListener('popstate',(ev)=>{ const v=(ev.state&&ev.state.view)||startView(); showSection(v); });
 </script>
 </body>
 </html>
