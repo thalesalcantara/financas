@@ -58,24 +58,38 @@ os.makedirs(STATIC_TABLES, exist_ok=True)
 DOCS_PERSIST_DIR = os.path.join(PERSIST_ROOT, "docs")
 os.makedirs(DOCS_PERSIST_DIR, exist_ok=True)
 
-def _build_db_uri() -> str:
-    url = os.environ.get("DATABASE_URL")
-    if not url:
-        return "sqlite:///" + os.path.join(BASE_DIR, "app.db")
-    # força driver novo psycopg
-    if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql+psycopg://", 1)
-    elif url.startswith("postgresql://") and "+psycopg" not in url:
-        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
 
-    # SSL + keepalive (libpq lê do URI)
-    sep = "&" if "?" in url else "?"
-    url = (
-        f"{url}{sep}"
-        "sslmode=require&"
-        "keepalives=1&keepalives_idle=30&keepalives_interval=10&keepalives_count=5"
-    )
-    return url
+def _merge_qs(url: str, extra: dict[str, str]) -> str:
+    """Insere parâmetros de query no URI sem duplicar os já existentes."""
+    p = urlparse(url)
+    q = dict(parse_qsl(p.query, keep_blank_values=True))
+    for k, v in (extra or {}).items():
+        q.setdefault(k, v)
+    return urlunparse(p._replace(query=urlencode(q, doseq=True)))
+
+
+def _build_db_uri() -> str:
+    raw = os.environ.get("DATABASE_URL")
+    if not raw:
+        return "sqlite:///" + os.path.join(BASE_DIR, "app.db")
+
+    # força driver psycopg3 (SQLAlchemy)
+    if raw.startswith("postgres://"):
+        raw = raw.replace("postgres://", "postgresql+psycopg://", 1)
+    elif raw.startswith("postgresql://") and "+psycopg" not in raw:
+        raw = raw.replace("postgresql://", "postgresql+psycopg://", 1)
+
+    # SSL + keepalive + app name via libpq (idempotente)
+    extras = {
+        "sslmode": "require",
+        "keepalives": "1",
+        "keepalives_idle": "30",
+        "keepalives_interval": "10",
+        "keepalives_count": "3",
+        "application_name": os.environ.get("APP_NAME", "financas-dxsu"),
+    }
+    return _merge_qs(raw, extras)
+
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "coopex-secret")
@@ -86,16 +100,14 @@ URI = _build_db_uri()
 if "sqlite" in URI and os.environ.get("FLASK_ENV") == "production":
     raise RuntimeError("DATABASE_URL ausente em produção")
 
-# ===== Pool “sem travar”, mas seguro =====
-# - Você pode dizer quantas conexões quer ALVO no total com DB_TARGET_CONNS (padrão 60).
-# - A gente divide por WEB_CONCURRENCY (nº de workers) para calcular por-worker.
-# - Se quiser forçar manualmente, use DB_POOL_SIZE / DB_MAX_OVERFLOW.
+# ===== Pool dimensionado por worker =====
 workers = int(os.environ.get("WEB_CONCURRENCY", "1") or "1")
 target_total = int(os.environ.get("DB_TARGET_CONNS", "60") or "60")
 per_worker_target = max(5, target_total // max(1, workers))
 
 pool_size = int(os.environ.get("DB_POOL_SIZE", str(per_worker_target)))
 max_overflow = int(os.environ.get("DB_MAX_OVERFLOW", str(max(5, per_worker_target // 2))))
+pool_recycle = int(os.environ.get("SQL_POOL_RECYCLE", "300"))  # 5 min
 
 app.config.update(
     SQLALCHEMY_DATABASE_URI=URI,
@@ -115,9 +127,9 @@ app.config.update(
         "pool_timeout": 15,
         "pool_pre_ping": True,       # testa conexão antes de usar (evita 500 de conn morta)
         "pool_use_lifo": True,       # reduz churn de conexões sob carga
-        # 👉 sem pool_recycle (como você pediu)
+        "pool_recycle": pool_recycle,  # recicla sockets ociosos (evita TLS bad record mac)
         "connect_args": {
-            "connect_timeout": 5,
+            "connect_timeout": int(os.getenv("PGCONNECT_TIMEOUT", "5")),
             # tempo máx. por statement no servidor (defensivo)
             "options": "-c statement_timeout=15000",
         },
@@ -126,10 +138,12 @@ app.config.update(
 
 db = SQLAlchemy(app)
 
+
 # Health checks
 @app.get("/healthz")
 def healthz():
     return "ok", 200
+
 
 @app.get("/readyz")
 def readyz():
@@ -138,6 +152,7 @@ def readyz():
         return "ready", 200
     except Exception:
         return "not-ready", 503
+
 
 # Liga foreign_keys no SQLite
 @event.listens_for(Engine, "connect")
@@ -149,6 +164,7 @@ def _set_sqlite_pragma(dbapi_con, con_record):
             cur.close()
     except Exception:
         pass
+
 
 def _is_sqlite() -> bool:
     try:
@@ -5753,6 +5769,19 @@ def marcar_todos_avisos_lidos_restaurante():
             ))
     db.session.commit()
     return redirect(url_for("portal_restaurante_avisos"))
+
+# routes/avisos.py
+from flask import Blueprint, jsonify
+from flask_login import login_required, current_user
+
+bp = Blueprint("avisos", __name__)
+
+@bp.get("/avisos/unread_count")
+@login_required
+def unread_count():
+    # TODO: substituir pela contagem real no futuro
+    return jsonify({"unread": 0})
+
 
 # =========================
 # Main
