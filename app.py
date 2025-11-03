@@ -176,7 +176,6 @@ def _is_sqlite() -> bool:
 # Models
 # =========================
 from flask_login import UserMixin
-from werkzeug.security import generate_password_hash, check_password_hash
 
 class Usuario(db.Model, UserMixin):
     __tablename__ = "usuarios"
@@ -564,7 +563,7 @@ def init_db():
     try:
         if _is_sqlite():
             db.session.execute(sa_text("""
-                CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON avaliacoes (criado_em);
+               CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON avaliacoes (criado_em);
                 CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON avaliacoes (restaurante_id, criado_em);
                 CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON avaliacoes (cooperado_id,  criado_em);
 
@@ -577,10 +576,12 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON public.avaliacoes (criado_em);
                 CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON public.avaliacoes (restaurante_id, criado_em);
                 CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON public.avaliacoes (cooperado_id,  criado_em);
-
-                CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em           ON public.avaliacoes_restaurante (criado_em);
-                CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado         ON public.avaliacoes_restaurante (restaurante_id, criado_em);
-                CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado         ON public.avaliacoes_restaurante (cooperado_id,  criado_em);
+            """))
+        else:
+            db.session.execute(sa_text("""
+                CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em        ON public.avaliacoes (criado_em);
+                CREATE INDEX IF NOT EXISTS ix_avaliacoes_rest_criado      ON public.avaliacoes (restaurante_id, criado_em);
+                CREATE INDEX IF NOT EXISTS ix_avaliacoes_coop_criado      ON public.avaliacoes (cooperado_id,  criado_em);
             """))
         db.session.commit()
     except Exception:
@@ -658,12 +659,14 @@ def init_db():
         # para ter a FK de fato, teria que recriar a tabela. Em dev, costuma bastar só a coluna.
         else:
             db.session.execute(sa_text("""
-                ALTER TABLE IF NOT EXISTS public.despesas_cooperado
-                ADD COLUMN IF NOT EXISTS beneficio_id INTEGER
+                CREATE INDEX IF NOT EXISTS ix_despesas_beneficio_id
+                ON public.despesas_cooperado (beneficio_id)
          """))
             db.session.execute(sa_text("""
-            CREATE INDEX IF NOT EXISTS ix_despesas_beneficio_id
-            ON public.despesas_cooperado (beneficio_id)
+                ALTER TABLE public.despesas_cooperado
+                ADD CONSTRAINT despesas_cooperado_beneficio_id_fkey
+                FOREIGN KEY (beneficio_id) REFERENCES public.beneficios_registro (id)
+                ON DELETE CASCADE
          """))
             db.session.execute(sa_text("""
             ALTER TABLE public.despesas_cooperado
@@ -1398,37 +1401,59 @@ def avisos_list():
         current_year=current_year
     )
 
-# === AVALIAÇÕES: Cooperado -> Restaurante (NOVO) =============================
+# === AVALIAÇÕES: Cooperado -> Restaurante (AJUSTADO) =========================
 class AvaliacaoRestaurante(db.Model):
     __tablename__ = "avaliacoes_restaurante"
+
     id = db.Column(db.Integer, primary_key=True)
 
     restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False, index=True)
     cooperado_id   = db.Column(db.Integer, db.ForeignKey("cooperados.id"),   nullable=False, index=True)
 
-    # 🔴 IMPORTANTE: CASCADE ao apagar o lançamento
+    # 1 avaliação por lançamento (o cooperado só avalia uma vez aquele turno/expediente)
     lancamento_id  = db.Column(
         db.Integer,
         db.ForeignKey("lancamentos.id", ondelete="CASCADE"),
         unique=True,
         index=True,
-        nullable=True
+        nullable=True,
     )
 
-    # mesmas métricas 1..5
-    estrelas_geral        = db.Column(db.Integer)
-    estrelas_pontualidade = db.Column(db.Integer)
-    estrelas_educacao     = db.Column(db.Integer)
-    estrelas_eficiencia   = db.Column(db.Integer)
-    estrelas_apresentacao = db.Column(db.Integer)
+    # ===== SOMENTE 3 DIMENSÕES =====
+    estrelas_ambiente   = db.Column(db.Integer)   # 1..5
+    estrelas_tratamento = db.Column(db.Integer)   # 1..5
+    estrelas_suporte    = db.Column(db.Integer)   # 1..5
 
-    comentario      = db.Column(db.Text)
-    media_ponderada = db.Column(db.Float)
-    sentimento      = db.Column(db.String(12))
-    temas           = db.Column(db.String(255))
-    alerta_crise    = db.Column(db.Boolean, default=False)
+    # Derivados
+    estrelas_geral      = db.Column(db.Float)     # média arredondada 1 casa
+    media_ponderada     = db.Column(db.Float)     # pode ser igual à geral (sem pesos)
+
+    comentario          = db.Column(db.Text)
+    sentimento          = db.Column(db.String(12))
+    temas               = db.Column(db.String(255))
+    alerta_crise        = db.Column(db.Boolean, default=False)
 
     criado_em = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    def recompute(self, pesos=(1, 1, 1)):
+        vals = [self.estrelas_ambiente, self.estrelas_tratamento, self.estrelas_suporte]
+        nums = [float(v) for v in vals if isinstance(v, (int, float)) and v is not None]
+        if not nums:
+            self.estrelas_geral = None
+            self.media_ponderada = None
+            return
+        if pesos and len(pesos) == 3:
+            total = 0.0
+            wsum = 0.0
+            for v, p in zip(vals, pesos):
+                if v is not None:
+                    total += float(v) * p
+                    wsum += p
+            media = (total / wsum) if wsum > 0 else (sum(nums) / len(nums))
+        else:
+            media = sum(nums) / len(nums)
+        self.media_ponderada = round(media, 2)
+        self.estrelas_geral = round(media, 1)
 
 @portal_bp.post("/avisos/<int:aviso_id>/lido", endpoint="marcar_aviso_lido")
 @role_required("cooperado")
@@ -2517,11 +2542,6 @@ def admin_delete_lancamento(id):
     flash("Lançamento excluído.", "success")
     return redirect(url_for("admin_dashboard", tab="lancamentos"))
 
-# ===== IMPORTS =====
-from flask import request, render_template, send_file, url_for
-from sqlalchemy import func, literal, and_
-from types import SimpleNamespace
-import io, csv
 
 # ===== IMPORTS =====
 from flask import request, render_template, send_file, url_for
@@ -4632,12 +4652,12 @@ def portal_cooperado():
         trocas_enviadas=trocas_enviadas,
     )
 
-from datetime import datetime
-from flask import request, redirect, url_for, flash, abort, session
-
+# === AVALIAR RESTAURANTE (cooperado -> restaurante)
+# Duas rotas para a MESMA função e MESMO endpoint (o do template):
 @app.post("/coop/avaliar/restaurante/<int:lanc_id>")
+@app.post("/producoes/<int:lanc_id>/avaliar")
 @role_required("cooperado")
-def coop_avaliar_restaurante(lanc_id):
+def producoes_avaliar(lanc_id):
     # 1) Cooperado logado
     u_id = session.get("user_id")
     coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
@@ -4653,56 +4673,92 @@ def coop_avaliar_restaurante(lanc_id):
           .first())
     if ja:
         flash("Você já avaliou esta produção.", "info")
-        return redirect(request.referrer or url_for("coop_dashboard"))
+        return redirect(request.referrer or url_for("coop_dashboard") + "#producoes")
 
-    # 4) Lê os campos do form (suporta 'nota' simples OU 'av_geral')
-    f  = request.form
-    g  = _clamp_star(f.get("nota") or f.get("av_geral"))   # obrigatório
-    p  = _clamp_star(f.get("av_pontualidade"))
-    ed = _clamp_star(f.get("av_educacao"))
-    ef = _clamp_star(f.get("av_eficiencia"))
-    ap = _clamp_star(f.get("av_apresentacao"))
-    tx = (f.get("av_comentario") or "").strip()
+    # -------- Helpers locais --------
+    def _clamp_star_local(v):
+        try:
+            n = int(float(v))
+        except Exception:
+            return None
+        return n if 1 <= n <= 5 else None
 
-    if not g:
-        flash("Selecione uma nota de 1 a 5.", "warning")
-        return redirect(request.referrer or url_for("coop_dashboard"))
+    def _get(v):
+        return request.form.get(v)
 
-    # 5) Cria e salva
+    # 4) Campos do form — SOMENTE 3 dimensões, com retrocompat:
+    amb  = _clamp_star_local(_get("av_ambiente")    or _get("av_apresentacao"))  # retro
+    trat = _clamp_star_local(_get("av_tratamento")  or _get("av_educacao"))      # retro
+    sup  = _clamp_star_local(_get("av_suporte")     or _get("av_eficiencia"))    # retro
+
+    # Se vier 'nota' / 'av_geral', usa como fallback nas faltantes
+    nota = _clamp_star_local(_get("nota") or _get("av_geral"))
+    if nota is not None:
+        if amb  is None: amb  = nota
+        if trat is None: trat = nota
+        if sup  is None: sup  = nota
+
+    # Validação
+    if not (amb and trat and sup):
+        flash("Selecione notas (1..5) para Ambiente, Tratamento e Suporte.", "warning")
+        return redirect(request.referrer or url_for("coop_dashboard") + "#producoes")
+
+    # Média (geral e ponderada iguais, com arredondamentos diferentes)
+    media = (amb + trat + sup) / 3.0
+    estrelas_geral  = round(media, 1)
+    media_ponderada = round(media, 2)
+
+    comentario = (_get("av_comentario") or "").strip() or None
+
+    # Derivados opcionais — mantém compat se suas funções existirem
+    try:
+        senti = _analise_sentimento(comentario) if comentario else None
+    except Exception:
+        senti = None
+    try:
+        temas = "; ".join(_identifica_temas(comentario)) if comentario else None
+    except Exception:
+        temas = None
+    try:
+        crise = _sinaliza_crise(estrelas_geral, comentario)
+    except Exception:
+        crise = False
+
     a = AvaliacaoRestaurante(
         restaurante_id=lanc.restaurante_id,
         cooperado_id=coop.id,
         lancamento_id=lanc.id,
-        estrelas_geral=g,
-        estrelas_pontualidade=p,
-        estrelas_educacao=ed,
-        estrelas_eficiencia=ef,
-        estrelas_apresentacao=ap,
-        comentario=tx,
-        media_ponderada=_media_ponderada(g, p, ed, ef, ap),
-        sentimento=_analise_sentimento(tx),
-        temas="; ".join(_identifica_temas(tx)),
-        alerta_crise=_sinaliza_crise(g, tx),
-        criado_em=datetime.utcnow(),
+
+        estrelas_ambiente=amb,
+        estrelas_tratamento=trat,
+        estrelas_suporte=sup,
+        estrelas_geral=estrelas_geral,
+        media_ponderada=media_ponderada,
+
+        comentario=comentario,
+        sentimento=senti,
+        temas=temas,
+        alerta_crise=crise,
+        # criado_em => default no modelo
     )
     db.session.add(a)
-    db.session.commit()
 
-    flash("Avaliação do restaurante registrada.", "success")
-    return redirect(request.referrer or url_for("coop_dashboard"))
+    try:
+        db.session.commit()
+        flash("Avaliação do restaurante registrada.", "success")
+    except IntegrityError:
+        db.session.rollback()
+        flash("Avaliação já registrada para este lançamento.", "info")
 
-# Alias para manter compatibilidade com o action do formulário
-@app.post("/producoes/<int:lanc_id>/avaliar", endpoint="producoes_avaliar")
+    return redirect(request.referrer or url_for("coop_dashboard") + "#producoes")
+
+
+# === ALIAS DO PAINEL: /painel/cooperado  -> redireciona para o endpoint oficial
+@app.get("/painel/cooperado")
 @role_required("cooperado")
-def producoes_avaliar(lanc_id):
-    # IMPORTANTÍSSIMO: retornar o que a função real retorna
-    return coop_avaliar_restaurante(lanc_id)
-
-@app.route("/painel/cooperado")
-@role_required("cooperado")
-def coop_dashboard():
-    return portal_cooperado()
-
+def coop_dashboard_alias():
+    return redirect(url_for("coop_dashboard"))
+    
 @app.route("/escala/solicitar_troca", methods=["POST"])
 @role_required("cooperado")
 def solicitar_troca():
@@ -5776,11 +5832,44 @@ from flask_login import login_required, current_user
 
 bp = Blueprint("avisos", __name__)
 
-@bp.get("/avisos/unread_count")
-@login_required
-def unread_count():
-    # TODO: substituir pela contagem real no futuro
-    return jsonify({"unread": 0})
+@app.get("/avisos/unread_count")
+def avisos_unread_count():
+    if "user_id" not in session:
+        return jsonify(count=0), 401
+
+    user_id = session.get("user_id")
+    user_tipo = session.get("user_tipo")
+
+    try:
+        if user_tipo == "cooperado":
+            coop = Cooperado.query.filter_by(usuario_id=user_id).first()
+            if not coop:
+                return jsonify(count=0), 403
+            avisos = get_avisos_for_cooperado(coop)
+            lidos = {
+                r.aviso_id
+                for r in AvisoLeitura.query.filter_by(cooperado_id=coop.id).all()
+            }
+            count = sum(1 for a in avisos if a.id not in lidos)
+
+        elif user_tipo == "restaurante":
+            rest = Restaurante.query.filter_by(usuario_id=user_id).first()
+            if not rest:
+                return jsonify(count=0), 403
+            avisos = get_avisos_for_restaurante(rest)
+            lidos = {
+                r.aviso_id
+                for r in AvisoLeitura.query.filter_by(restaurante_id=rest.id).all()
+            }
+            count = sum(1 for a in avisos if a.id not in lidos)
+
+        else:
+            count = 0
+
+        return jsonify(count=int(count))
+    except Exception:
+        db.session.rollback()
+        return jsonify(count=0), 500
 
 
 # =========================
