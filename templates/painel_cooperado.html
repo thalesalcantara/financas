@@ -2,8 +2,9 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Meu Painel - Coopex</title>
+  <title>Painel — Coopex</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2747d9">
 
   <!-- Fonts & Icons (CDN) -->
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
@@ -24,28 +25,26 @@
       --ok:#16a34a;         /* sucesso */
       --bad:#dc2626;        /* erro */
       --soft:#eef2ff;       /* chip */
+      --line:#00000012;     /* borda leve */
     }
 
     html,body{height:100%;overflow-x:hidden}
-    body{background:var(--bg);color:#111;font-family:'Roboto',system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";}
+    body{background:var(--bg);color:#111;font-family:'Roboto',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";}
     .navbar{background:var(--royal)}
-    .navbar-brand{font-family:'Orbitron',sans-serif;letter-spacing:.5px;color:#fff}
-    .navbar .pill{display:inline-flex;align-items:center;gap:.35rem;background:#ffffff;color:#111;border-radius:999px;padding:.2rem .55rem;font-weight:700;box-shadow:0 1px 6px #0001}
-    .navbar .pill .bi-star-fill{color:#f5c518}
-    .navbar .pill .bi-bag-check-fill{color:#16a34a}
     .btn-royal{background:var(--royal);color:#fff;border:0}
     .btn-royal:hover{background:var(--royal-2);color:#fff}
     .card{border:0;background:var(--card);border-radius:16px;box-shadow:0 8px 28px #0000000d}
     .muted{color:var(--muted)}
     .mono{font-variant-numeric:tabular-nums}
     .chip{display:inline-flex;align-items:center;gap:.35rem;background:var(--soft);color:#111;border-radius:999px;padding:.25rem .6rem;font-weight:700}
-    .kpi .label{color:#334155;font-weight:700}
-    .kpi .value{font-weight:800}
-    .kpi + .kpi{margin-top:.35rem}
     .mobile-wrap{max-width:520px;margin:0 auto}
     .desktop-warning{display:none}
     @media (min-width:992px){.desktop-warning{display:block}}
-    .unread-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#dc3545;box-shadow:0 0 0 2px #fff}
+
+    /* Navbar compacto (só avatar + KPIs à direita) */
+    .nav-actions .pill{display:inline-flex;align-items:center;gap:.35rem;background:#ffffff;color:#111;border-radius:999px;padding:.2rem .55rem;font-weight:700;box-shadow:0 1px 6px #0001}
+    .nav-actions .bi-star-fill{color:#f5c518}
+    .nav-actions .bi-bag-check-fill{color:#16a34a}
 
     /* Tabs */
     .sticky-tabs{position:sticky;top:0;z-index:10;background:linear-gradient(#f6f8ff,#f6f8ff)}
@@ -53,28 +52,39 @@
     .nav-tabs .nav-link{border:0;background:transparent;color:#1e293b;font-weight:700}
     .nav-tabs .nav-link.active{background:#fff;color:#111;border-radius:12px 12px 0 0;box-shadow:0 -6px 16px #00000010}
 
-    /* Lateral Menu (drawer) */
+    /* Drawer */
     #menuLateral{display:none;position:fixed;inset:0 auto 0 0;width:270px;background:#fff;box-shadow:6px 0 30px #0000001a;z-index:200;transform:translateX(-100%);transition:transform .25s ease}
     #menuLateral.aberto{display:block;transform:translateX(0)}
     #fundoMenu{display:none;position:fixed;inset:0;background:#0006;z-index:199}
     #fundoMenu.aberto{display:block}
 
-    /* Docs status */
+    /* Resumo (KPI) */
+    .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .kpi-card{border:1px solid var(--line);border-radius:14px;padding:.75rem}
+    .kpi-title{color:#334155;font-weight:700;font-size:.84rem;margin-bottom:.15rem}
+    .kpi-value{font-weight:800;font-size:1.15rem}
+    .kpi-sub{font-size:.78rem;color:var(--muted)}
+
+    /* Docs */
     .doc-ok{background:#e8fff1;border:1px solid #bff0d1}
     .doc-bad{background:#ffecec;border:1px solid #ffb3b3}
     .badge-soft{background:var(--soft);color:#111;border-radius:999px;padding:.15rem .55rem}
 
-    /* Escala */
-    .table-escala{table-layout:fixed;width:100%}
-    .table-escala thead{background:var(--soft)}
-    .table-escala th,.table-escala td{vertical-align:middle}
-    .row-stripe{border-left:6px solid var(--royal)}
-    .esc-today{background:rgba(34,197,94,.10)}
-    .esc-past{background:rgba(239,68,68,.07)}
-    .esc-future,.esc-tomorrow{background:rgba(59,130,246,.08)}
+    /* Escala — cartões responsivos (sem cortar) */
+    .esc-card{display:flex;gap:12px;padding:10px;border:1px solid var(--line);border-radius:12px;margin-bottom:10px;background:#fff}
+    .esc-bar{width:6px;border-radius:8px;background:var(--stripe,#e5e7eb)}
+    .esc-body{flex:1;min-width:0}
+    .esc-title{font-weight:700;color:var(--ink);word-break:break-word;overflow-wrap:anywhere}
+    .esc-meta{color:var(--muted);font-size:.9rem;word-break:break-word;overflow-wrap:anywhere}
+    .esc-actions{display:flex;align-items:center;justify-content:flex-end}
+    .esc-chip{display:inline-block;font-size:.75rem;background:#f1f5ff;color:#1f3a8a;border:1px solid #dbe4ff;border-radius:999px;padding:.2rem .5rem}
+    .esc-status-today{background:rgba(34,197,94,.10)}
+    .esc-status-past{background:rgba(239,68,68,.07)}
+    .esc-status-future{background:rgba(59,130,246,.08)}
+
     .btn-xs{padding:2px 8px;font-size:.78rem;border-radius:10px}
 
-    /* Rating (somente seleção por dimensão — sem “Geral” visível) */
+    /* Rating */
     .rating-stars{display:flex;gap:.25rem}
     .rating-stars .bi-star,.rating-stars .bi-star-fill{font-size:1.2rem}
     .rating-stars .bi-star-fill{color:#f5c518}
@@ -83,7 +93,7 @@
 
     /* Offcanvas Finanças */
     .offcanvas{border-top-left-radius:16px;border-top-right-radius:16px}
-    .soft-card{background:#fff;border:1px solid #00000010;border-radius:14px;box-shadow:0 6px 22px #0000000d}
+    .soft-card{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 6px 22px #0000000d}
     .title-muted{font-size:.8rem;color:#6b7280;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
 
     /* Calculadora */
@@ -100,9 +110,9 @@
 
     /* Notas */
     .notes-wrap{display:flex;gap:.5rem;height:60vh;min-height:420px}
-    .notes-list{width:38%;max-width:260px;background:#fff;border:1px solid #0001;border-radius:12px;overflow:auto}
-    .notes-editor{flex:1;background:#fff;border:1px solid #0001;border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
-    .notes-toolbar{display:flex;gap:.4rem;padding:.5rem;border-bottom:1px solid #0001;background:#f8f9fe;align-items:center}
+    .notes-list{width:38%;max-width:260px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:auto}
+    .notes-editor{flex:1;background:#fff;border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
+    .notes-toolbar{display:flex;gap:.4rem;padding:.5rem;border-bottom:1px solid var(--line);background:#f8f9fe;align-items:center}
     .note-card{padding:.55rem .65rem;border-bottom:1px solid #00000010}
     .note-card.active{background:#eef2ff}
     @media (max-width:575px){.notes-wrap{flex-direction:column}.notes-list{width:100%;max-width:none;height:180px}.notes-editor{height:calc(60vh - 190px)}}
@@ -119,7 +129,7 @@
 {% set _unread = unread if unread is defined else (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else (avisos_unread_count if avisos_unread_count is defined else 0)) %}
 {% set unread = _unread|int %}
 
-{# ==== MÉTRICAS PARA CABEÇALHO (estilo Uber) ==== #}
+{# ==== MÉTRICAS CABEÇALHO ==== #}
 {% set _qtd_prod = producoes|length %}
 {% set ns = namespace(sum=0, cnt=0) %}
 {% for l in producoes %}
@@ -136,9 +146,9 @@
 <div id="menuLateral" aria-label="Menu lateral">
   <div class="p-3 border-bottom d-flex align-items-center gap-2">
     <img src="{{ cooperado.foto_url or url_for('static', filename='img/default.png') }}"
-         alt="Foto do cooperado"
+         alt="Foto do usuário"
          style="width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid var(--royal)">
-    <div class="fw-bold">{{ cooperado.nome }}</div>
+    <!-- Nome removido a pedido: apenas a foto no topo -->
     <button class="btn-close ms-auto" id="fecharMenu" aria-label="Fechar"></button>
   </div>
 
@@ -179,7 +189,7 @@
 </div>
 
 <div class="mobile-wrap">
-  <!-- ===== NAVBAR ===== -->
+  <!-- ===== NAVBAR (só foto + KPIs à direita) ===== -->
   <nav class="navbar navbar-dark">
     <div class="container-fluid d-flex align-items-center flex-nowrap">
       <!-- Avatar abre o menu -->
@@ -189,14 +199,11 @@
              style="width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid #ffffff55">
       </button>
 
-      <!-- Título central -->
-      <span class="navbar-brand m-0 text-truncate" style="min-width:0;flex:1 1 auto;text-align:center">
-        Cooperado
-        {% if unread>0 %}<span class="unread-dot" title="{{ unread }} novo(s) aviso(s)"></span>{% endif %}
-      </span>
+      <!-- Centro vazio (removeu label 'Cooperado') -->
+      <div class="flex-grow-1"></div>
 
-      <!-- Ações à direita (estilo Uber: rating + entregas) -->
-      <div class="d-flex align-items-center gap-2 flex-shrink-0">
+      <!-- Ações à direita -->
+      <div class="nav-actions d-flex align-items-center gap-2 flex-shrink-0">
         <span class="pill" title="{{ _score_title }}">
           <i class="bi bi-star-fill" aria-hidden="true"></i>
           <span class="mono">{{ ("%.1f"|format(_score_header)).replace('.',',') }}</span>
@@ -245,21 +252,11 @@
 <!-- ===== Abas ===== -->
 <div class="sticky-tabs px-2">
   <ul class="nav nav-tabs nav-fill" id="painelTabs" role="tablist">
-    <li class="nav-item" role="presentation">
-      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#resumo" type="button" role="tab" aria-controls="resumo" aria-selected="true">Resumo</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#producoes" type="button" role="tab" aria-controls="producoes" aria-selected="false">Produções</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#ajustes" type="button" role="tab" aria-controls="ajustes" aria-selected="false">Ajustes Coop</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#escalas" type="button" role="tab" aria-controls="escalas" aria-selected="false">Escalas</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#trocas" type="button" role="tab" aria-controls="trocas" aria-selected="false">Trocas</button>
-    </li>
+    <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#resumo" type="button" role="tab" aria-controls="resumo" aria-selected="true">Resumo</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#producoes" type="button" role="tab" aria-controls="producoes" aria-selected="false">Produções</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ajustes" type="button" role="tab" aria-controls="ajustes" aria-selected="false">Ajustes Coop</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#escalas" type="button" role="tab" aria-controls="escalas" aria-selected="false">Escalas</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#trocas" type="button" role="tab" aria-controls="trocas" aria-selected="false">Trocas</button></li>
   </ul>
 </div>
 
@@ -267,27 +264,44 @@
   <!-- ===== RESUMO ===== -->
   <div class="tab-pane fade show active" id="resumo" role="tabpanel" aria-labelledby="resumo-tab">
     <div class="card p-3">
-      <div class="d-flex align-items-center mb-2">
-        <img src="{{ cooperado.foto_url or url_for('static', filename='img/default.png') }}"
-             alt="Foto"
-             style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:3px solid var(--royal);margin-right:10px">
-        <div>
-          <div class="fw-bold" style="color:var(--ink)">{{ cooperado.nome }}</div>
-          <div class="small text-muted">ID #{{ cooperado.id }}</div>
+      <!-- Grid de KPIs: limpo e separado dos nomes -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-title">Entregas no período</div>
+          <div class="kpi-value mono">{{ _qtd_prod }}</div>
+          <div class="kpi-sub">Quantidade</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Média de avaliação</div>
+          <div class="kpi-value mono">{{ ("%.1f"|format(_score_header)).replace('.',',') }}</div>
+          <div class="kpi-sub">{{ _score_title }}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Total Bruto</div>
+          <div class="kpi-value mono">R$ {{ "%.2f"|format(total_bruto|default(0)) }}</div>
+          <div class="kpi-sub">Recebido</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Descontos Individuais</div>
+          <div class="kpi-value mono">R$ {{ "%.2f"|format(total_descontos|default(0)) }}</div>
+          <div class="kpi-sub">No período</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">INSS (4,5%)</div>
+          <div class="kpi-value mono">R$ {{ "%.2f"|format(inss_valor|default(0)) }}</div>
+          <div class="kpi-sub">Desconto estimado</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Complemento INSS (meta)</div>
+          <div class="kpi-value mono">R$ {{ "%.2f"|format(inss_complemento|default(0)) }}</div>
+          <div class="kpi-sub">Sugestão</div>
+        </div>
+        <div class="kpi-card" style="grid-column:1/-1">
+          <div class="kpi-title">Total Líquido</div>
+          <div class="kpi-value mono text-success">R$ {{ "%.2f"|format(total_liquido|default(0)) }}</div>
+          <div class="kpi-sub">Após descontos</div>
         </div>
       </div>
-
-      {# Removido: cartões redundantes de 'Entregas no período' e 'Sua média' (agora no cabeçalho) #}
-
-      <hr class="my-2">
-
-      <div class="kpi"><span class="label">Total Bruto</span><span class="value mono">R$ {{ "%.2f"|format(total_bruto|default(0)) }}</span></div>
-      <div class="kpi"><span class="label">Total Descontos Individuais</span><span class="value mono">R$ {{ "%.2f"|format(total_descontos|default(0)) }}</span></div>
-      <hr class="my-2">
-      <div class="kpi"><span class="label">INSS (4,5%)</span><span class="value mono">R$ {{ "%.2f"|format(inss_valor|default(0)) }}</span></div>
-      <div class="kpi"><span class="label">Complemento INSS (meta)</span><span class="value mono">R$ {{ "%.2f"|format(inss_complemento|default(0)) }}</span></div>
-      <hr class="my-2">
-      <div class="kpi"><span class="label">Total Líquido</span><span class="value mono text-success">R$ {{ "%.2f"|format(total_liquido|default(0)) }}</span></div>
     </div>
   </div>
 
@@ -302,17 +316,17 @@
       {% for lanc in producoes %}
         <div class="card p-3">
           <div class="d-flex justify-content-between">
-            <div class="me-2">
-              <div class="fw-bold">{{ lanc.descricao }}</div>
+            <div class="me-2" style="min-width:0">
+              <div class="fw-bold" style="word-break:break-word;overflow-wrap:anywhere">{{ lanc.descricao }}</div>
               <div class="muted">
-                <i class="bi bi-shop"></i> {{ lanc.restaurante.nome }}
+                <i class="bi bi-shop"></i> <span style="word-break:break-word;overflow-wrap:anywhere">{{ lanc.restaurante.nome }}</span>
                 &nbsp;·&nbsp; <i class="bi bi-calendar-event"></i> {{ lanc.data.strftime('%d/%m/%Y') }}
                 {% if lanc.hora_inicio or lanc.hora_fim %}
                   &nbsp;·&nbsp; <i class="bi bi-clock"></i> {{ lanc.hora_inicio }}{% if lanc.hora_fim %}–{{ lanc.hora_fim }}{% endif %}
                 {% endif %}
               </div>
 
-              <!-- Avaliação: sem “média geral” visível; só 3 dimensões -->
+              <!-- Avaliação (mantida) -->
               <div class="mt-2">
                 {% set minha = lanc.minha_avaliacao %}
                 {% if minha is not none %}
@@ -340,25 +354,19 @@
                       <div class="col-12 col-sm-4">
                         <div class="small fw-semibold text-muted">Ambiente</div>
                         <div class="rating-stars selectable stars-group" data-field="av_ambiente" role="radiogroup">
-                          {% for i in range(1,6) %}
-                            <button type="button" class="star-btn" data-value="{{ i }}"><i class="bi bi-star"></i></button>
-                          {% endfor %}
+                          {% for i in range(1,6) %}<button type="button" class="star-btn" data-value="{{ i }}"><i class="bi bi-star"></i></button>{% endfor %}
                         </div>
                       </div>
                       <div class="col-12 col-sm-4">
                         <div class="small fw-semibold text-muted">Tratamento</div>
                         <div class="rating-stars selectable stars-group" data-field="av_tratamento" role="radiogroup">
-                          {% for i in range(1,6) %}
-                            <button type="button" class="star-btn" data-value="{{ i }}"><i class="bi bi-star"></i></button>
-                          {% endfor %}
+                          {% for i in range(1,6) %}<button type="button" class="star-btn" data-value="{{ i }}"><i class="bi bi-star"></i></button>{% endfor %}
                         </div>
                       </div>
                       <div class="col-12 col-sm-4">
                         <div class="small fw-semibold text-muted">Suporte</div>
                         <div class="rating-stars selectable stars-group" data-field="av_suporte" role="radiogroup">
-                          {% for i in range(1,6) %}
-                            <button type="button" class="star-btn" data-value="{{ i }}"><i class="bi bi-star"></i></button>
-                          {% endfor %}
+                          {% for i in range(1,6) %}<button type="button" class="star-btn" data-value="{{ i }}"><i class="bi bi-star"></i></button>{% endfor %}
                         </div>
                       </div>
                     </div>
@@ -427,7 +435,7 @@
     </div>
   </div>
 
-  <!-- ===== ESCALAS ===== -->
+  <!-- ===== ESCALAS (cartões mobile) ===== -->
   <div class="tab-pane fade" id="escalas" role="tabpanel" aria-labelledby="escalas-tab">
     <div class="card p-3 mb-3">
       {% set cnh_ok = doc_cnh.ok %}
@@ -480,39 +488,39 @@
       </div>
     </div>
 
-    <!-- Tabela de Escala -->
-    <table class="table table-bordered table-escala align-middle">
-      <thead><tr><th>Data</th><th>Turno</th><th>Horário</th><th>Contrato</th></tr></thead>
-      <tbody>
-      {% if minha_escala %}
-        {% for e in minha_escala %}
-          {% set stripe = (e.cor or e.status_color or '#e5e7eb') %}
-          {% set data_curta = e.data_curta or (e.data_fmt[:5] if e.data_fmt else (e.data[:5] if e.data else '')) %}
-          {% set dow = (e.dia_semana or e.dow or '')|upper %}
-          <tr class="row-stripe esc-{{ e.status }}" style="--bs-table-bg:transparent;--stripe:{{ stripe }}">
-            <td>
-              <div class="fw-bold">{{ data_curta }}</div>
-              {% if dow %}<small class="muted">{{ dow }}</small>{% endif %}
-              <div class="mt-1">
-                <button class="btn btn-xs btn-outline-primary"
-                        data-bs-toggle="modal"
-                        data-bs-target="#trocaModal"
-                        data-escala-id="{{ e.id }}"
-                        data-escala-desc="{{ (data_curta or '') ~ ((' - ' ~ dow) if dow else '') ~ ' • ' ~ (e.turno or '') ~ ' • ' ~ (e.horario_fmt or e.horario or '') ~ ' • ' ~ (e.contrato or '') }}">
-                  <i class="bi bi-arrow-left-right"></i> Trocar
-                </button>
-              </div>
-            </td>
-            <td class="text-center">{{ e.turno or '—' }}</td>
-            <td>{{ e.horario_fmt or e.horario or '—' }}</td>
-            <td>{{ e.contrato or '—' }}</td>
-          </tr>
-        {% endfor %}
-      {% else %}
-        <tr><td colspan="4" class="text-center muted">Nenhuma escala disponível.</td></tr>
-      {% endif %}
-      </tbody>
-    </table>
+    <!-- Lista de Escala (cards) -->
+    {% if minha_escala %}
+      {% for e in minha_escala %}
+        {% set stripe = (e.cor or e.status_color or '#e5e7eb') %}
+        {% set data_curta = e.data_curta or (e.data_fmt[:5] if e.data_fmt else (e.data[:5] if e.data else '')) %}
+        {% set dow = (e.dia_semana or e.dow or '')|upper %}
+        <div class="esc-card {% if e.status == 'today' %}esc-status-today{% elif e.status == 'past' %}esc-status-past{% else %}esc-status-future{% endif %}" style="--stripe: {{ stripe }}">
+          <div class="esc-bar" aria-hidden="true"></div>
+          <div class="esc-body">
+            <div class="esc-title">
+              {{ data_curta }}
+              {% if dow %}<span class="esc-chip ms-1">{{ dow }}</span>{% endif %}
+            </div>
+            <div class="esc-meta mt-1">
+              <div><i class="bi bi-sunrise-fill"></i> {{ e.turno or '—' }}</div>
+              <div><i class="bi bi-clock"></i> {{ e.horario_fmt or e.horario or '—' }}</div>
+              <div style="word-break:break-word;overflow-wrap:anywhere"><i class="bi bi-briefcase"></i> {{ e.contrato or '—' }}</div>
+            </div>
+          </div>
+          <div class="esc-actions">
+            <button class="btn btn-xs btn-outline-primary"
+                    data-bs-toggle="modal"
+                    data-bs-target="#trocaModal"
+                    data-escala-id="{{ e.id }}"
+                    data-escala-desc="{{ (data_curta or '') ~ ((' - ' ~ dow) if dow else '') ~ ' • ' ~ (e.turno or '') ~ ' • ' ~ (e.horario_fmt or e.horario or '') ~ ' • ' ~ (e.contrato or '') }}">
+              <i class="bi bi-arrow-left-right"></i> Trocar
+            </button>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="card p-3 text-center muted">Nenhuma escala disponível.</div>
+    {% endif %}
     <div class="mt-1 small muted"><i class="bi bi-info-circle"></i> As solicitações de troca ficam visíveis para o administrador.</div>
   </div>
 
@@ -528,10 +536,10 @@
           {% for t in trocas_recebidas_pendentes %}
             <div class="border rounded p-2 mb-2">
               <div class="d-flex align-items-center justify-content-between">
-                <div class="me-2">
-                  <div class="fw-semibold">{{ t.solicitante.nome }}</div>
-                  <div class="small muted">{{ t.origem_desc }}</div>
-                  {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
+                <div class="me-2" style="min-width:0">
+                  <div class="fw-semibold" style="word-break:break-word;overflow-wrap:anywhere">{{ t.solicitante.nome }}</div>
+                  <div class="small muted" style="word-break:break-word;overflow-wrap:anywhere">{{ t.origem_desc }}</div>
+                  {% if t.mensagem %}<div class="small" style="word-break:break-word;overflow-wrap:anywhere">{{ t.mensagem }}</div>{% endif %}
                   <div class="small muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
                 </div>
                 <div class="text-end">
@@ -541,6 +549,7 @@
                           data-troca-id="{{ t.id }}"
                           data-origem-desc="{{ t.origem_desc }}"
                           data-origem-weekday="{{ t.origem_weekday }}"
+                          data-origem-turno="{{ t.origem_turno }}"
                           data-origem-bucket="{{ t.origem_turno_bucket }}">
                     <i class="bi bi-check2"></i> Aceitar
                   </button>
@@ -567,10 +576,10 @@
           {% for t in trocas_enviadas %}
             <div class="border rounded p-2 mb-2">
               <div class="d-flex align-items-center justify-content-between">
-                <div class="me-2">
-                  <div class="fw-semibold">Para: {{ t.destino.nome }}</div>
-                  <div class="small muted">{{ t.origem_desc }}</div>
-                  {% if t.mensagem %}<div class="small">{{ t.mensagem }}</div>{% endif %}
+                <div class="me-2" style="min-width:0">
+                  <div class="fw-semibold" style="word-break:break-word;overflow-wrap:anywhere">Para: {{ t.destino.nome }}</div>
+                  <div class="small muted" style="word-break:break-word;overflow-wrap:anywhere">{{ t.origem_desc }}</div>
+                  {% if t.mensagem %}<div class="small" style="word-break:break-word;overflow-wrap:anywhere">{{ t.mensagem }}</div>{% endif %}
                   <div class="small muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
                 </div>
                 <div class="text-end">
@@ -759,7 +768,7 @@
       </div>
 
       <div class="card p-3">
-        <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center justify-content-between">
           <h6 class="mb-0"><i class="bi bi-clock-history"></i> Histórico</h6>
           <button class="btn btn-sm btn-outline-danger" id="cxLimpar"><i class="bi bi-trash"></i> Limpar</button>
         </div>
@@ -1049,7 +1058,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const li=document.createElement('li'); li.className='list-group-item d-flex align-items-center'; li.style.cursor='pointer';
       const avatar=document.createElement('img'); avatar.src=c.foto_url || '{{ url_for("static", filename="img/default.png") }}';
       avatar.alt=''; Object.assign(avatar.style,{width:'28px',height:'28px',objectFit:'cover',borderRadius:'50%',border:'1px solid #0001',marginRight:'.5rem'});
-      const name=document.createElement('div'); name.className='flex-fill'; name.innerHTML=`<div class="fw-semibold">${c.nome||'—'}</div>`;
+      const name=document.createElement('div'); name.className='flex-fill'; name.innerHTML=`<div class="fw-semibold" style="word-break:break-word;overflow-wrap:anywhere">${c.nome||'—'}</div>`;
       const choose=document.createElement('button'); choose.type='button'; choose.className='btn btn-sm btn-outline-primary'; choose.innerHTML='<i class="bi bi-person-arrows"></i> Selecionar';
       choose.addEventListener('click', ()=>{
         const esc = fromEscalaDescEl.textContent||'';
@@ -1112,7 +1121,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     compativeis.forEach(e=>{
       const li=document.createElement('li'); li.className='list-group-item d-flex align-items-center justify-content-between';
-      li.innerHTML=`<div class="me-2"><div class="fw-semibold">${e.data} • ${e.turno||''} • ${e.horario||''} • ${e.contrato||''}</div></div>
+      li.innerHTML=`<div class="me-2" style="word-break:break-word;overflow-wrap:anywhere"><div class="fw-semibold">${e.data} • ${e.turno||''} • ${e.horario||''} • ${e.contrato||''}</div></div>
                     <button type="button" class="btn btn-sm btn-outline-primary">Trocar com este</button>`;
       li.querySelector('button').addEventListener('click', ()=>{ destinoEscalaIdEl.value=e.id; btnConfirmarAceite.disabled=false;
         [...minhaEscalaCompatListEl.querySelectorAll('.list-group-item')].forEach(x=>x.classList.remove('active')); li.classList.add('active');
@@ -1125,7 +1134,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 });
 </script>
 
-<!-- Avaliação (3 dimensões -> gera nota/geral; sem mostrar “Geral” visual) -->
+<!-- Avaliação (3 dimensões -> gera nota/geral) -->
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.avaliar-form').forEach(form => {
@@ -1311,7 +1320,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const cls= it.tipo==='receita' ? 'text-success' : (it.tipo==='despesa' ? 'text-danger' : 'text-primary');
         const sinal=it.tipo==='receita'? '+' : '−'; const chip= it.tipo==='poupanca' ? '<span class="badge text-bg-primary ms-2">Poupança</span>' : '';
         const row=document.createElement('div'); row.className='d-flex align-items-center justify-content-between py-1 border-bottom';
-        row.innerHTML=`<div class="me-2"><div class="fw-semibold">${(it.cat||'Geral')} ${chip}</div><div class="small text-muted">${(it.desc||'')}</div></div>
+        row.innerHTML=`<div class="me-2" style="min-width:0"><div class="fw-semibold" style="word-break:break-word;overflow-wrap:anywhere">${(it.cat||'Geral')} ${chip}</div><div class="small text-muted" style="word-break:break-word;overflow-wrap:anywhere">${(it.desc||'')}</div></div>
         <div class="text-end"><div class="mono ${cls}">${sinal} ${money(it.val)}</div><button class="btn btn-sm btn-outline-danger mt-1"><i class="bi bi-trash"></i></button></div>`;
         row.querySelector('button').addEventListener('click', ()=> removeItem(it.id));
         body.appendChild(row);
