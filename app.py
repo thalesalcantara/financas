@@ -1469,69 +1469,6 @@ def _cooperado_atual() -> Cooperado | None:
         return None
     return Cooperado.query.filter_by(usuario_id=uid).first()
 
-@app.get("/portal/cooperado", endpoint="portal_cooperado")
-@role_required("cooperado")
-def portal_cooperado():
-    coop = _cooperado_atual()
-    if not coop:
-        abort(403)
-
-    hoje = date.today()
-    di_mes = date(hoje.year, hoje.month, 1)
-
-    # Média real das avaliações (Restaurante -> Cooperado)
-    media_real = db.session.query(
-        func.coalesce(func.avg(AvaliacaoCooperado.estrelas_geral), 0.0)
-    ).filter(AvaliacaoCooperado.cooperado_id == coop.id).scalar() or 0.0
-
-    qtd_avaliacoes = db.session.query(
-        func.count(AvaliacaoCooperado.id)
-    ).filter(AvaliacaoCooperado.cooperado_id == coop.id).scalar() or 0
-
-    # "Nota vitrine" lenta (campo do Usuario)
-    nota_vitrine = float(getattr(coop.usuario_ref, "rating_display", 0.0) or 0.0)
-
-    # Entregas (somatório do campo qtd_entregas)
-    entregas_total = int(db.session.query(
-        func.coalesce(func.sum(Lancamento.qtd_entregas), 0)
-    ).filter(Lancamento.cooperado_id == coop.id).scalar() or 0)
-
-    entregas_mes = int(db.session.query(
-        func.coalesce(func.sum(Lancamento.qtd_entregas), 0)
-    ).filter(
-        Lancamento.cooperado_id == coop.id,
-        Lancamento.data >= di_mes
-    ).scalar() or 0)
-
-    # Por contrato (restaurante)
-    entregas_por_contrato = db.session.query(
-        Restaurante.nome.label("contrato"),
-        func.coalesce(func.sum(Lancamento.qtd_entregas), 0).label("entregas")
-    ).join(Restaurante, Lancamento.restaurante_id == Restaurante.id
-    ).filter(
-        Lancamento.cooperado_id == coop.id
-    ).group_by(Restaurante.nome
-    ).order_by(Restaurante.nome.asc()).all()
-
-    # Últimos lançamentos
-    lancamentos = (Lancamento.query
-                   .filter_by(cooperado_id=coop.id)
-                   .order_by(Lancamento.data.desc(), Lancamento.id.desc())
-                   .limit(30).all())
-
-    return render_template(
-        "portal_cooperado.html",
-        coop=coop,
-        media_avaliacao=round(float(media_real), 2),
-        qtd_avaliacoes=int(qtd_avaliacoes),
-        nota_vitrine=round(nota_vitrine, 2),
-        entregas_total=entregas_total,
-        entregas_mes=entregas_mes,
-        entregas_por_contrato=entregas_por_contrato,
-        lancamentos=lancamentos,
-    )
-
-
     # --- Blueprint Portal (topo do arquivo, depois de criar `app`) ---
 portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
 
