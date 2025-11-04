@@ -165,25 +165,89 @@ def _set_sqlite_pragma(dbapi_con, con_record):
     except Exception:
         pass
 
-
-def _is_sqlite() -> bool:
+# ========= 🔧 Bootstrap de schema (colunas de rating do cooperado) =========
+def ensure_usuario_rating_columns() -> None:
+    """
+    Garante as colunas: rating_sum, rating_count, rating_display na tabela 'usuarios'.
+    Idempotente e leve: inspeciona 1x por boot e só altera se faltar coluna.
+    """
+    engine = db.engine
+    insp = sa_inspect(engine)
     try:
-        return db.session.get_bind().dialect.name == "sqlite"
+        existing = {c["name"] for c in insp.get_columns("usuarios")}
     except Exception:
-        return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
+        # Se a tabela ainda não existir, apenas retorna; o create_all abaixo criará
+        return
+
+    statements = []
+
+    # rating_sum
+    if "rating_sum" not in existing:
+        if engine.dialect.name == "postgresql":
+            statements.append(sa_text("ALTER TABLE usuarios ADD COLUMN rating_sum double precision DEFAULT 0"))
+        else:  # sqlite e outros
+            statements.append(sa_text("ALTER TABLE usuarios ADD COLUMN rating_sum REAL DEFAULT 0"))
+
+    # rating_count
+    if "rating_count" not in existing:
+        if engine.dialect.name == "postgresql":
+            statements.append(sa_text("ALTER TABLE usuarios ADD COLUMN rating_count integer DEFAULT 0"))
+        else:
+            statements.append(sa_text("ALTER TABLE usuarios ADD COLUMN rating_count INTEGER DEFAULT 0"))
+
+    # rating_display
+    if "rating_display" not in existing:
+        if engine.dialect.name == "postgresql":
+            statements.append(sa_text("ALTER TABLE usuarios ADD COLUMN rating_display numeric(3,2) DEFAULT 5.00"))
+        else:
+            statements.append(sa_text("ALTER TABLE usuarios ADD COLUMN rating_display NUMERIC DEFAULT 5.00"))
+
+    for stmt in statements:
+        db.session.execute(stmt)
+
+    if statements:
+        # Normaliza nulos e inicializa display em 5.00
+        db.session.execute(sa_text("UPDATE usuarios SET rating_sum = COALESCE(rating_sum, 0)"))
+        db.session.execute(sa_text("UPDATE usuarios SET rating_count = COALESCE(rating_count, 0)"))
+        db.session.execute(sa_text("UPDATE usuarios SET rating_display = COALESCE(rating_display, 5.00)"))
+        db.session.commit()
+
+
+def bootstrap_db_schema() -> None:
+    """
+    Executa create_all() e, em seguida, garante as colunas de rating.
+    Chamada única na inicialização do app.
+    """
+    db.create_all()
+    ensure_usuario_rating_columns()
+
+
+# 🔁 Chama o bootstrap 1x na subida do app
+with app.app_context():
+    bootstrap_db_schema()
 
 # =========================
 # Models
 # =========================
 from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+# assume que 'db' já está importado do seu app
 
 class Usuario(db.Model, UserMixin):
     __tablename__ = "usuarios"
+
     id = db.Column(db.Integer, primary_key=True)
     usuario = db.Column(db.String(80), unique=True, nullable=False)
     senha_hash = db.Column(db.String(200), nullable=False)
+
+    # já existentes no seu modelo (mantidos):
     tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
     ativo = db.Column(db.Boolean, nullable=False, default=True)
+
+    # >>> NOVOS CAMPOS DE AVALIAÇÃO (vitalícia, lenta, teto 5.00)
+    rating_sum = db.Column(db.Float, nullable=False, default=0.0)        # soma total das notas
+    rating_count = db.Column(db.Integer, nullable=False, default=0)       # quantidade de avaliações
+    rating_display = db.Column(db.Numeric(3, 2), nullable=False, default=5.00)  # exibida p/ usuário
 
     @property
     def is_active(self) -> bool:
@@ -195,6 +259,35 @@ class Usuario(db.Model, UserMixin):
 
     def check_password(self, raw: str) -> bool:
         return check_password_hash(self.senha_hash, raw)
+
+    # >>> NOVO MÉTODO: aplica avaliação movendo no máx. ±0,01 por avaliação
+    def apply_rating(self, score: float, step: float = 0.01):
+        """
+        Aplica uma nota (1..5) e move 'rating_display' no máx. ±step em direção
+        à média real (rating_sum/rating_count), com limites [1.00, 5.00].
+        """
+        # 1) normaliza nota recebida
+        s = 5.0 if score is None else float(score)
+        s = max(1.0, min(5.0, s))
+
+        # 2) atualiza soma/quantidade e média real
+        self.rating_sum = (self.rating_sum or 0.0) + s
+        self.rating_count = (self.rating_count or 0) + 1
+        avg = self.rating_sum / self.rating_count
+
+        # 3) ponto atual exibido
+        current = float(self.rating_display or 5.00)
+
+        # 4) aproxima devagar (±step) da média real, respeitando limites
+        if avg > current:
+            new_val = min(current + step, avg, 5.0)
+        elif avg < current:
+            new_val = max(current - step, avg, 1.0)
+        else:
+            new_val = current
+
+        # 5) guarda com 2 casas (Numeric(3,2) aceita float; o round evita ruído)
+        self.rating_display = round(new_val + 1e-9, 2)
 
         
 class Cooperado(db.Model):
@@ -1375,6 +1468,69 @@ def _cooperado_atual() -> Cooperado | None:
     if not uid:
         return None
     return Cooperado.query.filter_by(usuario_id=uid).first()
+
+@app.get("/portal/cooperado", endpoint="portal_cooperado")
+@role_required("cooperado")
+def portal_cooperado():
+    coop = _cooperado_atual()
+    if not coop:
+        abort(403)
+
+    hoje = date.today()
+    di_mes = date(hoje.year, hoje.month, 1)
+
+    # Média real das avaliações (Restaurante -> Cooperado)
+    media_real = db.session.query(
+        func.coalesce(func.avg(AvaliacaoCooperado.estrelas_geral), 0.0)
+    ).filter(AvaliacaoCooperado.cooperado_id == coop.id).scalar() or 0.0
+
+    qtd_avaliacoes = db.session.query(
+        func.count(AvaliacaoCooperado.id)
+    ).filter(AvaliacaoCooperado.cooperado_id == coop.id).scalar() or 0
+
+    # "Nota vitrine" lenta (campo do Usuario)
+    nota_vitrine = float(getattr(coop.usuario_ref, "rating_display", 0.0) or 0.0)
+
+    # Entregas (somatório do campo qtd_entregas)
+    entregas_total = int(db.session.query(
+        func.coalesce(func.sum(Lancamento.qtd_entregas), 0)
+    ).filter(Lancamento.cooperado_id == coop.id).scalar() or 0)
+
+    entregas_mes = int(db.session.query(
+        func.coalesce(func.sum(Lancamento.qtd_entregas), 0)
+    ).filter(
+        Lancamento.cooperado_id == coop.id,
+        Lancamento.data >= di_mes
+    ).scalar() or 0)
+
+    # Por contrato (restaurante)
+    entregas_por_contrato = db.session.query(
+        Restaurante.nome.label("contrato"),
+        func.coalesce(func.sum(Lancamento.qtd_entregas), 0).label("entregas")
+    ).join(Restaurante, Lancamento.restaurante_id == Restaurante.id
+    ).filter(
+        Lancamento.cooperado_id == coop.id
+    ).group_by(Restaurante.nome
+    ).order_by(Restaurante.nome.asc()).all()
+
+    # Últimos lançamentos
+    lancamentos = (Lancamento.query
+                   .filter_by(cooperado_id=coop.id)
+                   .order_by(Lancamento.data.desc(), Lancamento.id.desc())
+                   .limit(30).all())
+
+    return render_template(
+        "portal_cooperado.html",
+        coop=coop,
+        media_avaliacao=round(float(media_real), 2),
+        qtd_avaliacoes=int(qtd_avaliacoes),
+        nota_vitrine=round(nota_vitrine, 2),
+        entregas_total=entregas_total,
+        entregas_mes=entregas_mes,
+        entregas_por_contrato=entregas_por_contrato,
+        lancamentos=lancamentos,
+    )
+
 
     # --- Blueprint Portal (topo do arquivo, depois de criar `app`) ---
 portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
@@ -4188,6 +4344,12 @@ def admin_recusar_troca(id):
         flash("Esta solicitação já foi tratada.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
     t.status = "recusada"
+    t.aplicada_em = None
+    # preserva mensagem existente; opcional: carimbar motivo
+    motivo = (request.form.get("motivo") or "").strip()
+    if motivo:
+        prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
+        t.mensagem = prefix + f"Recusada pelo admin em {datetime.utcnow().strftime('%d/%m/%Y %H:%M')} — {motivo}"
     db.session.commit()
     flash("Solicitação recusada.", "info")
     return redirect(url_for("admin_dashboard", tab="escalas"))
