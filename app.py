@@ -4888,6 +4888,15 @@ def portal_cooperado():
 
     return redirect(request.referrer or url_for("coop_dashboard") + "#producoes")
 
+# Compat: manter endpoint antigo usado em templates herdados
+# Gera /coop/dashboard mas aponta para a mesma view 'portal_cooperado'
+app.add_url_rule(
+    "/coop/dashboard",
+    endpoint="coop_dashboard",
+    view_func=portal_cooperado,
+    methods=["GET"],
+)
+
 
 # === ALIAS DO PAINEL: /painel/cooperado  -> redireciona para o endpoint oficial
 @app.get("/painel/cooperado")
