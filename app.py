@@ -570,7 +570,7 @@ def init_db():
                "CREATE INDEX IF NOT EXISTS ix_av_rest_criado_em      ON avaliacoes_restaurante (criado_em)",
                "CREATE INDEX IF NOT EXISTS ix_av_rest_rest_criado    ON avaliacoes_restaurante (restaurante_id, criado_em)",
                "CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado    ON avaliacoes_restaurante (cooperado_id,  criado_em)",
-        ]
+           ]
        else:
            stmts = [
                "CREATE INDEX IF NOT EXISTS ix_avaliacoes_criado_em   ON public.avaliacoes (criado_em)",
@@ -582,12 +582,13 @@ def init_db():
                "CREATE INDEX IF NOT EXISTS ix_av_rest_coop_criado    ON public.avaliacoes_restaurante (cooperado_id,  criado_em)",
            ]
 
-   for sql in stmts:
-        db.session.execute(sa_text(sql))
+       for sql in stmts:
+           db.session.execute(sa_text(sql))
 
-        db.session.commit()
-   except Exception:
-        db.session.rollback()
+       db.session.commit()
+except Exception:
+    db.session.rollback()
+
 
 
     # 4) Migração leve: garantir coluna qtd_entregas em lancamentos
