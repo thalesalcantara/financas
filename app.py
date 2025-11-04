@@ -4545,14 +4545,16 @@ def editar_documentos(coop_id):
 # =========================
 # PORTAL COOPERADO
 # =========================
-@app.route("/portal/cooperado")
+@app.route("/portal/cooperado", methods=["GET"])
 @role_required("cooperado")
 def portal_cooperado():
+    # --- Cooperado logado ---
     u_id = session.get("user_id")
     coop = Cooperado.query.filter_by(usuario_id=u_id).first()
     if not coop:
         return "<p style='font-family:Arial;margin:40px'>Seu usuário não está vinculado a um cooperado. Avise o administrador.</p>"
 
+    # Compat: alguns templates esperam cooperado.usuario
     try:
         coop.usuario = coop.usuario_ref.usuario
     except Exception:
@@ -4573,10 +4575,10 @@ def portal_cooperado():
     def in_range(qs, col):
         return qs.filter(col >= di, col <= df)
 
+    # ---------- PRODUÇÕES (com marcação de "minha_avaliacao") ----------
     ql = in_range(Lancamento.query.filter_by(cooperado_id=coop.id), Lancamento.data)
     producoes = ql.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
 
-    # --- Marca se o cooperado já avaliou cada produção ---
     ids = [l.id for l in producoes]
     minhas = {}
     if ids:
@@ -4596,13 +4598,14 @@ def portal_cooperado():
     for l in producoes:
         l.minha_avaliacao = minhas.get(l.id)
 
+    # ---------- RECEITAS / DESPESAS (Coop) ----------
     qr = in_range(ReceitaCooperado.query.filter_by(cooperado_id=coop.id), ReceitaCooperado.data)
     receitas_coop = qr.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
 
     qd = in_range(DespesaCooperado.query.filter_by(cooperado_id=coop.id), DespesaCooperado.data)
     despesas_coop = qd.order_by(DespesaCooperado.data.desc(), DespesaCooperado.id.desc()).all()
 
-    # INSS calculado por lançamento e somado APENAS dentro do período filtrado
+    # ---------- TOTAIS / INSS ----------
     total_bruto = sum((l.valor or 0.0) for l in producoes) + sum((r.valor or 0.0) for r in receitas_coop)
     inss_valor = sum((l.valor or 0.0) * 0.045 for l in producoes)
     total_descontos = sum((d.valor or 0.0) for d in despesas_coop)
@@ -4612,7 +4615,9 @@ def portal_cooperado():
     salario_minimo = cfg.salario_minimo or 0.0
     inss_complemento = salario_minimo * 0.20
 
+    # ---------- DOCS (CNH / PLACA) ----------
     today = date.today()
+
     def dias_para_3112():
         alvo = date(today.year, 12, 31)
         if today > alvo:
@@ -4648,7 +4653,6 @@ def portal_cooperado():
         h = (e.horario or "").strip()
         return (1 if h else 0, len(h), e.id)
 
-    # helper: parse data "dd/mm/aaaa"
     def _to_date_from_str(s: str):
         m = _re.search(r'(\d{1,2})/(\d{1,2})/(\d{2,4})', str(s or ''))
         if not m:
@@ -4661,22 +4665,19 @@ def portal_cooperado():
         except Exception:
             return None
 
-    # helper: minutos do horário "HH:MM"
     def _mins(h):
         m = _re.search(r'(\d{1,2}):(\d{2})', str(h or ''))
         if not m:
-            return 24*60 + 59  # empurra vazios pro fim do dia
+            return 24*60 + 59
         hh, mm = map(int, m.groups())
         return hh*60 + mm
 
-    # helper: bucket para ordenar dia antes de noite
     def _bucket_idx(turno, horario):
         b = (_turno_bucket(turno, horario) or "").lower()
         if "dia" in b:
             return 1
         if "noite" in b:
             return 2
-        # fallback pelo horário
         mins = _mins(horario)
         return 2 if (mins >= 17*60 or mins <= 6*60) else 1
 
@@ -4688,7 +4689,6 @@ def portal_cooperado():
         if not cur or _score(e) > _score(cur):
             best[key] = e
 
-    # Ordena cronologicamente (não por id!)
     cand = list(best.values())
     for e in cand:
         d = _to_date_from_str(e.data) or date.min
@@ -4698,7 +4698,7 @@ def portal_cooperado():
 
     minha_escala = sorted(cand, key=lambda x: x._ord)
 
-    # ---------- Status/cores por data ----------
+    # Status/cores por data
     for e in minha_escala:
         dt = _to_date_from_str(e.data)
         if dt is None:
@@ -4720,20 +4720,18 @@ def portal_cooperado():
             'transparent'
         )
 
-    # ---------- versão JSON já na MESMA ORDEM ----------
-    minha_escala_json = []
-    for e in minha_escala:
-        minha_escala_json.append({
-            "id": e.id,
-            "data": e.data or "",
-            "turno": e.turno or "",
-            "horario": e.horario or "",
-            "contrato": e.contrato or "",
-            "weekday": _weekday_from_data_str(e.data),
-            "turno_bucket": _turno_bucket(e.turno, e.horario),
-        })
+    # versão JSON (mesma ordem)
+    minha_escala_json = [{
+        "id": e.id,
+        "data": e.data or "",
+        "turno": e.turno or "",
+        "horario": e.horario or "",
+        "contrato": e.contrato or "",
+        "weekday": _weekday_from_data_str(e.data),
+        "turno_bucket": _turno_bucket(e.turno, e.horario),
+    } for e in minha_escala]
 
-    # ---------- Trocas ----------
+    # ---------- TROCAS ----------
     coops = (Cooperado.query
              .filter(Cooperado.id != coop.id)
              .order_by(Cooperado.nome.asc())
@@ -4751,8 +4749,7 @@ def portal_cooperado():
           .order_by(TrocaSolicitacao.id.desc())
           .all())
 
-    trocas_recebidas_pendentes = []
-    trocas_recebidas_historico = []
+    trocas_recebidas_pendentes, trocas_recebidas_historico = [], []
     for t in rx:
         solicitante = Cooperado.query.get(t.solicitante_id)
         orig = Escala.query.get(t.origem_escala_id)
@@ -4773,14 +4770,12 @@ def portal_cooperado():
             "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
             "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
         }
-
         (trocas_recebidas_pendentes if t.status == "pendente" else trocas_recebidas_historico).append(item)
 
     ex = (TrocaSolicitacao.query
           .filter(TrocaSolicitacao.solicitante_id == coop.id)
           .order_by(TrocaSolicitacao.id.desc())
           .all())
-
     trocas_enviadas = []
     for t in ex:
         destino = Cooperado.query.get(t.destino_id)
@@ -4799,9 +4794,56 @@ def portal_cooperado():
             "linhas_afetadas": linhas_afetadas,
         })
 
+    # ========= EXTRAS incorporados da outra rota =========
+    # Média real das avaliações (Restaurante -> Cooperado)
+    media_real = db.session.query(
+        func.coalesce(func.avg(AvaliacaoCooperado.estrelas_geral), 0.0)
+    ).filter(AvaliacaoCooperado.cooperado_id == coop.id).scalar() or 0.0
+
+    qtd_avaliacoes = db.session.query(
+        func.count(AvaliacaoCooperado.id)
+    ).filter(AvaliacaoCooperado.cooperado_id == coop.id).scalar() or 0
+
+    # "Nota vitrine" lenta (campo do Usuario)
+    nota_vitrine = float(getattr(coop.usuario_ref, "rating_display", 0.0) or 0.0)
+
+    # Entregas (somatório do campo qtd_entregas)
+    di_mes = date(today.year, today.month, 1)
+    entregas_total = int(db.session.query(
+        func.coalesce(func.sum(Lancamento.qtd_entregas), 0)
+    ).filter(Lancamento.cooperado_id == coop.id).scalar() or 0)
+
+    entregas_mes = int(db.session.query(
+        func.coalesce(func.sum(Lancamento.qtd_entregas), 0)
+    ).filter(
+        Lancamento.cooperado_id == coop.id,
+        Lancamento.data >= di_mes
+    ).scalar() or 0)
+
+    # Por contrato (restaurante)
+    entregas_por_contrato = db.session.query(
+        Restaurante.nome.label("contrato"),
+        func.coalesce(func.sum(Lancamento.qtd_entregas), 0).label("entregas")
+    ).join(Restaurante, Lancamento.restaurante_id == Restaurante.id
+    ).filter(Lancamento.cooperado_id == coop.id
+    ).group_by(Restaurante.nome
+    ).order_by(Restaurante.nome.asc()).all()
+
+    # Últimos 30 lançamentos (independente do filtro)
+    lancamentos = (Lancamento.query
+                   .filter_by(cooperado_id=coop.id)
+                   .order_by(Lancamento.data.desc(), Lancamento.id.desc())
+                   .limit(30).all())
+
+    # Fallback para o cabeçalho do seu HTML
+    cooperado_score = round(nota_vitrine or media_real or 0.0, 2)
+
+    # ========= RENDER =========
     return render_template(
         "painel_cooperado.html",
-        cooperado=coop,
+        # base atual
+        cooperado=coop,  # usado no HTML novo
+        coop=coop,       # alias p/ compatibilidade com conteúdos antigos
         producoes=producoes,
         receitas_coop=receitas_coop,
         despesas_coop=despesas_coop,
@@ -4820,30 +4862,17 @@ def portal_cooperado():
         trocas_recebidas_pendentes=trocas_recebidas_pendentes,
         trocas_recebidas_historico=trocas_recebidas_historico,
         trocas_enviadas=trocas_enviadas,
+
+        # extras (herdados da outra versão)
+        media_avaliacao=round(float(media_real), 2),
+        qtd_avaliacoes=int(qtd_avaliacoes),
+        nota_vitrine=round(nota_vitrine, 2),
+        entregas_total=entregas_total,
+        entregas_mes=entregas_mes,
+        entregas_por_contrato=entregas_por_contrato,
+        lancamentos=lancamentos,
+        cooperado_score=cooperado_score,
     )
-
-# === AVALIAR RESTAURANTE (cooperado -> restaurante)
-# Duas rotas para a MESMA função e MESMO endpoint (o do template):
-@app.post("/coop/avaliar/restaurante/<int:lanc_id>")
-@app.post("/producoes/<int:lanc_id>/avaliar")
-@role_required("cooperado")
-def producoes_avaliar(lanc_id):
-    # 1) Cooperado logado
-    u_id = session.get("user_id")
-    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
-
-    # 2) Lançamento existe e é dele
-    lanc = Lancamento.query.get_or_404(lanc_id)
-    if lanc.cooperado_id != coop.id:
-        abort(403)
-
-    # 3) Já existe avaliação DESTE cooperado para ESTE lançamento?
-    ja = (AvaliacaoRestaurante.query
-          .filter_by(lancamento_id=lanc.id, cooperado_id=coop.id)
-          .first())
-    if ja:
-        flash("Você já avaliou esta produção.", "info")
-        return redirect(request.referrer or url_for("coop_dashboard") + "#producoes")
 
     # -------- Helpers locais --------
     def _clamp_star_local(v):
