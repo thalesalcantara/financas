@@ -2560,6 +2560,8 @@ from datetime import datetime, timedelta
 
 @app.route("/admin/avaliacoes", methods=["GET"])
 @admin_required
+@app.route("/admin/avaliacoes")
+@admin_required
 def admin_avaliacoes():
     # tipo=cooperado (padrão): Restaurante avalia Cooperado
     # tipo=restaurante: Cooperado avalia Restaurante
@@ -2616,11 +2618,14 @@ def admin_avaliacoes():
         filtros.append(Model.restaurante_id == restaurante_id)
     if cooperado_id:
         filtros.append(Model.cooperado_id == cooperado_id)
-    # Para não depender de datetime/time aqui, use func.date() (robusto e simples)
+
+    # >>> AQUI ESTAVA O PROBLEMA: antes usava di.isoformat() (string)
+    # Agora passamos o objeto date, então o bind será DATE, não VARCHAR.
+    # Se di/df forem None, NÃO aplica filtro de data => traz todas as avaliações.
     if di:
-        filtros.append(func.date(Model.criado_em) >= di.isoformat())
+        filtros.append(func.date(Model.criado_em) >= di)
     if df:
-        filtros.append(func.date(Model.criado_em) <= df.isoformat())
+        filtros.append(func.date(Model.criado_em) <= df)
 
     if filtros:
         base = base.filter(and_(*filtros))
@@ -2644,7 +2649,7 @@ def admin_avaliacoes():
         has_prev=(page > 1), has_next=(page < pages)
     )
 
-    # Achata para o template — **sempre** com todas as chaves usadas na UI
+    # Achata para o template — sempre com todas as chaves usadas na UI
     avaliacoes = []
     for a, rest_id, rest_nome, coop_id, coop_nome in rows:
         item = {
@@ -2668,7 +2673,7 @@ def admin_avaliacoes():
         }
 
         if tipo == "restaurante":
-            # Cooperado -> Restaurante: garante **Tratamento** visível
+            # Cooperado -> Restaurante: garante TRATAMENTO visível
             trat = getattr(a, "estrelas_tratamento", None)
             if trat is None:
                 # fallback para bases antigas onde "pontualidade" era usado
@@ -2698,7 +2703,7 @@ def admin_avaliacoes():
 
         avaliacoes.append(SimpleNamespace(**item))
 
-    # KPIs (função local simples para evitar imports extras)
+    # KPIs
     def avg_or_zero(coluna):
         if coluna is None:
             return 0.0
@@ -2777,7 +2782,7 @@ def admin_avaliacoes():
         top = sorted([x for x in ranking if x["qtd"] >= 3], key=lambda x: x["m_geral"], reverse=True)[:10]
         chart_top = {"labels": [r["coop_nome"] for r in top], "values": [round(r["m_geral"], 2) for r in top]}
 
-    # Compatibilidade (média de geral por par coop×rest) — não quebra se vazio
+    # Compatibilidade (média de geral por par coop×rest)
     compat_map = {}
     for a in avaliacoes:
         key = (a.coop_id, a.rest_id)
@@ -2821,7 +2826,6 @@ def admin_avaliacoes():
         preserve=preserve,
     )
 
-
 @app.route("/admin/avaliacoes/export.csv", methods=["GET"])
 @admin_required
 def admin_export_avaliacoes_csv():
@@ -2833,6 +2837,7 @@ def admin_export_avaliacoes_csv():
     data_inicio    = (request.args.get("data_inicio") or "").strip()
     data_fim       = (request.args.get("data_fim") or "").strip()
 
+    # Datas – usa o mesmo helper _parse_date da tela
     di = _parse_date(data_inicio)
     df = _parse_date(data_fim)
 
@@ -2849,11 +2854,20 @@ def admin_export_avaliacoes_csv():
     )
 
     filtros = []
-    if restaurante_id: filtros.append(Model.restaurante_id == restaurante_id)
-    if cooperado_id:   filtros.append(Model.cooperado_id   == cooperado_id)
-    if di: filtros.append(func.date(Model.criado_em) >= di.isoformat())
-    if df: filtros.append(func.date(Model.criado_em) <= df.isoformat())
-    if filtros: base = base.filter(and_(*filtros))
+    if restaurante_id:
+        filtros.append(Model.restaurante_id == restaurante_id)
+    if cooperado_id:
+        filtros.append(Model.cooperado_id   == cooperado_id)
+
+    # >>> AQUI o ajuste principal: passa o date, não string
+    # Se di/df forem None, não filtra por data => exporta TODAS
+    if di:
+        filtros.append(func.date(Model.criado_em) >= di)
+    if df:
+        filtros.append(func.date(Model.criado_em) <= df)
+
+    if filtros:
+        base = base.filter(and_(*filtros))
 
     rows = base.order_by(Model.criado_em.desc()).all()
 
@@ -2862,8 +2876,11 @@ def admin_export_avaliacoes_csv():
 
     if tipo == "restaurante":
         # Cooperado -> Restaurante: garante Tratamento no CSV
-        w.writerow(["Data/Hora","Restaurante","Cooperado","Geral","Tratamento","Ambiente","Suporte",
-                    "Comentário","Média Ponderada","Sentimento","Temas","Crítico?"])
+        w.writerow([
+            "Data/Hora","Restaurante","Cooperado","Geral",
+            "Tratamento","Ambiente","Suporte",
+            "Comentário","Média Ponderada","Sentimento","Temas","Crítico?"
+        ])
         for a, rest_nome, coop_nome in rows:
             trat = getattr(a, "estrelas_tratamento", None)
             if trat is None:
@@ -2877,9 +2894,12 @@ def admin_export_avaliacoes_csv():
 
             w.writerow([
                 a.criado_em.strftime("%d/%m/%Y %H:%M") if a.criado_em else "",
-                rest_nome, coop_nome,
+                rest_nome,
+                coop_nome,
                 a.estrelas_geral or 0,
-                (trat or 0), (amb or 0), (sup or 0),
+                (trat or 0),
+                (amb or 0),
+                (sup or 0),
                 (getattr(a, "comentario", "") or "").strip(),
                 (getattr(a, "media_ponderada", "") or ""),
                 (getattr(a, "sentimento", "") or ""),
@@ -2888,12 +2908,16 @@ def admin_export_avaliacoes_csv():
             ])
     else:
         # Restaurante -> Cooperado
-        w.writerow(["Data/Hora","Restaurante","Cooperado","Geral","Pontualidade","Educação","Eficiência","Apresentação",
-                    "Comentário","Média Ponderada","Sentimento","Temas","Crítico?"])
+        w.writerow([
+            "Data/Hora","Restaurante","Cooperado","Geral",
+            "Pontualidade","Educação","Eficiência","Apresentação",
+            "Comentário","Média Ponderada","Sentimento","Temas","Crítico?"
+        ])
         for a, rest_nome, coop_nome in rows:
             w.writerow([
                 a.criado_em.strftime("%d/%m/%Y %H:%M") if a.criado_em else "",
-                rest_nome, coop_nome,
+                rest_nome,
+                coop_nome,
                 a.estrelas_geral or 0,
                 (getattr(a, "estrelas_pontualidade", 0) or 0),
                 (getattr(a, "estrelas_educacao", 0) or 0),
@@ -2907,9 +2931,12 @@ def admin_export_avaliacoes_csv():
             ])
 
     mem = io.BytesIO(buf.getvalue().encode("utf-8-sig"))
-    return send_file(mem, as_attachment=True,
-                     download_name=f"avaliacoes_{tipo}.csv",
-                     mimetype="text/csv")
+    return send_file(
+        mem,
+        as_attachment=True,
+        download_name=f"avaliacoes_{tipo}.csv",
+        mimetype="text/csv",
+    )
 
 # =========================
 # CRUD Receitas/Despesas Coop (Admin)
