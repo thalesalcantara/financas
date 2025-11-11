@@ -75,7 +75,7 @@
   <!-- TOPO -->
   <header class="topbar">
     <div class="mobile-wrap d-flex align-items-center justify-content-between p-2">
-      <a href="{{ url_for('portal_cooperado') }}" class="btn btn-light btn-sm tap-lg">
+      <a href="{{ url_for('portal_cooperado') }}" class="btn btn-light btn-sm tap-lg" id="btnVoltar">
         <i class="bi bi-arrow-left"></i> Voltar
       </a>
       <div class="brand fw-bold">Avisos</div>
@@ -213,6 +213,27 @@
 
   <!-- Bootstrap bundle (JS) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Voltar com histórico + fallback -->
+  <script>
+    (function(){
+      const a = document.getElementById('btnVoltar');
+      if (!a) return;
+      try {
+        const ref = document.referrer;
+        if (ref && new URL(ref).origin === location.origin) {
+          a.addEventListener('click', function(e){
+            e.preventDefault();
+            history.back();
+          });
+        } else {
+          if (!a.getAttribute('href') || a.getAttribute('href') === '#') {
+            a.setAttribute('href', "{{ url_for('portal_cooperado') }}");
+          }
+        }
+      } catch(_) {}
+    })();
+  </script>
 
   <!-- Lógica da página -->
   <script>
