@@ -82,7 +82,7 @@
   <!-- TOPBAR -->
   <header class="topbar">
     <div class="wrap d-flex align-items-center justify-content-between px-3 py-2">
-      <a href="{{ back_href or url_for('coop_dashboard') }}" class="btn btn-outline-light btn-sm btn-top" id="btnVoltar">
+      <a href="{{ back_href or url_for('portal_cooperado') }}" class="btn btn-outline-light btn-sm btn-top" id="btnVoltar">
         <i class="bi bi-arrow-left"></i> <span class="d-none d-sm-inline">Voltar</span>
       </a>
       <div class="brand">Tabelas da Cooperativa</div>
@@ -207,7 +207,7 @@
           });
         } else {
           if (!a.getAttribute('href') || a.getAttribute('href') === '#') {
-            a.setAttribute('href', "{{ url_for('coop_dashboard') }}");
+            a.setAttribute('href', "{{ url_for('portal_cooperado') }}");
           }
         }
       } catch(_) {}
