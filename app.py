@@ -2617,8 +2617,6 @@ def admin_avaliacoes():
     if cooperado_id:
         filtros.append(Model.cooperado_id == cooperado_id)
 
-    # >>> AQUI ESTAVA O PROBLEMA: antes usava di.isoformat() (string)
-    # Agora passamos o objeto date, então o bind será DATE, não VARCHAR.
     # Se di/df forem None, NÃO aplica filtro de data => traz todas as avaliações.
     if di:
         filtros.append(func.date(Model.criado_em) >= di)
@@ -2794,7 +2792,7 @@ def admin_avaliacoes():
     for d in compat_map.values():
         avg = (d["sum"] / d["count"]) if d["count"] else 0.0
         compat.append({"coop": d["coop"], "rest": d["rest"], "avg": avg, "count": d["count"]})
-    compat.sort(key=lambda x: (-(x["avg"] or 0), -(x["count"] or 0), x["coop"], x["rest"]))
+        compat.sort(key=lambda x: (-(x["avg"] or 0), -(x["count"] or 0), x["coop"], x["rest"]))
 
     # Filtros p/ repopular form + preserva args para paginação
     _flt = SimpleNamespace(
@@ -2805,6 +2803,10 @@ def admin_avaliacoes():
     )
     preserve = request.args.to_dict(flat=True)
     preserve.pop("page", None)
+
+    # 🔹 AQUI: mesmas variáveis usadas no admin_dashboard normal
+    cfg = get_config()
+    admin_user = Usuario.query.filter_by(tipo="admin").first()
 
     return render_template(
         "admin_dashboard.html",
@@ -2822,6 +2824,8 @@ def admin_avaliacoes():
         page=pager.page,
         per_page=pager.per_page,
         preserve=preserve,
+        admin=admin_user,                          # 👈 passa o admin pro template
+        salario_minimo=cfg.salario_minimo or 0.0,  # 👈 e o salário mínimo também
     )
 
 @app.route("/admin/avaliacoes/export.csv", methods=["GET"])
@@ -2857,7 +2861,6 @@ def admin_export_avaliacoes_csv():
     if cooperado_id:
         filtros.append(Model.cooperado_id   == cooperado_id)
 
-    # >>> AQUI o ajuste principal: passa o date, não string
     # Se di/df forem None, não filtra por data => exporta TODAS
     if di:
         filtros.append(func.date(Model.criado_em) >= di)
