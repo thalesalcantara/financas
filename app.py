@@ -2560,8 +2560,6 @@ from datetime import datetime, timedelta
 
 @app.route("/admin/avaliacoes", methods=["GET"])
 @admin_required
-@app.route("/admin/avaliacoes")
-@admin_required
 def admin_avaliacoes():
     # tipo=cooperado (padrão): Restaurante avalia Cooperado
     # tipo=restaurante: Cooperado avalia Restaurante
