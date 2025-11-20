@@ -25,12 +25,13 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from dateutil.relativedelta import relativedelta
+
 from sqlalchemy import func, text as sa_text, or_, and_, case
 from sqlalchemy.inspection import inspect as sa_inspect
 from sqlalchemy.pool import QueuePool
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError, DisconnectionError
 from sqlalchemy import delete as sa_delete
 
 # 👉 Novo: para gerar XLSX em memória
@@ -38,7 +39,7 @@ from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 
-# ============ App / DB ============
+# ============ App / Diretórios ============
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
@@ -50,10 +51,13 @@ PERSIST_ROOT = os.environ.get("PERSIST_ROOT", "/var/data")
 if not os.path.isdir(PERSIST_ROOT):
     PERSIST_ROOT = os.path.join(BASE_DIR, "data")
 os.makedirs(PERSIST_ROOT, exist_ok=True)
+
 TABELAS_DIR = os.path.join(PERSIST_ROOT, "tabelas")
 os.makedirs(TABELAS_DIR, exist_ok=True)
+
 STATIC_TABLES = os.path.join(BASE_DIR, "static", "uploads", "tabelas")
 os.makedirs(STATIC_TABLES, exist_ok=True)
+
 # 🔹 Documentos (persistente em disco)
 DOCS_PERSIST_DIR = os.path.join(PERSIST_ROOT, "docs")
 os.makedirs(DOCS_PERSIST_DIR, exist_ok=True)
@@ -83,7 +87,7 @@ def _build_db_uri() -> str:
     extras = {
         "sslmode": "require",
         "keepalives": "1",
-        "keepalives_idle": "30",
+        "keepalives_idle": "30",   # segundos ocioso antes de mandar keepalive
         "keepalives_interval": "10",
         "keepalives_count": "3",
         "application_name": os.environ.get("APP_NAME", "financas-dxsu"),
@@ -102,12 +106,23 @@ if "sqlite" in URI and os.environ.get("FLASK_ENV") == "production":
 
 # ===== Pool dimensionado por worker =====
 workers = int(os.environ.get("WEB_CONCURRENCY", "1") or "1")
-target_total = int(os.environ.get("DB_TARGET_CONNS", "60") or "60")
-per_worker_target = max(5, target_total // max(1, workers))
+threads = int(os.environ.get("GTHREADS", "1") or "1")  # se não usar threads, fica 1
+req_concurrency = max(1, workers * threads)
 
-pool_size = int(os.environ.get("DB_POOL_SIZE", str(per_worker_target)))
-max_overflow = int(os.environ.get("DB_MAX_OVERFLOW", str(max(5, per_worker_target // 2))))
-pool_recycle = int(os.environ.get("SQL_POOL_RECYCLE", "300"))  # 5 min
+# alvo global de conexões por instância (ajustável via env)
+# 40 é bem suficiente para ~70 pessoas usando o sistema sem estourar limite do Postgres
+target_total = int(os.environ.get("DB_TARGET_CONNS", "40") or "40")
+
+# por worker, limitado para não exagerar:
+per_worker_target = max(5, min(target_total // max(1, workers), 15))
+
+default_pool_size = min(per_worker_target, req_concurrency + 2)
+default_max_overflow = max(5, default_pool_size)
+
+pool_size = int(os.environ.get("DB_POOL_SIZE", str(default_pool_size)))
+max_overflow = int(os.environ.get("DB_MAX_OVERFLOW", str(default_max_overflow)))
+pool_recycle = int(os.environ.get("SQL_POOL_RECYCLE", "240"))  # 4 min < timeout de idle do provider
+pool_timeout = int(os.environ.get("SQL_POOL_TIMEOUT", "20"))   # espera máx. por conexão do pool (s)
 
 app.config.update(
     SQLALCHEMY_DATABASE_URI=URI,
@@ -121,14 +136,14 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
     SQLALCHEMY_ENGINE_OPTIONS={
         "poolclass": QueuePool,
-        # 🔹 Tamanho do pool efetivo por *worker*:
         "pool_size": pool_size,
         "max_overflow": max_overflow,
-        "pool_timeout": 15,
-        "pool_pre_ping": True,       # testa conexão antes de usar (evita 500 de conn morta)
+        "pool_timeout": pool_timeout,
+        "pool_pre_ping": True,       # testa conexão antes de usar (evita usar conn morta)
         "pool_use_lifo": True,       # reduz churn de conexões sob carga
-        "pool_recycle": pool_recycle,  # recicla sockets ociosos (evita TLS bad record mac)
+        "pool_recycle": pool_recycle,  # recicla sockets ociosos (evita timeout de idle / TLS)
         "connect_args": {
+            # tempo máx. para abrir conexão
             "connect_timeout": int(os.getenv("PGCONNECT_TIMEOUT", "5")),
             # tempo máx. por statement no servidor (defensivo)
             "options": "-c statement_timeout=15000",
@@ -137,6 +152,32 @@ app.config.update(
 )
 
 db = SQLAlchemy(app)
+
+
+# ========= Retry de conexão p/ rotas críticas =========
+def with_db_retry(fn):
+    """
+    Decorator simples para repetir a operação 1x em caso de queda de conexão
+    (OperationalError / DisconnectionError). Usa junto de rotas que batem no banco.
+    """
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        last_exc = None
+        for attempt in range(2):  # tentativa 0 e 1
+            try:
+                return fn(*args, **kwargs)
+            except (OperationalError, DisconnectionError) as e:
+                last_exc = e
+                # rollback defensivo e pequeno backoff
+                db.session.rollback()
+                try:
+                    app.logger.warning(f"[DB_RETRY] tentativa {attempt+1} falhou: {e}")
+                except Exception:
+                    pass
+                time.sleep(0.2)
+        # se chegou aqui, estourou as tentativas
+        raise last_exc
+    return wrapper
 
 
 # Health checks
@@ -2048,7 +2089,7 @@ def admin_dashboard():
         for c in cooperados
     }
 
-      # -------- Escalas agrupadas e contagem por cooperado ----------
+    # -------- Escalas agrupadas e contagem por cooperado ----------
     escalas_all = Escala.query.order_by(Escala.id.asc()).all()
     esc_by_int: dict[int, list] = defaultdict(list)
     esc_by_str: dict[str, list] = defaultdict(list)
@@ -2549,14 +2590,6 @@ def admin_delete_lancamento(id):
     db.session.commit()
     flash("Lançamento excluído.", "success")
     return redirect(url_for("admin_dashboard", tab="lancamentos"))
-
-
-# ===== IMPORTS =====
-from flask import request, render_template, send_file, url_for
-from sqlalchemy import func, literal, and_
-from types import SimpleNamespace
-import io, csv
-from datetime import datetime, timedelta
 
 @app.route("/admin/avaliacoes", methods=["GET"])
 @admin_required
