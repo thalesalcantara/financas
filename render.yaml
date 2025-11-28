@@ -8,14 +8,13 @@ services:
     startCommand: >
       gunicorn app:app
       --bind 0.0.0.0:$PORT
-      --workers ${WEB_CONCURRENCY:-2}
+      --workers ${WEB_CONCURRENCY:-1}          # 1 worker para gastar menos RAM
       --threads 1
       --timeout 120
       --graceful-timeout 30
       --keep-alive 5
-      --max-requests 2000
-      --max-requests-jitter 200
-      --preload
+      --max-requests 400                      # recicla mais cedo p/ não acumular memória
+      --max-requests-jitter 50
       --access-logfile /dev/null
       --error-logfile -
       --log-level info
@@ -29,8 +28,8 @@ services:
         value: production
       - key: PYTHONUTF8
         value: "1"
-      - key: WEB_CONCURRENCY          # opcional: ajuste conforme CPU
-        value: "2"
+      - key: WEB_CONCURRENCY
+        value: "1"         # força só 1 worker mesmo
       - key: SECRET_KEY
         sync: false
       - key: DATABASE_URL
