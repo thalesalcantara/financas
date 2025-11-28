@@ -323,10 +323,12 @@
           <i class="bi bi-credit-card"></i> <span class="nav-link-label">Receitas Coop</span>
         </a>
 
-        <a class="nav-sublink {% if request.endpoint == 'admin_despesas_coop' %}active{% endif %}"
-           href="{{ url_for('admin_despesas_coop') }}">
+        <!-- Despesas Coop -> endpoint correto: add_despesa_coop -->
+        <a class="nav-sublink {% if request.endpoint == 'add_despesa_coop' %}active{% endif %}"
+           href="{{ url_for('add_despesa_coop') }}">
           <i class="bi bi-cart-dash"></i> <span class="nav-link-label">Despesas Coop</span>
         </a>
+
         <a class="nav-sublink {% if request.endpoint == 'admin_receitas_cooperados' %}active{% endif %}"
            href="{{ url_for('admin_receitas_cooperados') }}">
           <i class="bi bi-wallet2"></i> <span class="nav-link-label">Receitas Cooperados</span>
