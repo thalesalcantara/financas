@@ -311,8 +311,9 @@
       </button>
 
       <div id="menuFinanceiro" class="collapse show nav-sublinks">
-        <a class="nav-sublink {% if request.endpoint == 'admin_lancamentos' %}active{% endif %}"
-           href="{{ url_for('admin_lancamentos') }}">
+        <!-- Lançamentos -> endpoint correto: admin_add_lancamento -->
+        <a class="nav-sublink {% if request.endpoint == 'admin_add_lancamento' %}active{% endif %}"
+           href="{{ url_for('admin_add_lancamento') }}">
           <i class="bi bi-journal-text"></i> <span class="nav-link-label">Lançamentos</span>
         </a>
         <a class="nav-sublink {% if request.endpoint == 'admin_receitas_coop' %}active{% endif %}"
