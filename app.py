@@ -2738,7 +2738,7 @@ def admin_avaliacoes():
     admin_user = Usuario.query.get(uid)
 
     return render_template(
-        "admin_dashboard.html",
+        "admin_avaliacoes.html",
         tab="avaliacoes",
         tipo=tipo,
         avaliacoes=avaliacoes,
