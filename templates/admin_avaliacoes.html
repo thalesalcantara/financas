@@ -277,9 +277,9 @@
 
       <div class="nav-section-label">Visão Geral</div>
 
-      <!-- Resumo -->
-      <a class="nav-link-main {% if request.endpoint == 'admin_dashboard' %}active{% endif %}"
-         href="{{ url_for('admin_dashboard') }}">
+      <!-- Resumo (aba do /admin) -->
+      <a class="nav-link-main"
+         href="{{ url_for('admin_dashboard', tab='resumo') }}">
         <div class="nav-link-left">
           <span class="nav-link-icon"><i class="bi bi-graph-up"></i></span>
           <span class="nav-link-label">Resumo</span>
@@ -297,7 +297,7 @@
 
       <hr class="sidebar-divider">
 
-      <!-- FINANCEIRO ------------------------------------------------------>
+      <!-- FINANCEIRO: tudo volta pra /admin com a tab certa ------------------>
       <button class="nav-link-group-toggle"
               type="button"
               data-bs-toggle="collapse"
@@ -311,39 +311,44 @@
       </button>
 
       <div id="menuFinanceiro" class="collapse show nav-sublinks">
-        <!-- Lançamentos -> endpoint correto: admin_add_lancamento -->
-        <a class="nav-sublink {% if request.endpoint == 'admin_add_lancamento' %}active{% endif %}"
-           href="{{ url_for('admin_add_lancamento') }}">
+        <!-- Lançamentos (aba) -->
+        <a class="nav-sublink"
+           href="{{ url_for('admin_dashboard', tab='lancamentos') }}">
           <i class="bi bi-journal-text"></i> <span class="nav-link-label">Lançamentos</span>
         </a>
 
-        <!-- Receitas Coop -> endpoint correto: add_receita_coop -->
-        <a class="nav-sublink {% if request.endpoint == 'add_receita_coop' %}active{% endif %}"
-           href="{{ url_for('add_receita_coop') }}">
-          <i class="bi bi-credit-card"></i> <span class="nav-link-label">Receitas Coop</span>
+        <!-- Receitas Coop (aba) -->
+        <a class="nav-sublink"
+           href="{{ url_for('admin_dashboard', tab='receitas') }}">
+          <i class="bi bi-cash"></i> <span class="nav-link-label">Receitas Coop</span>
         </a>
 
-        <!-- Despesas Coop -> endpoint correto: add_despesa_coop -->
-        <a class="nav-sublink {% if request.endpoint == 'add_despesa_coop' %}active{% endif %}"
-           href="{{ url_for('add_despesa_coop') }}">
+        <!-- Despesas Coop (aba) -->
+        <a class="nav-sublink"
+           href="{{ url_for('admin_dashboard', tab='despesas') }}">
           <i class="bi bi-cart-dash"></i> <span class="nav-link-label">Despesas Coop</span>
         </a>
 
-        <a class="nav-sublink {% if request.endpoint == 'admin_receitas_cooperados' %}active{% endif %}"
-           href="{{ url_for('admin_receitas_cooperados') }}">
-          <i class="bi bi-wallet2"></i> <span class="nav-link-label">Receitas Cooperados</span>
+        <!-- Receitas Cooperados (aba) -->
+        <a class="nav-sublink"
+           href="{{ url_for('admin_dashboard', tab='coop_receitas') }}">
+          <i class="bi bi-cash-coin"></i> <span class="nav-link-label">Receitas Cooperados</span>
         </a>
-        <a class="nav-sublink {% if request.endpoint == 'admin_despesas_cooperados' %}active{% endif %}"
-           href="{{ url_for('admin_despesas_cooperados') }}">
-          <i class="bi bi-bag-dash"></i> <span class="nav-link-label">Despesas Cooperados</span>
+
+        <!-- Despesas Cooperados (aba) -->
+        <a class="nav-sublink"
+           href="{{ url_for('admin_dashboard', tab='coop_despesas') }}">
+          <i class="bi bi-people"></i> <span class="nav-link-label">Despesas Cooperados</span>
         </a>
-        <a class="nav-sublink {% if request.endpoint == 'admin_beneficios' %}active{% endif %}"
-           href="{{ url_for('admin_beneficios') }}">
+
+        <!-- Benefícios (aba) -->
+        <a class="nav-sublink"
+           href="{{ url_for('admin_dashboard', tab='beneficios') }}">
           <i class="bi bi-heart-pulse"></i> <span class="nav-link-label">Benefícios</span>
         </a>
       </div>
 
-      <!-- CADASTROS ------------------------------------------------------->
+      <!-- CADASTROS --------------------------------------------------------->
       <button class="nav-link-group-toggle"
               type="button"
               data-bs-toggle="collapse"
@@ -357,25 +362,32 @@
       </button>
 
       <div id="menuCadastros" class="collapse show nav-sublinks">
-        <a class="nav-sublink {% if request.endpoint == 'admin_cooperados' %}active{% endif %}"
-           href="{{ url_for('admin_cooperados') }}">
+        <!-- Cooperados (aba) -->
+        <a class="nav-sublink"
+           href="{{ url_for('admin_dashboard', tab='cooperados') }}">
           <i class="bi bi-person-badge"></i> <span class="nav-link-label">Cooperados</span>
         </a>
-        <a class="nav-sublink {% if request.endpoint == 'admin_estabelecimentos' %}active{% endif %}"
-           href="{{ url_for('admin_estabelecimentos') }}">
-          <i class="bi bi-shop-window"></i> <span class="nav-link-label">Estabelecimentos</span>
+
+        <!-- Estabelecimentos (aba) -->
+        <a class="nav-sublink"
+           href="{{ url_for('admin_dashboard', tab='restaurantes') }}">
+          <i class="bi bi-shop"></i> <span class="nav-link-label">Estabelecimentos</span>
         </a>
+
+        <!-- Documentos (rota dedicada) -->
         <a class="nav-sublink {% if request.endpoint == 'admin_documentos' %}active{% endif %}"
            href="{{ url_for('admin_documentos') }}">
           <i class="bi bi-folder2"></i> <span class="nav-link-label">Documentos</span>
         </a>
+
+        <!-- Tabelas (rota dedicada) -->
         <a class="nav-sublink {% if request.endpoint == 'admin_tabelas' %}active{% endif %}"
            href="{{ url_for('admin_tabelas') }}">
           <i class="bi bi-table"></i> <span class="nav-link-label">Tabelas</span>
         </a>
       </div>
 
-      <!-- OPERAÇÃO -------------------------------------------------------->
+      <!-- OPERAÇÃO ---------------------------------------------------------->
       <button class="nav-link-group-toggle"
               type="button"
               data-bs-toggle="collapse"
@@ -389,10 +401,13 @@
       </button>
 
       <div id="menuOperacao" class="collapse show nav-sublinks">
-        <a class="nav-sublink {% if request.endpoint == 'admin_escalas' %}active{% endif %}"
-           href="{{ url_for('admin_escalas') }}">
-          <i class="bi bi-calendar-week"></i> <span class="nav-link-label">Escalas</span>
+        <!-- Escalas (aba) -->
+        <a class="nav-sublink"
+           href="{{ url_for('admin_dashboard', tab='escalas') }}">
+          <i class="bi bi-calendar2-week"></i> <span class="nav-link-label">Escalas</span>
         </a>
+
+        <!-- Avisos (rota dedicada) -->
         <a class="nav-sublink {% if request.endpoint == 'admin_avisos' %}active{% endif %}"
            href="{{ url_for('admin_avisos') }}">
           <i class="bi bi-megaphone"></i> <span class="nav-link-label">Avisos</span>
@@ -401,10 +416,10 @@
 
       <hr class="sidebar-divider">
 
-      <!-- Config e Sair ---------------------------------------------------->
+      <!-- Config (aba) + Sair ---------------------------------------------->
       <div class="sidebar-footer">
-        <a class="nav-link-main {% if request.endpoint == 'admin_config' %}active{% endif %}"
-           href="{{ url_for('admin_config') }}">
+        <a class="nav-link-main"
+           href="{{ url_for('admin_dashboard', tab='config') }}">
           <div class="nav-link-left">
             <span class="nav-link-icon"><i class="bi bi-gear"></i></span>
             <span class="nav-link-label">Configurações</span>
