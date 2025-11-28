@@ -1974,7 +1974,7 @@ def toggle_status_cooperado(id):
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_dashboard():
-    from collections import namedtuple
+    from collections import namedtuple, defaultdict
     import re
     args = request.args
 
@@ -2042,8 +2042,14 @@ def admin_dashboard():
         rq = rq.filter(ReceitaCooperativa.data <= data_fim)
         dq = dq.filter(DespesaCooperativa.data <= data_fim)
 
-    receitas = rq.order_by(ReceitaCooperativa.data.desc().nullslast(), ReceitaCooperativa.id.desc()).all()
-    despesas = dq.order_by(DespesaCooperativa.data.desc(), DespesaCooperativa.id.desc()).all()
+    receitas = rq.order_by(
+        ReceitaCooperativa.data.desc().nullslast(),
+        ReceitaCooperativa.id.desc()
+    ).all()
+    despesas = dq.order_by(
+        DespesaCooperativa.data.desc(),
+        DespesaCooperativa.id.desc()
+    ).all()
     total_receitas = sum((r.valor_total or 0.0) for r in receitas)
     total_despesas = sum((d.valor or 0.0) for d in despesas)
 
@@ -2068,13 +2074,20 @@ def admin_dashboard():
     elif data_fim:
         dq2 = dq2.filter(DespesaCooperado.data_inicio <= data_fim)
 
-    receitas_coop = rq2.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
+    receitas_coop = rq2.order_by(
+        ReceitaCooperado.data.desc(),
+        ReceitaCooperado.id.desc()
+    ).all()
     # você pode manter por .data (domingo) ou, se preferir, ordenar pelo fim real do período:
-    despesas_coop = dq2.order_by(DespesaCooperado.data_fim.desc().nullslast(), DespesaCooperado.id.desc()).all()
+    despesas_coop = dq2.order_by(
+        DespesaCooperado.data_fim.desc().nullslast(),
+        DespesaCooperado.id.desc()
+    ).all()
 
     total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
     total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop)
 
+    # ---- Dados básicos
     cfg = get_config()
     cooperados = Cooperado.query.order_by(Cooperado.nome).all()
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
@@ -2089,30 +2102,7 @@ def admin_dashboard():
         for c in cooperados
     }
 
-    # -------- Escalas agrupadas e contagem por cooperado ----------
-    escalas_all = Escala.query.order_by(Escala.id.asc()).all()
-    esc_by_int: dict[int, list] = defaultdict(list)
-    esc_by_str: dict[str, list] = defaultdict(list)
-    for e in escalas_all:
-        k_int = e.cooperado_id if e.cooperado_id is not None else 0  # 0 = sem cadastro
-        esc_item = {
-            "data": e.data,
-            "turno": e.turno,
-            "horario": e.horario,
-            "contrato": e.contrato,
-            "cor": e.cor,
-            "nome_planilha": e.cooperado_nome,
-        }
-        esc_by_int[k_int].append(esc_item)
-        esc_by_str[str(k_int)].append(esc_item)
-
-    cont_rows = dict(
-        db.session.query(Escala.cooperado_id, func.count(Escala.id))
-        .group_by(Escala.cooperado_id)
-        .all()
-    )
-    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
-    qtd_sem_cadastro = int(cont_rows.get(None, 0))
+    admin_user = Usuario.query.filter_by(tipo="admin").first()
 
     # ---- Gráficos (por mês) — rótulo robusto "MM/YY"
     sums = {}
@@ -2137,237 +2127,283 @@ def admin_dashboard():
     chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
     chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
 
-    admin_user = Usuario.query.filter_by(tipo="admin").first()
+    # ========================
+    #  BLOCO PESADO: defaults
+    # ========================
 
-    # ---- Folha (últimos 30 dias padrão)
+    # Escalas
+    esc_by_int: dict[int, list] = defaultdict(list)
+    esc_by_str: dict[str, list] = defaultdict(list)
+    qtd_escalas_map = {}
+    qtd_sem_cadastro = 0
+
+    # Folha
     folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
     folha_fim = _parse_date(args.get("folha_fim")) or date.today()
     FolhaItem = namedtuple("FolhaItem", "cooperado lancamentos receitas despesas bruto inss outras_desp liquido")
-
     folha_por_coop = []
-    for c in cooperados:
-        l = (
-            Lancamento.query.filter(
-                Lancamento.cooperado_id == c.id,
-                Lancamento.data >= folha_inicio,
-                Lancamento.data <= folha_fim,
-            )
-            .order_by(Lancamento.data.asc(), Lancamento.id.asc())
-            .all()
-        )
-        r = (
-            ReceitaCooperado.query.filter(
-                ReceitaCooperado.cooperado_id == c.id,
-                ReceitaCooperado.data >= folha_inicio,
-                ReceitaCooperado.data <= folha_fim,
-            )
-            .order_by(ReceitaCooperado.data.asc(), ReceitaCooperado.id.asc())
-            .all()
-        )
-        d = (
-            DespesaCooperado.query.filter(
-                (DespesaCooperado.cooperado_id == c.id) | (DespesaCooperado.cooperado_id.is_(None)),
-                DespesaCooperado.data >= folha_inicio,
-                DespesaCooperado.data <= folha_fim,
-            )
-            .order_by(DespesaCooperado.data.asc(), DespesaCooperado.id.asc())
-            .all()
-        )
 
-        bruto_lanc = sum(x.valor or 0 for x in l)
-        inss = round(bruto_lanc * 0.045, 2)
-        outras_desp = sum(x.valor or 0 for x in d)
-        bruto_total = bruto_lanc + sum(x.valor or 0 for x in r)
-        liquido = bruto_total - inss - outras_desp
-
-        # anotações usadas no template
-        for x in l:
-            x.conta_inss = True
-            x.isento_benef = False
-            x.inss = round((x.valor or 0) * 0.045, 2)
-
-        folha_por_coop.append(
-            FolhaItem(
-                cooperado=c,
-                lancamentos=l,
-                receitas=r,
-                despesas=d,
-                bruto=bruto_total,
-                inss=inss,
-                outras_desp=outras_desp,
-                liquido=liquido,
-            )
-        )
-
-    # ----------------------------
-    # Benefícios para template (com filtros + id)
-    # ----------------------------
-    def _tokenize(s: str):
-        return [x.strip() for x in re.split(r"[;,]", s or "") if x.strip()]
-
-    def _d(s):
-        if not s:
-            return None
-        s = s.strip()
-        try:
-            if "/" in s:  # dd/mm/yyyy
-                d, m, y = s.split("/")
-                return date(int(y), int(m), int(d))
-            # yyyy-mm-dd
-            y, m, d = s.split("-")
-            return date(int(y), int(m), int(d))
-        except Exception:
-            return None
-
-    # filtros vindos da querystring da própria aba (já existem no seu HTML)
-    b_ini = _d(request.args.get("b_ini"))
-    b_fim = _d(request.args.get("b_fim"))
-    coop_filter = request.args.get("coop_benef_id", type=int)
-
-    q = BeneficioRegistro.query
-
-    # sobreposição de intervalo:
-    # inclui o benefício se [data_inicial, data_final] INTERSECTA o filtro
-    if b_ini and b_fim:
-        q = q.filter(
-            BeneficioRegistro.data_inicial <= b_fim,
-            BeneficioRegistro.data_final   >= b_ini,
-        )
-    elif b_ini:
-        q = q.filter(BeneficioRegistro.data_final >= b_ini)
-    elif b_fim:
-        q = q.filter(BeneficioRegistro.data_inicial <= b_fim)
-
-    historico_beneficios = q.order_by(BeneficioRegistro.id.desc()).all()
-
+    # Benefícios
     beneficios_view = []
-    for b in historico_beneficios:
-        nomes = _tokenize(b.recebedores_nomes or "")
-        ids   = _tokenize(b.recebedores_ids or "")
+    historico_beneficios = []
 
-        recs = []
-        for i, nome in enumerate(nomes):
-            rid = None
-            if i < len(ids) and str(ids[i]).isdigit():
-                try:
-                    rid = int(ids[i])
-                except Exception:
-                    rid = None
-
-            # se o filtro por cooperado estiver ativo, só mantém o recebedor alvo
-            if coop_filter and (rid is not None) and (rid != coop_filter):
-                continue
-
-            recs.append({"id": rid, "nome": nome})
-
-        # se o filtro por cooperado estiver ativo e nenhum recebedor bateu, pula o registro
-        if coop_filter and not recs:
-            continue
-
-        beneficios_view.append({
-            "id": b.id,  # <<< necessário para editar/excluir
-            "data_inicial": b.data_inicial,
-            "data_final": b.data_final,
-            "data_lancamento": b.data_lancamento,
-            "tipo": b.tipo,
-            "valor_total": b.valor_total or 0.0,
-            "recebedores": recs,
-        })
-
-    # ======== Trocas no admin ========
-    def _escala_desc(e: Escala | None) -> str:
-        return _escala_label(e)
-
-    def _split_turno_horario(s: str) -> tuple[str, str]:
-        if not s:
-            return "", ""
-        parts = [p.strip() for p in s.split("•")]
-        if len(parts) == 2:
-            return parts[0], parts[1]
-        return s.strip(), ""
-
-    def _linha_from_escala(e: Escala, saiu: str, entrou: str) -> dict:
-        return {
-            "dia": _escala_label(e).split(" • ")[0],
-            "turno_horario": " • ".join([x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]),
-            "contrato": (e.contrato or "").strip(),
-            "saiu": saiu,
-            "entrou": entrou,
-        }
-
-    trocas_all = TrocaSolicitacao.query.order_by(TrocaSolicitacao.id.desc()).all()
-    trocas_pendentes, trocas_historico = [], []
+    # Trocas
+    trocas_pendentes = []
+    trocas_historico = []
     trocas_historico_flat = []
 
-    for t in trocas_all:
-        solicitante = Cooperado.query.get(t.solicitante_id)
-        destinatario = Cooperado.query.get(t.destino_id)
-        orig = Escala.query.get(t.origem_escala_id)
+    # -------- Escalas agrupadas e contagem por cooperado ----------
+    # Só carrega se a aba realmente precisar disso
+    if active_tab in {"escalas", "trocas", "cooperados"}:
+        escalas_all = Escala.query.order_by(Escala.id.asc()).all()
+        for e in escalas_all:
+            k_int = e.cooperado_id if e.cooperado_id is not None else 0  # 0 = sem cadastro
+            esc_item = {
+                "data": e.data,
+                "turno": e.turno,
+                "horario": e.horario,
+                "contrato": e.contrato,
+                "cor": e.cor,
+                "nome_planilha": e.cooperado_nome,
+            }
+            esc_by_int[k_int].append(esc_item)
+            esc_by_str[str(k_int)].append(esc_item)
 
-        linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
+        cont_rows = dict(
+            db.session.query(Escala.cooperado_id, func.count(Escala.id))
+            .group_by(Escala.cooperado_id)
+            .all()
+        )
+        qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
+        qtd_sem_cadastro = int(cont_rows.get(None, 0))
 
-        if t.status == "aprovada" and not linhas_afetadas and orig and solicitante and destinatario:
-            # linha 1 (origem)
-            linhas_afetadas.append(_linha_from_escala(orig, saiu=solicitante.nome, entrou=destinatario.nome))
-            # linha 2 (melhor candidata do solicitante no mesmo bucket)
-            wd_o = _weekday_from_data_str(orig.data)
-            buck_o = _turno_bucket(orig.turno, orig.horario)
-            candidatas = Escala.query.filter_by(cooperado_id=solicitante.id).all()
-            best = None
-            for e in candidatas:
-                if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
-                    if (orig.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
-                        best = e
-                        break
-                    if best is None:
-                        best = e
-            if best:
-                linhas_afetadas.append(_linha_from_escala(best, saiu=destinatario.nome, entrou=solicitante.nome))
-
-        item = {
-            "id": t.id,
-            "status": t.status,
-            "mensagem": t.mensagem,
-            "criada_em": t.criada_em,
-            "aplicada_em": t.aplicada_em,
-            "solicitante": solicitante,
-            "destinatario": destinatario,
-            "origem": orig,
-            "destino": destinatario,
-            "origem_desc": _escala_desc(orig),
-            "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
-            "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
-            "linhas_afetadas": linhas_afetadas,
-        }
-
-        if t.status == "aprovada" and linhas_afetadas:
-            itens = []
-            for r in linhas_afetadas:
-                turno_txt, horario_txt = _split_turno_horario(r.get("turno_horario", ""))
-                itens.append(
-                    {
-                        "data": r.get("dia", ""),
-                        "turno": turno_txt,
-                        "horario": horario_txt,
-                        "contrato": r.get("contrato", ""),
-                        "saiu_nome": r.get("saiu", ""),
-                        "entrou_nome": r.get("entrou", ""),
-                    }
+    # ---- Folha (MUITO PESADA) – só quando tab="folha"
+    if active_tab == "folha":
+        for c in cooperados:
+            l = (
+                Lancamento.query.filter(
+                    Lancamento.cooperado_id == c.id,
+                    Lancamento.data >= folha_inicio,
+                    Lancamento.data <= folha_fim,
                 )
-                trocas_historico_flat.append(
-                    {
-                        "data": r.get("dia", ""),
-                        "turno": turno_txt,
-                        "horario": horario_txt,
-                        "contrato": r.get("contrato", ""),
-                        "saiu_nome": r.get("saiu", ""),
-                        "entrou_nome": r.get("entrou", ""),
-                        "aplicada_em": t.aplicada_em,
-                    }
+                .order_by(Lancamento.data.asc(), Lancamento.id.asc())
+                .all()
+            )
+            r = (
+                ReceitaCooperado.query.filter(
+                    ReceitaCooperado.cooperado_id == c.id,
+                    ReceitaCooperado.data >= folha_inicio,
+                    ReceitaCooperado.data <= folha_fim,
                 )
-            item["itens"] = itens
+                .order_by(ReceitaCooperado.data.asc(), ReceitaCooperado.id.asc())
+                .all()
+            )
+            d = (
+                DespesaCooperado.query.filter(
+                    (DespesaCooperado.cooperado_id == c.id) | (DespesasCooperado.cooperado_id.is_(None)),
+                    DespesaCooperado.data >= folha_inicio,
+                    DespesaCooperado.data <= folha_fim,
+                )
+                .order_by(DespesasCooperado.data.asc(), DespesasCooperado.id.asc())
+                .all()
+            )
 
-        (trocas_pendentes if t.status == "pendente" else trocas_historico).append(item)
+            bruto_lanc = sum(x.valor or 0 for x in l)
+            inss = round(bruto_lanc * 0.045, 2)
+            outras_desp = sum(x.valor or 0 for x in d)
+            bruto_total = bruto_lanc + sum(x.valor or 0 for x in r)
+            liquido = bruto_total - inss - outras_desp
+
+            # anotações usadas no template
+            for x in l:
+                x.conta_inss = True
+                x.isento_benef = False
+                x.inss = round((x.valor or 0) * 0.045, 2)
+
+            folha_por_coop.append(
+                FolhaItem(
+                    cooperado=c,
+                    lancamentos=l,
+                    receitas=r,
+                    despesas=d,
+                    bruto=bruto_total,
+                    inss=inss,
+                    outras_desp=outras_desp,
+                    liquido=liquido,
+                )
+            )
+
+    # ----------------------------
+    # Benefícios para template (com filtros + id) – só na aba "beneficios"
+    # ----------------------------
+    if active_tab == "beneficios":
+        def _tokenize(s: str):
+            return [x.strip() for x in re.split(r"[;,]", s or "") if x.strip()]
+
+        def _d(s):
+            if not s:
+                return None
+            s = s.strip()
+            try:
+                if "/" in s:  # dd/mm/yyyy
+                    d, m, y = s.split("/")
+                    return date(int(y), int(m), int(d))
+                # yyyy-mm-dd
+                y, m, d = s.split("-")
+                return date(int(y), int(m), int(d))
+            except Exception:
+                return None
+
+        # filtros vindos da querystring da própria aba (já existem no seu HTML)
+        b_ini = _d(request.args.get("b_ini"))
+        b_fim = _d(request.args.get("b_fim"))
+        coop_filter = request.args.get("coop_benef_id", type=int)
+
+        q_b = BeneficioRegistro.query
+
+        # sobreposição de intervalo:
+        # inclui o benefício se [data_inicial, data_final] INTERSECTA o filtro
+        if b_ini and b_fim:
+            q_b = q_b.filter(
+                BeneficioRegistro.data_inicial <= b_fim,
+                BeneficioRegistro.data_final   >= b_ini,
+            )
+        elif b_ini:
+            q_b = q_b.filter(BeneficioRegistro.data_final >= b_ini)
+        elif b_fim:
+            q_b = q_b.filter(BeneficioRegistro.data_inicial <= b_fim)
+
+        historico_beneficios = q_b.order_by(BeneficioRegistro.id.desc()).all()
+
+        beneficios_view = []
+        for b in historico_beneficios:
+            nomes = _tokenize(b.recebedores_nomes or "")
+            ids   = _tokenize(b.recebedores_ids or "")
+
+            recs = []
+            for i, nome in enumerate(nomes):
+                rid = None
+                if i < len(ids) and str(ids[i]).isdigit():
+                    try:
+                        rid = int(ids[i])
+                    except Exception:
+                        rid = None
+
+                # se o filtro por cooperado estiver ativo, só mantém o recebedor alvo
+                if coop_filter and (rid is not None) and (rid != coop_filter):
+                    continue
+
+                recs.append({"id": rid, "nome": nome})
+
+            # se o filtro por cooperado estiver ativo e nenhum recebedor bateu, pula o registro
+            if coop_filter and not recs:
+                continue
+
+            beneficios_view.append({
+                "id": b.id,  # <<< necessário para editar/excluir
+                "data_inicial": b.data_inicial,
+                "data_final": b.data_final,
+                "data_lancamento": b.data_lancamento,
+                "tipo": b.tipo,
+                "valor_total": b.valor_total or 0.0,
+                "recebedores": recs,
+            })
+
+    # ======== Trocas no admin ========
+    if active_tab == "trocas":
+        def _escala_desc(e: Escala | None) -> str:
+            return _escala_label(e)
+
+        def _split_turno_horario(s: str) -> tuple[str, str]:
+            if not s:
+                return "", ""
+            parts = [p.strip() for p in s.split("•")]
+            if len(parts) == 2:
+                return parts[0], parts[1]
+            return s.strip(), ""
+
+        def _linha_from_escala(e: Escala, saiu: str, entrou: str) -> dict:
+            return {
+                "dia": _escala_label(e).split(" • ")[0],
+                "turno_horario": " • ".join([x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]),
+                "contrato": (e.contrato or "").strip(),
+                "saiu": saiu,
+                "entrou": entrou,
+            }
+
+        trocas_all = TrocaSolicitacao.query.order_by(TrocaSolicitacao.id.desc()).all()
+        trocas_pendentes, trocas_historico = [], []
+        trocas_historico_flat = []
+
+        for t in trocas_all:
+            solicitante = Cooperado.query.get(t.solicitante_id)
+            destinatario = Cooperado.query.get(t.destino_id)
+            orig = Escala.query.get(t.origem_escala_id)
+
+            linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
+
+            if t.status == "aprovada" and not linhas_afetadas and orig and solicitante and destinatario:
+                # linha 1 (origem)
+                linhas_afetadas.append(_linha_from_escala(orig, saiu=solicitante.nome, entrou=destinatario.nome))
+                # linha 2 (melhor candidata do solicitante no mesmo bucket)
+                wd_o = _weekday_from_data_str(orig.data)
+                buck_o = _turno_bucket(orig.turno, orig.horario)
+                candidatas = Escala.query.filter_by(cooperado_id=solicitante.id).all()
+                best = None
+                for e in candidatas:
+                    if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
+                        if (orig.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
+                            best = e
+                            break
+                        if best is None:
+                            best = e
+                if best:
+                    linhas_afetadas.append(_linha_from_escala(best, saiu=destinatario.nome, entrou=solicitante.nome))
+
+            item = {
+                "id": t.id,
+                "status": t.status,
+                "mensagem": t.mensagem,
+                "criada_em": t.criada_em,
+                "aplicada_em": t.aplicada_em,
+                "solicitante": solicitante,
+                "destinatario": destinatario,
+                "origem": orig,
+                "destino": destinatario,
+                "origem_desc": _escala_desc(orig),
+                "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
+                "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
+                "linhas_afetadas": linhas_afetadas,
+            }
+
+            if t.status == "aprovada" and linhas_afetadas:
+                itens = []
+                for r in linhas_afetadas:
+                    turno_txt, horario_txt = _split_turno_horario(r.get("turno_horario", ""))
+                    itens.append(
+                        {
+                            "data": r.get("dia", ""),
+                            "turno": turno_txt,
+                            "horario": horario_txt,
+                            "contrato": r.get("contrato", ""),
+                            "saiu_nome": r.get("saiu", ""),
+                            "entrou_nome": r.get("entrou", ""),
+                        }
+                    )
+                    trocas_historico_flat.append(
+                        {
+                            "data": r.get("dia", ""),
+                            "turno": turno_txt,
+                            "horario": horario_txt,
+                            "contrato": r.get("contrato", ""),
+                            "saiu_nome": r.get("saiu", ""),
+                            "entrou_nome": r.get("entrou", ""),
+                            "aplicada_em": t.aplicada_em,
+                        }
+                    )
+                item["itens"] = itens
+
+            (trocas_pendentes if t.status == "pendente" else trocas_historico).append(item)
 
     current_date = date.today()
     data_limite = date(current_date.year, 12, 31)
@@ -2410,6 +2446,7 @@ def admin_dashboard():
         trocas_historico=trocas_historico,
         trocas_historico_flat=trocas_historico_flat,
     )
+
 
 # =========================
 # Navegação/Export util
