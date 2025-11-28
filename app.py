@@ -1945,7 +1945,6 @@ def logout():
 # =========================
 # Admin Dashboard
 # =========================
-# app.py
 from flask import jsonify, request
 
 @app.post("/admin/cooperados/<int:id>/toggle-status")
@@ -1962,10 +1961,7 @@ def toggle_status_cooperado(id):
         if not hasattr(user, "ativo"):
             # tenta criar no ar (não persiste coluna, só evita quebrar)
             # mas avisa o caller para você rodar a migração
-            return jsonify(
-                ok=False,
-                error="Campo 'ativo' ausente no modelo/DB. Faça deploy com o modelo atualizado e a migração."
-            ), 500
+            return jsonify(ok=False, error="Campo 'ativo' ausente no modelo/DB. Faça deploy com o modelo atualizado e a migração."), 500
 
         user.ativo = not atual
         db.session.commit()
@@ -1980,6 +1976,7 @@ def toggle_status_cooperado(id):
 def admin_dashboard():
     from collections import defaultdict
     import re
+
     args = request.args
 
     # --- Controle de abas
@@ -2132,7 +2129,7 @@ def admin_dashboard():
     chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
 
     # ========================
-    #  BLOCO "PESADO": defaults
+    #  BLOCO PESADO: defaults
     # ========================
 
     # Escalas
@@ -2267,9 +2264,7 @@ def admin_dashboard():
         def _linha_from_escala(e: Escala, saiu: str, entrou: str) -> dict:
             return {
                 "dia": _escala_label(e).split(" • ")[0],
-                "turno_horario": " • ".join(
-                    [x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]
-                ),
+                "turno_horario": " • ".join([x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]),
                 "contrato": (e.contrato or "").strip(),
                 "saiu": saiu,
                 "entrou": entrou,
@@ -2288,9 +2283,7 @@ def admin_dashboard():
 
             if t.status == "aprovada" and not linhas_afetadas and orig and solicitante and destinatario:
                 # linha 1 (origem)
-                linhas_afetadas.append(
-                    _linha_from_escala(orig, saiu=solicitante.nome, entrou=destinatario.nome)
-                )
+                linhas_afetadas.append(_linha_from_escala(orig, saiu=solicitante.nome, entrou=destinatario.nome))
                 # linha 2 (melhor candidata do solicitante no mesmo bucket)
                 wd_o = _weekday_from_data_str(orig.data)
                 buck_o = _turno_bucket(orig.turno, orig.horario)
@@ -2304,9 +2297,7 @@ def admin_dashboard():
                         if best is None:
                             best = e
                 if best:
-                    linhas_afetadas.append(
-                        _linha_from_escala(best, saiu=destinatario.nome, entrou=solicitante.nome)
-                    )
+                    linhas_afetadas.append(_linha_from_escala(best, saiu=destinatario.nome, entrou=solicitante.nome))
 
             item = {
                 "id": t.id,
@@ -2320,10 +2311,7 @@ def admin_dashboard():
                 "destino": destinatario,
                 "origem_desc": _escala_desc(orig),
                 "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
-                "origem_turno_bucket": _turno_bucket(
-                    orig.turno if orig else None,
-                    orig.horario if orig else None
-                ),
+                "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
                 "linhas_afetadas": linhas_afetadas,
             }
 
@@ -2394,7 +2382,6 @@ def admin_dashboard():
         trocas_historico=trocas_historico,
         trocas_historico_flat=trocas_historico_flat,
     )
-
 
 # =========================
 # Navegação/Export util
