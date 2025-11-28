@@ -316,10 +316,13 @@
            href="{{ url_for('admin_add_lancamento') }}">
           <i class="bi bi-journal-text"></i> <span class="nav-link-label">Lançamentos</span>
         </a>
-        <a class="nav-sublink {% if request.endpoint == 'admin_receitas_coop' %}active{% endif %}"
-           href="{{ url_for('admin_receitas_coop') }}">
+
+        <!-- Receitas Coop -> endpoint correto: add_receita_coop -->
+        <a class="nav-sublink {% if request.endpoint == 'add_receita_coop' %}active{% endif %}"
+           href="{{ url_for('add_receita_coop') }}">
           <i class="bi bi-credit-card"></i> <span class="nav-link-label">Receitas Coop</span>
         </a>
+
         <a class="nav-sublink {% if request.endpoint == 'admin_despesas_coop' %}active{% endif %}"
            href="{{ url_for('admin_despesas_coop') }}">
           <i class="bi bi-cart-dash"></i> <span class="nav-link-label">Despesas Coop</span>
