@@ -2103,7 +2103,9 @@ def admin_dashboard():
         for c in cooperados
     }
 
-    admin_user = Usuario.query.filter_by(tipo="admin").first()
+    uid = session.get("user_id")
+    admin_user = Usuario.query.get(uid)
+
 
     # ---- Gráficos (por mês) — rótulo robusto "MM/YY"
     sums = {}
@@ -2247,141 +2249,6 @@ def admin_dashboard():
                 "valor_total": b.valor_total or 0.0,
                 "recebedores": recs,
             })
-
-    # ======== Trocas no admin ========
-    if active_tab == "trocas":
-        def _escala_desc(e: Escala | None) -> str:
-            return _escala_label(e)
-
-        def _split_turno_horario(s: str) -> tuple[str, str]:
-            if not s:
-                return "", ""
-            parts = [p.strip() for p in s.split("•")]
-            if len(parts) == 2:
-                return parts[0], parts[1]
-            return s.strip(), ""
-
-        def _linha_from_escala(e: Escala, saiu: str, entrou: str) -> dict:
-            return {
-                "dia": _escala_label(e).split(" • ")[0],
-                "turno_horario": " • ".join([x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]),
-                "contrato": (e.contrato or "").strip(),
-                "saiu": saiu,
-                "entrou": entrou,
-            }
-
-        trocas_all = TrocaSolicitacao.query.order_by(TrocaSolicitacao.id.desc()).all()
-        trocas_pendentes, trocas_historico = [], []
-        trocas_historico_flat = []
-
-        for t in trocas_all:
-            solicitante = Cooperado.query.get(t.solicitante_id)
-            destinatario = Cooperado.query.get(t.destino_id)
-            orig = Escala.query.get(t.origem_escala_id)
-
-            linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
-
-            if t.status == "aprovada" and not linhas_afetadas and orig and solicitante and destinatario:
-                # linha 1 (origem)
-                linhas_afetadas.append(_linha_from_escala(orig, saiu=solicitante.nome, entrou=destinatario.nome))
-                # linha 2 (melhor candidata do solicitante no mesmo bucket)
-                wd_o = _weekday_from_data_str(orig.data)
-                buck_o = _turno_bucket(orig.turno, orig.horario)
-                candidatas = Escala.query.filter_by(cooperado_id=solicitante.id).all()
-                best = None
-                for e in candidatas:
-                    if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
-                        if (orig.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
-                            best = e
-                            break
-                        if best is None:
-                            best = e
-                if best:
-                    linhas_afetadas.append(_linha_from_escala(best, saiu=destinatario.nome, entrou=solicitante.nome))
-
-            item = {
-                "id": t.id,
-                "status": t.status,
-                "mensagem": t.mensagem,
-                "criada_em": t.criada_em,
-                "aplicada_em": t.aplicada_em,
-                "solicitante": solicitante,
-                "destinatario": destinatario,
-                "origem": orig,
-                "destino": destinatario,
-                "origem_desc": _escala_desc(orig),
-                "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
-                "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
-                "linhas_afetadas": linhas_afetadas,
-            }
-
-            if t.status == "aprovada" and linhas_afetadas:
-                itens = []
-                for r in linhas_afetadas:
-                    turno_txt, horario_txt = _split_turno_horario(r.get("turno_horario", ""))
-                    itens.append(
-                        {
-                            "data": r.get("dia", ""),
-                            "turno": turno_txt,
-                            "horario": horario_txt,
-                            "contrato": r.get("contrato", ""),
-                            "saiu_nome": r.get("saiu", ""),
-                            "entrou_nome": r.get("entrou", ""),
-                        }
-                    )
-                    trocas_historico_flat.append(
-                        {
-                            "data": r.get("dia", ""),
-                            "turno": turno_txt,
-                            "horario": horario_txt,
-                            "contrato": r.get("contrato", ""),
-                            "saiu_nome": r.get("saiu", ""),
-                            "entrou_nome": r.get("entrou", ""),
-                            "aplicada_em": t.aplicada_em,
-                        }
-                    )
-                item["itens"] = itens
-
-            (trocas_pendentes if t.status == "pendente" else trocas_historico).append(item)
-
-    current_date = date.today()
-    data_limite = date(current_date.year, 12, 31)
-
-    # ---- Render
-    return render_template(
-        "admin_dashboard.html",
-        tab=active_tab,  # <- mantém a aba ativa na UI
-        total_producoes=total_producoes,
-        total_inss=total_inss,
-        total_receitas=total_receitas,
-        total_despesas=total_despesas,
-        total_receitas_coop=total_receitas_coop,
-        total_despesas_coop=total_despesas_coop,
-        salario_minimo=cfg.salario_minimo or 0.0,
-        lancamentos=lancamentos,
-        receitas=receitas,
-        despesas=despesas,
-        receitas_coop=receitas_coop,
-        despesas_coop=despesas_coop,
-        cooperados=cooperados,
-        restaurantes=restaurantes,
-        beneficios_view=beneficios_view,
-        historico_beneficios=historico_beneficios,
-        current_date=current_date,
-        data_limite=data_limite,
-        admin=admin_user,
-        docinfo_map=docinfo_map,
-        escalas_por_coop=esc_by_int,
-        escalas_por_coop_json=esc_by_str,
-        qtd_escalas_map=qtd_escalas_map,
-        qtd_escalas_sem_cadastro=qtd_sem_cadastro,
-        status_doc_por_coop=status_doc_por_coop,
-        chart_data_lancamentos_coop=chart_data_lancamentos_coop,
-        chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
-        trocas_pendentes=trocas_pendentes,
-        trocas_historico=trocas_historico,
-        trocas_historico_flat=trocas_historico_flat,
-    )
 
 # =========================
 # Navegação/Export util
@@ -2809,9 +2676,9 @@ def admin_avaliacoes():
     preserve = request.args.to_dict(flat=True)
     preserve.pop("page", None)
 
-    # 🔹 AQUI: mesmas variáveis usadas no admin_dashboard normal
     cfg = get_config()
-    admin_user = Usuario.query.filter_by(tipo="admin").first()
+    uid = session.get("user_id")
+    admin_user = Usuario.query.get(uid)
 
     return render_template(
         "admin_dashboard.html",
