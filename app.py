@@ -2106,7 +2106,6 @@ def admin_dashboard():
     uid = session.get("user_id")
     admin_user = Usuario.query.get(uid)
 
-
     # ---- Gráficos (por mês) — rótulo robusto "MM/YY"
     sums = {}
     for l in lancamentos:
@@ -2249,6 +2248,64 @@ def admin_dashboard():
                 "valor_total": b.valor_total or 0.0,
                 "recebedores": recs,
             })
+
+    # ==== RETURN DO DASHBOARD (mantendo tudo, sem tirar nada) ====
+    return render_template(
+        "admin_dashboard.html",
+        tab=active_tab,
+        # filtros e período
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        restaurante_id=restaurante_id,
+        cooperado_id=cooperado_id,
+        considerar_periodo=considerar_periodo,
+        dows=dows,
+
+        # lançamentos
+        lancamentos=lancamentos,
+        total_producoes=total_producoes,
+        total_inss=total_inss,
+        chart_data_lancamentos_coop=chart_data_lancamentos_coop,
+        chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
+
+        # coop (institucional)
+        receitas=receitas,
+        despesas=despesas,
+        total_receitas=total_receitas,
+        total_despesas=total_despesas,
+
+        # cooperados (pessoa física)
+        receitas_coop=receitas_coop,
+        despesas_coop=despesas_coop,
+        total_receitas_coop=total_receitas_coop,
+        total_despesas_coop=total_despesas_coop,
+
+        # escalas
+        esc_by_int=esc_by_int,
+        esc_by_str=esc_by_str,
+        qtd_escalas_map=qtd_escalas_map,
+        qtd_sem_cadastro=qtd_sem_cadastro,
+
+        # benefícios
+        beneficios_view=beneficios_view,
+        historico_beneficios=historico_beneficios,
+
+        # trocas (mantidos mesmo vazios para não quebrar o template)
+        trocas_pendentes=trocas_pendentes,
+        trocas_historico=trocas_historico,
+        trocas_historico_flat=trocas_historico_flat,
+
+        # dados básicos / doc
+        cooperados=cooperados,
+        restaurantes=restaurantes,
+        docinfo_map=docinfo_map,
+        status_doc_por_coop=status_doc_por_coop,
+
+        # admin + config
+        admin=admin_user,
+        salario_minimo=cfg.salario_minimo or 0.0,
+        cfg=cfg,
+    )
 
 # =========================
 # Navegação/Export util
@@ -3131,6 +3188,7 @@ def marcar_aviso_lido_universal(aviso_id: int):
         return _ok_response()
 
     return ("", 403) if request.method == "POST" else redirect(url_for("login"))
+
 
 # =========================
 # CRUD Cooperados / Restaurantes / Senhas (Admin)
