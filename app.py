@@ -4012,84 +4012,73 @@ def escalas_purge_restaurante(rest_id):
 # =========================
 # Trocas (Admin aprovar/recusar)
 # =========================
+from sqlalchemy.exc import SQLAlchemyError
+from datetime import datetime
+
 @app.post("/admin/trocas/<int:id>/aprovar")
 @admin_required
 def admin_aprovar_troca(id):
     t = TrocaSolicitacao.query.get_or_404(id)
+
     if t.status != "pendente":
         flash("Esta solicitação já foi tratada.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
+    # Escala original que será "trocada"
     orig_e = Escala.query.get(t.origem_escala_id)
     if not orig_e:
-        flash("Plantão de origem inválido.", "danger")
+        flash("Escala original não encontrada. Não foi possível aplicar a troca.", "danger")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    solicitante = Cooperado.query.get(t.solicitante_id)
-    destinatario = Cooperado.query.get(t.destino_id)
-    if not solicitante or not destinatario:
-        flash("Cooperado(s) inválido(s) na solicitação.", "danger")
+    # Cooperados envolvidos
+    coop_solic = Cooperado.query.get(t.solicitante_id)
+    coop_dest  = Cooperado.query.get(t.destino_id)
+
+    if not coop_solic or not coop_dest:
+        flash("Cooperados envolvidos na troca não foram encontrados.", "danger")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    wd_o = _weekday_from_data_str(orig_e.data)
-    buck_o = _turno_bucket(orig_e.turno, orig_e.horario)
-    minhas = (Escala.query
-              .filter_by(cooperado_id=destinatario.id)
-              .order_by(Escala.id.asc()).all())
-    candidatas = [e for e in minhas
-                  if _weekday_from_data_str(e.data) == wd_o
-                  and _turno_bucket(e.turno, e.horario) == buck_o]
+    try:
+        # Regra simples:
+        # - O plantão que era do solicitante passa para o destino.
+        orig_e.cooperado_id = coop_dest.id
+        # Se existir este campo no modelo Escala, mantenha. Se não existir, remova a linha:
+        # orig_e.cooperado_nome = coop_dest.nome
 
-    if len(candidatas) != 1:
-        if len(candidatas) == 0:
-            flash("Destino não possui plantões compatíveis (mesmo dia da semana e mesmo turno).", "danger")
-        else:
-            flash("Mais de um plantão compatível encontrado para o destino. Aprove pelo portal do cooperado (onde é possível escolher).", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
+        t.status = "aprovada"
+        # Se existir este campo no modelo TrocaSolicitacao, mantenha. Se não existir, remova a linha:
+        t.aplicada_em = datetime.utcnow()
 
-    dest_e = candidatas[0]
+        db.session.commit()
+        flash("Troca aprovada e aplicada na escala.", "success")
 
-    linhas = [
-        {
-            "dia": _escala_label(orig_e).split(" • ")[0],
-            "turno_horario": " • ".join([x for x in [(orig_e.turno or "").strip(), (orig_e.horario or "").strip()] if x]),
-            "contrato": (orig_e.contrato or "").strip(),
-            "saiu": solicitante.nome,
-            "entrou": destinatario.nome,
-        },
-        {
-            "dia": _escala_label(dest_e).split(" • ")[0],
-            "turno_horario": " • ".join([x for x in [(dest_e.turno or "").strip(), (dest_e.horario or "").strip()] if x]),
-            "contrato": (dest_e.contrato or "").strip(),
-            "saiu": destinatario.nome,
-            "entrou": solicitante.nome,
-        }
-    ]
-    afetacao_json = {"linhas": linhas}
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        current_app.logger.exception(e)
+        flash("Erro ao aplicar a troca. Nenhuma alteração foi salva.", "danger")
 
-    solicitante_id = orig_e.cooperado_id
-    destino_id = dest_e.cooperado_id
-    orig_e.cooperado_id, dest_e.cooperado_id = destino_id, solicitante_id
-
-    t.status = "aprovada"
-    t.aplicada_em = datetime.utcnow()
-    prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
-    t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps(afetacao_json, ensure_ascii=False)
-
-    db.session.commit()
-    flash("Troca aprovada e aplicada com sucesso!", "success")
     return redirect(url_for("admin_dashboard", tab="escalas"))
+
 
 @app.post("/admin/trocas/<int:id>/recusar")
 @admin_required
 def admin_recusar_troca(id):
+    """
+    Apenas marca a solicitação como recusada, sem alterar escalas.
+    """
     t = TrocaSolicitacao.query.get_or_404(id)
+
     if t.status != "pendente":
         flash("Esta solicitação já foi tratada.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
+
     t.status = "recusada"
+    # Se tiver a coluna aplicada_em:
+    # t.aplicada_em = datetime.utcnow()
+
     db.session.commit()
-    flash("Solicitação recusada.", "info")
+
+    flash("Solicitação de troca recusada.", "info")
     return redirect(url_for("admin_dashboard", tab="escalas"))
 
 
