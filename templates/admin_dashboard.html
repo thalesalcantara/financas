@@ -302,14 +302,14 @@
         </div>
       </a>
 
-      <!-- Avaliações (AGORA É ROTA /admin/avaliacoes) -->
-      <a class="nav-link-main {% if request.endpoint == 'admin_avaliacoes' %}active{% endif %}"
-         href="{{ url_for('admin_avaliacoes') }}">
-        <div class="nav-link-left">
-          <span class="nav-link-icon"><i class="bi bi-stars"></i></span>
-          <span class="nav-link-label">Avaliações</span>
-        </div>
-      </a>
+      <!-- Avaliações (ROTA /admin/avaliacoes) -->
+    <a class="nav-link-main {% if request.endpoint == 'admin_avaliacoes' %}active{% endif %}"
+       href="{{ url_for('admin_avaliacoes') }}">
+      <div class="nav-link-left">
+        <span class="nav-link-icon"><i class="bi bi-stars"></i></span>
+        <span class="nav-link-label">Avaliações</span>
+      </div>
+    </a>
 
       <hr class="sidebar-divider">
 
