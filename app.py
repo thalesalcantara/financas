@@ -1962,7 +1962,10 @@ def toggle_status_cooperado(id):
         if not hasattr(user, "ativo"):
             # tenta criar no ar (não persiste coluna, só evita quebrar)
             # mas avisa o caller para você rodar a migração
-            return jsonify(ok=False, error="Campo 'ativo' ausente no modelo/DB. Faça deploy com o modelo atualizado e a migração."), 500
+            return jsonify(
+                ok=False,
+                error="Campo 'ativo' ausente no modelo/DB. Faça deploy com o modelo atualizado e a migração."
+            ), 500
 
         user.ativo = not atual
         db.session.commit()
@@ -1971,10 +1974,11 @@ def toggle_status_cooperado(id):
         db.session.rollback()
         return jsonify(ok=False, error="Falha ao salvar no banco"), 500
 
+
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_dashboard():
-    from collections import namedtuple, defaultdict
+    from collections import defaultdict
     import re
     args = request.args
 
@@ -2128,7 +2132,7 @@ def admin_dashboard():
     chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
 
     # ========================
-    #  BLOCO PESADO: defaults
+    #  BLOCO "PESADO": defaults
     # ========================
 
     # Escalas
@@ -2136,12 +2140,6 @@ def admin_dashboard():
     esc_by_str: dict[str, list] = defaultdict(list)
     qtd_escalas_map = {}
     qtd_sem_cadastro = 0
-
-    # Folha
-    folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
-    folha_fim = _parse_date(args.get("folha_fim")) or date.today()
-    FolhaItem = namedtuple("FolhaItem", "cooperado lancamentos receitas despesas bruto inss outras_desp liquido")
-    folha_por_coop = []
 
     # Benefícios
     beneficios_view = []
@@ -2176,62 +2174,6 @@ def admin_dashboard():
         )
         qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
         qtd_sem_cadastro = int(cont_rows.get(None, 0))
-
-    # ---- Folha (MUITO PESADA) – só quando tab="folha"
-    if active_tab == "folha":
-        for c in cooperados:
-            l = (
-                Lancamento.query.filter(
-                    Lancamento.cooperado_id == c.id,
-                    Lancamento.data >= folha_inicio,
-                    Lancamento.data <= folha_fim,
-                )
-                .order_by(Lancamento.data.asc(), Lancamento.id.asc())
-                .all()
-            )
-            r = (
-                ReceitaCooperado.query.filter(
-                    ReceitaCooperado.cooperado_id == c.id,
-                    ReceitaCooperado.data >= folha_inicio,
-                    ReceitaCooperado.data <= folha_fim,
-                )
-                .order_by(ReceitaCooperado.data.asc(), ReceitaCooperado.id.asc())
-                .all()
-            )
-            d = (
-                DespesaCooperado.query.filter(
-                    (DespesaCooperado.cooperado_id == c.id) | (DespesasCooperado.cooperado_id.is_(None)),
-                    DespesaCooperado.data >= folha_inicio,
-                    DespesaCooperado.data <= folha_fim,
-                )
-                .order_by(DespesasCooperado.data.asc(), DespesasCooperado.id.asc())
-                .all()
-            )
-
-            bruto_lanc = sum(x.valor or 0 for x in l)
-            inss = round(bruto_lanc * 0.045, 2)
-            outras_desp = sum(x.valor or 0 for x in d)
-            bruto_total = bruto_lanc + sum(x.valor or 0 for x in r)
-            liquido = bruto_total - inss - outras_desp
-
-            # anotações usadas no template
-            for x in l:
-                x.conta_inss = True
-                x.isento_benef = False
-                x.inss = round((x.valor or 0) * 0.045, 2)
-
-            folha_por_coop.append(
-                FolhaItem(
-                    cooperado=c,
-                    lancamentos=l,
-                    receitas=r,
-                    despesas=d,
-                    bruto=bruto_total,
-                    inss=inss,
-                    outras_desp=outras_desp,
-                    liquido=liquido,
-                )
-            )
 
     # ----------------------------
     # Benefícios para template (com filtros + id) – só na aba "beneficios"
@@ -2325,7 +2267,9 @@ def admin_dashboard():
         def _linha_from_escala(e: Escala, saiu: str, entrou: str) -> dict:
             return {
                 "dia": _escala_label(e).split(" • ")[0],
-                "turno_horario": " • ".join([x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]),
+                "turno_horario": " • ".join(
+                    [x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]
+                ),
                 "contrato": (e.contrato or "").strip(),
                 "saiu": saiu,
                 "entrou": entrou,
@@ -2344,7 +2288,9 @@ def admin_dashboard():
 
             if t.status == "aprovada" and not linhas_afetadas and orig and solicitante and destinatario:
                 # linha 1 (origem)
-                linhas_afetadas.append(_linha_from_escala(orig, saiu=solicitante.nome, entrou=destinatario.nome))
+                linhas_afetadas.append(
+                    _linha_from_escala(orig, saiu=solicitante.nome, entrou=destinatario.nome)
+                )
                 # linha 2 (melhor candidata do solicitante no mesmo bucket)
                 wd_o = _weekday_from_data_str(orig.data)
                 buck_o = _turno_bucket(orig.turno, orig.horario)
@@ -2358,7 +2304,9 @@ def admin_dashboard():
                         if best is None:
                             best = e
                 if best:
-                    linhas_afetadas.append(_linha_from_escala(best, saiu=destinatario.nome, entrou=solicitante.nome))
+                    linhas_afetadas.append(
+                        _linha_from_escala(best, saiu=destinatario.nome, entrou=solicitante.nome)
+                    )
 
             item = {
                 "id": t.id,
@@ -2372,7 +2320,10 @@ def admin_dashboard():
                 "destino": destinatario,
                 "origem_desc": _escala_desc(orig),
                 "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
-                "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
+                "origem_turno_bucket": _turno_bucket(
+                    orig.turno if orig else None,
+                    orig.horario if orig else None
+                ),
                 "linhas_afetadas": linhas_afetadas,
             }
 
@@ -2439,9 +2390,6 @@ def admin_dashboard():
         status_doc_por_coop=status_doc_por_coop,
         chart_data_lancamentos_coop=chart_data_lancamentos_coop,
         chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
-        folha_inicio=folha_inicio,
-        folha_fim=folha_fim,
-        folha_por_coop=folha_por_coop,
         trocas_pendentes=trocas_pendentes,
         trocas_historico=trocas_historico,
         trocas_historico_flat=trocas_historico_flat,
