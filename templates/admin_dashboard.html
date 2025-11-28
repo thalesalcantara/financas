@@ -263,6 +263,17 @@
 </head>
 <body>
 
+{# -----------------------------------------
+   Fallbacks e aba ativa
+   ----------------------------------------- #}
+{% set kpis       = kpis if kpis is defined else {'qtd':0,'geral':0,'trat':0,'amb':0,'sup':0,'pont':0,'educ':0,'efic':0,'apres':0} %}
+{% set chart_top  = chart_top if chart_top is defined else {'labels':[],'values':[]} %}
+{% set ranking    = ranking if ranking is defined else [] %}
+{% set compat     = compat if compat is defined else [] %}
+{% set avaliacoes = avaliacoes if avaliacoes is defined else [] %}
+{% set _flt       = _flt if _flt is defined else namespace(restaurante_id=None, cooperado_id=None, data_inicio='', data_fim='') %}
+{% set _tab       = (tab if tab is defined else request.args.get('tab','resumo')) %}
+
 <div class="layout">
 
   <!-- SIDEBAR -------------------------------------------------------------->
@@ -273,20 +284,25 @@
       <span class="brand-sub">Administração Central</span>
     </div>
 
-    <nav class="sidebar-nav">
+    <nav class="sidebar-nav nav flex-column">
 
       <div class="nav-section-label">Visão Geral</div>
 
-      <!-- Resumo (página atual) -->
-      <a class="nav-link-main {% if request.endpoint == 'admin_dashboard' %}active{% endif %}"
-         href="{{ url_for('admin_dashboard') }}">
+      <!-- Resumo (TAB, igual antes) -->
+      <a class="nav-link-main {{ 'active' if _tab=='resumo' else '' }}"
+         data-bs-toggle="tab"
+         data-bs-target="#resumo"
+         href="#resumo"
+         role="tab"
+         aria-controls="resumo"
+         aria-selected="{{ 'true' if _tab=='resumo' else 'false' }}">
         <div class="nav-link-left">
           <span class="nav-link-icon"><i class="bi bi-graph-up"></i></span>
           <span class="nav-link-label">Resumo</span>
         </div>
       </a>
 
-      <!-- Avaliações (html admin_avaliacoes) -->
+      <!-- Avaliações (AGORA É ROTA /admin/avaliacoes) -->
       <a class="nav-link-main {% if request.endpoint == 'admin_avaliacoes' %}active{% endif %}"
          href="{{ url_for('admin_avaliacoes') }}">
         <div class="nav-link-left">
@@ -297,7 +313,7 @@
 
       <hr class="sidebar-divider">
 
-      <!-- FINANCEIRO ------------------------------------------------------>
+      <!-- FINANCEIRO (TABS, não rotas) ------------------------------------->
       <button class="nav-link-group-toggle"
               type="button"
               data-bs-toggle="collapse"
@@ -311,39 +327,80 @@
       </button>
 
       <div id="menuFinanceiro" class="collapse show nav-sublinks">
-        <a class="nav-sublink {% if request.endpoint == 'admin_lancamentos' %}active{% endif %}"
-           href="{{ url_for('admin_lancamentos') }}">
+        <!-- Lançamentos (tab) -->
+        <a class="nav-sublink {{ 'active' if _tab=='lancamentos' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#lancamentos"
+           href="#lancamentos"
+           role="tab"
+           aria-controls="lancamentos"
+           aria-selected="{{ 'true' if _tab=='lancamentos' else 'false' }}">
           <i class="bi bi-journal-text"></i>
           <span class="nav-link-label">Lançamentos</span>
         </a>
-        <a class="nav-sublink {% if request.endpoint == 'admin_receitas_coop' %}active{% endif %}"
-           href="{{ url_for('admin_receitas_coop') }}">
+
+        <!-- Receitas Coop (tab) -->
+        <a class="nav-sublink {{ 'active' if _tab=='receitas' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#receitas"
+           href="#receitas"
+           role="tab"
+           aria-controls="receitas"
+           aria-selected="{{ 'true' if _tab=='receitas' else 'false' }}">
           <i class="bi bi-credit-card"></i>
           <span class="nav-link-label">Receitas Coop</span>
         </a>
-        <a class="nav-sublink {% if request.endpoint == 'admin_despesas_coop' %}active{% endif %}"
-           href="{{ url_for('admin_despesas_coop') }}">
+
+        <!-- Despesas Coop (tab) -->
+        <a class="nav-sublink {{ 'active' if _tab=='despesas' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#despesas"
+           href="#despesas"
+           role="tab"
+           aria-controls="despesas"
+           aria-selected="{{ 'true' if _tab=='despesas' else 'false' }}">
           <i class="bi bi-cart-dash"></i>
           <span class="nav-link-label">Despesas Coop</span>
         </a>
-        <a class="nav-sublink {% if request.endpoint == 'admin_receitas_cooperados' %}active{% endif %}"
-           href="{{ url_for('admin_receitas_cooperados') }}">
+
+        <!-- Receitas Cooperados (tab) -->
+        <a class="nav-sublink {{ 'active' if _tab=='coop_receitas' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#coop_receitas"
+           href="#coop_receitas"
+           role="tab"
+           aria-controls="coop_receitas"
+           aria-selected="{{ 'true' if _tab=='coop_receitas' else 'false' }}">
           <i class="bi bi-wallet2"></i>
           <span class="nav-link-label">Receitas Cooperados</span>
         </a>
-        <a class="nav-sublink {% if request.endpoint == 'admin_despesas_cooperados' %}active{% endif %}"
-           href="{{ url_for('admin_despesas_cooperados') }}">
+
+        <!-- Despesas Cooperados (tab) -->
+        <a class="nav-sublink {{ 'active' if _tab=='coop_despesas' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#coop_despesas"
+           href="#coop_despesas"
+           role="tab"
+           aria-controls="coop_despesas"
+           aria-selected="{{ 'true' if _tab=='coop_despesas' else 'false' }}">
           <i class="bi bi-bag-dash"></i>
           <span class="nav-link-label">Despesas Cooperados</span>
         </a>
-        <a class="nav-sublink {% if request.endpoint == 'admin_beneficios' %}active{% endif %}"
-           href="{{ url_for('admin_beneficios') }}">
+
+        <!-- Benefícios (tab) -->
+        <a class="nav-sublink {{ 'active' if _tab=='beneficios' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#beneficios"
+           href="#beneficios"
+           role="tab"
+           aria-controls="beneficios"
+           aria-selected="{{ 'true' if _tab=='beneficios' else 'false' }}">
           <i class="bi bi-heart-pulse"></i>
           <span class="nav-link-label">Benefícios</span>
         </a>
       </div>
 
-      <!-- CADASTROS ------------------------------------------------------->
+      <!-- CADASTROS (tabs + rotas) ------------------------------------------>
       <button class="nav-link-group-toggle"
               type="button"
               data-bs-toggle="collapse"
@@ -357,21 +414,38 @@
       </button>
 
       <div id="menuCadastros" class="collapse show nav-sublinks">
-        <a class="nav-sublink {% if request.endpoint == 'admin_cooperados' %}active{% endif %}"
-           href="{{ url_for('admin_cooperados') }}">
+        <!-- Cooperados (tab) -->
+        <a class="nav-sublink {{ 'active' if _tab=='cooperados' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#cooperados"
+           href="#cooperados"
+           role="tab"
+           aria-controls="cooperados"
+           aria-selected="{{ 'true' if _tab=='cooperados' else 'false' }}">
           <i class="bi bi-person-badge"></i>
           <span class="nav-link-label">Cooperados</span>
         </a>
-        <a class="nav-sublink {% if request.endpoint == 'admin_estabelecimentos' %}active{% endif %}"
-           href="{{ url_for('admin_estabelecimentos') }}">
+
+        <!-- Estabelecimentos (tab) -->
+        <a class="nav-sublink {{ 'active' if _tab=='restaurantes' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#restaurantes"
+           href="#restaurantes"
+           role="tab"
+           aria-controls="restaurantes"
+           aria-selected="{{ 'true' if _tab=='restaurantes' else 'false' }}">
           <i class="bi bi-shop-window"></i>
           <span class="nav-link-label">Estabelecimentos</span>
         </a>
+
+        <!-- Documentos (rota) -->
         <a class="nav-sublink {% if request.endpoint == 'admin_documentos' %}active{% endif %}"
            href="{{ url_for('admin_documentos') }}">
           <i class="bi bi-folder2"></i>
           <span class="nav-link-label">Documentos</span>
         </a>
+
+        <!-- Tabelas (rota) -->
         <a class="nav-sublink {% if request.endpoint == 'admin_tabelas' %}active{% endif %}"
            href="{{ url_for('admin_tabelas') }}">
           <i class="bi bi-table"></i>
@@ -379,7 +453,7 @@
         </a>
       </div>
 
-      <!-- OPERAÇÃO -------------------------------------------------------->
+      <!-- OPERAÇÃO ---------------------------------------------------------->
       <button class="nav-link-group-toggle"
               type="button"
               data-bs-toggle="collapse"
@@ -393,11 +467,19 @@
       </button>
 
       <div id="menuOperacao" class="collapse show nav-sublinks">
-        <a class="nav-sublink {% if request.endpoint == 'admin_escalas' %}active{% endif %}"
-           href="{{ url_for('admin_escalas') }}">
+        <!-- Escalas (tab) -->
+        <a class="nav-sublink {{ 'active' if _tab=='escalas' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#escalas"
+           href="#escalas"
+           role="tab"
+           aria-controls="escalas"
+           aria-selected="{{ 'true' if _tab=='escalas' else 'false' }}">
           <i class="bi bi-calendar-week"></i>
           <span class="nav-link-label">Escalas</span>
         </a>
+
+        <!-- Avisos (rota, como já era) -->
         <a class="nav-sublink {% if request.endpoint == 'admin_avisos' %}active{% endif %}"
            href="{{ url_for('admin_avisos') }}">
           <i class="bi bi-megaphone"></i>
@@ -407,10 +489,15 @@
 
       <hr class="sidebar-divider">
 
-      <!-- Config e Sair ---------------------------------------------------->
+      <!-- Config (TAB) e Sair (rota) ---------------------------------------->
       <div class="sidebar-footer">
-        <a class="nav-link-main {% if request.endpoint == 'admin_config' %}active{% endif %}"
-           href="{{ url_for('admin_config') }}">
+        <a class="nav-link-main {{ 'active' if _tab=='config' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#config"
+           href="#config"
+           role="tab"
+           aria-controls="config"
+           aria-selected="{{ 'true' if _tab=='config' else 'false' }}">
           <div class="nav-link-left">
             <span class="nav-link-icon"><i class="bi bi-gear"></i></span>
             <span class="nav-link-label">Configurações</span>
@@ -429,20 +516,9 @@
     </nav>
   </aside>
 
-  <!-- MAIN NOVO -->
-<main class="main">
-  <div class="content-shell">
-
-    <!-- Cabeçalho / título -->
-    <div class="page-header d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-      <div>
-        <h3 class="mb-0 d-flex align-items-center gap-2">
-          <i class="bi bi-graph-up text-primary"></i>
-          Resumo Geral
-        </h3>
-        <small>Visão consolidada da operação e financeiro da Coopex.</small>
-      </div>
-    </div>
+ <!-- Main -->
+  <main class="main">
+    <div class="tab-content">
 
      <!-- === RESUMO (Dashboard Financeiro Completo) === -->
 <section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
@@ -2306,8 +2382,6 @@
   </div>
 </div>
 </section> <!-- FECHA A ABA BENEFÍCIOS -->
-
-      </section> <!-- FECHA A ABA BENEFÍCIOS -->
 
 <!-- ==== BENEFÍCIOS: prévia + total + seleção em massa (escopado) ==== -->
 <script>
