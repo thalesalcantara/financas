@@ -277,14 +277,11 @@
 
       <div class="nav-section-label">Visão Geral</div>
 
-      <!-- Resumo (aba do /admin) -->
-      <a class="nav-link-main"
-         href="{{ url_for('admin_dashboard', tab='resumo') }}">
-        <div class="nav-link-left">
-          <span class="nav-link-icon"><i class="bi bi-graph-up"></i></span>
-          <span class="nav-link-label">Resumo</span>
-        </div>
-      </a>
+      <!-- Receitas Coop (aba) -->
+        <a class="nav-sublink"
+           href="{{ url_for('admin_dashboard', tab='resumo') }}">
+          <i class="bi bi-cash"></i> <span class="nav-link-label">resumo</span>
+        </a>
 
       <!-- Avaliações (página atual) -->
       <a class="nav-link-main active"
@@ -958,3 +955,4 @@
 
 </body>
 </html>
+
