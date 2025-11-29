@@ -32,7 +32,12 @@ from sqlalchemy.inspection import inspect as sa_inspect
 from sqlalchemy.pool import QueuePool
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError, DisconnectionError
+from sqlalchemy.exc import (
+    OperationalError,
+    SQLAlchemyError,
+    IntegrityError,
+    DisconnectionError,
+)
 from sqlalchemy import delete as sa_delete
 
 # 👉 Novo: para gerar XLSX em memória
@@ -76,15 +81,16 @@ def _merge_qs(url: str, extra: dict[str, str]) -> str:
 def _build_db_uri() -> str:
     raw = os.environ.get("DATABASE_URL")
     if not raw:
+        # Ambiente local: SQLite (arquivo simples)
         return "sqlite:///" + os.path.join(BASE_DIR, "app.db")
 
-    # força driver psycopg3 (SQLAlchemy)
+    # Render / Heroku ainda usam `postgres://` às vezes
     if raw.startswith("postgres://"):
         raw = raw.replace("postgres://", "postgresql+psycopg://", 1)
     elif raw.startswith("postgresql://") and "+psycopg" not in raw:
         raw = raw.replace("postgresql://", "postgresql+psycopg://", 1)
 
-    # SSL + keepalive + app name via libpq (idempotente)
+    # SSL + keepalive + app name via libpq
     extras = {
         "sslmode": "require",
         "keepalives": "1",
@@ -105,31 +111,31 @@ URI = _build_db_uri()
 if "sqlite" in URI and os.environ.get("FLASK_ENV") == "production":
     raise RuntimeError("DATABASE_URL ausente em produção")
 
-# ===== Pool dimensionado por worker =====
-workers = int(os.environ.get("WEB_CONCURRENCY", "1") or "1")
-threads = int(os.environ.get("GTHREADS", "1") or "1")  # se não usar threads, fica 1
-req_concurrency = max(1, workers * threads)
+# ================== CONFIG DE POOL / MEMÓRIA ==================
+# Em vez de tentar calcular por worker/thread, deixamos um pool
+# pequeno e estável, que funciona bem pra muitos usuários sem
+# ficar abrindo conexão demais (cada conexão consome RAM no Postgres).
+#
+# Se precisar ajustar, use as variáveis de ambiente:
+#   DB_POOL_SIZE (qtd. conexões fixas no pool, por instância)
+#   DB_MAX_OVERFLOW (qtd. conexões extras temporárias em pico)
+#
+# Valores padrão bem conservadores:
+DEFAULT_POOL_SIZE = 5           # 5 conns fixas no pool
+DEFAULT_MAX_OVERFLOW = 5        # até 5 extras em pico
+DEFAULT_POOL_RECYCLE = 240      # 4 min (< idle timeout do provider)
+DEFAULT_POOL_TIMEOUT = 20       # espera máx. por conexão do pool (s)
 
-# alvo global de conexões por instância (ajustável via env)
-# 40 é bem suficiente para ~70 pessoas usando o sistema sem estourar limite do Postgres
-target_total = int(os.environ.get("DB_TARGET_CONNS", "40") or "40")
-
-# por worker, limitado para não exagerar:
-per_worker_target = max(5, min(target_total // max(1, workers), 15))
-
-default_pool_size = min(per_worker_target, req_concurrency + 2)
-default_max_overflow = max(5, default_pool_size)
-
-pool_size = int(os.environ.get("DB_POOL_SIZE", str(default_pool_size)))
-max_overflow = int(os.environ.get("DB_MAX_OVERFLOW", str(default_max_overflow)))
-pool_recycle = int(os.environ.get("SQL_POOL_RECYCLE", "240"))  # 4 min < timeout de idle do provider
-pool_timeout = int(os.environ.get("SQL_POOL_TIMEOUT", "20"))   # espera máx. por conexão do pool (s)
+pool_size = int(os.environ.get("DB_POOL_SIZE", str(DEFAULT_POOL_SIZE)))
+max_overflow = int(os.environ.get("DB_MAX_OVERFLOW", str(DEFAULT_MAX_OVERFLOW)))
+pool_recycle = int(os.environ.get("SQL_POOL_RECYCLE", str(DEFAULT_POOL_RECYCLE)))
+pool_timeout = int(os.environ.get("SQL_POOL_TIMEOUT", str(DEFAULT_POOL_TIMEOUT)))
 
 app.config.update(
     SQLALCHEMY_DATABASE_URI=URI,
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     JSON_SORT_KEYS=False,
-    MAX_CONTENT_LENGTH=32 * 1024 * 1024,  # 32MB
+    MAX_CONTENT_LENGTH=32 * 1024 * 1024,  # 32MB upload
     SESSION_COOKIE_HTTPONLY=True,
     REMEMBER_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
@@ -140,9 +146,9 @@ app.config.update(
         "pool_size": pool_size,
         "max_overflow": max_overflow,
         "pool_timeout": pool_timeout,
-        "pool_pre_ping": True,       # testa conexão antes de usar (evita usar conn morta)
-        "pool_use_lifo": True,       # reduz churn de conexões sob carga
-        "pool_recycle": pool_recycle,  # recicla sockets ociosos (evita timeout de idle / TLS)
+        "pool_pre_ping": True,        # testa conexão antes de usar (evita conn morta)
+        "pool_use_lifo": True,        # reduz churn de conexões sob carga
+        "pool_recycle": pool_recycle, # recicla sockets ociosos (evita timeout de idle/TLS)
         "connect_args": {
             # tempo máx. para abrir conexão
             "connect_timeout": int(os.getenv("PGCONNECT_TIMEOUT", "5")),
@@ -153,6 +159,26 @@ app.config.update(
 )
 
 db = SQLAlchemy(app)
+
+# (opcional, mas ajuda a garantir que conexões problemáticas
+# sejam descartadas, evitando "engarrafar" o pool e gerar
+# consumo inútil de recurso)
+
+@event.listens_for(Engine, "engine_connect")
+def ping_connection(connection, branch):
+    """
+    Verifica se a conexão ainda está viva.
+    Isso evita ficar segurando conexão morta no pool.
+    """
+    if branch:
+        # sub-connection de uma mesma conexão, ignora
+        return
+    try:
+        connection.scalar(sa_text("SELECT 1"))
+    except (DisconnectionError, OperationalError):
+        # força reconectar
+        connection.invalidate()
+        connection.scalar(sa_text("SELECT 1"))
 
 
 # ========= Retry de conexão p/ rotas críticas =========
@@ -2838,12 +2864,12 @@ def admin_avaliacoes():
     preserve = request.args.to_dict(flat=True)
     preserve.pop("page", None)
 
-    # 🔹 AQUI: mesmas variáveis usadas no admin_dashboard normal
     cfg = get_config()
-    admin_user = Usuario.query.filter_by(tipo="admin").first()
+    uid = session.get("user_id")
+    admin_user = Usuario.query.get(uid)
 
     return render_template(
-        "admin_dashboard.html",
+        "admin_avaliacoes.html",
         tab="avaliacoes",
         tipo=tipo,
         avaliacoes=avaliacoes,
