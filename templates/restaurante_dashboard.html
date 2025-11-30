@@ -202,7 +202,9 @@
       <div class="col-md-6 col-lg-4">
         <div class="card-soft">
           <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="badge text-bg-primary fw-semibold">{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][dia.weekday()] }} — {{ dia.strftime('%d/%m/%Y') }}</span>
+            <span class="badge text-bg-primary fw-semibold">
+              {{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][dia.weekday()] }} — {{ dia.strftime('%d/%m/%Y') }}
+            </span>
             <i class="bi bi-people"></i>
           </div>
           <div style="max-height:360px; overflow:auto; border-top:1px dashed var(--border);">
@@ -212,38 +214,59 @@
                 {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
                 <div class="fw-bold mt-2">{{ contrato_nome }}</div>
 
-                {# --- 1) Turnos de DIA --- #}
-                {% for item in grupo.list %}
-                  {% set t = (item.turno or '')|lower %}
-                  {% if 'noite' not in t and ( 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t ) %}
-                  <div class="py-2 border-bottom">
-                    <div class="fw-bold">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
-                    <div class="text-muted small">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
-                  </div>
-                  {% endif %}
-                {% endfor %}
+                {# --- BLOCO: TURNOS DE DIA --- #}
+                <div class="mt-1">
+                  <div class="small text-uppercase text-muted">Dia</div>
+                  {% for item in grupo.list %}
+                    {% set t = (item.turno or '')|lower %}
+                    {% if 'noite' not in t and ( 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t ) %}
+                    <div class="py-2 border-bottom">
+                      <div class="fw-bold">
+                        {{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}
+                      </div>
+                      <div class="text-muted small">
+                        {{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}
+                      </div>
+                    </div>
+                    {% endif %}
+                  {% endfor %}
+                </div>
 
-                {# --- 2) Turnos de NOITE --- #}
-                {% for item in grupo.list %}
-                  {% set t = (item.turno or '')|lower %}
-                  {% if 'noite' in t %}
-                  <div class="py-2 border-bottom">
-                    <div class="fw-bold">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
-                    <div class="text-muted small">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
-                  </div>
-                  {% endif %}
-                {% endfor %}
+                {# --- BLOCO: TURNOS DE NOITE --- #}
+                <div class="mt-2">
+                  <div class="small text-uppercase text-muted">Noite</div>
+                  {% for item in grupo.list %}
+                    {% set t = (item.turno or '')|lower %}
+                    {% if 'noite' in t %}
+                    <div class="py-2 border-bottom">
+                      <div class="fw-bold">
+                        {{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}
+                      </div>
+                      <div class="text-muted small">
+                        {{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}
+                      </div>
+                    </div>
+                    {% endif %}
+                  {% endfor %}
+                </div>
 
-                {# --- 3) Turnos INDEFINIDOS (nem dia nem noite) --- #}
-                {% for item in grupo.list %}
-                  {% set t = (item.turno or '')|lower %}
-                  {% if not ('noite' in t or 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
-                  <div class="py-2 border-bottom">
-                    <div class="fw-bold">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
-                    <div class="text-muted small">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
-                  </div>
-                  {% endif %}
-                {% endfor %}
+                {# --- BLOCO: TURNOS INDEFINIDOS --- #}
+                <div class="mt-2 mb-2">
+                  <div class="small text-uppercase text-muted">Indefinido</div>
+                  {% for item in grupo.list %}
+                    {% set t = (item.turno or '')|lower %}
+                    {% if not ('noite' in t or 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
+                    <div class="py-2 border-bottom">
+                      <div class="fw-bold">
+                        {{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}
+                      </div>
+                      <div class="text-muted small">
+                        {{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}
+                      </div>
+                    </div>
+                    {% endif %}
+                  {% endfor %}
+                </div>
 
               {% endfor %}
             {% else %}
@@ -254,63 +277,82 @@
       </div>
       {% endfor %}
     </div>
+
     {% else %}
+    {# =================== MODO "SOMENTE 1 DIA" =================== #}
     <hr class="my-3">
     <div class="card-soft">
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <span class="badge text-bg-primary fw-semibold">{{ _ref_data and ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][_ref_data.weekday()] }} — {{ _ref_data and _ref_data.strftime('%d/%m/%Y') }}</span>
+        <span class="badge text-bg-primary fw-semibold">
+          {{ _ref_data and ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][_ref_data.weekday()] }} — {{ _ref_data and _ref_data.strftime('%d/%m/%Y') }}
+        </span>
         <i class="bi bi-calendar-day"></i>
       </div>
       <table class="table table-bordered table-hover align-middle table-compact">
-        <thead><tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Contrato</th>
+            <th>Cooperado</th>
+            <th>Turno</th>
+            <th>Horário</th>
+          </tr>
+        </thead>
         <tbody>
           {% set lista = _agenda.get(_ref_data, []) if _ref_data else [] %}
           {% if lista %}
-            {% for grupo in (lista | groupby('contrato')) %}
-              {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
 
-              {# --- 1) DIA --- #}
-              {% for item in grupo.list %}
-                {% set t = (item.turno or '')|lower %}
-                {% if 'noite' not in t and ( 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t ) %}
-                <tr>
-                  <td>{{ contrato_nome }}</td>
-                  <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
-                  <td>{{ item.turno or '—' }}</td>
-                  <td>{{ item.horario or '—' }}</td>
-                </tr>
-                {% endif %}
-              {% endfor %}
-
-              {# --- 2) NOITE --- #}
-              {% for item in grupo.list %}
-                {% set t = (item.turno or '')|lower %}
-                {% if 'noite' in t %}
-                <tr>
-                  <td>{{ contrato_nome }}</td>
-                  <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
-                  <td>{{ item.turno or '—' }}</td>
-                  <td>{{ item.horario or '—' }}</td>
-                </tr>
-                {% endif %}
-              {% endfor %}
-
-              {# --- 3) INDEFINIDOS --- #}
-              {% for item in grupo.list %}
-                {% set t = (item.turno or '')|lower %}
-                {% if not ('noite' in t or 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
-                <tr>
-                  <td>{{ contrato_nome }}</td>
-                  <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
-                  <td>{{ item.turno or '—' }}</td>
-                  <td>{{ item.horario or '—' }}</td>
-                </tr>
-                {% endif %}
-              {% endfor %}
-
+            {# --- PRIMEIRO: TURNOS DE DIA --- #}
+            <tr class="table-primary text-center">
+              <td colspan="4" class="fw-bold text-uppercase">Turno de DIA</td>
+            </tr>
+            {% for item in lista %}
+              {% set t = (item.turno or '')|lower %}
+              {% if 'noite' not in t and ( 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t ) %}
+              <tr>
+                <td>{{ item.contrato or 'Sem contrato' }}</td>
+                <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
+                <td>{{ item.turno or '—' }}</td>
+                <td>{{ item.horario or '—' }}</td>
+              </tr>
+              {% endif %}
             {% endfor %}
+
+            {# --- DEPOIS: TURNOS DE NOITE --- #}
+            <tr class="table-primary text-center">
+              <td colspan="4" class="fw-bold text-uppercase">Turno de NOITE</td>
+            </tr>
+            {% for item in lista %}
+              {% set t = (item.turno or '')|lower %}
+              {% if 'noite' in t %}
+              <tr>
+                <td>{{ item.contrato or 'Sem contrato' }}</td>
+                <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
+                <td>{{ item.turno or '—' }}</td>
+                <td>{{ item.horario or '—' }}</td>
+              </tr>
+              {% endif %}
+            {% endfor %}
+
+            {# --- POR FIM: TURNOS INDEFINIDOS --- #}
+            <tr class="table-primary text-center">
+              <td colspan="4" class="fw-bold text-uppercase">Turno INDEFINIDO</td>
+            </tr>
+            {% for item in lista %}
+              {% set t = (item.turno or '')|lower %}
+              {% if not ('noite' in t or 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
+              <tr>
+                <td>{{ item.contrato or 'Sem contrato' }}</td>
+                <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
+                <td>{{ item.turno or '—' }}</td>
+                <td>{{ item.horario or '—' }}</td>
+              </tr>
+              {% endif %}
+            {% endfor %}
+
           {% else %}
-            <tr><td colspan="4" class="text-center text-muted">Sem escala registrada.</td></tr>
+            <tr>
+              <td colspan="4" class="text-center text-muted">Sem escala registrada.</td>
+            </tr>
           {% endif %}
         </tbody>
       </table>
