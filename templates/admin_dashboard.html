@@ -3106,150 +3106,208 @@
 </section>
 
        <!-- ESCALAS -->
-      <section class="tab-pane fade" id="escalas">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <h4 class="mb-0">Escalas</h4>
-          <div class="alert alert-info py-1 px-2 mb-0">
-            <b>Prazo-limite geral:</b> 31/12/<span id="prazoAno">—</span> — faltam <b><span id="prazoDias">0</span> dias</b>.
-          </div>
-        </div>
-
-        <!-- Upload -->
-        <div class="card p-3 mb-3">
-          <h6 class="mb-2">Upload da Escala (.xlsx)</h6>
-          <form method="POST" action="{{ url_for('upload_escala') }}" enctype="multipart/form-data" class="row g-2 align-items-end">
-            <div class="col-md-6">
-              <input type="file" class="form-control" name="file" accept=".xlsx" required>
-            </div>
-            <div class="col-md-3">
-              <button class="btn btn-royal w-100"><i class="bi bi-upload"></i> Enviar Planilha</button>
-            </div>
-          </form>
-          <small class="muted">A associação do cooperado é feita por nome (mínimo 2 partes em comum, ignorando acentos).</small>
-        </div>
-
-        <!-- Cooperados & Escalas -->
-        <div class="card p-3 mb-3">
-          <div class="table-responsive">
-            <table class="table table-bordered align-middle">
-              <thead>
-                <tr>
-                  <th>Cooperado</th>
-                  <th>CNH</th>
-                  <th>Val. CNH</th>
-                  <th>Placa</th>
-                  <th>Val. Placa</th>
-                  <th>Situação</th>
-                  <th>Última atualização</th>
-                  <th class="text-center">Qtde de linhas</th>
-                  <th class="text-center">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for c in cooperados %}
-                {% set lst = (escalas_por_coop[c.id] if (escalas_por_coop is defined and c.id in escalas_por_coop) else []) %}
-                {% set sdoc = status_doc_por_coop.get(c.id) if status_doc_por_coop is defined else None %}
-                {% set ok_cnh   = sdoc.cnh_ok if sdoc is not none and 'cnh_ok' in sdoc else None %}
-                {% set ok_placa = sdoc.placa_ok if sdoc is not none and 'placa_ok' in sdoc else None %}
-                <tr>
-                  <td>{{ c.nome }}</td>
-                  <td>{{ c.cnh_numero if c.cnh_numero is defined and c.cnh_numero else '—' }}</td>
-                  <td>{% if c.cnh_validade is defined and c.cnh_validade %}{{ c.cnh_validade.strftime('%d/%m') }}{% else %}—{% endif %}</td>
-                  <td>{{ c.placa if c.placa is defined and c.placa else '—' }}</td>
-                  <td>{% if c.placa_validade is defined and c.placa_validade %}{{ c.placa_validade.strftime('%d/%m') }}{% else %}—{% endif %}</td>
-                  <td class="text-nowrap">
-                    {% if ok_cnh is not none %}
-                      <span class="badge {{ 'bg-success' if ok_cnh else 'bg-danger' }} me-1">CNH {{ 'OK' if ok_cnh else 'Pend.' }}</span>
-                    {% else %}
-                      <span class="badge bg-secondary me-1">CNH —</span>
-                    {% endif %}
-                    {% if ok_placa is not none %}
-                      <span class="badge {{ 'bg-success' if ok_placa else 'bg-danger' }}">Placa {{ 'OK' if ok_placa else 'Pend.' }}</span>
-                    {% else %}
-                      <span class="badge bg-secondary">Placa —</span>
-                    {% endif %}
-                    {% if ok_cnh and ok_placa %}<span class="ms-1 text-success">👏</span>{% endif %}
-                  </td>
-                  <td>{{ c.ultima_atualizacao.strftime('%d/%m/%Y %H:%M') if c.ultima_atualizacao else '—' }}</td>
-                  <td class="text-center">{{ lst|length }}</td>
-                  <td class="text-center">
-                    <button class="btn btn-sm btn-royal" data-bs-toggle="modal" data-bs-target="#modalEscalas" data-coopid="{{ c.id }}">
-                      <i class="bi bi-eye"></i> Ver escala
-                    </button>
-                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('editar_documentos', coop_id=c.id) }}">
-                      <i class="bi bi-pen"></i> Documentos
-                    </a>
-                  </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="9" class="text-center text-muted">Nenhum cooperado</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-       
-        <!-- SOLICITAÇÕES DE TROCA (pendentes) -->
-<div class="card p-3 mb-3">
-  <div class="d-flex justify-content-between align-items-center">
-    <h5 class="mb-0"><i class="bi bi-arrow-left-right"></i> Solicitações de Troca de Escala</h5>
-    <span class="badge-soft">Pendentes: {{ trocas_pendentes|length if trocas_pendentes else 0 }}</span>
+<section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h4 class="mb-0">Escalas</h4>
+    <div class="alert alert-info py-1 px-2 mb-0">
+      <b>Prazo-limite geral:</b> 31/12/<span id="prazoAno">—</span> — faltam <b><span id="prazoDias">0</span> dias</b>.
+    </div>
   </div>
 
-  <div class="table-responsive mt-2">
-    <table class="table table-bordered align-middle">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Solicitante</th>
-          <th>Origem</th>
-          <th>Destino</th>
-          <th>Mensagem</th>
-          <th>Solicitada em</th>
-          <th class="text-center">Ações</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for t in trocas_pendentes or [] %}
-  {% set solicitante = t.solicitante if t.solicitante else None %}
-  {% set origem = t.origem if t.origem else None %}
-  {% set destino = t.destino if t.destino else None %}
+  <!-- Upload -->
+  <div class="card p-3 mb-3">
+    <h6 class="mb-2">Upload da Escala (.xlsx)</h6>
 
-  <tr>
-    <td class="text-muted">#{{ t.id|default('-', true) }}</td>
+    <form method="POST"
+          action="{{ url_for('upload_escala') }}"
+          enctype="multipart/form-data"
+          class="row g-2 align-items-end">
 
-    <td>
-      <div class="text-tight">
-        <b>{{ (solicitante.nome if solicitante else t.solicitante_nome)|default('-', true) }}</b>
+      {# CSRF, se você estiver usando CSRFProtect/Flask-WTF #}
+      {% if csrf_token is defined %}
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% endif %}
+
+      <div class="col-md-6">
+        <label for="arquivo_escala" class="form-label">Planilha de escala (.xlsx)</label>
+        <input type="file"
+               class="form-control"
+               id="arquivo_escala"
+               name="file"
+               accept=".xlsx"
+               required>
       </div>
-      <small class="text-muted">
-        ID {{ (solicitante.id if solicitante else t.solicitante_id)|default('-', true) }}
-      </small>
-    </td>
+      <div class="col-md-3">
+        <button type="submit" class="btn btn-royal w-100">
+          <i class="bi bi-upload"></i> Enviar Planilha
+        </button>
+      </div>
+    </form>
+
+    <small class="muted">
+      A associação do cooperado é feita por login (quando existir) ou por nome,
+      ignorando acentos.
+    </small>
+  </div>
+
+  <!-- Cooperados & Escalas -->
+  <div class="card p-3 mb-3">
+    <div class="table-responsive">
+      <table class="table table-bordered align-middle">
+        <thead>
+          <tr>
+            <th>Cooperado</th>
+            <th>CNH</th>
+            <th>Val. CNH</th>
+            <th>Placa</th>
+            <th>Val. Placa</th>
+            <th>Situação</th>
+            <th>Última atualização</th>
+            <th class="text-center">Qtde de linhas</th>
+            <th class="text-center">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in cooperados %}
+          {% set lst = (escalas_por_coop[c.id] if (escalas_por_coop is defined and c.id in escalas_por_coop) else []) %}
+          {% set sdoc = status_doc_por_coop.get(c.id) if status_doc_por_coop is defined else None %}
+          {% set ok_cnh   = sdoc.cnh_ok if sdoc is not none and 'cnh_ok' in sdoc else None %}
+          {% set ok_placa = sdoc.placa_ok if sdoc is not none and 'placa_ok' in sdoc else None %}
+          <tr>
+            <td>{{ c.nome }}</td>
+            <td>{{ c.cnh_numero if c.cnh_numero is defined and c.cnh_numero else '—' }}</td>
             <td>
-              <div><i class="bi bi-calendar-event"></i>
+              {% if c.cnh_validade is defined and c.cnh_validade %}
+                {{ c.cnh_validade.strftime('%d/%m') }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>{{ c.placa if c.placa is defined and c.placa else '—' }}</td>
+            <td>
+              {% if c.placa_validade is defined and c.placa_validade %}
+                {{ c.placa_validade.strftime('%d/%m') }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td class="text-nowrap">
+              {% if ok_cnh is not none %}
+                <span class="badge {{ 'bg-success' if ok_cnh else 'bg-danger' }} me-1">
+                  CNH {{ 'OK' if ok_cnh else 'Pend.' }}
+                </span>
+              {% else %}
+                <span class="badge bg-secondary me-1">CNH —</span>
+              {% endif %}
+
+              {% if ok_placa is not none %}
+                <span class="badge {{ 'bg-success' if ok_placa else 'bg-danger' }}">
+                  Placa {{ 'OK' if ok_placa else 'Pend.' }}
+                </span>
+              {% else %}
+                <span class="badge bg-secondary">Placa —</span>
+              {% endif %}
+
+              {% if ok_cnh and ok_placa %}
+                <span class="ms-1 text-success">👏</span>
+              {% endif %}
+            </td>
+            <td>
+              {{ c.ultima_atualizacao.strftime('%d/%m/%Y %H:%M') if c.ultima_atualizacao else '—' }}
+            </td>
+            <td class="text-center">{{ lst|length }}</td>
+            <td class="text-center">
+              <button class="btn btn-sm btn-royal"
+                      data-bs-toggle="modal"
+                      data-bs-target="#modalEscalas"
+                      data-coopid="{{ c.id }}">
+                <i class="bi bi-eye"></i> Ver escala
+              </button>
+              <a class="btn btn-sm btn-outline-secondary"
+                 href="{{ url_for('editar_documentos', coop_id=c.id) }}">
+                <i class="bi bi-pen"></i> Documentos
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="9" class="text-center text-muted">Nenhum cooperado</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SOLICITAÇÕES DE TROCA (pendentes) -->
+  <div class="card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">
+        <i class="bi bi-arrow-left-right"></i> Solicitações de Troca de Escala
+      </h5>
+      <span class="badge-soft">
+        Pendentes: {{ trocas_pendentes|length if trocas_pendentes else 0 }}
+      </span>
+    </div>
+
+    <div class="table-responsive mt-2">
+      <table class="table table-bordered align-middle">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Solicitante</th>
+            <th>Origem</th>
+            <th>Destino</th>
+            <th>Mensagem</th>
+            <th>Solicitada em</th>
+            <th class="text-center">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in trocas_pendentes or [] %}
+          {% set solicitante = t.solicitante if t.solicitante else None %}
+          {% set origem = t.origem if t.origem else None %}
+          {% set destino = t.destino if t.destino else None %}
+
+          <tr>
+            <td class="text-muted">#{{ t.id|default('-', true) }}</td>
+
+            <td>
+              <div class="text-tight">
+                <b>{{ (solicitante.nome if solicitante else t.solicitante_nome)|default('-', true) }}</b>
+              </div>
+              <small class="text-muted">
+                ID {{ (solicitante.id if solicitante else t.solicitante_id)|default('-', true) }}
+              </small>
+            </td>
+
+            <td>
+              <div>
+                <i class="bi bi-calendar-event"></i>
                 {% if origem and origem.data is defined %}
                   {{ origem.data }}
                 {% elif t.origem_data is defined %}
                   {{ t.origem_data }}
                 {% else %} — {% endif %}
               </div>
-              <div><i class="bi bi-sun"></i>
+              <div>
+                <i class="bi bi-sun"></i>
                 {% if origem and origem.turno is defined %}
                   {{ origem.turno }}
                 {% elif t.origem_turno is defined %}
                   {{ t.origem_turno }}
                 {% else %} — {% endif %}
               </div>
-              <div><i class="bi bi-clock"></i>
+              <div>
+                <i class="bi bi-clock"></i>
                 {% if origem and origem.horario is defined %}
                   {{ origem.horario }}
                 {% elif t.origem_horario is defined %}
                   {{ t.origem_horario }}
                 {% else %} — {% endif %}
               </div>
-              <div><i class="bi bi-briefcase"></i>
+              <div>
+                <i class="bi bi-briefcase"></i>
                 {% if origem and origem.contrato is defined %}
                   {{ origem.contrato }}
                 {% elif t.origem_contrato is defined %}
@@ -3276,7 +3334,9 @@
               </small>
             </td>
 
-            <td class="text-break">{{ t.mensagem if t.mensagem is defined and t.mensagem else '—' }}</td>
+            <td class="text-break">
+              {{ t.mensagem if t.mensagem is defined and t.mensagem else '—' }}
+            </td>
 
             <td>
               {% if t.criada_em is defined and t.criada_em %}
@@ -3308,43 +3368,47 @@
               </div>
             </td>
           </tr>
-        {% else %}
+          {% else %}
           <tr>
             <td colspan="7" class="text-center text-muted">Nenhuma solicitação pendente.</td>
           </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <small class="muted">
+      Ao aprovar, os nomes são trocados nas escalas e a ação aparece em “Trocas aplicadas”.
+    </small>
   </div>
 
-  <small class="muted">Ao aprovar, os nomes são trocados nas escalas e a ação aparece em “Trocas aplicadas”.</small>
-</div>
+  <!-- TROCAS APLICADAS (histórico) -->
+  <div class="card p-3">
+    <div class="d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">
+        <i class="bi bi-clock-history"></i> Trocas aplicadas
+      </h5>
+      <span class="badge-soft">
+        {{ trocas_historico_flat|length if trocas_historico_flat else (trocas_historico|length if trocas_historico else 0) }} registro(s)
+      </span>
+    </div>
 
-<!-- TROCAS APLICADAS (histórico) -->
-<div class="card p-3">
-  <div class="d-flex justify-content-between align-items-center">
-    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Trocas aplicadas</h5>
-    <span class="badge-soft">
-      {{ trocas_historico_flat|length if trocas_historico_flat else (trocas_historico|length if trocas_historico else 0) }} registro(s)
-    </span>
-  </div>
-
-  {% if trocas_historico_flat %}
-    <div class="table-responsive mt-2">
-      <table class="table table-bordered align-middle">
-        <thead>
-          <tr>
-            <th>Dia do plantão</th>
-            <th>Turno / Horário</th>
-            <th>Contrato</th>
-            <th>Cooperado (saiu)</th>
-            <th></th>
-            <th>Cooperado (entrou)</th>
-            <th>Aprovada em</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in trocas_historico_flat %}
+    {% if trocas_historico_flat %}
+      <div class="table-responsive mt-2">
+        <table class="table table-bordered align-middle">
+          <thead>
+            <tr>
+              <th>Dia do plantão</th>
+              <th>Turno / Horário</th>
+              <th>Contrato</th>
+              <th>Cooperado (saiu)</th>
+              <th></th>
+              <th>Cooperado (entrou)</th>
+              <th>Aprovada em</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in trocas_historico_flat %}
             <tr>
               <td>{{ r.data }}</td>
               <td>{{ r.turno }}{% if r.horario %} · {{ r.horario }}{% endif %}</td>
@@ -3354,27 +3418,29 @@
               <td class="text-success">{{ r.entrou_nome }}</td>
               <td>{{ r.aplicada_em.strftime('%d/%m/%Y %H:%M') if r.aplicada_em else '—' }}</td>
             </tr>
-          {% else %}
-            <tr><td colspan="7" class="text-center text-muted">Sem trocas aplicadas.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+            {% else %}
+            <tr>
+              <td colspan="7" class="text-center text-muted">Sem trocas aplicadas.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
 
-  {% elif trocas_historico %}
-    <div class="table-responsive mt-2">
-      <table class="table table-bordered align-middle">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Aplicada em</th>
-            <th>Solicitante</th>
-            <th>Destinatário</th>
-            <th>Linhas afetadas</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for t in trocas_historico %}
+    {% elif trocas_historico %}
+      <div class="table-responsive mt-2">
+        <table class="table table-bordered align-middle">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Aplicada em</th>
+              <th>Solicitante</th>
+              <th>Destinatário</th>
+              <th>Linhas afetadas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in trocas_historico %}
             <tr>
               <td class="text-muted">#{{ t.id }}</td>
               <td>{{ t.aplicada_em.strftime('%d/%m/%Y %H:%M') if t.aplicada_em else '—' }}</td>
@@ -3394,54 +3460,58 @@
                     </thead>
                     <tbody>
                       {% for i in t.itens %}
-                        <tr>
-                          <td>{{ i.data }}</td>
-                          <td>{{ i.turno }}{% if i.horario %} · {{ i.horario }}{% endif %}</td>
-                          <td>{{ i.contrato }}</td>
-                          <td class="text-danger">{{ i.saiu_nome }}</td>
-                          <td class="text-success">{{ i.entrou_nome }}</td>
-                        </tr>
+                      <tr>
+                        <td>{{ i.data }}</td>
+                        <td>{{ i.turno }}{% if i.horario %} · {{ i.horario }}{% endif %}</td>
+                        <td>{{ i.contrato }}</td>
+                        <td class="text-danger">{{ i.saiu_nome }}</td>
+                        <td class="text-success">{{ i.entrou_nome }}</td>
+                      </tr>
                       {% endfor %}
                     </tbody>
                   </table>
                 </div>
               </td>
             </tr>
-          {% else %}
-            <tr><td colspan="5" class="text-center text-muted">Sem trocas aplicadas.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  {% else %}
-    <div class="text-center text-muted mt-2">Sem trocas aplicadas.</div>
-  {% endif %}
-</div>
-
-<!-- TROCAS POR COOPERADO (detalhado) -->
-<div class="card p-3 mb-3">
-  <div class="d-flex justify-content-between align-items-center">
-    <h5 class="mb-0"><i class="bi bi-people"></i> Trocas por Cooperado (detalhado)</h5>
-    <span class="badge-soft">Mostrando escalas trocadas por cada cooperado</span>
+            {% else %}
+            <tr>
+              <td colspan="5" class="text-center text-muted">Sem trocas aplicadas.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-center text-muted mt-2">Sem trocas aplicadas.</div>
+    {% endif %}
   </div>
 
-  <div class="table-responsive mt-2">
-    <table class="table table-bordered align-middle">
-      <thead>
-        <tr>
-          <th>Cooperado</th>
-          <th>Ação</th>
-          <th>Dia do plantão</th>
-          <th>Turno</th>
-          <th>Horário</th>
-          <th>Contrato</th>
-          <th>Com quem trocou</th>
-          <th>Aprovada em</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% if trocas_historico_flat %}
-          {% for r in trocas_historico_flat %}
+  <!-- TROCAS POR COOPERADO (detalhado) -->
+  <div class="card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">
+        <i class="bi bi-people"></i> Trocas por Cooperado (detalhado)
+      </h5>
+      <span class="badge-soft">Mostrando escalas trocadas por cada cooperado</span>
+    </div>
+
+    <div class="table-responsive mt-2">
+      <table class="table table-bordered align-middle">
+        <thead>
+          <tr>
+            <th>Cooperado</th>
+            <th>Ação</th>
+            <th>Dia do plantão</th>
+            <th>Turno</th>
+            <th>Horário</th>
+            <th>Contrato</th>
+            <th>Com quem trocou</th>
+            <th>Aprovada em</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if trocas_historico_flat %}
+            {% for r in trocas_historico_flat %}
             <tr>
               <td class="text-danger">{{ r.saiu_nome }}</td>
               <td><span class="badge bg-danger">Saiu</span></td>
@@ -3462,12 +3532,14 @@
               <td>{{ r.saiu_nome }}</td>
               <td>{{ r.aplicada_em.strftime('%d/%m/%Y %H:%M') if r.aplicada_em else '—' }}</td>
             </tr>
-          {% else %}
-            <tr><td colspan="8" class="text-center text-muted">Sem trocas aplicadas.</td></tr>
-          {% endfor %}
-        {% elif trocas_historico %}
-          {% for t in trocas_historico %}
-            {% for i in t.itens %}
+            {% else %}
+            <tr>
+              <td colspan="8" class="text-center text-muted">Sem trocas aplicadas.</td>
+            </tr>
+            {% endfor %}
+          {% elif trocas_historico %}
+            {% for t in trocas_historico %}
+              {% for i in t.itens %}
               <tr>
                 <td class="text-danger">{{ i.saiu_nome }}</td>
                 <td><span class="badge bg-danger">Saiu</span></td>
@@ -3488,80 +3560,52 @@
                 <td>{{ i.saiu_nome }}</td>
                 <td>{{ t.aplicada_em.strftime('%d/%m/%Y %H:%M') if t.aplicada_em else '—' }}</td>
               </tr>
+              {% endfor %}
+            {% else %}
+            <tr>
+              <td colspan="8" class="text-center text-muted">Sem trocas aplicadas.</td>
+            </tr>
             {% endfor %}
           {% else %}
-            <tr><td colspan="8" class="text-center text-muted">Sem trocas aplicadas.</td></tr>
-          {% endfor %}
-        {% else %}
-          <tr><td colspan="8" class="text-center text-muted">Sem trocas aplicadas.</td></tr>
-        {% endif %}
-      </tbody>
-    </table>
+          <tr>
+            <td colspan="8" class="text-center text-muted">Sem trocas aplicadas.</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
   </div>
-</div>
-        <!-- Modal visualizar escala do cooperado -->
-        <div class="modal fade" id="modalEscalas" tabindex="-1">
-          <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-              <div class="modal-header"><h5 class="modal-title">Escala do Cooperado</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-              <div class="modal-body">
-                <div class="table-responsive">
-                  <table class="table table-bordered align-middle">
-                    <thead>
-                      <tr>
-                        <th>Data</th>
-                        <th>Turno</th>
-                        <th>Horário</th>
-                        <th>Contrato</th>
-                      </tr>
-                    </thead>
-                    <tbody id="tbody-escala"></tbody>
-                  </table>
-                </div>
-              </div>
-              <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button></div>
-            </div>
+
+  <!-- Modal visualizar escala do cooperado -->
+  <div class="modal fade" id="modalEscalas" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Escala do Cooperado</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Turno</th>
+                  <th>Horário</th>
+                  <th>Contrato</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-escala"></tbody>
+            </table>
           </div>
         </div>
-      </section>
-
-      <!-- CONFIG -->
-      <section class="tab-pane fade {{ 'show active' if _tab=='config' else '' }}" id="config" role="tabpanel">
-        <h4 class="mb-3">Configurações</h4>
-        <div class="card p-3 mb-4">
-          <h6>Salário Mínimo Atual</h6>
-          <form method="POST" action="{{ url_for('update_config') }}" class="row g-2">
-            <div class="col-md-4">
-              <input type="number" step="0.01" class="form-control" name="salario_minimo" value="{{ salario_minimo|default(0) }}" required>
-            </div>
-            <div class="col-md-3"><button class="btn btn-royal w-100"><i class="bi bi-save"></i> Salvar</button></div>
-          </form>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
         </div>
-
-        <div class="card p-3">
-          <h6>Conta do Administrador</h6>
-          <form method="POST" action="{{ url_for('alterar_admin') }}" class="row g-2">
-            <div class="col-md-3">
-              <label class="form-label">Usuário</label>
-              <input type="text" class="form-control" name="usuario" value="{{ admin.usuario if admin is defined and admin and admin.usuario else 'coopex' }}" required>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Nova Senha</label>
-              <input type="password" class="form-control" name="nova_senha" placeholder="Deixe em branco p/ manter">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Confirmar Senha</label>
-              <input type="password" class="form-control" name="confirmar_senha">
-            </div>
-            <div class="col-md-3 d-flex align-items-end">
-              <button class="btn btn-royal w-100"><i class="bi bi-save"></i> Atualizar</button>
-            </div>
-          </form>
-        </div>
-      </section>
-
+      </div>
     </div>
-  </main>
+  </div>
+</section>
 
   <!-- MODAIS =================================================== -->
   <div class="modal fade" id="modalEditLancamento" tabindex="-1">
