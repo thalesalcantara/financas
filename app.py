@@ -26,7 +26,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from dateutil.relativedelta import relativedelta
 
-from sqlalchemy import func, text as sa_text, or_, and_, case, literal
+from sqlalchemy import func, text as sa_text, or_, and_, case
 from sqlalchemy.inspection import inspect as sa_inspect
 from sqlalchemy.pool import QueuePool
 from sqlalchemy import event
@@ -152,7 +152,6 @@ app.config.update(
 )
 
 db = SQLAlchemy(app)
-
 
 # ========= Retry de conexão p/ rotas críticas =========
 def with_db_retry(fn):
