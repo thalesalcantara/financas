@@ -2068,7 +2068,10 @@ def admin_dashboard():
     # documentos OK?
     docinfo_map = {c.id: _build_docinfo(c) for c in cooperados}
     status_doc_por_coop = {
-        c.id: {"cnh_ok": docinfo_map[c.id]["cnh"]["ok"], "placa_ok": docinfo_map[c.id]["placa"]["ok"]}
+        c.id: {
+            "cnh_ok": docinfo_map[c.id]["cnh"]["ok"],
+            "placa_ok": docinfo_map[c.id]["placa"]["ok"],
+        }
         for c in cooperados
     }
 
@@ -2080,26 +2083,45 @@ def admin_dashboard():
     for e in escalas_all:
         k_int = e.cooperado_id if e.cooperado_id is not None else 0  # 0 = sem cadastro
         esc_item = {
-            "data": e.data, "turno": e.turno, "horario": e.horario,
-            "contrato": e.contrato, "cor": e.cor, "nome_planilha": e.cooperado_nome
+            "data": e.data,
+            "turno": e.turno,
+            "horario": e.horario,
+            "contrato": e.contrato,
+            "cor": e.cor,
+            "nome_planilha": e.cooperado_nome,
         }
         esc_by_int[k_int].append(esc_item)
         esc_by_str[str(k_int)].append(esc_item)
 
-    cont_rows = dict(db.session.query(Escala.cooperado_id, func.count(Escala.id)).group_by(Escala.cooperado_id).all())
+    cont_rows = dict(
+        db.session.query(Escala.cooperado_id, func.count(Escala.id))
+        .group_by(Escala.cooperado_id)
+        .all()
+    )
     qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
     qtd_sem_cadastro = int(cont_rows.get(None, 0))
 
-    # gráficos (por mês)
+    # ===== gráficos (por mês) - robusto =====
     sums = {}
     for l in lancamentos:
         if not l.data:
             continue
-        key = l.data.strftime("%Y-%m")
+        key = l.data.strftime("%Y-%m")  # ex: 2025-11
         sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
+
+    labels_fmt = []
+    values = []
     labels_ord = sorted(sums.keys())
-    labels_fmt = [datetime.strptime(k, "%Y-%m").strftime("%m/%Y") for k in labels_ord]
-    values = [round(sums[k], 2) for k in labels_ord]
+
+    for k in labels_ord:
+        try:
+            dt = datetime.strptime(k, "%Y-%m")
+            labels_fmt.append(dt.strftime("%m/%Y"))
+            values.append(round(sums[k], 2))
+        except ValueError:
+            # se vier algo bizarro tipo "205-11", ignora para não derrubar o painel
+            current_app.logger.warning("Ignorando chave inesperada em gráfico mensal: %r", k)
+
     chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
     chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
 
@@ -2122,14 +2144,16 @@ def admin_dashboard():
             except Exception:
                 rid = None
             recs.append({"id": rid, "nome": nome})
-        beneficios_view.append({
-            "data_inicial": b.data_inicial,
-            "data_final": b.data_final,
-            "data_lancamento": b.data_lancamento,
-            "tipo": b.tipo,
-            "valor_total": b.valor_total or 0.0,
-            "recebedores": recs,
-        })
+        beneficios_view.append(
+            {
+                "data_inicial": b.data_inicial,
+                "data_final": b.data_final,
+                "data_lancamento": b.data_lancamento,
+                "tipo": b.tipo,
+                "valor_total": b.valor_total or 0.0,
+                "recebedores": recs,
+            }
+        )
 
     # ======== Trocas no admin ========
     def _escala_desc(e: Escala | None) -> str:
@@ -2146,7 +2170,9 @@ def admin_dashboard():
     def _linha_from_escala(e: Escala, saiu: str, entrou: str) -> dict:
         return {
             "dia": _escala_label(e).split(" • ")[0],
-            "turno_horario": " • ".join([x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]),
+            "turno_horario": " • ".join(
+                [x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]
+            ),
             "contrato": (e.contrato or "").strip(),
             "saiu": saiu,
             "entrou": entrou,
@@ -2161,29 +2187,41 @@ def admin_dashboard():
         destinatario = Cooperado.query.get(t.destino_id)
         orig = Escala.query.get(t.origem_escala_id)
 
-        linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
+        linhas_afetadas = (
+            _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
+        )
 
         if t.status == "aprovada" and not linhas_afetadas and orig and solicitante and destinatario:
-            linhas_afetadas.append(_linha_from_escala(
-                orig, saiu=solicitante.nome, entrou=destinatario.nome
-            ))
+            linhas_afetadas.append(
+                _linha_from_escala(
+                    orig,
+                    saiu=solicitante.nome,
+                    entrou=destinatario.nome,
+                )
+            )
             wd_o = _weekday_from_data_str(orig.data)
             buck_o = _turno_bucket(orig.turno, orig.horario)
-            candidatas = (Escala.query
-                          .filter_by(cooperado_id=solicitante.id)
-                          .all())
+            candidatas = Escala.query.filter_by(cooperado_id=solicitante.id).all()
             best = None
             for e in candidatas:
-                if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
-                    if (orig.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
+                if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(
+                    e.turno, e.horario
+                ) == buck_o:
+                    if (orig.contrato or "").strip().lower() == (
+                        e.contrato or ""
+                    ).strip().lower():
                         best = e
                         break
                     if best is None:
                         best = e
             if best:
-                linhas_afetadas.append(_linha_from_escala(
-                    best, saiu=destinatario.nome, entrou=solicitante.nome
-                ))
+                linhas_afetadas.append(
+                    _linha_from_escala(
+                        best,
+                        saiu=destinatario.nome,
+                        entrou=solicitante.nome,
+                    )
+                )
 
         item = {
             "id": t.id,
@@ -2193,35 +2231,44 @@ def admin_dashboard():
             "aplicada_em": t.aplicada_em,
             "solicitante": solicitante,
             "destinatario": destinatario,
-            "orig": Escala.query.get(t.origem_escala_id),
+            "orig": orig,
             "destino": destinatario,
             "origem_desc": _escala_desc(orig),
             "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
-            "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
+            "origem_turno_bucket": _turno_bucket(
+                orig.turno if orig else None,
+                orig.horario if orig else None,
+            ),
             "linhas_afetadas": linhas_afetadas,
         }
 
         if t.status == "aprovada" and linhas_afetadas:
             itens = []
             for r in linhas_afetadas:
-                turno_txt, horario_txt = _split_turno_horario(r.get("turno_horario", ""))
-                itens.append({
-                    "data": r.get("dia", ""),
-                    "turno": turno_txt,
-                    "horario": horario_txt,
-                    "contrato": r.get("contrato", ""),
-                    "saiu_nome": r.get("saiu", ""),
-                    "entrou_nome": r.get("entrou", ""),
-                })
-                trocas_historico_flat.append({
-                    "data": r.get("dia", ""),
-                    "turno": turno_txt,
-                    "horario": horario_txt,
-                    "contrato": r.get("contrato", ""),
-                    "saiu_nome": r.get("saiu", ""),
-                    "entrou_nome": r.get("entrou", ""),
-                    "aplicada_em": t.aplicada_em,
-                })
+                turno_txt, horario_txt = _split_turno_horario(
+                    r.get("turno_horario", "")
+                )
+                itens.append(
+                    {
+                        "data": r.get("dia", ""),
+                        "turno": turno_txt,
+                        "horario": horario_txt,
+                        "contrato": r.get("contrato", ""),
+                        "saiu_nome": r.get("saiu", ""),
+                        "entrou_nome": r.get("entrou", ""),
+                    }
+                )
+                trocas_historico_flat.append(
+                    {
+                        "data": r.get("dia", ""),
+                        "turno": turno_txt,
+                        "horario": horario_txt,
+                        "contrato": r.get("contrato", ""),
+                        "saiu_nome": r.get("saiu", ""),
+                        "entrou_nome": r.get("entrou", ""),
+                        "aplicada_em": t.aplicada_em,
+                    }
+                )
             item["itens"] = itens
 
         (trocas_pendentes if t.status == "pendente" else trocas_historico).append(item)
