@@ -4072,76 +4072,69 @@ def escalas_purge_restaurante(rest_id):
     return redirect(url_for("admin_dashboard", tab="escalas"))
 
 # =========================
-# Trocas (Admin aprovar/recusar)
+# Trocas - ações do ADMIN
 # =========================
-from sqlalchemy.exc import SQLAlchemyError
-from datetime import datetime
-
-@app.post("/admin/trocas/<int:id>/aprovar")
-@admin_required
-def admin_aprovar_troca(id):
-    t = TrocaSolicitacao.query.get_or_404(id)
-
-    if t.status != "pendente":
-        flash("Esta solicitação já foi tratada.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
-    # Escala original que será "trocada"
-    orig_e = Escala.query.get(t.origem_escala_id)
-    if not orig_e:
-        flash("Escala original não encontrada. Não foi possível aplicar a troca.", "danger")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
-    # Cooperados envolvidos
-    coop_solic = Cooperado.query.get(t.solicitante_id)
-    coop_dest  = Cooperado.query.get(t.destino_id)
-
-    if not coop_solic or not coop_dest:
-        flash("Cooperados envolvidos na troca não foram encontrados.", "danger")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
-    try:
-        # Regra simples:
-        # - O plantão que era do solicitante passa para o destino.
-        orig_e.cooperado_id = coop_dest.id
-        # Se existir este campo no modelo Escala, mantenha. Se não existir, remova a linha:
-        # orig_e.cooperado_nome = coop_dest.nome
-
-        t.status = "aprovada"
-        # Se existir este campo no modelo TrocaSolicitacao, mantenha. Se não existir, remova a linha:
-        t.aplicada_em = datetime.utcnow()
-
-        db.session.commit()
-        flash("Troca aprovada e aplicada na escala.", "success")
-
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        current_app.logger.exception(e)
-        flash("Erro ao aplicar a troca. Nenhuma alteração foi salva.", "danger")
-
-    return redirect(url_for("admin_dashboard", tab="escalas"))
-
 
 @app.post("/admin/trocas/<int:id>/recusar")
 @admin_required
 def admin_recusar_troca(id):
     """
-    Apenas marca a solicitação como recusada, sem alterar escalas.
+    Admin recusa a solicitação de troca.
+    Apenas muda o status, não mexe em escalas.
+    """
+    t = TrocaSolicitacao.query.get_or_404(id)
+
+    # Se já não estiver pendente, não tenta recusar de novo
+    if t.status != "pendente":
+        flash("Esta solicitação já foi tratada.", "warning")
+        return redirect(url_for("admin_dashboard", tab="resumo"))
+
+    try:
+        t.status = "recusada"
+        # se a coluna existir no modelo, registra o momento da decisão
+        if hasattr(t, "aplicada_em"):
+            t.aplicada_em = datetime.utcnow()
+
+        db.session.commit()
+        flash("Solicitação de troca recusada.", "info")
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash("Erro ao recusar a solicitação de troca.", "danger")
+
+    # no painel de admin as trocas pendentes/histórico estão no resumo
+    return redirect(url_for("admin_dashboard", tab="resumo"))
+
+
+@app.post("/admin/trocas/<int:id>/aprovar")
+@admin_required
+def admin_aprovar_troca(id):
+    """
+    Admin aprova a solicitação de troca.
+    Aqui estou apenas mudando o status para 'aprovada';
+    se você tiver uma função que aplica a troca nas escalas,
+    pode chamá-la aqui.
     """
     t = TrocaSolicitacao.query.get_or_404(id)
 
     if t.status != "pendente":
         flash("Esta solicitação já foi tratada.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
+        return redirect(url_for("admin_dashboard", tab="resumo"))
 
-    t.status = "recusada"
-    # Se tiver a coluna aplicada_em:
-    # t.aplicada_em = datetime.utcnow()
+    try:
+        # se você tiver uma função que aplica a troca nas escalas, use:
+        # _aplicar_troca_nas_escalas(t)
 
-    db.session.commit()
+        t.status = "aprovada"
+        if hasattr(t, "aplicada_em"):
+            t.aplicada_em = datetime.utcnow()
 
-    flash("Solicitação de troca recusada.", "info")
-    return redirect(url_for("admin_dashboard", tab="escalas"))
+        db.session.commit()
+        flash("Solicitação de troca aprovada.", "success")
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash("Erro ao aprovar a solicitação de troca.", "danger")
+
+    return redirect(url_for("admin_dashboard", tab="resumo"))
 
 
 # --- Admin tool: aplicar ON DELETE CASCADE nas FKs (Postgres) ---
