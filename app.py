@@ -28,6 +28,7 @@ from werkzeug.utils import secure_filename
 from dateutil.relativedelta import relativedelta
 
 from sqlalchemy import func, text as sa_text, or_, and_, case
+from sqlalchemy import func, text as sa_text, or_, and_, case, literal
 from sqlalchemy.inspection import inspect as sa_inspect
 from sqlalchemy.pool import QueuePool
 from sqlalchemy import event
@@ -4160,7 +4161,7 @@ def escalas_purge_all():
 def escalas_purge_cooperado(coop_id):
     res = db.session.execute(sa_delete(Escala).where(Escala.cooperado_id == coop_id))
     db.session.commit()
-    flash(f"Escalas do cooperado #{coop_id} excluídas ({res.rowcount or 0}).", "info")
+    flash(f"Escalas do cooperado removidas ({res.rowcount or 0}).", "info")
     return redirect(url_for("admin_dashboard", tab="escalas"))
 
 @app.post("/escalas/purge_restaurante/<int:rest_id>")
