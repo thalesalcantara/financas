@@ -2838,12 +2838,12 @@ def admin_avaliacoes():
     preserve = request.args.to_dict(flat=True)
     preserve.pop("page", None)
 
+    # 🔹 AQUI: mesmas variáveis usadas no admin_dashboard normal
     cfg = get_config()
-    uid = session.get("user_id")
-    admin_user = Usuario.query.get(uid)
+    admin_user = Usuario.query.filter_by(tipo="admin").first()
 
     return render_template(
-        "admin_avaliacoes.html",
+        "admin_dashboard.html",
         tab="avaliacoes",
         tipo=tipo,
         avaliacoes=avaliacoes,
