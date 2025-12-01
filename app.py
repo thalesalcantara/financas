@@ -2857,6 +2857,25 @@ def admin_avaliacoes():
         salario_minimo=cfg.salario_minimo or 0.0,
     )
 
+@app.route("/admin/avaliacoes/export")
+@role_required("admin")
+def admin_export_avaliacoes_csv():
+    """
+    Endpoint usado pelo botão 'Exportar CSV' em admin_avaliacoes.html.
+    Por enquanto só volta para a tela com um aviso, para não dar erro 500.
+    """
+    from flask import flash, redirect, url_for, request
+
+    flash("Exportação em CSV ainda não foi implementada.", "warning")
+
+    # Mantém os mesmos filtros que estavam na tela
+    args = {
+        "data_inicio": request.args.get("data_inicio") or "",
+        "data_fim": request.args.get("data_fim") or "",
+        "tipo": request.args.get("tipo") or "",
+    }
+    return redirect(url_for("admin_avaliacoes", **args))
+ 
 # =========================
 # CRUD Receitas/Despesas Coop (Admin)
 # =========================
