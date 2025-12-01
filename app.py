@@ -2411,20 +2411,11 @@ def admin_dashboard():
         trocas_historico_flat=trocas_historico_flat,
     )
 
-# =========================
-# Navegação/Export util
-# =========================
-@app.route("/filtrar_lancamentos")
-@admin_required
-def filtrar_lancamentos():
-    qs = request.query_string.decode("utf-8")
-    base = url_for("admin_dashboard", tab="lancamentos")
-    joiner = "&" if qs else ""
-    return redirect(f"{base}{joiner}{qs}")
-    
 @app.route("/exportar_lancamentos")
 @admin_required
 def exportar_lancamentos():
+    import io
+    from collections import defaultdict
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from openpyxl.utils import get_column_letter
@@ -2450,7 +2441,9 @@ def exportar_lancamentos():
     if dows:
         lancs = [l for l in lancs if l.data and _dow(l.data) in dows]
 
-    # ---- Monta o Excel
+    # ===============================
+    # Monta o Excel - Planilha base
+    # ===============================
     wb = Workbook()
     ws = wb.active
     ws.title = "Lançamentos"
@@ -2462,10 +2455,10 @@ def exportar_lancamentos():
     ws.append(header)
 
     # Estilo do header
-    bold = Font(bold=True)
+    bold   = Font(bold=True)
     center = Alignment(horizontal="center", vertical="center")
-    fill = PatternFill("solid", fgColor="DDDDDD")
-    thin = Side(border_style="thin", color="CCCCCC")
+    fill   = PatternFill("solid", fgColor="DDDDDD")
+    thin   = Side(border_style="thin", color="CCCCCC")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
     for col_idx, _ in enumerate(header, start=1):
@@ -2475,19 +2468,64 @@ def exportar_lancamentos():
         cell.fill = fill
         cell.border = border
 
-    # Linhas
+    # ===============================
+    # Acumuladores de totais
+    # ===============================
+    # Totais por contrato (restaurante + período)
+    totais_contrato = defaultdict(lambda: {
+        "restaurante": "",
+        "periodo": "",
+        "bruto": 0.0,
+        "inss": 0.0,
+        "liq": 0.0,
+    })
+
+    # Totais por contrato + cooperado
+    totais_contrato_coop = defaultdict(lambda: {
+        "restaurante": "",
+        "periodo": "",
+        "cooperado": "",
+        "bruto": 0.0,
+        "inss": 0.0,
+        "liq": 0.0,
+    })
+
+    # Totais por cooperado (todos os contratos)
+    totais_coop = defaultdict(lambda: {
+        "cooperado": "",
+        "bruto": 0.0,
+        "inss": 0.0,
+        "liq": 0.0,
+    })
+
+    # Totais gerais
+    total_geral_bruto = 0.0
+    total_geral_inss  = 0.0
+    total_geral_liq   = 0.0
+
+    # ===============================
+    # Linhas de lançamentos
+    # ===============================
     for l in lancs:
         v = float(l.valor or 0.0)
         inss = v * 0.045
-        liq = v - inss
+        liq  = v - inss
 
+        rest_nome   = l.restaurante.nome if l.restaurante else ""
+        rest_period = l.restaurante.periodo if l.restaurante else ""
+        rest_id     = l.restaurante_id or 0
+
+        coop_nome = l.cooperado.nome if l.cooperado else ""
+        coop_id   = l.cooperado_id or 0
+
+        # Linha detalhada
         row = [
-            l.restaurante.nome if l.restaurante else "",
-            l.restaurante.periodo if l.restaurante else "",
-            l.cooperado.nome if l.cooperado else "",
+            rest_nome,
+            rest_period,
+            coop_nome,
             (l.descricao or ""),
             v,
-            l.data,  # se None, vai vazio
+            l.data,
             (l.hora_inicio or ""),
             (l.hora_fim or ""),
             inss,
@@ -2495,18 +2533,198 @@ def exportar_lancamentos():
         ]
         ws.append(row)
 
-    # Formatos de número/data e largura das colunas
-    # Índices das colunas (1-based): Valor=5, Data=6, INSS=9, Liquido=10
+        # ---- Acumula por contrato
+        key_contrato = (rest_id, rest_nome, rest_period)
+        tc = totais_contrato[key_contrato]
+        tc["restaurante"] = rest_nome
+        tc["periodo"] = rest_period
+        tc["bruto"] += v
+        tc["inss"]  += inss
+        tc["liq"]   += liq
+
+        # ---- Acumula por contrato + cooperado
+        key_contrato_coop = (rest_id, rest_nome, rest_period, coop_id, coop_nome)
+        tcc = totais_contrato_coop[key_contrato_coop]
+        tcc["restaurante"] = rest_nome
+        tcc["periodo"]     = rest_period
+        tcc["cooperado"]   = coop_nome
+        tcc["bruto"]      += v
+        tcc["inss"]       += inss
+        tcc["liq"]        += liq
+
+        # ---- Acumula por cooperado (geral)
+        key_coop = (coop_id, coop_nome)
+        tcg = totais_coop[key_coop]
+        tcg["cooperado"] = coop_nome
+        tcg["bruto"]    += v
+        tcg["inss"]     += inss
+        tcg["liq"]      += liq
+
+        # ---- Totais gerais
+        total_geral_bruto += v
+        total_geral_inss  += inss
+        total_geral_liq   += liq
+
+    # ===============================
+    # Resumos na MESMA ABA (ao lado)
+    # ===============================
+    # Começa duas colunas depois do último dado (para ficar "ao lado")
+    start_col = ws.max_column + 2
     currency_fmt = "0.00"
-    date_fmt = "DD/MM/YYYY"
+    date_fmt = "DD/MM/YYYY"  # continua sendo usado nas linhas de dados
 
+    current_row = 1
+
+    # -------- Totais por Contrato --------
+    ws.cell(row=current_row, column=start_col, value="Totais por Contrato").font = bold
+    current_row += 1
+
+    header_contrato = ["Restaurante", "Periodo", "Total Bruto", "Total INSS", "Total Líquido"]
+    for idx, titulo in enumerate(header_contrato, start=start_col):
+        cell = ws.cell(row=current_row, column=idx, value=titulo)
+        cell.font = bold
+        cell.alignment = center
+        cell.fill = fill
+        cell.border = border
+    current_row += 1
+
+    # Dados por contrato
+    soma_bruto_contratos = 0.0
+    soma_inss_contratos  = 0.0
+    soma_liq_contratos   = 0.0
+
+    for key, tc in sorted(totais_contrato.items(), key=lambda x: (x[1]["restaurante"], x[1]["periodo"])):
+        r_nome = tc["restaurante"] or "—"
+        r_per  = tc["periodo"] or "—"
+        b      = tc["bruto"]
+        i      = tc["inss"]
+        lq     = tc["liq"]
+
+        ws.cell(row=current_row, column=start_col,     value=r_nome)
+        ws.cell(row=current_row, column=start_col + 1, value=r_per)
+
+        c_b = ws.cell(row=current_row, column=start_col + 2, value=b)
+        c_i = ws.cell(row=current_row, column=start_col + 3, value=i)
+        c_l = ws.cell(row=current_row, column=start_col + 4, value=lq)
+
+        c_b.number_format = currency_fmt
+        c_i.number_format = currency_fmt
+        c_l.number_format = currency_fmt
+
+        soma_bruto_contratos += b
+        soma_inss_contratos  += i
+        soma_liq_contratos   += lq
+
+        current_row += 1
+
+    # Linha TOTAL GERAL dos contratos
+    if totais_contrato:
+        ws.cell(row=current_row, column=start_col, value="TOTAL GERAL").font = bold
+        ws.cell(row=current_row, column=start_col + 1, value="")
+
+        c_b = ws.cell(row=current_row, column=start_col + 2, value=soma_bruto_contratos)
+        c_i = ws.cell(row=current_row, column=start_col + 3, value=soma_inss_contratos)
+        c_l = ws.cell(row=current_row, column=start_col + 4, value=soma_liq_contratos)
+        c_b.font = c_i.font = c_l.font = bold
+        c_b.number_format = c_i.number_format = c_l.number_format = currency_fmt
+        current_row += 2  # espaço
+
+    # -------- Totais por Contrato e Cooperado --------
+    ws.cell(row=current_row, column=start_col, value="Totais por Contrato e Cooperado").font = bold
+    current_row += 1
+
+    header_cc = ["Restaurante", "Periodo", "Cooperado", "Total Bruto", "Total INSS", "Total Líquido"]
+    for idx, titulo in enumerate(header_cc, start=start_col):
+        cell = ws.cell(row=current_row, column=idx, value=titulo)
+        cell.font = bold
+        cell.alignment = center
+        cell.fill = fill
+        cell.border = border
+    current_row += 1
+
+    for key, tcc in sorted(
+        totais_contrato_coop.items(),
+        key=lambda x: (x[1]["restaurante"], x[1]["periodo"], x[1]["cooperado"])
+    ):
+        r_nome = tcc["restaurante"] or "—"
+        r_per  = tcc["periodo"] or "—"
+        c_nome = tcc["cooperado"] or "—"
+        b      = tcc["bruto"]
+        i      = tcc["inss"]
+        lq     = tcc["liq"]
+
+        ws.cell(row=current_row, column=start_col,     value=r_nome)
+        ws.cell(row=current_row, column=start_col + 1, value=r_per)
+        ws.cell(row=current_row, column=start_col + 2, value=c_nome)
+
+        c_b = ws.cell(row=current_row, column=start_col + 3, value=b)
+        c_i = ws.cell(row=current_row, column=start_col + 4, value=i)
+        c_l = ws.cell(row=current_row, column=start_col + 5, value=lq)
+
+        c_b.number_format = currency_fmt
+        c_i.number_format = currency_fmt
+        c_l.number_format = currency_fmt
+
+        current_row += 1
+
+    current_row += 2  # espaço
+
+    # -------- Totais por Cooperado (todos os contratos) --------
+    ws.cell(row=current_row, column=start_col, value="Totais por Cooperado (Todos os Contratos)").font = bold
+    current_row += 1
+
+    header_coop = ["Cooperado", "Total Bruto", "Total INSS", "Total Líquido"]
+    for idx, titulo in enumerate(header_coop, start=start_col):
+        cell = ws.cell(row=current_row, column=idx, value=titulo)
+        cell.font = bold
+        cell.alignment = center
+        cell.fill = fill
+        cell.border = border
+    current_row += 1
+
+    for key, tcg in sorted(totais_coop.items(), key=lambda x: x[1]["cooperado"]):
+        coop_nome = tcg["cooperado"] or "—"
+        b         = tcg["bruto"]
+        i         = tcg["inss"]
+        lq        = tcg["liq"]
+
+        ws.cell(row=current_row, column=start_col, value=coop_nome)
+        c_b = ws.cell(row=current_row, column=start_col + 1, value=b)
+        c_i = ws.cell(row=current_row, column=start_col + 2, value=i)
+        c_l = ws.cell(row=current_row, column=start_col + 3, value=lq)
+
+        c_b.number_format = currency_fmt
+        c_i.number_format = currency_fmt
+        c_l.number_format = currency_fmt
+
+        current_row += 1
+
+    # Linha "TOTAL GERAL" (todos os contratos / cooperados)
+    if lancs:
+        current_row += 1
+        ws.cell(row=current_row, column=start_col, value="TOTAL GERAL (Bruto / INSS / Líquido)").font = bold
+        c_b = ws.cell(row=current_row, column=start_col + 1, value=total_geral_bruto)
+        c_i = ws.cell(row=current_row, column=start_col + 2, value=total_geral_inss)
+        c_l = ws.cell(row=current_row, column=start_col + 3, value=total_geral_liq)
+        c_b.font = c_i.font = c_l.font = bold
+        c_b.number_format = c_i.number_format = c_l.number_format = currency_fmt
+
+    # ===============================
+    # Formatos de número/data (linhas detalhadas)
+    # Índices das colunas (1-based): Valor=5, Data=6, INSS=9, Liquido=10
+    # ===============================
     for r in range(2, ws.max_row + 1):
-        ws.cell(row=r, column=5).number_format = currency_fmt
-        ws.cell(row=r, column=6).number_format = date_fmt
-        ws.cell(row=r, column=9).number_format = currency_fmt
-        ws.cell(row=r, column=10).number_format = currency_fmt
+        # só formatamos colunas que sabemos serem numéricas/data na parte detalhada
+        if ws.cell(row=r, column=5).value is not None:
+            ws.cell(row=r, column=5).number_format = currency_fmt
+        if ws.cell(row=r, column=6).value is not None:
+            ws.cell(row=r, column=6).number_format = date_fmt
+        if ws.cell(row=r, column=9).value is not None:
+            ws.cell(row=r, column=9).number_format = currency_fmt
+        if ws.cell(row=r, column=10).value is not None:
+            ws.cell(row=r, column=10).number_format = currency_fmt
 
-    # Ajuste simples de largura (auto-fit aproximado)
+    # Ajuste simples de largura (auto-fit aproximado) para TODAS as colunas usadas
     for col_idx in range(1, ws.max_column + 1):
         max_len = 0
         col_letter = get_column_letter(col_idx)
@@ -2521,10 +2739,12 @@ def exportar_lancamentos():
     # Congelar cabeçalho
     ws.freeze_panes = "A2"
 
-    # Borda nas células de dados
-    for r in range(2, ws.max_row + 1):
+    # Borda em todas as células com dados
+    for r in range(1, ws.max_row + 1):
         for c in range(1, ws.max_column + 1):
-            ws.cell(row=r, column=c).border = border
+            cell = ws.cell(row=r, column=c)
+            if cell.value is not None:
+                cell.border = border
 
     # ---- Retorna como download .xlsx
     mem = io.BytesIO()
