@@ -2580,7 +2580,7 @@ def exportar_lancamentos():
         ws.cell(row=current_row, column=start_col + 1, value=r_per)
 
         c_b = ws.cell(row=current_row, column=start_col + 2, value=b)
-        c_i = ws.cell(row=current_row, column=start_col + 3, value	i)
+        c_i = ws.cell(row=current_row, column=start_col + 3, value=i)
         c_l = ws.cell(row=current_row, column=start_col + 4, value=lq)
         c_b.number_format = c_i.number_format = c_l.number_format = currency_fmt
 
