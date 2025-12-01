@@ -2429,8 +2429,8 @@ def exportar_lancamentos():
     import io
     from collections import defaultdict
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import Font, Alignment, PatternFill
+    # sem Border/Side em tudo pra ficar mais rápido
 
     args = request.args
     restaurante_id = args.get("restaurante_id", type=int)
@@ -2454,32 +2454,37 @@ def exportar_lancamentos():
         lancs = [l for l in lancs if l.data and _dow(l.data) in dows]
 
     # ===============================
-    # Monta o Excel - Planilha base
+    # Configuração geral de estilo
     # ===============================
     wb = Workbook()
-    ws = wb.active
-    ws.title = "Lançamentos"
-
-    header = [
-        "Restaurante", "Periodo", "Cooperado", "Descricao",
-        "Valor", "Data", "HoraInicio", "HoraFim", "INSS", "Liquido",
-    ]
-    ws.append(header)
 
     bold   = Font(bold=True)
     center = Alignment(horizontal="center", vertical="center")
-    fill   = PatternFill("solid", fgColor="DDDDDD")
-    thin   = Side(border_style="thin", color="CCCCCC")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    header_fill = PatternFill("solid", fgColor="DDDDDD")
 
-    for col_idx, _ in enumerate(header, start=1):
-        cell = ws.cell(row=1, column=col_idx)
+    currency_fmt = "0.00"
+    date_fmt = "DD/MM/YYYY"
+
+    # ===============================
+    # ABA 1 - Lançamentos (detalhado)
+    # ===============================
+    ws_det = wb.active
+    ws_det.title = "Lançamentos"
+
+    header_det = [
+        "Restaurante", "Periodo", "Cooperado", "Descricao",
+        "Valor", "Data", "HoraInicio", "HoraFim", "INSS", "Liquido",
+    ]
+    ws_det.append(header_det)
+    for col_idx in range(1, len(header_det) + 1):
+        cell = ws_det.cell(row=1, column=col_idx)
         cell.font = bold
         cell.alignment = center
-        cell.fill = fill
-        cell.border = border
+        cell.fill = header_fill
 
-    from collections import defaultdict
+    # ===============================
+    # Estruturas de soma
+    # ===============================
     totais_contrato = defaultdict(lambda: {
         "restaurante": "", "periodo": "", "bruto": 0.0, "inss": 0.0, "liq": 0.0,
     })
@@ -2489,11 +2494,18 @@ def exportar_lancamentos():
     totais_coop = defaultdict(lambda: {
         "cooperado": "", "bruto": 0.0, "inss": 0.0, "liq": 0.0,
     })
+    # para ver o que cada cooperado fez em cada data
+    totais_coop_dia = defaultdict(lambda: {
+        "cooperado": "", "data": None, "restaurante": "", "periodo": "", "bruto": 0.0, "inss": 0.0, "liq": 0.0,
+    })
 
     total_geral_bruto = 0.0
     total_geral_inss  = 0.0
     total_geral_liq   = 0.0
 
+    # ===============================
+    # Preenche lançamentos + somatórios
+    # ===============================
     for l in lancs:
         v = float(l.valor or 0.0)
         inss = v * 0.045
@@ -2518,8 +2530,15 @@ def exportar_lancamentos():
             inss,
             liq,
         ]
-        ws.append(row)
+        ws_det.append(row)
+        r = ws_det.max_row
+        # formatação direta nas colunas
+        ws_det.cell(row=r, column=5).number_format = currency_fmt
+        ws_det.cell(row=r, column=6).number_format = date_fmt
+        ws_det.cell(row=r, column=9).number_format = currency_fmt
+        ws_det.cell(row=r, column=10).number_format = currency_fmt
 
+        # ---- Totais por contrato
         key_contrato = (rest_id, rest_nome, rest_period)
         tc = totais_contrato[key_contrato]
         tc["restaurante"] = rest_nome
@@ -2528,6 +2547,7 @@ def exportar_lancamentos():
         tc["inss"]       += inss
         tc["liq"]        += liq
 
+        # ---- Totais por contrato + cooperado
         key_contrato_coop = (rest_id, rest_nome, rest_period, coop_id, coop_nome)
         tcc = totais_contrato_coop[key_contrato_coop]
         tcc["restaurante"] = rest_nome
@@ -2537,6 +2557,7 @@ def exportar_lancamentos():
         tcc["inss"]       += inss
         tcc["liq"]        += liq
 
+        # ---- Totais por cooperado (geral)
         key_coop = (coop_id, coop_nome)
         tcg = totais_coop[key_coop]
         tcg["cooperado"] = coop_nome
@@ -2544,156 +2565,195 @@ def exportar_lancamentos():
         tcg["inss"]     += inss
         tcg["liq"]      += liq
 
+        # ---- Totais por cooperado e dia
+        # chave inclui data e contrato para ficar bem identificado
+        key_coop_dia = (coop_id, coop_nome, l.data, rest_id, rest_nome, rest_period)
+        tcd = totais_coop_dia[key_coop_dia]
+        tcd["cooperado"]   = coop_nome
+        tcd["data"]        = l.data
+        tcd["restaurante"] = rest_nome
+        tcd["periodo"]     = rest_period
+        tcd["bruto"]      += v
+        tcd["inss"]       += inss
+        tcd["liq"]        += liq
+
+        # ---- Total geral
         total_geral_bruto += v
         total_geral_inss  += inss
         total_geral_liq   += liq
 
-    # ==== Resumos na mesma aba ====
-    start_col = ws.max_column + 2
-    currency_fmt = "0.00"
-    date_fmt = "DD/MM/YYYY"
-    current_row = 1
+    ws_det.freeze_panes = "A2"
 
-    # Totais por contrato
-    ws.cell(row=current_row, column=start_col, value="Totais por Contrato").font = bold
-    current_row += 1
-
+    # ===============================
+    # ABA 2 - Totais por Contrato
+    # ===============================
+    ws_con = wb.create_sheet("Totais por Contrato")
     header_contrato = ["Restaurante", "Periodo", "Total Bruto", "Total INSS", "Total Líquido"]
-    for idx, titulo in enumerate(header_contrato, start=start_col):
-        cell = ws.cell(row=current_row, column=idx, value=titulo)
+    ws_con.append(header_contrato)
+    for c in range(1, len(header_contrato) + 1):
+        cell = ws_con.cell(row=1, column=c)
         cell.font = bold
         cell.alignment = center
-        cell.fill = fill
-        cell.border = border
-    current_row += 1
+        cell.fill = header_fill
 
-    soma_bruto_contratos = soma_inss_contratos = soma_liq_contratos = 0.0
+    soma_b = soma_i = soma_l = 0.0
+    row_idx = 2
+    for _, tc in sorted(
+        totais_contrato.items(),
+        key=lambda x: (x[1]["restaurante"], x[1]["periodo"])
+    ):
+        ws_con.append([
+            tc["restaurante"] or "—",
+            tc["periodo"] or "—",
+            tc["bruto"],
+            tc["inss"],
+            tc["liq"],
+        ])
+        r = row_idx
+        ws_con.cell(row=r, column=3).number_format = currency_fmt
+        ws_con.cell(row=r, column=4).number_format = currency_fmt
+        ws_con.cell(row=r, column=5).number_format = currency_fmt
+        soma_b += tc["bruto"]
+        soma_i += tc["inss"]
+        soma_l += tc["liq"]
+        row_idx += 1
 
-    for key, tc in sorted(totais_contrato.items(), key=lambda x: (x[1]["restaurante"], x[1]["periodo"])):
-        r_nome = tc["restaurante"] or "—"
-        r_per  = tc["periodo"] or "—"
-        b      = tc["bruto"]
-        i      = tc["inss"]
-        lq     = tc["liq"]
+    if row_idx > 2:
+        ws_con.append(["TOTAL GERAL", "", soma_b, soma_i, soma_l])
+        r = row_idx
+        for col in (1, 3, 4, 5):
+            cell = ws_con.cell(row=r, column=col)
+            cell.font = bold
+            if col != 1:
+                cell.number_format = currency_fmt
 
-        ws.cell(row=current_row, column=start_col,     value=r_nome)
-        ws.cell(row=current_row, column=start_col + 1, value=r_per)
+    ws_con.freeze_panes = "A2"
 
-        c_b = ws.cell(row=current_row, column=start_col + 2, value=b)
-        c_i = ws.cell(row=current_row, column=start_col + 3, value=i)
-        c_l = ws.cell(row=current_row, column=start_col + 4, value=lq)
-        c_b.number_format = c_i.number_format = c_l.number_format = currency_fmt
-
-        soma_bruto_contratos += b
-        soma_inss_contratos  += i
-        soma_liq_contratos   += lq
-
-        current_row += 1
-
-    if totais_contrato:
-        ws.cell(row=current_row, column=start_col, value="TOTAL GERAL").font = bold
-        c_b = ws.cell(row=current_row, column=start_col + 2, value=soma_bruto_contratos)
-        c_i = ws.cell(row=current_row, column=start_col + 3, value=soma_inss_contratos)
-        c_l = ws.cell(row=current_row, column=start_col + 4, value=soma_liq_contratos)
-        c_b.font = c_i.font = c_l.font = bold
-        c_b.number_format = c_i.number_format = c_l.number_format = currency_fmt
-        current_row += 2
-
-    # Totais por contrato + cooperado
-    ws.cell(row=current_row, column=start_col, value="Totais por Contrato e Cooperado").font = bold
-    current_row += 1
-
+    # ===============================
+    # ABA 3 - Contrato x Cooperado
+    # ===============================
+    ws_cc = wb.create_sheet("Contrato x Cooperado")
     header_cc = ["Restaurante", "Periodo", "Cooperado", "Total Bruto", "Total INSS", "Total Líquido"]
-    for idx, titulo in enumerate(header_cc, start=start_col):
-        cell = ws.cell(row=current_row, column=idx, value=titulo)
+    ws_cc.append(header_cc)
+    for c in range(1, len(header_cc) + 1):
+        cell = ws_cc.cell(row=1, column=c)
         cell.font = bold
         cell.alignment = center
-        cell.fill = fill
-        cell.border = border
-    current_row += 1
+        cell.fill = header_fill
 
-    for key, tcc in sorted(
+    row_idx = 2
+    for _, tcc in sorted(
         totais_contrato_coop.items(),
         key=lambda x: (x[1]["restaurante"], x[1]["periodo"], x[1]["cooperado"])
     ):
-        r_nome = tcc["restaurante"] or "—"
-        r_per  = tcc["periodo"] or "—"
-        c_nome = tcc["cooperado"] or "—"
-        b      = tcc["bruto"]
-        i      = tcc["inss"]
-        lq     = tcc["liq"]
+        ws_cc.append([
+            tcc["restaurante"] or "—",
+            tcc["periodo"] or "—",
+            tcc["cooperado"] or "—",
+            tcc["bruto"],
+            tcc["inss"],
+            tcc["liq"],
+        ])
+        r = row_idx
+        ws_cc.cell(row=r, column=4).number_format = currency_fmt
+        ws_cc.cell(row=r, column=5).number_format = currency_fmt
+        ws_cc.cell(row=r, column=6).number_format = currency_fmt
+        row_idx += 1
 
-        ws.cell(row=current_row, column=start_col,     value=r_nome)
-        ws.cell(row=current_row, column=start_col + 1, value=r_per)
-        ws.cell(row=current_row, column=start_col + 2, value=c_nome)
+    ws_cc.freeze_panes = "A2"
 
-        c_b = ws.cell(row=current_row, column=start_col + 3, value=b)
-        c_i = ws.cell(row=current_row, column=start_col + 4, value=i)
-        c_l = ws.cell(row=current_row, column=start_col + 5, value=lq)
-        c_b.number_format = c_i.number_format = c_l.number_format = currency_fmt
-
-        current_row += 1
-
-    current_row += 2
-
-    # Totais por cooperado (geral)
-    ws.cell(row=current_row, column=start_col, value="Totais por Cooperado (Todos os Contratos)").font = bold
-    current_row += 1
-
-    header_coop = ["Cooperado", "Total Bruto", "Total INSS", "Total Líquido"]
-    for idx, titulo in enumerate(header_coop, start=start_col):
-        cell = ws.cell(row=current_row, column=idx, value=titulo)
+    # ===============================
+    # ABA 4 - Cooperado por Dia
+    # ===============================
+    ws_cd = wb.create_sheet("Cooperado por Dia")
+    header_cd = ["Cooperado", "Data", "Restaurante", "Periodo", "Total Bruto", "Total INSS", "Total Líquido"]
+    ws_cd.append(header_cd)
+    for c in range(1, len(header_cd) + 1):
+        cell = ws_cd.cell(row=1, column=c)
         cell.font = bold
         cell.alignment = center
-        cell.fill = fill
-        cell.border = border
-    current_row += 1
+        cell.fill = header_fill
 
-    for key, tcg in sorted(totais_coop.items(), key=lambda x: x[1]["cooperado"]):
-        coop_nome = tcg["cooperado"] or "—"
-        b         = tcg["bruto"]
-        i         = tcg["inss"]
-        lq        = tcg["liq"]
+    row_idx = 2
+    for _, tcd in sorted(
+        totais_coop_dia.items(),
+        key=lambda x: (x[1]["cooperado"], x[1]["data"] or "", x[1]["restaurante"], x[1]["periodo"])
+    ):
+        ws_cd.append([
+            tcd["cooperado"] or "—",
+            tcd["data"],
+            tcd["restaurante"] or "—",
+            tcd["periodo"] or "—",
+            tcd["bruto"],
+            tcd["inss"],
+            tcd["liq"],
+        ])
+        r = row_idx
+        ws_cd.cell(row=r, column=2).number_format = date_fmt
+        ws_cd.cell(row=r, column=5).number_format = currency_fmt
+        ws_cd.cell(row=r, column=6).number_format = currency_fmt
+        ws_cd.cell(row=r, column=7).number_format = currency_fmt
+        row_idx += 1
 
-        ws.cell(row=current_row, column=start_col, value=coop_nome)
-        c_b = ws.cell(row=current_row, column=start_col + 1, value=b)
-        c_i = ws.cell(row=current_row, column=start_col + 2, value=i)
-        c_l = ws.cell(row=current_row, column=start_col + 3, value=lq)
-        c_b.number_format = c_i.number_format = c_l.number_format = currency_fmt
+    ws_cd.freeze_panes = "A2"
 
-        current_row += 1
+    # ===============================
+    # ABA 5 - Totais por Cooperado
+    # ===============================
+    ws_tc = wb.create_sheet("Totais por Cooperado")
+    header_tc = ["Cooperado", "Total Bruto", "Total INSS", "Total Líquido"]
+    ws_tc.append(header_tc)
+    for c in range(1, len(header_tc) + 1):
+        cell = ws_tc.cell(row=1, column=c)
+        cell.font = bold
+        cell.alignment = center
+        cell.fill = header_fill
 
-    if lancs:
-        current_row += 1
-        ws.cell(row=current_row, column=start_col, value="TOTAL GERAL (Bruto / INSS / Líquido)").font = bold
-        c_b = ws.cell(row=current_row, column=start_col + 1, value=total_geral_bruto)
-        c_i = ws.cell(row=current_row, column=start_col + 2, value=total_geral_inss)
-        c_l = ws.cell(row=current_row, column=start_col + 3, value=total_geral_liq)
-        c_b.font = c_i.font = c_l.font = bold
-        c_b.number_format = c_i.number_format = c_l.number_format = currency_fmt
+    row_idx = 2
+    for _, tcg in sorted(totais_coop.items(), key=lambda x: x[1]["cooperado"]):
+        ws_tc.append([
+            tcg["cooperado"] or "—",
+            tcg["bruto"],
+            tcg["inss"],
+            tcg["liq"],
+        ])
+        r = row_idx
+        ws_tc.cell(row=r, column=2).number_format = currency_fmt
+        ws_tc.cell(row=r, column=3).number_format = currency_fmt
+        ws_tc.cell(row=r, column=4).number_format = currency_fmt
+        row_idx += 1
 
-    # Formatação das linhas detalhadas
-    for r in range(2, len(lancs) + 2):
-        ws.cell(row=r, column=5).number_format = currency_fmt
-        ws.cell(row=r, column=6).number_format = date_fmt
-        ws.cell(row=r, column=9).number_format = currency_fmt
-        ws.cell(row=r, column=10).number_format = currency_fmt
+    if row_idx > 2:
+        total_b = sum(v["bruto"] for v in totais_coop.values())
+        total_i = sum(v["inss"] for v in totais_coop.values())
+        total_l = sum(v["liq"] for v in totais_coop.values())
+        ws_tc.append(["TOTAL GERAL", total_b, total_i, total_l])
+        r = row_idx
+        for col in (1, 2, 3, 4):
+            cell = ws_tc.cell(row=r, column=col)
+            cell.font = bold
+            if col != 1:
+                cell.number_format = currency_fmt
 
-    from openpyxl.utils import get_column_letter
-    for col_idx in range(1, ws.max_column + 1):
-        max_len = 0
-        col_letter = get_column_letter(col_idx)
-        for cell in ws[col_letter]:
-            txt = str(cell.value) if cell.value is not None else ""
-            max_len = max(max_len, len(txt))
-        ws.column_dimensions[col_letter].width = min(max(10, max_len + 2), 50)
+    ws_tc.freeze_panes = "A2"
 
-    ws.freeze_panes = "A2"
+    # ===============================
+    # ABA 6 - Resumo Geral
+    # ===============================
+    ws_rg = wb.create_sheet("Resumo Geral")
+    ws_rg["A1"] = "Total Geral Bruto"
+    ws_rg["A2"] = "Total Geral INSS"
+    ws_rg["A3"] = "Total Geral Líquido"
+    ws_rg["A1"].font = ws_rg["A2"].font = ws_rg["A3"].font = bold
 
-    for r in range(1, ws.max_row + 1):
-        for c in range(1, ws.max_column + 1):
-            ws.cell(row=r, column=c).border = border
+    ws_rg["B1"] = total_geral_bruto
+    ws_rg["B2"] = total_geral_inss
+    ws_rg["B3"] = total_geral_liq
+    ws_rg["B1"].number_format = ws_rg["B2"].number_format = ws_rg["B3"].number_format = currency_fmt
 
+    # ===============================
+    # Envio do arquivo
+    # ===============================
     mem = io.BytesIO()
     wb.save(mem)
     mem.seek(0)
