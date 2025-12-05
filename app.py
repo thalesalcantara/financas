@@ -6090,6 +6090,15 @@ def avisos_unread_count():
             pass
         return _nocache(jsonify(count=0)), 500
 
+import click
+
+@app.cli.command("init-db")
+def init_db_command():
+    """Roda init_db() manualmente."""
+    click.echo("Rodando init_db() ...")
+    with app.app_context():
+        init_db()
+    click.echo("init_db() concluído.")
 
 # =========================
 # Main
