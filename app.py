@@ -1974,10 +1974,8 @@ def toggle_status_cooperado(id):
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_dashboard():
-    from collections import namedtuple, defaultdict
-    from datetime import date, timedelta
+    from collections import namedtuple
     import re
-
     args = request.args
 
     # --- Controle de abas
@@ -2002,9 +2000,7 @@ def admin_dashboard():
     considerar_periodo = bool(args.get("considerar_periodo"))
     dows = set(args.getlist("dow"))  # {"1","2",...}
 
-    # ------------------------------------------------------------------
-    # 1) Lançamentos (com filtros + DOW)
-    # ------------------------------------------------------------------
+    # ---- Lançamentos (com filtros + DOW)
     q = Lancamento.query
     if restaurante_id:
         q = q.filter(Lancamento.restaurante_id == restaurante_id)
@@ -2014,7 +2010,6 @@ def admin_dashboard():
         q = q.filter(Lancamento.data >= data_inicio)
     if data_fim:
         q = q.filter(Lancamento.data <= data_fim)
-
     lanc_base = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
 
     if dows:
@@ -2037,9 +2032,7 @@ def admin_dashboard():
     total_producoes = sum((l.valor or 0.0) for l in lancamentos)
     total_inss = total_producoes * 0.045
 
-    # ------------------------------------------------------------------
-    # 2) Coop (institucional)
-    # ------------------------------------------------------------------
+    # ---- Coop (institucional)
     rq = ReceitaCooperativa.query
     dq = DespesaCooperativa.query
     if data_inicio:
@@ -2049,22 +2042,12 @@ def admin_dashboard():
         rq = rq.filter(ReceitaCooperativa.data <= data_fim)
         dq = dq.filter(DespesaCooperativa.data <= data_fim)
 
-    receitas = rq.order_by(
-        ReceitaCooperativa.data.desc().nullslast(),
-        ReceitaCooperativa.id.desc()
-    ).all()
-
-    despesas = dq.order_by(
-        DespesaCooperativa.data.desc(),
-        DespesaCooperativa.id.desc()
-    ).all()
-
+    receitas = rq.order_by(ReceitaCooperativa.data.desc().nullslast(), ReceitaCooperativa.id.desc()).all()
+    despesas = dq.order_by(DespesaCooperativa.data.desc(), DespesaCooperativa.id.desc()).all()
     total_receitas = sum((r.valor_total or 0.0) for r in receitas)
     total_despesas = sum((d.valor or 0.0) for d in despesas)
 
-    # ------------------------------------------------------------------
-    # 3) Cooperados (pessoa física)
-    # ------------------------------------------------------------------
+    # ---- Cooperados (pessoa física)
     rq2 = ReceitaCooperado.query
     dq2 = DespesaCooperado.query
 
@@ -2085,22 +2068,13 @@ def admin_dashboard():
     elif data_fim:
         dq2 = dq2.filter(DespesaCooperado.data_inicio <= data_fim)
 
-    receitas_coop = rq2.order_by(
-        ReceitaCooperado.data.desc(),
-        ReceitaCooperado.id.desc()
-    ).all()
-
-    despesas_coop = dq2.order_by(
-        DespesaCooperado.data_fim.desc().nullslast(),
-        DespesaCooperado.id.desc()
-    ).all()
+    receitas_coop = rq2.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
+    # você pode manter por .data (domingo) ou, se preferir, ordenar pelo fim real do período:
+    despesas_coop = dq2.order_by(DespesaCooperado.data_fim.desc().nullslast(), DespesaCooperado.id.desc()).all()
 
     total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
     total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop)
 
-    # ------------------------------------------------------------------
-    # 4) Config, cooperados, restaurantes, documentos
-    # ------------------------------------------------------------------
     cfg = get_config()
     cooperados = Cooperado.query.order_by(Cooperado.nome).all()
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
@@ -2115,9 +2089,7 @@ def admin_dashboard():
         for c in cooperados
     }
 
-    # ------------------------------------------------------------------
-    # 5) Escalas agrupadas e contagem por cooperado
-    # ------------------------------------------------------------------
+    # -------- Escalas agrupadas e contagem por cooperado ----------
     escalas_all = Escala.query.order_by(Escala.id.asc()).all()
     esc_by_int: dict[int, list] = defaultdict(list)
     esc_by_str: dict[str, list] = defaultdict(list)
@@ -2142,9 +2114,7 @@ def admin_dashboard():
     qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
     qtd_sem_cadastro = int(cont_rows.get(None, 0))
 
-    # ------------------------------------------------------------------
-    # 6) Gráficos (por mês) — rótulo robusto "MM/YY"
-    # ------------------------------------------------------------------
+    # ---- Gráficos (por mês) — rótulo robusto "MM/YY"
     sums = {}
     for l in lancamentos:
         if not l.data:
@@ -2169,9 +2139,7 @@ def admin_dashboard():
 
     admin_user = Usuario.query.filter_by(tipo="admin").first()
 
-    # ------------------------------------------------------------------
-    # 7) Folha (últimos 30 dias padrão) – COMPLETA, sem remover nada
-    # ------------------------------------------------------------------
+    # ---- Folha (últimos 30 dias padrão)
     folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
     folha_fim = _parse_date(args.get("folha_fim")) or date.today()
     FolhaItem = namedtuple("FolhaItem", "cooperado lancamentos receitas despesas bruto inss outras_desp liquido")
@@ -2230,128 +2198,6 @@ def admin_dashboard():
                 liquido=liquido,
             )
         )
-
-    # ------------------------------------------------------------------
-    # 8) Benefícios (com filtros + id)
-    # ------------------------------------------------------------------
-    def _tokenize(s: str):
-        return [x.strip() for x in re.split(r"[;,]", s or "") if x.strip()]
-
-    def _d(s):
-        if not s:
-            return None
-        s = s.strip()
-        try:
-            if "/" in s:  # dd/mm/yyyy
-                d, m, y = s.split("/")
-                return date(int(y), int(m), int(d))
-            # yyyy-mm-dd
-            y, m, d = s.split("-")
-            return date(int(y), int(m), int(d))
-        except Exception:
-            return None
-
-    b_ini = _d(request.args.get("b_ini"))
-    b_fim = _d(request.args.get("b_fim"))
-    coop_filter = request.args.get("coop_benef_id", type=int)
-
-    q_ben = BeneficioRegistro.query
-
-    if b_ini and b_fim:
-        q_ben = q_ben.filter(
-            BeneficioRegistro.data_inicial <= b_fim,
-            BeneficioRegistro.data_final   >= b_ini,
-        )
-    elif b_ini:
-        q_ben = q_ben.filter(BeneficioRegistro.data_final >= b_ini)
-    elif b_fim:
-        q_ben = q_ben.filter(BeneficioRegistro.data_inicial <= b_fim)
-
-    historico_beneficios = q_ben.order_by(BeneficioRegistro.id.desc()).all()
-
-    beneficios_view = []
-    for b in historico_beneficios:
-        nomes = _tokenize(b.recebedores_nomes or "")
-        ids   = _tokenize(b.recebedores_ids or "")
-
-        recs = []
-        for i, nome in enumerate(nomes):
-            rid = None
-            if i < len(ids) and str(ids[i]).isdigit():
-                try:
-                    rid = int(ids[i])
-                except Exception:
-                    rid = None
-
-            if coop_filter and (rid is not None) and (rid != coop_filter):
-                continue
-
-            recs.append({"id": rid, "nome": nome})
-
-        if coop_filter and not recs:
-            continue
-
-        beneficios_view.append({
-            "id": b.id,
-            "data_inicial": b.data_inicial,
-            "data_final": b.data_final,
-            "data_lancamento": b.data_lancamento,
-            "tipo": b.tipo,
-            "valor_total": b.valor_total or 0.0,
-            "recebedores": recs,
-        })
-
-    # ------------------------------------------------------------------
-    # 9) Render
-    # ------------------------------------------------------------------
-    return render_template(
-        "admin_dashboard.html",   # <<< AQUI: tem que ser exatamente o nome do HTML na pasta templates
-        active_tab=active_tab,
-        cfg=cfg,
-        cooperados=cooperados,
-        restaurantes=restaurantes,
-
-        lancamentos=lancamentos,
-        total_producoes=total_producoes,
-        total_inss=total_inss,
-
-        receitas=receitas,
-        despesas=despesas,
-        total_receitas=total_receitas,
-        total_despesas=total_despesas,
-
-        receitas_coop=receitas_coop,
-        despesas_coop=despesas_coop,
-        total_receitas_coop=total_receitas_coop,
-        total_despesas_coop=total_despesas_coop,
-
-        chart_data_lancamentos_coop=chart_data_lancamentos_coop,
-        chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
-
-        status_doc_por_coop=status_doc_por_coop,
-        esc_by_int=esc_by_int,
-        esc_by_str=esc_by_str,
-        qtd_escalas_map=qtd_escalas_map,
-        qtd_sem_cadastro=qtd_sem_cadastro,
-
-        admin_user=admin_user,
-
-        data_inicio=data_inicio,
-        data_fim=data_fim,
-        restaurante_id=restaurante_id,
-        cooperado_id=cooperado_id,
-        considerar_periodo=considerar_periodo,
-        dows=dows,
-
-        folha_inicio=folha_inicio,
-        folha_fim=folha_fim,
-        folha_por_coop=folha_por_coop,
-
-        beneficios_view=beneficios_view,
-        b_ini=b_ini,
-        b_fim=b_fim,
-        coop_benef_id=coop_filter,
-    )
 
     # ----------------------------
     # Benefícios para template (com filtros + id)
@@ -2427,34 +2273,6 @@ def admin_dashboard():
             "valor_total": b.valor_total or 0.0,
             "recebedores": recs,
         })
-
-    return render_template(
-        "admin_dashboard.html",  # ajuste aqui se o seu template tiver outro nome
-        active_tab=active_tab,
-        cfg=cfg,
-        cooperados=cooperados,
-        restaurantes=restaurantes,
-        lancamentos=lancamentos,
-        total_producoes=total_producoes,
-        total_inss=total_inss,
-        receitas=receitas,
-        despesas=despesas,
-        total_receitas=total_receitas,
-        total_despesas=total_despesas,
-        receitas_coop=receitas_coop,
-        despesas_coop=despesas_coop,
-        total_receitas_coop=total_receitas_coop,
-        total_despesas_coop=total_despesas_coop,
-        chart_data_lancamentos_coop=chart_data_lancamentos_coop,
-        chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
-        admin_user=admin_user,
-        status_doc_por_coop=status_doc_por_coop,
-        esc_by_int=esc_by_int,
-        esc_by_str=esc_by_str,
-        qtd_escalas_map=qtd_escalas_map,
-        qtd_sem_cadastro=qtd_sem_cadastro,
-        beneficios_view=beneficios_view,
-    )
 
     # ======== Trocas no admin ========
     def _escala_desc(e: Escala | None) -> str:
