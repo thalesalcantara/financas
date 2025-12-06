@@ -3239,7 +3239,7 @@
     </div>
   </div>
 
-  <!-- SOLICITAÇÕES DE TROCA (pendentes) -->
+    <!-- SOLICITAÇÕES DE TROCA (pendentes) -->
   <div class="card p-3 mb-3">
     <div class="d-flex justify-content-between align-items-center">
       <h5 class="mb-0">
@@ -3378,22 +3378,22 @@
     </div>
 
     <small class="muted">
-      Ao aprovar, os nomes são trocados nas escalas e a ação aparece em “Trocas aplicadas”.
+      Ao aprovar, os nomes são trocados nas escalas e a ação aparece em “Histórico de trocas”.
     </small>
   </div>
 
-  <!-- TROCAS APLICADAS (histórico) -->
-  <div class="card p-3">
+  <!-- HISTÓRICO DE TROCAS (modelo enxuto) -->
+  <div class="card p-3 mb-3">
     <div class="d-flex justify-content-between align-items-center">
       <h5 class="mb-0">
-        <i class="bi bi-clock-history"></i> Trocas aplicadas
+        <i class="bi bi-clock-history"></i> Histórico de trocas de escala
       </h5>
       <span class="badge-soft">
         {{ trocas_historico_flat|length if trocas_historico_flat else (trocas_historico|length if trocas_historico else 0) }} registro(s)
       </span>
     </div>
 
-    {% if trocas_historico_flat %}
+    {% if trocas_historico_flat or trocas_historico %}
       <div class="table-responsive mt-2">
         <table class="table table-bordered align-middle">
           <thead>
@@ -3401,179 +3401,77 @@
               <th>Dia do plantão</th>
               <th>Turno / Horário</th>
               <th>Contrato</th>
-              <th>Cooperado (saiu)</th>
-              <th></th>
-              <th>Cooperado (entrou)</th>
+              <th>Resumo da troca</th>
               <th>Aprovada em</th>
             </tr>
           </thead>
           <tbody>
-            {% for r in trocas_historico_flat %}
-            <tr>
-              <td>{{ r.data }}</td>
-              <td>{{ r.turno }}{% if r.horario %} · {{ r.horario }}{% endif %}</td>
-              <td>{{ r.contrato }}</td>
-              <td class="text-danger">{{ r.saiu_nome }}</td>
-              <td class="text-center"><i class="bi bi-arrow-right"></i></td>
-              <td class="text-success">{{ r.entrou_nome }}</td>
-              <td>{{ r.aplicada_em.strftime('%d/%m/%Y %H:%M') if r.aplicada_em else '—' }}</td>
-            </tr>
-            {% else %}
-            <tr>
-              <td colspan="7" class="text-center text-muted">Sem trocas aplicadas.</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+            {% if trocas_historico_flat %}
+              {# Versão já “achatada”: cada item representa uma linha de troca #}
+              {% for r in trocas_historico_flat %}
+              <tr>
+                <td>{{ r.data }}</td>
+                <td>
+                  {{ r.turno }}
+                  {% if r.horario %}<span class="text-muted"> · {{ r.horario }}</span>{% endif %}
+                </td>
+                <td>{{ r.contrato }}</td>
+                <td>
+                  <strong>{{ r.saiu_nome }}</strong>
+                  <span class="text-muted"> trocou a escala com </span>
+                  <strong>{{ r.entrou_nome }}</strong>
+                </td>
+                <td>
+                  {% if r.aplicada_em %}
+                    {% if r.aplicada_em.strftime is defined %}
+                      {{ r.aplicada_em.strftime('%d/%m/%Y %H:%M') }}
+                    {% else %}
+                      {{ r.aplicada_em }}
+                    {% endif %}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
 
-    {% elif trocas_historico %}
-      <div class="table-responsive mt-2">
-        <table class="table table-bordered align-middle">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Aplicada em</th>
-              <th>Solicitante</th>
-              <th>Destinatário</th>
-              <th>Linhas afetadas</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for t in trocas_historico %}
-            <tr>
-              <td class="text-muted">#{{ t.id }}</td>
-              <td>{{ t.aplicada_em.strftime('%d/%m/%Y %H:%M') if t.aplicada_em else '—' }}</td>
-              <td>{{ t.solicitante.nome }}</td>
-              <td>{{ t.destinatario.nome }}</td>
-              <td>
-                <div class="table-responsive">
-                  <table class="table table-sm mb-0">
-                    <thead>
-                      <tr>
-                        <th>Dia</th>
-                        <th>Turno/Horário</th>
-                        <th>Contrato</th>
-                        <th>Saiu</th>
-                        <th>Entrou</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for i in t.itens %}
-                      <tr>
-                        <td>{{ i.data }}</td>
-                        <td>{{ i.turno }}{% if i.horario %} · {{ i.horario }}{% endif %}</td>
-                        <td>{{ i.contrato }}</td>
-                        <td class="text-danger">{{ i.saiu_nome }}</td>
-                        <td class="text-success">{{ i.entrou_nome }}</td>
-                      </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              </td>
-            </tr>
             {% else %}
-            <tr>
-              <td colspan="5" class="text-center text-muted">Sem trocas aplicadas.</td>
-            </tr>
-            {% endfor %}
+              {# Versão em que vem agrupado em trocas + itens #}
+              {% for t in trocas_historico %}
+                {% for i in t.itens %}
+                <tr>
+                  <td>{{ i.data }}</td>
+                  <td>
+                    {{ i.turno }}
+                    {% if i.horario %}<span class="text-muted"> · {{ i.horario }}</span>{% endif %}
+                  </td>
+                  <td>{{ i.contrato }}</td>
+                  <td>
+                    <strong>{{ i.saiu_nome }}</strong>
+                    <span class="text-muted"> trocou a escala com </span>
+                    <strong>{{ i.entrou_nome }}</strong>
+                  </td>
+                  <td>
+                    {% if t.aplicada_em %}
+                      {% if t.aplicada_em.strftime is defined %}
+                        {{ t.aplicada_em.strftime('%d/%m/%Y %H:%M') }}
+                      {% else %}
+                        {{ t.aplicada_em }}
+                      {% endif %}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              {% endfor %}
+            {% endif %}
           </tbody>
         </table>
       </div>
     {% else %}
       <div class="text-center text-muted mt-2">Sem trocas aplicadas.</div>
     {% endif %}
-  </div>
-
-  <!-- TROCAS POR COOPERADO (detalhado) -->
-  <div class="card p-3 mb-3">
-    <div class="d-flex justify-content-between align-items-center">
-      <h5 class="mb-0">
-        <i class="bi bi-people"></i> Trocas por Cooperado (detalhado)
-      </h5>
-      <span class="badge-soft">Mostrando escalas trocadas por cada cooperado</span>
-    </div>
-
-    <div class="table-responsive mt-2">
-      <table class="table table-bordered align-middle">
-        <thead>
-          <tr>
-            <th>Cooperado</th>
-            <th>Ação</th>
-            <th>Dia do plantão</th>
-            <th>Turno</th>
-            <th>Horário</th>
-            <th>Contrato</th>
-            <th>Com quem trocou</th>
-            <th>Aprovada em</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% if trocas_historico_flat %}
-            {% for r in trocas_historico_flat %}
-            <tr>
-              <td class="text-danger">{{ r.saiu_nome }}</td>
-              <td><span class="badge bg-danger">Saiu</span></td>
-              <td>{{ r.data }}</td>
-              <td>{{ r.turno }}</td>
-              <td>{{ r.horario or '' }}</td>
-              <td>{{ r.contrato }}</td>
-              <td>{{ r.entrou_nome }}</td>
-              <td>{{ r.aplicada_em.strftime('%d/%m/%Y %H:%M') if r.aplicada_em else '—' }}</td>
-            </tr>
-            <tr>
-              <td class="text-success">{{ r.entrou_nome }}</td>
-              <td><span class="badge bg-success">Entrou</span></td>
-              <td>{{ r.data }}</td>
-              <td>{{ r.turno }}</td>
-              <td>{{ r.horario or '' }}</td>
-              <td>{{ r.contrato }}</td>
-              <td>{{ r.saiu_nome }}</td>
-              <td>{{ r.aplicada_em.strftime('%d/%m/%Y %H:%M') if r.aplicada_em else '—' }}</td>
-            </tr>
-            {% else %}
-            <tr>
-              <td colspan="8" class="text-center text-muted">Sem trocas aplicadas.</td>
-            </tr>
-            {% endfor %}
-          {% elif trocas_historico %}
-            {% for t in trocas_historico %}
-              {% for i in t.itens %}
-              <tr>
-                <td class="text-danger">{{ i.saiu_nome }}</td>
-                <td><span class="badge bg-danger">Saiu</span></td>
-                <td>{{ i.data }}</td>
-                <td>{{ i.turno }}</td>
-                <td>{{ i.horario or '' }}</td>
-                <td>{{ i.contrato }}</td>
-                <td>{{ i.entrou_nome }}</td>
-                <td>{{ t.aplicada_em.strftime('%d/%m/%Y %H:%M') if t.aplicada_em else '—' }}</td>
-              </tr>
-              <tr>
-                <td class="text-success">{{ i.entrou_nome }}</td>
-                <td><span class="badge bg-success">Entrou</span></td>
-                <td>{{ i.data }}</td>
-                <td>{{ i.turno }}</td>
-                <td>{{ i.horario or '' }}</td>
-                <td>{{ i.contrato }}</td>
-                <td>{{ i.saiu_nome }}</td>
-                <td>{{ t.aplicada_em.strftime('%d/%m/%Y %H:%M') if t.aplicada_em else '—' }}</td>
-              </tr>
-              {% endfor %}
-            {% else %}
-            <tr>
-              <td colspan="8" class="text-center text-muted">Sem trocas aplicadas.</td>
-            </tr>
-            {% endfor %}
-          {% else %}
-          <tr>
-            <td colspan="8" class="text-center text-muted">Sem trocas aplicadas.</td>
-          </tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
   </div>
 
   <!-- Modal visualizar escala do cooperado -->
