@@ -926,7 +926,7 @@
       {% endfor %}
     ];
 
-    // *** Receitas e Despesas da COOPERATIVA (corporativo) ***
+    // *** AQUI: Receitas e Despesas da COOPERATIVA — mesma lógica da aba Receitas ***
     const REC_COOP_CORP = [
       {% for r in _rec_coop_corp %}
         {
@@ -954,7 +954,6 @@
         { id: {{ c.id }}, nome: "{{ c.nome|e }}" }{{ "," if not loop.last }}
       {% endfor %}
     ];
-
     const RESTS = [
       {% for r in restaurantes %}
         { id: {{ r.id }}, nome: "{{ r.nome|e }}" }{{ "," if not loop.last }}
@@ -969,27 +968,19 @@
 
     // ---- Utils ----
     const parseISO = s => (!s)?null:new Date(s+'T00:00:00');
-    const fmtBR = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{
-      minimumFractionDigits:2,
-      maximumFractionDigits:2
-    });
-
+    const fmtBR = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
     const inRange = (d) => {
-      const di = parseISO(FILTER.ri);
-      const df = parseISO(FILTER.rf);
-      const x  = parseISO(d);
-      if (!x) return true;
-      if (di && x < di) return false;
-      if (df && x > df) return false;
+      const di = parseISO(FILTER.ri), df = parseISO(FILTER.rf), x = parseISO(d);
+      if(!x) return true;
+      if(di && x < di) return false;
+      if(df && x > df) return false;
       return true;
     };
-
     const byMonthKey = d => {
       if(!d) return '';
       const dt = parseISO(d);
       return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
     };
-
     const sumBy = (arr, fn) => arr.reduce((acc,cur)=>acc+(+fn(cur)||0), 0);
 
     // ---- Filtrados ----
@@ -998,17 +989,14 @@
       (FILTER.cid==null || p.cooperado_id===FILTER.cid) &&
       (FILTER.rid==null || p.restaurante_id===FILTER.rid)
     );
-
     const filteredRECp = REC_COOP.filter(r =>
       inRange(r.data) &&
       (FILTER.cid==null || r.cooperado_id===FILTER.cid)
     );
-
     const filteredDESp = DESP_COOP.filter(d =>
       inRange(d.data) &&
       (FILTER.cid==null || d.cooperado_id===FILTER.cid)
     );
-
     const filteredRECc = REC_COOP_CORP.filter(r => inRange(r.data));
     const filteredDESc = DESP_COOP_CORP.filter(d => inRange(d.data));
 
@@ -1022,7 +1010,7 @@
     const kpiResultadoCoop = kpiRecCoopCorp - kpiDespCoopCorp;
     const kpiTotalReceitasGeral = kpiRecCoopCorp + kpiRecCooperadosFull;
 
-    // Aplica nos cards
+    // aplica
     document.getElementById('kpiTotalProds').textContent        = fmtBR(kpiProd);
     document.getElementById('kpiINSS').textContent              = fmtBR(kpiINSS);
     document.getElementById('kpiRecCoopCorp').textContent       = fmtBR(kpiRecCoopCorp);
@@ -1038,48 +1026,38 @@
       resEl.classList.add(kpiResultadoCoop < 0 ? 'text-danger' : 'text-success');
     }
 
-    // ---- Tabela Resumo por Cooperado ----
+    // ---- Tabela Resumo por Cooperado (cores nos valores e totais) ----
     (function buildResumoCoop(){
       const map = new Map(); // id -> item agregado
       const ensure = (id, nome) => {
         if(!map.has(id)) map.set(id, {id, nome, prod:0, inss:0, rec:0, des:0, ad:0});
         return map.get(id);
       };
-
       filteredPROD.forEach(p=>{
         if(p.cooperado_id==null) return;
         const row = ensure(p.cooperado_id, p.cooperado_nome);
         row.prod += p.valor;
         row.inss += p.valor*0.045;
       });
-
       filteredRECp.forEach(r=>{
         if(r.cooperado_id==null) return;
         const row = ensure(r.cooperado_id, r.cooperado_nome);
         row.rec += r.valor;
       });
-
       filteredDESp.forEach(d=>{
         if(d.cooperado_id==null) return;
         const row = ensure(d.cooperado_id, d.cooperado_nome || '—');
-        if(d.adiantamento) row.ad += d.valor;
-        else row.des += d.valor;
+        if(d.adiantamento) row.ad += d.valor; else row.des += d.valor;
       });
 
-      const rows = Array.from(map.values())
-        .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
-
+      const rows = Array.from(map.values()).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
       const tbody = document.querySelector('#tblResumoCoop tbody');
-      tbody.innerHTML = rows.length
-        ? ''
-        : '<tr><td colspan="7" class="text-center text-muted">Sem dados no filtro.</td></tr>';
+      tbody.innerHTML = rows.length? '' : '<tr><td colspan="7" class="text-center text-muted">Sem dados no filtro.</td></tr>';
 
       let tProd=0,tINSS=0,tRec=0,tDes=0,tAd=0,tLiq=0;
-
       rows.forEach(r=>{
         const liq = r.prod + r.rec - r.inss - r.des - r.ad;
         tProd+=r.prod; tINSS+=r.inss; tRec+=r.rec; tDes+=r.des; tAd+=r.ad; tLiq+=liq;
-
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td class="text-break">${r.nome||'—'}</td>
@@ -1092,7 +1070,7 @@
         tbody.appendChild(tr);
       });
 
-      // Totais
+      // Totais com cores
       document.getElementById('tProd').textContent = fmtBR(tProd);
       document.getElementById('tINSS').textContent = fmtBR(tINSS);
 
@@ -1107,8 +1085,7 @@
 
       tLiqEl.textContent = fmtBR(tLiq);
       tLiqEl.classList.remove('text-danger','text-success');
-      if (tLiq < 0) tLiqEl.classList.add('text-danger');
-      else tLiqEl.classList.add('text-success');
+      if (tLiq < 0) tLiqEl.classList.add('text-danger'); // negativo em vermelho
     })();
 
     // ---- Gráficos (Chart.js via CDN) ----
@@ -1121,34 +1098,21 @@
     });
 
     ensureChart().then(()=>{
-
       // Cooperativa: Receitas vs Despesas por mês
       (function(){
         const byM = {};
-        filteredRECc.forEach(r=>{
-          const k=byMonthKey(r.data)||'—';
-          (byM[k]??=( {r:0,d:0} )).r+=r.valor;
-        });
-        filteredDESc.forEach(d=>{
-          const k=byMonthKey(d.data)||'—';
-          (byM[k]??=( {r:0,d:0} )).d+=d.valor;
-        });
-
+        filteredRECc.forEach(r=>{ const k=byMonthKey(r.data)||'—'; (byM[k]??=( {r:0,d:0} )).r+=r.valor; });
+        filteredDESc.forEach(d=>{ const k=byMonthKey(d.data)||'—'; (byM[k]??=( {r:0,d:0} )).d+=d.valor; });
         const labels = Object.keys(byM).sort();
         const rec = labels.map(k=>byM[k].r);
         const des = labels.map(k=>byM[k].d);
-
         new Chart(document.getElementById('chartCoop'), {
           type:'bar',
           data:{ labels, datasets:[
             {label:'Receitas', data:rec},
             {label:'Despesas', data:des}
           ]},
-          options:{
-            responsive:true,
-            plugins:{ legend:{ position:'top' } },
-            scales:{ y:{ beginAtZero:true } }
-          }
+          options:{responsive:true, plugins:{legend:{position:'top'}}, scales:{y:{beginAtZero:true}}}
         });
       })();
 
@@ -1160,22 +1124,16 @@
           (byM[k]??=( {prod:0,inss:0} )).prod+=p.valor;
           byM[k].inss += p.valor*0.045;
         });
-
         const labels = Object.keys(byM).sort();
         const prod = labels.map(k=>byM[k].prod);
         const inss = labels.map(k=>byM[k].inss);
-
         new Chart(document.getElementById('chartCooperados'), {
           type:'line',
           data:{ labels, datasets:[
             {label:'Produções (bruto)', data:prod, tension:.2},
             {label:'INSS (4,5%)', data:inss, tension:.2}
           ]},
-          options:{
-            responsive:true,
-            plugins:{ legend:{ position:'top' } },
-            scales:{ y:{ beginAtZero:true } }
-          }
+          options:{responsive:true, plugins:{legend:{position:'top'}}, scales:{y:{beginAtZero:true}}}
         });
       })();
 
@@ -1186,51 +1144,32 @@
           if(p.restaurante_id==null) return;
           byR[p.restaurante_nome] = (byR[p.restaurante_nome]||0) + p.valor;
         });
-
         const entries = Object.entries(byR).sort((a,b)=>b[1]-a[1]).slice(0,20);
-        const labels  = entries.map(e=>e[0]);
-        const vals    = entries.map(e=>e[1]);
-
+        const labels = entries.map(e=>e[0]);
+        const vals   = entries.map(e=>e[1]);
         new Chart(document.getElementById('chartEstabs'), {
           type:'bar',
-          data:{ labels, datasets:[
-            {label:'Produções por Estabelecimento', data:vals}
-          ]},
-          options:{
-            responsive:true,
-            indexAxis:'y',
-            scales:{ x:{ beginAtZero:true } },
-            plugins:{ legend:{ display:false } }
-          }
+          data:{ labels, datasets:[{label:'Produções por Estabelecimento', data:vals}] },
+          options:{responsive:true, indexAxis:'y', scales:{x:{beginAtZero:true}}, plugins:{legend:{display:false}}}
         });
       })();
 
       // Avaliações — média por mês (se houver)
       (function(){
         if(!Array.isArray(AVALS) || AVALS.length===0) return;
-
         const byM = {};
         AVALS.filter(a=>inRange(a.data)).forEach(a=>{
           const k = byMonthKey(a.data)||'—';
           (byM[k]??=( {s:0,c:0} )).s += (a.geral||0);
           byM[k].c += 1;
         });
-
         const labels = Object.keys(byM).sort();
         if(labels.length===0) return;
-
         const medias = labels.map(k=> (byM[k].c? byM[k].s/byM[k].c : 0) );
-
         new Chart(document.getElementById('chartAvaliacao'), {
           type:'line',
-          data:{ labels, datasets:[
-            {label:'Média ★', data:medias, tension:.2}
-          ]},
-          options:{
-            responsive:true,
-            scales:{ y:{ beginAtZero:true, max:5 } },
-            plugins:{ legend:{ display:false } }
-          }
+          data:{ labels, datasets:[{label:'Média ★', data:medias, tension:.2}] },
+          options:{responsive:true, scales:{y:{beginAtZero:true, max:5}}, plugins:{legend:{display:false}}}
         });
       })();
     });
@@ -1248,7 +1187,6 @@
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       XLSX.utils.book_append_sheet(wb, ws, title);
     }
-
     function safeSheetName(s){
       const cleaned = String(s||'').replace(/[:\\/?*\[\]]/g,' ').slice(0,31).trim();
       return cleaned || 'Planilha';
@@ -1280,14 +1218,7 @@
       // Produções (geral)
       const prodAOA = [['Data','Cooperado','Estabelecimento','Descrição','Valor','INSS(4,5%)']];
       filteredPROD.forEach(p=>{
-        prodAOA.push([
-          p.data,
-          p.cooperado_nome||'',
-          p.restaurante_nome||'',
-          'Produção',
-          p.valor,
-          p.valor*0.045
-        ]);
+        prodAOA.push([p.data, p.cooperado_nome||'', p.restaurante_nome||'', 'Produção', p.valor, p.valor*0.045]);
       });
       aoaToSheet('Producoes', prodAOA, wb);
 
@@ -1303,13 +1234,10 @@
       // Estabelecimentos (soma no período)
       const byR = {};
       filteredPROD.forEach(p=>{
-        if(p.restaurante_nome)
-          byR[p.restaurante_nome]=(byR[p.restaurante_nome]||0)+p.valor;
+        if(p.restaurante_nome) byR[p.restaurante_nome]=(byR[p.restaurante_nome]||0)+p.valor;
       });
       const estAOA = [['Estabelecimento','Total Produções (R$)']];
-      Object.entries(byR)
-        .sort((a,b)=>b[1]-a[1])
-        .forEach(([nome,v])=>estAOA.push([nome,v]));
+      Object.entries(byR).sort((a,b)=>b[1]-a[1]).forEach(([nome,v])=>estAOA.push([nome,v]));
       aoaToSheet('Estabelecimentos', estAOA, wb);
 
       // Uma aba por Cooperado — Receitas
@@ -1332,20 +1260,14 @@
       });
       Object.keys(byC_des).forEach(nome=>{
         const aoa = [['Data','Descrição','Valor','Adiantamento']];
-        byC_des[nome].forEach(d=>aoa.push([
-          d.data,
-          d.descricao||'',
-          d.valor,
-          d.adiantamento? 'SIM':'NÃO'
-        ]));
+        byC_des[nome].forEach(d=>aoa.push([d.data, d.descricao||'', d.valor, d.adiantamento? 'SIM':'NÃO']));
         aoaToSheet(safeSheetName('Despesa - '+nome), aoa, wb);
       });
 
       // Avaliações (opcional)
       if (Array.isArray(AVALS) && AVALS.length){
         const avAOA = [['Data','Geral']];
-        AVALS.filter(a=>inRange(a.data))
-             .forEach(a=>avAOA.push([a.data, a.geral]));
+        AVALS.filter(a=>inRange(a.data)).forEach(a=>avAOA.push([a.data, a.geral]));
         aoaToSheet('Avaliacoes', avAOA, wb);
       }
 
@@ -1354,10 +1276,10 @@
       XLSX.writeFile(wb, `Dashboard_Coopex_${ymd}.xlsx`);
     }
 
-    document.getElementById('btnExportXLSX')
-      ?.addEventListener('click', exportXLSX);
+    document.getElementById('btnExportXLSX')?.addEventListener('click', exportXLSX);
   })();
-</script>
+  </script>
+</section>
 
      <!-- LANÇAMENTOS (versão profissional/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='lancamentos' else '' }}" id="lancamentos" role="tabpanel">
@@ -3317,7 +3239,7 @@
     </div>
   </div>
 
-    <!-- SOLICITAÇÕES DE TROCA (pendentes) -->
+  <!-- SOLICITAÇÕES DE TROCA (pendentes) -->
 <div class="card p-3 mb-3">
   <div class="d-flex justify-content-between align-items-center">
     <div>
@@ -3654,7 +3576,6 @@
     border-color: rgba(13,110,253,0.3);
   }
 </style>
-
 
   <!-- Modal visualizar escala do cooperado -->
   <div class="modal fade" id="modalEscalas" tabindex="-1">
