@@ -2284,8 +2284,7 @@ def admin_dashboard():
             "recebedores": recs,
         })
 
-            # ======== Trocas no admin ========
-
+                # ======== Trocas no admin ========
     def _escala_desc(e: Escala | None) -> str:
         return _escala_label(e) if e else ""
 
@@ -2299,37 +2298,39 @@ def admin_dashboard():
 
     def _linha_from_escala(e: Escala, saiu: str, entrou: str) -> dict:
         return {
-            "dia": _escala_label(e).split(" • ")[0],
+            "dia": _escala_label(e).split(" • ")[0] if e else "",
             "turno_horario": " • ".join(
-                [x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]
+                x for x in [
+                    (e.turno or "").strip() if e and e.turno else "",
+                    (e.horario or "").strip() if e and e.horario else "",
+                ] if x
             ),
-            "contrato": (e.contrato or "").strip(),
+            "contrato": (e.contrato or "").strip() if e and e.contrato else "",
             "saiu": saiu,
             "entrou": entrou,
         }
 
-    trocas_all = (
-        TrocaSolicitacao.query
-        .order_by(TrocaSolicitacao.id.desc())
-        .all()
-    )
-
+    trocas_all = TrocaSolicitacao.query.order_by(TrocaSolicitacao.id.desc()).all()
     trocas_pendentes: list[dict] = []
     trocas_historico: list[dict] = []
     trocas_historico_flat: list[dict] = []
 
     for t in trocas_all:
-        solicitante = Cooperado.query.get(t.solicitante_id)
-        destinatario = Cooperado.query.get(t.destino_id)
+        solicitante = Cooperado.query.get(t.solicitante_id) if t.solicitante_id else None
+        destinatario = Cooperado.query.get(t.destino_id) if t.destino_id else None
+        origem_escala = Escala.query.get(t.origem_escala_id) if t.origem_escala_id else None
 
-        origem_escala = Escala.query.get(t.origem_escala_id)
-        destino_escala = Escala.query.get(t.destino_escala_id) if t.destino_escala_id else None
-
-        # linhas que foram realmente aplicadas (para histórico)
+        # Para trocas APROVADAS, tentar reconstruir as linhas afetadas
         linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
 
-        if t.status == "aprovada" and not linhas_afetadas and origem_escala and solicitante and destinatario:
-            # linha 1 (origem)
+        if (
+            t.status == "aprovada"
+            and not linhas_afetadas
+            and origem_escala
+            and solicitante
+            and destinatario
+        ):
+            # Linha 1: escala de origem (coop 1)
             linhas_afetadas.append(
                 _linha_from_escala(
                     origem_escala,
@@ -2338,13 +2339,15 @@ def admin_dashboard():
                 )
             )
 
-            # linha 2 (melhor escala do solicitante no mesmo bucket)
+            # Linha 2: melhor candidata do solicitante no mesmo dia/bucket
             wd_o = _weekday_from_data_str(origem_escala.data)
             buck_o = _turno_bucket(origem_escala.turno, origem_escala.horario)
+
             candidatas = Escala.query.filter_by(cooperado_id=solicitante.id).all()
             best = None
             for e in candidatas:
                 if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
+                    # Preferir mesma descrição de contrato
                     if (origem_escala.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
                         best = e
                         break
@@ -2352,6 +2355,7 @@ def admin_dashboard():
                         best = e
 
             if best:
+                # Essa segunda linha costuma ser a escala do cooperado 2
                 linhas_afetadas.append(
                     _linha_from_escala(
                         best,
@@ -2360,45 +2364,32 @@ def admin_dashboard():
                     )
                 )
 
-        item: dict[str, Any] = {
+        # Monta o item base (mesma estrutura para pendentes e histórico)
+        item: dict = {
             "id": t.id,
             "status": t.status,
-            "mensagem": t.mensagem or "",
+            "mensagem": t.mensagem,
             "criada_em": t.criada_em,
             "aplicada_em": t.aplicada_em,
-
-            # --- Cooperados ---
-            "solicitante": solicitante,
-            "destinatario": destinatario,
-            "solicitante_nome": solicitante.nome if solicitante else "",
-            "solicitante_id": solicitante.id if solicitante else None,
-            "destinatario_nome": destinatario.nome if destinatario else "",
-            "destinatario_id": destinatario.id if destinatario else None,
-
-            # --- Escalas ---
-            "origem": origem_escala,          # Escala 1
-            "destino": destino_escala,        # Escala 2
+            "solicitante": solicitante,      # Cooperado 1 (quem pediu)
+            "destinatario": destinatario,    # Cooperado 2 (para quem vai)
+            "origem": origem_escala,         # Escala 1 (sempre a de origem)
+            "destino": None,                 # Escala 2 vem dos campos destino_* na TrocaSolicitacao
             "origem_desc": _escala_desc(origem_escala),
-            "destino_desc": _escala_desc(destino_escala),
             "origem_weekday": _weekday_from_data_str(origem_escala.data) if origem_escala else None,
             "origem_turno_bucket": _turno_bucket(
                 origem_escala.turno if origem_escala else None,
                 origem_escala.horario if origem_escala else None,
             ),
-            "destino_weekday": _weekday_from_data_str(destino_escala.data) if destino_escala else None,
-            "destino_turno_bucket": _turno_bucket(
-                destino_escala.turno if destino_escala else None,
-                destino_escala.horario if destino_escala else None,
-            ),
-
             "linhas_afetadas": linhas_afetadas,
         }
 
+        # Também alimenta o histórico "flat", usado numa visão mais compacta se quiser
         if t.status == "aprovada" and linhas_afetadas:
             itens = []
             for r in linhas_afetadas:
                 turno_txt, horario_txt = _split_turno_horario(r.get("turno_horario", ""))
-                base_row = {
+                row = {
                     "data": r.get("dia", ""),
                     "turno": turno_txt,
                     "horario": horario_txt,
@@ -2406,10 +2397,10 @@ def admin_dashboard():
                     "saiu_nome": r.get("saiu", ""),
                     "entrou_nome": r.get("entrou", ""),
                 }
-                itens.append(base_row)
+                itens.append(row)
                 trocas_historico_flat.append(
                     {
-                        **base_row,
+                        **row,
                         "aplicada_em": t.aplicada_em,
                     }
                 )
