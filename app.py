@@ -1974,7 +1974,7 @@ def toggle_status_cooperado(id):
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_dashboard():
-    from collections import namedtuple
+    from collections import defaultdict
     import re
     args = request.args
 
@@ -2139,66 +2139,6 @@ def admin_dashboard():
 
     admin_user = Usuario.query.filter_by(tipo="admin").first()
 
-    # ---- Folha (últimos 30 dias padrão)
-    folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
-    folha_fim = _parse_date(args.get("folha_fim")) or date.today()
-    FolhaItem = namedtuple("FolhaItem", "cooperado lancamentos receitas despesas bruto inss outras_desp liquido")
-
-    folha_por_coop = []
-    for c in cooperados:
-        l = (
-            Lancamento.query.filter(
-                Lancamento.cooperado_id == c.id,
-                Lancamento.data >= folha_inicio,
-                Lancamento.data <= folha_fim,
-            )
-            .order_by(Lancamento.data.asc(), Lancamento.id.asc())
-            .all()
-        )
-        r = (
-            ReceitaCooperado.query.filter(
-                ReceitaCooperado.cooperado_id == c.id,
-                ReceitaCooperado.data >= folha_inicio,
-                ReceitaCooperado.data <= folha_fim,
-            )
-            .order_by(ReceitaCooperado.data.asc(), ReceitaCooperado.id.asc())
-            .all()
-        )
-        d = (
-            DespesaCooperado.query.filter(
-                (DespesaCooperado.cooperado_id == c.id) | (DespesaCooperado.cooperado_id.is_(None)),
-                DespesaCooperado.data >= folha_inicio,
-                DespesaCooperado.data <= folha_fim,
-            )
-            .order_by(DespesaCooperado.data.asc(), DespesaCooperado.id.asc())
-            .all()
-        )
-
-        bruto_lanc = sum(x.valor or 0 for x in l)
-        inss = round(bruto_lanc * 0.045, 2)
-        outras_desp = sum(x.valor or 0 for x in d)
-        bruto_total = bruto_lanc + sum(x.valor or 0 for x in r)
-        liquido = bruto_total - inss - outras_desp
-
-        # anotações usadas no template
-        for x in l:
-            x.conta_inss = True
-            x.isento_benef = False
-            x.inss = round((x.valor or 0) * 0.045, 2)
-
-        folha_por_coop.append(
-            FolhaItem(
-                cooperado=c,
-                lancamentos=l,
-                receitas=r,
-                despesas=d,
-                bruto=bruto_total,
-                inss=inss,
-                outras_desp=outras_desp,
-                liquido=liquido,
-            )
-        )
-
     # ----------------------------
     # Benefícios para template (com filtros + id)
     # ----------------------------
@@ -2273,6 +2213,34 @@ def admin_dashboard():
             "valor_total": b.valor_total or 0.0,
             "recebedores": recs,
         })
+
+    return render_template(
+        "admin.html",  # ajuste aqui se o seu template tiver outro nome
+        active_tab=active_tab,
+        cfg=cfg,
+        cooperados=cooperados,
+        restaurantes=restaurantes,
+        lancamentos=lancamentos,
+        total_producoes=total_producoes,
+        total_inss=total_inss,
+        receitas=receitas,
+        despesas=despesas,
+        total_receitas=total_receitas,
+        total_despesas=total_despesas,
+        receitas_coop=receitas_coop,
+        despesas_coop=despesas_coop,
+        total_receitas_coop=total_receitas_coop,
+        total_despesas_coop=total_despesas_coop,
+        chart_data_lancamentos_coop=chart_data_lancamentos_coop,
+        chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
+        admin_user=admin_user,
+        status_doc_por_coop=status_doc_por_coop,
+        esc_by_int=esc_by_int,
+        esc_by_str=esc_by_str,
+        qtd_escalas_map=qtd_escalas_map,
+        qtd_sem_cadastro=qtd_sem_cadastro,
+        beneficios_view=beneficios_view,
+    )
 
     # ======== Trocas no admin ========
     def _escala_desc(e: Escala | None) -> str:
