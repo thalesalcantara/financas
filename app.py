@@ -1974,8 +1974,10 @@ def toggle_status_cooperado(id):
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_dashboard():
+    from collections import namedtuple, defaultdict
+    from datetime import date, timedelta
     import re
-    from collections import defaultdict
+
     args = request.args
 
     # --- Controle de abas
@@ -2040,7 +2042,6 @@ def admin_dashboard():
     # ------------------------------------------------------------------
     rq = ReceitaCooperativa.query
     dq = DespesaCooperativa.query
-
     if data_inicio:
         rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
         dq = dq.filter(DespesaCooperativa.data >= data_inicio)
@@ -2120,7 +2121,6 @@ def admin_dashboard():
     escalas_all = Escala.query.order_by(Escala.id.asc()).all()
     esc_by_int: dict[int, list] = defaultdict(list)
     esc_by_str: dict[str, list] = defaultdict(list)
-
     for e in escalas_all:
         k_int = e.cooperado_id if e.cooperado_id is not None else 0  # 0 = sem cadastro
         esc_item = {
@@ -2170,11 +2170,66 @@ def admin_dashboard():
     admin_user = Usuario.query.filter_by(tipo="admin").first()
 
     # ------------------------------------------------------------------
-    # 7) Folha de pagamento — DESATIVADA (apenas placeholders leves)
+    # 7) Folha (últimos 30 dias padrão) – COMPLETA, sem remover nada
     # ------------------------------------------------------------------
     folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
     folha_fim = _parse_date(args.get("folha_fim")) or date.today()
-    folha_por_coop = []  # nada calculado, aba "folha" fica vazia/leve
+    FolhaItem = namedtuple("FolhaItem", "cooperado lancamentos receitas despesas bruto inss outras_desp liquido")
+
+    folha_por_coop = []
+    for c in cooperados:
+        l = (
+            Lancamento.query.filter(
+                Lancamento.cooperado_id == c.id,
+                Lancamento.data >= folha_inicio,
+                Lancamento.data <= folha_fim,
+            )
+            .order_by(Lancamento.data.asc(), Lancamento.id.asc())
+            .all()
+        )
+        r = (
+            ReceitaCooperado.query.filter(
+                ReceitaCooperado.cooperado_id == c.id,
+                ReceitaCooperado.data >= folha_inicio,
+                ReceitaCooperado.data <= folha_fim,
+            )
+            .order_by(ReceitaCooperado.data.asc(), ReceitaCooperado.id.asc())
+            .all()
+        )
+        d = (
+            DespesaCooperado.query.filter(
+                (DespesaCooperado.cooperado_id == c.id) | (DespesaCooperado.cooperado_id.is_(None)),
+                DespesaCooperado.data >= folha_inicio,
+                DespesaCooperado.data <= folha_fim,
+            )
+            .order_by(DespesaCooperado.data.asc(), DespesaCooperado.id.asc())
+            .all()
+        )
+
+        bruto_lanc = sum(x.valor or 0 for x in l)
+        inss = round(bruto_lanc * 0.045, 2)
+        outras_desp = sum(x.valor or 0 for x in d)
+        bruto_total = bruto_lanc + sum(x.valor or 0 for x in r)
+        liquido = bruto_total - inss - outras_desp
+
+        # anotações usadas no template
+        for x in l:
+            x.conta_inss = True
+            x.isento_benef = False
+            x.inss = round((x.valor or 0) * 0.045, 2)
+
+        folha_por_coop.append(
+            FolhaItem(
+                cooperado=c,
+                lancamentos=l,
+                receitas=r,
+                despesas=d,
+                bruto=bruto_total,
+                inss=inss,
+                outras_desp=outras_desp,
+                liquido=liquido,
+            )
+        )
 
     # ------------------------------------------------------------------
     # 8) Benefícios (com filtros + id)
@@ -2196,15 +2251,12 @@ def admin_dashboard():
         except Exception:
             return None
 
-    # filtros vindos da querystring da própria aba (já existem no seu HTML)
     b_ini = _d(request.args.get("b_ini"))
     b_fim = _d(request.args.get("b_fim"))
     coop_filter = request.args.get("coop_benef_id", type=int)
 
     q_ben = BeneficioRegistro.query
 
-    # sobreposição de intervalo:
-    # inclui o benefício se [data_inicial, data_final] INTERSECTA o filtro
     if b_ini and b_fim:
         q_ben = q_ben.filter(
             BeneficioRegistro.data_inicial <= b_fim,
@@ -2231,18 +2283,16 @@ def admin_dashboard():
                 except Exception:
                     rid = None
 
-            # se o filtro por cooperado estiver ativo, só mantém o recebedor alvo
             if coop_filter and (rid is not None) and (rid != coop_filter):
                 continue
 
             recs.append({"id": rid, "nome": nome})
 
-        # se o filtro por cooperado estiver ativo e nenhum recebedor bateu, pula o registro
         if coop_filter and not recs:
             continue
 
         beneficios_view.append({
-            "id": b.id,  # necessário para editar/excluir
+            "id": b.id,
             "data_inicial": b.data_inicial,
             "data_final": b.data_final,
             "data_lancamento": b.data_lancamento,
@@ -2255,7 +2305,7 @@ def admin_dashboard():
     # 9) Render
     # ------------------------------------------------------------------
     return render_template(
-        "dashboard_admin.html",  # troque para o nome real do seu template
+        "admin.html",   # <<< AQUI: tem que ser exatamente o nome do HTML na pasta templates
         active_tab=active_tab,
         cfg=cfg,
         cooperados=cooperados,
@@ -2286,7 +2336,6 @@ def admin_dashboard():
 
         admin_user=admin_user,
 
-        # filtros gerais
         data_inicio=data_inicio,
         data_fim=data_fim,
         restaurante_id=restaurante_id,
@@ -2294,12 +2343,10 @@ def admin_dashboard():
         considerar_periodo=considerar_periodo,
         dows=dows,
 
-        # folha (placeholder leve)
         folha_inicio=folha_inicio,
         folha_fim=folha_fim,
         folha_por_coop=folha_por_coop,
 
-        # benefícios
         beneficios_view=beneficios_view,
         b_ini=b_ini,
         b_fim=b_fim,
