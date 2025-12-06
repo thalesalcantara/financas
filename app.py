@@ -2139,15 +2139,17 @@ def admin_dashboard():
 
     admin_user = Usuario.query.filter_by(tipo="admin").first()
 
-        # ---- Folha (últimos 30 dias padrão) - SÓ CALCULA SE ABRIR A ABA DA FOLHA
-    folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
-    folha_fim = _parse_date(args.get("folha_fim")) or date.today()
-
+        # =====================================================================
+    # 7) Folha de pagamento  -> SÓ CALCULA SE A ABA "folha" ESTIVER ABERTA
+    # =====================================================================
     folha_por_coop = []
+    folha_inicio = None
+    folha_fim = None
 
-    # Se você NÃO usar mais a aba de folha, essa condição nunca será verdadeira
-    # e então nada aqui embaixo será executado (deixa o /admin bem mais leve).
-    if "folha" in (active_tab or ""):
+    if active_tab == "folha":
+        folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
+        folha_fim = _parse_date(args.get("folha_fim")) or date.today()
+
         FolhaItem = namedtuple(
             "FolhaItem",
             "cooperado lancamentos receitas despesas bruto inss outras_desp liquido"
