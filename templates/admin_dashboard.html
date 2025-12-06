@@ -3275,17 +3275,16 @@
             {% set solicitante  = t.solicitante  if t.solicitante  else None %}
             {% set destinatario = t.destinatario if t.destinatario else None %}
             {% set origem       = t.origem       if t.origem       else None %}
-            {% set destino      = t.destino      if t.destino      else None %}
 
             {# Cooperado 1 (solicitante) #}
             {% set solicitante_nome = (solicitante.nome if solicitante else t.solicitante_nome)|default('—', true) %}
             {% set solicitante_id   = (solicitante.id   if solicitante else t.solicitante_id)|default('—', true) %}
 
-            {# Cooperado 2 (destinatário) – CORRIGIDO #}
+            {# Cooperado 2 (destinatário) #}
             {% set coop2_nome = (destinatario.nome if destinatario else t.destinatario_nome)|default('—', true) %}
             {% set coop2_id   = (destinatario.id   if destinatario else t.destinatario_id)|default('—', true) %}
 
-            {# Escala de origem #}
+            {# Escala de origem (cooperado 1) #}
             {% if origem and origem.data is defined %}
               {% set origem_data = origem.data %}
             {% elif t.origem_data is defined %}
@@ -3318,35 +3317,35 @@
               {% set origem_contrato = '—' %}
             {% endif %}
 
-            {# Escala de destino #}
-            {% if destino and destino.data is defined %}
-              {% set destino_data = destino.data %}
-            {% elif t.destino_data is defined %}
+            {# Escala de destino (cooperado 2) – usa primeiro os campos calculados no Python #}
+            {% if t.destino_data is defined and t.destino_data %}
               {% set destino_data = t.destino_data %}
+            {% elif t.destino and t.destino.data is defined %}
+              {% set destino_data = t.destino.data %}
             {% else %}
               {% set destino_data = '—' %}
             {% endif %}
 
-            {% if destino and destino.turno is defined %}
-              {% set destino_turno = destino.turno %}
-            {% elif t.destino_turno is defined %}
+            {% if t.destino_turno is defined and t.destino_turno %}
               {% set destino_turno = t.destino_turno %}
+            {% elif t.destino and t.destino.turno is defined %}
+              {% set destino_turno = t.destino.turno %}
             {% else %}
               {% set destino_turno = '—' %}
             {% endif %}
 
-            {% if destino and destino.horario is defined %}
-              {% set destino_horario = destino.horario %}
-            {% elif t.destino_horario is defined %}
+            {% if t.destino_horario is defined and t.destino_horario %}
               {% set destino_horario = t.destino_horario %}
+            {% elif t.destino and t.destino.horario is defined %}
+              {% set destino_horario = t.destino.horario %}
             {% else %}
               {% set destino_horario = '—' %}
             {% endif %}
 
-            {% if destino and destino.contrato is defined %}
-              {% set destino_contrato = destino.contrato %}
-            {% elif t.destino_contrato is defined %}
+            {% if t.destino_contrato is defined and t.destino_contrato %}
               {% set destino_contrato = t.destino_contrato %}
+            {% elif t.destino and t.destino.contrato is defined %}
+              {% set destino_contrato = t.destino.contrato %}
             {% else %}
               {% set destino_contrato = '—' %}
             {% endif %}
@@ -3487,7 +3486,6 @@
             {% set solicitante  = t.solicitante  if t.solicitante  else None %}
             {% set destinatario = t.destinatario if t.destinatario else None %}
             {% set origem       = t.origem       if t.origem       else None %}
-            {% set destino      = t.destino      if t.destino      else None %}
 
             {% set solicitante_nome = (solicitante.nome if solicitante else t.solicitante_nome)|default('—', true) %}
             {% set solicitante_id   = (solicitante.id   if solicitante else t.solicitante_id)|default('—', true) %}
@@ -3527,33 +3525,25 @@
               {% set origem_contrato = '—' %}
             {% endif %}
 
-            {% if destino and destino.data is defined %}
-              {% set destino_data = destino.data %}
-            {% elif t.destino_data is defined %}
+            {% if t.destino_data is defined and t.destino_data %}
               {% set destino_data = t.destino_data %}
             {% else %}
               {% set destino_data = '—' %}
             {% endif %}
 
-            {% if destino and destino.turno is defined %}
-              {% set destino_turno = destino.turno %}
-            {% elif t.destino_turno is defined %}
+            {% if t.destino_turno is defined and t.destino_turno %}
               {% set destino_turno = t.destino_turno %}
             {% else %}
               {% set destino_turno = '—' %}
             {% endif %}
 
-            {% if destino and destino.horario is defined %}
-              {% set destino_horario = destino.horario %}
-            {% elif t.destino_horario is defined %}
+            {% if t.destino_horario is defined and t.destino_horario %}
               {% set destino_horario = t.destino_horario %}
             {% else %}
               {% set destino_horario = '—' %}
             {% endif %}
 
-            {% if destino and destino.contrato is defined %}
-              {% set destino_contrato = destino.contrato %}
-            {% elif t.destino_contrato is defined %}
+            {% if t.destino_contrato is defined and t.destino_contrato %}
               {% set destino_contrato = t.destino_contrato %}
             {% else %}
               {% set destino_contrato = '—' %}
