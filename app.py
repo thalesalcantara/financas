@@ -2284,8 +2284,7 @@ def admin_dashboard():
             "recebedores": recs,
         })
 
-        # ======== Trocas no admin ========
-
+    # ======== Trocas no admin ========
     def _escala_desc(e: Escala | None) -> str:
         return _escala_label(e)
 
@@ -2300,38 +2299,11 @@ def admin_dashboard():
     def _linha_from_escala(e: Escala, saiu: str, entrou: str) -> dict:
         return {
             "dia": _escala_label(e).split(" • ")[0],
-            "turno_horario": " • ".join(
-                [x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]
-            ),
+            "turno_horario": " • ".join([x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]),
             "contrato": (e.contrato or "").strip(),
             "saiu": saiu,
             "entrou": entrou,
         }
-
-    def _melhor_escala_para_troca(cooperado_id: int, ref: Escala | None) -> Escala | None:
-        """
-        Acha a melhor escala do cooperado no mesmo dia/bucket da escala de referência,
-        priorizando o mesmo contrato.
-        """
-        if not ref:
-            return None
-
-        wd_ref = _weekday_from_data_str(ref.data)
-        buck_ref = _turno_bucket(ref.turno, ref.horario)
-
-        candidatas = Escala.query.filter_by(cooperado_id=cooperado_id).all()
-        best = None
-
-        for e in candidatas:
-            if _weekday_from_data_str(e.data) == wd_ref and _turno_bucket(e.turno, e.horario) == buck_ref:
-                # se contrato bater, usamos essa direto
-                if (ref.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
-                    return e
-                # senão, guardamos como melhor até achar algo melhor
-                if best is None:
-                    best = e
-
-        return best
 
     trocas_all = TrocaSolicitacao.query.order_by(TrocaSolicitacao.id.desc()).all()
     trocas_pendentes, trocas_historico = [], []
@@ -2342,27 +2314,25 @@ def admin_dashboard():
         destinatario = Cooperado.query.get(t.destino_id)
         orig = Escala.query.get(t.origem_escala_id)
 
-        # escala do cooperado 2 (lado direito do card)
-        destino_escala = (
-            _melhor_escala_para_troca(destinatario.id, orig)
-            if destinatario and orig
-            else None
-        )
-
         linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
 
         if t.status == "aprovada" and not linhas_afetadas and orig and solicitante and destinatario:
             # linha 1 (origem)
-            linhas_afetadas.append(
-                _linha_from_escala(orig, saiu=solicitante.nome, entrou=destinatario.nome)
-            )
-
+            linhas_afetadas.append(_linha_from_escala(orig, saiu=solicitante.nome, entrou=destinatario.nome))
             # linha 2 (melhor candidata do solicitante no mesmo bucket)
-            best_solic = _melhor_escala_para_troca(solicitante.id, orig)
-            if best_solic:
-                linhas_afetadas.append(
-                    _linha_from_escala(best_solic, saiu=destinatario.nome, entrou=solicitante.nome)
-                )
+            wd_o = _weekday_from_data_str(orig.data)
+            buck_o = _turno_bucket(orig.turno, orig.horario)
+            candidatas = Escala.query.filter_by(cooperado_id=solicitante.id).all()
+            best = None
+            for e in candidatas:
+                if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
+                    if (orig.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
+                        best = e
+                        break
+                    if best is None:
+                        best = e
+            if best:
+                linhas_afetadas.append(_linha_from_escala(best, saiu=destinatario.nome, entrou=solicitante.nome))
 
         item = {
             "id": t.id,
@@ -2373,14 +2343,10 @@ def admin_dashboard():
             "solicitante": solicitante,
             "destinatario": destinatario,
             "origem": orig,
-            "destino": destino_escala,  # agora é Escala, não Cooperado
+            "destino": destinatario,
             "origem_desc": _escala_desc(orig),
-            "destino_desc": _escala_desc(destino_escala) if destino_escala else "",
             "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
-            "origem_turno_bucket": _turno_bucket(
-                orig.turno if orig else None,
-                orig.horario if orig else None,
-            ),
+            "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
             "linhas_afetadas": linhas_afetadas,
         }
 
@@ -2412,6 +2378,48 @@ def admin_dashboard():
             item["itens"] = itens
 
         (trocas_pendentes if t.status == "pendente" else trocas_historico).append(item)
+
+    current_date = date.today()
+    data_limite = date(current_date.year, 12, 31)
+
+    # ---- Render
+    return render_template(
+        "admin_dashboard.html",
+        tab=active_tab,  # <- mantém a aba ativa na UI
+        total_producoes=total_producoes,
+        total_inss=total_inss,
+        total_receitas=total_receitas,
+        total_despesas=total_despesas,
+        total_receitas_coop=total_receitas_coop,
+        total_despesas_coop=total_despesas_coop,
+        salario_minimo=cfg.salario_minimo or 0.0,
+        lancamentos=lancamentos,
+        receitas=receitas,
+        despesas=despesas,
+        receitas_coop=receitas_coop,
+        despesas_coop=despesas_coop,
+        cooperados=cooperados,
+        restaurantes=restaurantes,
+        beneficios_view=beneficios_view,
+        historico_beneficios=historico_beneficios,
+        current_date=current_date,
+        data_limite=data_limite,
+        admin=admin_user,
+        docinfo_map=docinfo_map,
+        escalas_por_coop=esc_by_int,
+        escalas_por_coop_json=esc_by_str,
+        qtd_escalas_map=qtd_escalas_map,
+        qtd_escalas_sem_cadastro=qtd_sem_cadastro,
+        status_doc_por_coop=status_doc_por_coop,
+        chart_data_lancamentos_coop=chart_data_lancamentos_coop,
+        chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
+        folha_inicio=folha_inicio,
+        folha_fim=folha_fim,
+        folha_por_coop=folha_por_coop,
+        trocas_pendentes=trocas_pendentes,
+        trocas_historico=trocas_historico,
+        trocas_historico_flat=trocas_historico_flat,
+    )
 
 # =========================
 # Navegação/Export util
