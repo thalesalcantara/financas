@@ -1976,7 +1976,6 @@ def toggle_status_cooperado(id):
 def admin_dashboard():
     from collections import namedtuple
     import re
-
     args = request.args
 
     # --- Controle de abas
@@ -2001,15 +2000,86 @@ def admin_dashboard():
     considerar_periodo = bool(args.get("considerar_periodo"))
     dows = set(args.getlist("dow"))  # {"1","2",...}
 
-    # =========================================================================
-    # 1) DADOS BÁSICOS COMPARTILHADOS (BARATOS)
-    # =========================================================================
+    # ---- Lançamentos (com filtros + DOW)
+    q = Lancamento.query
+    if restaurante_id:
+        q = q.filter(Lancamento.restaurante_id == restaurante_id)
+    if cooperado_id:
+        q = q.filter(Lancamento.cooperado_id == cooperado_id)
+    if data_inicio:
+        q = q.filter(Lancamento.data >= data_inicio)
+    if data_fim:
+        q = q.filter(Lancamento.data <= data_fim)
+    lanc_base = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
+
+    if dows:
+        lancamentos = [l for l in lanc_base if l.data and _dow(l.data) in dows]
+    else:
+        lancamentos = lanc_base
+
+    # Se marcar "considerar_periodo", só mantemos dias do período do restaurante
+    if considerar_periodo and restaurante_id:
+        rest = Restaurante.query.get(restaurante_id)
+        if rest:
+            mapa = {
+                "seg-dom": {"1", "2", "3", "4", "5", "6", "7"},
+                "sab-sex": {"6", "7", "1", "2", "3", "4", "5"},
+                "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
+            }
+            permitidos = mapa.get(rest.periodo, {"1", "2", "3", "4", "5", "6", "7"})
+            lancamentos = [l for l in lancamentos if l.data and _dow(l.data) in permitidos]
+
+    total_producoes = sum((l.valor or 0.0) for l in lancamentos)
+    total_inss = total_producoes * 0.045
+
+    # ---- Coop (institucional)
+    rq = ReceitaCooperativa.query
+    dq = DespesaCooperativa.query
+    if data_inicio:
+        rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
+        dq = dq.filter(DespesaCooperativa.data >= data_inicio)
+    if data_fim:
+        rq = rq.filter(ReceitaCooperativa.data <= data_fim)
+        dq = dq.filter(DespesaCooperativa.data <= data_fim)
+
+    receitas = rq.order_by(ReceitaCooperativa.data.desc().nullslast(), ReceitaCooperativa.id.desc()).all()
+    despesas = dq.order_by(DespesaCooperativa.data.desc(), DespesaCooperativa.id.desc()).all()
+    total_receitas = sum((r.valor_total or 0.0) for r in receitas)
+    total_despesas = sum((d.valor or 0.0) for d in despesas)
+
+    # ---- Cooperados (pessoa física)
+    rq2 = ReceitaCooperado.query
+    dq2 = DespesaCooperado.query
+
+    # Receitas (pontuais): filtra por data simples
+    if data_inicio:
+        rq2 = rq2.filter(ReceitaCooperado.data >= data_inicio)
+    if data_fim:
+        rq2 = rq2.filter(ReceitaCooperado.data <= data_fim)
+
+    # Despesas (semanais): usa sobreposição do intervalo [data_inicio, data_fim]
+    if data_inicio and data_fim:
+        dq2 = dq2.filter(
+            DespesaCooperado.data_inicio <= data_fim,
+            DespesaCooperado.data_fim    >= data_inicio,
+        )
+    elif data_inicio:
+        dq2 = dq2.filter(DespesaCooperado.data_fim >= data_inicio)
+    elif data_fim:
+        dq2 = dq2.filter(DespesaCooperado.data_inicio <= data_fim)
+
+    receitas_coop = rq2.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
+    # você pode manter por .data (domingo) ou, se preferir, ordenar pelo fim real do período:
+    despesas_coop = dq2.order_by(DespesaCooperado.data_fim.desc().nullslast(), DespesaCooperado.id.desc()).all()
+
+    total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
+    total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop)
+
     cfg = get_config()
     cooperados = Cooperado.query.order_by(Cooperado.nome).all()
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
-    admin_user = Usuario.query.filter_by(tipo="admin").first()
 
-    # documentos OK? (usado em aba de cooperados ou similares)
+    # documentos OK?
     docinfo_map = {c.id: _build_docinfo(c) for c in cooperados}
     status_doc_por_coop = {
         c.id: {
@@ -2019,206 +2089,70 @@ def admin_dashboard():
         for c in cooperados
     }
 
-    # =========================================================================
-    # 2) INICIALIZA VARIÁVEIS PESADAS (pra não quebrar o template em outras abas)
-    # =========================================================================
-    lancamentos = []
-    total_producoes = 0.0
-    total_inss = 0.0
+    # -------- Escalas agrupadas e contagem por cooperado ----------
+    escalas_all = Escala.query.order_by(Escala.id.asc()).all()
+    esc_by_int: dict[int, list] = defaultdict(list)
+    esc_by_str: dict[str, list] = defaultdict(list)
+    for e in escalas_all:
+        k_int = e.cooperado_id if e.cooperado_id is not None else 0  # 0 = sem cadastro
+        esc_item = {
+            "data": e.data,
+            "turno": e.turno,
+            "horario": e.horario,
+            "contrato": e.contrato,
+            "cor": e.cor,
+            "nome_planilha": e.cooperado_nome,
+        }
+        esc_by_int[k_int].append(esc_item)
+        esc_by_str[str(k_int)].append(esc_item)
 
-    receitas = []
-    despesas = []
-    total_receitas = 0.0
-    total_despesas = 0.0
+    cont_rows = dict(
+        db.session.query(Escala.cooperado_id, func.count(Escala.id))
+        .group_by(Escala.cooperado_id)
+        .all()
+    )
+    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
+    qtd_sem_cadastro = int(cont_rows.get(None, 0))
 
-    receitas_coop = []
-    despesas_coop = []
-    total_receitas_coop = 0.0
-    total_despesas_coop = 0.0
+    # ---- Gráficos (por mês) — rótulo robusto "MM/YY"
+    sums = {}
+    for l in lancamentos:
+        if not l.data:
+            continue
+        key = l.data.strftime("%Y-%m")  # sempre YYYY-MM
+        sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
 
-    esc_by_int: dict[int, list] = {}
-    esc_by_str: dict[str, list] = {}
-    qtd_escalas_map: dict[int, int] = {}
-    qtd_sem_cadastro = 0
+    labels_ord = sorted(sums.keys())
 
-    chart_data_lancamentos_coop = {"labels": [], "values": []}
+    def _fmt_label(k: str) -> str:
+        # aceita "YYYY-MM" ou "YY-MM" e mostra "MM/YY"
+        parts = k.split("-")
+        if len(parts) == 2 and parts[0] and parts[1]:
+            year, month = parts[0], parts[1]
+            return f"{month}/{year[-2:]}"
+        return k
+
+    labels_fmt = [_fmt_label(k) for k in labels_ord]
+    values = [round(sums[k], 2) for k in labels_ord]
+    chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
     chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
 
-    # =========================================================================
-    # 3) Lançamentos + Receitas/Despesas COOP + Cooperados + Gráficos
-    #    -> Só carrega em abas "financeiras"
-    # =========================================================================
-    abas_financeiras = {"lancamentos", "resumo", "financeiro", "home"}
+    admin_user = Usuario.query.filter_by(tipo="admin").first()
 
-    if active_tab in abas_financeiras:
-        # ---- Lançamentos (com filtros + DOW)
-        q = Lancamento.query
-        if restaurante_id:
-            q = q.filter(Lancamento.restaurante_id == restaurante_id)
-        if cooperado_id:
-            q = q.filter(Lancamento.cooperado_id == cooperado_id)
-        if data_inicio:
-            q = q.filter(Lancamento.data >= data_inicio)
-        if data_fim:
-            q = q.filter(Lancamento.data <= data_fim)
-
-        lanc_base = q.order_by(
-            Lancamento.data.desc(), Lancamento.id.desc()
-        ).all()
-
-        if dows:
-            lancamentos = [l for l in lanc_base if l.data and _dow(l.data) in dows]
-        else:
-            lancamentos = lanc_base
-
-        # Se marcar "considerar_periodo", só mantemos dias do período do restaurante
-        if considerar_periodo and restaurante_id:
-            rest = Restaurante.query.get(restaurante_id)
-            if rest:
-                mapa = {
-                    "seg-dom": {"1", "2", "3", "4", "5", "6", "7"},
-                    "sab-sex": {"6", "7", "1", "2", "3", "4", "5"},
-                    "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
-                }
-                permitidos = mapa.get(
-                    rest.periodo,
-                    {"1", "2", "3", "4", "5", "6", "7"},
-                )
-                lancamentos = [
-                    l for l in lancamentos
-                    if l.data and _dow(l.data) in permitidos
-                ]
-
-        total_producoes = sum((l.valor or 0.0) for l in lancamentos)
-        total_inss = total_producoes * 0.045
-
-        # ---- Coop (institucional)
-        rq = ReceitaCooperativa.query
-        dq = DespesaCooperativa.query
-        if data_inicio:
-            rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
-            dq = dq.filter(DespesaCooperativa.data >= data_inicio)
-        if data_fim:
-            rq = rq.filter(ReceitaCooperativa.data <= data_fim)
-            dq = dq.filter(DespesaCooperativa.data <= data_fim)
-
-        receitas = rq.order_by(
-            ReceitaCooperativa.data.desc().nullslast(),
-            ReceitaCooperativa.id.desc(),
-        ).all()
-        despesas = dq.order_by(
-            DespesaCooperativa.data.desc(),
-            DespesaCooperativa.id.desc(),
-        ).all()
-        total_receitas = sum((r.valor_total or 0.0) for r in receitas)
-        total_despesas = sum((d.valor or 0.0) for d in despesas)
-
-        # ---- Cooperados (pessoa física)
-        rq2 = ReceitaCooperado.query
-        dq2 = DespesaCooperado.query
-
-        # Receitas (pontuais): filtra por data simples
-        if data_inicio:
-            rq2 = rq2.filter(ReceitaCooperado.data >= data_inicio)
-        if data_fim:
-            rq2 = rq2.filter(ReceitaCooperado.data <= data_fim)
-
-        # Despesas (semanais): usa sobreposição do intervalo [data_inicio, data_fim]
-        if data_inicio and data_fim:
-            dq2 = dq2.filter(
-                DespesaCooperado.data_inicio <= data_fim,
-                DespesaCooperado.data_fim >= data_inicio,
-            )
-        elif data_inicio:
-            dq2 = dq2.filter(DespesaCooperado.data_fim >= data_inicio)
-        elif data_fim:
-            dq2 = dq2.filter(DespesaCooperado.data_inicio <= data_fim)
-
-        receitas_coop = rq2.order_by(
-            ReceitaCooperado.data.desc(),
-            ReceitaCooperado.id.desc(),
-        ).all()
-
-        # você pode manter por .data (domingo) ou ordenar pelo fim real do período:
-        despesas_coop = dq2.order_by(
-            DespesaCooperado.data_fim.desc().nullslast(),
-            DespesaCooperado.id.desc(),
-        ).all()
-
-        total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
-        total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop)
-
-        # ---- Gráficos (por mês) — rótulo robusto "MM/YY"
-        sums = {}
-        for l in lancamentos:
-            if not l.data:
-                continue
-            key = l.data.strftime("%Y-%m")  # sempre YYYY-MM
-            sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
-
-        labels_ord = sorted(sums.keys())
-
-        def _fmt_label(k: str) -> str:
-            # aceita "YYYY-MM" ou "YY-MM" e mostra "MM/YY"
-            parts = k.split("-")
-            if len(parts) == 2 and parts[0] and parts[1]:
-                year, month = parts[0], parts[1]
-                return f"{month}/{year[-2:]}"
-            return k
-
-        labels_fmt = [_fmt_label(k) for k in labels_ord]
-        values = [round(sums[k], 2) for k in labels_ord]
-        chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
-        chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
-
-    # =========================================================================
-    # 4) ESCALAS AGRUPADAS / CONTAGEM -> só quando a aba usar
-    # =========================================================================
-    abas_escalas = {"escalas", "lancamentos", "home"}
-
-    if active_tab in abas_escalas:
-        from collections import defaultdict  # se não tiver no topo do arquivo
-        esc_by_int = defaultdict(list)
-        esc_by_str = defaultdict(list)
-
-        escalas_all = Escala.query.order_by(Escala.id.asc()).all()
-        for e in escalas_all:
-            k_int = e.cooperado_id if e.cooperado_id is not None else 0  # 0 = sem cadastro
-            esc_item = {
-                "data": e.data,
-                "turno": e.turno,
-                "horario": e.horario,
-                "contrato": e.contrato,
-                "cor": e.cor,
-                "nome_planilha": e.cooperado_nome,
-            }
-            esc_by_int[k_int].append(esc_item)
-            esc_by_str[str(k_int)].append(esc_item)
-
-        cont_rows = dict(
-            db.session.query(Escala.cooperado_id, func.count(Escala.id))
-            .group_by(Escala.cooperado_id)
-            .all()
-        )
-        qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
-        qtd_sem_cadastro = int(cont_rows.get(None, 0))
-
-    # =========================================================================
-    # 5) FOLHA DE PAGAMENTO  -> SÓ CALCULA SE A ABA "folha" ESTIVER ABERTA
-    # =========================================================================
+        # =====================================================================
+    # 7) Folha de pagamento  -> SÓ CALCULA SE A ABA "folha" ESTIVER ABERTA
+    # =====================================================================
     folha_por_coop = []
     folha_inicio = None
     folha_fim = None
 
     if active_tab == "folha":
-        folha_inicio = _parse_date(args.get("folha_inicio")) or (
-            date.today() - timedelta(days=30)
-        )
+        folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
         folha_fim = _parse_date(args.get("folha_fim")) or date.today()
 
         FolhaItem = namedtuple(
             "FolhaItem",
-            "cooperado lancamentos receitas despesas bruto inss outras_desp liquido",
+            "cooperado lancamentos receitas despesas bruto inss outras_desp liquido"
         )
 
         for c in cooperados:
@@ -2242,8 +2176,7 @@ def admin_dashboard():
             )
             d = (
                 DespesaCooperado.query.filter(
-                    (DespesaCooperado.cooperado_id == c.id)
-                    | (DespesaCooperado.cooperado_id.is_(None)),
+                    (DespesaCooperado.cooperado_id == c.id) | (DespesaCooperado.cooperado_id.is_(None)),
                     DespesaCooperado.data >= folha_inicio,
                     DespesaCooperado.data <= folha_fim,
                 )
@@ -2275,10 +2208,6 @@ def admin_dashboard():
                     liquido=liquido,
                 )
             )
-
-    # -------------------------------------------------------------------------
-    # AQUI CONTINUA O RESTO DA SUA FUNÇÃO (benefícios, trocas, render_template, etc.)
-    # -------------------------------------------------------------------------
 
     # ----------------------------
     # Benefícios para template (com filtros + id)
