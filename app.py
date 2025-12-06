@@ -2284,9 +2284,10 @@ def admin_dashboard():
             "recebedores": recs,
         })
 
-    # ======== Trocas no admin ========
+        # ======== Trocas no admin ========
+
     def _escala_desc(e: Escala | None) -> str:
-        return _escala_label(e)
+        return _escala_label(e) if e else ""
 
     def _split_turno_horario(s: str) -> tuple[str, str]:
         if not s:
@@ -2299,7 +2300,9 @@ def admin_dashboard():
     def _linha_from_escala(e: Escala, saiu: str, entrou: str) -> dict:
         return {
             "dia": _escala_label(e).split(" • ")[0],
-            "turno_horario": " • ".join([x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]),
+            "turno_horario": " • ".join(
+                [x for x in [(e.turno or "").strip(), (e.horario or "").strip()] if x]
+            ),
             "contrato": (e.contrato or "").strip(),
             "saiu": saiu,
             "entrou": entrou,
@@ -2314,25 +2317,54 @@ def admin_dashboard():
         destinatario = Cooperado.query.get(t.destino_id)
         orig = Escala.query.get(t.origem_escala_id)
 
+        # --- escala do cooperado 2 (destino) para mostrar contrato/turno/horário
+        destino_escala = None
+        if orig and destinatario:
+            wd_o = _weekday_from_data_str(orig.data)
+            buck_o = _turno_bucket(orig.turno, orig.horario)
+
+            candidatas_dest = Escala.query.filter_by(cooperado_id=destinatario.id).all()
+            best_dest = None
+            for e in candidatas_dest:
+                if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
+                    # dá preferência se o contrato for igual ao da origem
+                    if (orig.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
+                        best_dest = e
+                        break
+                    if best_dest is None:
+                        best_dest = e
+
+            if best_dest:
+                destino_escala = best_dest
+            elif candidatas_dest:
+                # fallback: qualquer escala do cooperado 2
+                destino_escala = candidatas_dest[0]
+
+        # --- linhas afetadas para histórico
         linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
 
         if t.status == "aprovada" and not linhas_afetadas and orig and solicitante and destinatario:
-            # linha 1 (origem)
-            linhas_afetadas.append(_linha_from_escala(orig, saiu=solicitante.nome, entrou=destinatario.nome))
-            # linha 2 (melhor candidata do solicitante no mesmo bucket)
+            # linha 1 (origem -> solicitante sai, destinatário entra)
+            linhas_afetadas.append(
+                _linha_from_escala(orig, saiu=solicitante.nome, entrou=destinatario.nome)
+            )
+
+            # linha 2 (melhor escala do solicitante no mesmo bucket)
             wd_o = _weekday_from_data_str(orig.data)
             buck_o = _turno_bucket(orig.turno, orig.horario)
-            candidatas = Escala.query.filter_by(cooperado_id=solicitante.id).all()
-            best = None
-            for e in candidatas:
+            candidatas_solic = Escala.query.filter_by(cooperado_id=solicitante.id).all()
+            best_solic = None
+            for e in candidatas_solic:
                 if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
                     if (orig.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
-                        best = e
+                        best_solic = e
                         break
-                    if best is None:
-                        best = e
-            if best:
-                linhas_afetadas.append(_linha_from_escala(best, saiu=destinatario.nome, entrou=solicitante.nome))
+                    if best_solic is None:
+                        best_solic = e
+            if best_solic:
+                linhas_afetadas.append(
+                    _linha_from_escala(best_solic, saiu=destinatario.nome, entrou=solicitante.nome)
+                )
 
         item = {
             "id": t.id,
@@ -2342,11 +2374,20 @@ def admin_dashboard():
             "aplicada_em": t.aplicada_em,
             "solicitante": solicitante,
             "destinatario": destinatario,
-            "origem": orig,
-            "destino": destinatario,
+            "origem": orig,                 # Escala do cooperado 1
+            "destino": destino_escala,      # Escala do cooperado 2
             "origem_desc": _escala_desc(orig),
+            "destino_desc": _escala_desc(destino_escala) if destino_escala else "",
             "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
-            "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
+            "origem_turno_bucket": _turno_bucket(
+                orig.turno if orig else None,
+                orig.horario if orig else None,
+            ),
+            "destino_weekday": _weekday_from_data_str(destino_escala.data) if destino_escala else None,
+            "destino_turno_bucket": _turno_bucket(
+                destino_escala.turno if destino_escala else None,
+                destino_escala.horario if destino_escala else None,
+            ),
             "linhas_afetadas": linhas_afetadas,
         }
 
