@@ -2305,7 +2305,7 @@ def admin_dashboard():
     # 9) Render
     # ------------------------------------------------------------------
     return render_template(
-        "admin.html",   # <<< AQUI: tem que ser exatamente o nome do HTML na pasta templates
+        "admin_dashboard.html",   # <<< AQUI: tem que ser exatamente o nome do HTML na pasta templates
         active_tab=active_tab,
         cfg=cfg,
         cooperados=cooperados,
@@ -2429,7 +2429,7 @@ def admin_dashboard():
         })
 
     return render_template(
-        "admin.html",  # ajuste aqui se o seu template tiver outro nome
+        "admin_dashboard.html",  # ajuste aqui se o seu template tiver outro nome
         active_tab=active_tab,
         cfg=cfg,
         cooperados=cooperados,
