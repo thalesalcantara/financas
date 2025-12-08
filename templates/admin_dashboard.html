@@ -3415,21 +3415,21 @@
               </td>
 
               <td class="mensagem-col">
-  {% set raw_msg = t.mensagem or '' %}
-  {% if 'AFETACAO_JSON' in raw_msg %}
-    <div class="extra-small text-muted">
-      Sem mensagem adicional.
-    </div>
-  {% elif raw_msg %}
-    <div class="extra-small text-muted">
-      {{ raw_msg }}
-    </div>
-  {% else %}
-    <div class="extra-small text-muted">
-      Sem mensagem adicional.
-    </div>
-  {% endif %}
-</td>
+                {% set raw_msg = t.mensagem or '' %}
+                {% if 'AFETACAO_JSON' in raw_msg %}
+                  <div class="extra-small text-muted">
+                    Sem mensagem adicional.
+                  </div>
+                {% elif raw_msg %}
+                  <div class="extra-small text-muted">
+                    {{ raw_msg }}
+                  </div>
+                {% else %}
+                  <div class="extra-small text-muted">
+                    Sem mensagem adicional.
+                  </div>
+                {% endif %}
+              </td>
 
               <td class="text-end">
                 <div class="d-flex flex-column gap-1 align-items-end">
@@ -3625,9 +3625,20 @@
               </td>
 
               <td class="mensagem-col">
-                <div class="extra-small text-muted">
-                  {{ t.mensagem if t.mensagem else 'Sem mensagem adicional.' }}
-                </div>
+                {% set raw_msg = t.mensagem or '' %}
+                {% if 'AFETACAO_JSON' in raw_msg %}
+                  <div class="extra-small text-muted">
+                    Sem mensagem adicional.
+                  </div>
+                {% elif raw_msg %}
+                  <div class="extra-small text-muted">
+                    {{ raw_msg }}
+                  </div>
+                {% else %}
+                  <div class="extra-small text-muted">
+                    Sem mensagem adicional.
+                  </div>
+                {% endif %}
               </td>
 
               <td>
