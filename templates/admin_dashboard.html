@@ -522,355 +522,523 @@
 
      <!-- === RESUMO (Dashboard Financeiro Completo) === -->
 <section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
-  {# ---------- Helpers de data ---------- #}
-  {% macro ymd(x) -%}
-    {%- if x and x.strftime is defined -%}
-      {{ x.strftime('%Y-%m-%d') }}
-    {%- elif x -%}
-      {{ x }}
-    {%- else -%}
-      {{ '' }}
-    {%- endif -%}
-  {%- endmacro %}
+  <div class="resumo-shell">
 
-  {# ---------- Filtros atuais (querystring) ---------- #}
-  {% set ri  = request.args.get('resumo_inicio','') %}
-  {% set rf  = request.args.get('resumo_fim','') %}
-  {% set rs  = request.args.get('resumo_restaurante_id','') %}
-  {% set cs  = request.args.get('resumo_cooperado_id','') %}
-  {% set rid = rs|int if rs else None %}
-  {% set cid = cs|int if cs else None %}
+    {# ---------- Helpers de data ---------- #}
+    {% macro ymd(x) -%}
+      {%- if x and x.strftime is defined -%}
+        {{ x.strftime('%Y-%m-%d') }}
+      {%- elif x -%}
+        {{ x }}
+      {%- else -%}
+        {{ '' }}
+      {%- endif -%}
+    {%- endmacro %}
 
-  {# ---------- Bases com fallback (NÃO sobrescrever 'receitas'/'despesas' originais) ---------- #}
-  {% set _producoes = (producoes | default([]) | list) %}
-  {% if _producoes|length == 0 %}
-    {% set _producoes = (lancamentos | default([]) | list) %}
-  {% endif %}
+    {# ---------- Filtros atuais (querystring) ---------- #}
+    {% set ri  = request.args.get('resumo_inicio','') %}
+    {% set rf  = request.args.get('resumo_fim','') %}
+    {% set rs  = request.args.get('resumo_restaurante_id','') %}
+    {% set cs  = request.args.get('resumo_cooperado_id','') %}
+    {% set rid = rs|int if rs else None %}
+    {% set cid = cs|int if cs else None %}
 
-  {# Cooperados (por pessoa) #}
-  {% set receitas_coop = (receitas_coop | default([]) | list) %}
-  {% set despesas_coop = (despesas_coop | default([]) | list) %}
-
-  {# Cooperativa (geral) — usar exatamente a MESMA fonte da aba de receitas da coop #}
-  {# Se sua tela da aba usa 'receitas', então aqui usamos 'receitas' também. Mantive fallbacks caso mude o nome. #}
-  {% set _rec_coop_corp =
-       (receitas if receitas is defined else
-        (receitas_cooperativa if receitas_cooperativa is defined else
-         (receitas_corp if receitas_corp is defined else
-          []))) %}
-  {% set _desp_coop_corp =
-       (despesas if despesas is defined else
-        (despesas_cooperativa if despesas_cooperativa is defined else
-         (despesas_corp if despesas_corp is defined else
-          []))) %}
-
-  {# ---------- Totais (lado servidor, para primeiro paint) ---------- #}
-  {# Produções (considera restaurante/cooperado) #}
-  {% set ns_prod = namespace(total=0) %}
-  {% for p in _producoes %}
-    {% set d   = ymd(p.data) %}
-    {% set okd = (not ri or d >= ri) and (not rf or d <= rf) %}
-    {% set okc = (not cid or (p.cooperado and p.cooperado.id==cid)) %}
-    {% set okr = (not rid or (p.restaurante and p.restaurante.id==rid)) %}
-    {% if okd and okc and okr %}
-      {% set ns_prod.total = ns_prod.total + (p.valor or 0) %}
+    {# ---------- Bases com fallback (NÃO sobrescrever 'receitas'/'despesas' originais) ---------- #}
+    {% set _producoes = (producoes | default([]) | list) %}
+    {% if _producoes|length == 0 %}
+      {% set _producoes = (lancamentos | default([]) | list) %}
     {% endif %}
-  {% endfor %}
-  {% set total_producoes_f = ns_prod.total %}
-  {% set total_inss_f      = total_producoes_f * 0.045 %}
 
-  {# Coop (geral) — usar a mesma lógica da aba RECEITAS: valor|default(valor_total, true)|default(0, true) #}
-  {% set ns_rec_corp = namespace(total=0) %}
-  {% for r in _rec_coop_corp %}
-    {% set d = ymd(r.data or r.data_lancamento) %}
-    {% if (not ri or d >= ri) and (not rf or d <= rf) %}
-      {% set v = r.valor|default(r.valor_total, true)|default(0, true) %}
-      {% set ns_rec_corp.total = ns_rec_corp.total + (v or 0) %}
-    {% endif %}
-  {% endfor %}
-  {% set total_receitas_corp_f = ns_rec_corp.total %}
+    {# Cooperados (por pessoa) #}
+    {% set receitas_coop = (receitas_coop | default([]) | list) %}
+    {% set despesas_coop = (despesas_coop | default([]) | list) %}
 
-  {% set ns_desp_corp = namespace(total=0) %}
-  {% for d in _desp_coop_corp %}
-    {% set dt = ymd(d.data or d.data_lancamento) %}
-    {% if (not ri or dt >= ri) and (not rf or dt <= rf) %}
-      {% set v = d.valor|default(d.valor_total, true)|default(0, true) %}
-      {% set ns_desp_corp.total = ns_desp_corp.total + (v or 0) %}
-    {% endif %}
-  {% endfor %}
-  {% set total_despesas_corp_f = ns_desp_corp.total %}
+    {# Cooperativa (geral) — mesma fonte da aba de RECEITAS/ DESPESAS da coop #}
+    {% set _rec_coop_corp =
+         (receitas if receitas is defined else
+          (receitas_cooperativa if receitas_cooperativa is defined else
+           (receitas_corp if receitas_corp is defined else
+            []))) %}
+    {% set _desp_coop_corp =
+         (despesas if despesas is defined else
+          (despesas_cooperativa if despesas_cooperativa is defined else
+           (despesas_corp if despesas_corp is defined else
+            []))) %}
 
-  {# Cooperados (por pessoa) #}
-  {% set ns_rec_coop = namespace(total=0) %}
-  {% for r in receitas_coop %}
-    {% set d = ymd(r.data) %}
-    {% set okd = (not ri or d >= ri) and (not rf or d <= rf) %}
-    {% set okc = (not cid or (r.cooperado and r.cooperado.id==cid)) %}
-    {% if okd and okc %}
-      {% set ns_rec_coop.total = ns_rec_coop.total + (r.valor or 0) %}
-    {% endif %}
-  {% endfor %}
-  {% set total_receitas_coop_f = ns_rec_coop.total %}
+    {# ---------- Totais (lado servidor, para primeiro paint) ---------- #}
+    {# Produções (considera restaurante/cooperado) #}
+    {% set ns_prod = namespace(total=0) %}
+    {% for p in _producoes %}
+      {% set d   = ymd(p.data) %}
+      {% set okd = (not ri or d >= ri) and (not rf or d <= rf) %}
+      {% set okc = (not cid or (p.cooperado and p.cooperado.id==cid)) %}
+      {% set okr = (not rid or (p.restaurante and p.restaurante.id==rid)) %}
+      {% if okd and okc and okr %}
+        {% set ns_prod.total = ns_prod.total + (p.valor or 0) %}
+      {% endif %}
+    {% endfor %}
+    {% set total_producoes_f = ns_prod.total %}
+    {% set total_inss_f      = total_producoes_f * 0.045 %}
 
-  {% set ns_desp_coop = namespace(total=0) %}
-  {% for d in despesas_coop %}
-    {% set dt  = ymd(d.data) %}
-    {% set okd = (not ri or dt >= ri) and (not rf or dt <= rf) %}
-    {% set okc = (not cid or (d.cooperado and d.cooperado.id==cid)) %}
-    {% if okd and okc %}
-      {% set ns_desp_coop.total = ns_desp_coop.total + (d.valor or 0) %}
-    {% endif %}
-  {% endfor %}
-  {% set total_despesas_coop_f = ns_desp_coop.total %}
+    {# Coop (geral) — mesma lógica da aba RECEITAS: valor|default(valor_total, true)|default(0, true) #}
+    {% set ns_rec_corp = namespace(total=0) %}
+    {% for r in _rec_coop_corp %}
+      {% set d = ymd(r.data or r.data_lancamento) %}
+      {% if (not ri or d >= ri) and (not rf or d <= rf) %}
+        {% set v = r.valor|default(r.valor_total, true)|default(0, true) %}
+        {% set ns_rec_corp.total = ns_rec_corp.total + (v or 0) %}
+      {% endif %}
+    {% endfor %}
+    {% set total_receitas_corp_f = ns_rec_corp.total %}
 
-  {# Ajuste: Receitas dos cooperados = Produções + Receitas individuais #}
-  {% set total_receitas_coop_full_f = (total_producoes_f|default(0)) + (total_receitas_coop_f|default(0)) %}
+    {% set ns_desp_corp = namespace(total=0) %}
+    {% for d in _desp_coop_corp %}
+      {% set dt = ymd(d.data or d.data_lancamento) %}
+      {% if (not ri or dt >= ri) and (not rf or dt <= rf) %}
+        {% set v = d.valor|default(d.valor_total, true)|default(0, true) %}
+        {% set ns_desp_corp.total = ns_desp_corp.total + (v or 0) %}
+      {% endif %}
+    {% endfor %}
+    {% set total_despesas_corp_f = ns_desp_corp.total %}
 
-  {# Resultado coop e Total de Receitas (Geral) #}
-  {% set _resultado_corp = (total_receitas_corp_f|default(0)) - (total_despesas_corp_f|default(0)) %}
-  {% set _total_receitas_geral = (total_receitas_corp_f|default(0)) + (total_receitas_coop_full_f|default(0)) %}
+    {# Cooperados (por pessoa) #}
+    {% set ns_rec_coop = namespace(total=0) %}
+    {% for r in receitas_coop %}
+      {% set d = ymd(r.data) %}
+      {% set okd = (not ri or d >= ri) and (not rf or d <= rf) %}
+      {% set okc = (not cid or (r.cooperado and r.cooperado.id==cid)) %}
+      {% if okd and okc %}
+        {% set ns_rec_coop.total = ns_rec_coop.total + (r.valor or 0) %}
+      {% endif %}
+    {% endfor %}
+    {% set total_receitas_coop_f = ns_rec_coop.total %}
 
-  <!-- Filtros -->
-  <div class="card border-0 shadow-sm rounded-3 mb-3">
-    <div class="card-body">
-      <form method="GET" class="row g-2 align-items-end">
-        <input type="hidden" name="tab" value="resumo">
-        <div class="col-md-2">
-          <label class="form-label">De</label>
-          <input type="date" class="form-control form-control-sm" name="resumo_inicio" value="{{ ri }}">
-        </div>
-        <div class="col-md-2">
-          <label class="form-label">Até</label>
-          <input type="date" class="form-control form-control-sm" name="resumo_fim" value="{{ rf }}">
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Estabelecimento</label>
-          <select class="form-select form-select-sm" name="resumo_restaurante_id">
-            <option value="">Todos</option>
-            {% for r in restaurantes %}
-              <option value="{{ r.id }}" {{ 'selected' if rid and rid==r.id else '' }}>{{ r.nome }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Cooperado</label>
-          <select class="form-select form-select-sm" name="resumo_cooperado_id">
-            <option value="">Todos</option>
-            {% for c in cooperados %}
-              <option value="{{ c.id }}" {{ 'selected' if cid and cid==c.id else '' }}>{{ c.nome }}</option>
-            {% endfor %}
-          </select>
-        </div>
+    {% set ns_desp_coop = namespace(total=0) %}
+    {% for d in despesas_coop %}
+      {% set dt  = ymd(d.data) %}
+      {% set okd = (not ri or dt >= ri) and (not rf or dt <= rf) %}
+      {% set okc = (not cid or (d.cooperado and d.cooperado.id==cid)) %}
+      {% if okd and okc %}
+        {% set ns_desp_coop.total = ns_desp_coop.total + (d.valor or 0) %}
+      {% endif %}
+    {% endfor %}
+    {% set total_despesas_coop_f = ns_desp_coop.total %}
 
-        <div class="col-12 d-flex flex-wrap gap-2">
-          <button class="btn btn-royal btn-sm"><i class="bi bi-funnel"></i> Filtrar</button>
-          {% if ri or rf or rid or cid %}
-            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_dashboard', tab='resumo') }}">Limpar</a>
-          {% endif %}
-          <button id="btnExportXLSX" type="button" class="btn btn-outline-success btn-sm">
-            <i class="bi bi-file-earmark-excel"></i> Exportar XLSX (com filtros)
-          </button>
-          {% if ri or rf or rid or cid %}
-            <span class="small text-muted ms-1">
-              Período: <b>{{ ri if ri else 'início' }}</b> a <b>{{ rf if rf else 'hoje' }}</b>
-              {% if rid %} · Estab: <b>{{ (restaurantes|selectattr('id','equalto',rid)|list)[0].nome }}</b>{% endif %}
-              {% if cid %} · Cooperado: <b>{{ (cooperados|selectattr('id','equalto',cid)|list)[0].nome }}</b>{% endif %}
-            </span>
-          {% endif %}
-        </div>
-      </form>
-    </div>
-  </div>
+    {# Ajuste: Receitas dos cooperados = Produções + Receitas individuais #}
+    {% set total_receitas_coop_full_f = (total_producoes_f|default(0)) + (total_receitas_coop_f|default(0)) %}
 
-  <!-- KPIs -->
-  <div class="row g-2">
-    <div class="col-12 col-sm-6 col-lg-3">
-      <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
-        <div class="d-flex align-items-center justify-content-between">
-          <div>
-            <div class="text-uppercase text-muted small">Total Produções</div>
-            <div id="kpiTotalProds" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_producoes_f) }}</div>
-            <div class="small text-muted">Bruto no período</div>
-          </div>
-          <div class="kpi-icon"><i class="bi bi-graph-up"></i></div>
-        </div>
-      </div>
-    </div>
+    {# Resultado coop e Total de Receitas (Geral) #}
+    {% set _resultado_corp = (total_receitas_corp_f|default(0)) - (total_despesas_corp_f|default(0)) %}
+    {% set _total_receitas_geral = (total_receitas_corp_f|default(0)) + (total_receitas_coop_full_f|default(0)) %}
 
-    <div class="col-12 col-sm-6 col-lg-3">
-      <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
-        <div class="d-flex align-items-center justify-content-between">
-          <div>
-            <div class="text-uppercase text-muted small">Total INSS</div>
-            <div id="kpiINSS" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_inss_f) }}</div>
-            <div class="small text-muted">4,5% s/ produções</div>
-          </div>
-          <div class="kpi-icon"><i class="bi bi-shield-check"></i></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-lg-3">
-      <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
-        <div class="d-flex align-items-center justify-content-between">
-          <div>
-            <div class="text-uppercase text-muted small">Receitas Cooperativa</div>
-            <div id="kpiRecCoopCorp" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(total_receitas_corp_f) }}</div>
-            <div class="small text-muted">Entradas da coop</div>
-          </div>
-          <div class="kpi-icon"><i class="bi bi-cash-coin"></i></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-lg-3">
-      <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
-        <div class="d-flex align-items-center justify-content-between">
-          <div>
-            <div class="text-uppercase text-muted small">Despesas Cooperativa</div>
-            <div id="kpiDespCoopCorp" class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_despesas_corp_f) }}</div>
-            <div class="small text-muted">Saídas da coop</div>
-          </div>
-          <div class="kpi-icon"><i class="bi bi-cart-dash"></i></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-lg-3">
-      <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
-        <div class="d-flex align-items-center justify-content-between">
-          <div>
-            <div class="text-uppercase text-muted small">Receitas Cooperados (Prod + Rec)</div>
-            <div id="kpiRecCooperadosFull" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(total_receitas_coop_full_f) }}</div>
-            <div class="small text-muted">Produções + Receitas</div>
-          </div>
-          <div class="kpi-icon"><i class="bi bi-currency-exchange"></i></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-lg-3">
-      <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
-        <div class="d-flex align-items-center justify-content-between">
-          <div>
-            <div class="text-uppercase text-muted small">Despesas Cooperados</div>
-            <div id="kpiDespCooperados" class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_despesas_coop_f) }}</div>
-            <div class="small text-muted">Débitos/benefícios</div>
-          </div>
-          <div class="kpi-icon"><i class="bi bi-bank"></i></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-lg-3">
-      <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
-        <div class="d-flex align-items-center justify-content-between">
-          <div>
-            <div class="text-uppercase text-muted small">Resultado Cooperativa</div>
-            <div class="fw-bold fs-5">
-              <span id="kpiResultadoCoop" class="{{ 'text-success' if _resultado_corp >= 0 else 'text-danger' }}">
-                R$ {{ '%.2f'|format(_resultado_corp) }}
-              </span>
+    <!-- Filtros -->
+    <div class="card border-0 shadow-sm rounded-4 mb-3 resumo-filter-card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div class="d-flex align-items-center gap-2">
+            <div class="resumo-pill-label">
+              <i class="bi bi-sliders"></i>
             </div>
-            <div class="small text-muted">Receitas − Despesas (coop)</div>
+            <div>
+              <h5 class="mb-0 resumo-title">Resumo geral financeiro</h5>
+              <small class="text-muted">
+                Use os filtros para enxergar produção, INSS, receitas, despesas e adiantamentos por período, estabelecimento e cooperado.
+              </small>
+            </div>
           </div>
-          <div class="kpi-icon"><i class="bi bi-pie-chart"></i></div>
+          {% if ri or rf or rid or cid %}
+            <div class="d-flex flex-wrap gap-1 small justify-content-end">
+              {% if ri or rf %}
+                <span class="badge rounded-pill bg-light text-dark border">
+                  <i class="bi bi-calendar-event"></i>
+                  {{ ri if ri else 'início' }} — {{ rf if rf else 'hoje' }}
+                </span>
+              {% endif %}
+              {% if rid %}
+                <span class="badge rounded-pill bg-light text-dark border">
+                  <i class="bi bi-shop"></i>
+                  Estab: {{ (restaurantes|selectattr('id','equalto',rid)|list)[0].nome }}
+                </span>
+              {% endif %}
+              {% if cid %}
+                <span class="badge rounded-pill bg-light text-dark border">
+                  <i class="bi bi-person"></i>
+                  Coop: {{ (cooperados|selectattr('id','equalto',cid)|list)[0].nome }}
+                </span>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+
+        <form method="GET" class="row g-2 align-items-end">
+          <input type="hidden" name="tab" value="resumo">
+          <div class="col-md-2">
+            <label class="form-label">De</label>
+            <input type="date" class="form-control form-control-sm" name="resumo_inicio" value="{{ ri }}">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Até</label>
+            <input type="date" class="form-control form-control-sm" name="resumo_fim" value="{{ rf }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Estabelecimento</label>
+            <select class="form-select form-select-sm" name="resumo_restaurante_id">
+              <option value="">Todos</option>
+              {% for r in restaurantes %}
+                <option value="{{ r.id }}" {{ 'selected' if rid and rid==r.id else '' }}>{{ r.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Cooperado</label>
+            <select class="form-select form-select-sm" name="resumo_cooperado_id">
+              <option value="">Todos</option>
+              {% for c in cooperados %}
+                <option value="{{ c.id }}" {{ 'selected' if cid and cid==c.id else '' }}>{{ c.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-12 d-flex flex-wrap gap-2 mt-2">
+            <button class="btn btn-royal btn-sm">
+              <i class="bi bi-funnel"></i> Filtrar
+            </button>
+            {% if ri or rf or rid or cid %}
+              <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_dashboard', tab='resumo') }}">
+                <i class="bi bi-x-circle"></i> Limpar
+              </a>
+            {% endif %}
+            <button id="btnExportXLSX" type="button" class="btn btn-outline-success btn-sm">
+              <i class="bi bi-file-earmark-excel"></i> Exportar XLSX (com filtros)
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="row g-2 resumo-kpi-row">
+      <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+          <div class="kpi-border kpi-prod"></div>
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="text-uppercase text-muted small">Total Produções</div>
+              <div id="kpiTotalProds" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_producoes_f) }}</div>
+              <div class="small text-muted">Bruto no período</div>
+            </div>
+            <div class="kpi-icon"><i class="bi bi-graph-up"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+          <div class="kpi-border kpi-inss"></div>
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="text-uppercase text-muted small">Total INSS</div>
+              <div id="kpiINSS" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_inss_f) }}</div>
+              <div class="small text-muted">4,5% s/ produções</div>
+            </div>
+            <div class="kpi-icon"><i class="bi bi-shield-check"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+          <div class="kpi-border kpi-rec-coop"></div>
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="text-uppercase text-muted small">Receitas Cooperativa</div>
+              <div id="kpiRecCoopCorp" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(total_receitas_corp_f) }}</div>
+              <div class="small text-muted">Entradas da coop</div>
+            </div>
+            <div class="kpi-icon"><i class="bi bi-cash-coin"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+          <div class="kpi-border kpi-desp-coop"></div>
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="text-uppercase text-muted small">Despesas Cooperativa</div>
+              <div id="kpiDespCoopCorp" class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_despesas_corp_f) }}</div>
+              <div class="small text-muted">Saídas da coop</div>
+            </div>
+            <div class="kpi-icon"><i class="bi bi-cart-dash"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+          <div class="kpi-border kpi-rec-coop2"></div>
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="text-uppercase text-muted small">Receitas Cooperados</div>
+              <div id="kpiRecCooperadosFull" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(total_receitas_coop_full_f) }}</div>
+              <div class="small text-muted">Produções + Receitas</div>
+            </div>
+            <div class="kpi-icon"><i class="bi bi-currency-exchange"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+          <div class="kpi-border kpi-desp-coop2"></div>
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="text-uppercase text-muted small">Despesas Cooperados</div>
+              <div id="kpiDespCooperados" class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_despesas_coop_f) }}</div>
+              <div class="small text-muted">Débitos/benefícios</div>
+            </div>
+            <div class="kpi-icon"><i class="bi bi-bank"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+          <div class="kpi-border kpi-res-coop"></div>
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="text-uppercase text-muted small">Resultado Cooperativa</div>
+              <div class="fw-bold fs-5">
+                <span id="kpiResultadoCoop" class="{{ 'text-success' if _resultado_corp >= 0 else 'text-danger' }}">
+                  R$ {{ '%.2f'|format(_resultado_corp) }}
+                </span>
+              </div>
+              <div class="small text-muted">Receitas − Despesas (coop)</div>
+            </div>
+            <div class="kpi-icon"><i class="bi bi-pie-chart"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+          <div class="kpi-border kpi-total-rec"></div>
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="text-uppercase text-muted small">Total de Receitas (Geral)</div>
+              <div id="kpiTotalReceitasGeral" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(_total_receitas_geral) }}</div>
+              <div class="small text-muted">Coop + (Prod + Rec Cooperados)</div>
+            </div>
+            <div class="kpi-icon"><i class="bi bi-cash-stack"></i></div>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="col-12 col-sm-6 col-lg-3">
-      <div class="card border-0 shadow-sm rounded-3 h-100 p-3">
-        <div class="d-flex align-items-center justify-content-between">
-          <div>
-            <div class="text-uppercase text-muted small">Total de Receitas (Geral)</div>
-            <div id="kpiTotalReceitasGeral" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(_total_receitas_geral) }}</div>
-            <div class="small text-muted">Coop + (Prod + Rec Cooperados)</div>
+    <!-- Resumo por Cooperado -->
+    <div class="card border-0 shadow-sm rounded-4 mt-3">
+      <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+          <div class="d-flex align-items-center gap-2">
+            <div class="resumo-pill-label"><i class="bi bi-people"></i></div>
+            <div>
+              <h6 class="m-0">Resumo por Cooperado (filtro aplicado)</h6>
+              <small class="text-muted">
+                Líquido = Produções + <span class="text-success">Receitas</span> − INSS −
+                <span class="text-danger">Despesas</span> − <span class="text-primary">Adiant.</span>
+              </small>
+            </div>
           </div>
-          <div class="kpi-icon"><i class="bi bi-cash-stack"></i></div>
+        </div>
+        <div class="table-responsive">
+          <table id="tblResumoCoop" class="table table-sm table-bordered table-hover align-middle table-resumo">
+            <thead class="table-light">
+              <tr class="text-nowrap">
+                <th>Cooperado</th>
+                <th class="text-end">Produções</th>
+                <th class="text-end">INSS (4,5%)</th>
+                <th class="text-end text-success">Receitas</th>
+                <th class="text-end text-danger">Despesas</th>
+                <th class="text-end text-primary">Adiant.</th>
+                <th class="text-end">Líquido</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="7" class="text-center text-muted">Carregando…</td></tr>
+            </tbody>
+            <tfoot>
+              <tr class="table-light fw-bold">
+                <td>Total</td>
+                <td class="text-end" id="tProd">R$ 0,00</td>
+                <td class="text-end" id="tINSS">R$ 0,00</td>
+                <td class="text-end text-success" id="tRec">R$ 0,00</td>
+                <td class="text-end text-danger" id="tDes">R$ 0,00</td>
+                <td class="text-end text-primary" id="tAd">R$ 0,00</td>
+                <td class="text-end fw-bold" id="tLiq">R$ 0,00</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Resumo por Cooperado -->
-  <div class="card border-0 shadow-sm rounded-3 mt-2">
-    <div class="card-body">
-      <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
-        <h6 class="m-0 d-flex align-items-center gap-2">
-          <i class="bi bi-people"></i> Resumo por Cooperado (filtro aplicado)
-        </h6>
-        <small class="text-muted">Líquido = Produções + <span class="text-success">Receitas</span> − INSS − <span class="text-danger">Despesas</span> − <span class="text-primary">Adiant.</span></small>
+    <!-- Gráficos -->
+    <div class="row g-2 mt-3">
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4 p-3">
+          <h6 class="mb-2 d-flex align-items-center gap-1">
+            <span class="resumo-pill-label"><i class="bi bi-graph-up-arrow"></i></span>
+            <span>Evolução Mensal — Cooperativa</span>
+          </h6>
+          <canvas id="chartCoop"></canvas>
+        </div>
       </div>
-      <div class="table-responsive">
-        <table id="tblResumoCoop" class="table table-sm table-bordered table-hover align-middle">
-          <thead class="table-light">
-            <tr class="text-nowrap">
-              <th>Cooperado</th>
-              <th class="text-end">Produções</th>
-              <th class="text-end">INSS (4,5%)</th>
-              <th class="text-end">Receitas</th>
-              <th class="text-end">Despesas</th>
-              <th class="text-end">Adiant.</th>
-              <th class="text-end">Líquido</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td colspan="7" class="text-center text-muted">Carregando…</td></tr>
-          </tbody>
-          <tfoot>
-            <tr class="table-light fw-bold">
-              <td>Total</td>
-              <td class="text-end" id="tProd">R$ 0,00</td>
-              <td class="text-end" id="tINSS">R$ 0,00</td>
-              <td class="text-end text-success" id="tRec">R$ 0,00</td>
-              <td class="text-end text-danger" id="tDes">R$ 0,00</td>
-              <td class="text-end text-primary" id="tAd">R$ 0,00</td>
-              <td class="text-end fw-bold" id="tLiq">R$ 0,00</td>
-            </tr>
-          </tfoot>
-        </table>
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4 p-3">
+          <h6 class="mb-2 d-flex align-items-center gap-1">
+            <span class="resumo-pill-label"><i class="bi bi-graph-up-arrow"></i></span>
+            <span>Evolução Mensal — Cooperados</span>
+          </h6>
+          <canvas id="chartCooperados"></canvas>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Gráficos -->
-  <div class="row g-2 mt-2">
-    <div class="col-12 col-lg-6">
-      <div class="card border-0 shadow-sm rounded-3 p-3">
-        <h6 class="mb-2"><i class="bi bi-graph-up-arrow"></i> Evolução Mensal — Cooperativa</h6>
-        <canvas id="chartCoop"></canvas>
+    <div class="row g-2 mt-3">
+      <div class="col-12">
+        <div class="card border-0 shadow-sm rounded-4 p-3">
+          <h6 class="mb-2 d-flex align-items-center gap-1">
+            <span class="resumo-pill-label"><i class="bi bi-shop"></i></span>
+            <span>Top Estabelecimentos (Produções no período)</span>
+          </h6>
+          <canvas id="chartEstabs"></canvas>
+        </div>
       </div>
     </div>
-    <div class="col-12 col-lg-6">
-      <div class="card border-0 shadow-sm rounded-3 p-3">
-        <h6 class="mb-2"><i class="bi bi-graph-up-arrow"></i> Evolução Mensal — Cooperados</h6>
-        <canvas id="chartCooperados"></canvas>
-      </div>
-    </div>
-  </div>
 
-  <div class="row g-2 mt-2">
-    <div class="col-12">
-      <div class="card border-0 shadow-sm rounded-3 p-3">
-        <h6 class="mb-2"><i class="bi bi-shop"></i> Top Estabelecimentos (Produções no período)</h6>
-        <canvas id="chartEstabs"></canvas>
-      </div>
-    </div>
-  </div>
-
-  {% set _has_av = (avaliacoes is defined) and (avaliacoes|length > 0) %}
-  <div class="row g-2 mt-2" {% if not _has_av %}style="display:none"{% endif %}>
-    <div class="col-12 col-lg-6">
-      <div class="card border-0 shadow-sm rounded-3 p-3">
-        <h6 class="mb-2"><i class="bi bi-stars"></i> Avaliações — Média por mês</h6>
-        <canvas id="chartAvaliacao"></canvas>
-      </div>
-    </div>
-  </div>
+  </div> <!-- /resumo-shell -->
 
   <style>
-    .kpi-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(39,71,217,.10);color:var(--royal-blue)}
+    /* CONTAINER GERAL DA ABA RESUMO */
+    #resumo .resumo-shell{
+      background: radial-gradient(circle at top left, rgba(48,71,214,0.10), transparent 55%),
+                  radial-gradient(circle at bottom right, rgba(16,185,129,0.10), transparent 55%);
+      border-radius: 1.5rem;
+      padding: 0.85rem;
+    }
+
+    #resumo .resumo-filter-card {
+      background: rgba(255,255,255,0.96);
+      border: 1px solid rgba(148,163,184,0.35);
+    }
+
+    #resumo .resumo-title{
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+
+    #resumo .resumo-kpi-row .card.kpi-card {
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.12s ease-out, box-shadow 0.12s ease-out, border-color 0.12s ease-out, background-color 0.12s ease-out;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+    }
+
+    #resumo .resumo-kpi-row .card.kpi-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.14);
+      border-color: rgba(48,71,214,0.55);
+      background: linear-gradient(135deg, #ffffff, #f5f7ff);
+    }
+
+    #resumo .kpi-border{
+      position:absolute;
+      inset:0;
+      border-radius:inherit;
+      border:2px solid transparent;
+      pointer-events:none;
+      opacity:0.85;
+    }
+    #resumo .kpi-prod{ border-color: rgba(37,99,235,0.55); }
+    #resumo .kpi-inss{ border-color: rgba(56,189,248,0.55); }
+    #resumo .kpi-rec-coop{ border-color: rgba(16,185,129,0.55); }
+    #resumo .kpi-desp-coop{ border-color: rgba(239,68,68,0.55); }
+    #resumo .kpi-rec-coop2{ border-color: rgba(34,197,94,0.55); }
+    #resumo .kpi-desp-coop2{ border-color: rgba(248,113,113,0.65); }
+    #resumo .kpi-res-coop{ border-color: rgba(14,116,144,0.6); }
+    #resumo .kpi-total-rec{ border-color: rgba(99,102,241,0.7); }
+
+    #resumo .resumo-kpi-row .card.kpi-card .text-muted.small {
+      font-size: 0.76rem;
+    }
+
+    #resumo .resumo-pill-label {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(48,71,214,0.08);
+      color: #3047d6;
+      font-size: 0.9rem;
+    }
+
+    #resumo .kpi-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(48,71,214,0.08);
+      color: #3047d6;
+      font-size: 1.1rem;
+    }
+
+    #resumo .table-resumo thead th {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: #f5f7fb;
+      border-bottom: 1px solid #e4e7f0;
+    }
+
+    #resumo .table-resumo tbody td {
+      font-size: 0.8rem;
+    }
+
+    #resumo .table-resumo tfoot td {
+      font-size: 0.82rem;
+    }
+
+    #resumo .table-resumo tbody tr:hover {
+      background-color: #f8f9ff;
+    }
+
+    #resumo .card.p-3 > h6 {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    #resumo canvas {
+      max-height: 280px;
+    }
+
+    @media (max-width: 576px) {
+      #resumo .resumo-shell{
+        border-radius: 1rem;
+        padding: 0.6rem;
+      }
+      #resumo .resumo-kpi-row .card.kpi-card {
+        padding: 0.75rem 0.85rem;
+      }
+
+      #resumo .resumo-filter-card .form-label {
+        font-size: 0.78rem;
+      }
+    }
   </style>
 
   <!-- Dados (seguros p/ JS) + Scripts (Chart.js + XLSX) -->
@@ -926,7 +1094,7 @@
       {% endfor %}
     ];
 
-    // *** AQUI: Receitas e Despesas da COOPERATIVA — mesma lógica da aba Receitas ***
+    // Receitas e Despesas da COOPERATIVA (mesma lógica da aba Receitas)
     const REC_COOP_CORP = [
       {% for r in _rec_coop_corp %}
         {
@@ -957,12 +1125,6 @@
     const RESTS = [
       {% for r in restaurantes %}
         { id: {{ r.id }}, nome: "{{ r.nome|e }}" }{{ "," if not loop.last }}
-      {% endfor %}
-    ];
-
-    const AVALS = [
-      {% for a in (avaliacoes or []) %}
-        { data: "{{ a.criado_em.strftime('%Y-%m-%d') if a.criado_em else '' }}", geral: {{ (a.geral or 0)|float }} }{{ "," if not loop.last }}
       {% endfor %}
     ];
 
@@ -1010,7 +1172,7 @@
     const kpiResultadoCoop = kpiRecCoopCorp - kpiDespCoopCorp;
     const kpiTotalReceitasGeral = kpiRecCoopCorp + kpiRecCooperadosFull;
 
-    // aplica
+    // aplica KPIs
     document.getElementById('kpiTotalProds').textContent        = fmtBR(kpiProd);
     document.getElementById('kpiINSS').textContent              = fmtBR(kpiINSS);
     document.getElementById('kpiRecCoopCorp').textContent       = fmtBR(kpiRecCoopCorp);
@@ -1026,7 +1188,7 @@
       resEl.classList.add(kpiResultadoCoop < 0 ? 'text-danger' : 'text-success');
     }
 
-    // ---- Tabela Resumo por Cooperado (cores nos valores e totais) ----
+    // ---- Tabela Resumo por Cooperado (incluindo Adiant.) ----
     (function buildResumoCoop(){
       const map = new Map(); // id -> item agregado
       const ensure = (id, nome) => {
@@ -1098,25 +1260,84 @@
     });
 
     ensureChart().then(()=>{
-      // Cooperativa: Receitas vs Despesas por mês
+      const moneyTick = (value) => 'R$ ' + value.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+      const baseChartOptions = {
+        responsive:true,
+        plugins:{
+          legend:{
+            position:'bottom',
+            labels:{ usePointStyle:true, padding:18, boxWidth:10, boxHeight:10 }
+          },
+          tooltip:{
+            mode:'index',
+            intersect:false,
+            callbacks:{
+              label:(ctx)=>{
+                const label = ctx.dataset.label || '';
+                const v = ctx.parsed.y ?? ctx.parsed.x ?? 0;
+                return `${label}: ${moneyTick(v)}`;
+              }
+            }
+          }
+        },
+        scales:{
+          x:{ grid:{ display:false } },
+          y:{
+            beginAtZero:true,
+            grid:{ color:'rgba(148,163,184,0.25)' },
+            ticks:{
+              callback:(v)=> moneyTick(v)
+            }
+          }
+        }
+      };
+
+      // Cooperativa: Receitas vs Despesas por mês (barras)
       (function(){
         const byM = {};
-        filteredRECc.forEach(r=>{ const k=byMonthKey(r.data)||'—'; (byM[k]??=( {r:0,d:0} )).r+=r.valor; });
-        filteredDESc.forEach(d=>{ const k=byMonthKey(d.data)||'—'; (byM[k]??=( {r:0,d:0} )).d+=d.valor; });
+        filteredRECc.forEach(r=>{
+          const k=byMonthKey(r.data)||'—';
+          (byM[k]??=( {r:0,d:0} )).r+=r.valor;
+        });
+        filteredDESc.forEach(d=>{
+          const k=byMonthKey(d.data)||'—';
+          (byM[k]??=( {r:0,d:0} )).d+=d.valor;
+        });
         const labels = Object.keys(byM).sort();
         const rec = labels.map(k=>byM[k].r);
         const des = labels.map(k=>byM[k].d);
+
         new Chart(document.getElementById('chartCoop'), {
           type:'bar',
-          data:{ labels, datasets:[
-            {label:'Receitas', data:rec},
-            {label:'Despesas', data:des}
-          ]},
-          options:{responsive:true, plugins:{legend:{position:'top'}}, scales:{y:{beginAtZero:true}}}
+          data:{
+            labels,
+            datasets:[
+              {
+                label:'Receitas',
+                data:rec,
+                backgroundColor:'rgba(37, 99, 235, 0.75)',
+                borderRadius:6,
+              },
+              {
+                label:'Despesas',
+                data:des,
+                backgroundColor:'rgba(239, 68, 68, 0.75)',
+                borderRadius:6,
+              }
+            ]
+          },
+          options:{
+            ...baseChartOptions,
+            scales:{
+              ...baseChartOptions.scales,
+              x:{ ...baseChartOptions.scales.x, stacked:false },
+              y:{ ...baseChartOptions.scales.y }
+            }
+          }
         });
       })();
 
-      // Cooperados: Produções (bruto) e INSS por mês
+      // Cooperados: Produções (bruto) e INSS por mês (linha/área)
       (function(){
         const byM = {};
         filteredPROD.forEach(p=>{
@@ -1127,17 +1348,41 @@
         const labels = Object.keys(byM).sort();
         const prod = labels.map(k=>byM[k].prod);
         const inss = labels.map(k=>byM[k].inss);
+
         new Chart(document.getElementById('chartCooperados'), {
           type:'line',
-          data:{ labels, datasets:[
-            {label:'Produções (bruto)', data:prod, tension:.2},
-            {label:'INSS (4,5%)', data:inss, tension:.2}
-          ]},
-          options:{responsive:true, plugins:{legend:{position:'top'}}, scales:{y:{beginAtZero:true}}}
+          data:{
+            labels,
+            datasets:[
+              {
+                label:'Produções (bruto)',
+                data:prod,
+                borderColor:'rgba(37, 99, 235, 1)',
+                backgroundColor:'rgba(37, 99, 235, 0.18)',
+                borderWidth:2,
+                tension:0.3,
+                fill:true,
+                pointRadius:3,
+                pointHoverRadius:4
+              },
+              {
+                label:'INSS (4,5%)',
+                data:inss,
+                borderColor:'rgba(56, 189, 248, 1)',
+                backgroundColor:'rgba(56, 189, 248, 0.12)',
+                borderWidth:2,
+                tension:0.3,
+                fill:true,
+                pointRadius:3,
+                pointHoverRadius:4
+              }
+            ]
+          },
+          options:baseChartOptions
         });
       })();
 
-      // Estabelecimentos (ranking no período)
+      // Estabelecimentos (ranking no período) — barra horizontal
       (function(){
         const byR = {};
         filteredPROD.forEach(p=>{
@@ -1147,29 +1392,26 @@
         const entries = Object.entries(byR).sort((a,b)=>b[1]-a[1]).slice(0,20);
         const labels = entries.map(e=>e[0]);
         const vals   = entries.map(e=>e[1]);
+
         new Chart(document.getElementById('chartEstabs'), {
           type:'bar',
-          data:{ labels, datasets:[{label:'Produções por Estabelecimento', data:vals}] },
-          options:{responsive:true, indexAxis:'y', scales:{x:{beginAtZero:true}}, plugins:{legend:{display:false}}}
-        });
-      })();
-
-      // Avaliações — média por mês (se houver)
-      (function(){
-        if(!Array.isArray(AVALS) || AVALS.length===0) return;
-        const byM = {};
-        AVALS.filter(a=>inRange(a.data)).forEach(a=>{
-          const k = byMonthKey(a.data)||'—';
-          (byM[k]??=( {s:0,c:0} )).s += (a.geral||0);
-          byM[k].c += 1;
-        });
-        const labels = Object.keys(byM).sort();
-        if(labels.length===0) return;
-        const medias = labels.map(k=> (byM[k].c? byM[k].s/byM[k].c : 0) );
-        new Chart(document.getElementById('chartAvaliacao'), {
-          type:'line',
-          data:{ labels, datasets:[{label:'Média ★', data:medias, tension:.2}] },
-          options:{responsive:true, scales:{y:{beginAtZero:true, max:5}}, plugins:{legend:{display:false}}}
+          data:{
+            labels,
+            datasets:[{
+              label:'Produções por Estabelecimento',
+              data:vals,
+              backgroundColor:'rgba(16, 185, 129, 0.8)',
+              borderRadius:6,
+            }]
+          },
+          options:{
+            ...baseChartOptions,
+            plugins:{
+              ...baseChartOptions.plugins,
+              legend:{ display:false }
+            },
+            indexAxis:'y'
+          }
         });
       })();
     });
@@ -1263,13 +1505,6 @@
         byC_des[nome].forEach(d=>aoa.push([d.data, d.descricao||'', d.valor, d.adiantamento? 'SIM':'NÃO']));
         aoaToSheet(safeSheetName('Despesa - '+nome), aoa, wb);
       });
-
-      // Avaliações (opcional)
-      if (Array.isArray(AVALS) && AVALS.length){
-        const avAOA = [['Data','Geral']];
-        AVALS.filter(a=>inRange(a.data)).forEach(a=>avAOA.push([a.data, a.geral]));
-        aoaToSheet('Avaliacoes', avAOA, wb);
-      }
 
       const now = new Date();
       const ymd = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
