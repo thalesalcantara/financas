@@ -26,7 +26,10 @@
     body{
       margin:0;
       font-family:'Roboto',sans-serif;
-      background:#f3f5fb;
+      /* Fundo um pouco mais sofisticado, estilo iOS */
+      background:
+        radial-gradient(circle at top left,#e5ebff 0,#f3f5fb 45%),
+        radial-gradient(circle at bottom right,#dde4ff 0,#f3f5fb 55%);
       color:#1f2430;
       overflow-x:hidden;
     }
@@ -44,7 +47,12 @@
       left:0;
       height:100vh;
       width:var(--sidebar-w);
-      background:linear-gradient(180deg,var(--royal-blue),var(--royal-dark));
+      /* Gradiente + vidro / blur */
+      background:linear-gradient(
+        180deg,
+        rgba(39,71,217,0.96),
+        rgba(22,37,138,0.92)
+      );
       color:#fff;
       padding:18px 14px;
       display:flex;
@@ -52,6 +60,9 @@
       box-shadow:0 0 22px rgba(0,0,0,.25);
       z-index:1020;
       overflow-y:auto;
+      border-right:1px solid rgba(255,255,255,0.25);
+      backdrop-filter:blur(20px) saturate(150%);
+      -webkit-backdrop-filter:blur(20px) saturate(150%);
     }
 
     .brand{
@@ -98,28 +109,36 @@
       justify-content:space-between;
       width:100%;
       border:0;
-      border-radius:10px;
-      padding:8px 10px;
-      margin:2px 0;
+      /* pill / boleado */
+      border-radius:999px;
+      padding:8px 12px;
+      margin:4px 0;
       background:transparent;
       color:#fff;
       font-size:.9rem;
       text-align:left;
       text-decoration:none;
       cursor:pointer;
-      transition:background .15s,transform .05s;
+      transition:
+        background .15s,
+        transform .05s,
+        box-shadow .15s;
     }
     .nav-link-main:hover,
     .nav-link-group-toggle:hover{
-      background:rgba(255,255,255,.08);
+      background:rgba(255,255,255,.10);
+      box-shadow:0 6px 14px rgba(15,23,42,0.35);
     }
     .nav-link-main.active{
-      background:rgba(0,0,0,.20);
-      box-shadow:0 0 0 1px rgba(255,255,255,.22);
+      background:rgba(0,0,0,.26);
+      box-shadow:
+        0 8px 20px rgba(15,23,42,.65),
+        0 0 0 1px rgba(255,255,255,.30);
     }
     .nav-link-main:active,
     .nav-link-group-toggle:active{
       transform:scale(.98);
+      box-shadow:0 3px 8px rgba(15,23,42,.45);
     }
 
     .nav-link-left{
@@ -150,22 +169,26 @@
       display:flex;
       align-items:center;
       gap:8px;
-      padding:6px 8px;
+      padding:6px 10px;
       margin:2px 0;
-      border-radius:8px;
+      /* pill nos sublinks também */
+      border-radius:999px;
       font-size:.85rem;
       color:rgba(255,255,255,.85);
       text-decoration:none;
-      transition:background .15s,color .15s,transform .05s;
+      transition:background .15s,color .15s,transform .05s,box-shadow .15s;
     }
     .nav-sublink:hover{
-      background:rgba(255,255,255,.08);
+      background:rgba(255,255,255,.10);
       color:#fff;
+      box-shadow:0 4px 10px rgba(15,23,42,0.4);
     }
     .nav-sublink.active{
-      background:rgba(0,0,0,.20);
+      background:rgba(0,0,0,.26);
       color:#fff;
-      box-shadow:0 0 0 1px rgba(255,255,255,.22);
+      box-shadow:
+        0 6px 16px rgba(15,23,42,.65),
+        0 0 0 1px rgba(255,255,255,.30);
     }
 
     .sidebar-footer{
@@ -199,21 +222,56 @@
       font-size:.85rem;
     }
 
+    /* CARDS COM EFEITO VIDRO LEVE -------------------------------------------*/
     .card{
-      border-radius:12px;
-      border:0;
-      box-shadow:0 2px 8px rgba(15,23,42,.09);
-      background:#fff;
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,0.75);
+      box-shadow:
+        0 16px 38px rgba(15,23,42,.16),
+        0 0 0 1px rgba(148,163,184,0.25);
+      background:
+        radial-gradient(circle at top left,
+          rgba(255,255,255,0.95),
+          rgba(247,249,255,0.9));
+      backdrop-filter:blur(14px) saturate(140%);
+      -webkit-backdrop-filter:blur(14px) saturate(140%);
+    }
+
+    /* BOTÕES GLOBAIS PILL / ESTILO iOS -------------------------------------*/
+
+    .btn{
+      border-radius:999px !important;
+      padding:.4rem 1.1rem;
+      font-weight:500;
+      border-width:0;
+      position:relative;
+      overflow:hidden;
+      transition:
+        transform .12s ease-out,
+        box-shadow .12s ease-out,
+        background .12s ease-out,
+        filter .12s ease-out;
+    }
+
+    .btn:hover{
+      transform:translateY(-1px);
+      box-shadow:0 8px 20px rgba(15,23,42,.25);
+      filter:brightness(1.03);
+    }
+
+    .btn:active{
+      transform:translateY(0);
+      box-shadow:0 3px 10px rgba(15,23,42,.35);
     }
 
     .btn-royal{
-      background:var(--royal-blue);
+      background:linear-gradient(135deg,var(--royal-blue),var(--royal-dark));
       color:#fff;
-      border-color:var(--royal-blue);
+      border:0;
+      box-shadow:0 10px 24px rgba(39,71,217,.55);
     }
     .btn-royal:hover{
-      background:var(--hover-blue);
-      border-color:var(--hover-blue);
+      background:linear-gradient(135deg,var(--hover-blue),var(--royal-blue));
       color:#fff;
     }
 
@@ -230,11 +288,14 @@
     }
 
     .badge-soft{
-      background:#eef2ff;
+      background:rgba(238,242,255,0.95);
       color:#223;
       border-radius:999px;
       padding:.15rem .55rem;
       font-size:.75rem;
+      border:1px solid rgba(199,210,254,0.9);
+      backdrop-filter:blur(8px);
+      -webkit-backdrop-filter:blur(8px);
     }
 
     /* Responsivo -------------------------------------------------------------*/
@@ -259,7 +320,7 @@
         padding:16px 10px;
       }
     }
-  </style>
+</style>
 </head>
 <body>
 
@@ -928,15 +989,41 @@
   <style>
     /* CONTAINER GERAL DA ABA RESUMO */
     #resumo .resumo-shell{
-      background: radial-gradient(circle at top left, rgba(48,71,214,0.10), transparent 55%),
-                  radial-gradient(circle at bottom right, rgba(16,185,129,0.10), transparent 55%);
+      background:
+        radial-gradient(circle at top left, rgba(48,71,214,0.14), transparent 55%),
+        radial-gradient(circle at bottom right, rgba(16,185,129,0.12), transparent 55%);
       border-radius: 1.5rem;
       padding: 0.85rem;
+      border: 1px solid rgba(148,163,184,0.35);
+      box-shadow:
+        0 18px 40px rgba(15,23,42,0.15),
+        0 0 0 1px rgba(148,163,184,0.18);
+      background-color: rgba(248,250,255,0.88);
+      backdrop-filter: blur(18px) saturate(140%);
+      -webkit-backdrop-filter: blur(18px) saturate(140%);
     }
 
     #resumo .resumo-filter-card {
-      background: rgba(255,255,255,0.96);
-      border: 1px solid rgba(148,163,184,0.35);
+      background: linear-gradient(
+        145deg,
+        rgba(255,255,255,0.97),
+        rgba(245,248,255,0.94)
+      );
+      border-radius: 1.1rem;
+      border: 1px solid rgba(148,163,184,0.40);
+      box-shadow:
+        0 14px 32px rgba(15,23,42,0.14),
+        0 0 0 1px rgba(148,163,184,0.18);
+      backdrop-filter: blur(16px) saturate(145%);
+      -webkit-backdrop-filter: blur(16px) saturate(145%);
+      transition: box-shadow 0.15s ease-out, transform 0.15s ease-out;
+    }
+
+    #resumo .resumo-filter-card:hover{
+      transform: translateY(-1px);
+      box-shadow:
+        0 18px 44px rgba(15,23,42,0.18),
+        0 0 0 1px rgba(59,130,246,0.35);
     }
 
     #resumo .resumo-title{
@@ -944,19 +1031,42 @@
       font-weight: 600;
     }
 
+    /* KPI CARDS - ESTILO iOS / VIDRO */
     #resumo .resumo-kpi-row .card.kpi-card {
       position: relative;
       overflow: hidden;
-      transition: transform 0.12s ease-out, box-shadow 0.12s ease-out, border-color 0.12s ease-out, background-color 0.12s ease-out;
-      border: 1px solid #e2e8f0;
-      background: #ffffff;
+      border-radius: 1.25rem;
+      transition:
+        transform 0.12s ease-out,
+        box-shadow 0.12s ease-out,
+        border-color 0.12s ease-out,
+        background-color 0.12s ease-out,
+        filter 0.12s ease-out;
+      border: 1px solid rgba(226,232,240,0.9);
+      background: linear-gradient(
+        135deg,
+        rgba(255,255,255,0.97),
+        rgba(245,247,255,0.93)
+      );
+      box-shadow:
+        0 14px 30px rgba(15,23,42,0.12),
+        0 0 0 1px rgba(148,163,184,0.16);
+      backdrop-filter: blur(14px) saturate(135%);
+      -webkit-backdrop-filter: blur(14px) saturate(135%);
     }
 
     #resumo .resumo-kpi-row .card.kpi-card:hover {
       transform: translateY(-2px);
-      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.14);
+      box-shadow:
+        0 20px 46px rgba(15,23,42,0.18),
+        0 0 0 1px rgba(48,71,214,0.55);
       border-color: rgba(48,71,214,0.55);
-      background: linear-gradient(135deg, #ffffff, #f5f7ff);
+      background: linear-gradient(
+        135deg,
+        rgba(255,255,255,0.98),
+        rgba(238,242,255,0.98)
+      );
+      filter: brightness(1.01);
     }
 
     #resumo .kpi-border{
@@ -980,6 +1090,7 @@
       font-size: 0.76rem;
     }
 
+    /* BOLINHAS / PÍLULAS ESTILO iOS */
     #resumo .resumo-pill-label {
       width: 32px;
       height: 32px;
@@ -987,28 +1098,37 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      background: rgba(48,71,214,0.08);
+      background: radial-gradient(circle at 30% 20%, #ffffff, rgba(48,71,214,0.14));
       color: #3047d6;
       font-size: 0.9rem;
+      box-shadow: 0 8px 18px rgba(37,99,235,0.32);
+      border: 1px solid rgba(191,219,254,0.9);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
 
     #resumo .kpi-icon {
       width: 42px;
       height: 42px;
-      border-radius: 14px;
+      border-radius: 1.2rem;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(48,71,214,0.08);
+      background: radial-gradient(circle at 30% 20%, #ffffff, rgba(48,71,214,0.12));
       color: #3047d6;
       font-size: 1.1rem;
+      box-shadow: 0 10px 22px rgba(37,99,235,0.35);
+      border: 1px solid rgba(191,219,254,0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
 
+    /* TABELA RESUMO ---------------------------------------------------------*/
     #resumo .table-resumo thead th {
       font-size: 0.78rem;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      background: #f5f7fb;
+      background: linear-gradient(90deg,#f5f7fb,#eef2ff);
       border-bottom: 1px solid #e4e7f0;
     }
 
@@ -1018,6 +1138,7 @@
 
     #resumo .table-resumo tfoot td {
       font-size: 0.82rem;
+      font-weight: 600;
     }
 
     #resumo .table-resumo tbody tr:hover {
@@ -1046,7 +1167,7 @@
         font-size: 0.78rem;
       }
     }
-  </style>
+</style>
 
   <!-- Dados (seguros p/ JS) + Scripts (Chart.js + XLSX) -->
 <script>
@@ -1996,33 +2117,52 @@
     color: #9aa0ac;
   }
 
+  /* HEADER LANCAMENTOS - VIDRO / iOS */
   .lanc-card-header {
-    border-radius: 1rem;
-    border: 1px solid #e4e7f0;
-    background: radial-gradient(circle at top left, #f5f7ff 0, #ffffff 40%);
+    border-radius: 1.25rem;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    background:
+      radial-gradient(circle at top left, rgba(48, 71, 214, 0.18) 0, rgba(248, 250, 255, 0.98) 40%),
+      radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.10) 0, rgba(255, 255, 255, 0.96) 50%);
+    box-shadow:
+      0 16px 36px rgba(15, 23, 42, 0.16),
+      0 0 0 1px rgba(148, 163, 184, 0.18);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
   }
 
+  /* ÍCONE REDONDO ESTILO iOS */
   .lanc-icon-circle {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border-radius: 999px;
-    background: #3047d61a;
+    background: radial-gradient(circle at 30% 20%, #ffffff, rgba(48, 71, 214, 0.18));
     display: inline-flex;
     align-items: center;
     justify-content: center;
     color: #3047d6;
-    font-size: 1rem;
+    font-size: 1.05rem;
+    box-shadow: 0 10px 22px rgba(37, 99, 235, 0.35);
+    border: 1px solid rgba(191, 219, 254, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
 
+  /* CHIPS KPI - PÍLULAS BOLEADAS */
   .kpi-chip {
     border-radius: 999px;
-    padding: 0.3rem 0.9rem;
+    padding: 0.35rem 1rem;
     font-size: 0.78rem;
     display: inline-flex;
     flex-direction: column;
-    min-width: 90px;
-    border: 1px solid #e5e7eb;
-    background: #ffffff;
+    min-width: 96px;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98));
+    box-shadow:
+      0 10px 24px rgba(15, 23, 42, 0.12),
+      0 0 0 1px rgba(148, 163, 184, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   .kpi-label {
@@ -2035,45 +2175,65 @@
   }
 
   .kpi-info {
-    background: #eef2ff;
+    background: linear-gradient(135deg, #eef2ff, #dbeafe);
     border-color: #c7d2fe;
     color: #1d4ed8;
   }
 
   .kpi-soft {
-    background: #f1f5f9;
+    background: linear-gradient(135deg, #f1f5f9, #e5e7eb);
     border-color: #e2e8f0;
   }
 
   .kpi-success {
-    background: #e5fbf0;
+    background: linear-gradient(135deg, #e5fbf0, #bbf7d0);
     border-color: #bbf7d0;
     color: #166534;
   }
 
   .kpi-danger {
-    background: #fee2e2;
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
     border-color: #fecaca;
     color: #b91c1c;
   }
 
   .kpi-neutral {
-    background: #f9fafb;
+    background: linear-gradient(135deg, #f9fafb, #e5e7eb);
     border-color: #e5e7eb;
   }
 
+  /* CARD FILTRO - GLASSMORPHISM */
   .lanc-filter-card {
-    border-radius: 0.9rem;
-    border: 1px solid #e4e7f0;
-    background: #ffffff;
+    border-radius: 1rem;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    background: linear-gradient(
+      140deg,
+      rgba(255, 255, 255, 0.97),
+      rgba(245, 248, 255, 0.96)
+    );
+    box-shadow:
+      0 16px 32px rgba(15, 23, 42, 0.16),
+      0 0 0 1px rgba(148, 163, 184, 0.16);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    transition: transform 0.14s ease-out, box-shadow 0.14s ease-out;
+  }
+
+  .lanc-filter-card:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 20px 44px rgba(15, 23, 42, 0.20),
+      0 0 0 1px rgba(59, 130, 246, 0.36);
   }
 
   .filter-dot {
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
     border-radius: 999px;
     background: #22c55e;
-    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
+    box-shadow:
+      0 0 0 4px rgba(34, 197, 94, 0.18),
+      0 0 12px rgba(34, 197, 94, 0.45);
   }
 
   .lanc-label {
@@ -2081,35 +2241,59 @@
     font-weight: 500;
   }
 
+  /* CARD "LANÇAR" - VIDRO VERDE */
   .lanc-launch-card {
-    border-radius: 0.9rem;
-    border: 1px solid #e4e7f0;
-    background: linear-gradient(135deg, #f5f7ff 0, #ffffff 60%);
+    border-radius: 1rem;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    background: linear-gradient(
+      135deg,
+      rgba(34, 197, 94, 0.06),
+      rgba(245, 253, 250, 0.98)
+    );
+    box-shadow:
+      0 16px 34px rgba(22, 163, 74, 0.23),
+      0 0 0 1px rgba(187, 247, 208, 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 
   .launch-icon {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     border-radius: 999px;
-    background: #22c55e1a;
+    background: radial-gradient(circle at 30% 20%, #ffffff, rgba(34, 197, 94, 0.20));
     display: inline-flex;
     align-items: center;
     justify-content: center;
     color: #16a34a;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+    box-shadow: 0 10px 22px rgba(34, 197, 94, 0.4);
+    border: 1px solid rgba(187, 247, 208, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
 
+  /* CARD TABELA - VIDRO BRANCO */
   .lanc-table-card {
-    border-radius: 0.9rem;
-    border: 1px solid #e4e7f0;
-    background: #ffffff;
+    border-radius: 1rem;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.98),
+      rgba(248, 250, 252, 0.98)
+    );
+    box-shadow:
+      0 18px 38px rgba(15, 23, 42, 0.16),
+      0 0 0 1px rgba(148, 163, 184, 0.18);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
   }
 
   .lanc-table thead th {
     font-size: 0.76rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    background-color: #f8fafc;
+    background: linear-gradient(90deg, #f8fafc, #eef2ff);
     border-bottom: 1px solid #e5e7eb;
   }
 
@@ -2131,6 +2315,8 @@
   .bg-soft-count {
     background: #eef2ff;
     color: #1f2937;
+    border-radius: 999px;
+    padding: 0.12rem 0.6rem;
   }
 
   .lanc-tfoot-row {
@@ -2138,11 +2324,46 @@
     font-size: 0.78rem;
   }
 
+  /* BOTÃO EXCLUIR BOLEADO ESTILO iOS */
   .btn-del {
-    transition: transform 0.12s ease-out;
+    border-radius: 999px;
+    border: 1px solid rgba(248, 113, 113, 0.9);
+    padding: 0.25rem 0.7rem;
+    font-size: 0.75rem;
+    background: radial-gradient(circle at 30% 20%, #fee2e2, #fecaca);
+    color: #991b1b;
+    box-shadow:
+      0 10px 22px rgba(248, 113, 113, 0.45),
+      0 0 0 1px rgba(248, 202, 202, 0.85);
+    transition: transform 0.12s ease-out, box-shadow 0.12s ease-out, filter 0.12s ease-out;
   }
+
   .btn-del:hover {
     transform: translateY(-1px);
+    box-shadow:
+      0 14px 30px rgba(248, 113, 113, 0.55),
+      0 0 0 1px rgba(248, 202, 202, 0.95);
+    filter: brightness(1.02);
+  }
+
+  .btn-del:active {
+    transform: translateY(0);
+    box-shadow:
+      0 6px 14px rgba(248, 113, 113, 0.45),
+      0 0 0 1px rgba(248, 202, 202, 0.95);
+  }
+
+  @media (max-width: 576px) {
+    .lanc-card-header {
+      border-radius: 1rem;
+    }
+    .lanc-table-card {
+      border-radius: 0.9rem;
+    }
+    .kpi-chip {
+      min-width: 80px;
+      padding: 0.3rem 0.75rem;
+    }
   }
 </style>
 
@@ -4416,7 +4637,7 @@
 
 <style>
   .section-title {
-    font-size: 0.95rem;
+    font-size: 0.98rem;
     font-weight: 600;
   }
 
@@ -4425,17 +4646,30 @@
     color: #6c757d;
   }
 
+  /* CARD BASE – VIDRO / iOS */
   .card {
-    border-radius: 0.75rem;
-    border: 1px solid #e4e7f0;
+    border-radius: 1.1rem;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.98),
+      rgba(245, 248, 255, 0.98)
+    );
+    box-shadow:
+      0 18px 38px rgba(15, 23, 42, 0.18),
+      0 0 0 1px rgba(148, 163, 184, 0.18);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
   }
 
   .badge-soft {
-    background: #eef2ff;
+    background: radial-gradient(circle at 30% 20%, #ffffff, #eef2ff);
     color: #3047d6;
     border-radius: 999px;
-    padding: 0.25rem 0.7rem;
+    padding: 0.25rem 0.8rem;
     font-size: 0.75rem;
+    border: 1px solid rgba(191, 219, 254, 0.9);
+    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.25);
   }
 
   .extra-small {
@@ -4447,23 +4681,64 @@
     color: #9aa0ac;
   }
 
+  /* BOTÃO EXTRA PEQUENO – PÍLULA iOS */
   .btn-xs {
-    padding: 0.18rem 0.5rem;
+    padding: 0.18rem 0.65rem;
     font-size: 0.74rem;
     border-radius: 999px;
+    border: 1px solid rgba(209, 213, 219, 0.9);
+    background: radial-gradient(circle at 20% 0, #ffffff, #e5edff);
+    box-shadow:
+      0 10px 24px rgba(148, 163, 184, 0.45),
+      0 0 0 1px rgba(199, 210, 254, 0.85);
+    transition: transform 0.12s ease-out, box-shadow 0.12s ease-out, filter 0.12s ease-out;
   }
 
+  .btn-xs:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 14px 32px rgba(129, 140, 248, 0.55),
+      0 0 0 1px rgba(129, 140, 248, 0.95);
+    filter: brightness(1.02);
+  }
+
+  .btn-xs:active {
+    transform: translateY(0);
+    box-shadow:
+      0 8px 18px rgba(129, 140, 248, 0.4),
+      0 0 0 1px rgba(129, 140, 248, 0.95);
+  }
+
+  /* CARD UPLOAD ESCALAS – VIDRO */
   .escala-upload-card {
-    background: linear-gradient(135deg, #f5f7ff 0%, #ffffff 100%);
+    background:
+      radial-gradient(circle at top left, rgba(48, 71, 214, 0.18) 0, rgba(245, 247, 255, 0.98) 35%),
+      radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.10) 0, rgba(255, 255, 255, 0.98) 50%);
+    border-radius: 1.25rem;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    box-shadow:
+      0 18px 42px rgba(15, 23, 42, 0.22),
+      0 0 0 1px rgba(148, 163, 184, 0.2);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
   }
 
+  /* CAIXA DE BUSCA – BOLEADA / iOS */
   .escala-search-box {
     min-width: 240px;
     max-width: 260px;
-    padding: 0.6rem 0.75rem;
-    border-radius: 0.75rem;
-    background: #f8f9ff;
-    border: 1px solid #e0e4ff;
+    padding: 0.6rem 0.85rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #f8f9ff, #eef2ff);
+    border: 1px solid rgba(208, 213, 255, 0.95);
+    box-shadow:
+      0 12px 26px rgba(129, 140, 248, 0.30),
+      0 0 0 1px rgba(191, 219, 254, 0.85);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   .search-input::placeholder {
@@ -4475,6 +4750,7 @@
     overflow-y: auto;
   }
 
+  /* TABELA ESCALAS – CABEÇALHO SUAVE */
   .table-escalas {
     border-collapse: separate;
     border-spacing: 0;
@@ -4484,7 +4760,7 @@
     font-size: 0.72rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    background-color: #f5f7fb;
+    background: linear-gradient(90deg, #f5f7fb, #eef2ff);
     border-bottom: 1px solid #e4e7f0;
   }
 
@@ -4495,32 +4771,34 @@
     font-size: 0.78rem;
   }
 
+  /* BADGES DE DOCUMENTOS – PÍLULAS VIDRO */
   .badge-doc {
     font-size: 0.68rem;
     border-radius: 999px;
-    padding: 0.15rem 0.55rem;
+    padding: 0.18rem 0.6rem;
     border: 1px solid transparent;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
   }
 
   .badge-doc-ok {
-    background: #e9f9ee;
+    background: radial-gradient(circle at 30% 20%, #ffffff, #e9f9ee);
     color: #1c7c3c;
     border-color: #b7e4c7;
   }
 
   .badge-doc-pend {
-    background: #fff0f0;
+    background: radial-gradient(circle at 30% 20%, #ffffff, #fff0f0);
     color: #b02a37;
     border-color: #f5c2c7;
   }
 
   .badge-doc-na {
-    background: #f2f3f7;
+    background: radial-gradient(circle at 30% 20%, #ffffff, #f2f3f7);
     color: #6c757d;
     border-color: #dde1ee;
   }
 
-  /* Trocas – mesmo padrão visual */
+  /* TROCAS – MESMO VISUAL VIDRO */
   .troca-pendentes-wrapper,
   .troca-historico-wrapper {
     max-height: 380px;
@@ -4536,7 +4814,7 @@
     font-size: 0.72rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    background-color: #f5f7fb;
+    background: linear-gradient(90deg, #f5f7fb, #eef2ff);
     border-bottom: 1px solid #e4e7f0;
   }
 
@@ -4552,6 +4830,23 @@
     white-space: nowrap;
     text-overflow: ellipsis;
     overflow: hidden;
+  }
+
+  @media (max-width: 576px) {
+    .card {
+      border-radius: 1rem;
+      box-shadow:
+        0 12px 28px rgba(15, 23, 42, 0.18),
+        0 0 0 1px rgba(148, 163, 184, 0.18);
+    }
+
+    .escala-upload-card {
+      border-radius: 1.1rem;
+    }
+
+    .escala-search-box {
+      max-width: 100%;
+    }
   }
 </style>
 
