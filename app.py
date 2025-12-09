@@ -3846,24 +3846,42 @@ def delete_receita_coop(id):
 @admin_required
 def add_despesa_coop():
     f = request.form
-    ids = request.form.getlist("cooperado_ids[]")
+
+    # lista de cooperados selecionados (vários checkboxes ou um select múltiplo)
+    ids = f.getlist("cooperado_ids[]")  # ex.: ["3", "5", "8"]
+
     descricao = f.get("descricao", "").strip()
     valor_total = f.get("valor", type=float) or 0.0
     d = _parse_date(f.get("data"))
-    # nome do checkbox no HTML, por ex.: <input type="checkbox" name="eh_adiantamento">
+    # nome do checkbox no HTML: <input type="checkbox" name="eh_adiantamento">
     eh_adiantamento = bool(f.get("eh_adiantamento"))
-    ...
-    db.session.add(DespesaCooperado(
-        cooperado_id=cid,
-        descricao=descricao,
-        valor=valor_unit,
-        data=d,
-        eh_adiantamento=eh_adiantamento,  # 👈 grava a flag
-    ))
+
+    # segurança: se ninguém foi selecionado
+    if not ids:
+        flash("Selecione pelo menos um cooperado.", "warning")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    # se não veio data válida, usa hoje
+    if not d:
+        d = date.today()
+
+    # se quiser dividir o valor igualmente entre os cooperados:
+    qtd = len(ids)
+    valor_unit = valor_total / qtd if qtd > 0 else 0.0
+
+    # cria uma despesa para cada cooperado selecionado
+    for cid in ids:
+        db.session.add(DespesaCooperado(
+            cooperado_id=cid,
+            descricao=descricao,
+            valor=valor_unit,
+            data=d,
+            eh_adiantamento=eh_adiantamento,  # grava a flag de adiantamento
+        ))
+
     db.session.commit()
     flash("Despesa(s) lançada(s).", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
 
 @app.route("/coop/despesas/<int:id>/edit", methods=["POST"])
 @admin_required
