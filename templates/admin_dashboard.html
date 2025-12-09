@@ -1129,6 +1129,7 @@
       { id: {{ c.id }}, nome: "{{ c.nome|e }}" }{{ "," if not loop.last }}
     {% endfor %}
   ];
+
   const RESTS = [
     {% for r in restaurantes %}
       { id: {{ r.id }}, nome: "{{ r.nome|e }}" }{{ "," if not loop.last }}
@@ -1136,54 +1137,63 @@
   ];
 
   // ---- Utils ----
-  const parseISO = s => (!s)?null:new Date(s+'T00:00:00');
-  const fmtBR = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{
-    minimumFractionDigits:2,
-    maximumFractionDigits:2
+  const parseISO = s => (!s) ? null : new Date(s + 'T00:00:00');
+
+  const fmtBR = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
   });
+
   const inRange = (d) => {
-    const di = parseISO(FILTER.ri), df = parseISO(FILTER.rf), x = parseISO(d);
-    if(!x) return true;
-    if(di && x < di) return false;
-    if(df && x > df) return false;
+    const di = parseISO(FILTER.ri);
+    const df = parseISO(FILTER.rf);
+    const x  = parseISO(d);
+    if (!x) return true;
+    if (di && x < di) return false;
+    if (df && x > df) return false;
     return true;
   };
+
   const byMonthKey = d => {
-    if(!d) return '';
+    if (!d) return '';
     const dt = parseISO(d);
-    if(!dt || isNaN(dt)) return '';
-    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
+    if (!dt || isNaN(dt)) return '';
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
   };
-  const sumBy = (arr, fn) => arr.reduce((acc,cur)=>acc+(+fn(cur)||0), 0);
+
+  const sumBy = (arr, fn) => arr.reduce((acc, cur) => acc + (+fn(cur) || 0), 0);
 
   // ---- Filtrados ----
   const filteredPROD = PRODUCOES.filter(p =>
     inRange(p.data) &&
-    (FILTER.cid==null || p.cooperado_id===FILTER.cid) &&
-    (FILTER.rid==null || p.restaurante_id===FILTER.rid)
+    (FILTER.cid == null || p.cooperado_id === FILTER.cid) &&
+    (FILTER.rid == null || p.restaurante_id === FILTER.rid)
   );
+
   const filteredRECp = REC_COOP.filter(r =>
     inRange(r.data) &&
-    (FILTER.cid==null || r.cooperado_id===FILTER.cid)
+    (FILTER.cid == null || r.cooperado_id === FILTER.cid)
   );
+
   const filteredDESp = DESP_COOP.filter(d =>
     inRange(d.data) &&
-    (FILTER.cid==null || d.cooperado_id===FILTER.cid)
+    (FILTER.cid == null || d.cooperado_id === FILTER.cid)
   );
+
   const filteredRECc = REC_COOP_CORP.filter(r => inRange(r.data));
   const filteredDESc = DESP_COOP_CORP.filter(d => inRange(d.data));
 
   // ---- KPIs (front) ----
-  const kpiProd               = sumBy(filteredPROD, x=>x.valor);
+  const kpiProd               = sumBy(filteredPROD, x => x.valor);
   const kpiINSS               = kpiProd * 0.045;
-  const kpiRecCoopCorp        = sumBy(filteredRECc, x=>x.valor);
-  const kpiDespCoopCorp       = sumBy(filteredDESc, x=>x.valor);
-  const kpiRecCooperadosFull  = kpiProd + sumBy(filteredRECp, x=>x.valor);
-  const kpiDespCooperados     = sumBy(filteredDESp, x=>x.valor);
+  const kpiRecCoopCorp        = sumBy(filteredRECc, x => x.valor);
+  const kpiDespCoopCorp       = sumBy(filteredDESc, x => x.valor);
+  const kpiRecCooperadosFull  = kpiProd + sumBy(filteredRECp, x => x.valor);
+  const kpiDespCooperados     = sumBy(filteredDESp, x => x.valor);
   const kpiResultadoCoop      = kpiRecCoopCorp - kpiDespCoopCorp;
   const kpiTotalReceitasGeral = kpiRecCoopCorp + kpiRecCooperadosFull;
 
-  // aplica KPIs
+  // aplica KPIs na tela
   document.getElementById('kpiTotalProds').textContent         = fmtBR(kpiProd);
   document.getElementById('kpiINSS').textContent               = fmtBR(kpiINSS);
   document.getElementById('kpiRecCoopCorp').textContent        = fmtBR(kpiRecCoopCorp);
@@ -1193,63 +1203,80 @@
   document.getElementById('kpiTotalReceitasGeral').textContent = fmtBR(kpiTotalReceitasGeral);
 
   const resEl = document.getElementById('kpiResultadoCoop');
-  if (resEl){
+  if (resEl) {
     resEl.textContent = fmtBR(kpiResultadoCoop);
-    resEl.classList.remove('text-success','text-danger');
+    resEl.classList.remove('text-success', 'text-danger');
     resEl.classList.add(kpiResultadoCoop < 0 ? 'text-danger' : 'text-success');
   }
 
   // ---- Função de resumo (usada na tabela e no XLSX) ----
-  function computeResumoCoopRows(){
+  function computeResumoCoopRows() {
     const map = new Map(); // id -> item agregado
     const ensure = (id, nome) => {
-      if(!map.has(id)) map.set(id, {id, nome, prod:0, inss:0, rec:0, des:0, ad:0});
+      if (!map.has(id)) {
+        map.set(id, { id, nome, prod: 0, inss: 0, rec: 0, des: 0, ad: 0 });
+      }
       return map.get(id);
     };
 
-    filteredPROD.forEach(p=>{
-      if(p.cooperado_id==null) return;
+    filteredPROD.forEach(p => {
+      if (p.cooperado_id == null) return;
       const row = ensure(p.cooperado_id, p.cooperado_nome);
       row.prod += p.valor;
-      row.inss += p.valor*0.045;
+      row.inss += p.valor * 0.045;
     });
-    filteredRECp.forEach(r=>{
-      if(r.cooperado_id==null) return;
+
+    filteredRECp.forEach(r => {
+      if (r.cooperado_id == null) return;
       const row = ensure(r.cooperado_id, r.cooperado_nome);
       row.rec += r.valor;
     });
-    filteredDESp.forEach(d=>{
-      if(d.cooperado_id==null) return;
+
+    filteredDESp.forEach(d => {
+      if (d.cooperado_id == null) return;
       const row = ensure(d.cooperado_id, d.cooperado_nome || '—');
-      if(d.adiantamento) row.ad += d.valor; else row.des += d.valor;
+      if (d.adiantamento) row.ad += d.valor;
+      else row.des += d.valor;
     });
 
-    return Array.from(map.values()).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    return Array.from(map.values()).sort((a, b) =>
+      (a.nome || '').localeCompare(b.nome || '', 'pt-BR')
+    );
   }
 
   const RESUMO_COOP_ROWS = computeResumoCoopRows();
 
   // ---- Tabela Resumo por Cooperado (incluindo Adiant.) na tela ----
-  (function renderResumoCoopTable(){
-    const rows = RESUMO_COOP_ROWS;
+  (function renderResumoCoopTable() {
+    const rows  = RESUMO_COOP_ROWS;
     const tbody = document.querySelector('#tblResumoCoop tbody');
+
+    if (!tbody) return;
+
     tbody.innerHTML = rows.length
       ? ''
       : '<tr><td colspan="7" class="text-center text-muted">Sem dados no filtro.</td></tr>';
 
-    let tProd=0,tINSS=0,tRec=0,tDes=0,tAd=0,tLiq=0;
-    rows.forEach(r=>{
+    let tProd = 0, tINSS = 0, tRec = 0, tDes = 0, tAd = 0, tLiq = 0;
+
+    rows.forEach(r => {
       const liq = r.prod + r.rec - r.inss - r.des - r.ad;
-      tProd+=r.prod; tINSS+=r.inss; tRec+=r.rec; tDes+=r.des; tAd+=r.ad; tLiq+=liq;
+      tProd += r.prod;
+      tINSS += r.inss;
+      tRec  += r.rec;
+      tDes  += r.des;
+      tAd   += r.ad;
+      tLiq  += liq;
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td class="text-break">${r.nome||'—'}</td>
+        <td class="text-break">${r.nome || '—'}</td>
         <td class="text-end">${fmtBR(r.prod)}</td>
         <td class="text-end">${fmtBR(r.inss)}</td>
         <td class="text-end text-success">${fmtBR(r.rec)}</td>
         <td class="text-end text-danger">${fmtBR(r.des)}</td>
         <td class="text-end text-primary">${fmtBR(r.ad)}</td>
-        <td class="text-end fw-bold ${liq<0?'text-danger':''}">${fmtBR(liq)}</td>`;
+        <td class="text-end fw-bold ${liq < 0 ? 'text-danger' : ''}">${fmtBR(liq)}</td>`;
       tbody.appendChild(tr);
     });
 
@@ -1262,42 +1289,44 @@
     const tAdEl  = document.getElementById('tAd');
     const tLiqEl = document.getElementById('tLiq');
 
-    tRecEl.textContent = fmtBR(tRec);
-    tDesEl.textContent = fmtBR(tDes);
-    tAdEl.textContent  = fmtBR(tAd);
+    if (tRecEl) tRecEl.textContent = fmtBR(tRec);
+    if (tDesEl) tDesEl.textContent = fmtBR(tDes);
+    if (tAdEl)  tAdEl.textContent  = fmtBR(tAd);
 
-    tLiqEl.textContent = fmtBR(tLiq);
-    tLiqEl.classList.remove('text-danger','text-success');
-    if (tLiq < 0) tLiqEl.classList.add('text-danger'); // negativo em vermelho
+    if (tLiqEl) {
+      tLiqEl.textContent = fmtBR(tLiq);
+      tLiqEl.classList.remove('text-danger', 'text-success');
+      if (tLiq < 0) tLiqEl.classList.add('text-danger'); // negativo em vermelho
+    }
   })();
 
   // ---- Gráficos (Chart.js via CDN) ----
-  const ensureChart = () => new Promise(res=>{
+  const ensureChart = () => new Promise(res => {
     if (window.Chart) return res();
-    const s=document.createElement('script');
-    s.src="https://cdn.jsdelivr.net/npm/chart.js";
-    s.onload=()=>res();
+    const s = document.createElement('script');
+    s.src = "https://cdn.jsdelivr.net/npm/chart.js";
+    s.onload = () => res();
     document.head.appendChild(s);
   });
 
-  ensureChart().then(()=>{
-    const moneyTick = (value) => 'R$ ' + value.toLocaleString('pt-BR',{
-      minimumFractionDigits:2,
-      maximumFractionDigits:2
+  ensureChart().then(() => {
+    const moneyTick = (value) => 'R$ ' + value.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     });
 
     const baseChartOptions = {
-      responsive:true,
-      plugins:{
-        legend:{
-          position:'bottom',
-          labels:{ usePointStyle:true, padding:18, boxWidth:10, boxHeight:10 }
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { usePointStyle: true, padding: 18, boxWidth: 10, boxHeight: 10 }
         },
-        tooltip:{
-          mode:'index',
-          intersect:false,
-          callbacks:{
-            label:(ctx)=>{
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: (ctx) => {
               const label = ctx.dataset.label || '';
               const v = ctx.parsed.y ?? ctx.parsed.x ?? 0;
               return `${label}: ${moneyTick(v)}`;
@@ -1305,174 +1334,190 @@
           }
         }
       },
-      scales:{
-        x:{ grid:{ display:false } },
-        y:{
-          beginAtZero:true,
-          grid:{ color:'rgba(148,163,184,0.25)' },
-          ticks:{ callback:(v)=> moneyTick(v) }
+      scales: {
+        x: { grid: { display: false } },
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(148,163,184,0.25)' },
+          ticks: { callback: (v) => moneyTick(v) }
         }
       }
     };
 
     // Cooperativa: Receitas vs Despesas por mês (barras)
-    (function(){
+    (function () {
       const byM = {};
-      filteredRECc.forEach(r=>{
-        const k=byMonthKey(r.data)||'—';
-        (byM[k]??=( {r:0,d:0} )).r+=r.valor;
+      filteredRECc.forEach(r => {
+        const k = byMonthKey(r.data) || '—';
+        (byM[k] ??= { r: 0, d: 0 }).r += r.valor;
       });
-      filteredDESc.forEach(d=>{
-        const k=byMonthKey(d.data)||'—';
-        (byM[k]??=( {r:0,d:0} )).d+=d.valor;
+      filteredDESc.forEach(d => {
+        const k = byMonthKey(d.data) || '—';
+        (byM[k] ??= { r: 0, d: 0 }).d += d.valor;
       });
-      const labels = Object.keys(byM).sort();
-      const rec = labels.map(k=>byM[k].r);
-      const des = labels.map(k=>byM[k].d);
 
-      new Chart(document.getElementById('chartCoop'), {
-        type:'bar',
-        data:{
+      const labels = Object.keys(byM).sort();
+      const rec    = labels.map(k => byM[k].r);
+      const des    = labels.map(k => byM[k].d);
+
+      const ctx = document.getElementById('chartCoop');
+      if (!ctx) return;
+
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
           labels,
-          datasets:[
+          datasets: [
             {
-              label:'Receitas',
-              data:rec,
-              backgroundColor:'rgba(37, 99, 235, 0.75)',
-              borderRadius:6,
+              label: 'Receitas',
+              data: rec,
+              backgroundColor: 'rgba(37, 99, 235, 0.75)',
+              borderRadius: 6,
             },
             {
-              label:'Despesas',
-              data:des,
-              backgroundColor:'rgba(239, 68, 68, 0.75)',
-              borderRadius:6,
+              label: 'Despesas',
+              data: des,
+              backgroundColor: 'rgba(239, 68, 68, 0.75)',
+              borderRadius: 6,
             }
           ]
         },
-        options:{
+        options: {
           ...baseChartOptions,
-          scales:{
+          scales: {
             ...baseChartOptions.scales,
-            x:{ ...baseChartOptions.scales.x, stacked:false },
-            y:{ ...baseChartOptions.scales.y }
+            x: { ...baseChartOptions.scales.x, stacked: false },
+            y: { ...baseChartOptions.scales.y }
           }
         }
       });
     })();
 
     // Cooperados: Produções (bruto) e INSS por mês (linha/área)
-    (function(){
+    (function () {
       const byM = {};
-      filteredPROD.forEach(p=>{
-        const k=byMonthKey(p.data)||'—';
-        (byM[k]??=( {prod:0,inss:0} )).prod+=p.valor;
-        byM[k].inss += p.valor*0.045;
+      filteredPROD.forEach(p => {
+        const k = byMonthKey(p.data) || '—';
+        (byM[k] ??= { prod: 0, inss: 0 }).prod += p.valor;
+        byM[k].inss += p.valor * 0.045;
       });
-      const labels = Object.keys(byM).sort();
-      const prod = labels.map(k=>byM[k].prod);
-      const inss = labels.map(k=>byM[k].inss);
 
-      new Chart(document.getElementById('chartCooperados'), {
-        type:'line',
-        data:{
+      const labels = Object.keys(byM).sort();
+      const prod   = labels.map(k => byM[k].prod);
+      const inss   = labels.map(k => byM[k].inss);
+
+      const ctx = document.getElementById('chartCooperados');
+      if (!ctx) return;
+
+      new Chart(ctx, {
+        type: 'line',
+        data: {
           labels,
-          datasets:[
+          datasets: [
             {
-              label:'Produções (bruto)',
-              data:prod,
-              borderColor:'rgba(37, 99, 235, 1)',
-              backgroundColor:'rgba(37, 99, 235, 0.18)',
-              borderWidth:2,
-              tension:0.3,
-              fill:true,
-              pointRadius:3,
-              pointHoverRadius:4
+              label: 'Produções (bruto)',
+              data: prod,
+              borderColor: 'rgba(37, 99, 235, 1)',
+              backgroundColor: 'rgba(37, 99, 235, 0.18)',
+              borderWidth: 2,
+              tension: 0.3,
+              fill: true,
+              pointRadius: 3,
+              pointHoverRadius: 4
             },
             {
-              label:'INSS (4,5%)',
-              data:inss,
-              borderColor:'rgba(56, 189, 248, 1)',
-              backgroundColor:'rgba(56, 189, 248, 0.12)',
-              borderWidth:2,
-              tension:0.3,
-              fill:true,
-              pointRadius:3,
-              pointHoverRadius:4
+              label: 'INSS (4,5%)',
+              data: inss,
+              borderColor: 'rgba(56, 189, 248, 1)',
+              backgroundColor: 'rgba(56, 189, 248, 0.12)',
+              borderWidth: 2,
+              tension: 0.3,
+              fill: true,
+              pointRadius: 3,
+              pointHoverRadius: 4
             }
           ]
         },
-        options:baseChartOptions
+        options: baseChartOptions
       });
     })();
 
     // Estabelecimentos (ranking no período) — barra horizontal
-    (function(){
+    (function () {
       const byR = {};
-      filteredPROD.forEach(p=>{
-        if(p.restaurante_id==null) return;
-        byR[p.restaurante_nome] = (byR[p.restaurante_nome]||0) + p.valor;
+      filteredPROD.forEach(p => {
+        if (p.restaurante_id == null) return;
+        byR[p.restaurante_nome] = (byR[p.restaurante_nome] || 0) + p.valor;
       });
-      const entries = Object.entries(byR).sort((a,b)=>b[1]-a[1]).slice(0,20);
-      const labels = entries.map(e=>e[0]);
-      const vals   = entries.map(e=>e[1]);
 
-      new Chart(document.getElementById('chartEstabs'), {
-        type:'bar',
-        data:{
+      const entries = Object.entries(byR)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 20);
+
+      const labels = entries.map(e => e[0]);
+      const vals   = entries.map(e => e[1]);
+
+      const ctx = document.getElementById('chartEstabs');
+      if (!ctx) return;
+
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
           labels,
-          datasets:[{
-            label:'Produções por Estabelecimento',
-            data:vals,
-            backgroundColor:'rgba(16, 185, 129, 0.8)',
-            borderRadius:6,
+          datasets: [{
+            label: 'Produções por Estabelecimento',
+            data: vals,
+            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+            borderRadius: 6,
           }]
         },
-        options:{
+        options: {
           ...baseChartOptions,
-          plugins:{
+          plugins: {
             ...baseChartOptions.plugins,
-            legend:{ display:false }
+            legend: { display: false }
           },
-          indexAxis:'y'
+          indexAxis: 'y'
         }
       });
     })();
   });
 
   // ---- Exportação XLSX ----
-  const ensureXLSX = () => new Promise(res=>{
+  const ensureXLSX = () => new Promise(res => {
     if (window.XLSX) return res();
-    const s=document.createElement('script');
-    s.src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
-    s.onload=()=>res();
+    const s = document.createElement('script');
+    s.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+    s.onload = () => res();
     document.head.appendChild(s);
   });
 
-  function aoaToSheet(title, aoa, wb){
+  function aoaToSheet(title, aoa, wb) {
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     XLSX.utils.book_append_sheet(wb, ws, title);
   }
-  function safeSheetName(s){
-    const cleaned = String(s||'').replace(/[:\\/?*\[\]]/g,' ').slice(0,31).trim();
+
+  function safeSheetName(s) {
+    const cleaned = String(s || '').replace(/[:\\/?*\[\]]/g, ' ').slice(0, 31).trim();
     return cleaned || 'Planilha';
   }
 
-  async function exportXLSX(){
+  async function exportXLSX() {
     await ensureXLSX();
     const wb = XLSX.utils.book_new();
 
     // KPIs
     const k1 = [
       ['Dashboard Financeiro — Filtro'],
-      ['Período', FILTER.ri||'início', '→', FILTER.rf||'hoje'],
-      ['Estabelecimento', FILTER.rid==null ? 'Todos' : (RESTS.find(r=>r.id===FILTER.rid)?.nome||FILTER.rid)],
-      ['Cooperado', FILTER.cid==null ? 'Todos' : (COOPS.find(c=>c.id===FILTER.cid)?.nome||FILTER.cid)],
+      ['Período', FILTER.ri || 'início', '→', FILTER.rf || 'hoje'],
+      ['Estabelecimento', FILTER.rid == null ? 'Todos' : (RESTS.find(r => r.id === FILTER.rid)?.nome || FILTER.rid)],
+      ['Cooperado', FILTER.cid == null ? 'Todos' : (COOPS.find(c => c.id === FILTER.cid)?.nome || FILTER.cid)],
       [],
       ['KPIs'],
       ['Total Produções', kpiProd],
-      ['INSS (4,5%)',    kpiINSS],
-      ['Receitas Coop (período)',  kpiRecCoopCorp],
-      ['Despesas Coop (período)',  kpiDespCoopCorp],
+      ['INSS (4,5%)', kpiINSS],
+      ['Receitas Coop (período)', kpiRecCoopCorp],
+      ['Despesas Coop (período)', kpiDespCoopCorp],
       ['Receitas Cooperados (Prod + Rec)', kpiRecCooperadosFull],
       ['Despesas Cooperados (período)', kpiDespCooperados],
       ['Total de Receitas (Geral)', kpiTotalReceitasGeral],
@@ -1481,37 +1526,46 @@
     aoaToSheet('KPIs', k1, wb);
 
     // Produções (geral)
-    const prodAOA = [['Data','Cooperado','Estabelecimento','Descrição','Valor','INSS(4,5%)']];
-    filteredPROD.forEach(p=>{
-      prodAOA.push([p.data, p.cooperado_nome||'', p.restaurante_nome||'', 'Produção', p.valor, p.valor*0.045]);
+    const prodAOA = [['Data', 'Cooperado', 'Estabelecimento', 'Descrição', 'Valor', 'INSS(4,5%)']];
+    filteredPROD.forEach(p => {
+      prodAOA.push([p.data, p.cooperado_nome || '', p.restaurante_nome || '', 'Produção', p.valor, p.valor * 0.045]);
     });
     aoaToSheet('Producoes', prodAOA, wb);
 
     // Receitas/Despesas Coop (Cooperativa)
-    const recCAOA = [['Data','Descrição','Valor']];
-    filteredRECc.forEach(r=>recCAOA.push([r.data, r.descricao||'', r.valor]));
+    const recCAOA = [['Data', 'Descrição', 'Valor']];
+    filteredRECc.forEach(r => recCAOA.push([r.data, r.descricao || '', r.valor]));
     aoaToSheet('Receitas_Coop', recCAOA, wb);
 
-    const desCAOA = [['Data','Descrição','Valor']];
-    filteredDESc.forEach(d=>desCAOA.push([d.data, d.descricao||'', d.valor]));
+    const desCAOA = [['Data', 'Descrição', 'Valor']];
+    filteredDESc.forEach(d => desCAOA.push([d.data, d.descricao || '', d.valor]));
     aoaToSheet('Despesas_Coop', desCAOA, wb);
 
     // Estabelecimentos (soma no período)
     const byR = {};
-    filteredPROD.forEach(p=>{
-      if(p.restaurante_nome) byR[p.restaurante_nome]=(byR[p.restaurante_nome]||0)+p.valor;
+    filteredPROD.forEach(p => {
+      if (p.restaurante_nome)
+        byR[p.restaurante_nome] = (byR[p.restaurante_nome] || 0) + p.valor;
     });
-    const estAOA = [['Estabelecimento','Total Produções (R$)']];
-    Object.entries(byR).sort((a,b)=>b[1]-a[1]).forEach(([nome,v])=>estAOA.push([nome,v]));
+    const estAOA = [['Estabelecimento', 'Total Produções (R$)']];
+    Object.entries(byR)
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([nome, v]) => estAOA.push([nome, v]));
     aoaToSheet('Estabelecimentos', estAOA, wb);
 
     // RESUMO por cooperado (com ADT separado)
-    const resumoAOA = [['Cooperado','Produções','INSS','Receitas','Despesas','Adiantamentos','Líquido']];
-    let tProd=0,tINSS=0,tRec=0,tDes=0,tAd=0,tLiq=0;
+    const resumoAOA = [['Cooperado', 'Produções', 'INSS', 'Receitas', 'Despesas', 'Adiantamentos', 'Líquido']];
+    let tProd = 0, tINSS = 0, tRec = 0, tDes = 0, tAd = 0, tLiq = 0;
 
-    RESUMO_COOP_ROWS.forEach(r=>{
+    RESUMO_COOP_ROWS.forEach(r => {
       const liq = r.prod + r.rec - r.inss - r.des - r.ad;
-      tProd+=r.prod; tINSS+=r.inss; tRec+=r.rec; tDes+=r.des; tAd+=r.ad; tLiq+=liq;
+      tProd += r.prod;
+      tINSS += r.inss;
+      tRec  += r.rec;
+      tDes  += r.des;
+      tAd   += r.ad;
+      tLiq  += liq;
+
       resumoAOA.push([
         r.nome || '—',
         r.prod,
@@ -1537,30 +1591,30 @@
 
     // Uma aba por Cooperado — Receitas
     const byC_rec = {};
-    filteredRECp.forEach(r=>{
+    filteredRECp.forEach(r => {
       const k = r.cooperado_nome || `ID ${r.cooperado_id}`;
       (byC_rec[k] ||= []).push(r);
     });
-    Object.keys(byC_rec).forEach(nome=>{
-      const aoa = [['Data','Descrição','Valor']];
-      byC_rec[nome].forEach(r=>aoa.push([r.data, r.descricao||'', r.valor]));
-      aoaToSheet(safeSheetName('Receita - '+nome), aoa, wb);
+    Object.keys(byC_rec).forEach(nome => {
+      const aoa = [['Data', 'Descrição', 'Valor']];
+      byC_rec[nome].forEach(r => aoa.push([r.data, r.descricao || '', r.valor]));
+      aoaToSheet(safeSheetName('Receita - ' + nome), aoa, wb);
     });
 
     // Uma aba por Cooperado — Despesas (com flag de adiantamento)
     const byC_des = {};
-    filteredDESp.forEach(d=>{
+    filteredDESp.forEach(d => {
       const k = d.cooperado_nome || `ID ${d.cooperado_id}`;
       (byC_des[k] ||= []).push(d);
     });
-    Object.keys(byC_des).forEach(nome=>{
-      const aoa = [['Data','Descrição','Valor','Adiantamento']];
-      byC_des[nome].forEach(d=>aoa.push([d.data, d.descricao||'', d.valor, d.adiantamento? 'SIM':'NÃO']));
-      aoaToSheet(safeSheetName('Despesa - '+nome), aoa, wb);
+    Object.keys(byC_des).forEach(nome => {
+      const aoa = [['Data', 'Descrição', 'Valor', 'Adiantamento']];
+      byC_des[nome].forEach(d => aoa.push([d.data, d.descricao || '', d.valor, d.adiantamento ? 'SIM' : 'NÃO']));
+      aoaToSheet(safeSheetName('Despesa - ' + nome), aoa, wb);
     });
 
     const now = new Date();
-    const ymd = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const ymd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     XLSX.writeFile(wb, `Dashboard_Coopex_${ymd}.xlsx`);
   }
 
