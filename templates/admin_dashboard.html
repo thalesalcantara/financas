@@ -1163,6 +1163,16 @@
 
   const sumBy = (arr, fn) => arr.reduce((acc, cur) => acc + (+fn(cur) || 0), 0);
 
+  // helper robusto para flag de adiantamento (pega número, string ou boolean)
+  const isAdiantamento = (raw) => {
+    return (
+      raw === 1 ||
+      raw === '1' ||
+      raw === true ||
+      raw === 'true'
+    );
+  };
+
   // ---- Filtrados ----
   const filteredPROD = PRODUCOES.filter(p =>
     inRange(p.data) &&
@@ -1235,8 +1245,11 @@
     filteredDESp.forEach(d => {
       if (d.cooperado_id == null) return;
       const row = ensure(d.cooperado_id, d.cooperado_nome || '—');
-      if (d.adiantamento) row.ad += d.valor;
-      else row.des += d.valor;
+      if (isAdiantamento(d.adiantamento)) {
+        row.ad += d.valor;   // agora adiantamento vai pra coluna AD
+      } else {
+        row.des += d.valor;  // e o resto fica em Despesas
+      }
     });
 
     return Array.from(map.values()).sort((a, b) =>
@@ -1609,7 +1622,10 @@
     });
     Object.keys(byC_des).forEach(nome => {
       const aoa = [['Data', 'Descrição', 'Valor', 'Adiantamento']];
-      byC_des[nome].forEach(d => aoa.push([d.data, d.descricao || '', d.valor, d.adiantamento ? 'SIM' : 'NÃO']));
+      byC_des[nome].forEach(d => {
+        const ad = isAdiantamento(d.adiantamento) ? 'SIM' : 'NÃO';
+        aoa.push([d.data, d.descricao || '', d.valor, ad]);
+      });
       aoaToSheet(safeSheetName('Despesa - ' + nome), aoa, wb);
     });
 
@@ -1622,7 +1638,7 @@
 })();
 </script>
 </section>
-
+    
      <!-- LANÇAMENTOS (versão moderna/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='lancamentos' else '' }}" id="lancamentos" role="tabpanel">
   {% set soma_valor = (lancamentos|sum(attribute='valor')) if lancamentos else 0 %}
