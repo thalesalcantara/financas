@@ -620,19 +620,20 @@
       <hr class="sidebar-divider">
 
       <!-- Config (TAB) e Sair (rota) ---------------------------------------->
-      <div class="sidebar-footer">
-        <a class="nav-link-main {{ 'active' if _tab=='config' else '' }}"
-           data-bs-toggle="tab"
-           data-bs-target="#config"
-           href="#config"
-           role="tab"
-           aria-controls="config"
-           aria-selected="{{ 'true' if _tab=='config' else 'false' }}">
-          <div class="nav-link-left">
-            <span class="nav-link-icon"><i class="bi bi-gear"></i></span>
-            <span class="nav-link-label">Configurações</span>
-          </div>
-        </a>
+      <!-- Config (tab) -->
+    <a class="nav-link {{ 'active' if _tab=='config' else '' }}"
+       data-bs-toggle="tab"
+       data-bs-target="#config"
+       href="#config"
+       role="tab"
+       aria-controls="config"
+       aria-selected="{{ 'true' if _tab=='config' else 'false' }}">
+      <i class="bi bi-gear"></i> <span>Configurações</span>
+    </a>
+
+    <a class="nav-link" href="{{ url_for('logout') }}">
+      <i class="bi bi-box-arrow-right"></i> <span>Sair</span>
+    </a>
 
         <a class="nav-link-main"
            href="{{ url_for('logout') }}">
