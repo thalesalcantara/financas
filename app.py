@@ -3852,22 +3852,14 @@ def add_despesa_coop():
     d = _parse_date(f.get("data"))
     # nome do checkbox no HTML, por ex.: <input type="checkbox" name="eh_adiantamento">
     eh_adiantamento = bool(f.get("eh_adiantamento"))
-
-    cooperados = Cooperado.query.order_by(Cooperado.nome).all()
-    dest_ids = [c.id for c in cooperados] if "all" in ids else [int(i) for i in ids if i.isdigit()]
-    if not dest_ids:
-        flash("Selecione pelo menos um cooperado.", "warning")
-        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-    valor_unit = round(valor_total / max(1, len(dest_ids)), 2)
-    for cid in dest_ids:
-        db.session.add(DespesaCooperado(
-            cooperado_id=cid,
-            descricao=descricao,
-            valor=valor_unit,
-            data=d,
-            eh_adiantamento=eh_adiantamento,  # 👈 grava a flag
-        ))
+    ...
+            db.session.add(DespesaCooperado(
+                cooperado_id=cid,
+                descricao=descricao,
+                valor=valor_unit,
+                data=d,
+                eh_adiantamento=eh_adiantamento,  # 👈 grava a flag
+            ))
     db.session.commit()
     flash("Despesa(s) lançada(s).", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
