@@ -1286,7 +1286,7 @@
   {% set soma_valor = (lancamentos|sum(attribute='valor')) if lancamentos else 0 %}
   {% set soma_inss  = (soma_valor * 0.045) %}
   {% set soma_liq   = (soma_valor - soma_inss) %}
-  {% set soma_qtd   = (lancamentos|sum(attribute='qtd_entregas')) if lancamentos else 0 %}
+  {% set soma_qtd = (lancamentos | map(attribute='qtd_entregas') | select('number') | sum) if lancamentos else 0 %}
 
   <!-- Header + KPIs -->
   <div class="card lanc-card-header mb-3">
