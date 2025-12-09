@@ -3853,13 +3853,13 @@ def add_despesa_coop():
     # nome do checkbox no HTML, por ex.: <input type="checkbox" name="eh_adiantamento">
     eh_adiantamento = bool(f.get("eh_adiantamento"))
     ...
-            db.session.add(DespesaCooperado(
-                cooperado_id=cid,
-                descricao=descricao,
-                valor=valor_unit,
-                data=d,
-                eh_adiantamento=eh_adiantamento,  # 👈 grava a flag
-            ))
+    db.session.add(DespesaCooperado(
+        cooperado_id=cid,
+        descricao=descricao,
+        valor=valor_unit,
+        data=d,
+        eh_adiantamento=eh_adiantamento,  # 👈 grava a flag
+    ))
     db.session.commit()
     flash("Despesa(s) lançada(s).", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
