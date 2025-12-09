@@ -1101,7 +1101,7 @@
     {% endfor %}
   ];
 
-  // Receitas e Despesas da COOPERATIVA (mesma lógica da aba Receitas)
+  // Receitas e Despesas da COOPERATIVA
   const REC_COOP_CORP = [
     {% for r in _rec_coop_corp %}
       {
@@ -1199,8 +1199,8 @@
     resEl.classList.add(kpiResultadoCoop < 0 ? 'text-danger' : 'text-success');
   }
 
-  // ---- Tabela Resumo por Cooperado (incluindo Adiant.) ----
-  (function buildResumoCoop(){
+  // ---- Função de resumo (usada na tabela e no XLSX) ----
+  function computeResumoCoopRows(){
     const map = new Map(); // id -> item agregado
     const ensure = (id, nome) => {
       if(!map.has(id)) map.set(id, {id, nome, prod:0, inss:0, rec:0, des:0, ad:0});
@@ -1224,7 +1224,14 @@
       if(d.adiantamento) row.ad += d.valor; else row.des += d.valor;
     });
 
-    const rows = Array.from(map.values()).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    return Array.from(map.values()).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+  }
+
+  const RESUMO_COOP_ROWS = computeResumoCoopRows();
+
+  // ---- Tabela Resumo por Cooperado (incluindo Adiant.) na tela ----
+  (function renderResumoCoopTable(){
+    const rows = RESUMO_COOP_ROWS;
     const tbody = document.querySelector('#tblResumoCoop tbody');
     tbody.innerHTML = rows.length
       ? ''
@@ -1498,6 +1505,36 @@
     Object.entries(byR).sort((a,b)=>b[1]-a[1]).forEach(([nome,v])=>estAOA.push([nome,v]));
     aoaToSheet('Estabelecimentos', estAOA, wb);
 
+    // RESUMO por cooperado (com ADT separado)
+    const resumoAOA = [['Cooperado','Produções','INSS','Receitas','Despesas','Adiantamentos','Líquido']];
+    let tProd=0,tINSS=0,tRec=0,tDes=0,tAd=0,tLiq=0;
+
+    RESUMO_COOP_ROWS.forEach(r=>{
+      const liq = r.prod + r.rec - r.inss - r.des - r.ad;
+      tProd+=r.prod; tINSS+=r.inss; tRec+=r.rec; tDes+=r.des; tAd+=r.ad; tLiq+=liq;
+      resumoAOA.push([
+        r.nome || '—',
+        r.prod,
+        r.inss,
+        r.rec,
+        r.des,
+        r.ad,
+        liq
+      ]);
+    });
+
+    resumoAOA.push([
+      'TOTAIS',
+      tProd,
+      tINSS,
+      tRec,
+      tDes,
+      tAd,
+      tLiq
+    ]);
+
+    aoaToSheet('Resumo_Cooperados', resumoAOA, wb);
+
     // Uma aba por Cooperado — Receitas
     const byC_rec = {};
     filteredRECp.forEach(r=>{
@@ -1510,7 +1547,7 @@
       aoaToSheet(safeSheetName('Receita - '+nome), aoa, wb);
     });
 
-    // Uma aba por Cooperado — Despesas (separando adiant.)
+    // Uma aba por Cooperado — Despesas (com flag de adiantamento)
     const byC_des = {};
     filteredDESp.forEach(d=>{
       const k = d.cooperado_nome || `ID ${d.cooperado_id}`;
