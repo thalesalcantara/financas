@@ -306,12 +306,23 @@
       .sidebar{
         padding:18px 8px;
       }
-      .brand-sub,
-      .brand-title,
-      .nav-section-label,
-      .nav-link-label{
-        display:none;
+
+      /* MANTER os textos visíveis no mobile */
+      .brand-title{
+        font-size: .9rem;
       }
+      .brand-sub{
+        font-size: .65rem;
+        opacity: .8;
+      }
+      .nav-section-label{
+        font-size: .6rem;
+      }
+      .nav-link-label{
+        font-size: .7rem;
+        white-space: normal;
+      }
+
       .nav-sublinks{
         padding-left:12px;
       }
@@ -320,7 +331,65 @@
         padding:16px 10px;
       }
     }
-</style>
+
+    /* =========================
+       AJUSTES DE CONTRASTE
+       ========================= */
+
+    /* Deixar textos "muted" mais escuros */
+    .text-muted,
+    .text-muted-2,
+    .form-label,
+    .lanc-label,
+    #resumo .table-resumo tfoot td {
+      color: #374151 !important;  /* cinza bem mais escuro */
+    }
+
+    /* Texto padrão mais forte */
+    body,
+    .card,
+    .table,
+    .table td,
+    .table th {
+      color: #111827;
+    }
+
+    /* Badges suaves com mais contraste */
+    .badge-soft{
+      background:#e5e7eb;
+      color:#111827;
+      border-color:#cbd5f5;
+    }
+
+    /* Pequenas legendas em cards/tabelas */
+    small,
+    small.text-muted,
+    #resumo .resumo-kpi-row .card.kpi-card .text-muted.small {
+      color:#4b5563 !important;
+    }
+
+    /* Campos de formulário: texto escuro dentro de inputs e selects */
+    .form-control,
+    .form-select,
+    .input-group-text {
+      color:#111827;
+    }
+
+    /* Melhor contraste nas bordas de cards "glass" muito claras */
+    .lanc-card-header,
+    .lanc-filter-card,
+    .lanc-launch-card,
+    .lanc-table-card,
+    #resumo .resumo-filter-card,
+    #resumo .resumo-shell{
+      border-color: rgba(148,163,184,0.6);
+    }
+
+    /* Títulos de seção dentro de cards */
+    h5, h6 {
+      color:#111827;
+    }
+  </style>
 </head>
 <body>
 
