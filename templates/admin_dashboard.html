@@ -613,16 +613,23 @@
     {% endfor %}
     {% set total_receitas_coop_f = ns_rec_coop.total %}
 
-    {% set ns_desp_coop = namespace(total=0) %}
-    {% for d in despesas_coop %}
-      {% set dt  = ymd(d.data) %}
-      {% set okd = (not ri or dt >= ri) and (not rf or dt <= rf) %}
-      {% set okc = (not cid or (d.cooperado and d.cooperado.id==cid)) %}
-      {% if okd and okc %}
-        {% set ns_desp_coop.total = ns_desp_coop.total + (d.valor or 0) %}
-      {% endif %}
-    {% endfor %}
-    {% set total_despesas_coop_f = ns_desp_coop.total %}
+    {% set ns_desp_coop = namespace(total=0, total_adiant=0) %}
+{% for d in despesas_coop %}
+  {% set dt  = ymd(d.data) %}
+  {% set okd = (not ri or dt >= ri) and (not rf or dt <= rf) %}
+  {% set okc = (not cid or (d.cooperado and d.cooperado.id==cid)) %}
+  {% if okd and okc %}
+    {% if d.adiantamento %}
+      {# SOMENTE adiantamento, fora do total de Despesas Cooperados #}
+      {% set ns_desp_coop.total_adiant = ns_desp_coop.total_adiant + (d.valor or 0) %}
+    {% else %}
+      {# Despesa “normal” (entra no total de Despesas Cooperados) #}
+      {% set ns_desp_coop.total = ns_desp_coop.total + (d.valor or 0) %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
+{% set total_despesas_coop_f = ns_desp_coop.total %}
+{% set total_adiantamentos_f = ns_desp_coop.total_adiant %}
 
     {# Ajuste: Receitas dos cooperados = Produções + Receitas individuais #}
     {% set total_receitas_coop_full_f = (total_producoes_f|default(0)) + (total_receitas_coop_f|default(0)) %}
