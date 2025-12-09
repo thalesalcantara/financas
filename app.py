@@ -357,28 +357,54 @@ class ReceitaCooperado(db.Model):
 # =========================
 class DespesaCooperado(db.Model):
     __tablename__ = "despesas_cooperado"
+
     id = db.Column(db.Integer, primary_key=True)
-    cooperado_id = db.Column(db.Integer, db.ForeignKey("cooperados.id"), nullable=True)  # None = Todos
+
+    # None = Todos (quando cooperado_id for nulo, vale pra todos)
+    cooperado_id = db.Column(
+        db.Integer,
+        db.ForeignKey("cooperados.id"),
+        nullable=True,
+        index=True
+    )
     cooperado = db.relationship("Cooperado")
+
     descricao = db.Column(db.String(200), nullable=False)
-    valor = db.Column(db.Float, default=0.0)
-    # legado (pontual)
-    data = db.Column(db.Date)
 
-    # novo (período)
-    data_inicio = db.Column(db.Date)
-    data_fim    = db.Column(db.Date)
+    # usa float mesmo, como você já estava usando
+    valor = db.Column(db.Float, default=0.0, nullable=False)
 
-    # NOVO: vínculo forte para sabermos quem gerou a despesa
+    # 🔹 legado (pontual)
+    data = db.Column(db.Date, nullable=True)
+
+    # 🔹 novo (período)
+    data_inicio = db.Column(db.Date, nullable=True)
+    data_fim    = db.Column(db.Date, nullable=True)
+
+    # 🔹 vínculo com o registro de benefício (adiantamento, ajuda, etc.)
     beneficio_id = db.Column(
         db.Integer,
         db.ForeignKey("beneficios_registro.id", ondelete="CASCADE"),
         index=True,
-        nullable=True  # deixa True para migrar suave
+        nullable=True  # deixa True pra não quebrar nada antigo
     )
 
-    # 🔴 NOVO: marca se é adiantamento
-    eh_adiantamento = db.Column(db.Boolean, default=False)
+    # 🔴 MARCA SE ESSA DESPESA É ADIANTAMENTO
+    eh_adiantamento = db.Column(
+        db.Boolean,
+        default=False,
+        nullable=False
+    )
+
+
+class Adiantamento(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    cooperado_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    valor = db.Column(db.Numeric(10, 2), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='APROVADO')  # ou PENDENTE/RECUSADO
+    data_solicitacao = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    data_aprovacao = db.Column(db.DateTime)
+    despesa_id = db.Column(db.Integer, db.ForeignKey('despesa_cooperado.id'))  # vínculo com a despesa
     
 
 class BeneficioRegistro(db.Model):
@@ -3251,6 +3277,48 @@ def delete_despesa(id):
     db.session.commit()
     flash("Despesa excluída.", "success")
     return redirect(url_for("admin_dashboard", tab="despesas"))
+
+@app.route('/cooperado/<int:cooperado_id>/despesas/nova', methods=['POST'])
+@login_required
+def nova_despesa_cooperado(cooperado_id):
+    descricao = request.form.get('descricao')
+    valor_str = request.form.get('valor', '0').replace(',', '.')
+    valor = Decimal(valor_str) if valor_str else Decimal('0.00')
+
+    eh_adiantamento = request.form.get('eh_adiantamento') == '1'
+
+    agora = datetime.now(tz_brasilia)
+
+    # 1) Cria a DESPESA (já marcando se é adiantamento ou não)
+    tipo = 'ADIANT' if eh_adiantamento else 'DESPESA'
+
+    nova_despesa = DespesaCooperado(
+        cooperado_id=cooperado_id,
+        descricao=descricao,
+        valor=valor,
+        data=agora,
+        tipo=tipo
+    )
+
+    db.session.add(nova_despesa)
+    db.session.flush()  # gera o ID da despesa sem dar commit ainda
+
+    # 2) Se marcou "adiantamento", cria também o registro em ADIANTAMENTOS
+    if eh_adiantamento:
+        novo_adiant = Adiantamento(
+            cooperado_id=cooperado_id,
+            valor=valor,
+            status='APROVADO',             # se você quiser já aprovado
+            data_solicitacao=agora,
+            data_aprovacao=agora,
+            despesa_id=nova_despesa.id      # vínculo com a despesa criada
+        )
+        db.session.add(novo_adiant)
+
+    db.session.commit()
+
+    flash('Despesa registrada com sucesso!', 'success')
+    return redirect(url_for('despesas_cooperadoS', cooperado_id=cooperado_id))
 
 # =========================
 # Avisos (admin + públicos)
