@@ -3107,61 +3107,106 @@
 
        <!-- ESCALAS -->
 <section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <h4 class="mb-0">Escalas</h4>
-    <div class="alert alert-info py-1 px-2 mb-0">
-      <b>Prazo-limite geral:</b> 31/12/<span id="prazoAno">—</span> — faltam <b><span id="prazoDias">0</span> dias</b>.
+  <!-- Cabeçalho Escalas -->
+  <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 align-items-lg-center mb-3">
+    <div>
+      <h5 class="mb-0 section-title">Gestão de Escalas</h5>
+      <small class="section-subtitle">
+        Upload da planilha, consulta rápida por cooperado e histórico de trocas em um só lugar.
+      </small>
+    </div>
+
+    <div class="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center">
+      <div class="alert alert-info py-1 px-2 mb-0 small shadow-sm border-0">
+        <b>Prazo-limite geral:</b> 31/12/<span id="prazoAno">—</span>
+        <span class="mx-1">•</span>
+        faltam <b><span id="prazoDias">0</span> dias</b>.
+      </div>
     </div>
   </div>
 
-  <!-- Upload -->
-  <div class="card p-3 mb-3">
-    <h6 class="mb-2">Upload da Escala (.xlsx)</h6>
+  <!-- Upload + Busca -->
+  <div class="card p-3 mb-3 escala-upload-card">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+      <div class="flex-grow-1">
+        <h6 class="mb-1 section-title">Upload da Escala (.xlsx)</h6>
+        <small class="section-subtitle">
+          Envie a planilha oficial de escalas. A associação do cooperado é feita por login (quando existir) ou por nome,
+          ignorando acentos.
+        </small>
 
-    <form method="POST"
-          action="{{ url_for('upload_escala') }}"
-          enctype="multipart/form-data"
-          class="row g-2 align-items-end">
+        <form method="POST"
+              action="{{ url_for('upload_escala') }}"
+              enctype="multipart/form-data"
+              class="row g-2 align-items-end mt-2">
 
-      {# CSRF, se você estiver usando CSRFProtect/Flask-WTF #}
-      {% if csrf_token is defined %}
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      {% endif %}
+          {% if csrf_token is defined %}
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% endif %}
 
-      <div class="col-md-6">
-        <label for="arquivo_escala" class="form-label">Planilha de escala (.xlsx)</label>
-        <input type="file"
-               class="form-control"
-               id="arquivo_escala"
-               name="file"
-               accept=".xlsx"
-               required>
+          <div class="col-md-6">
+            <label for="arquivo_escala" class="form-label extra-small text-muted-2 mb-1">
+              Planilha de escala (.xlsx)
+            </label>
+            <input type="file"
+                   class="form-control form-control-sm"
+                   id="arquivo_escala"
+                   name="file"
+                   accept=".xlsx"
+                   required>
+          </div>
+
+          <div class="col-md-3">
+            <button type="submit" class="btn btn-royal btn-sm w-100 mt-1">
+              <i class="bi bi-upload me-1"></i> Enviar Planilha
+            </button>
+          </div>
+        </form>
       </div>
-      <div class="col-md-3">
-        <button type="submit" class="btn btn-royal w-100">
-          <i class="bi bi-upload"></i> Enviar Planilha
-        </button>
-      </div>
-    </form>
 
-    <small class="muted">
-      A associação do cooperado é feita por login (quando existir) ou por nome,
-      ignorando acentos.
-    </small>
+      <!-- Busca por cooperado -->
+      <div class="escala-search-box">
+        <span class="section-subtitle d-block mb-1">Pesquisar cooperado</span>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-light border-0 pe-1">
+            <i class="bi bi-search text-muted-2"></i>
+          </span>
+          <input type="text"
+                 id="filtroCooperado"
+                 class="form-control border-0 shadow-none search-input"
+                 placeholder="Digite o nome do cooperado...">
+        </div>
+        <div class="d-flex gap-2 mt-2 justify-content-end">
+          <span class="badge-soft">
+            Cooperados: {{ cooperados|length if cooperados else 0 }}
+          </span>
+          <span class="badge-soft">
+            Com escala: {{ escalas_por_coop|length if escalas_por_coop is defined else 0 }}
+          </span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Cooperados & Escalas -->
   <div class="card p-3 mb-3">
-    <div class="table-responsive">
-      <table class="table table-bordered align-middle">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div>
+        <h6 class="mb-0 section-title">Resumo dos Cooperados</h6>
+        <small class="section-subtitle">
+          Documentação, quantidade de linhas na escala e acesso rápido ao detalhamento.
+        </small>
+      </div>
+    </div>
+
+    <div class="table-responsive escalas-wrapper">
+      <table class="table table-sm align-middle mb-0 table-escalas" id="tabela-escalas">
         <thead>
           <tr>
             <th>Cooperado</th>
             <th>CNH</th>
-            <th>Val. CNH</th>
             <th>Placa</th>
-            <th>Val. Placa</th>
-            <th>Situação</th>
+            <th>Situação Docs</th>
             <th>Última atualização</th>
             <th class="text-center">Qtde de linhas</th>
             <th class="text-center">Ações</th>
@@ -3169,502 +3214,572 @@
         </thead>
         <tbody>
           {% for c in cooperados %}
-          {% set lst = (escalas_por_coop[c.id] if (escalas_por_coop is defined and c.id in escalas_por_coop) else []) %}
-          {% set sdoc = status_doc_por_coop.get(c.id) if status_doc_por_coop is defined else None %}
-          {% set ok_cnh   = sdoc.cnh_ok if sdoc is not none and 'cnh_ok' in sdoc else None %}
-          {% set ok_placa = sdoc.placa_ok if sdoc is not none and 'placa_ok' in sdoc else None %}
-          <tr>
-            <td>{{ c.nome }}</td>
-            <td>{{ c.cnh_numero if c.cnh_numero is defined and c.cnh_numero else '—' }}</td>
-            <td>
-              {% if c.cnh_validade is defined and c.cnh_validade %}
-                {{ c.cnh_validade.strftime('%d/%m') }}
-              {% else %}
-                —
-              {% endif %}
-            </td>
-            <td>{{ c.placa if c.placa is defined and c.placa else '—' }}</td>
-            <td>
-              {% if c.placa_validade is defined and c.placa_validade %}
-                {{ c.placa_validade.strftime('%d/%m') }}
-              {% else %}
-                —
-              {% endif %}
-            </td>
-            <td class="text-nowrap">
-              {% if ok_cnh is not none %}
-                <span class="badge {{ 'bg-success' if ok_cnh else 'bg-danger' }} me-1">
-                  CNH {{ 'OK' if ok_cnh else 'Pend.' }}
-                </span>
-              {% else %}
-                <span class="badge bg-secondary me-1">CNH —</span>
-              {% endif %}
+            {% set lst = (escalas_por_coop[c.id] if (escalas_por_coop is defined and c.id in escalas_por_coop) else []) %}
+            {% set sdoc = status_doc_por_coop.get(c.id) if status_doc_por_coop is defined else None %}
+            {% set ok_cnh   = sdoc.cnh_ok if sdoc is not none and 'cnh_ok' in sdoc else None %}
+            {% set ok_placa = sdoc.placa_ok if sdoc is not none and 'placa_ok' in sdoc else None %}
 
-              {% if ok_placa is not none %}
-                <span class="badge {{ 'bg-success' if ok_placa else 'bg-danger' }}">
-                  Placa {{ 'OK' if ok_placa else 'Pend.' }}
-                </span>
-              {% else %}
-                <span class="badge bg-secondary">Placa —</span>
-              {% endif %}
+            <tr data-coop-nome="{{ c.nome|lower }}">
+              <!-- Cooperado -->
+              <td>
+                <div class="small fw-semibold text-truncate">
+                  {{ c.nome }}
+                </div>
+                <div class="extra-small text-muted-2">
+                  ID {{ c.id }}
+                </div>
+              </td>
 
-              {% if ok_cnh and ok_placa %}
-                <span class="ms-1 text-success">👏</span>
-              {% endif %}
-            </td>
-            <td>
-              {{ c.ultima_atualizacao.strftime('%d/%m/%Y %H:%M') if c.ultima_atualizacao else '—' }}
-            </td>
-            <td class="text-center">{{ lst|length }}</td>
-            <td class="text-center">
-              <button class="btn btn-sm btn-royal"
-                      data-bs-toggle="modal"
-                      data-bs-target="#modalEscalas"
-                      data-coopid="{{ c.id }}">
-                <i class="bi bi-eye"></i> Ver escala
-              </button>
-              <a class="btn btn-sm btn-outline-secondary"
-                 href="{{ url_for('editar_documentos', coop_id=c.id) }}">
-                <i class="bi bi-pen"></i> Documentos
-              </a>
-            </td>
-          </tr>
+              <!-- CNH -->
+              <td>
+                <div class="extra-small text-muted">
+                  {{ c.cnh_numero if c.cnh_numero is defined and c.cnh_numero else '—' }}
+                </div>
+                <div class="extra-small text-muted-2">
+                  Validade:
+                  {% if c.cnh_validade is defined and c.cnh_validade %}
+                    {{ c.cnh_validade.strftime('%d/%m') }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </div>
+              </td>
+
+              <!-- Placa -->
+              <td>
+                <div class="extra-small text-muted">
+                  {{ c.placa if c.placa is defined and c.placa else '—' }}
+                </div>
+                <div class="extra-small text-muted-2">
+                  Validade:
+                  {% if c.placa_validade is defined and c.placa_validade %}
+                    {{ c.placa_validade.strftime('%d/%m') }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </div>
+              </td>
+
+              <!-- Situação Docs -->
+              <td class="text-nowrap">
+                {% if ok_cnh is not none %}
+                  <span class="badge badge-doc {{ 'badge-doc-ok' if ok_cnh else 'badge-doc-pend' }} me-1">
+                    CNH {{ 'OK' if ok_cnh else 'Pend.' }}
+                  </span>
+                {% else %}
+                  <span class="badge badge-doc badge-doc-na">CNH —</span>
+                {% endif %}
+
+                {% if ok_placa is not none %}
+                  <span class="badge badge-doc {{ 'badge-doc-ok' if ok_placa else 'badge-doc-pend' }} mt-1 mt-sm-0">
+                    Placa {{ 'OK' if ok_placa else 'Pend.' }}
+                  </span>
+                {% else %}
+                  <span class="badge badge-doc badge-doc-na mt-1 mt-sm-0">Placa —</span>
+                {% endif %}
+
+                {% if ok_cnh and ok_placa %}
+                  <span class="ms-1 text-success">👏</span>
+                {% endif %}
+              </td>
+
+              <!-- Última atualização -->
+              <td>
+                <div class="extra-small text-muted">
+                  {{ c.ultima_atualizacao.strftime('%d/%m/%Y %H:%M') if c.ultima_atualizacao else '—' }}
+                </div>
+              </td>
+
+              <!-- Qtde linhas -->
+              <td class="text-center">
+                <span class="badge-soft d-inline-flex align-items-center justify-content-center px-2">
+                  {{ lst|length }}
+                </span>
+              </td>
+
+              <!-- Ações -->
+              <td class="text-center">
+                <div class="d-flex flex-column flex-sm-row gap-1 justify-content-center">
+                  <button class="btn btn-royal btn-xs"
+                          data-bs-toggle="modal"
+                          data-bs-target="#modalEscalas"
+                          data-coopid="{{ c.id }}">
+                    <i class="bi bi-eye me-1"></i> Ver escala
+                  </button>
+                  <a class="btn btn-outline-secondary btn-xs"
+                     href="{{ url_for('editar_documentos', coop_id=c.id) }}">
+                    <i class="bi bi-pen me-1"></i> Documentos
+                  </a>
+                </div>
+              </td>
+            </tr>
           {% else %}
-          <tr>
-            <td colspan="9" class="text-center text-muted">Nenhum cooperado</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
- <!-- SOLICITAÇÕES DE TROCA (pendentes) -->
-<div class="card p-3 mb-3">
-  <div class="d-flex justify-content-between align-items-center">
-    <div>
-      <h5 class="mb-0 section-title">
-        Trocas de Escala - Pendentes
-      </h5>
-      <small class="section-subtitle">
-        Visualização dos dois contratos e de quem é cada um.
-      </small>
-    </div>
-    <span class="badge-soft">
-      Pendentes: {{ trocas_pendentes|length if trocas_pendentes else 0 }}
-    </span>
-  </div>
-
-  {% if trocas_pendentes %}
-    <div class="table-responsive mt-3 troca-pendentes-wrapper">
-      <table class="table table-sm align-middle mb-0 table-troca">
-        <thead>
-          <tr>
-            <th style="width: 80px;">#</th>
-            <th>Cooperado 1</th>
-            <th>Escala 1</th>
-            <th>Cooperado 2</th>
-            <th>Escala 2</th>
-            <th style="width: 220px;">Mensagem</th>
-            <th style="width: 130px;" class="text-end">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for t in trocas_pendentes or [] %}
-            {# Objetos principais #}
-            {% set solicitante  = t.solicitante  if t.solicitante  else None %}
-            {% set destinatario = t.destinatario if t.destinatario else None %}
-            {% set origem       = t.origem       if t.origem       else None %}
-
-            {# Cooperado 1 (solicitante) #}
-            {% set solicitante_nome = (solicitante.nome if solicitante else t.solicitante_nome)|default('—', true) %}
-            {% set solicitante_id   = (solicitante.id   if solicitante else t.solicitante_id)|default('—', true) %}
-
-            {# Cooperado 2 (destinatário) #}
-            {% set coop2_nome = (destinatario.nome if destinatario else t.destinatario_nome)|default('—', true) %}
-            {% set coop2_id   = (destinatario.id   if destinatario else t.destinatario_id)|default('—', true) %}
-
-            {# Escala de origem (cooperado 1) #}
-            {% if origem and origem.data is defined %}
-              {% set origem_data = origem.data %}
-            {% elif t.origem_data is defined %}
-              {% set origem_data = t.origem_data %}
-            {% else %}
-              {% set origem_data = '—' %}
-            {% endif %}
-
-            {% if origem and origem.turno is defined %}
-              {% set origem_turno = origem.turno %}
-            {% elif t.origem_turno is defined %}
-              {% set origem_turno = t.origem_turno %}
-            {% else %}
-              {% set origem_turno = '—' %}
-            {% endif %}
-
-            {% if origem and origem.horario is defined %}
-              {% set origem_horario = origem.horario %}
-            {% elif t.origem_horario is defined %}
-              {% set origem_horario = t.origem_horario %}
-            {% else %}
-              {% set origem_horario = '—' %}
-            {% endif %}
-
-            {% if origem and origem.contrato is defined %}
-              {% set origem_contrato = origem.contrato %}
-            {% elif t.origem_contrato is defined %}
-              {% set origem_contrato = t.origem_contrato %}
-            {% else %}
-              {% set origem_contrato = '—' %}
-            {% endif %}
-
-            {# Escala de destino (cooperado 2) – usa primeiro os campos calculados no Python #}
-            {% if t.destino_data is defined and t.destino_data %}
-              {% set destino_data = t.destino_data %}
-            {% elif t.destino and t.destino.data is defined %}
-              {% set destino_data = t.destino.data %}
-            {% else %}
-              {% set destino_data = '—' %}
-            {% endif %}
-
-            {% if t.destino_turno is defined and t.destino_turno %}
-              {% set destino_turno = t.destino_turno %}
-            {% elif t.destino and t.destino.turno is defined %}
-              {% set destino_turno = t.destino.turno %}
-            {% else %}
-              {% set destino_turno = '—' %}
-            {% endif %}
-
-            {% if t.destino_horario is defined and t.destino_horario %}
-              {% set destino_horario = t.destino_horario %}
-            {% elif t.destino and t.destino.horario is defined %}
-              {% set destino_horario = t.destino.horario %}
-            {% else %}
-              {% set destino_horario = '—' %}
-            {% endif %}
-
-            {% if t.destino_contrato is defined and t.destino_contrato %}
-              {% set destino_contrato = t.destino_contrato %}
-            {% elif t.destino and t.destino.contrato is defined %}
-              {% set destino_contrato = t.destino.contrato %}
-            {% else %}
-              {% set destino_contrato = '—' %}
-            {% endif %}
-
             <tr>
-              <td>
-                <div class="small fw-semibold">#{{ t.id|default('—', true) }}</div>
-                <div class="text-muted-2 extra-small">
-                  {% if t.criada_em %}
-                    {% if t.criada_em.strftime is defined %}
-                      {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}
-                    {% else %}
-                      {{ t.criada_em }}
-                    {% endif %}
-                  {% else %}
-                    —
-                  {% endif %}
-                </div>
-              </td>
-
-              <td>
-                <div class="small fw-semibold text-truncate">
-                  {{ solicitante_nome }}
-                </div>
-                <div class="text-muted-2 extra-small">
-                  ID {{ solicitante_id }}
-                </div>
-              </td>
-
-              <td>
-                <div class="extra-small text-muted">
-                  {{ origem_contrato }}
-                </div>
-                <div class="extra-small text-muted">
-                  {{ origem_data }}
-                </div>
-                <div class="extra-small text-muted">
-                  {{ origem_turno }}
-                </div>
-                <div class="extra-small text-muted">
-                  {{ origem_horario }}
-                </div>
-              </td>
-
-              <td>
-                <div class="small fw-semibold text-truncate text-success">
-                  {{ coop2_nome }}
-                </div>
-                <div class="text-muted-2 extra-small">
-                  ID {{ coop2_id }}
-                </div>
-              </td>
-
-              <td>
-                <div class="extra-small text-muted">
-                  {{ destino_contrato }}
-                </div>
-                <div class="extra-small text-muted">
-                  {{ destino_data }}
-                </div>
-                <div class="extra-small text-muted">
-                  {{ destino_turno }}
-                </div>
-                <div class="extra-small text-muted">
-                  {{ destino_horario }}
-                </div>
-              </td>
-
-              <td class="mensagem-col">
-                {% set raw_msg = t.mensagem or '' %}
-                {% if 'AFETACAO_JSON' in raw_msg %}
-                  <div class="extra-small text-muted">
-                    Sem mensagem adicional.
-                  </div>
-                {% elif raw_msg %}
-                  <div class="extra-small text-muted">
-                    {{ raw_msg }}
-                  </div>
-                {% else %}
-                  <div class="extra-small text-muted">
-                    Sem mensagem adicional.
-                  </div>
-                {% endif %}
-              </td>
-
-              <td class="text-end">
-                <div class="d-flex flex-column gap-1 align-items-end">
-                  <form method="POST"
-                        action="{{ url_for('admin_aprovar_troca', id=t.id if t.id is defined else none) }}"
-                        onsubmit="return confirm('Confirmar aprovação desta troca?');">
-                    <button type="submit" class="btn btn-success btn-xs w-100">
-                      Aprovar
-                    </button>
-                  </form>
-
-                  <form method="POST"
-                        action="{{ url_for('admin_recusar_troca', id=t.id if t.id is defined else none) }}"
-                        onsubmit="return confirm('Recusar esta solicitação?');">
-                    <button type="submit" class="btn btn-outline-danger btn-xs w-100">
-                      Recusar
-                    </button>
-                  </form>
-                </div>
+              <td colspan="7" class="text-center text-muted py-4">
+                Nenhum cooperado encontrado.
               </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-  {% else %}
-    <div class="text-center text-muted mt-3">
-      Nenhuma solicitação pendente.
-    </div>
-  {% endif %}
-</div>
-
-<!-- HISTÓRICO DE TROCAS (aplicadas) -->
-<div class="card p-3 mb-3">
-  <div class="d-flex justify-content-between align-items-center">
-    <div>
-      <h5 class="mb-0 section-title">
-        Trocas de Escala - Aplicadas
-      </h5>
-      <small class="section-subtitle">
-        Registro das trocas já aprovadas.
-      </small>
-    </div>
-    <span class="badge-soft">
-      {{ trocas_historico|length if trocas_historico else 0 }} registro(s)
-    </span>
   </div>
 
-  {% if trocas_historico %}
-    <div class="table-responsive mt-3 troca-historico-wrapper">
-      <table class="table table-sm align-middle mb-0 table-troca">
-        <thead>
-          <tr>
-            <th style="width: 80px;">#</th>
-            <th>Cooperado 1</th>
-            <th>Escala 1</th>
-            <th>Cooperado 2</th>
-            <th>Escala 2</th>
-            <th style="width: 220px;">Mensagem</th>
-            <th style="width: 150px;">Aplicada em</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for t in trocas_historico or [] %}
-            {% set solicitante  = t.solicitante  if t.solicitante  else None %}
-            {% set destinatario = t.destinatario if t.destinatario else None %}
-            {% set origem       = t.origem       if t.origem       else None %}
+  <!-- SOLICITAÇÕES DE TROCA (pendentes) -->
+  <div class="card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h5 class="mb-0 section-title">
+          Trocas de Escala - Pendentes
+        </h5>
+        <small class="section-subtitle">
+          Visualização dos dois contratos e de quem é cada um.
+        </small>
+      </div>
+      <span class="badge-soft">
+        Pendentes: {{ trocas_pendentes|length if trocas_pendentes else 0 }}
+      </span>
+    </div>
 
-            {% set solicitante_nome = (solicitante.nome if solicitante else t.solicitante_nome)|default('—', true) %}
-            {% set solicitante_id   = (solicitante.id   if solicitante else t.solicitante_id)|default('—', true) %}
-
-            {% set coop2_nome = (destinatario.nome if destinatario else t.destinatario_nome)|default('—', true) %}
-            {% set coop2_id   = (destinatario.id   if destinatario else t.destinatario_id)|default('—', true) %}
-
-            {% if origem and origem.data is defined %}
-              {% set origem_data = origem.data %}
-            {% elif t.origem_data is defined %}
-              {% set origem_data = t.origem_data %}
-            {% else %}
-              {% set origem_data = '—' %}
-            {% endif %}
-
-            {% if origem and origem.turno is defined %}
-              {% set origem_turno = origem.turno %}
-            {% elif t.origem_turno is defined %}
-              {% set origem_turno = t.origem_turno %}
-            {% else %}
-              {% set origem_turno = '—' %}
-            {% endif %}
-
-            {% if origem and origem.horario is defined %}
-              {% set origem_horario = origem.horario %}
-            {% elif t.origem_horario is defined %}
-              {% set origem_horario = t.origem_horario %}
-            {% else %}
-              {% set origem_horario = '—' %}
-            {% endif %}
-
-            {% if origem and origem.contrato is defined %}
-              {% set origem_contrato = origem.contrato %}
-            {% elif t.origem_contrato is defined %}
-              {% set origem_contrato = t.origem_contrato %}
-            {% else %}
-              {% set origem_contrato = '—' %}
-            {% endif %}
-
-            {% if t.destino_data is defined and t.destino_data %}
-              {% set destino_data = t.destino_data %}
-            {% else %}
-              {% set destino_data = '—' %}
-            {% endif %}
-
-            {% if t.destino_turno is defined and t.destino_turno %}
-              {% set destino_turno = t.destino_turno %}
-            {% else %}
-              {% set destino_turno = '—' %}
-            {% endif %}
-
-            {% if t.destino_horario is defined and t.destino_horario %}
-              {% set destino_horario = t.destino_horario %}
-            {% else %}
-              {% set destino_horario = '—' %}
-            {% endif %}
-
-            {% if t.destino_contrato is defined and t.destino_contrato %}
-              {% set destino_contrato = t.destino_contrato %}
-            {% else %}
-              {% set destino_contrato = '—' %}
-            {% endif %}
-
+    {% if trocas_pendentes %}
+      <div class="table-responsive mt-3 troca-pendentes-wrapper">
+        <table class="table table-sm align-middle mb-0 table-troca">
+          <thead>
             <tr>
-              <td>
-                <div class="small fw-semibold">#{{ t.id|default('—', true) }}</div>
-                <div class="text-muted-2 extra-small">
-                  {% if t.criada_em %}
-                    {% if t.criada_em.strftime is defined %}
-                      {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}
-                    {% else %}
-                      {{ t.criada_em }}
-                    {% endif %}
-                  {% else %}
-                    —
-                  {% endif %}
-                </div>
-              </td>
-
-              <td>
-                <div class="small fw-semibold text-truncate">
-                  {{ solicitante_nome }}
-                </div>
-                <div class="text-muted-2 extra-small">
-                  ID {{ solicitante_id }}
-                </div>
-              </td>
-
-              <td>
-                <div class="extra-small text-muted">
-                  {{ origem_contrato }}
-                </div>
-                <div class="extra-small text-muted">
-                  {{ origem_data }}
-                </div>
-                <div class="extra-small text-muted">
-                  {{ origem_turno }}
-                </div>
-                <div class="extra-small text-muted">
-                  {{ origem_horario }}
-                </div>
-              </td>
-
-              <td>
-                <div class="small fw-semibold text-truncate text-success">
-                  {{ coop2_nome }}
-                </div>
-                <div class="text-muted-2 extra-small">
-                  ID {{ coop2_id }}
-                </div>
-              </td>
-
-              <td>
-                <div class="extra-small text-muted">
-                  {{ destino_contrato }}
-                </div>
-                <div class="extra-small text-muted">
-                  {{ destino_data }}
-                </div>
-                <div class="extra-small text-muted">
-                  {{ destino_turno }}
-                </div>
-                <div class="extra-small text-muted">
-                  {{ destino_horario }}
-                </div>
-              </td>
-
-              <td class="mensagem-col">
-                {% set raw_msg = t.mensagem or '' %}
-                {% if 'AFETACAO_JSON' in raw_msg %}
-                  <div class="extra-small text-muted">
-                    Sem mensagem adicional.
-                  </div>
-                {% elif raw_msg %}
-                  <div class="extra-small text-muted">
-                    {{ raw_msg }}
-                  </div>
-                {% else %}
-                  <div class="extra-small text-muted">
-                    Sem mensagem adicional.
-                  </div>
-                {% endif %}
-              </td>
-
-              <td>
-                <div class="extra-small text-muted">
-                  {% if t.aplicada_em %}
-                    {% if t.aplicada_em.strftime is defined %}
-                      {{ t.aplicada_em.strftime('%d/%m/%Y %H:%M') }}
-                    {% else %}
-                      {{ t.aplicada_em }}
-                    {% endif %}
-                  {% else %}
-                    —
-                  {% endif %}
-                </div>
-              </td>
+              <th style="width: 80px;">#</th>
+              <th>Cooperado 1</th>
+              <th>Escala 1</th>
+              <th>Cooperado 2</th>
+              <th>Escala 2</th>
+              <th style="width: 220px;">Mensagem</th>
+              <th style="width: 130px;" class="text-end">Ações</th>
             </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {% for t in trocas_pendentes or [] %}
+              {% set solicitante  = t.solicitante  if t.solicitante  else None %}
+              {% set destinatario = t.destinatario if t.destinatario else None %}
+              {% set origem       = t.origem       if t.origem       else None %}
+
+              {% set solicitante_nome = (solicitante.nome if solicitante else t.solicitante_nome)|default('—', true) %}
+              {% set solicitante_id   = (solicitante.id   if solicitante else t.solicitante_id)|default('—', true) %}
+
+              {% set coop2_nome = (destinatario.nome if destinatario else t.destinatario_nome)|default('—', true) %}
+              {% set coop2_id   = (destinatario.id   if destinatario else t.destinatario_id)|default('—', true) %}
+
+              {% if origem and origem.data is defined %}
+                {% set origem_data = origem.data %}
+              {% elif t.origem_data is defined %}
+                {% set origem_data = t.origem_data %}
+              {% else %}
+                {% set origem_data = '—' %}
+              {% endif %}
+
+              {% if origem and origem.turno is defined %}
+                {% set origem_turno = origem.turno %}
+              {% elif t.origem_turno is defined %}
+                {% set origem_turno = t.origem_turno %}
+              {% else %}
+                {% set origem_turno = '—' %}
+              {% endif %}
+
+              {% if origem and origem.horario is defined %}
+                {% set origem_horario = origem.horario %}
+              {% elif t.origem_horario is defined %}
+                {% set origem_horario = t.origem_horario %}
+              {% else %}
+                {% set origem_horario = '—' %}
+              {% endif %}
+
+              {% if origem and origem.contrato is defined %}
+                {% set origem_contrato = origem.contrato %}
+              {% elif t.origem_contrato is defined %}
+                {% set origem_contrato = t.origem_contrato %}
+              {% else %}
+                {% set origem_contrato = '—' %}
+              {% endif %}
+
+              {% if t.destino_data is defined and t.destino_data %}
+                {% set destino_data = t.destino_data %}
+              {% elif t.destino and t.destino.data is defined %}
+                {% set destino_data = t.destino.data %}
+              {% else %}
+                {% set destino_data = '—' %}
+              {% endif %}
+
+              {% if t.destino_turno is defined and t.destino_turno %}
+                {% set destino_turno = t.destino_turno %}
+              {% elif t.destino and t.destino.turno is defined %}
+                {% set destino_turno = t.destino.turno %}
+              {% else %}
+                {% set destino_turno = '—' %}
+              {% endif %}
+
+              {% if t.destino_horario is defined and t.destino_horario %}
+                {% set destino_horario = t.destino_horario %}
+              {% elif t.destino and t.destino.horario is defined %}
+                {% set destino_horario = t.destino.horario %}
+              {% else %}
+                {% set destino_horario = '—' %}
+              {% endif %}
+
+              {% if t.destino_contrato is defined and t.destino_contrato %}
+                {% set destino_contrato = t.destino_contrato %}
+              {% elif t.destino and t.destino.contrato is defined %}
+                {% set destino_contrato = t.destino.contrato %}
+              {% else %}
+                {% set destino_contrato = '—' %}
+              {% endif %}
+
+              <tr>
+                <td>
+                  <div class="small fw-semibold">#{{ t.id|default('—', true) }}</div>
+                  <div class="text-muted-2 extra-small">
+                    {% if t.criada_em %}
+                      {% if t.criada_em.strftime is defined %}
+                        {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}
+                      {% else %}
+                        {{ t.criada_em }}
+                      {% endif %}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </td>
+
+                <td>
+                  <div class="small fw-semibold text-truncate">
+                    {{ solicitante_nome }}
+                  </div>
+                  <div class="text-muted-2 extra-small">
+                    ID {{ solicitante_id }}
+                  </div>
+                </td>
+
+                <td>
+                  <div class="extra-small text-muted">
+                    {{ origem_contrato }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ origem_data }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ origem_turno }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ origem_horario }}
+                  </div>
+                </td>
+
+                <td>
+                  <div class="small fw-semibold text-truncate text-success">
+                    {{ coop2_nome }}
+                  </div>
+                  <div class="text-muted-2 extra-small">
+                    ID {{ coop2_id }}
+                  </div>
+                </td>
+
+                <td>
+                  <div class="extra-small text-muted">
+                    {{ destino_contrato }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ destino_data }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ destino_turno }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ destino_horario }}
+                  </div>
+                </td>
+
+                <td class="mensagem-col">
+                  {% set raw_msg = t.mensagem or '' %}
+                  {% if 'AFETACAO_JSON' in raw_msg %}
+                    <div class="extra-small text-muted">
+                      Sem mensagem adicional.
+                    </div>
+                  {% elif raw_msg %}
+                    <div class="extra-small text-muted">
+                      {{ raw_msg }}
+                    </div>
+                  {% else %}
+                    <div class="extra-small text-muted">
+                      Sem mensagem adicional.
+                    </div>
+                  {% endif %}
+                </td>
+
+                <td class="text-end">
+                  <div class="d-flex flex-column gap-1 align-items-end">
+                    <form method="POST"
+                          action="{{ url_for('admin_aprovar_troca', id=t.id if t.id is defined else none) }}"
+                          onsubmit="return confirm('Confirmar aprovação desta troca?');">
+                      <button type="submit" class="btn btn-success btn-xs w-100">
+                        Aprovar
+                      </button>
+                    </form>
+
+                    <form method="POST"
+                          action="{{ url_for('admin_recusar_troca', id=t.id if t.id is defined else none) }}"
+                          onsubmit="return confirm('Recusar esta solicitação?');">
+                      <button type="submit" class="btn btn-outline-danger btn-xs w-100">
+                        Recusar
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-center text-muted mt-3">
+        Nenhuma solicitação pendente.
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- HISTÓRICO DE TROCAS (aplicadas) -->
+  <div class="card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h5 class="mb-0 section-title">
+          Trocas de Escala - Aplicadas
+        </h5>
+        <small class="section-subtitle">
+          Registro das trocas já aprovadas.
+        </small>
+      </div>
+      <span class="badge-soft">
+        {{ trocas_historico|length if trocas_historico else 0 }} registro(s)
+      </span>
     </div>
-  {% else %}
-    <div class="text-center text-muted mt-2">
-      Sem trocas aplicadas.
+
+    {% if trocas_historico %}
+      <div class="table-responsive mt-3 troca-historico-wrapper">
+        <table class="table table-sm align-middle mb-0 table-troca">
+          <thead>
+            <tr>
+              <th style="width: 80px;">#</th>
+              <th>Cooperado 1</th>
+              <th>Escala 1</th>
+              <th>Cooperado 2</th>
+              <th>Escala 2</th>
+              <th style="width: 220px;">Mensagem</th>
+              <th style="width: 150px;">Aplicada em</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in trocas_historico or [] %}
+              {% set solicitante  = t.solicitante  if t.solicitante  else None %}
+              {% set destinatario = t.destinatario if t.destinatario else None %}
+              {% set origem       = t.origem       if t.origem       else None %}
+
+              {% set solicitante_nome = (solicitante.nome if solicitante else t.solicitante_nome)|default('—', true) %}
+              {% set solicitante_id   = (solicitante.id   if solicitante else t.solicitante_id)|default('—', true) %}
+
+              {% set coop2_nome = (destinatario.nome if destinatario else t.destinatario_nome)|default('—', true) %}
+              {% set coop2_id   = (destinatario.id   if destinatario else t.destinatario_id)|default('—', true) %}
+
+              {% if origem and origem.data is defined %}
+                {% set origem_data = origem.data %}
+              {% elif t.origem_data is defined %}
+                {% set origem_data = t.origem_data %}
+              {% else %}
+                {% set origem_data = '—' %}
+              {% endif %}
+
+              {% if origem and origem.turno is defined %}
+                {% set origem_turno = origem.turno %}
+              {% elif t.origem_turno is defined %}
+                {% set origem_turno = t.origem_turno %}
+              {% else %}
+                {% set origem_turno = '—' %}
+              {% endif %}
+
+              {% if origem and origem.horario is defined %}
+                {% set origem_horario = origem.horario %}
+              {% elif t.origem_horario is defined %}
+                {% set origem_horario = t.origem_horario %}
+              {% else %}
+                {% set origem_horario = '—' %}
+              {% endif %}
+
+              {% if origem and origem.contrato is defined %}
+                {% set origem_contrato = origem.contrato %}
+              {% elif t.origem_contrato is defined %}
+                {% set origem_contrato = t.origem_contrato %}
+              {% else %}
+                {% set origem_contrato = '—' %}
+              {% endif %}
+
+              {% if t.destino_data is defined and t.destino_data %}
+                {% set destino_data = t.destino_data %}
+              {% else %}
+                {% set destino_data = '—' %}
+              {% endif %}
+
+              {% if t.destino_turno is defined and t.destino_turno %}
+                {% set destino_turno = t.destino_turno %}
+              {% else %}
+                {% set destino_turno = '—' %}
+              {% endif %}
+
+              {% if t.destino_horario is defined and t.destino_horario %}
+                {% set destino_horario = t.destino_horario %}
+              {% else %}
+                {% set destino_horario = '—' %}
+              {% endif %}
+
+              {% if t.destino_contrato is defined and t.destino_contrato %}
+                {% set destino_contrato = t.destino_contrato %}
+              {% else %}
+                {% set destino_contrato = '—' %}
+              {% endif %}
+
+              <tr>
+                <td>
+                  <div class="small fw-semibold">#{{ t.id|default('—', true) }}</div>
+                  <div class="text-muted-2 extra-small">
+                    {% if t.criada_em %}
+                      {% if t.criada_em.strftime is defined %}
+                        {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}
+                      {% else %}
+                        {{ t.criada_em }}
+                      {% endif %}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </td>
+
+                <td>
+                  <div class="small fw-semibold text-truncate">
+                    {{ solicitante_nome }}
+                  </div>
+                  <div class="text-muted-2 extra-small">
+                    ID {{ solicitante_id }}
+                  </div>
+                </td>
+
+                <td>
+                  <div class="extra-small text-muted">
+                    {{ origem_contrato }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ origem_data }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ origem_turno }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ origem_horario }}
+                  </div>
+                </td>
+
+                <td>
+                  <div class="small fw-semibold text-truncate text-success">
+                    {{ coop2_nome }}
+                  </div>
+                  <div class="text-muted-2 extra-small">
+                    ID {{ coop2_id }}
+                  </div>
+                </td>
+
+                <td>
+                  <div class="extra-small text-muted">
+                    {{ destino_contrato }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ destino_data }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ destino_turno }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ destino_horario }}
+                  </div>
+                </td>
+
+                <td class="mensagem-col">
+                  {% set raw_msg = t.mensagem or '' %}
+                  {% if 'AFETACAO_JSON' in raw_msg %}
+                    <div class="extra-small text-muted">
+                      Sem mensagem adicional.
+                    </div>
+                  {% elif raw_msg %}
+                    <div class="extra-small text-muted">
+                      {{ raw_msg }}
+                    </div>
+                  {% else %}
+                    <div class="extra-small text-muted">
+                      Sem mensagem adicional.
+                    </div>
+                  {% endif %}
+                </td>
+
+                <td>
+                  <div class="extra-small text-muted">
+                    {% if t.aplicada_em %}
+                      {% if t.aplicada_em.strftime is defined %}
+                        {{ t.aplicada_em.strftime('%d/%m/%Y %H:%M') }}
+                      {% else %}
+                        {{ t.aplicada_em }}
+                      {% endif %}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-center text-muted mt-2">
+        Sem trocas aplicadas.
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Modal visualizar escala do cooperado -->
+  <div class="modal fade" id="modalEscalas" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header border-0 pb-0">
+          <div>
+            <h5 class="modal-title section-title">Escala do Cooperado</h5>
+            <small class="section-subtitle" id="modalEscalaCoopNome">Detalhamento da escala selecionada.</small>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body pt-2">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 table-escalas">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Turno</th>
+                  <th>Horário</th>
+                  <th>Contrato</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-escala"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+        </div>
+      </div>
     </div>
-  {% endif %}
-</div>
+  </div>
+</section>
 
 <style>
   .section-title {
@@ -3677,6 +3792,102 @@
     color: #6c757d;
   }
 
+  .card {
+    border-radius: 0.75rem;
+    border: 1px solid #e4e7f0;
+  }
+
+  .badge-soft {
+    background: #eef2ff;
+    color: #3047d6;
+    border-radius: 999px;
+    padding: 0.25rem 0.7rem;
+    font-size: 0.75rem;
+  }
+
+  .extra-small {
+    font-size: 0.74rem;
+    line-height: 1.1;
+  }
+
+  .text-muted-2 {
+    color: #9aa0ac;
+  }
+
+  .btn-xs {
+    padding: 0.18rem 0.5rem;
+    font-size: 0.74rem;
+    border-radius: 999px;
+  }
+
+  .escala-upload-card {
+    background: linear-gradient(135deg, #f5f7ff 0%, #ffffff 100%);
+  }
+
+  .escala-search-box {
+    min-width: 240px;
+    max-width: 260px;
+    padding: 0.6rem 0.75rem;
+    border-radius: 0.75rem;
+    background: #f8f9ff;
+    border: 1px solid #e0e4ff;
+  }
+
+  .search-input::placeholder {
+    font-size: 0.78rem;
+  }
+
+  .escalas-wrapper {
+    max-height: 420px;
+    overflow-y: auto;
+  }
+
+  .table-escalas {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .table-escalas thead th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background-color: #f5f7fb;
+    border-bottom: 1px solid #e4e7f0;
+  }
+
+  .table-escalas th,
+  .table-escalas td {
+    padding: 0.4rem 0.55rem;
+    vertical-align: middle;
+    font-size: 0.78rem;
+  }
+
+  .badge-doc {
+    font-size: 0.68rem;
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+    border: 1px solid transparent;
+  }
+
+  .badge-doc-ok {
+    background: #e9f9ee;
+    color: #1c7c3c;
+    border-color: #b7e4c7;
+  }
+
+  .badge-doc-pend {
+    background: #fff0f0;
+    color: #b02a37;
+    border-color: #f5c2c7;
+  }
+
+  .badge-doc-na {
+    background: #f2f3f7;
+    color: #6c757d;
+    border-color: #dde1ee;
+  }
+
+  /* Trocas – mesmo padrão visual */
   .troca-pendentes-wrapper,
   .troca-historico-wrapper {
     max-height: 380px;
@@ -3703,72 +3914,33 @@
     font-size: 0.78rem;
   }
 
-  .extra-small {
-    font-size: 0.74rem;
-    line-height: 1.1;
-  }
-
-  .text-muted-2 {
-    color: #9aa0ac;
-  }
-
   .mensagem-col {
     max-width: 220px;
     white-space: nowrap;
     text-overflow: ellipsis;
     overflow: hidden;
   }
-
-  .btn-xs {
-    padding: 0.18rem 0.5rem;
-    font-size: 0.74rem;
-    border-radius: 999px;
-  }
-
-  .badge-soft {
-    background: #eef2ff;
-    color: #3047d6;
-    border-radius: 999px;
-    padding: 0.25rem 0.7rem;
-    font-size: 0.75rem;
-  }
-
-  .card {
-    border-radius: 0.75rem;
-    border: 1px solid #e4e7f0;
-  }
 </style>
 
-  <!-- Modal visualizar escala do cooperado -->
-  <div class="modal fade" id="modalEscalas" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Escala do Cooperado</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="table-responsive">
-            <table class="table table-bordered align-middle">
-              <thead>
-                <tr>
-                  <th>Data</th>
-                  <th>Turno</th>
-                  <th>Horário</th>
-                  <th>Contrato</th>
-                </tr>
-              </thead>
-              <tbody id="tbody-escala"></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+<script>
+  // Filtro por nome do cooperado
+  document.addEventListener('DOMContentLoaded', function () {
+    const input = document.getElementById('filtroCooperado');
+    const tabela = document.getElementById('tabela-escalas');
+
+    if (input && tabela) {
+      input.addEventListener('input', function () {
+        const termo = this.value.toLowerCase().trim();
+        const linhas = tabela.querySelectorAll('tbody tr[data-coop-nome]');
+
+        linhas.forEach(function (tr) {
+          const nome = (tr.getAttribute('data-coop-nome') || '').toLowerCase();
+          tr.style.display = (!termo || nome.includes(termo)) ? '' : 'none';
+        });
+      });
+    }
+  });
+</script>
 
   <!-- MODAIS =================================================== -->
   <div class="modal fade" id="modalEditLancamento" tabindex="-1">
