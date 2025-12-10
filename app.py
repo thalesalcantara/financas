@@ -155,6 +155,26 @@ app.config.update(
 
 db = SQLAlchemy(app)
 
+def ajustar_banco():
+    try:
+        # se você tiver essa função _is_sqlite, use; senão pode checar pela URI
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(despesas_cooperado);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "eh_adiantamento" not in colnames:
+                db.session.execute(sa_text(
+                    "ALTER TABLE despesas_cooperado ADD COLUMN eh_adiantamento BOOLEAN DEFAULT 0"
+                ))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("""
+                ALTER TABLE IF EXISTS public.despesas_cooperado
+                ADD COLUMN IF NOT EXISTS eh_adiantamento BOOLEAN DEFAULT FALSE
+            """))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
 
 # ========= Retry de conexão p/ rotas críticas =========
 def with_db_retry(fn):
@@ -739,6 +759,24 @@ def init_db():
     except Exception:
         db.session.rollback()
 
+    # 4.z) eh_adiantamento em despesas_cooperado (marca adiantamento separado)
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(despesas_cooperado);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "eh_adiantamento" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE despesas_cooperado ADD COLUMN eh_adiantamento BOOLEAN DEFAULT 0"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("""
+                ALTER TABLE IF EXISTS public.despesas_cooperado
+                ADD COLUMN IF NOT EXISTS eh_adiantamento BOOLEAN DEFAULT FALSE
+            """))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
     # 4.1) cooperado_nome em escalas
     try:
         if _is_sqlite():
@@ -822,22 +860,22 @@ def init_db():
         if _is_sqlite():
             db.session.execute(sa_text("""
                 CREATE TABLE IF NOT EXISTS avaliacoes_restaurante (
-                  id INTEGER PRIMARY KEY,
-                  restaurante_id INTEGER NOT NULL,
-                  cooperado_id   INTEGER NOT NULL,
-                  lancamento_id  INTEGER UNIQUE,
-                  estrelas_geral INTEGER,
-                  estrelas_ambiente   = db.Column(db.Integer)
-                  estrelas_tratamento = db.Column(db.Integer)
-                  estrelas_suporte    = db.Column(db.Integer)
-                  comentario TEXT,
-                  media_ponderada REAL,
-                  sentimento TEXT,
-                  temas TEXT,
-                  alerta_crise INTEGER DEFAULT 0,
-                  criado_em TIMESTAMP
-                );
-            """))
+                id SERIAL PRIMARY KEY,
+                restaurante_id INTEGER NOT NULL,
+                cooperado_id   INTEGER NOT NULL,
+                lancamento_id  INTEGER UNIQUE,
+                estrelas_geral INTEGER,
+                estrelas_ambiente   INTEGER,
+                estrelas_tratamento INTEGER,
+                estrelas_suporte    INTEGER,
+                comentario TEXT,
+                media_ponderada DOUBLE PRECISION,
+                sentimento VARCHAR(12),
+                temas VARCHAR(255),
+                alerta_crise BOOLEAN DEFAULT FALSE,
+                criado_em TIMESTAMP
+              );
+          """))
             db.session.execute(sa_text(
                 "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
             db.session.execute(sa_text(
@@ -945,6 +983,7 @@ try:
     if os.environ.get("INIT_DB_ON_START", "1") == "1":
         _t0 = datetime.utcnow()
         with app.app_context():
+       
             init_db()
         try:
             app.logger.info(f"init_db concluído em {(datetime.utcnow() - _t0).total_seconds():.2f}s")
