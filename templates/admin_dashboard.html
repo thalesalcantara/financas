@@ -1173,6 +1173,26 @@
     );
   };
 
+  // ---- NORMALIZAÇÃO: tentar achar cooperado_id a partir do nome ----
+  (function normalizeDespesasCoopIds() {
+    if (!COOPS || !COOPS.length) return;
+    const mapByName = {};
+    COOPS.forEach(c => {
+      if (c.nome) {
+        mapByName[c.nome] = c.id;
+      }
+    });
+
+    DESP_COOP.forEach(d => {
+      if (d.cooperado_id == null && d.cooperado_nome) {
+        const found = mapByName[d.cooperado_nome];
+        if (found != null) {
+          d.cooperado_id = found;
+        }
+      }
+    });
+  })();
+
   // ---- Filtrados ----
   const filteredPROD = PRODUCOES.filter(p =>
     inRange(p.data) &&
