@@ -1194,12 +1194,24 @@
   const filteredDESc = DESP_COOP_CORP.filter(d => inRange(d.data));
 
   // ---- KPIs (front) ----
-  const kpiProd               = sumBy(filteredPROD, x => x.valor);
+    const kpiProd               = sumBy(filteredPROD, x => x.valor);
   const kpiINSS               = kpiProd * 0.045;
   const kpiRecCoopCorp        = sumBy(filteredRECc, x => x.valor);
   const kpiDespCoopCorp       = sumBy(filteredDESc, x => x.valor);
   const kpiRecCooperadosFull  = kpiProd + sumBy(filteredRECp, x => x.valor);
-  const kpiDespCooperados     = sumBy(filteredDESp, x => x.valor);
+
+  // >>> AQUI: separa despesas “normais” e adiantamentos <<<
+  const kpiDespCooperados = sumBy(
+    filteredDESp,
+    x => isAdiantamento(x.adiantamento) ? 0 : x.valor
+  );
+
+  const kpiAdiantCooperados = sumBy(
+    filteredDESp,
+    x => isAdiantamento(x.adiantamento) ? x.valor : 0
+  );
+  // <<< FIM DO AJUSTE >>>
+
   const kpiResultadoCoop      = kpiRecCoopCorp - kpiDespCoopCorp;
   const kpiTotalReceitasGeral = kpiRecCoopCorp + kpiRecCooperadosFull;
 
