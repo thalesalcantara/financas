@@ -2115,7 +2115,20 @@ def admin_dashboard():
     despesas_coop = dq2.order_by(DespesaCooperado.data_fim.desc().nullslast(), DespesaCooperado.id.desc()).all()
 
     total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
-    total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop)
+
+# Despesas normais (eh_adiantamento = False ou None)
+    total_despesas_coop = sum(
+        (d.valor or 0.0)
+        for d in despesas_coop
+        if not d.eh_adiantamento  # False ou None entram aqui
+    )
+
+    # Adiantamentos (eh_adiantamento = True)
+    total_adiantamentos_coop = sum(
+        (d.valor or 0.0)
+        for d in despesas_coop
+        if d.eh_adiantamento
+    )
 
     cfg = get_config()
     cooperados = Cooperado.query.order_by(Cooperado.nome).all()
