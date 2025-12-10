@@ -1194,13 +1194,13 @@
   const filteredDESc = DESP_COOP_CORP.filter(d => inRange(d.data));
 
   // ---- KPIs (front) ----
-    const kpiProd               = sumBy(filteredPROD, x => x.valor);
+  const kpiProd               = sumBy(filteredPROD, x => x.valor);
   const kpiINSS               = kpiProd * 0.045;
   const kpiRecCoopCorp        = sumBy(filteredRECc, x => x.valor);
   const kpiDespCoopCorp       = sumBy(filteredDESc, x => x.valor);
   const kpiRecCooperadosFull  = kpiProd + sumBy(filteredRECp, x => x.valor);
 
-  // >>> AQUI: separa despesas “normais” e adiantamentos <<<
+  // separa despesas “normais” e adiantamentos dos cooperados
   const kpiDespCooperados = sumBy(
     filteredDESp,
     x => isAdiantamento(x.adiantamento) ? 0 : x.valor
@@ -1210,7 +1210,6 @@
     filteredDESp,
     x => isAdiantamento(x.adiantamento) ? x.valor : 0
   );
-  // <<< FIM DO AJUSTE >>>
 
   const kpiResultadoCoop      = kpiRecCoopCorp - kpiDespCoopCorp;
   const kpiTotalReceitasGeral = kpiRecCoopCorp + kpiRecCooperadosFull;
@@ -1258,9 +1257,9 @@
       if (d.cooperado_id == null) return;
       const row = ensure(d.cooperado_id, d.cooperado_nome || '—');
       if (isAdiantamento(d.adiantamento)) {
-        row.ad += d.valor;   // agora adiantamento vai pra coluna AD
+        row.ad += d.valor;   // adiantamento vai para coluna AD
       } else {
-        row.des += d.valor;  // e o resto fica em Despesas
+        row.des += d.valor;  // demais despesas
       }
     });
 
@@ -1544,7 +1543,8 @@
       ['Receitas Coop (período)', kpiRecCoopCorp],
       ['Despesas Coop (período)', kpiDespCoopCorp],
       ['Receitas Cooperados (Prod + Rec)', kpiRecCooperadosFull],
-      ['Despesas Cooperados (período)', kpiDespCooperados],
+      ['Despesas Cooperados (período, sem adiantamentos)', kpiDespCooperados],
+      ['Adiantamentos Cooperados (período)', kpiAdiantCooperados],
       ['Total de Receitas (Geral)', kpiTotalReceitasGeral],
       ['Resultado Cooperativa', kpiResultadoCoop],
     ];
