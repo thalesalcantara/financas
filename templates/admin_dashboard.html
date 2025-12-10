@@ -1047,8 +1047,7 @@
       }
     }
   </style>
-
-  <!-- Dados (seguros p/ JS) + Scripts (Chart.js + XLSX) -->
+<!-- Dados (seguros p/ JS) + Scripts (Chart.js + XLSX) -->
 <script>
 (function(){
   // ---- Filtros atuais ----
@@ -1173,27 +1172,7 @@
     );
   };
 
-  // ---- NORMALIZAÇÃO: tentar achar cooperado_id a partir do nome ----
-  (function normalizeDespesasCoopIds() {
-    if (!COOPS || !COOPS.length) return;
-    const mapByName = {};
-    COOPS.forEach(c => {
-      if (c.nome) {
-        mapByName[c.nome] = c.id;
-      }
-    });
-
-    DESP_COOP.forEach(d => {
-      if (d.cooperado_id == null && d.cooperado_nome) {
-        const found = mapByName[d.cooperado_nome];
-        if (found != null) {
-          d.cooperado_id = found;
-        }
-      }
-    });
-  })();
-
-  // ---- Filtrados ----
+  // ---- Filtro de despesas com fallback por nome quando filtrar por cooperado ----
   const filteredPROD = PRODUCOES.filter(p =>
     inRange(p.data) &&
     (FILTER.cid == null || p.cooperado_id === FILTER.cid) &&
@@ -1205,10 +1184,20 @@
     (FILTER.cid == null || r.cooperado_id === FILTER.cid)
   );
 
-  const filteredDESp = DESP_COOP.filter(d =>
-    inRange(d.data) &&
-    (FILTER.cid == null || d.cooperado_id === FILTER.cid)
-  );
+  const filteredDESp = DESP_COOP.filter(d => {
+    if (!inRange(d.data)) return false;
+    if (FILTER.cid == null) return true;
+
+    // tenta bater por ID primeiro
+    if (d.cooperado_id === FILTER.cid) return true;
+
+    // fallback por nome, se o lançamento não tiver id mas tiver nome
+    const coop = COOPS.find(c => c.id === FILTER.cid);
+    if (coop && d.cooperado_nome) {
+      return d.cooperado_nome.trim().toUpperCase() === coop.nome.trim().toUpperCase();
+    }
+    return false;
+  });
 
   const filteredRECc = REC_COOP_CORP.filter(r => inRange(r.data));
   const filteredDESc = DESP_COOP_CORP.filter(d => inRange(d.data));
@@ -1250,31 +1239,37 @@
     resEl.classList.add(kpiResultadoCoop < 0 ? 'text-danger' : 'text-success');
   }
 
+  // ---- chave segura para agrupar cooperado mesmo sem id ----
+  const coopKey = (id, nome) => {
+    if (id != null) return `id:${id}`;
+    if (nome && nome.trim()) return `nome:${nome.trim().toUpperCase()}`;
+    return 'nome:—';
+  };
+
   // ---- Função de resumo (usada na tabela e no XLSX) ----
   function computeResumoCoopRows() {
-    const map = new Map(); // id -> item agregado
+    const map = new Map(); // key -> item agregado
+
     const ensure = (id, nome) => {
-      if (!map.has(id)) {
-        map.set(id, { id, nome, prod: 0, inss: 0, rec: 0, des: 0, ad: 0 });
+      const key = coopKey(id, nome);
+      if (!map.has(key)) {
+        map.set(key, { key, id, nome, prod: 0, inss: 0, rec: 0, des: 0, ad: 0 });
       }
-      return map.get(id);
+      return map.get(key);
     };
 
     filteredPROD.forEach(p => {
-      if (p.cooperado_id == null) return;
       const row = ensure(p.cooperado_id, p.cooperado_nome);
       row.prod += p.valor;
       row.inss += p.valor * 0.045;
     });
 
     filteredRECp.forEach(r => {
-      if (r.cooperado_id == null) return;
       const row = ensure(r.cooperado_id, r.cooperado_nome);
       row.rec += r.valor;
     });
 
     filteredDESp.forEach(d => {
-      if (d.cooperado_id == null) return;
       const row = ensure(d.cooperado_id, d.cooperado_nome || '—');
       if (isAdiantamento(d.adiantamento)) {
         row.ad += d.valor;   // adiantamento vai para coluna AD
