@@ -509,7 +509,7 @@
           <i class="bi bi-calendar-week"></i><span>Escala</span>
         </a>
         {% if session.get('user_tipo') == 'restaurante' %}
-        <a data-target="tabelas" id="linkTabelas" href="{{ url_for('restaurantes_tabelas') }}">
+        <a data-target="tabelas" id="linkTabelas" href="{{ url_for('rest_tabelas') }}">
           <i class="bi bi-table"></i><span>Tabelas</span>
         </a>
         {% endif %}
@@ -1450,7 +1450,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // ========================
-// OVERLAY GLOBAL (LANÇAR / EXCLUIR)
+// OVERLAY "LANÇANDO / EXCLUINDO"
 // ========================
 const overlayLanc = document.getElementById('overlayLancando');
 const overlayTextEl = overlayLanc?.querySelector('.lanc-overlay-text');
@@ -1525,6 +1525,7 @@ function formatPhoneBR(v) {
   function selectCoop({id, nome, foto, total, foneDigits, foneRaw}) {
     if (!id) return;
 
+    // Mostra área do cooperado / esconde o aviso
     if (header) header.style.display = '';
     if (form) form.style.display = '';
     if (hint) hint.style.display = 'none';
@@ -1752,6 +1753,7 @@ function initAvisos(){
 
   refresh();
 
+  // se não veio lista no contexto, buscar da rota e injetar
   if(!document.querySelector('#avisosListContainer .aviso-card')){
     const href=document.getElementById('linkAvisos')?.href;
     if(href) loadAvisosFromRoute(href);
@@ -1771,7 +1773,7 @@ async function loadAvisosFromRoute(href){
     if(cards.length){
       cards.forEach(c=>cont.appendChild(document.importNode(c,true)));
       avisosWired=false;
-      initAvisos();
+      initAvisos(); // religar handlers
       setAvisosBadge(cards.filter(c=>c.getAttribute('data-lido')==='0').length);
     }else{
       cont.innerHTML='<div class="card card-body"><div class="text-muted"><i class="bi bi-inbox me-1"></i> Nenhum aviso disponível.</div></div>';
@@ -1794,6 +1796,7 @@ function initLancar(){
   const busca = document.getElementById('buscaCoop');
   const itens  = Array.from(document.querySelectorAll('.cooperado-item'));
 
+  // Função central: filtra a lista e, se pedido, já seleciona o cooperado
   function filtrarESelecionar(valor, autoSelecionar){
     const q = (valor || '').trim().toLowerCase();
     const visiveis = [];
@@ -1807,25 +1810,33 @@ function initLancar(){
 
     if (!autoSelecionar) return;
 
+    // 1º: tenta achar match EXATO com o nome
     let alvo = visiveis.find(el => (el.dataset.nome || '').toLowerCase() === q);
+
+    // Se não tiver match exato, mas só sobrou 1 visível, seleciona esse
     if (!alvo && visiveis.length === 1){
       alvo = visiveis[0];
     }
 
     if (alvo){
+      // dispara o clique, que usa o fluxo já existente (selectCoop)
       alvo.click();
+      // opcional: tira o foco do input
       if (busca) busca.blur();
     }
   }
 
+  // Enquanto digita → só filtra (como era antes)
   busca?.addEventListener('input', function(){
     filtrarESelecionar(this.value, false);
   });
 
+  // Quando escolhe no datalist ou sai do campo → filtra e tenta selecionar
   busca?.addEventListener('change', function(){
     filtrarESelecionar(this.value, true);
   });
 
+  // Quando aperta Enter dentro do campo → filtra e tenta selecionar
   busca?.addEventListener('keydown', function(e){
     if (e.key === 'Enter'){
       e.preventDefault();
@@ -1833,22 +1844,28 @@ function initLancar(){
     }
   });
 
+  // Prepara estrelas da avaliação no formulário de lançamento (se existir)
   document.querySelectorAll('.rating-group').forEach(g=>{
     if (g.dataset.name !== 'av_geral') wireStars(g);
   });
   autoGeral();
 
+  // Fluxo de avaliação e animação de "Lançando…"
   wireAvaliacaoFlow();
 
-  // EXCLUSÃO COM OVERLAY "EXCLUINDO…"
+  // ========================
+  // EXCLUSÃO COM ANIMAÇÃO "EXCLUINDO…"
+  // ========================
   const blocoTabelas = document.getElementById('blocoTabelas');
   blocoTabelas?.addEventListener('click', (e)=>{
     const link = e.target.closest('a.btn-outline-danger');
     if(!link) return;
     e.preventDefault();
-    if(!confirm('Deseja realmente excluir este lançamento?')) return;
+    const ok = confirm('Deseja realmente excluir este lançamento?');
+    if(!ok) return;
     showLancOverlay('delete');
-    setTimeout(()=>{ window.location.href = link.href; }, 80);
+    // navega para a rota de exclusão
+    window.location.href = link.href;
   });
 }
 
@@ -1935,6 +1952,7 @@ function initLancamentos(){
     sessionStorage.setItem('scrollY', String(window.scrollY));
   });
 
+  // CSV com coluna Descrição
   document.getElementById('btnExportCsv')?.addEventListener('click', ()=>{
     const rowsVis=rows().filter(r=>r.style.display!=='none');
     const header=['Data','Cooperado','Contrato','Horário','Descrição','Entregas','Valor (R$)'];
@@ -1975,6 +1993,7 @@ function initLancamentos(){
     f.q.dispatchEvent(new Event('input'));
   }
 
+  // Avaliar/editar avaliação sem sair da página
   wireAvalLanc();
 }
 
@@ -2003,7 +2022,7 @@ function wireStars(group){
   paint(Number(hidden.value||0),false);
 }
 
-// autoGeral: média só se houver notas
+// autoGeral: média só se houver notas; senão fica vazio e não pinta
 function autoGeral(){
   const g=document.querySelector('.rating-group[data-name="av_geral"]');
   if(!g) return;
@@ -2024,7 +2043,7 @@ function autoGeral(){
 }
 
 // ========================
-// FLUXO MODAL AVALIAÇÃO (LANÇAR) + OVERLAY "LANÇANDO…"
+// FLUXO MODAL AVALIAÇÃO (LANÇAR)
 // ========================
 function setAvalInputsEnabled(enabled){
   const boxAval = document.getElementById('boxAval');
@@ -2039,13 +2058,14 @@ function wireAvaliacaoFlow(){
   if(!form) return;
 
   const modalEl = document.getElementById('modalAvaliar');
-  const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
+  const modal = new bootstrap.Modal(modalEl);
   const btnAvaliarAgora = document.getElementById('btnAvaliarAgora');
   const btnPularAval = document.getElementById('btnPularAval');
   const chkAvaliar = document.getElementById('chkAvaliar');
   const inputAvaliar = document.getElementById('inputAvaliar');
   const boxAval = document.getElementById('boxAval');
 
+  // lock de submissão para não duplicar
   let isSubmitting = false;
   const submitBtn = form.querySelector('button.btn-royal[type="submit"], button.btn-royal');
 
@@ -2061,6 +2081,7 @@ function wireAvaliacaoFlow(){
     form.style.pointerEvents = on ? 'none' : '';
     form.classList.toggle('opacity-75', on);
 
+    // overlay global
     if(on) showLancOverlay('launch'); else hideLancOverlay();
   }
 
@@ -2079,18 +2100,19 @@ function wireAvaliacaoFlow(){
     try{ el?.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
   }
 
+  // Inicialmente: avaliação desabilitada (não envia nada)
   setAvalInputsEnabled(false);
 
-  // checkbox "Registrar avaliação agora"
+  // Marcar/Desmarcar "avaliar agora"
   chkAvaliar?.addEventListener('change', ()=>{
     const on = chkAvaliar.checked;
-    if(inputAvaliar) inputAvaliar.value = on ? '1':'0';
+    inputAvaliar.value = on ? '1':'0';
     if(boxAval) boxAval.style.display = on ? 'block':'none';
     setAvalInputsEnabled(on);
     if(on){ autoGeral(); }
   });
 
-  // SUBMIT PRINCIPAL
+  // Intercepta submit pra perguntar se quer avaliar (quando ainda não marcou)
   form.addEventListener('submit', function(ev){
     if(isSubmitting){
       ev.preventDefault();
@@ -2098,65 +2120,50 @@ function wireAvaliacaoFlow(){
     }
     if(!form.checkValidity()){
       form.reportValidity?.();
-      ev.preventDefault();
       return;
     }
 
-    const avaliando =
-      (chkAvaliar && chkAvaliar.checked) ||
-      (inputAvaliar && inputAvaliar.value === '1') ||
-      (boxAval && boxAval.style.display === 'block');
+    const avaliando = chkAvaliar.checked || inputAvaliar.value === '1' || (boxAval && boxAval.style.display === 'block');
 
     if(avaliando){
-      // Vai com avaliação → habilita campos e manda com overlay
       setAvalInputsEnabled(true);
       autoGeral();
       ensureRequestId();
-      setSubmitting(true);  // overlay "Lançando…"
-      return;               // deixa o submit seguir
+      setSubmitting(true);
+      // deixa o submit seguir normalmente
+      return;
     }
 
-    // Não está avaliando
-    if(modal){
-      // Se existir modal: pergunta "Avaliar ou pular?"
-      ev.preventDefault();
-      modal.show();
-    }else{
-      // Se não existir modal: manda direto com overlay
-      ensureRequestId();
-      setSubmitting(true);
-      // não dá preventDefault → submit segue
-    }
+    // Não avaliando → abre modal de confirmação
+    ev.preventDefault();
+    modal.show();
   });
 
-  // Clicou "Avaliar agora" no modal
+  // Clicou "Avaliar agora"
   btnAvaliarAgora?.addEventListener('click', ()=>{
-    if(!chkAvaliar || !inputAvaliar) return;
     chkAvaliar.checked = true;
     inputAvaliar.value = '1';
     if(boxAval) boxAval.style.display = 'block';
     setAvalInputsEnabled(true);
-    modal?.hide();
+    modal.hide();
     setTimeout(()=>{
       scrollIntoViewSmooth(boxAval);
-      boxAval?.querySelector('.rating-group .star')?.focus?.();
+      boxAval.querySelector('.rating-group .star')?.focus?.();
     }, 150);
   });
 
-  // Clicou "Pular e lançar" no modal
+  // Clicou "Pular e lançar" (sem avaliação)
   btnPularAval?.addEventListener('click', ()=>{
-    if(inputAvaliar){
-      if(chkAvaliar) chkAvaliar.checked = false;
-      inputAvaliar.value = '0';
-    }
+    chkAvaliar.checked = false;
+    inputAvaliar.value = '0';
     if(boxAval) boxAval.style.display = 'none';
     setAvalInputsEnabled(false);
-    modal?.hide();
+    modal.hide();
     setTimeout(()=>{
       if(isSubmitting) return;
       ensureRequestId();
-      setSubmitting(true);  // overlay "Lançando…"
-      form.submit();        // submit real
+      setSubmitting(true);
+      form.submit();
     }, 80);
   });
 
@@ -2175,8 +2182,7 @@ function wireAvaliacaoFlow(){
 function paintStaticStars(el){
   const score = Number(el?.dataset?.score||0);
   if(!el) return;
-  const s = Math.max(0, Math.min(5, score));
-  el.textContent = '★★★★★'.slice(0, s).padEnd(5, '☆');
+  el.textContent = '★★★★★'.slice(0, Math.max(0, Math.min(5, score))).padEnd(5, '☆');
 }
 function wireAvalLanc(){
   const tbody = document.getElementById('tbodyLanc');
@@ -2292,12 +2298,11 @@ async function loadTabelasFromRoute(href){
     cont.appendChild(document.importNode(card,true));
     wireTabelaViewer();
   }catch(e){
-    // mantém como está
+    // falhou: deixa como está
   }
 }
 function wireTabelaViewer(){
   const modalEl=document.getElementById('modalTabela');
-  if(!modalEl) return;
   const modal=new bootstrap.Modal(modalEl);
   const lbl=document.getElementById('modalTabelaLabel');
   const frame=document.getElementById('modalFrame');
@@ -2327,7 +2332,7 @@ document.getElementById('sideNav')?.addEventListener('click', async (e)=>{
   const a=e.target.closest('a');
   if(!a) return;
   const t=a.getAttribute('data-target');
-  if(!t) return;
+  if(!t) return; // logout segue normal
   e.preventDefault();
   document.querySelectorAll('#sideNav a').forEach(x=>x.classList.remove('active'));
   a.classList.add('active');
@@ -2351,7 +2356,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   showSection(initial);
   const unread=Number(document.getElementById('toastCount')?.textContent||'0');
   setAvisosBadge(unread);
-  hideLancOverlay(); // garante overlay escondido ao carregar
 });
 
 window.addEventListener('popstate',(ev)=>{
