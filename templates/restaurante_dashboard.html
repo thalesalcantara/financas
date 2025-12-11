@@ -259,10 +259,42 @@
   }
   .aviso-card.prioridade{border-left-color:var(--danger);}
 
-  /* Cooperados (lista leve) */
+  /* ============================
+     LANÇAR – layout profissional
+     ============================ */
+
+  /* Coluna da esquerda (painel de cooperados) */
+  section[data-view="lancar"] .card-cooperados-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:6px;
+  }
+  section[data-view="lancar"] .card-cooperados-header-title{
+    font-size:.8rem;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--muted);
+    font-weight:700;
+  }
+
+  #buscaCoop{
+    font-size:.86rem;
+  }
+  #selectCoop{
+    font-size:.86rem;
+    margin-top:4px;
+  }
+
+  #listaCooperados{
+    margin-top:8px;
+    padding-top:4px;
+    border-top:1px dashed var(--border);
+  }
+
   .cooperado-avatar{
-    width:40px;
-    height:40px;
+    width:42px;
+    height:42px;
     border-radius:50%;
     object-fit:cover;
     flex-shrink:0;
@@ -273,27 +305,65 @@
     align-items:center;
     justify-content:space-between;
     gap:8px;
-    padding:6px 6px;
+    padding:6px 8px;
     border-radius:10px;
     cursor:pointer;
     border:1px solid transparent;
     background:transparent;
+    transition:background .12s ease,border-color .12s ease,transform .08s ease;
   }
   .cooperado-item:hover{
     background:#edf2ff;
     border-color:#d0ddff;
+    transform:translateY(-1px);
   }
   .cooperado-item.selected{
     background:var(--royal-soft);
     border-color:var(--royal);
   }
 
-  /* Header cooperado selecionado */
+  section[data-view="lancar"] .cooperado-meta-nome{
+    font-weight:600;
+    font-size:.9rem;
+  }
+  section[data-view="lancar"] .cooperado-meta-extra{
+    font-size:.8rem;
+    color:var(--muted);
+  }
+
+  /* Header do cooperado selecionado / formulário */
+  #blocoLancamento{
+    border-radius:16px;
+  }
+
+  #hintSelecione{
+    border-radius:12px;
+    background:#eef2ff;
+    border:1px dashed #c7d2fe;
+    font-size:.9rem;
+  }
+
+  .selected-header{
+    border-radius:12px;
+    background:#f3f4ff;
+    padding:10px 12px;
+  }
   .selected-header img.big{
-    width:72px;
-    height:72px;
+    width:70px;
+    height:70px;
     border-radius:50%;
     object-fit:cover;
+  }
+
+  section[data-view="lancar"] #formLancamento{
+    border-radius:12px;
+    background:#f9fafb;
+    padding:10px 12px;
+    margin-top:8px;
+  }
+
+  section[data-view="lancar"] #formLancamento .form-label{
+    margin-bottom:2px;
   }
 
   /* Rating */
@@ -395,6 +465,51 @@
   }
   @media(max-width:720px){
     .content{padding-inline:14px;}
+    section[data-view="lancar"] #formLancamento{
+      padding:10px;
+    }
+  }
+
+  /* ============================
+     OVERLAY "LANÇANDO..."
+     ============================ */
+  .lanc-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(15,23,42,.35);
+    backdrop-filter:blur(2px);
+    display:none;          /* é ligado via JS */
+    align-items:center;
+    justify-content:center;
+    z-index:2000;
+  }
+  .lanc-overlay-box{
+    background:var(--card);
+    border-radius:16px;
+    padding:18px 22px;
+    box-shadow:0 10px 30px rgba(15,23,42,0.35);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+    min-width:220px;
+  }
+  .lanc-spinner{
+    width:34px;
+    height:34px;
+    border-radius:50%;
+    border:3px solid var(--border);
+    border-top-color:var(--royal);
+    animation:lanc-spin .7s linear infinite;
+  }
+  .lanc-overlay-text{
+    font-weight:600;
+    color:var(--royal);
+    font-size:.95rem;
+  }
+
+  @keyframes lanc-spin{
+    to{transform:rotate(360deg);}
   }
 </style>
 </head>
