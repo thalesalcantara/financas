@@ -8,82 +8,395 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <style>
-    :root{
-      --royal:#2141d9; --royal-2:#3654e6; --royal-3:#eaf0ff;
-      --ink:#0b1220; --muted:#6b7280; --soft:#f5f7ff; --danger:#e74c3c; --ok:#16a34a;
-      --border:#e6e9f2; --chip:#eef1ff; --card:#fff; --bg:#fff; --text:#111827;
-      --aside-grad1: var(--royal); --aside-grad2: var(--royal-2);
-    }
-    :root[data-theme="dark"]{
-      --bg:#0b1220; --text:#e5e7eb; --muted:#9aa4b2; --card:#0f172a;
-      --border:#1f2a44; --chip:#132040; --royal:#3b82f6; --royal-2:#2563eb; --royal-3:#0b2447;
-      --aside-grad1:#0b2a6b; --aside-grad2:#143d86;
-    }
-    html,body{height:100%}
-    body{margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif}
-    a{text-decoration:none}
-    .shell{display:grid; grid-template-columns:260px 1fr; min-height:100vh}
-    .aside{
-      background:linear-gradient(180deg,var(--aside-grad1) 0%,var(--aside-grad2) 100%);
-      color:#fff; padding:18px 16px; position:sticky; top:0; height:100dvh;
-    }
-    .brand{font-weight:800; font-size:1.12rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.08); display:flex; align-items:center; gap:8px}
-    .theme-toggle{margin-top:10px; border:1px solid rgba(255,255,255,.25); color:#fff; background:rgba(255,255,255,.06); border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:8px; cursor:pointer}
-    /* menu menor */
-    .navmenu{margin-top:18px; display:flex; flex-direction:column; gap:6px}
-    .navmenu a{color:#fff; padding:9px 11px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600; position:relative; font-size:.94rem}
-    .navmenu a i{font-size:1rem}
-    .navmenu a.active,.navmenu a:hover{background:rgba(255,255,255,.14)}
-    .content{padding:24px clamp(14px,3vw,32px)}
-    .section-title{color:var(--royal); font-weight:800; font-size:1.25rem; display:flex; gap:10px; align-items:center}
-    .card{background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 0 #0000000a}
-    .card-soft{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px}
-    .chip{background:var(--chip); color:var(--text); border:1px solid var(--border); border-radius:999px; padding:.2rem .65rem; font-weight:700}
-    .table{color:var(--text)} .table td,.table th{border-color:var(--border)} .table thead th{border-color:var(--border)}
-    .table-compact th,.table-compact td{padding:.5rem .6rem}
-    .btn-royal{background:var(--royal); color:#fff; border:none}
-    .btn-royal:hover{background:var(--royal-2); color:#fff}
-    .btn-outline-royal{border:1px solid var(--royal); color:var(--royal); background:transparent}
-    .btn-outline-royal:hover{background:var(--royal); color:#fff}
-    .btn-outline-danger{color:#e74c3c; border-color:#e74c3c}
-    .btn-outline-danger:hover{background:#e74c3c; color:#fff}
-    /* SPA sections */
-    section[data-view]{display:none}
-    section.view-active{display:block}
-    /* somente Avisos tem bolinha */
-    .badge-dot{
-      min-width:22px; height:22px; line-height:22px; border-radius:999px; padding:0 6px;
-      font-size:.75rem; font-weight:800; display:inline-flex; align-items:center; justify-content:center;
-      background:#dc3545; color:#fff; box-shadow:0 0 0 2px rgba(255,255,255,.25) inset; margin-left:auto;
-    }
-    @media (max-width:920px){ .shell{grid-template-columns:66px 1fr} .brand span{display:none} .navmenu a span{display:none} }
-    /* Avisos */
-    .aviso-card{border-left:6px solid #3b82f6}
-    .aviso-card.lido{border-left-color:#94a3b8; opacity:.98}
-    .aviso-card.prioridade{border-left-color:var(--danger)}
-    /* Cooperados */
-    .cooperado-avatar{width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 1px 0 #0001}
-    .cooperado-item{display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; cursor:pointer}
-    .cooperado-item:hover{background:#f8faff20}
-    .cooperado-item.selected{outline:2px solid var(--royal); background:#1d4ed820}
-    .selected-header .big{width:180px; height:180px; border-radius:50%; object-fit:cover; border:6px solid var(--royal); box-shadow:0 6px 16px #0002}
-    .rating-group{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
-    .rating-label{width:160px; font-weight:700}
-    .stars{display:inline-flex; gap:3px; font-size:1.4rem; cursor:pointer}
-    .star{color:#94a3b8; transition:transform .06s}
-    .star.active,.star.hover{color:#fbbf24}
-    .rating-group[data-name="av_geral"] .stars{pointer-events:none; opacity:.95}
-    .sticky-tools{position:sticky; top:12px}
-    .kpi{background:#fafcff10; border:1px solid var(--border); border-radius:12px; padding:10px 12px}
-    .kpi .v{font-weight:800; font-size:1.05rem}
-    /* Tabelas (cartão) */
-    .doc-row{border:1px solid var(--border); border-radius:16px; padding:14px 16px; background:var(--card); box-shadow:0 10px 28px #00000012; transition:transform .08s, box-shadow .12s; cursor:pointer}
-    .doc-row:active{transform:scale(.995)} .doc-row:hover{box-shadow:0 12px 32px #00000018}
-    .doc-title{font-weight:800; font-size:1.05rem}
-    .doc-cat{font-size:.75rem; color:var(--royal); text-transform:uppercase; letter-spacing:.08em; font-weight:800}
-    .doc-date{color:var(--muted); font-size:.9rem}
-    .doc-desc{font-size:.95rem; color:var(--text); background:var(--soft); border-radius:10px; padding:.6em .9em}
-  </style>
+  :root{
+    /* Paleta principal – azul royal */
+    --royal:#2141d9;
+    --royal-2:#3654e6;
+    --royal-soft:#edf1ff;
+
+    --bg:#f5f7ff;
+    --text:#111827;
+    --muted:#6b7280;
+
+    --card:#ffffff;
+    --border:#e1e5f2;
+    --chip:#eef1ff;
+
+    --danger:#e74c3c;
+    --ok:#16a34a;
+  }
+
+  :root[data-theme="dark"]{
+    --bg:#020617;
+    --text:#e5e7eb;
+    --muted:#9ca3af;
+
+    --card:#020617;
+    --border:#1f2937;
+    --chip:#111827;
+
+    --royal:#3b82f6;
+    --royal-2:#2563eb;
+    --royal-soft:#0b2447;
+  }
+
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif;
+    font-size:15px;
+    line-height:1.5;
+  }
+  a{text-decoration:none; color:inherit;}
+
+  /* Layout geral */
+  .shell{
+    display:grid;
+    grid-template-columns:260px minmax(0,1fr);
+    min-height:100vh;
+  }
+
+  .aside{
+    background:linear-gradient(180deg,#2141d9 0%,#3654e6 100%);
+    color:#f9fafb;
+    padding:18px 14px;
+    position:sticky;
+    top:0;
+    height:100dvh;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+
+  .brand{
+    font-weight:800;
+    font-size:1.02rem;
+    padding:10px 12px;
+    border-radius:12px;
+    background:rgba(15,23,42,0.18);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .theme-toggle{
+    margin-top:4px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,0.35);
+    background:rgba(15,23,42,0.18);
+    color:#e5e7eb;
+    padding:8px 10px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    cursor:pointer;
+    font-size:.82rem;
+  }
+
+  .navmenu{
+    margin-top:12px;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  .navmenu a{
+    color:#f9fafb;
+    padding:8px 10px;
+    border-radius:10px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-weight:600;
+    font-size:.9rem;
+    opacity:.9;
+    transition:background .12s ease,opacity .12s ease;
+  }
+  .navmenu a i{font-size:1rem;}
+  .navmenu a:hover{background:rgba(15,23,42,0.25); opacity:1;}
+  .navmenu a.active{
+    background:#1d3ad3;
+    opacity:1;
+  }
+
+  .content{
+    padding:22px clamp(14px,3vw,32px);
+    max-width:1200px;
+    width:100%;
+    margin:0 auto;
+  }
+
+  .section-title{
+    color:var(--royal);
+    font-weight:800;
+    font-size:1.18rem;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:10px;
+  }
+  .section-title i{font-size:1.1rem;}
+
+  /* Cards / chips / tabela */
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    box-shadow:0 2px 6px rgba(15,23,42,0.04);
+  }
+  .card-body{padding:14px 16px;}
+
+  .chip{
+    background:var(--chip);
+    border-radius:999px;
+    border:1px solid var(--border);
+    padding:.18rem .7rem;
+    font-size:.8rem;
+    font-weight:600;
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    color:var(--text);
+  }
+
+  .table{
+    color:var(--text);
+    margin-bottom:0;
+  }
+  .table th,
+  .table td{
+    border-color:var(--border);
+    font-size:.86rem;
+  }
+  .table thead th{
+    background:#f9fafb;
+    text-transform:uppercase;
+    font-size:.75rem;
+    letter-spacing:.03em;
+    color:var(--muted);
+  }
+  .table-compact th,
+  .table-compact td{
+    padding:.45rem .55rem;
+  }
+
+  /* Botões */
+  .btn-royal{
+    background:var(--royal);
+    color:#fff;
+    border:none;
+    border-radius:999px;
+    font-size:.9rem;
+    font-weight:600;
+    padding:.4rem .9rem;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+  .btn-royal:hover{
+    background:var(--royal-2);
+    color:#fff;
+  }
+
+  .btn-outline-royal{
+    border-radius:999px;
+    border:1px solid var(--royal);
+    background:transparent;
+    color:var(--royal);
+    font-size:.86rem;
+    font-weight:600;
+    padding:.3rem .8rem;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+  .btn-outline-royal:hover{
+    background:var(--royal);
+    color:#fff;
+  }
+
+  .btn-outline-danger{
+    border-radius:999px;
+    border-color:var(--danger);
+    color:var(--danger);
+    font-size:.85rem;
+    padding:.25rem .75rem;
+  }
+  .btn-outline-danger:hover{
+    background:var(--danger);
+    color:#fff;
+  }
+
+  /* SPA */
+  section[data-view]{display:none;}
+  section.view-active{display:block;}
+
+  /* Badge avisos */
+  .badge-dot{
+    min-width:20px;
+    height:20px;
+    border-radius:999px;
+    padding:0 6px;
+    font-size:.72rem;
+    font-weight:700;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    background:#e11d48;
+    color:#fff;
+    margin-left:auto;
+  }
+
+  /* Avisos */
+  .aviso-card{
+    border-left:4px solid var(--royal);
+    border-radius:14px;
+  }
+  .aviso-card.lido{
+    border-left-color:#9ca3af;
+    opacity:.96;
+  }
+  .aviso-card.prioridade{border-left-color:var(--danger);}
+
+  /* Cooperados (lista leve) */
+  .cooperado-avatar{
+    width:40px;
+    height:40px;
+    border-radius:50%;
+    object-fit:cover;
+    flex-shrink:0;
+  }
+
+  .cooperado-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:6px 6px;
+    border-radius:10px;
+    cursor:pointer;
+    border:1px solid transparent;
+    background:transparent;
+  }
+  .cooperado-item:hover{
+    background:#edf2ff;
+    border-color:#d0ddff;
+  }
+  .cooperado-item.selected{
+    background:var(--royal-soft);
+    border-color:var(--royal);
+  }
+
+  /* Header cooperado selecionado */
+  .selected-header img.big{
+    width:72px;
+    height:72px;
+    border-radius:50%;
+    object-fit:cover;
+  }
+
+  /* Rating */
+  .rating-group{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .rating-label{
+    min-width:150px;
+    font-weight:600;
+    font-size:.9rem;
+    color:var(--muted);
+  }
+  .stars{
+    display:inline-flex;
+    gap:3px;
+    font-size:1.1rem;
+    cursor:pointer;
+  }
+  .star{
+    color:#cbd5f5;
+  }
+  .star.active,
+  .star.hover{
+    color:#facc15;
+  }
+  .rating-group[data-name="av_geral"] .stars{
+    pointer-events:none;
+    opacity:.9;
+  }
+
+  /* KPI simples (se usar) */
+  .kpi{
+    background:#f9fbff;
+    border-radius:12px;
+    border:1px solid var(--border);
+    padding:8px 10px;
+    font-size:.86rem;
+  }
+
+  /* Documentos / tabelas */
+  .doc-row{
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:12px 14px;
+    background:var(--card);
+    box-shadow:0 3px 8px rgba(15,23,42,0.08);
+  }
+  .doc-row:hover{
+    box-shadow:0 5px 12px rgba(15,23,42,0.12);
+  }
+  .doc-title{font-weight:700; font-size:.96rem;}
+  .doc-cat{
+    font-size:.72rem;
+    color:var(--royal);
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    font-weight:700;
+  }
+  .doc-date{font-size:.84rem; color:var(--muted);}
+  .doc-desc{
+    margin-top:.25rem;
+    font-size:.9rem;
+    background:#f3f4ff;
+    border-radius:10px;
+    padding:.5rem .75rem;
+  }
+
+  /* Form */
+  .form-label{
+    font-size:.8rem;
+    font-weight:600;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.04em;
+  }
+  .form-control,
+  .form-select{
+    border-radius:10px;
+    border:1px solid var(--border);
+    font-size:.9rem;
+  }
+  .form-control:focus,
+  .form-select:focus{
+    border-color:var(--royal);
+    box-shadow:0 0 0 1px rgba(37,99,235,0.2);
+  }
+
+  textarea.form-control{
+    border-radius:12px;
+  }
+
+  @media(max-width:920px){
+    .shell{grid-template-columns:70px minmax(0,1fr);}
+    .brand span{display:none;}
+    .navmenu a span{display:none;}
+  }
+  @media(max-width:720px){
+    .content{padding-inline:14px;}
+  }
+</style>
 </head>
 <body>
   <div class="shell">
@@ -679,33 +992,87 @@
 
 <!-- ===== LANÇAR ===== -->
 <section data-view="lancar">
-  <div class="section-title"><i class="bi bi-plus-circle"></i> Lançar Produção Diária</div>
+  <div class="section-title d-flex align-items-center gap-2">
+    <i class="bi bi-plus-circle"></i>
+    <span>Lançar Produção Diária</span>
+  </div>
 
-  <div class="card card-body">
+  <!-- Filtro de período -->
+  <div class="card card-body mb-3 shadow-sm border-0">
     <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
       <input type="hidden" name="view" value="lancar">
-      <div class="col-md-3"><label class="form-label">Início</label><input type="date" name="data_inicio" class="form-control" value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}"></div>
-      <div class="col-md-3"><label class="form-label">Fim</label><input type="date" name="data_fim" class="form-control" value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}"></div>
-      <div class="col-md-3"><div class="small text-muted mb-1">Período em uso</div><div class="chip">{% if filtro_inicio and filtro_fim %}{{ filtro_inicio.strftime('%d/%m/%Y') }} a {{ filtro_fim.strftime('%d/%m/%Y') }}{% else %} — {% endif %}</div></div>
-      <div class="col-md-3 text-end">
-        <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
-        <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-arrow-counterclockwise"></i> Limpar</a>
+
+      <div class="col-md-3">
+        <label class="form-label small text-muted">Início</label>
+        <input type="date" name="data_inicio" class="form-control"
+               value="{{ filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio }}">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label small text-muted">Fim</label>
+        <input type="date" name="data_fim" class="form-control"
+               value="{{ filtro_fim.strftime('%Y-%m-%d') if filtro_fim }}">
+      </div>
+
+      <div class="col-md-3">
+        <div class="small text-muted mb-1">Período em uso</div>
+        <div class="chip">
+          {% if filtro_inicio and filtro_fim %}
+            {{ filtro_inicio.strftime('%d/%m/%Y') }} a {{ filtro_fim.strftime('%d/%m/%Y') }}
+          {% else %}
+            —
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="col-md-3 text-md-end">
+        <button class="btn btn-royal mb-1 mb-md-0">
+          <i class="bi bi-funnel"></i> Aplicar
+        </button>
+        <a class="btn btn-outline-secondary mb-1 mb-md-0"
+           href="{{ url_for('portal_restaurante', view='lancar') }}">
+          <i class="bi bi-arrow-counterclockwise"></i> Limpar
+        </a>
       </div>
     </form>
   </div>
 
-  <div class="row g-3 mt-1">
+  <div class="row g-3">
+    <!-- COLUNA ESQUERDA: Seleção do cooperado -->
     <div class="col-lg-4">
-      <div class="card card-body">
-        <div class="input-group mb-2">
-          <span class="input-group-text"><i class="bi bi-search"></i></span>
-          <input id="buscaCoop" type="text" class="form-control" placeholder="Buscar cooperado..." list="cooperadosList">
-          <datalist id="cooperadosList">{% for coop in _cooperados %}<option value="{{ coop.nome }}"></option>{% endfor %}</datalist>
-          <select id="selectCoop" class="form-select">
-            <option value="">Lista...</option>
+      <div class="card card-body shadow-sm border-0 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fw-semibold small text-uppercase text-muted">
+            1. Escolha o cooperado
+          </div>
+        </div>
+
+        <!-- Busca + select compacto -->
+        <div class="mb-3">
+          <label class="form-label small text-muted mb-1">Buscar / Selecionar</label>
+          <div class="input-group">
+            <span class="input-group-text">
+              <i class="bi bi-search"></i>
+            </span>
+            <input id="buscaCoop"
+                   type="text"
+                   class="form-control"
+                   placeholder="Digite o nome do cooperado..."
+                   list="cooperadosList">
+            <datalist id="cooperadosList">
+              {% for coop in _cooperados %}
+                <option value="{{ coop.nome }}"></option>
+              {% endfor %}
+            </datalist>
+          </div>
+          <select id="selectCoop" class="form-select mt-2">
+            <option value="">Selecione pela lista...</option>
             {% for coop in _cooperados %}
               <option
                 value="{{ coop.id }}"
+                data-nome="{{ coop.nome }}"
+                data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
+                data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}"
                 data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
                 data-fone-raw="{{ coop.telefone or '' }}"
               >
@@ -715,38 +1082,45 @@
           </select>
         </div>
 
-        <div id="listaCooperados" style="max-height:60vh; overflow:auto;">
+        <!-- Lista “neutra”: só nomes, sem valores/telefones -->
+        <div class="small text-muted mb-1 d-flex justify-content-between align-items-center">
+          <span>Cooperados cadastrados</span>
+          <span class="badge bg-light text-dark border">{{ _cooperados|length }}</span>
+        </div>
+
+        <div id="listaCooperados" style="max-height: 60vh; overflow:auto;">
           {% for coop in _cooperados %}
-          <div class="cooperado-item"
-               data-id="{{ coop.id }}"
-               data-nome="{{ coop.nome }}"
-               data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
-               data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}"
-               data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
-               data-fone-raw="{{ coop.telefone or '' }}">
-            <img src="{{ url_for('media_coop', coop_id=coop.id) if coop.foto_bytes else url_for('static', filename='img/default.png') }}" class="cooperado-avatar" alt="Foto do cooperado">
-            <div class="d-flex flex-column">
-              <span class="fw-bold">{{ coop.nome }}</span>
-              <small class="text-muted">No período: R$ {{ '%.2f'|format(coop.total_periodo or 0) }}</small>
-              {% if coop.telefone %}
-                <small class="text-muted"><i class="bi bi-telephone"></i> {{ coop.telefone }}</small>
-              {% endif %}
-            </div>
-          </div>
+            <button type="button"
+                    class="cooperado-item list-group-item list-group-item-action d-flex justify-content-between align-items-center border-0 border-bottom py-2 px-0 w-100 text-start"
+                    style="background: transparent;"
+                    data-id="{{ coop.id }}"
+                    data-nome="{{ coop.nome }}"
+                    data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
+                    data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}"
+                    data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
+                    data-fone-raw="{{ coop.telefone or '' }}">
+              <span class="fw-semibold text-truncate">{{ coop.nome }}</span>
+              <span class="text-muted small">
+                <i class="bi bi-arrow-right-short"></i> Selecionar
+              </span>
+            </button>
           {% else %}
-            <div class="text-muted small">Nenhum cooperado encontrado.</div>
+            <div class="text-muted small mt-2">Nenhum cooperado cadastrado.</div>
           {% endfor %}
         </div>
       </div>
     </div>
 
+    <!-- COLUNA DIREITA: Lançamento + histórico -->
     <div class="col-lg-8">
-      <div class="card card-body" id="blocoLancamento">
-        <div class="selected-header text-center mb-2" id="selectedHeader" style="display:none;">
-          <img id="selFoto" src="" class="big" alt="">
-          <div class="fw-bold fs-5 mt-2 d-flex justify-content-center align-items-center gap-2 flex-wrap">
+      <div class="card card-body shadow-sm border-0" id="blocoLancamento">
+
+        <!-- Cabeçalho do cooperado selecionado (invisível até selecionar) -->
+        <div class="selected-header text-center mb-3" id="selectedHeader" style="display:none;">
+          <img id="selFoto" src="" class="big mb-2" alt="Foto do cooperado selecionado">
+          <div class="fw-bold fs-5 d-flex justify-content-center align-items-center gap-2 flex-wrap">
             <span id="selNome"></span>
-            <!-- 👇 telefone ao lado do nome -->
+            <!-- telefone ao lado do nome -->
             <a id="selPhone"
                class="badge bg-light text-dark border text-decoration-none"
                style="font-weight:500;"
@@ -754,576 +1128,729 @@
               <span class="text-muted">Sem telefone</span>
             </a>
           </div>
-          <div class="text-muted">Total no período: R$ <span id="selTotal">0,00</span></div>
+          <div class="text-muted">
+            Total no período selecionado:
+            <span class="fw-semibold">R$ <span id="selTotal">0,00</span></span>
+          </div>
         </div>
 
-        <div class="alert alert-info py-2 px-3 mb-2" id="hintSelecione">Selecione um cooperado para lançar.</div>
+        <!-- Estado inicial: sem cooperado selecionado -->
+        <div class="py-4 text-center text-muted" id="hintSelecione">
+          <div class="mb-2">
+            <i class="bi bi-person-badge" style="font-size: 2rem;"></i>
+          </div>
+          <div class="fw-semibold">Nenhum cooperado selecionado</div>
+          <div class="small">
+            Utilize a lista ou a caixa de busca à esquerda para escolher um cooperado
+            e então registrar a produção diária.
+          </div>
+        </div>
 
-        <form id="formLancamento" method="POST" action="{{ _url_lancar_producao }}" class="row g-2 align-items-end mb-1" style="display:none;">
+        <!-- Formulário de lançamento (aparece só após selecionar) -->
+        <form id="formLancamento"
+              method="POST"
+              action="{{ _url_lancar_producao }}"
+              class="row g-2 align-items-end mb-1"
+              style="display:none;">
+
           <input type="hidden" name="cooperado_id" id="inputCooperadoId" value="">
-          <div class="col-md-3"><label class="form-label">Valor (R$)</label><input type="number" class="form-control" name="valor" step="0.01" required></div>
-          <div class="col-md-3"><label class="form-label">Data</label><input type="date" class="form-control" name="data" required></div>
-          <div class="col-md-3"><label class="form-label">Hora Início</label><input type="time" class="form-control" name="hora_inicio"></div>
-          <div class="col-md-3"><label class="form-label">Hora Fim</label><input type="time" class="form-control" name="hora_fim"></div>
-          <div class="col-md-3"><label class="form-label">Entregas</label><input type="number" class="form-control" name="qtd_entregas" min="0" step="1"></div>
+
+          <div class="col-md-3">
+            <label class="form-label">Valor (R$)</label>
+            <input type="number" class="form-control" name="valor" step="0.01" required>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Data</label>
+            <input type="date" class="form-control" name="data" required>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Hora Início</label>
+            <input type="time" class="form-control" name="hora_inicio">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Hora Fim</label>
+            <input type="time" class="form-control" name="hora_fim">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Entregas</label>
+            <input type="number" class="form-control" name="qtd_entregas" min="0" step="1">
+          </div>
 
           <!-- Descrição (opcional) — exclusiva do Portal do Estabelecimento -->
           <div class="col-12">
             <label class="form-label">Descrição (opcional)</label>
-            <textarea class="form-control" name="descricao" rows="2"
+            <textarea class="form-control"
+                      name="descricao"
+                      rows="2"
                       placeholder="Ex.: motivo do valor, observações, contrato especial…"></textarea>
           </div>
 
           <div class="col-12"><hr class="my-2"></div>
+
+          <!-- Avaliação opcional -->
           <div class="col-12">
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="chkAvaliar"
-                onclick="document.getElementById('boxAval').style.display=this.checked?'block':'none'; document.getElementById('inputAvaliar').value=this.checked?'1':'0';">
-              <label class="form-check-label" for="chkAvaliar">Registrar avaliação agora</label>
+              <input class="form-check-input"
+                     type="checkbox"
+                     id="chkAvaliar"
+                     onclick="document.getElementById('boxAval').style.display=this.checked?'block':'none'; document.getElementById('inputAvaliar').value=this.checked?'1':'0';">
+              <label class="form-check-label" for="chkAvaliar">
+                Registrar avaliação agora
+              </label>
             </div>
             <input type="hidden" name="avaliar" id="inputAvaliar" value="0">
           </div>
 
           <div id="boxAval" class="row g-2" style="display:none;">
-            {% for nm,titulo in [('av_pontualidade','Pontualidade'),('av_educacao','Educação'),('av_eficiencia','Eficiência / Cuidado'),('av_apresentacao','Apresentação')] %}
-            <div class="col-md-6">
-              <div class="rating-group" data-name="{{ nm }}">
-                <div class="rating-label">{{ titulo }}</div>
-                <div class="stars">
-                  <i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i>
+            {% for nm,titulo in [('av_pontualidade','Pontualidade'),
+                                 ('av_educacao','Educação'),
+                                 ('av_eficiencia','Eficiência / Cuidado'),
+                                 ('av_apresentacao','Apresentação')] %}
+              <div class="col-md-6">
+                <div class="rating-group" data-name="{{ nm }}">
+                  <div class="rating-label">{{ titulo }}</div>
+                  <div class="stars">
+                    <i class="bi bi-star-fill star" data-v="1"></i>
+                    <i class="bi bi-star-fill star" data-v="2"></i>
+                    <i class="bi bi-star-fill star" data-v="3"></i>
+                    <i class="bi bi-star-fill star" data-v="4"></i>
+                    <i class="bi bi-star-fill star" data-v="5"></i>
+                  </div>
+                  <input type="hidden" name="{{ nm }}" value="">
                 </div>
-                <input type="hidden" name="{{ nm }}" value="">
               </div>
-            </div>
             {% endfor %}
+
             <div class="col-md-6">
               <div class="rating-group" data-name="av_geral" data-auto="true">
                 <div class="rating-label">Geral (média automática)</div>
-                <div class="stars"><i class="bi bi-star-fill star" data-v="1"></i><i class="bi bi-star-fill star" data-v="2"></i><i class="bi bi-star-fill star" data-v="3"></i><i class="bi bi-star-fill star" data-v="4"></i><i class="bi bi-star-fill star" data-v="5"></i></div>
+                <div class="stars">
+                  <i class="bi bi-star-fill star" data-v="1"></i>
+                  <i class="bi bi-star-fill star" data-v="2"></i>
+                  <i class="bi bi-star-fill star" data-v="3"></i>
+                  <i class="bi bi-star-fill star" data-v="4"></i>
+                  <i class="bi bi-star-fill star" data-v="5"></i>
+                </div>
                 <input type="hidden" name="av_geral" value="">
               </div>
             </div>
-            <div class="col-12"><label class="form-label">Comentário (opcional)</label><textarea class="form-control" name="av_comentario" rows="2" placeholder="Conte rapidamente como foi a experiência..."></textarea></div>
+
+            <div class="col-12">
+              <label class="form-label">Comentário (opcional)</label>
+              <textarea class="form-control"
+                        name="av_comentario"
+                        rows="2"
+                        placeholder="Conte rapidamente como foi a experiência..."></textarea>
+            </div>
           </div>
 
-          <div class="col-12 text-end mt-2"><button class="btn btn-royal"><i class="bi bi-plus-circle"></i> Lançar</button></div>
+          <div class="col-12 text-end mt-2">
+            <button class="btn btn-royal">
+              <i class="bi bi-plus-circle"></i> Lançar
+            </button>
+          </div>
         </form>
       </div>
 
-      <!-- Tabelas por cooperado (mostra/oculta pelo selecionado) -->
-      <div id="blocoTabelas" class="mt-2">
+      <!-- Histórico por cooperado (controlado via JS pelo selecionado) -->
+      <div id="blocoTabelas" class="mt-3">
         {% for coop in _cooperados %}
-        <div id="tabela-{{ coop.id }}" class="card card-body lancamentos-table" style="display:none;">
-          <table class="table table-bordered table-hover align-middle table-compact">
-            <thead><tr><th>Valor</th><th>Data</th><th>Horário</th><th>Entregas</th><th>Editar</th><th>Excluir</th></tr></thead>
-            <tbody>
-              {% for lanc in coop.lancamentos %}
-              <tr>
-                <td>R$ {{ '%.2f'|format(lanc.valor or 0) }}</td>
-                <td>{{ lanc.data.strftime('%d/%m/%Y') if lanc.data }}</td>
-                <td>{{ lanc.hora_inicio or '' }}{% if lanc.hora_inicio or lanc.hora_fim %} às {% endif %}{{ lanc.hora_fim or '' }}</td>
-                <td>{{ lanc.qtd_entregas if lanc.qtd_entregas is not none else '-' }}</td>
-                <td>{% if has_editar_lanc %}<a href="{{ url_for('editar_lancamento', id=lanc.id) }}" class="btn btn-outline-royal btn-sm"><i class="bi bi-pencil"></i></a>{% endif %}</td>
-                <td><a href="{{ url_for('excluir_lancamento', id=lanc.id) }}" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></a></td>
-              </tr>
-              {% else %}<tr><td colspan="6" class="text-center text-muted">Nenhum lançamento no período selecionado</td></tr>{% endfor %}
-            </tbody>
-          </table>
-        </div>
+          <div id="tabela-{{ coop.id }}"
+               class="card card-body lancamentos-table shadow-sm border-0"
+               style="display:none;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="fw-semibold small text-muted text-uppercase">
+                Produção no período selecionado
+              </span>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-bordered table-hover align-middle table-sm">
+                <thead class="table-light">
+                  <tr>
+                    <th>Valor</th>
+                    <th>Data</th>
+                    <th>Horário</th>
+                    <th>Entregas</th>
+                    <th class="text-center">Editar</th>
+                    <th class="text-center">Excluir</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for lanc in coop.lancamentos %}
+                    <tr>
+                      <td>R$ {{ '%.2f'|format(lanc.valor or 0) }}</td>
+                      <td>{{ lanc.data.strftime('%d/%m/%Y') if lanc.data }}</td>
+                      <td>
+                        {{ lanc.hora_inicio or '' }}
+                        {% if lanc.hora_inicio or lanc.hora_fim %} às {% endif %}
+                        {{ lanc.hora_fim or '' }}
+                      </td>
+                      <td>{{ lanc.qtd_entregas if lanc.qtd_entregas is not none else '-' }}</td>
+                      <td class="text-center">
+                        {% if has_editar_lanc %}
+                          <a href="{{ url_for('editar_lancamento', id=lanc.id) }}"
+                             class="btn btn-outline-royal btn-sm">
+                            <i class="bi bi-pencil"></i>
+                          </a>
+                        {% endif %}
+                      </td>
+                      <td class="text-center">
+                        <a href="{{ url_for('excluir_lancamento', id=lanc.id) }}"
+                           class="btn btn-outline-danger btn-sm">
+                          <i class="bi bi-trash"></i>
+                        </a>
+                      </td>
+                    </tr>
+                  {% else %}
+                    <tr>
+                      <td colspan="6" class="text-center text-muted">
+                        Nenhum lançamento no período selecionado
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
         {% endfor %}
       </div>
     </div>
   </div>
 </section>
 
-<script>
-  // máscara simples BR
-  function formatPhoneBR(v) {
-    let d = (v || '').replace(/\D/g,'');
-    if (d.length > 11 && d.startsWith('55')) d = d.slice(d.length - 11);
-    d = d.slice(0, 11);
-    if (d.length <= 10) {
-      return d.replace(/^(\d{0,2})(\d{0,4})(\d{0,4}).*$/, (_,a,b,c)=>{
-        let out=''; if(a) out+='('+a; if(a && a.length===2) out+=') ';
-        if(b) out+=b; if(b && b.length===4 && c) out+='-'+c; return out;
-      });
-    }
-    return d.replace(/^(\d{2})(\d{5})(\d{4}).*$/, '($1) $2-$3');
-  }
-
-  (function(){
-    const header     = document.getElementById('selectedHeader');
-    const img        = document.getElementById('selFoto');
-    const nomeEl     = document.getElementById('selNome');
-    const totalEl    = document.getElementById('selTotal');
-    const phoneEl    = document.getElementById('selPhone');
-    const form       = document.getElementById('formLancamento');
-    const hint       = document.getElementById('hintSelecione');
-    const inputId    = document.getElementById('inputCooperadoId');
-
-    function setPhone(digits, raw) {
-      const d = (digits || '').replace(/\D/g,'');
-      if (d) {
-        phoneEl.textContent = formatPhoneBR(d);
-        phoneEl.href = 'https://wa.me/55' + d;
-        phoneEl.target = '_blank';
-        phoneEl.classList.remove('text-muted');
-      } else {
-        phoneEl.innerHTML = '<span class="text-muted">Sem telefone</span>';
-        phoneEl.removeAttribute('href');
-        phoneEl.removeAttribute('target');
-      }
-    }
-
-    function selectCoop({id, nome, foto, total, foneDigits, foneRaw}) {
-      header.style.display = '';
-      form.style.display = '';
-      hint.style.display = 'none';
-
-      img.src = foto || img.src;
-      nomeEl.textContent = nome || '—';
-      totalEl.textContent = (total || '0,00');
-
-      setPhone(foneDigits, foneRaw);
-      inputId.value = id || '';
-      // mostra tabela correspondente
-      document.querySelectorAll('.lancamentos-table').forEach(t => t.style.display = 'none');
-      const table = document.getElementById('tabela-' + id);
-      if (table) table.style.display = '';
-    }
-
-    // clique na lista
-    document.getElementById('listaCooperados')?.addEventListener('click', (e) => {
-      const card = e.target.closest('.cooperado-item');
-      if (!card) return;
-      selectCoop({
-        id: card.dataset.id,
-        nome: card.dataset.nome,
-        foto: card.dataset.foto,
-        total: (parseFloat(card.dataset.total || '0') || 0).toFixed(2).replace('.', ','),
-        foneDigits: card.dataset.fone || '',
-        foneRaw: card.dataset['foneRaw'] || ''
-      });
-    });
-
-    // mudança no select
-    document.getElementById('selectCoop')?.addEventListener('change', (e) => {
-      const opt = e.target.selectedOptions[0];
-      if (!opt || !opt.value) return;
-      // tenta achar o card para pegar foto/total; se não tiver, usa básicos
-      const card = document.querySelector('.cooperado-item[data-id="'+opt.value+'"]');
-      selectCoop({
-        id: opt.value,
-        nome: opt.textContent.trim(),
-        foto: card ? card.dataset.foto : '',
-        total: card ? (parseFloat(card.dataset.total || '0').toFixed(2).replace('.', ',')) : '0,00',
-        foneDigits: opt.getAttribute('data-fone') || (card ? card.dataset.fone : ''),
-        foneRaw: opt.getAttribute('data-fone-raw') || (card ? card.dataset['foneRaw'] : '')
-      });
-    });
-  })();
-</script>
-
-<!-- ===== TABELAS (carregada da rota e exibida aqui) ===== -->
-<section data-view="tabelas">
-  <div class="section-title"><i class="bi bi-table"></i> Minhas Tabelas</div>
-  <div id="tabelasContainer">
-    {% if tabela %}
-      {% set titulo = tabela.titulo or login_nome %}
-      {% set nome_arquivo = tabela.arquivo_nome or '' %}
-      {% set ext = nome_arquivo.split('.')[-1]|lower if '.' in nome_arquivo else '' %}
-      <article class="doc-row my-2"
-               data-view="{{ url_for('rest_tabela_abrir', tabela_id=tabela.id) }}"
-               data-download="{{ url_for('rest_tabela_download', tabela_id=tabela.id) }}"
-               data-title-full="{{ titulo }}" data-ext="{{ ext }}">
-        <div class="d-flex justify-content-between align-items-start">
-          <div class="pe-2">
-            <div class="doc-cat">TABELA</div>
-            <div class="doc-title d-flex align-items-center gap-2"><i class="bi bi-journal-text"></i> {{ titulo }}</div>
-            <div class="doc-date">{{ tabela.enviado_em.strftime('%d/%m/%Y %H:%M') if tabela.enviado_em else '' }}</div>
-            {% if tabela.descricao %}<div class="doc-desc mt-2">{{ tabela.descricao }}</div>{% endif %}
-            <div class="mt-2 d-flex flex-wrap gap-2">
-              <span class="chip"><i class="bi bi-file-earmark"></i> {{ nome_arquivo or '—' }}</span>
-              {% if ext %}<span class="chip"><i class="bi bi-tag"></i> {{ ext|upper }}</span>{% endif %}
-            </div>
-          </div>
-          <div class="ms-2 d-flex flex-column gap-2">
-            <button class="btn btn-royal" data-open title="Visualizar"><i class="bi bi-journal-bookmark-fill"></i></button>
-            <a class="btn btn-outline-secondary btn-sm" data-direct-download href="{{ url_for('rest_tabela_download', tabela_id=tabela.id) }}"><i class="bi bi-download"></i></a>
-          </div>
-        </div>
-        <div class="text-muted small mt-2">Clique para visualizar em tela cheia ou baixe o arquivo.</div>
-      </article>
-    {% else %}
-      <div class="card card-body text-muted">Carregando tabelas…</div>
-    {% endif %}
-  </div>
-</section>
-<!-- /sections -->
-</main>
-</div>
-
-<!-- TOAST PERSISTENTE (TOPO DIREITO) -->
-{% set _avisos_for_toast = avisos if avisos is defined and avisos is not none else [] %}
-{% set _unread_from_list_t = (_avisos_for_toast | selectattr('lido','equalto',False) | list | length) %}
-{% set _unread_from_ctx_t = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
-{% set _toast_unread = _unread_from_list_t if _unread_from_list_t>0 else _unread_from_ctx_t %}
-<div class="position-fixed top-0 end-0 p-3" style="z-index:1060;">
-  <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false">
-    <div class="toast-header">
-      <i class="bi bi-megaphone-fill me-2"></i><strong class="me-auto">Novos avisos</strong><small>agora</small>
-      <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
-    </div>
-    <div class="toast-body">
-      Você tem <b id="toastCount">{{ _toast_unread }}</b> aviso(s) não lido(s).
-      <a id="toastVerAgora" href="{{ url_for('portal_restaurante_avisos') }}" class="link-primary fw-semibold">Ver agora</a>
-    </div>
-  </div>
-</div>
-
-<!-- TOAST OK -->
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index:1056;">
-  <div id="toastOK" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="2200">
-    <div class="toast-header">
-      <i class="bi bi-check2-circle text-success me-2"></i><strong class="me-auto">Pronto</strong><small>agora</small>
-      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Fechar"></button>
-    </div>
-    <div class="toast-body">Aviso marcado como lido.</div>
-  </div>
-</div>
-
-<!-- MODAL FULLSCREEN TABELAS -->
-<div class="modal fade" id="modalTabela" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-fullscreen">
-    <div class="modal-content">
-      <div class="modal-header">
-        <div><div class="doc-cat mb-0">TABELA</div><h5 class="modal-title" id="modalTabelaLabel"></h5></div>
-        <div class="d-flex align-items-center gap-2">
-          <a id="modalAbrirNovaAba" href="#" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-up-right"></i> Abrir em nova aba</a>
-          <a id="modalBaixar" href="#" class="btn btn-primary btn-sm"><i class="bi bi-download"></i> Baixar</a>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-        </div>
-      </div>
-      <div class="modal-body p-2">
-        <iframe id="modalFrame" class="w-100" style="height:82vh; border:0" allowfullscreen></iframe>
-        <div id="modalAviso" class="small text-muted mt-2 d-none">Se o arquivo não abrir, use “Abrir em nova aba” ou “Baixar”.</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ======================= -->
-<!-- MODAL AVALIAR (NOVO) -->
-<!-- ======================= -->
-<div class="modal fade" id="modalAvaliar" tabindex="-1" aria-labelledby="modalAvaliarLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="modalAvaliarLabel"><i class="bi bi-star-half me-2"></i>Deseja avaliar o motoboy agora?</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-      </div>
-      <div class="modal-body">
-        <p class="mb-0">Você pode registrar a avaliação agora ou <b>pular</b> e lançar apenas os dados.</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" id="btnPularAval"><i class="bi bi-skip-forward"></i> Pular e lançar</button>
-        <button type="button" class="btn btn-royal" id="btnAvaliarAgora"><i class="bi bi-star-fill"></i> Avaliar agora</button>
-      </div>
-    </div>
-  </div>
-</div>
-<!-- /MODAL AVALIAR -->
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  /* ===== Tema ===== */
-  const THEME_KEY='portal_theme';
-  function applyTheme(t){
-    document.documentElement.setAttribute('data-theme', t==='dark'?'dark':'light');
-    const lbl=document.getElementById('lblTheme'); const icon=document.querySelector('#btnTheme i');
-    if(lbl) lbl.textContent = (t==='dark')?'Claro':'Escuro';
-    if(icon){ icon.classList.toggle('bi-moon', t!=='dark'); icon.classList.toggle('bi-sun', t==='dark'); }
-    localStorage.setItem(THEME_KEY, t);
+// ========================
+// MÁSCARA + SELEÇÃO COOPERADO (LANÇAR)
+// ========================
+
+// máscara simples BR
+function formatPhoneBR(v) {
+  let d = (v || '').replace(/\D/g,'');
+  if (d.length > 11 && d.startsWith('55')) d = d.slice(d.length - 11);
+  d = d.slice(0, 11);
+  if (d.length <= 10) {
+    return d.replace(/^(\d{0,2})(\d{0,4})(\d{0,4}).*$/, (_,a,b,c)=>{
+      let out=''; if(a) out+='('+a; if(a && a.length===2) out+=') ';
+      if(b) out+=b; if(b && b.length===4 && c) out+='-'+c; return out;
+    });
   }
-  (function initTheme(){
-    const saved = localStorage.getItem(THEME_KEY) || 'light';
-    applyTheme(saved);
-    document.getElementById('btnTheme')?.addEventListener('click', ()=>{
-      const cur = localStorage.getItem(THEME_KEY) || 'light';
-      applyTheme(cur==='dark'?'light':'dark');
-    });
-  })();
+  return d.replace(/^(\d{2})(\d{5})(\d{4}).*$/, '($1) $2-$3');
+}
 
-  /* ===== Navegação SPA ===== */
-  function showSection(view){
-    document.querySelectorAll('section[data-view]').forEach(sec=>sec.classList.toggle('view-active', sec.getAttribute('data-view')===view));
-    document.querySelectorAll('#sideNav a').forEach(a=>{
-      const t=a.getAttribute('data-target'); a.classList.toggle('active', t===view);
-    });
-    if(view==='avisos') initAvisos();
-    if(view==='lancamentos') initLancamentos();
-    if(view==='lancar') initLancar();
-    if(view==='tabelas') initTabelas();
-  }
-  function pushView(v){ const u=new URL(location.href); u.searchParams.set('view',v); history.pushState({view:v},'',u.toString()); }
-  function startView(){ return new URL(location.href).searchParams.get('view') || 'lancar'; }
+// Controle de seleção do cooperado (Lançar)
+(function(){
+  const header  = document.getElementById('selectedHeader');
+  const img     = document.getElementById('selFoto');
+  const nomeEl  = document.getElementById('selNome');
+  const totalEl = document.getElementById('selTotal');
+  const phoneEl = document.getElementById('selPhone');
+  const form    = document.getElementById('formLancamento');
+  const hint    = document.getElementById('hintSelecione');
+  const inputId = document.getElementById('inputCooperadoId');
 
-  /* ===== Utils ===== */
-  function togglePwd(btn){ const i=btn.previousElementSibling; if(!i) return; i.type=i.type==='password'?'text':'password'; btn.querySelector('i').classList.toggle('bi-eye'); btn.querySelector('i').classList.toggle('bi-eye-slash'); }
-  const brMoney = (n)=> (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
-  const todayStr = ()=>{ const d=new Date(); const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return d.getFullYear()+'-'+mm+'-'+dd; };
-  function prefetch(href){ try{ const l=document.createElement('link'); l.rel='prefetch'; l.href=href; document.head.appendChild(l);}catch(e){} }
+  const listaCooperados = document.getElementById('listaCooperados');
+  const cooperadoCards  = listaCooperados ? listaCooperados.querySelectorAll('.cooperado-item') : [];
 
-  /* ===== Toast & badge de Avisos ===== */
-  let toastAvisosInst=null;
-  function ensureToastInstance(){ const el=document.getElementById('toastAvisos'); if(!el) return null; if(!toastAvisosInst) toastAvisosInst = new bootstrap.Toast(el,{autohide:false}); return toastAvisosInst; }
-  function setAvisosBadge(n){
-    const b=document.getElementById('badgeAvisos'); if(b){ b.style.display = n>0 ? 'inline-flex':'none'; b.textContent=n; }
-    const tCnt=document.getElementById('toastCount'); if(tCnt) tCnt.textContent=n;
-    const tit=document.getElementById('badgeTitulo'); if(tit){ tit.className='badge '+(n>0?'text-bg-danger':'text-bg-success'); tit.textContent = n>0 ? (n+' não lido(s)') : 'Tudo lido'; }
-    const t=ensureToastInstance(); if(t){ if(n>0) t.show(); else t.hide(); }
-  }
-
-  /* ===== Avisos ===== */
-  let avisosWired=false;
-  function initAvisos(){
-    if(avisosWired) return; avisosWired=true;
-    const toastOK = new bootstrap.Toast(document.getElementById('toastOK'));
-    function getUnread(){ return document.querySelectorAll('.aviso-card[data-lido="0"]').length; }
-    function refresh(){ setAvisosBadge(getUnread()); }
-
-    // filtro
-    document.getElementById('toggleNaoLidos')?.addEventListener('change', (e)=>{
-      const only=e.target.checked;
-      document.querySelectorAll('.aviso-card').forEach(card=>{
-        const lido=card.getAttribute('data-lido')==='1';
-        card.style.display = (only && lido) ? 'none' : '';
-      });
-    });
-
-    // marcar lido
-    (document.getElementById('avisosListContainer')||document).addEventListener('click', async (ev)=>{
-      const btn=ev.target.closest('[data-acao="marcar-lido"]'); if(!btn) return;
-      const url=btn.getAttribute('data-url'); const card=btn.closest('.aviso-card');
-      try{
-        const resp=await fetch(url,{method:'POST',credentials:'same-origin'});
-        if(resp.ok){
-          card.setAttribute('data-lido','1'); card.classList.add('lido');
-          const meta=card.querySelector('.text-muted.small'); if(meta && !/Lido/.test(meta.innerHTML)) meta.innerHTML += ' • <span class="text-success">Lido</span>';
-          btn.remove(); refresh(); toastOK.show();
-        }else{ alert('Falha ao marcar como lido ('+resp.status+').'); }
-      }catch(e){ alert('Erro de rede.'); }
-    });
-
-    refresh();
-
-    // se não veio lista no contexto, buscar da rota e injetar
-    if(!document.querySelector('#avisosListContainer .aviso-card')){
-      const href=document.getElementById('linkAvisos')?.href;
-      if(href) loadAvisosFromRoute(href);
+  function setPhone(digits, raw) {
+    const d = (digits || '').replace(/\D/g,'');
+    if (d) {
+      phoneEl.textContent = formatPhoneBR(d);
+      phoneEl.href = 'https://wa.me/55' + d;
+      phoneEl.target = '_blank';
+      phoneEl.classList.remove('text-muted');
+    } else {
+      phoneEl.innerHTML = '<span class="text-muted">Sem telefone</span>';
+      phoneEl.removeAttribute('href');
+      phoneEl.removeAttribute('target');
     }
   }
 
-  async function loadAvisosFromRoute(href){
+  function clearSelection() {
+    cooperadoCards.forEach(c => c.classList.remove('selected'));
+  }
+
+  function selectCoop({id, nome, foto, total, foneDigits, foneRaw}) {
+    if (!id) return;
+
+    // Mostra área do cooperado / esconde o aviso
+    if (header) header.style.display = '';
+    if (form) form.style.display = '';
+    if (hint) hint.style.display = 'none';
+
+    if (img && foto) img.src = foto;
+    if (nomeEl) nomeEl.textContent = nome || '—';
+    if (totalEl) totalEl.textContent = (total || '0,00');
+
+    setPhone(foneDigits, foneRaw);
+    if (inputId) inputId.value = id || '';
+
+    // mostra tabela correspondente
+    document.querySelectorAll('.lancamentos-table').forEach(t => t.style.display = 'none');
+    const table = document.getElementById('tabela-' + id);
+    if (table) table.style.display = '';
+
+    // define data de hoje se o campo estiver vazio
+    if (form) {
+      const campoData = form.querySelector('input[name="data"]');
+      if (campoData && !campoData.value) {
+        const hoje = new Date();
+        const yyyy = hoje.getFullYear();
+        const mm = String(hoje.getMonth() + 1).padStart(2, '0');
+        const dd = String(hoje.getDate()).padStart(2, '0');
+        campoData.value = `${yyyy}-${mm}-${dd}`;
+      }
+    }
+  }
+
+  // clique na lista de cooperados
+  listaCooperados?.addEventListener('click', (e) => {
+    const card = e.target.closest('.cooperado-item');
+    if (!card) return;
+    clearSelection();
+    card.classList.add('selected');
+    selectCoop({
+      id: card.dataset.id,
+      nome: card.dataset.nome,
+      foto: card.dataset.foto,
+      total: (parseFloat(card.dataset.total || '0') || 0).toFixed(2).replace('.', ','),
+      foneDigits: card.dataset.fone || '',
+      foneRaw: card.dataset['foneRaw'] || ''
+    });
+  });
+
+  // mudança no <select> de cooperado
+  document.getElementById('selectCoop')?.addEventListener('change', (e) => {
+    const opt = e.target.selectedOptions[0];
+    if (!opt || !opt.value) return;
+
+    const card = document.querySelector('.cooperado-item[data-id="'+opt.value+'"]');
+    if (card) {
+      clearSelection();
+      card.classList.add('selected');
+    }
+
+    selectCoop({
+      id: opt.value,
+      nome: opt.textContent.trim(),
+      foto: card ? card.dataset.foto : '',
+      total: card ? (parseFloat(card.dataset.total || '0').toFixed(2).replace('.', ',')) : '0,00',
+      foneDigits: opt.getAttribute('data-fone') || (card ? card.dataset.fone : ''),
+      foneRaw: opt.getAttribute('data-fone-raw') || (card ? card.dataset['foneRaw'] : '')
+    });
+  });
+})();
+
+// ========================
+// TEMA
+// ========================
+const THEME_KEY='portal_theme';
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t==='dark'?'dark':'light');
+  const lbl=document.getElementById('lblTheme');
+  const icon=document.querySelector('#btnTheme i');
+  if(lbl) lbl.textContent = (t==='dark')?'Claro':'Escuro';
+  if(icon){
+    icon.classList.toggle('bi-moon', t!=='dark');
+    icon.classList.toggle('bi-sun', t==='dark');
+  }
+  localStorage.setItem(THEME_KEY, t);
+}
+(function initTheme(){
+  const saved = localStorage.getItem(THEME_KEY) || 'light';
+  applyTheme(saved);
+  document.getElementById('btnTheme')?.addEventListener('click', ()=>{
+    const cur = localStorage.getItem(THEME_KEY) || 'light';
+    applyTheme(cur==='dark'?'light':'dark');
+  });
+})();
+
+// ========================
+// NAVEGAÇÃO SPA
+// ========================
+function showSection(view){
+  document.querySelectorAll('section[data-view]').forEach(sec=>{
+    sec.classList.toggle('view-active', sec.getAttribute('data-view')===view);
+  });
+  document.querySelectorAll('#sideNav a').forEach(a=>{
+    const t=a.getAttribute('data-target');
+    a.classList.toggle('active', t===view);
+  });
+  if(view==='avisos') initAvisos();
+  if(view==='lancamentos') initLancamentos();
+  if(view==='lancar') initLancar();
+  if(view==='tabelas') initTabelas();
+}
+function pushView(v){
+  const u=new URL(location.href);
+  u.searchParams.set('view',v);
+  history.pushState({view:v},'',u.toString());
+}
+function startView(){
+  return new URL(location.href).searchParams.get('view') || 'lancar';
+}
+
+// ========================
+// UTILS
+// ========================
+function togglePwd(btn){
+  const i=btn.previousElementSibling;
+  if(!i) return;
+  i.type=i.type==='password'?'text':'password';
+  const icon = btn.querySelector('i');
+  if(icon){
+    icon.classList.toggle('bi-eye');
+    icon.classList.toggle('bi-eye-slash');
+  }
+}
+const brMoney = (n)=> (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+const todayStr = ()=>{
+  const d=new Date();
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  const dd=String(d.getDate()).padStart(2,'0');
+  return d.getFullYear()+'-'+mm+'-'+dd;
+};
+function prefetch(href){
+  try{
+    const l=document.createElement('link');
+    l.rel='prefetch';
+    l.href=href;
+    document.head.appendChild(l);
+  }catch(e){}
+}
+
+// ========================
+// TOAST & BADGE DE AVISOS
+// ========================
+let toastAvisosInst=null;
+function ensureToastInstance(){
+  const el=document.getElementById('toastAvisos');
+  if(!el) return null;
+  if(!toastAvisosInst) toastAvisosInst = new bootstrap.Toast(el,{autohide:false});
+  return toastAvisosInst;
+}
+function setAvisosBadge(n){
+  const b=document.getElementById('badgeAvisos');
+  if(b){
+    b.style.display = n>0 ? 'inline-flex':'none';
+    b.textContent=n;
+  }
+  const tCnt=document.getElementById('toastCount');
+  if(tCnt) tCnt.textContent=n;
+  const tit=document.getElementById('badgeTitulo');
+  if(tit){
+    tit.className='badge '+(n>0?'text-bg-danger':'text-bg-success');
+    tit.textContent = n>0 ? (n+' não lido(s)') : 'Tudo lido';
+  }
+  const t=ensureToastInstance();
+  if(t){
+    if(n>0) t.show();
+    else t.hide();
+  }
+}
+
+// ========================
+// AVISOS
+// ========================
+let avisosWired=false;
+function initAvisos(){
+  if(avisosWired) return;
+  avisosWired=true;
+  const toastOK = new bootstrap.Toast(document.getElementById('toastOK'));
+  function getUnread(){
+    return document.querySelectorAll('.aviso-card[data-lido="0"]').length;
+  }
+  function refresh(){
+    setAvisosBadge(getUnread());
+  }
+
+  // filtro
+  document.getElementById('toggleNaoLidos')?.addEventListener('change', (e)=>{
+    const only=e.target.checked;
+    document.querySelectorAll('.aviso-card').forEach(card=>{
+      const lido=card.getAttribute('data-lido')==='1';
+      card.style.display = (only && lido) ? 'none' : '';
+    });
+  });
+
+  // marcar lido
+  (document.getElementById('avisosListContainer')||document).addEventListener('click', async (ev)=>{
+    const btn=ev.target.closest('[data-acao="marcar-lido"]');
+    if(!btn) return;
+    const url=btn.getAttribute('data-url');
+    const card=btn.closest('.aviso-card');
     try{
-      const res=await fetch(href,{credentials:'same-origin'}); if(!res.ok) throw new Error(res.status);
-      const html=await res.text(); const dom=new DOMParser().parseFromString(html,'text/html');
-      const cards=[...dom.querySelectorAll('.aviso-card,#avisosListContainer .aviso,.aviso')];
-      const cont=document.getElementById('avisosListContainer'); if(!cont) return;
-      cont.innerHTML='';
-      if(cards.length){
-        cards.forEach(c=>cont.appendChild(document.importNode(c,true)));
-        avisosWired=false; initAvisos(); // religar handlers
-        setAvisosBadge(cards.filter(c=>c.getAttribute('data-lido')==='0').length);
+      const resp=await fetch(url,{method:'POST',credentials:'same-origin'});
+      if(resp.ok){
+        card.setAttribute('data-lido','1');
+        card.classList.add('lido');
+        const meta=card.querySelector('.text-muted.small');
+        if(meta && !/Lido/.test(meta.innerHTML)){
+          meta.innerHTML += ' • <span class="text-success">Lido</span>';
+        }
+        btn.remove();
+        refresh();
+        toastOK.show();
       }else{
-        cont.innerHTML='<div class="card card-body"><div class="text-muted"><i class="bi bi-inbox me-1"></i> Nenhum aviso disponível.</div></div>';
-        setAvisosBadge(0);
+        alert('Falha ao marcar como lido ('+resp.status+').');
       }
     }catch(e){
-      const cont=document.getElementById('avisosListContainer');
-      if(cont) cont.innerHTML='<div class="card card-body text-muted">Não foi possível carregar os avisos agora.</div>';
+      alert('Erro de rede.');
     }
+  });
+
+  refresh();
+
+  // se não veio lista no contexto, buscar da rota e injetar
+  if(!document.querySelector('#avisosListContainer .aviso-card')){
+    const href=document.getElementById('linkAvisos')?.href;
+    if(href) loadAvisosFromRoute(href);
   }
+}
 
-  /* ===== Lançar ===== */
-  let lancarWired=false;
-  function initLancar(){
-    if(lancarWired) return; lancarWired=true;
-    const busca=document.getElementById('buscaCoop');
-    const select=document.getElementById('selectCoop');
-    const itens=Array.from(document.querySelectorAll('.cooperado-item'));
-    const form=document.getElementById('formLancamento');
-    const hint=document.getElementById('hintSelecione');
-    const header=document.getElementById('selectedHeader');
-    const inputCoopId=document.getElementById('inputCooperadoId');
-    const selFoto=document.getElementById('selFoto');
-    const selNome=document.getElementById('selNome');
-    const selTotal=document.getElementById('selTotal');
-
-    function mostrarCooperado(el){
-      if(!el) return;
-      itens.forEach(i=>i.classList.remove('selected')); el.classList.add('selected');
-      inputCoopId.value=el.dataset.id; selFoto.src=el.dataset.foto; selNome.textContent=el.dataset.nome; selTotal.textContent=el.dataset.total;
-      header.style.display='block'; form.style.display='flex'; hint.style.display='none';
-      document.querySelectorAll('.lancamentos-table').forEach(t=>t.style.display='none');
-      const t=document.getElementById('tabela-'+el.dataset.id); if(t) t.style.display='block';
-      document.querySelectorAll('.rating-group').forEach(g=>{ if(g.dataset.name!=='av_geral') wireStars(g); });
-      autoGeral();
+async function loadAvisosFromRoute(href){
+  try{
+    const res=await fetch(href,{credentials:'same-origin'});
+    if(!res.ok) throw new Error(res.status);
+    const html=await res.text();
+    const dom=new DOMParser().parseFromString(html,'text/html');
+    const cards=[...dom.querySelectorAll('.aviso-card,#avisosListContainer .aviso,.aviso')];
+    const cont=document.getElementById('avisosListContainer');
+    if(!cont) return;
+    cont.innerHTML='';
+    if(cards.length){
+      cards.forEach(c=>cont.appendChild(document.importNode(c,true)));
+      avisosWired=false;
+      initAvisos(); // religar handlers
+      setAvisosBadge(cards.filter(c=>c.getAttribute('data-lido')==='0').length);
+    }else{
+      cont.innerHTML='<div class="card card-body"><div class="text-muted"><i class="bi bi-inbox me-1"></i> Nenhum aviso disponível.</div></div>';
+      setAvisosBadge(0);
     }
-    itens.forEach(el=>el.addEventListener('click',()=>mostrarCooperado(el)));
-    busca?.addEventListener('input',function(){ const q=this.value.trim().toLowerCase(); itens.forEach(el=>el.style.display=(el.dataset.nome||'').toLowerCase().includes(q)?'':'none'); });
-    select?.addEventListener('change',function(){ const el=itens.find(x=>x.dataset.id===this.value); if(el) mostrarCooperado(el); });
-    if(itens[0]) mostrarCooperado(itens[0]);
+  }catch(e){
+    const cont=document.getElementById('avisosListContainer');
+    if(cont) cont.innerHTML='<div class="card card-body text-muted">Não foi possível carregar os avisos agora.</div>';
+  }
+}
 
-    wireAvaliacaoFlow(); // ligar fluxo do modal de avaliação
+// ========================
+// LANÇAR (TELA DE LANÇAMENTO)
+// ========================
+let lancarWired=false;
+function initLancar(){
+  if(lancarWired) return;
+  lancarWired=true;
+
+  const busca=document.getElementById('buscaCoop');
+  const itens=Array.from(document.querySelectorAll('.cooperado-item'));
+
+  // Filtro por nome
+  busca?.addEventListener('input',function(){
+    const q=this.value.trim().toLowerCase();
+    itens.forEach(el=>{
+      const nome=(el.dataset.nome||'').toLowerCase();
+      el.style.display = !q || nome.includes(q) ? '' : 'none';
+    });
+  });
+
+  // Prepara estrelas da avaliação no formulário de lançamento (se existir)
+  document.querySelectorAll('.rating-group').forEach(g=>{
+    if(g.dataset.name!=='av_geral') wireStars(g);
+  });
+  autoGeral();
+
+  // Liga fluxo do modal de avaliação (lancar)
+  wireAvaliacaoFlow();
+}
+
+// ========================
+// LANÇAMENTOS (LISTAGEM)
+// ========================
+let lancamentosWired=false;
+function initLancamentos(){
+  if(lancamentosWired) return;
+  lancamentosWired=true;
+  const tbody=document.getElementById('tbodyLanc');
+  if(!tbody) return;
+  const ftValor=document.getElementById('ftValor');
+  const ftEnt=document.getElementById('ftEntregas');
+  const kpiV=document.getElementById('kpiTotalValor');
+  const kpiE=document.getElementById('kpiTotalEntregas');
+  const grid=document.getElementById('gridCoop');
+  const f=document.getElementById('formFiltroLanc');
+
+  const key='lanc_applied_today';
+  if(f && !f.data_inicio.value && !f.data_fim.value && !f.mes.value && !sessionStorage.getItem(key)){
+    const t=todayStr();
+    f.data_inicio.value=t;
+    f.data_fim.value=t;
+    sessionStorage.setItem(key,'1');
+    sessionStorage.setItem('scrollY', String(window.scrollY));
+    f.submit();
+    return;
+  }
+  const savedY=Number(sessionStorage.getItem('scrollY')||0);
+  if(savedY){
+    window.scrollTo(0,savedY);
+    sessionStorage.removeItem('scrollY');
   }
 
-  function wireStars(group){
-    const hidden=group.querySelector('input[type="hidden"]'); const stars=group.querySelectorAll('.star');
-    function paint(v,hover=false){ stars.forEach(s=>{ const on=Number(s.dataset.v)<=v; s.classList.toggle('active',on); s.classList.toggle('hover',hover&&on); }); }
-    stars.forEach(s=>{
-      s.addEventListener('mouseenter',()=>paint(Number(s.dataset.v),true));
-      s.addEventListener('mouseleave',()=>paint(Number(hidden.value||0),false));
-      s.addEventListener('click',()=>{ hidden.value=Number(s.dataset.v); paint(Number(hidden.value),false); autoGeral(); });
-    });
-    paint(Number(hidden.value||0),false);
+  function rows(){
+    return Array.from(tbody.querySelectorAll('tr'));
   }
-
-  // autoGeral: média só se houver notas; senão fica vazio e não pinta
-  function autoGeral(){
-    const g=document.querySelector('.rating-group[data-name="av_geral"]'); if(!g) return;
-    const h=g.querySelector('input[type="hidden"]');
-    const nomes=['av_pontualidade','av_educacao','av_eficiencia','av_apresentacao']; 
-    const vals=[];
-    nomes.forEach(n=>{
-      const v=Number(document.querySelector(`.rating-group[data-name="${n}"] input[type="hidden"]`)?.value||0);
-      if(v>0) vals.push(v);
+  function recompute(){
+    let totV=0, totE=0;
+    const per={};
+    rows().forEach(tr=>{
+      if(tr.style.display==='none') return;
+      const v=Number(tr.querySelector('.valor')?.dataset.valor||0);
+      const eTxt = tr.querySelector('.entregas')?.textContent?.trim() || '0';
+      const e = eTxt === '-' ? 0 : Number(eTxt.replace(/\D+/g,''));
+      totV+=v;
+      totE+=e;
+      const id=tr.dataset.coop;
+      const nm=tr.dataset.coopnome;
+      per[id]=per[id]||{nome:nm,valor:0,ent:0};
+      per[id].valor+=v;
+      per[id].ent+=e;
     });
-    const media = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : null;
-    h.value = media ?? '';
-    g.querySelectorAll('.star').forEach(s=>{
-      const v=Number(s.dataset.v);
-      s.classList.toggle('active', !!media && v<=media);
-      s.classList.remove('hover');
-    });
-  }
-
-  /* ===== Lancamentos ===== */
-  let lancamentosWired=false;
-  function initLancamentos(){
-    if(lancamentosWired) return; lancamentosWired=true;
-    const tbody=document.getElementById('tbodyLanc'); if(!tbody) return;
-    const ftValor=document.getElementById('ftValor'); const ftEnt=document.getElementById('ftEntregas');
-    const kpiV=document.getElementById('kpiTotalValor'); const kpiE=document.getElementById('kpiTotalEntregas');
-    const grid=document.getElementById('gridCoop'); const f=document.getElementById('formFiltroLanc');
-
-    const key='lanc_applied_today';
-    if(f && !f.data_inicio.value && !f.data_fim.value && !f.mes.value && !sessionStorage.getItem(key)){
-      const t=todayStr(); f.data_inicio.value=t; f.data_fim.value=t;
-      sessionStorage.setItem(key,'1'); sessionStorage.setItem('scrollY', String(window.scrollY)); f.submit(); return;
-    }
-    const savedY=Number(sessionStorage.getItem('scrollY')||0); if(savedY){ window.scrollTo(0,savedY); sessionStorage.removeItem('scrollY'); }
-
-    function rows(){ return Array.from(tbody.querySelectorAll('tr')); }
-    function recompute(){
-      let totV=0, totE=0; const per={};
-      rows().forEach(tr=>{
-        if(tr.style.display==='none') return;
-        const v=Number(tr.querySelector('.valor')?.dataset.valor||0);
-        const eTxt = tr.querySelector('.entregas')?.textContent?.trim() || '0'; // AJUSTE
-        const e = eTxt === '-' ? 0 : Number(eTxt.replace(/\D+/g,''));
-        totV+=v; totE+=e;
-        const id=tr.dataset.coop, nm=tr.dataset.coopnome;
-        per[id]=per[id]||{nome:nm,valor:0,ent:0}; per[id].valor+=v; per[id].ent+=e;
+    if(ftValor) ftValor.textContent='R$ '+brMoney(totV);
+    if(ftEnt) ftEnt.textContent=String(totE);
+    if(kpiV) kpiV.textContent=brMoney(totV);
+    if(kpiE) kpiE.textContent=String(totE);
+    if(grid){
+      grid.innerHTML='';
+      Object.values(per).sort((a,b)=>b.valor-a.valor).forEach(p=>{
+        const div=document.createElement('div');
+        div.className='col-sm-6 col-xl-4';
+        div.innerHTML=`<div class="kpi h-100">
+          <div class="fw-bold">${p.nome||'-'}</div>
+          <div class="small text-muted">Entregas: <b>${p.ent||0}</b></div>
+          <div>Total: <b>R$ ${brMoney(p.valor||0)}</b></div>
+        </div>`;
+        grid.appendChild(div);
       });
-      ftValor.textContent='R$ '+brMoney(totV); ftEnt.textContent=String(totE); kpiV.textContent=brMoney(totV); kpiE.textContent=String(totE);
-      grid.innerHTML=''; Object.values(per).sort((a,b)=>b.valor-a.valor).forEach(p=>{
-        const div=document.createElement('div'); div.className='col-sm-6 col-xl-4';
-        div.innerHTML=`<div class="kpi h-100"><div class="fw-bold">${p.nome||'-'}</div><div class="small text-muted">Entregas: <b>${p.ent||0}</b></div><div>Total: <b>R$ ${brMoney(p.valor||0)}</b></div></div>`; grid.appendChild(div);
-      });
     }
-    f?.q?.addEventListener('input', ()=>{
-      const q=(f.q.value||'').toLowerCase().trim(); sessionStorage.setItem('lanc_q',q);
-      rows().forEach(tr=>{ const coop=(tr.dataset.coopnome||'').toLowerCase(); const contrato=(tr.dataset.contrato||'').toLowerCase(); tr.style.display = (!q || coop.includes(q) || contrato.includes(q)) ? '' : 'none'; });
-      recompute();
+  }
+  f?.q?.addEventListener('input', ()=>{
+    const q=(f.q.value||'').toLowerCase().trim();
+    sessionStorage.setItem('lanc_q',q);
+    rows().forEach(tr=>{
+      const coop=(tr.dataset.coopnome||'').toLowerCase();
+      const contrato=(tr.dataset.contrato||'').toLowerCase();
+      tr.style.display = (!q || coop.includes(q) || contrato.includes(q)) ? '' : 'none';
     });
-    f?.addEventListener('submit', ()=>{ sessionStorage.setItem('scrollY', String(window.scrollY)); });
-
-    // CSV com coluna Descrição
-    document.getElementById('btnExportCsv')?.addEventListener('click', ()=>{
-      const rowsVis=rows().filter(r=>r.style.display!=='none');
-      const header=['Data','Cooperado','Contrato','Horário','Descrição','Entregas','Valor (R$)']; // NOVO
-      const linhas=[header]; let totE=0, totV=0;
-
-      function csvEscape(t){ return '"' + String(t||'').replace(/"/g,'""') + '"'; }
-
-      rowsVis.forEach(r=>{
-        const c=r.cells;
-        const data=c[0]?.textContent.trim()||'';
-        const coop=c[1]?.textContent.trim()||'';
-        const contrato=c[2]?.textContent.trim()||'';
-        const horario=c[3]?.textContent.trim()||'';
-        const desc=(r.querySelector('.desc')?.textContent||'').replace(/\s+/g,' ').trim(); // NOVO
-        const eTxt=(r.querySelector('.entregas')?.textContent.trim()||'0');
-        const entregas=(eTxt==='-')?0:Number(eTxt.replace(/\D+/g,''));
-        const valorNum=Number(r.querySelector('.valor')?.dataset.valor||0);
-
-        linhas.push([data,coop,contrato,horario,csvEscape(desc),String(entregas),valorNum.toFixed(2).replace('.',',')]);
-        totE+=entregas; totV+=valorNum;
-      });
-      linhas.push(['Totais','','','', '', String(totE), String(totV.toFixed(2)).replace('.',',')]);
-      const csv='\uFEFF'+linhas.map(l=>l.join(';')).join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='lancamentos.csv'; a.click(); URL.revokeObjectURL(a.href);
-    });
-
     recompute();
-    const savedQ=sessionStorage.getItem('lanc_q')||''; if(savedQ && f?.q){ f.q.value=savedQ; f.q.dispatchEvent(new Event('input')); }
+  });
+  f?.addEventListener('submit', ()=>{
+    sessionStorage.setItem('scrollY', String(window.scrollY));
+  });
 
-    // Avaliar/editar avaliação sem sair da página
-    wireAvalLanc();
-  }
+  // CSV com coluna Descrição
+  document.getElementById('btnExportCsv')?.addEventListener('click', ()=>{
+    const rowsVis=rows().filter(r=>r.style.display!=='none');
+    const header=['Data','Cooperado','Contrato','Horário','Descrição','Entregas','Valor (R$)'];
+    const linhas=[header];
+    let totE=0, totV=0;
 
-  /* ===== Tabelas ===== */
-  function initTabelas(){
-    if(!document.querySelector('#tabelasContainer .doc-row')){
-      const href=document.getElementById('linkTabelas')?.href; if(href) loadTabelasFromRoute(href);
-    }
-    wireTabelaViewer();
-  }
-  async function loadTabelasFromRoute(href){
-    try{
-      const res=await fetch(href,{credentials:'same-origin'}); if(!res.ok) throw new Error(res.status);
-      const html=await res.text(); const dom=new DOMParser().parseFromString(html,'text/html');
-      const card=dom.querySelector('.doc-row'); if(!card) return;
-      const cont=document.getElementById('tabelasContainer'); cont.innerHTML=''; cont.appendChild(document.importNode(card,true));
-      wireTabelaViewer();
-    }catch(e){ /* falhou: deixa como está */ }
-  }
-  function wireTabelaViewer(){
-    const modalEl=document.getElementById('modalTabela'); const modal=new bootstrap.Modal(modalEl);
-    const lbl=document.getElementById('modalTabelaLabel'); const frame=document.getElementById('modalFrame');
-    const baixar=document.getElementById('modalBaixar'); const novaAba=document.getElementById('modalAbrirNovaAba');
+    function csvEscape(t){ return '"' + String(t||'').replace(/"/g,'""') + '"'; }
 
-    document.getElementById('tabelasContainer')?.addEventListener('click', (ev)=>{
-      const card=ev.target.closest('.doc-row'); if(!card) return;
-      if(ev.target.closest('a[data-direct-download],button[data-direct-download]')) return;
-      const viewUrl=card.dataset.view||'#'; const downUrl=card.dataset.download||viewUrl; const title=card.dataset.titleFull||'';
-      lbl.textContent=title; baixar.href=downUrl; novaAba.href=viewUrl; frame.src=viewUrl; modal.show();
+    rowsVis.forEach(r=>{
+      const c=r.cells;
+      const data=c[0]?.textContent.trim()||'';
+      const coop=c[1]?.textContent.trim()||'';
+      const contrato=c[2]?.textContent.trim()||'';
+      const horario=c[3]?.textContent.trim()||'';
+      const desc=(r.querySelector('.desc')?.textContent||'').replace(/\s+/g,' ').trim();
+      const eTxt=(r.querySelector('.entregas')?.textContent.trim()||'0');
+      const entregas=(eTxt==='-')?0:Number(eTxt.replace(/\D+/g,''));
+      const valorNum=Number(r.querySelector('.valor')?.dataset.valor||0);
+
+      linhas.push([data,coop,contrato,horario,csvEscape(desc),String(entregas),valorNum.toFixed(2).replace('.',',')]);
+      totE+=entregas;
+      totV+=valorNum;
     });
-    modalEl.addEventListener('hidden.bs.modal',()=>{ frame.src=''; });
+    linhas.push(['Totais','','','', '', String(totE), String(totV.toFixed(2)).replace('.',',')]);
+    const csv='\uFEFF'+linhas.map(l=>l.join(';')).join('\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='lancamentos.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  recompute();
+  const savedQ=sessionStorage.getItem('lanc_q')||'';
+  if(savedQ && f?.q){
+    f.q.value=savedQ;
+    f.q.dispatchEvent(new Event('input'));
   }
 
-  /* ===== Helpers para avaliação ===== */
+  // Avaliar/editar avaliação sem sair da página
+  wireAvalLanc();
+}
+
+// ========================
+// HELPERS AVALIAÇÃO (ESTRELAS)
+// ========================
+function wireStars(group){
+  const hidden=group.querySelector('input[type="hidden"]');
+  const stars=group.querySelectorAll('.star');
+  function paint(v,hover=false){
+    stars.forEach(s=>{
+      const on=Number(s.dataset.v)<=v;
+      s.classList.toggle('active',on);
+      s.classList.toggle('hover',hover&&on);
+    });
+  }
+  stars.forEach(s=>{
+    s.addEventListener('mouseenter',()=>paint(Number(s.dataset.v),true));
+    s.addEventListener('mouseleave',()=>paint(Number(hidden.value||0),false));
+    s.addEventListener('click',()=>{
+      hidden.value=Number(s.dataset.v);
+      paint(Number(hidden.value),false);
+      autoGeral();
+    });
+  });
+  paint(Number(hidden.value||0),false);
+}
+
+// autoGeral: média só se houver notas; senão fica vazio e não pinta
+function autoGeral(){
+  const g=document.querySelector('.rating-group[data-name="av_geral"]');
+  if(!g) return;
+  const h=g.querySelector('input[type="hidden"]');
+  const nomes=['av_pontualidade','av_educacao','av_eficiencia','av_apresentacao'];
+  const vals=[];
+  nomes.forEach(n=>{
+    const v=Number(document.querySelector(`.rating-group[data-name="${n}"] input[type="hidden"]`)?.value||0);
+    if(v>0) vals.push(v);
+  });
+  const media = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+  h.value = media ?? '';
+  g.querySelectorAll('.star').forEach(s=>{
+    const v=Number(s.dataset.v);
+    s.classList.toggle('active', !!media && v<=media);
+    s.classList.remove('hover');
+  });
+}
+
+// ========================
+// FLUXO MODAL AVALIAÇÃO (LANÇAR)
+// ========================
 function setAvalInputsEnabled(enabled){
   const boxAval = document.getElementById('boxAval');
   if(!boxAval) return;
-  // Não mexe em "name" (para não quebrar). Apenas alterna "disabled".
   boxAval.querySelectorAll('input[name^="av_"], textarea[name="av_comentario"]').forEach(el=>{
     el.disabled = !enabled;
   });
 }
 
-/* ===== Fluxo do Modal de Avaliação (Lançar) ===== */
 function wireAvaliacaoFlow(){
   const form = document.getElementById('formLancamento');
   if(!form) return;
@@ -1336,9 +1863,9 @@ function wireAvaliacaoFlow(){
   const inputAvaliar = document.getElementById('inputAvaliar');
   const boxAval = document.getElementById('boxAval');
 
-  // ===== NOVO: lock de submissão para não duplicar =====
+  // lock de submissão para não duplicar
   let isSubmitting = false;
-  const submitBtn = form.querySelector('button.btn-royal[type="submit"]');
+  const submitBtn = form.querySelector('button.btn-royal[type="submit"], button.btn-royal');
 
   function setSubmitting(on){
     isSubmitting = !!on;
@@ -1349,13 +1876,11 @@ function wireAvaliacaoFlow(){
         ? '<span class="spinner-border spinner-border-sm me-1"></span> Lançando…'
         : submitBtn.dataset.origText;
     }
-    // evita cliques em qualquer campo enquanto envia
     form.style.pointerEvents = on ? 'none' : '';
     form.classList.toggle('opacity-75', on);
   }
 
   function ensureRequestId(){
-    // cria um request_id único para o backend deduplicar
     let inp = form.querySelector('input[name="request_id"]');
     if(!inp){
       inp = document.createElement('input');
@@ -1363,7 +1888,6 @@ function wireAvaliacaoFlow(){
       inp.name = 'request_id';
       form.appendChild(inp);
     }
-    // Sempre renova ao tentar enviar (dá pra manter o mesmo se preferir)
     inp.value = Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
   }
 
@@ -1385,7 +1909,10 @@ function wireAvaliacaoFlow(){
 
   // Intercepta submit pra perguntar se quer avaliar (quando ainda não marcou)
   form.addEventListener('submit', function(ev){
-    if(isSubmitting){ ev.preventDefault(); return; } // já está enviando
+    if(isSubmitting){
+      ev.preventDefault();
+      return;
+    }
     if(!form.checkValidity()){
       form.reportValidity?.();
       return;
@@ -1394,12 +1921,10 @@ function wireAvaliacaoFlow(){
     const avaliando = chkAvaliar.checked || inputAvaliar.value === '1' || (boxAval && boxAval.style.display === 'block');
 
     if(avaliando){
-      // Vai enviar com avaliação
       setAvalInputsEnabled(true);
-      autoGeral();          // garante que a média esteja setada
-      ensureRequestId();    // idempotência
-      setSubmitting(true);  // trava UI
-      // deixa o submit continuar
+      autoGeral();
+      ensureRequestId();
+      setSubmitting(true);
       return;
     }
 
@@ -1426,7 +1951,7 @@ function wireAvaliacaoFlow(){
     chkAvaliar.checked = false;
     inputAvaliar.value = '0';
     if(boxAval) boxAval.style.display = 'none';
-    setAvalInputsEnabled(false); // garante que nada de av_ vai no POST
+    setAvalInputsEnabled(false);
     modal.hide();
     setTimeout(()=>{
       if(isSubmitting) return;
@@ -1442,7 +1967,9 @@ function wireAvaliacaoFlow(){
   });
 }
 
-/* ===== Avaliar/Editar na página de Lançamentos (sem sair) ===== */
+// ========================
+// AVALIAÇÃO NA LISTA DE LANÇAMENTOS
+// ========================
 function paintStaticStars(el){
   const score = Number(el?.dataset?.score||0);
   if(!el) return;
@@ -1450,7 +1977,7 @@ function paintStaticStars(el){
 }
 function wireAvalLanc(){
   const tbody = document.getElementById('tbodyLanc');
-  const modalEl = document.getElementById('modalAvalLanc'); // opcional
+  const modalEl = document.getElementById('modalAvalLanc');
   if(!tbody || !modalEl) return;
 
   const modal = new bootstrap.Modal(modalEl);
@@ -1475,7 +2002,8 @@ function wireAvalLanc(){
     info.textContent = `${tr.cells[0].textContent.trim()} • ${tr.dataset.coopnome}`;
 
     modalEl.querySelectorAll('input[name^="av_"]').forEach(i=>i.value='');
-    modalEl.querySelector('textarea[name="av_comentario"]').value='';
+    const ta = modalEl.querySelector('textarea[name="av_comentario"]');
+    if(ta) ta.value='';
 
     try{
       const r = await fetch(getUrl, {credentials:'same-origin'});
@@ -1494,11 +2022,12 @@ function wireAvalLanc(){
             const inp = modalEl.querySelector(`input[name="${k}"]`);
             if(inp){ inp.value = v || ''; }
           });
-          const ta = modalEl.querySelector('textarea[name="av_comentario"]');
           if(ta) ta.value = d.comentario || '';
         }
       }
-    }catch(e){/* silencioso */ }
+    }catch(e){
+      // silencioso
+    }
 
     initStarsInModal();
     modal.show();
@@ -1537,29 +2066,93 @@ function wireAvalLanc(){
   document.querySelectorAll('.stars-static').forEach(paintStaticStars);
 }
 
-/* ===== Eventos do menu ===== */
+// ========================
+// TABELAS
+// ========================
+function initTabelas(){
+  if(!document.querySelector('#tabelasContainer .doc-row')){
+    const href=document.getElementById('linkTabelas')?.href;
+    if(href) loadTabelasFromRoute(href);
+  }
+  wireTabelaViewer();
+}
+async function loadTabelasFromRoute(href){
+  try{
+    const res=await fetch(href,{credentials:'same-origin'});
+    if(!res.ok) throw new Error(res.status);
+    const html=await res.text();
+    const dom=new DOMParser().parseFromString(html,'text/html');
+    const card=dom.querySelector('.doc-row');
+    if(!card) return;
+    const cont=document.getElementById('tabelasContainer');
+    cont.innerHTML='';
+    cont.appendChild(document.importNode(card,true));
+    wireTabelaViewer();
+  }catch(e){
+    // falhou: deixa como está
+  }
+}
+function wireTabelaViewer(){
+  const modalEl=document.getElementById('modalTabela');
+  const modal=new bootstrap.Modal(modalEl);
+  const lbl=document.getElementById('modalTabelaLabel');
+  const frame=document.getElementById('modalFrame');
+  const baixar=document.getElementById('modalBaixar');
+  const novaAba=document.getElementById('modalAbrirNovaAba');
+
+  document.getElementById('tabelasContainer')?.addEventListener('click', (ev)=>{
+    const card=ev.target.closest('.doc-row');
+    if(!card) return;
+    if(ev.target.closest('a[data-direct-download],button[data-direct-download]')) return;
+    const viewUrl=card.dataset.view||'#';
+    const downUrl=card.dataset.download||viewUrl;
+    const title=card.dataset.titleFull||'';
+    lbl.textContent=title;
+    baixar.href=downUrl;
+    novaAba.href=viewUrl;
+    frame.src=viewUrl;
+    modal.show();
+  });
+  modalEl.addEventListener('hidden.bs.modal',()=>{ frame.src=''; });
+}
+
+// ========================
+// EVENTOS DO MENU / INICIALIZAÇÃO
+// ========================
 document.getElementById('sideNav')?.addEventListener('click', async (e)=>{
-  const a=e.target.closest('a'); if(!a) return;
-  const t=a.getAttribute('data-target'); if(!t) return; // logout segue normal
+  const a=e.target.closest('a');
+  if(!a) return;
+  const t=a.getAttribute('data-target');
+  if(!t) return; // logout segue normal
   e.preventDefault();
-  document.querySelectorAll('#sideNav a').forEach(x=>x.classList.remove('active')); a.classList.add('active');
-  showSection(t); pushView(t);
-  if(t==='avisos' || t==='tabelas'){ prefetch(a.href); }
+  document.querySelectorAll('#sideNav a').forEach(x=>x.classList.remove('active'));
+  a.classList.add('active');
+  showSection(t);
+  pushView(t);
+  if(t==='avisos' || t==='tabelas'){
+    prefetch(a.href);
+  }
 });
 
 document.getElementById('toastVerAgora')?.addEventListener('click', async (e)=>{
   e.preventDefault();
   const href=e.currentTarget.getAttribute('href');
-  showSection('avisos'); pushView('avisos');
+  showSection('avisos');
+  pushView('avisos');
   await loadAvisosFromRoute(href);
 });
 
-/* ===== Inicialização ===== */
 document.addEventListener('DOMContentLoaded', ()=>{
-  const initial=startView(); showSection(initial);
-  const unread=Number(document.getElementById('toastCount')?.textContent||'0'); setAvisosBadge(unread);
+  const initial=startView();
+  showSection(initial);
+  const unread=Number(document.getElementById('toastCount')?.textContent||'0');
+  setAvisosBadge(unread);
 });
-window.addEventListener('popstate',(ev)=>{ const v=(ev.state&&ev.state.view)||startView(); showSection(v); });
+
+window.addEventListener('popstate',(ev)=>{
+  const v=(ev.state&&ev.state.view)||startView();
+  showSection(v);
+});
 </script>
 </body>
 </html>
