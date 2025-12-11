@@ -509,7 +509,7 @@
           <i class="bi bi-calendar-week"></i><span>Escala</span>
         </a>
         {% if session.get('user_tipo') == 'restaurante' %}
-        <a data-target="tabelas" id="linkTabelas" href="{{ url_for('rest_tabelas') }}">
+        <a data-target="tabelas" id="linkTabelas" href="{{ url_for('restaurantes_tabelas') }}">
           <i class="bi bi-table"></i><span>Tabelas</span>
         </a>
         {% endif %}
@@ -1848,7 +1848,6 @@ function initLancar(){
     e.preventDefault();
     if(!confirm('Deseja realmente excluir este lançamento?')) return;
     showLancOverlay('delete');
-    // pequeno delay só para o overlay aparecer visualmente
     setTimeout(()=>{ window.location.href = link.href; }, 80);
   });
 }
@@ -2082,14 +2081,16 @@ function wireAvaliacaoFlow(){
 
   setAvalInputsEnabled(false);
 
+  // checkbox "Registrar avaliação agora"
   chkAvaliar?.addEventListener('change', ()=>{
     const on = chkAvaliar.checked;
-    inputAvaliar.value = on ? '1':'0';
+    if(inputAvaliar) inputAvaliar.value = on ? '1':'0';
     if(boxAval) boxAval.style.display = on ? 'block':'none';
     setAvalInputsEnabled(on);
     if(on){ autoGeral(); }
   });
 
+  // SUBMIT PRINCIPAL
   form.addEventListener('submit', function(ev){
     if(isSubmitting){
       ev.preventDefault();
@@ -2097,25 +2098,38 @@ function wireAvaliacaoFlow(){
     }
     if(!form.checkValidity()){
       form.reportValidity?.();
+      ev.preventDefault();
       return;
     }
 
-    const avaliando = chkAvaliar?.checked || inputAvaliar?.value === '1' || (boxAval && boxAval.style.display === 'block');
+    const avaliando =
+      (chkAvaliar && chkAvaliar.checked) ||
+      (inputAvaliar && inputAvaliar.value === '1') ||
+      (boxAval && boxAval.style.display === 'block');
 
     if(avaliando){
+      // Vai com avaliação → habilita campos e manda com overlay
       setAvalInputsEnabled(true);
       autoGeral();
       ensureRequestId();
-      setSubmitting(true);
-      return; // deixa o submit seguir
+      setSubmitting(true);  // overlay "Lançando…"
+      return;               // deixa o submit seguir
     }
 
+    // Não está avaliando
     if(modal){
+      // Se existir modal: pergunta "Avaliar ou pular?"
       ev.preventDefault();
       modal.show();
+    }else{
+      // Se não existir modal: manda direto com overlay
+      ensureRequestId();
+      setSubmitting(true);
+      // não dá preventDefault → submit segue
     }
   });
 
+  // Clicou "Avaliar agora" no modal
   btnAvaliarAgora?.addEventListener('click', ()=>{
     if(!chkAvaliar || !inputAvaliar) return;
     chkAvaliar.checked = true;
@@ -2129,21 +2143,24 @@ function wireAvaliacaoFlow(){
     }, 150);
   });
 
+  // Clicou "Pular e lançar" no modal
   btnPularAval?.addEventListener('click', ()=>{
-    if(!inputAvaliar) return;
-    if(chkAvaliar) chkAvaliar.checked = false;
-    inputAvaliar.value = '0';
+    if(inputAvaliar){
+      if(chkAvaliar) chkAvaliar.checked = false;
+      inputAvaliar.value = '0';
+    }
     if(boxAval) boxAval.style.display = 'none';
     setAvalInputsEnabled(false);
     modal?.hide();
     setTimeout(()=>{
       if(isSubmitting) return;
       ensureRequestId();
-      setSubmitting(true);
-      form.submit();
+      setSubmitting(true);  // overlay "Lançando…"
+      form.submit();        // submit real
     }, 80);
   });
 
+  // Se voltar de bfcache, destrava o botão e esconde overlay
   window.addEventListener('pageshow', (e)=>{
     if(e.persisted){
       setSubmitting(false);
