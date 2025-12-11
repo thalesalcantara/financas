@@ -1439,11 +1439,40 @@
   </div>
 </section>
 
-<!-- OVERLAY DE LANÇAMENTO -->
-<div id="overlayLancando" class="lanc-overlay">
-  <div class="lanc-overlay-box">
-    <div class="lanc-spinner"></div>
-    <div class="lanc-overlay-text">Lançando…</div>
+<!-- MODAL – PERGUNTA SE QUER AVALIAR ANTES DE LANÇAR -->
+<div class="modal fade" id="modalAvaliar" tabindex="-1" aria-labelledby="modalAvaliarLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0" style="border-radius: 14px;">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title" id="modalAvaliarLabel">
+          Avaliar este cooperado?
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <p class="mb-3 text-muted">
+          Você pode lançar a produção agora sem registrar avaliação, ou abrir o formulário
+          de avaliação para registrar a nota deste cooperado antes de concluir o lançamento.
+        </p>
+
+        <ul class="small text-muted mb-3 ps-3">
+          <li><strong>Avaliar agora:</strong> abre os campos de avaliação (estrelas e comentário).</li>
+          <li><strong>Lançar sem avaliar:</strong> grava o lançamento sem nenhuma avaliação.</li>
+        </ul>
+      </div>
+      <div class="modal-footer border-0 pt-0 d-flex justify-content-between">
+        <button type="button"
+                class="btn btn-outline-secondary"
+                id="btnPularAval">
+          Lançar sem avaliar
+        </button>
+        <button type="button"
+                class="btn btn-royal"
+                id="btnAvaliarAgora">
+          Avaliar agora
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
