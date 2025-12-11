@@ -477,6 +477,18 @@
   @keyframes lanc-spin{
     to{transform:rotate(360deg);}
   }
+
+  /* Animação de linha ao excluir */
+  .row-exiting{
+    animation: rowHide .35s ease forwards;
+  }
+
+  @keyframes rowHide{
+    to{
+      opacity:0;
+      transform:translateX(-10px);
+    }
+  }
 </style>
 </head>
 <body>
@@ -1438,6 +1450,29 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // ========================
+// OVERLAY "LANÇANDO / EXCLUINDO"
+// ========================
+const overlayLanc = document.getElementById('overlayLancando');
+const overlayTextEl = overlayLanc?.querySelector('.lanc-overlay-text');
+
+function showLancOverlay(mode){
+  if(!overlayLanc) return;
+  if(overlayTextEl){
+    if(mode === 'delete'){
+      overlayTextEl.textContent = 'Excluindo…';
+    }else{
+      overlayTextEl.textContent = 'Lançando…';
+    }
+  }
+  overlayLanc.style.display = 'flex';
+}
+
+function hideLancOverlay(){
+  if(!overlayLanc) return;
+  overlayLanc.style.display = 'none';
+}
+
+// ========================
 // MÁSCARA + SELEÇÃO COOPERADO (LANÇAR)
 // ========================
 
@@ -1815,8 +1850,23 @@ function initLancar(){
   });
   autoGeral();
 
-  // Liga fluxo do modal de avaliação (lançar)
+  // Fluxo de avaliação e animação de "Lançando…"
   wireAvaliacaoFlow();
+
+  // ========================
+  // EXCLUSÃO COM ANIMAÇÃO "EXCLUINDO…"
+  // ========================
+  const blocoTabelas = document.getElementById('blocoTabelas');
+  blocoTabelas?.addEventListener('click', (e)=>{
+    const link = e.target.closest('a.btn-outline-danger');
+    if(!link) return;
+    e.preventDefault();
+    const ok = confirm('Deseja realmente excluir este lançamento?');
+    if(!ok) return;
+    showLancOverlay('delete');
+    // navega para a rota de exclusão
+    window.location.href = link.href;
+  });
 }
 
 // ========================
@@ -2030,6 +2080,9 @@ function wireAvaliacaoFlow(){
     }
     form.style.pointerEvents = on ? 'none' : '';
     form.classList.toggle('opacity-75', on);
+
+    // overlay global
+    if(on) showLancOverlay('launch'); else hideLancOverlay();
   }
 
   function ensureRequestId(){
@@ -2077,6 +2130,7 @@ function wireAvaliacaoFlow(){
       autoGeral();
       ensureRequestId();
       setSubmitting(true);
+      // deixa o submit seguir normalmente
       return;
     }
 
@@ -2113,9 +2167,12 @@ function wireAvaliacaoFlow(){
     }, 80);
   });
 
-  // Se voltar de bfcache, destrava o botão
+  // Se voltar de bfcache, destrava o botão e esconde overlay
   window.addEventListener('pageshow', (e)=>{
-    if(e.persisted) setSubmitting(false);
+    if(e.persisted){
+      setSubmitting(false);
+      hideLancOverlay();
+    }
   });
 }
 
