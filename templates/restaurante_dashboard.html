@@ -1640,30 +1640,69 @@ async function loadAvisosFromRoute(href){
 // ========================
 // LANÇAR (TELA DE LANÇAMENTO)
 // ========================
-let lancarWired=false;
+let lancarWired = false;
 function initLancar(){
-  if(lancarWired) return;
-  lancarWired=true;
+  if (lancarWired) return;
+  lancarWired = true;
 
-  const busca=document.getElementById('buscaCoop');
-  const itens=Array.from(document.querySelectorAll('.cooperado-item'));
+  const busca = document.getElementById('buscaCoop');
+  const itens  = Array.from(document.querySelectorAll('.cooperado-item'));
 
-  // Filtro por nome
-  busca?.addEventListener('input',function(){
-    const q=this.value.trim().toLowerCase();
+  // Função central: filtra a lista e, se pedido, já seleciona o cooperado
+  function filtrarESelecionar(valor, autoSelecionar){
+    const q = (valor || '').trim().toLowerCase();
+    const visiveis = [];
+
     itens.forEach(el=>{
-      const nome=(el.dataset.nome||'').toLowerCase();
-      el.style.display = !q || nome.includes(q) ? '' : 'none';
+      const nome = (el.dataset.nome || '').toLowerCase();
+      const match = !q || nome.includes(q);
+      el.style.display = match ? '' : 'none';
+      if (match) visiveis.push(el);
     });
+
+    if (!autoSelecionar) return;
+
+    // 1º: tenta achar match EXATO com o nome
+    let alvo = visiveis.find(el => (el.dataset.nome || '').toLowerCase() === q);
+
+    // Se não tiver match exato, mas só sobrou 1 visível, seleciona esse
+    if (!alvo && visiveis.length === 1){
+      alvo = visiveis[0];
+    }
+
+    if (alvo){
+      // dispara o clique, que usa o fluxo já existente (selectCoop)
+      alvo.click();
+      // opcional: tira o foco do input
+      if (busca) busca.blur();
+    }
+  }
+
+  // Enquanto digita → só filtra (como era antes)
+  busca?.addEventListener('input', function(){
+    filtrarESelecionar(this.value, false);
+  });
+
+  // Quando escolhe no datalist ou sai do campo → filtra e tenta selecionar
+  busca?.addEventListener('change', function(){
+    filtrarESelecionar(this.value, true);
+  });
+
+  // Quando aperta Enter dentro do campo → filtra e tenta selecionar
+  busca?.addEventListener('keydown', function(e){
+    if (e.key === 'Enter'){
+      e.preventDefault();
+      filtrarESelecionar(this.value, true);
+    }
   });
 
   // Prepara estrelas da avaliação no formulário de lançamento (se existir)
   document.querySelectorAll('.rating-group').forEach(g=>{
-    if(g.dataset.name!=='av_geral') wireStars(g);
+    if (g.dataset.name !== 'av_geral') wireStars(g);
   });
   autoGeral();
 
-  // Liga fluxo do modal de avaliação (lancar)
+  // Liga fluxo do modal de avaliação (lançar)
   wireAvaliacaoFlow();
 }
 
