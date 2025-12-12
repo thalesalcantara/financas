@@ -545,6 +545,7 @@
       {% set _ref_data = ref_data if ref_data is defined and ref_data is not none else None %}
       {% set _modo = modo if modo is defined and modo is not none else 'semana' %}
       {% set _url_lancar_producao = url_lancar_producao if url_lancar_producao is defined else url_for('portal_restaurante') %}
+      {% set _ids_escalados = cooperados_escalados_ids if cooperados_escalados_ids is defined and cooperados_escalados_ids is not none else [] %}
 
       <!-- ===== CONFIG ===== -->
       <section data-view="config">
@@ -1185,22 +1186,28 @@
             </datalist>
           </div>
 
-          <select id="selectCoop" class="form-select mt-2">
-            <option value="">Selecione pela lista...</option>
-            {% for coop in _cooperados %}
-              <option
-                value="{{ coop.id }}"
-                data-nome="{{ coop.nome }}"
-                data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
-                data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}"
-                data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
-                data-fone-raw="{{ coop.telefone or '' }}"
-              >
-                {{ coop.nome }}
-              </option>
-            {% endfor %}
-          </select>
-        </div>
+         <div id="listaCooperados" style="max-height: 60vh; overflow:auto;">
+  {% for coop in _cooperados %}
+    {% set _escalado = coop.id in _ids_escalados %}
+    <button type="button"
+            class="cooperado-item w-100 text-start"
+            data-id="{{ coop.id }}"
+            data-nome="{{ coop.nome }}"
+            data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
+            data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}"
+            data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
+            data-fone-raw="{{ coop.telefone or '' }}"
+            data-escalado="{{ 1 if _escalado else 0 }}"
+            {% if not _escalado %}style="display:none;"{% endif %}>
+      <span class="fw-semibold text-truncate">{{ coop.nome }}</span>
+      <span class="text-muted small">
+        <i class="bi bi-check2-circle" title="Selecionar"></i>
+      </span>
+    </button>
+  {% else %}
+    <div class="text-muted small mt-2">Nenhum cooperado cadastrado.</div>
+  {% endfor %}
+</div>
 
         <!-- Lista de cooperados -->
         <div class="small text-muted mb-1 d-flex justify-content-between align-items-center">
@@ -1589,43 +1596,62 @@ function formatPhoneBR(v) {
     }
   }
 
-  // clique na lista de cooperados
   listaCooperados?.addEventListener('click', (e) => {
-    const card = e.target.closest('.cooperado-item');
-    if (!card) return;
-    clearSelection();
-    card.classList.add('selected');
-    selectCoop({
-      id: card.dataset.id,
-      nome: card.dataset.nome,
-      foto: card.dataset.foto,
-      total: (parseFloat(card.dataset.total || '0') || 0).toFixed(2).replace('.', ','),
-      foneDigits: card.dataset.fone || '',
-      foneRaw: card.dataset['foneRaw'] || ''
-    });
+  const card = e.target.closest('.cooperado-item');
+  if (!card) return;
+
+  const escalado = card.dataset.escalado === '1';
+  const nome = card.dataset.nome || 'este cooperado';
+
+  // Se não estiver escalado, pergunta antes
+  if (!escalado){
+    const ok = confirmForaEscala(nome);
+    if (!ok) return;
+  }
+
+  clearSelection();
+  card.classList.add('selected');
+  selectCoop({
+    id: card.dataset.id,
+    nome: card.dataset.nome,
+    foto: card.dataset.foto,
+    total: (parseFloat(card.dataset.total || '0') || 0).toFixed(2).replace('.', ','),
+    foneDigits: card.dataset.fone || '',
+    foneRaw: card.dataset['foneRaw'] || ''
   });
+});
 
   // mudança no <select> de cooperado
   document.getElementById('selectCoop')?.addEventListener('change', (e) => {
-    const opt = e.target.selectedOptions[0];
-    if (!opt || !opt.value) return;
+  const opt = e.target.selectedOptions[0];
+  if (!opt || !opt.value) return;
 
-    const card = document.querySelector('.cooperado-item[data-id="'+opt.value+'"]');
-    if (card) {
-      clearSelection();
-      card.classList.add('selected');
+  const escalado = opt.getAttribute('data-escalado') === '1';
+  const nome = opt.getAttribute('data-nome') || opt.textContent.trim();
+
+  if (!escalado){
+    const ok = confirmForaEscala(nome);
+    if (!ok){
+      e.target.value = '';
+      return;
     }
+  }
 
-    selectCoop({
-      id: opt.value,
-      nome: opt.textContent.trim(),
-      foto: card ? card.dataset.foto : '',
-      total: card ? (parseFloat(card.dataset.total || '0').toFixed(2).replace('.', ',')) : '0,00',
-      foneDigits: opt.getAttribute('data-fone') || (card ? card.dataset.fone : ''),
-      foneRaw: opt.getAttribute('data-fone-raw') || (card ? card.dataset['foneRaw'] : '')
-    });
+  const card = document.querySelector('.cooperado-item[data-id="'+opt.value+'"]');
+  if (card) {
+    clearSelection();
+    card.classList.add('selected');
+  }
+
+  selectCoop({
+    id: opt.value,
+    nome: opt.textContent.trim(),
+    foto: card ? card.dataset.foto : '',
+    total: card ? (parseFloat(card.dataset.total || '0').toFixed(2).replace('.', ',')) : '0,00',
+    foneDigits: opt.getAttribute('data-fone') || (card ? card.dataset.fone : ''),
+    foneRaw: opt.getAttribute('data-fone-raw') || (card ? card.dataset['foneRaw'] : '')
   });
-})();
+});
 
 // ========================
 // TEMA
