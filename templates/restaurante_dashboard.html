@@ -1764,59 +1764,11 @@ function setAvisosBadge(n){
   }
   const tCnt=document.getElementById('toastCount');
   if(tCnt) tCnt.textContent=n;
-  const tit=document.getElementById('badgeTitulo');
-  if(tit){
-    tit.className='badge '+(n>0?'text-bg-danger':'text-bg-success');
-    tit.textContent = n>0 ? (n+' não lido(s)') : 'Tudo lido';
-  }
   const t=ensureToastInstance();
   if(t){
     if(n>0) t.show();
     else t.hide();
   }
-}
-
-// ========================
-// SOM + DETECÇÃO DE NOVO AVISO (SEM REMOVER NADA)
-// ========================
-const AVISO_LAST_KEY = 'avisos_last_unread';
-
-function playAvisoSound(){
-  const a = document.getElementById('audioAvisos');
-  if(!a) return;
-  try{
-    a.currentTime = 0;
-    const p = a.play();
-    if(p && typeof p.catch === 'function') p.catch(()=>{});
-  }catch(e){}
-}
-
-function notifyIfNewAvisos(unread){
-  const last = Number(localStorage.getItem(AVISO_LAST_KEY) || '0');
-
-  // atualiza badge/toast sempre
-  setAvisosBadge(unread);
-
-  // se aumentou e não está na aba avisos -> toca
-  const currentView = startView();
-  if(unread > last && currentView !== 'avisos'){
-    playAvisoSound();
-  }
-
-  localStorage.setItem(AVISO_LAST_KEY, String(unread));
-}
-
-// polling opcional (só funciona se existir uma rota JSON no backend)
-// Se você NÃO tiver a rota ainda, deixe como está: não quebra nada.
-async function pollAvisos(){
-  try{
-    const r = await fetch('/api/rest/avisos/unread_count', {credentials:'same-origin'});
-    if(!r.ok) return;
-    const j = await r.json();
-    if(j && j.ok){
-      notifyIfNewAvisos(Number(j.unread || 0));
-    }
-  }catch(e){}
 }
 
 // ========================
@@ -1831,10 +1783,7 @@ function initAvisos(){
     return document.querySelectorAll('.aviso-card[data-lido="0"]').length;
   }
   function refresh(){
-    // ao entrar/atualizar avisos, sincroniza e marca como "visto" (para parar som/toast repetindo)
-    const n = getUnread();
-    notifyIfNewAvisos(n);
-    localStorage.setItem(AVISO_LAST_KEY, String(n));
+    setAvisosBadge(getUnread());
   }
 
   // filtro
@@ -1894,13 +1843,10 @@ async function loadAvisosFromRoute(href){
       cards.forEach(c=>cont.appendChild(document.importNode(c,true)));
       avisosWired=false;
       initAvisos();
-      // usa notify para tocar SOM se aumentou e não está em avisos (mas aqui você está em avisos)
-      notifyIfNewAvisos(cards.filter(c=>c.getAttribute('data-lido')==='0').length);
-      localStorage.setItem(AVISO_LAST_KEY, String(cards.filter(c=>c.getAttribute('data-lido')==='0').length));
+      setAvisosBadge(cards.filter(c=>c.getAttribute('data-lido')==='0').length);
     }else{
       cont.innerHTML='<div class="card card-body"><div class="text-muted"><i class="bi bi-inbox me-1"></i> Nenhum aviso disponível.</div></div>';
-      notifyIfNewAvisos(0);
-      localStorage.setItem(AVISO_LAST_KEY,'0');
+      setAvisosBadge(0);
     }
   }catch(e){
     const cont=document.getElementById('avisosListContainer');
@@ -2462,6 +2408,80 @@ function wireTabelaViewer(){
 }
 
 // ========================
+// ========================
+// ADICIONADO: UNLOCK DO ÁUDIO (SEM ISSO O CHROME BLOQUEIA)
+// ========================
+(function unlockAudioOnce(){
+  const a = document.getElementById('audioAvisos');
+  if(!a) return;
+
+  let unlocked = false;
+  async function unlock(){
+    if(unlocked) return;
+    unlocked = true;
+    try{
+      a.muted = true;
+      a.currentTime = 0;
+      await a.play();
+      a.pause();
+      a.muted = false;
+      a.currentTime = 0;
+    }catch(e){
+      unlocked = false;
+    }
+  }
+
+  ['click','touchstart','keydown'].forEach(evt=>{
+    window.addEventListener(evt, unlock, {once:true, passive:true});
+  });
+})();
+
+// ========================
+// ADICIONADO: POLLING DE AVISOS (CONTADOR REAL DO BACKEND)
+// ========================
+let lastUnread = null;
+
+async function pollAvisos(){
+  try{
+    const r = await fetch('/api/rest/avisos/unread_count', {credentials:'same-origin'});
+    if(!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    if(!j || !j.ok) return;
+    const unread = Number(j.unread || 0);
+
+    // atualiza badge/toast sempre
+    setAvisosBadge(unread);
+
+    // toca/mostra somente se aumentou (novo aviso)
+    if(lastUnread === null){
+      lastUnread = unread;
+      return;
+    }
+    if(unread > lastUnread){
+      onNewAviso(unread);
+    }
+    lastUnread = unread;
+  }catch(e){
+    // sem alert para não poluir
+  }
+}
+
+function onNewAviso(unread){
+  // mostra toast
+  setAvisosBadge(unread);
+
+  // tenta tocar som (pode depender do unlock)
+  const a = document.getElementById('audioAvisos');
+  if(a){
+    try{
+      a.currentTime = 0;
+      const p = a.play();
+      if(p && typeof p.catch === 'function') p.catch(()=>{});
+    }catch(e){}
+  }
+}
+
+// ========================
 // EVENTOS DO MENU / INICIALIZAÇÃO
 // ========================
 document.getElementById('sideNav')?.addEventListener('click', async (e)=>{
@@ -2487,19 +2507,18 @@ document.getElementById('toastVerAgora')?.addEventListener('click', async (e)=>{
   await loadAvisosFromRoute(href);
 });
 
+// ========================
+// ADICIONADO: NO LOGIN / LOAD, POLLA E SETA TOAST IMEDIATO
+// ========================
 document.addEventListener('DOMContentLoaded', ()=>{
   const initial=startView();
   showSection(initial);
 
-  // pega do badge do menu (que vem do Jinja) e aplica com lógica de som
-  const unread = Number(document.getElementById('badgeAvisos')?.textContent || '0');
-  notifyIfNewAvisos(unread);
-
   hideLancOverlay(); // garante overlay escondido ao carregar
 
-  // inicia polling (não quebra se a rota não existir)
-  setInterval(pollAvisos, 25000);
+  // puxa contagem real imediatamente + a cada 25s
   pollAvisos();
+  setInterval(pollAvisos, 25000);
 });
 
 window.addEventListener('popstate',(ev)=>{
