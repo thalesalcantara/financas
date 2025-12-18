@@ -1747,7 +1747,7 @@ function prefetch(href){
 }
 
 // ========================
-// TOAST & BADGE DE AVISOS
+// TOAST & BADGE DE AVISOS (CORRIGIDO: SEM PISCAR)
 // ========================
 let toastAvisosInst=null;
 function ensureToastInstance(){
@@ -1756,7 +1756,15 @@ function ensureToastInstance(){
   if(!toastAvisosInst) toastAvisosInst = new bootstrap.Toast(el,{autohide:false});
   return toastAvisosInst;
 }
-function setAvisosBadge(n){
+
+/**
+ * setAvisosBadge(n, {showToast:boolean})
+ * - showToast=false: atualiza badge/contador sem abrir/fechar toast (não pisca)
+ * - showToast=true : abre se n>0 / fecha se n==0
+ */
+function setAvisosBadge(n, opts){
+  const o = Object.assign({showToast:false}, (opts||{}));
+
   const b=document.getElementById('badgeAvisos');
   if(b){
     b.style.display = n>0 ? 'inline-flex':'none';
@@ -1764,6 +1772,9 @@ function setAvisosBadge(n){
   }
   const tCnt=document.getElementById('toastCount');
   if(tCnt) tCnt.textContent=n;
+
+  if(!o.showToast) return;
+
   const t=ensureToastInstance();
   if(t){
     if(n>0) t.show();
@@ -1772,18 +1783,82 @@ function setAvisosBadge(n){
 }
 
 // ========================
+// AVISO: ÁUDIO (DESBLOQUEIO + "PENDENTE" PARA LOGIN)
+// ========================
+let __audioAvisosUnlocked = false;
+let __audioAvisosPending = false;
+
+function tryPlayAvisoSound(){
+  const a = document.getElementById('audioAvisos');
+  if(!a) return;
+
+  try{
+    a.currentTime = 0;
+    const p = a.play();
+    if(p && typeof p.catch === 'function'){
+      p.catch(()=>{
+        __audioAvisosPending = true; // se bloqueou autoplay, toca no primeiro clique/tecla
+      });
+    }
+  }catch(e){
+    __audioAvisosPending = true;
+  }
+}
+
+// ========================
+// ADICIONADO: UNLOCK DO ÁUDIO (SEM ISSO O CHROME BLOQUEIA)
+// ========================
+(function unlockAudioOnce(){
+  const a = document.getElementById('audioAvisos');
+  if(!a) return;
+
+  let unlocked = false;
+  async function unlock(){
+    if(unlocked) return;
+    unlocked = true;
+    try{
+      a.muted = true;
+      a.currentTime = 0;
+      await a.play();
+      a.pause();
+      a.muted = false;
+      a.currentTime = 0;
+
+      __audioAvisosUnlocked = true;
+
+      // se tinha som pendente (login bloqueado), toca agora
+      if(__audioAvisosPending){
+        __audioAvisosPending = false;
+        tryPlayAvisoSound();
+      }
+    }catch(e){
+      unlocked = false;
+      __audioAvisosUnlocked = false;
+    }
+  }
+
+  ['click','touchstart','keydown'].forEach(evt=>{
+    window.addEventListener(evt, unlock, {once:true, passive:true});
+  });
+})();
+
+// ========================
 // AVISOS
 // ========================
 let avisosWired=false;
 function initAvisos(){
   if(avisosWired) return;
   avisosWired=true;
-  const toastOK = new bootstrap.Toast(document.getElementById('toastOK'));
+
+  const toastOKEl = document.getElementById('toastOK');
+  const toastOK = toastOKEl ? new bootstrap.Toast(toastOKEl) : null;
+
   function getUnread(){
     return document.querySelectorAll('.aviso-card[data-lido="0"]').length;
   }
   function refresh(){
-    setAvisosBadge(getUnread());
+    // aqui NÃO abre toast (para não piscar)
+    setAvisosBadge(getUnread(), {showToast:false});
   }
 
   // filtro
@@ -1812,7 +1887,10 @@ function initAvisos(){
         }
         btn.remove();
         refresh();
-        toastOK.show();
+        toastOK?.show();
+
+        // sincroniza com backend (para badge ficar perfeito)
+        pollAvisos();
       }else{
         alert('Falha ao marcar como lido ('+resp.status+').');
       }
@@ -1843,10 +1921,17 @@ async function loadAvisosFromRoute(href){
       cards.forEach(c=>cont.appendChild(document.importNode(c,true)));
       avisosWired=false;
       initAvisos();
-      setAvisosBadge(cards.filter(c=>c.getAttribute('data-lido')==='0').length);
+
+      // atualiza badge sem abrir toast (sem piscar)
+      const unreadLocal = cards.filter(c=>c.getAttribute('data-lido')==='0').length;
+      setAvisosBadge(unreadLocal, {showToast:false});
+
+      // alinha com backend
+      pollAvisos();
     }else{
       cont.innerHTML='<div class="card card-body"><div class="text-muted"><i class="bi bi-inbox me-1"></i> Nenhum aviso disponível.</div></div>';
-      setAvisosBadge(0);
+      setAvisosBadge(0, {showToast:false});
+      pollAvisos();
     }
   }catch(e){
     const cont=document.getElementById('avisosListContainer');
@@ -2408,38 +2493,10 @@ function wireTabelaViewer(){
 }
 
 // ========================
-// ========================
-// ADICIONADO: UNLOCK DO ÁUDIO (SEM ISSO O CHROME BLOQUEIA)
-// ========================
-(function unlockAudioOnce(){
-  const a = document.getElementById('audioAvisos');
-  if(!a) return;
-
-  let unlocked = false;
-  async function unlock(){
-    if(unlocked) return;
-    unlocked = true;
-    try{
-      a.muted = true;
-      a.currentTime = 0;
-      await a.play();
-      a.pause();
-      a.muted = false;
-      a.currentTime = 0;
-    }catch(e){
-      unlocked = false;
-    }
-  }
-
-  ['click','touchstart','keydown'].forEach(evt=>{
-    window.addEventListener(evt, unlock, {once:true, passive:true});
-  });
-})();
-
-// ========================
-// ADICIONADO: POLLING DE AVISOS (CONTADOR REAL DO BACKEND)
+// POLLING DE AVISOS (PERFEITO: LOGIN + NOVO AVISO + SEM PISCAR)
 // ========================
 let lastUnread = null;
+let __shownAtLogin = false;
 
 async function pollAvisos(){
   try{
@@ -2447,38 +2504,47 @@ async function pollAvisos(){
     if(!r.ok) throw new Error(r.status);
     const j = await r.json();
     if(!j || !j.ok) return;
+
     const unread = Number(j.unread || 0);
 
-    // atualiza badge/toast sempre
-    setAvisosBadge(unread);
+    // 1) atualiza badge SEM abrir toast (evita piscar)
+    setAvisosBadge(unread, { showToast: false });
 
-    // toca/mostra somente se aumentou (novo aviso)
+    // 2) PRIMEIRA LEITURA (após login/load)
     if(lastUnread === null){
       lastUnread = unread;
+
+      // se já tem não lidos ao logar: mostra toast UMA vez e tenta som
+      if(unread > 0 && !__shownAtLogin){
+        __shownAtLogin = true;
+        setAvisosBadge(unread, { showToast: true });
+        tryPlayAvisoSound(); // tenta tocar; se bloquear, toca no primeiro clique/tecla
+      }
       return;
     }
+
+    // 3) Se aumentou, chegou aviso novo
     if(unread > lastUnread){
       onNewAviso(unread);
     }
+
+    // 4) Se virou 0 (todos lidos), pode fechar toast
+    if(unread === 0 && lastUnread > 0){
+      setAvisosBadge(0, { showToast: true }); // fecha
+    }
+
     lastUnread = unread;
   }catch(e){
-    // sem alert para não poluir
+    // silencioso
   }
 }
 
 function onNewAviso(unread){
-  // mostra toast
-  setAvisosBadge(unread);
+  // abre toast UMA vez + atualiza badge
+  setAvisosBadge(unread, { showToast: true });
 
-  // tenta tocar som (pode depender do unlock)
-  const a = document.getElementById('audioAvisos');
-  if(a){
-    try{
-      a.currentTime = 0;
-      const p = a.play();
-      if(p && typeof p.catch === 'function') p.catch(()=>{});
-    }catch(e){}
-  }
+  // toca som 1x (ou marca pendente se o browser bloquear)
+  tryPlayAvisoSound();
 }
 
 // ========================
@@ -2508,7 +2574,7 @@ document.getElementById('toastVerAgora')?.addEventListener('click', async (e)=>{
 });
 
 // ========================
-// ADICIONADO: NO LOGIN / LOAD, POLLA E SETA TOAST IMEDIATO
+// NO LOGIN / LOAD: POLL IMEDIATO + INTERVALO
 // ========================
 document.addEventListener('DOMContentLoaded', ()=>{
   const initial=startView();
