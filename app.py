@@ -3967,13 +3967,16 @@ def delete_receita_coop(id):
     flash("Receita do cooperado excluída.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_receitas"))
 
+from datetime import date
+
 @app.route("/coop/despesas/add", methods=["POST"])
 @admin_required
 def add_despesa_coop():
     f = request.form
 
     # lista de cooperados selecionados (vários checkboxes ou um select múltiplo)
-    ids = f.getlist("cooperado_ids[]")  # ex.: ["3", "5", "8"]
+    # aceita tanto "cooperado_ids[]" quanto "cooperado_ids" (depende do HTML)
+    ids = f.getlist("cooperado_ids[]") or f.getlist("cooperado_ids")  # ex.: ["3", "5", "8"]
 
     descricao = f.get("descricao", "").strip()
     valor_total = f.get("valor", type=float) or 0.0
@@ -3981,9 +3984,17 @@ def add_despesa_coop():
     # nome do checkbox no HTML: <input type="checkbox" name="eh_adiantamento">
     eh_adiantamento = bool(f.get("eh_adiantamento"))
 
-    # segurança: se ninguém foi selecionado
+    # validações básicas
     if not ids:
         flash("Selecione pelo menos um cooperado.", "warning")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    if not descricao:
+        flash("Informe a descrição da despesa.", "warning")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    if valor_total <= 0:
+        flash("Informe um valor válido (maior que zero).", "warning")
         return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
     # se não veio data válida, usa hoje
@@ -3996,8 +4007,13 @@ def add_despesa_coop():
 
     # cria uma despesa para cada cooperado selecionado
     for cid in ids:
+        try:
+            cid_int = int(cid)
+        except (TypeError, ValueError):
+            continue
+
         db.session.add(DespesaCooperado(
-            cooperado_id=cid,
+            cooperado_id=cid_int,
             descricao=descricao,
             valor=valor_unit,
             data=d,
@@ -4008,20 +4024,44 @@ def add_despesa_coop():
     flash("Despesa(s) lançada(s).", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
+
 @app.route("/coop/despesas/<int:id>/edit", methods=["POST"])
 @admin_required
 def edit_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
     f = request.form
-    dc.cooperado_id = f.get("cooperado_id", type=int)
-    dc.descricao = f.get("descricao", "").strip()
-    dc.valor = f.get("valor", type=float)
-    dc.data = _parse_date(f.get("data"))
+
+    cooperado_id = f.get("cooperado_id", type=int)
+    descricao = f.get("descricao", "").strip()
+    valor = f.get("valor", type=float)
+    d = _parse_date(f.get("data"))
+
+    if not cooperado_id:
+        flash("Selecione um cooperado válido.", "warning")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    if not descricao:
+        flash("Informe a descrição da despesa.", "warning")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    if valor is None or valor <= 0:
+        flash("Informe um valor válido (maior que zero).", "warning")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    if not d:
+        d = dc.data or date.today()
+
+    dc.cooperado_id = cooperado_id
+    dc.descricao = descricao
+    dc.valor = valor
+    dc.data = d
+
     db.session.commit()
     flash("Despesa do cooperado atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
-@app.route("/coop/despesas/<int:id>/delete")
+
+@app.route("/coop/despesas/<int:id>/delete", methods=["GET", "POST"])
 @admin_required
 def delete_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
