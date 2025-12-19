@@ -588,6 +588,79 @@ class AvisoLeitura(db.Model):
     lido_em = db.Column(db.DateTime, default=datetime.utcnow)
     __table_args__ = (db.UniqueConstraint("aviso_id", "cooperado_id", "restaurante_id", name="uq_aviso_dest"), )
 
+from sqlalchemy import func, or_
+
+def resumo_semanal_cooperado(cooperado_id: int, inicio: date, fim: date):
+    """
+    Retorna lista de semanas com:
+      receita, despesa, saldo(>=0), devedor(>=0) com carry-forward.
+
+    IMPORTANTE:
+      - Usa DespesaCooperado.data (que no seu app é normalizada para DOMINGO da semana).
+      - Assim cada despesa cai em UMA semana e não duplica.
+    """
+    # alinha para semanas cheias
+    ini_sem, _ = semana_bounds(inicio)
+    _, fim_sem = semana_bounds(fim)
+
+    semanas = []
+    divida = 0.0
+
+    cur_ini = ini_sem
+    while cur_ini <= fim_sem:
+        cur_fim = cur_ini + timedelta(days=6)  # domingo
+
+        # Receita da semana (ajuste se sua "receita semanal" vier de outra fonte)
+        receita = float(
+            db.session.query(func.coalesce(func.sum(ReceitaCooperado.valor), 0.0))
+            .filter(
+                ReceitaCooperado.cooperado_id == cooperado_id,
+                ReceitaCooperado.data >= cur_ini,
+                ReceitaCooperado.data <= cur_fim,
+            )
+            .scalar() or 0.0
+        )
+
+        # Despesa da semana: usa o DOMINGO (DespesaCooperado.data == cur_fim)
+        # Inclui despesas globais (cooperado_id NULL) + do cooperado
+        despesa = float(
+            db.session.query(func.coalesce(func.sum(DespesaCooperado.valor), 0.0))
+            .filter(
+                or_(
+                    DespesaCooperado.cooperado_id == cooperado_id,
+                    DespesaCooperado.cooperado_id.is_(None),
+                ),
+                DespesaCooperado.data == cur_fim,
+            )
+            .scalar() or 0.0
+        )
+
+        total_cobrar = divida + despesa
+
+        saldo = receita - total_cobrar
+        if saldo < 0:
+            saldo = 0.0
+
+        devedor = total_cobrar - receita
+        if devedor < 0:
+            devedor = 0.0
+
+        semanas.append({
+            "semana_inicio": cur_ini,
+            "semana_fim": cur_fim,
+            "receita": round(receita, 2),
+            "despesa": round(despesa, 2),
+            "divida_anterior": round(divida, 2),
+            "saldo": round(saldo, 2),
+            "devedor": round(devedor, 2),
+        })
+
+        # carry-forward
+        divida = devedor
+        cur_ini = cur_ini + timedelta(days=7)
+
+    return semanas   
+
 # =========================
 # Helpers
 # =========================
@@ -4419,6 +4492,105 @@ def upload_escala():
 
     return redirect(url_for("admin_dashboard", tab="escalas"))
 
+def saldo_acumulado_cooperado(cooperado_id: int, ate: date | None = None) -> float:
+    """
+    Retorna o saldo acumulado (receitas - despesas - INSS) até a data 'ate' (inclusive).
+    Se ficar negativo, significa dívida carregada.
+    """
+    if ate is None:
+        ate = date.today()
+
+    # 1) Produção (lancamentos) até 'ate'
+    lancs = (
+        db.session.query(func.coalesce(func.sum(Lancamento.valor), 0.0))
+        .filter(Lancamento.cooperado_id == cooperado_id)
+        .filter(Lancamento.data <= ate)
+        .scalar()
+        or 0.0
+    )
+    inss = float(lancs) * 0.045
+
+    # 2) Outras receitas do cooperado até 'ate'
+    recs = (
+        db.session.query(func.coalesce(func.sum(ReceitaCooperado.valor), 0.0))
+        .filter(ReceitaCooperado.cooperado_id == cooperado_id)
+        .filter(ReceitaCooperado.data <= ate)
+        .scalar()
+        or 0.0
+    )
+
+    # 3) Despesas do cooperado até 'ate'
+    # Como suas despesas são semanais (data_inicio/data_fim), consideramos "ocorreu" quando a semana encerra (data_fim).
+    # Também inclui despesas globais (cooperado_id NULL) se isso fizer sentido no seu negócio.
+    deps = (
+        db.session.query(func.coalesce(func.sum(DespesaCooperado.valor), 0.0))
+        .filter(or_(DespesaCooperado.cooperado_id == cooperado_id,
+                    DespesaCooperado.cooperado_id.is_(None)))
+        .filter(DespesaCooperado.data_fim <= ate)
+        .scalar()
+        or 0.0
+    )
+
+    return float(lancs) + float(recs) - float(inss) - float(deps)
+
+def resumo_semana_cooperado(cooperado_id: int, base: date | None = None) -> dict:
+    """
+    Retorna um resumo da semana (seg-dom):
+      - a_receber (nunca negativo)
+      - saldo_devedor (se houver)
+      - saldo_final (pode ser negativo)
+    """
+    if base is None:
+        base = date.today()
+    ini, fim = semana_bounds(base)
+
+    # saldo anterior até o dia antes da semana começar
+    saldo_anterior = saldo_acumulado_cooperado(cooperado_id, ate=ini - timedelta(days=1))
+
+    # receitas/produção dentro da semana
+    lanc_sem = (
+        db.session.query(func.coalesce(func.sum(Lancamento.valor), 0.0))
+        .filter(Lancamento.cooperado_id == cooperado_id)
+        .filter(Lancamento.data >= ini, Lancamento.data <= fim)
+        .scalar() or 0.0
+    )
+    inss_sem = float(lanc_sem) * 0.045
+
+    rec_sem = (
+        db.session.query(func.coalesce(func.sum(ReceitaCooperado.valor), 0.0))
+        .filter(ReceitaCooperado.cooperado_id == cooperado_id)
+        .filter(ReceitaCooperado.data >= ini, ReceitaCooperado.data <= fim)
+        .scalar() or 0.0
+    )
+
+    # despesas que “batem” nessa semana (sobreposição)
+    dep_sem = (
+        db.session.query(func.coalesce(func.sum(DespesaCooperado.valor), 0.0))
+        .filter(or_(DespesaCooperado.cooperado_id == cooperado_id,
+                    DespesaCooperado.cooperado_id.is_(None)))
+        .filter(DespesaCooperado.data_inicio <= fim,
+                DespesaCooperado.data_fim    >= ini)
+        .scalar() or 0.0
+    )
+
+    saldo_final = float(saldo_anterior) + float(lanc_sem) + float(rec_sem) - float(inss_sem) - float(dep_sem)
+
+    a_receber = max(0.0, saldo_final)
+    saldo_devedor = max(0.0, -saldo_final)
+
+    return {
+        "ini": ini,
+        "fim": fim,
+        "saldo_anterior": round(float(saldo_anterior), 2),
+        "lanc_sem": round(float(lanc_sem), 2),
+        "inss_sem": round(float(inss_sem), 2),
+        "rec_sem": round(float(rec_sem), 2),
+        "dep_sem": round(float(dep_sem), 2),
+        "saldo_final": round(float(saldo_final), 2),
+        "a_receber": round(float(a_receber), 2),
+        "saldo_devedor": round(float(saldo_devedor), 2),
+    }
+
 
 # =========================
 # Ações de exclusão de escalas
@@ -4775,14 +4947,84 @@ def portal_cooperado():
     qr = in_range(ReceitaCooperado.query.filter_by(cooperado_id=coop.id), ReceitaCooperado.data)
     receitas_coop = qr.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
 
-    qd = in_range(DespesaCooperado.query.filter_by(cooperado_id=coop.id), DespesaCooperado.data)
-    despesas_coop = qd.order_by(DespesaCooperado.data.desc(), DespesaCooperado.id.desc()).all()
+    # ---------------------------
+    # DESPESAS (compatível com data OU data_inicio/data_fim)
+    # ---------------------------
+    def _despesas_periodo_q():
+        base = DespesaCooperado.query.filter_by(cooperado_id=coop.id)
+
+        # Se existir o modelo semanal (data_inicio/data_fim), usa interseção do período.
+        # Senão, cai no comportamento antigo (campo .data entre di..df).
+        if hasattr(DespesaCooperado, "data_inicio") and hasattr(DespesaCooperado, "data_fim"):
+            return (base
+                    .filter(DespesaCooperado.data_inicio <= df,
+                            DespesaCooperado.data_fim >= di)
+                    .order_by(DespesaCooperado.data_fim.desc(), DespesaCooperado.id.desc()))
+        else:
+            return (in_range(base, DespesaCooperado.data)
+                    .order_by(DespesaCooperado.data.desc(), DespesaCooperado.id.desc()))
+
+    despesas_coop = _despesas_periodo_q().all()
 
     # INSS calculado por lançamento e somado APENAS dentro do período filtrado
     total_bruto = sum((l.valor or 0.0) for l in producoes) + sum((r.valor or 0.0) for r in receitas_coop)
     inss_valor = sum((l.valor or 0.0) * 0.045 for l in producoes)
     total_descontos = sum((d.valor or 0.0) for d in despesas_coop)
     total_liquido = total_bruto - inss_valor - total_descontos
+
+    # =====================================================
+    # SALDO DEVEDOR (sem tirar nada do que já existe)
+    # Regra:
+    #  - saldo_anterior = saldo acumulado até o dia anterior de di
+    #  - saldo_final = saldo_anterior + total_liquido (do período filtrado)
+    #  - a_receber = nunca negativo
+    #  - saldo_devedor = nunca negativo (dívida carregada p/ próxima semana/período)
+    # =====================================================
+    from sqlalchemy import func  # garante func disponível aqui
+
+    def _sum_scalar(q):
+        v = q.scalar()
+        return float(v or 0.0)
+
+    # soma de lançamentos antes do período
+    sum_lanc_antes = _sum_scalar(
+        db.session.query(func.coalesce(func.sum(Lancamento.valor), 0.0))
+        .filter(Lancamento.cooperado_id == coop.id)
+        .filter(Lancamento.data < di)
+    )
+
+    # soma de receitas antes do período
+    sum_rec_antes = _sum_scalar(
+        db.session.query(func.coalesce(func.sum(ReceitaCooperado.valor), 0.0))
+        .filter(ReceitaCooperado.cooperado_id == coop.id)
+        .filter(ReceitaCooperado.data < di)
+    )
+
+    # soma de despesas antes do período (compatível com data OU data_inicio/data_fim)
+    if hasattr(DespesaCooperado, "data_inicio") and hasattr(DespesaCooperado, "data_fim"):
+        sum_dep_antes = _sum_scalar(
+            db.session.query(func.coalesce(func.sum(DespesaCooperado.valor), 0.0))
+            .filter(DespesaCooperado.cooperado_id == coop.id)
+            # consideramos "ocorreu" quando a semana encerrou (data_fim)
+            .filter(DespesaCooperado.data_fim < di)
+        )
+    else:
+        sum_dep_antes = _sum_scalar(
+            db.session.query(func.coalesce(func.sum(DespesaCooperado.valor), 0.0))
+            .filter(DespesaCooperado.cooperado_id == coop.id)
+            .filter(DespesaCooperado.data < di)
+        )
+
+    inss_antes = float(sum_lanc_antes) * 0.045
+    saldo_anterior = float(sum_lanc_antes) + float(sum_rec_antes) - float(inss_antes) - float(sum_dep_antes)
+
+    saldo_final = float(saldo_anterior) + float(total_liquido)
+    a_receber = max(0.0, saldo_final)
+    saldo_devedor = max(0.0, -saldo_final)
+
+    # (mantém compat visual: se você quiser continuar exibindo "total_liquido" como antes,
+    #  ele fica igual; agora você tem também a_receber e saldo_devedor para mostrar certo)
+    total_liquido_sem_negativo = a_receber
 
     cfg = get_config()
     salario_minimo = cfg.salario_minimo or 0.0
@@ -4985,6 +5227,14 @@ def portal_cooperado():
         inss_valor=inss_valor,
         total_descontos=total_descontos,
         total_liquido=total_liquido,
+
+        # ===== NOVOS (não removi nada; só acrescentei) =====
+        saldo_anterior=round(float(saldo_anterior), 2),
+        saldo_final=round(float(saldo_final), 2),
+        a_receber=round(float(a_receber), 2),                      # nunca negativo
+        saldo_devedor=round(float(saldo_devedor), 2),              # dívida carregada
+        total_liquido_sem_negativo=round(float(total_liquido_sem_negativo), 2),
+
         inss_complemento=inss_complemento,
         salario_minimo=salario_minimo,
         current_year=today.year,
@@ -4997,6 +5247,7 @@ def portal_cooperado():
         trocas_recebidas_historico=trocas_recebidas_historico,
         trocas_enviadas=trocas_enviadas,
     )
+
 
 # === AVALIAR RESTAURANTE (cooperado -> restaurante)
 # Duas rotas para a MESMA função e MESMO endpoint (o do template):
@@ -5104,7 +5355,7 @@ def producoes_avaliar(lanc_id):
 @role_required("cooperado")
 def coop_dashboard_alias():
     return redirect(url_for("coop_dashboard"))
-    
+
 @app.route("/escala/solicitar_troca", methods=["POST"])
 @role_required("cooperado")
 def solicitar_troca():
@@ -5238,6 +5489,7 @@ def recusar_troca(troca_id):
     db.session.commit()
     flash("Solicitação recusada.", "info")
     return redirect(url_for("portal_cooperado"))
+
 
 # =========================
 # PORTAL RESTAURANTE
