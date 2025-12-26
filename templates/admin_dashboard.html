@@ -4759,469 +4759,502 @@
   </div>
 
   <!-- JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script>
-    // Confirmar exclusão
-    document.addEventListener('click', function(e){
-      if(e.target.closest('.btn-del')){
-        if(!confirm('Tem certeza que deseja excluir?')) e.preventDefault();
-      }
-    });
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-    // Preenche modais a partir dos data-*
-    function bindModal(modalId, mapFields){
-      const el = document.getElementById(modalId);
-      if(!el) return;
-      el.addEventListener('show.bs.modal', (ev)=>{
-        const btn = ev.relatedTarget;
-        const form = el.querySelector('form');
-        const ds = btn?.dataset || {};
-        if(ds.url) form.setAttribute('action', ds.url);
-        Object.keys(mapFields).forEach(k=>{
-          const name = mapFields[k];
-          const input = form.querySelector(`[name="${name}"]`);
-          if(!input) return;
-          const val = ds[k] ?? '';
-          if(input.tagName === 'SELECT'){
-            [...input.options].forEach(o => o.selected = (String(o.value) === String(val)));
-          }else{
-            input.value = val;
-          }
-        });
-      });
+<script>
+  // Confirmar exclusão
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('.btn-del')) {
+      if (!confirm('Tem certeza que deseja excluir?')) e.preventDefault();
     }
-    bindModal('modalEditLancamento',   {id:'id', restaurante:'restaurante_id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', hora_inicio:'hora_inicio', hora_fim:'hora_fim'});
-    bindModal('modalEditReceita',      {id:'id', descricao:'descricao', valor:'valor', data:'data'});
-    bindModal('modalEditDespesa',      {id:'id', descricao:'descricao', valor:'valor', data:'data'});
-    bindModal('modalEditReceitaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
-    bindModal('modalEditDespesaCoop',  {id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data'});
-    bindModal('modalEditCooperado',    {id:'id', nome:'nome', usuario:'usuario'});
-    bindModal('modalResetSenhaCooperado', {id:'id'});
-    bindModal('modalEditRestaurante',  {id:'id', nome:'nome', periodo:'periodo', usuario:'usuario'});
-    bindModal('modalResetSenhaRestaurante', {id:'id'});
+  });
 
-    // ===== Gráficos =====
-    const rawLancCoop   = {{ (chart_data_lancamentos_coop or {'labels':[], 'values':[]}) | tojson }};
-    const rawLancCooper = {{ (chart_data_lancamentos_cooperados or {'labels':[], 'values':[]}) | tojson }};
-    const fallbackLancCoop   = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
-    const fallbackLancCooper = {labels:['Total'], values:[Number('{{ total_producoes|default(0) }}')]};
-    const dataLancCoop   = (rawLancCoop.labels && rawLancCoop.labels.length && rawLancCoop.values && rawLancCoop.values.length) ? rawLancCoop : fallbackLancCoop;
-    const dataLancCooper = (rawLancCooper.labels && rawLancCooper.labels.length && rawLancCooper.values && rawLancCooper.values.length) ? rawLancCooper : fallbackLancCooper;
+  // Preenche modais a partir dos data-*
+  function bindModal(modalId, mapFields) {
+    const el = document.getElementById(modalId);
+    if (!el) return;
 
-    function buildLineChart(canvasId, labels, values, label){
-      const ctx = document.getElementById(canvasId);
-      if(!ctx) return;
-      new Chart(ctx, {
-        type:'line',
-        data:{ labels: labels, datasets:[{ label: label, data: values, tension:.25, borderWidth:2, pointRadius:3, fill:false }] },
-        options:{
-          responsive:true, maintainAspectRatio:false,
-          scales:{ y:{beginAtZero:true,ticks:{callback:(v)=>'R$ '+Number(v).toLocaleString('pt-BR')}} },
-          plugins:{ legend:{display:true}, tooltip:{callbacks:{label:(c)=>'R$ '+Number(c.parsed.y).toLocaleString('pt-BR',{minimumFractionDigits:2})}} }
+    el.addEventListener('show.bs.modal', (ev) => {
+      const btn = ev.relatedTarget;
+      const form = el.querySelector('form');
+      const ds = btn?.dataset || {};
+
+      if (form && ds.url) form.setAttribute('action', ds.url);
+
+      Object.keys(mapFields).forEach((k) => {
+        const name = mapFields[k];
+        const input = form?.querySelector(`[name="${name}"]`);
+        if (!input) return;
+
+        const val = ds[k] ?? '';
+        if (input.tagName === 'SELECT') {
+          [...input.options].forEach((o) => (o.selected = (String(o.value) === String(val))));
+        } else {
+          input.value = val;
         }
       });
-    }
-    buildLineChart('chartLancCoop', dataLancCoop.labels, dataLancCoop.values, 'Lançamentos/Produções');
-    buildLineChart('chartLancCooperados', dataLancCooper.labels, dataLancCooper.values, 'Lançamentos/Produções');
-
-    // ===== Preservar aba ativa via ?tab= =====
-    document.addEventListener('DOMContentLoaded', () => {
-      const params = new URLSearchParams(location.search);
-      const targetTab = params.get('tab');
-      if(targetTab){
-        const link = document.querySelector(`.sidebar .nav-link[href="#${targetTab}"]`);
-        if(link){ new bootstrap.Tab(link).show(); }
-      }
-      document.querySelectorAll('.sidebar .nav-link[data-bs-toggle="tab"]').forEach(a => {
-        a.addEventListener('shown.bs.tab', (e) => {
-          const id = e.target.getAttribute('href')?.slice(1) || '';
-          if(!id) return;
-          const p = new URLSearchParams(location.search);
-          p.set('tab', id);
-          history.replaceState(null, '', location.pathname + '?' + p.toString() + e.target.getAttribute('href'));
-        });
-      });
-
-      // Contagem regressiva até 31/12 (aba Escalas)
-      const anoSpan = document.getElementById('prazoAno');
-      const diasSpan = document.getElementById('prazoDias');
-      function updatePrazo() {
-        const now = new Date();
-        let target = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
-        if (now > target) target = new Date(now.getFullYear()+1, 11, 31, 23, 59, 59);
-        const diff = target - now;
-        const dias = Math.max(0, Math.ceil(diff / (1000*60*60*24)));
-        if (anoSpan) anoSpan.textContent = target.getFullYear();
-        if (diasSpan) diasSpan.textContent = dias;
-      }
-      updatePrazo();
-      setInterval(updatePrazo, 60*1000);
     });
-  </script>
+  }
 
-  <!-- ==== ESCALAS: horário & cores (robusto) ==== -->
-  <script>
-    const ESCALAS = {{ escalas_por_coop|default({})|tojson }};
-    const modalEsc = document.getElementById('modalEscalas');
+  bindModal('modalEditLancamento',   { id:'id', restaurante:'restaurante_id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', hora_inicio:'hora_inicio', hora_fim:'hora_fim' });
+  bindModal('modalEditReceita',      { id:'id', descricao:'descricao', valor:'valor', data:'data' });
+  bindModal('modalEditDespesa',      { id:'id', descricao:'descricao', valor:'valor', data:'data' });
+  bindModal('modalEditReceitaCoop',  { id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data' });
+  bindModal('modalEditDespesaCoop',  { id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data' });
+  bindModal('modalEditCooperado',    { id:'id', nome:'nome', usuario:'usuario' });
+  bindModal('modalResetSenhaCooperado', { id:'id' });
+  bindModal('modalEditRestaurante',  { id:'id', nome:'nome', periodo:'periodo', usuario:'usuario' });
+  bindModal('modalResetSenhaRestaurante', { id:'id' });
 
-    const norm = (s) => String(s||'')
-      .normalize('NFD').replace(/\p{Diacritic}/gu,'')
-      .toLowerCase().replace(/[^a-z0-9]/g,'');
+  // ===== Gráficos =====
+  const rawLancCoop   = {{ (chart_data_lancamentos_coop or {'labels':[], 'values':[]}) | tojson }};
+  const rawLancCooper = {{ (chart_data_lancamentos_cooperados or {'labels':[], 'values':[]}) | tojson }};
 
-    function pick(obj, aliases){
-      const keys = Object.keys(obj||{});
-      for(const name of aliases){
-        const target = norm(name);
-        for(const k of keys){
-          if(norm(k).includes(target)){
-            const v = obj[k];
-            if(v !== undefined && v !== null && String(v).trim() !== '') return v;
+  const totalProducoesFallback = parseFloat('{{ total_producoes|default(0) }}') || 0;
+
+  const fallbackLancCoop   = { labels: ['Total'], values: [totalProducoesFallback] };
+  const fallbackLancCooper = { labels: ['Total'], values: [totalProducoesFallback] };
+
+  const dataLancCoop = (rawLancCoop?.labels?.length && rawLancCoop?.values?.length) ? rawLancCoop : fallbackLancCoop;
+  const dataLancCooperados = (rawLancCooper?.labels?.length && rawLancCooper?.values?.length) ? rawLancCooper : fallbackLancCooper;
+
+  function buildLineChart(canvasId, labels, values, label) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: label,
+          data: values,
+          tension: .25,
+          borderWidth: 2,
+          pointRadius: 3,
+          fill: false
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: (v) => 'R$ ' + Number(v).toLocaleString('pt-BR')
+            }
+          }
+        },
+        plugins: {
+          legend: { display: true },
+          tooltip: {
+            callbacks: {
+              label: (c) => 'R$ ' + Number(c.parsed.y).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+            }
           }
         }
       }
-      return '';
+    });
+  }
+
+  buildLineChart('chartLancCoop', dataLancCoop.labels, dataLancCoop.values, 'Lançamentos/Produções');
+  buildLineChart('chartLancCooperados', dataLancCooperados.labels, dataLancCooperados.values, 'Lançamentos/Produções');
+
+  // ===== Preservar aba ativa via ?tab= =====
+  document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(location.search);
+    const targetTab = params.get('tab');
+
+    if (targetTab) {
+      const link = document.querySelector(`.sidebar .nav-link[href="#${targetTab}"]`);
+      if (link) new bootstrap.Tab(link).show();
     }
 
-    function guessHorario(obj){
-      for(const [k,v] of Object.entries(obj||{})){
-        const s = String(v??'').trim();
-        if(!s) continue;
-        if(/\b\d{1,2}:\d{2}/.test(s)) return s;
-      }
-      return '';
-    }
+    document.querySelectorAll('.sidebar .nav-link[data-bs-toggle="tab"]').forEach(a => {
+      a.addEventListener('shown.bs.tab', (e) => {
+        const id = e.target.getAttribute('href')?.slice(1) || '';
+        if (!id) return;
 
-    function formatHorarioCell(v){
-      if(!v) return '';
-      let s = String(v).trim();
-      s = s.replace(/\s*–\s*/g,'-');
-      s = s.replace(/\s*-\s*/g,'-');
-      const parts = s.split(/\s*\/\s*/).map(seg=>{
-        seg = seg.trim();
-        seg = seg.replace(/\s*(?:-|a|as|às)\s*/i,' às ');
-        return seg;
+        const p = new URLSearchParams(location.search);
+        p.set('tab', id);
+        history.replaceState(null, '', location.pathname + '?' + p.toString() + e.target.getAttribute('href'));
       });
-      return parts.join(' / ');
+    });
+
+    // Contagem regressiva até 31/12 (aba Escalas)
+    const anoSpan = document.getElementById('prazoAno');
+    const diasSpan = document.getElementById('prazoDias');
+
+    function updatePrazo() {
+      const now = new Date();
+      let target = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+      if (now > target) target = new Date(now.getFullYear() + 1, 11, 31, 23, 59, 59);
+
+      const diff = target - now;
+      const dias = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+
+      if (anoSpan) anoSpan.textContent = target.getFullYear();
+      if (diasSpan) diasSpan.textContent = dias;
     }
 
-    function resolveCores(row){
-      const spec = pick(row, ['cor_linha','cores','cor','color','row_color','linha_cor','bg','background','style']) || '';
-      function normColor(c){
-        if(!c) return null;
-        c = String(c).trim();
-        if (/^[0-9A-Fa-f]{8}$/.test(c)) {
-          const a = parseInt(c.slice(0,2),16)/255;
-          const r = parseInt(c.slice(2,4),16);
-          const g = parseInt(c.slice(4,6),16);
-          const b = parseInt(c.slice(6,8),16);
+    updatePrazo();
+    setInterval(updatePrazo, 60 * 1000);
+  });
+</script>
+
+<!-- ==== ESCALAS: horário & cores (robusto) ==== -->
+<script>
+  const ESCALAS = {{ escalas_por_coop|default({})|tojson }};
+  const modalEsc = document.getElementById('modalEscalas');
+
+  const norm = (s) => String(s || '')
+    .normalize('NFD').replace(/\p{Diacritic}/gu, '')
+    .toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  function pick(obj, aliases) {
+    const keys = Object.keys(obj || {});
+    for (const name of aliases) {
+      const target = norm(name);
+      for (const k of keys) {
+        if (norm(k).includes(target)) {
+          const v = obj[k];
+          if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+        }
+      }
+    }
+    return '';
+  }
+
+  function resolveCores(row) {
+    const spec = pick(row, ['cor_linha', 'cores', 'cor', 'color', 'row_color', 'linha_cor', 'bg', 'background', 'style']) || '';
+
+    function normColor(c) {
+      if (!c) return null;
+      c = String(c).trim();
+
+      // AARRGGBB (8 hex sem #)
+      if (/^[0-9A-Fa-f]{8}$/.test(c)) {
+        const a = parseInt(c.slice(0, 2), 16) / 255;
+        const r = parseInt(c.slice(2, 4), 16);
+        const g = parseInt(c.slice(4, 6), 16);
+        const b = parseInt(c.slice(6, 8), 16);
+        return `rgba(${r},${g},${b},${a.toFixed(3)})`;
+      }
+
+      // RRGGBB (6 hex sem #)
+      if (/^[0-9A-Fa-f]{6}$/.test(c)) return `#${c}`;
+
+      // #RRGGBB ou #AARRGGBB
+      if (/^#[0-9A-Fa-f]{6,8}$/.test(c)) {
+        if (c.length === 9) {
+          const a = parseInt(c.slice(1, 3), 16) / 255;
+          const r = parseInt(c.slice(3, 5), 16);
+          const g = parseInt(c.slice(5, 7), 16);
+          const b = parseInt(c.slice(7, 9), 16);
           return `rgba(${r},${g},${b},${a.toFixed(3)})`;
         }
-        if (/^[0-9A-Fa-f]{6}$/.test(c)) return `#${c}`;
-        if (/^#[0-9A-Fa-f]{6,8}$/.test(c)) {
-          if (c.length === 9) {
-            const a = parseInt(c.slice(1,3),16)/255;
-            const r = parseInt(c.slice(3,5),16);
-            const g = parseInt(c.slice(5,7),16);
-            const b = parseInt(c.slice(7,9),16);
-            return `rgba(${r},${g},${b},${a.toFixed(3)})`;
-          }
-          return c;
-        }
-        const map = { 'amarelo':'#fff3cd','vermelho':'#f8d7da','verde':'#d1e7dd','azul':'#cfe2ff','cinza':'#e9ecef','laranja':'#ffe5b4','roxo':'#e0d1ff','rosa':'#ffd6e7' };
-        const low = c.toLowerCase();
-        if (map[low]) return map[low];
         return c;
       }
-      function parseColorSpec(spec){
-        const out = { rowBg:null, rowFg:null, colBg:[null,null,null,null], colFg:[null,null,null,null] };
-        if(!spec) return out;
-        if (Array.isArray(spec)) {
-          const parts = spec.map(normColor);
-          if (parts.length === 1){ out.rowBg = parts[0]; return out; }
-          if (parts.length === 2){ out.rowBg = parts[0]; out.rowFg = parts[1]; return out; }
-          if (parts.length >= 4){
-            out.colBg = [parts[0],parts[1],parts[2],parts[3]];
-            if (parts.length >= 8) out.colFg = [parts[4],parts[5],parts[6],parts[7]];
-            return out;
-          }
-        }
-        if (typeof spec === 'string') {
-          try { if (spec.trim().startsWith('[') || spec.trim().startsWith('{')) return parseColorSpec(JSON.parse(spec)); } catch(_) {}
-          const parts = spec.split('|').map(s=>normColor(s.trim())).filter(Boolean);
-          if (parts.length === 1){ out.rowBg = parts[0]; return out; }
-          if (parts.length === 2){ out.rowBg = parts[0]; out.rowFg = parts[1]; return out; }
-          if (parts.length >= 4){
-            out.colBg = [parts[0],parts[1],parts[2],parts[3]];
-            if (parts.length >= 8) out.colFg = [parts[4],parts[5],parts[6],parts[7]];
-            return out;
-          }
-          out.rowBg = normColor(spec);
+
+      const map = {
+        'amarelo': '#fff3cd', 'vermelho': '#f8d7da', 'verde': '#d1e7dd',
+        'azul': '#cfe2ff', 'cinza': '#e9ecef', 'laranja': '#ffe5b4',
+        'roxo': '#e0d1ff', 'rosa': '#ffd6e7'
+      };
+      const low = c.toLowerCase();
+      if (map[low]) return map[low];
+      return c;
+    }
+
+    function parseColorSpec(spec) {
+      const out = { rowBg: null, rowFg: null, colBg: [null, null, null, null], colFg: [null, null, null, null] };
+      if (!spec) return out;
+
+      if (Array.isArray(spec)) {
+        const parts = spec.map(normColor);
+        if (parts.length === 1) { out.rowBg = parts[0]; return out; }
+        if (parts.length === 2) { out.rowBg = parts[0]; out.rowFg = parts[1]; return out; }
+        if (parts.length >= 4) {
+          out.colBg = [parts[0], parts[1], parts[2], parts[3]];
+          if (parts.length >= 8) out.colFg = [parts[4], parts[5], parts[6], parts[7]];
           return out;
         }
-        if (typeof spec === 'object') {
-          if (spec.rowBg || spec.rowFg || spec.colBg || spec.colFg) {
-            out.rowBg = normColor(spec.rowBg);
-            out.rowFg = normColor(spec.rowFg);
-            out.colBg = (spec.colBg||[]).map(normColor).concat([null,null,null,null]).slice(0,4);
-            out.colFg = (spec.colFg||[]).map(normColor).concat([null,null,null,null]).slice(0,4);
-            return out;
-          }
-          const bgData     = normColor(spec.bgData||spec.data||spec.bg_data);
-          const bgTurno    = normColor(spec.bgTurno||spec.turno||spec.bg_turno);
-          const bgHorario  = normColor(spec.bgHorario||spec.horario||spec.bg_horario||spec.hora);
-          const bgContrato = normColor(spec.bgContrato||spec.contrato||spec.bg_contrato);
-          const fgData     = normColor(spec.fgData||spec.textData);
-          const fgTurno    = normColor(spec.fgTurno||spec.textTurno);
-          const fgHorario  = normColor(spec.fgHorario||spec.textHorario||spec.textHora);
-          const fgContrato = normColor(spec.fgContrato||spec.textContrato);
-          if (bgData || bgTurno || bgHorario || bgContrato) {
-            out.colBg = [bgData,bgTurno,bgHorario,bgContrato];
-            out.colFg = [fgData,fgTurno,fgHorario,fgContrato];
-          }
+      }
+
+      if (typeof spec === 'string') {
+        try {
+          const t = spec.trim();
+          if (t.startsWith('[') || t.startsWith('{')) return parseColorSpec(JSON.parse(t));
+        } catch (_) { }
+
+        const parts = spec.split('|').map(s => normColor(s.trim())).filter(Boolean);
+        if (parts.length === 1) { out.rowBg = parts[0]; return out; }
+        if (parts.length === 2) { out.rowBg = parts[0]; out.rowFg = parts[1]; return out; }
+        if (parts.length >= 4) {
+          out.colBg = [parts[0], parts[1], parts[2], parts[3]];
+          if (parts.length >= 8) out.colFg = [parts[4], parts[5], parts[6], parts[7]];
           return out;
+        }
+
+        out.rowBg = normColor(spec);
+        return out;
+      }
+
+      if (typeof spec === 'object') {
+        if (spec.rowBg || spec.rowFg || spec.colBg || spec.colFg) {
+          out.rowBg = normColor(spec.rowBg);
+          out.rowFg = normColor(spec.rowFg);
+          out.colBg = (spec.colBg || []).map(normColor).concat([null, null, null, null]).slice(0, 4);
+          out.colFg = (spec.colFg || []).map(normColor).concat([null, null, null, null]).slice(0, 4);
+          return out;
+        }
+
+        const bgData = normColor(spec.bgData || spec.data || spec.bg_data);
+        const bgTurno = normColor(spec.bgTurno || spec.turno || spec.bg_turno);
+        const bgHorario = normColor(spec.bgHorario || spec.horario || spec.bg_horario || spec.hora);
+        const bgContrato = normColor(spec.bgContrato || spec.contrato || spec.bg_contrato);
+
+        const fgData = normColor(spec.fgData || spec.textData);
+        const fgTurno = normColor(spec.fgTurno || spec.textTurno);
+        const fgHorario = normColor(spec.fgHorario || spec.textHorario || spec.textHora);
+        const fgContrato = normColor(spec.fgContrato || spec.textContrato);
+
+        if (bgData || bgTurno || bgHorario || bgContrato) {
+          out.colBg = [bgData, bgTurno, bgHorario, bgContrato];
+          out.colFg = [fgData, fgTurno, fgHorario, fgContrato];
         }
         return out;
       }
-      return parseColorSpec(spec);
+
+      return out;
     }
 
-    if (modalEsc) {
-      modalEsc.addEventListener('show.bs.modal', (ev) => {
-        const coopId = ev.relatedTarget?.dataset?.coopid;
-        const tbody = modalEsc.querySelector('#tbody-escala');
-        tbody.innerHTML = '';
+    return parseColorSpec(spec);
+  }
 
-        const raw = ESCALAS[String(coopId)] || [];
-        if (!raw.length) {
-          tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhuma escala</td></tr>`;
-          return;
-        }
+  function fmtHorario(h) {
+    if (!h) return '';
+    let s = String(h).trim().replace(/\s*–\s*/g, '-').replace(/\s*-\s*/g, '-');
+    return s.split(/\s*\/\s*/).map(seg => seg.trim().replace(/\s*(?:-|a|as|às)\s*/i, ' às ')).join(' / ');
+  }
 
-        const grouped = new Map();
-        for (const e of raw) {
-          const data     = pick(e, ['data','dt','dia','date']) || '';
-          const turno    = pick(e, ['turno','periodo','shift']) || '';
-          const contrato = pick(e, ['contrato','setor','unidade','contr','local']) || '';
-          let horario  = pick(e, ['horário','horario','hora','horas','turno/horario','escala','jornada']);
-          if(!horario){
-            for(const [k,v] of Object.entries(e||{})){
-              const s = String(v??'').trim(); if(s && /\b\d{1,2}:\d{2}/.test(s)){ horario = s; break; }
-            }
+  if (modalEsc) {
+    modalEsc.addEventListener('show.bs.modal', (ev) => {
+      const coopId = ev.relatedTarget?.dataset?.coopid;
+      const tbody = modalEsc.querySelector('#tbody-escala');
+      if (!tbody) return;
+
+      tbody.innerHTML = '';
+
+      const raw = ESCALAS[String(coopId)] || [];
+      if (!raw.length) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhuma escala</td></tr>`;
+        return;
+      }
+
+      const grouped = new Map();
+
+      for (const e of raw) {
+        const data = pick(e, ['data', 'dt', 'dia', 'date']) || '';
+        const turno = pick(e, ['turno', 'periodo', 'shift']) || '';
+        const contrato = pick(e, ['contrato', 'setor', 'unidade', 'contr', 'local']) || '';
+
+        let horario = pick(e, ['horário', 'horario', 'hora', 'horas', 'turno/horario', 'escala', 'jornada']);
+        if (!horario) {
+          for (const v of Object.values(e || {})) {
+            const s = String(v ?? '').trim();
+            if (s && /\b\d{1,2}:\d{2}/.test(s)) { horario = s; break; }
           }
-          const fmtHorario = (h)=>{
-            if(!h) return '';
-            let s = String(h).trim().replace(/\s*–\s*/g,'-').replace(/\s*-\s*/g,'-');
-            return s.split(/\s*\/\s*/).map(seg=>seg.trim().replace(/\s*(?:-|a|as|às)\s*/i,' às ')).join(' / ');
-          };
-          const key = [data, turno, contrato].map(v=>String(v).toLowerCase()).join('|');
-          const cur = grouped.get(key);
-          const val = { data, turno, contrato, horario: fmtHorario(horario), src: e };
-          if (!cur) grouped.set(key, val);
-          else if (!cur.horario && val.horario) grouped.set(key, val);
         }
 
-        for (const { data, turno, contrato, horario, src } of grouped.values()) {
-          const cores = resolveCores(src);
-          const tr = document.createElement('tr');
-          if (cores.rowBg) tr.style.background = cores.rowBg;
-          if (cores.rowFg) tr.style.color = cores.rowFg;
-          tr.innerHTML = `
-            <td class="cel-data">${data}</td>
-            <td class="cel-turno">${turno}</td>
-            <td class="cel-horario">${horario || ''}</td>
-            <td class="cel-contrato">${contrato}</td>
-          `;
-          const cols = [
-            tr.querySelector('.cel-data'),
-            tr.querySelector('.cel-turno'),
-            tr.querySelector('.cel-horario'),
-            tr.querySelector('.cel-contrato')
-          ];
-          cols.forEach((td,i)=>{
-            if (cores.colBg[i]) td.style.background = cores.colBg[i];
-            if (cores.colFg[i]) td.style.color = cores.colFg[i];
-            if (cores.colBg[i] || cores.colFg[i]) { td.style.borderRadius = '6px'; td.style.padding = '6px 8px'; }
-          });
-          tbody.appendChild(tr);
-        }
-      });
-    }
-  </script>
+        const key = [data, turno, contrato].map(v => String(v).toLowerCase()).join('|');
+        const cur = grouped.get(key);
+        const val = { data, turno, contrato, horario: fmtHorario(horario), src: e };
 
-  <!-- ==== BENEFÍCIOS: prévia + cálculo do TOTAL antes de enviar ==== -->
-  <script>
-    (function(){
-      const TOTAL_COOPS = {{ cooperados|length or 0 }};
-
-      function idsFromSelect(sel){
-        return Array.from(sel?.selectedOptions || []).map(o => String(o.value));
-      }
-      function valNum(inp){
-        const n = parseFloat(String(inp?.value ?? '').replace(',','.'));
-        return isFinite(n) ? n : 0;
-      }
-      function setBadge(el, txt){ if(el) el.textContent = txt; }
-      function money(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}); }
-
-      function calcPreview(prefix){
-        const unit    = document.getElementById(`${prefix}_valor_unit`);
-        const bensSel = document.getElementById(`${prefix}_beneficiarios`);
-        const isenSel = document.getElementById(`${prefix}_isencoes`);
-        const badge   = document.getElementById(`${prefix}_badge`);
-
-        if(!unit || !bensSel || !isenSel || !badge) return;
-
-        const vUnit = Math.max(0, valNum(unit));
-        const bens  = idsFromSelect(bensSel);
-        const isen  = idsFromSelect(isenSel);
-
-        const unique = new Set([...bens, ...isen]); // quem não paga
-        const numBens = bens.length;
-        const numIsen = isen.length;
-        const pagantes = Math.max(0, TOTAL_COOPS - unique.size);
-        const total = vUnit * numBens;
-        const porPag = pagantes > 0 ? (total / pagantes) : 0;
-
-        setBadge(badge,
-          `Recebem: ${numBens} · Isentos: ${numIsen} · Pagantes: ${pagantes} · Total a ratear: ${money(total)} · Cobrança por pagante: ${money(porPag)}`
-        );
+        if (!cur) grouped.set(key, val);
+        else if (!cur.horario && val.horario) grouped.set(key, val);
       }
 
-      ['hosp','farm','alim'].forEach(p=>{
-        ['change','keyup'].forEach(ev=>{
-          document.getElementById(`${p}_valor_unit`)?.addEventListener(ev, ()=>calcPreview(p));
-          document.getElementById(`${p}_beneficiarios`)?.addEventListener(ev, ()=>calcPreview(p));
-          document.getElementById(`${p}_isencoes`)?.addEventListener(ev, ()=>calcPreview(p));
+      for (const { data, turno, contrato, horario, src } of grouped.values()) {
+        const cores = resolveCores(src);
+
+        const tr = document.createElement('tr');
+        if (cores.rowBg) tr.style.background = cores.rowBg;
+        if (cores.rowFg) tr.style.color = cores.rowFg;
+
+        tr.innerHTML = `
+          <td class="cel-data">${data}</td>
+          <td class="cel-turno">${turno}</td>
+          <td class="cel-horario">${horario || ''}</td>
+          <td class="cel-contrato">${contrato}</td>
+        `;
+
+        const cols = [
+          tr.querySelector('.cel-data'),
+          tr.querySelector('.cel-turno'),
+          tr.querySelector('.cel-horario'),
+          tr.querySelector('.cel-contrato')
+        ];
+
+        cols.forEach((td, i) => {
+          if (!td) return;
+          if (cores.colBg[i]) td.style.background = cores.colBg[i];
+          if (cores.colFg[i]) td.style.color = cores.colFg[i];
+          if (cores.colBg[i] || cores.colFg[i]) {
+            td.style.borderRadius = '6px';
+            td.style.padding = '6px 8px';
+          }
         });
-        calcPreview(p);
-      });
 
-      <script>
-(function(){
-  const sec = document.getElementById('beneficios');
-  if (!sec) return; // só roda nesta aba
-
-  // ===== Utils =====
-  const TOTAL_COOPS = {{ cooperados|length or 0 }};
-  function valNum(inp) {
-    const n = parseFloat(String(inp?.value ?? '').replace(',', '.'));
-    return isFinite(n) ? n : 0;
-  }
-  function idsFromSelect(sel) {
-    return Array.from(sel?.selectedOptions || []).map(o => String(o.value));
-  }
-  function money(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}); }
-  function setBadge(el, txt){ if(el) el.textContent = txt; }
-
-  // ===== Prévia por tipo (hosp/farm/alim) =====
-  function calcPreview(prefix){
-    const unit    = sec.querySelector(`#${prefix}_valor_unit`);
-    const bensSel = sec.querySelector(`#${prefix}_beneficiarios`);
-    const isenSel = sec.querySelector(`#${prefix}_isencoes`);
-    const badge   = sec.querySelector(`#${prefix}_badge`);
-    if(!unit || !bensSel || !isenSel || !badge) return;
-
-    const vUnit = Math.max(0, valNum(unit));
-    const bens  = idsFromSelect(bensSel);
-    const isen  = idsFromSelect(isenSel);
-    const unique = new Set([...bens, ...isen]); // não pagam
-    const numBens = bens.length;
-    const numIsen = isen.length;
-    const pagantes = Math.max(0, TOTAL_COOPS - unique.size);
-    const total = vUnit * numBens;
-    const porPag = pagantes > 0 ? (total / pagantes) : 0;
-
-    setBadge(badge, `Recebem: ${numBens} · Isentos: ${numIsen} · Pagantes: ${pagantes} · Total a ratear: ${money(total)} · Cobrança por pagante: ${money(porPag)}`);
-  }
-
-  ['hosp','farm','alim'].forEach(p=>{
-    sec.querySelector(`#${p}_valor_unit`)?.addEventListener('input', ()=>calcPreview(p));
-    sec.querySelector(`#${p}_beneficiarios`)?.addEventListener('change', ()=>calcPreview(p));
-    sec.querySelector(`#${p}_isencoes`)?.addEventListener('change', ()=>calcPreview(p));
-    calcPreview(p); // estado inicial
-  });
-
-  // ===== Cálculo dos totais no submit + garantir IDs dos hidden =====
-  const form = sec.querySelector('#form-beneficios');
-  if (form){
-    // garantir ids dos hidden esperados
-    (function ensureHiddenIds(){
-      const map = { hosp:'hosp_valor_total', farm:'farm_valor_total', alim:'alim_valor_total' };
-      Object.entries(map).forEach(([p, id])=>{
-        if (!sec.querySelector(`#${id}`)) {
-          const i = sec.querySelector(`input[name="${p}_valor"]`);
-          if (i) i.id = id;
-        }
-      });
-    })();
-
-    function setTotal(prefix){
-      const unit = sec.querySelector(`#${prefix}_valor_unit`);
-      const bensSel = sec.querySelector(`#${prefix}_beneficiarios`);
-      const hidden = sec.querySelector(`#${prefix}_valor_total`) || sec.querySelector(`input[name="${prefix}_valor"]`);
-      const count = (bensSel && bensSel.selectedOptions) ? bensSel.selectedOptions.length : 0;
-      const total = Math.max(0, valNum(unit) * count);
-      if (hidden) hidden.value = total.toFixed(2);
-    }
-
-    form.addEventListener('submit', function(){
-      ['hosp','farm','alim'].forEach(setTotal);
+        tbody.appendChild(tr);
+      }
     });
   }
+</script>
 
-  // ===== Seleção em massa + modal de exclusão (tabela) =====
-  try {
-    const tbl      = sec.querySelector('#tabela-beneficios');
-    const checkAll = sec.querySelector('#check_all');
-    const bulkBtn  = sec.querySelector('#btn-bulk-delete');
-    const modal    = document.getElementById('modalExcluirBeneficio'); // modal fica fora da aba
+<!-- ==== BENEFÍCIOS: prévia + cálculo do TOTAL antes de enviar ==== -->
+<script>
+  (function () {
+    const sec = document.getElementById('beneficios');
+    if (!sec) return; // só roda nesta aba
 
-    if (tbl || checkAll || bulkBtn || modal) {
-      const allChecks = () => tbl ? tbl.querySelectorAll('tbody .chk-beneficio') : [];
-      const checkedCount = () => tbl ? tbl.querySelectorAll('tbody .chk-beneficio:checked').length : 0;
+    const TOTAL_COOPS = {{ cooperados|length or 0 }};
 
-      function toggleBulkBtn(){ if (bulkBtn) bulkBtn.disabled = checkedCount() === 0; }
-      function updateHeaderState(){
+    // ===== Utils =====
+    function valNum(inp) {
+      const n = parseFloat(String(inp?.value ?? '').replace(',', '.'));
+      return isFinite(n) ? n : 0;
+    }
+    function idsFromSelect(sel) {
+      return Array.from(sel?.selectedOptions || []).map(o => String(o.value));
+    }
+    function money(v) {
+      return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function setBadge(el, txt) { if (el) el.textContent = txt; }
+
+    // ===== Prévia por tipo (hosp/farm/alim) =====
+    function calcPreview(prefix) {
+      const unit = sec.querySelector(`#${prefix}_valor_unit`);
+      const bensSel = sec.querySelector(`#${prefix}_beneficiarios`);
+      const isenSel = sec.querySelector(`#${prefix}_isencoes`);
+      const badge = sec.querySelector(`#${prefix}_badge`);
+      if (!unit || !bensSel || !isenSel || !badge) return;
+
+      const vUnit = Math.max(0, valNum(unit));
+      const bens = idsFromSelect(bensSel);
+      const isen = idsFromSelect(isenSel);
+
+      // regra do seu texto: union(bens + isen) = "quem não paga"
+      const uniqueNaoPagam = new Set([...bens, ...isen]);
+      const numBens = bens.length;
+      const numIsen = isen.length;
+      const pagantes = Math.max(0, TOTAL_COOPS - uniqueNaoPagam.size);
+
+      const total = vUnit * numBens;
+      const porPag = pagantes > 0 ? (total / pagantes) : 0;
+
+      setBadge(
+        badge,
+        `Recebem: ${numBens} · Isentos: ${numIsen} · Pagantes: ${pagantes} · Total a ratear: ${money(total)} · Cobrança por pagante: ${money(porPag)}`
+      );
+    }
+
+    ['hosp', 'farm', 'alim'].forEach(p => {
+      sec.querySelector(`#${p}_valor_unit`)?.addEventListener('input', () => calcPreview(p));
+      sec.querySelector(`#${p}_beneficiarios`)?.addEventListener('change', () => calcPreview(p));
+      sec.querySelector(`#${p}_isencoes`)?.addEventListener('change', () => calcPreview(p));
+      calcPreview(p);
+    });
+
+    // ===== Cálculo dos totais no submit + garantir IDs dos hidden =====
+    const form = sec.querySelector('#form-beneficios');
+    if (form) {
+      // garante IDs dos hidden esperados (se existir só name="")
+      (function ensureHiddenIds() {
+        const map = { hosp: 'hosp_valor_total', farm: 'farm_valor_total', alim: 'alim_valor_total' };
+        Object.entries(map).forEach(([p, id]) => {
+          if (!sec.querySelector(`#${id}`)) {
+            const i = sec.querySelector(`input[name="${p}_valor"]`);
+            if (i) i.id = id;
+          }
+        });
+      })();
+
+      function setTotal(prefix) {
+        const unit = sec.querySelector(`#${prefix}_valor_unit`);
+        const bensSel = sec.querySelector(`#${prefix}_beneficiarios`);
+        const hidden = sec.querySelector(`#${prefix}_valor_total`) || sec.querySelector(`input[name="${prefix}_valor"]`);
+
+        const count = (bensSel?.selectedOptions?.length) ? bensSel.selectedOptions.length : 0;
+        const total = Math.max(0, valNum(unit) * count);
+
+        if (hidden) hidden.value = total.toFixed(2);
+      }
+
+      form.addEventListener('submit', function () {
+        ['hosp', 'farm', 'alim'].forEach(setTotal);
+      });
+    }
+
+    // ===== Seleção em massa + modal de exclusão (tabela) =====
+    try {
+      const tbl = sec.querySelector('#tabela-beneficios');
+      const checkAll = sec.querySelector('#check_all');
+      const bulkBtn = sec.querySelector('#btn-bulk-delete');
+      const modal = document.getElementById('modalExcluirBeneficio'); // modal pode ficar fora da aba
+
+      const allChecks = () => (tbl ? tbl.querySelectorAll('tbody .chk-beneficio') : []);
+      const checkedCount = () => (tbl ? tbl.querySelectorAll('tbody .chk-beneficio:checked').length : 0);
+
+      function toggleBulkBtn() { if (bulkBtn) bulkBtn.disabled = checkedCount() === 0; }
+      function updateHeaderState() {
         if (!checkAll) return;
-        const items   = allChecks();
-        const total   = items.length;
+        const items = allChecks();
+        const total = items.length;
         const checked = checkedCount();
-        if (checked === 0){ checkAll.checked = false; checkAll.indeterminate = false; }
-        else if (checked === total){ checkAll.checked = true; checkAll.indeterminate = false; }
+
+        if (checked === 0) { checkAll.checked = false; checkAll.indeterminate = false; }
+        else if (checked === total) { checkAll.checked = true; checkAll.indeterminate = false; }
         else { checkAll.checked = false; checkAll.indeterminate = true; }
       }
 
-      checkAll?.addEventListener('change', ()=>{
+      checkAll?.addEventListener('change', () => {
         allChecks().forEach(ch => { ch.checked = checkAll.checked; });
-        toggleBulkBtn(); updateHeaderState();
+        toggleBulkBtn();
+        updateHeaderState();
       });
 
-      tbl?.addEventListener('change', (e)=>{
-        if (e.target && e.target.classList?.contains('chk-beneficio')){
-          toggleBulkBtn(); updateHeaderState();
+      tbl?.addEventListener('change', (e) => {
+        if (e.target && e.target.classList?.contains('chk-beneficio')) {
+          toggleBulkBtn();
+          updateHeaderState();
         }
       });
 
-      toggleBulkBtn(); updateHeaderState();
+      toggleBulkBtn();
+      updateHeaderState();
 
-      // Modal individual
+      // Modal individual (exclusão)
       if (modal) {
         modal.addEventListener('show.bs.modal', function (ev) {
-          const btn   = ev.relatedTarget;
-          const id    = btn ? btn.getAttribute('data-beneficio-id') : '';
+          const btn = ev.relatedTarget;
+          const id = btn ? btn.getAttribute('data-beneficio-id') : '';
           const label = btn ? (btn.getAttribute('data-beneficio-label') || '—') : '—';
+
           const labelNode = modal.querySelector('#beneficio_label_preview');
           if (labelNode) labelNode.textContent = label;
+
           const hidden = modal.querySelector('#beneficio_id_hidden');
           if (hidden) hidden.value = id || '';
         });
       }
+    } catch (err) {
+      console.error('[beneficios-js]', err);
     }
-  } catch (err) {
-    console.error('[beneficios-js]', err);
-  }
-})();
+  })();
 </script>
 </body>
 </html>
