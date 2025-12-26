@@ -307,31 +307,45 @@
           <div class="kpi-value mono">{{ _qtd_prod }}</div>
           <div class="kpi-sub">Quantidade</div>
         </div>
+
         <div class="kpi-card">
           <div class="kpi-title">Média de avaliação</div>
           <div class="kpi-value mono">{{ ("%.1f"|format(_score_header)).replace('.',',') }}</div>
           <div class="kpi-sub">{{ _score_title }}</div>
         </div>
+
         <div class="kpi-card">
           <div class="kpi-title">Total Bruto</div>
           <div class="kpi-value mono">R$ {{ "%.2f"|format(total_bruto|default(0)) }}</div>
           <div class="kpi-sub">Recebido</div>
         </div>
+
         <div class="kpi-card">
           <div class="kpi-title">Descontos Individuais</div>
           <div class="kpi-value mono">R$ {{ "%.2f"|format(total_descontos|default(0)) }}</div>
           <div class="kpi-sub">No período</div>
         </div>
+
+        <!-- INSS separado: 4% -->
         <div class="kpi-card">
-          <div class="kpi-title">INSS (4,5%)</div>
+          <div class="kpi-title">INSS (4%)</div>
           <div class="kpi-value mono">R$ {{ "%.2f"|format(inss_valor|default(0)) }}</div>
           <div class="kpi-sub">Desconto estimado</div>
         </div>
+
+        <!-- SEST/SENAT separado: 0,5% -->
+        <div class="kpi-card">
+          <div class="kpi-title">SEST/SENAT (0,5%)</div>
+          <div class="kpi-value mono">R$ {{ "%.2f"|format(sest_senat_valor|default(0)) }}</div>
+          <div class="kpi-sub">Desconto estimado</div>
+        </div>
+
         <div class="kpi-card">
           <div class="kpi-title">Complemento INSS (meta)</div>
           <div class="kpi-value mono">R$ {{ "%.2f"|format(inss_complemento|default(0)) }}</div>
           <div class="kpi-sub">Sugestão</div>
         </div>
+
         <div class="kpi-card" style="grid-column:1/-1">
           <div class="kpi-title">Total Líquido</div>
           <div class="kpi-value mono text-success">R$ {{ "%.2f"|format(total_liquido|default(0)) }}</div>
@@ -422,7 +436,8 @@
 
             <div class="text-end">
               <div class="h6 m-0 mono">R$ {{ "%.2f"|format(lanc.valor) }}</div>
-              <small class="muted">INSS (4,5%): R$ {{ "%.2f"|format((lanc.valor or 0)*0.045) }}</small>
+              <small class="muted">INSS (4%): R$ {{ "%.2f"|format((lanc.valor or 0)*0.04) }}</small><br>
+              <small class="muted">SEST/SENAT (0,5%): R$ {{ "%.2f"|format((lanc.valor or 0)*0.005) }}</small>
             </div>
           </div>
         </div>
