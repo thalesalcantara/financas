@@ -4008,274 +4008,69 @@ def delete_receita_coop(id):
     flash("Receita do cooperado excluída.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_receitas"))
 
-from datetime import date
-from flask import request, redirect, url_for, flash
-from sqlalchemy import func, case, and_, or_
-
-# models esperados:
-# DespesaCooperado (id, cooperado_id, descricao, valor, data, data_inicio, data_fim, beneficio_id, eh_adiantamento)
-# Cooperado (id, nome, ...)
-# db = SQLAlchemy()
-
-def _checkbox_true(form, name: str) -> bool:
-    """
-    Suporta:
-      - <input type="checkbox" name="eh_adiantamento" value="1">
-      - <input type="checkbox" name="eh_adiantamento">
-    """
-    v = form.get(name)
-    return v in ("1", "true", "True", "on", "yes", "sim")
-
-def _parse_date(value: str):
-    # Use o seu _parse_date real aqui.
-    # Deve retornar date ou None
-    if not value:
-        return None
-    try:
-        y, m, d = value.split("-")
-        return date(int(y), int(m), int(d))
-    except Exception:
-        return None
-
-def _range_filter_despesas(di: date, df: date):
-    """
-    Filtra despesas que caem no intervalo [di, df], cobrindo:
-      - pontual: dc.data
-      - período: dc.data_inicio / dc.data_fim com sobreposição
-    """
-    return or_(
-        # pontual dentro do intervalo
-        and_(DespesaCooperado.data.isnot(None),
-             DespesaCooperado.data >= di,
-             DespesaCooperado.data <= df),
-
-        # período sobrepõe o intervalo
-        and_(DespesaCooperado.data.is_(None),
-             DespesaCooperado.data_inicio.isnot(None),
-             DespesaCooperado.data_fim.isnot(None),
-             DespesaCooperado.data_inicio <= df,
-             DespesaCooperado.data_fim >= di)
-    )
-
-def calcular_resumo_por_cooperado(di: date, df: date):
-    """
-    Retorna lista com:
-      cooperado_id, total_despesas (SEM adiantamento), total_adiantamento
-    """
-    filtro = _range_filter_despesas(di, df)
-
-    total_despesas = func.coalesce(func.sum(
-        case(
-            (DespesaCooperado.eh_adiantamento.is_(False), DespesaCooperado.valor),
-            else_=0
-        )
-    ), 0)
-
-    total_adiant = func.coalesce(func.sum(
-        case(
-            (DespesaCooperado.eh_adiantamento.is_(True), DespesaCooperado.valor),
-            else_=0
-        )
-    ), 0)
-
-    rows = (
-        db.session.query(
-            DespesaCooperado.cooperado_id.label("cooperado_id"),
-            total_despesas.label("total_despesas"),
-            total_adiant.label("total_adiantamento"),
-        )
-        .filter(filtro)
-        .group_by(DespesaCooperado.cooperado_id)
-        .all()
-    )
-    return rows
-
-def atualizar_aba_resumo(di: date, df: date):
-    """
-    Aqui você atualiza a ABA 'resumo' (planilha).
-    Eu deixei pronto para você plugar seu método (Google Sheets / Excel / etc).
-    Regra: Adiantamento vai na coluna 'Adiantamento' e NÃO soma com 'Despesas'.
-    """
-    # Exemplo: obter totais do período:
-    rows = calcular_resumo_por_cooperado(di, df)
-
-    # Você deve mapear cada cooperado_id para a linha correspondente na aba "resumo"
-    # e escrever:
-    #   col_despesas = total_despesas
-    #   col_adiantamento = total_adiantamento
-    #
-    # Se você já tem uma função que escreve na planilha, altere ela para usar:
-    #   total_despesas = soma de eh_adiantamento == False
-    #   total_adiantamento = soma de eh_adiantamento == True
-    #
-    # Não implemento a escrita aqui porque cada projeto usa uma lib diferente.
-    return
-
-
-# -------------------------
-# DESPESAS (COOPERADO)
-# -------------------------
-
 @app.route("/coop/despesas/add", methods=["POST"])
 @admin_required
 def add_despesa_coop():
     f = request.form
 
-    ids = f.getlist("cooperado_ids[]")  # ["3","5","8"]
+    # lista de cooperados selecionados (vários checkboxes ou um select múltiplo)
+    ids = f.getlist("cooperado_ids[]")  # ex.: ["3", "5", "8"]
 
-    descricao = (f.get("descricao") or "").strip()
+    descricao = f.get("descricao", "").strip()
     valor_total = f.get("valor", type=float) or 0.0
+    d = _parse_date(f.get("data"))
+    # nome do checkbox no HTML: <input type="checkbox" name="eh_adiantamento">
+    eh_adiantamento = bool(f.get("eh_adiantamento"))
 
-    d = _parse_date(f.get("data"))  # pode vir vazio
-    di = _parse_date(f.get("data_inicio"))
-    df = _parse_date(f.get("data_fim"))
-
-    eh_adiantamento = _checkbox_true(f, "eh_adiantamento")
-    beneficio_id = f.get("beneficio_id", type=int)  # pode ser None
-
-    if not descricao:
-        flash("Informe a descrição.", "warning")
-        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-    if valor_total <= 0:
-        flash("Informe um valor válido (maior que zero).", "warning")
-        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-    # Regra de data:
-    if di or df:
-        if di and not df:
-            df = di
-        if df and not di:
-            di = df
-        if di and df and df < di:
-            flash("Data fim não pode ser menor que data início.", "warning")
-            return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-        data_pontual = None
-    else:
-        data_pontual = d or date.today()
-        di = None
-        df = None
-
-    # Se não selecionou ninguém -> "Todos" (cooperado_id=None)
+    # segurança: se ninguém foi selecionado
     if not ids:
-        dc = DespesaCooperado(
-            cooperado_id=None,
-            descricao=descricao,
-            valor=float(valor_total),
-            data=data_pontual,
-            data_inicio=di,
-            data_fim=df,
-            beneficio_id=beneficio_id,
-            eh_adiantamento=eh_adiantamento
-        )
-        db.session.add(dc)
-        db.session.commit()
-
-        # Se você atualiza a aba resumo por período, chame aqui:
-        # atualizar_aba_resumo(di or data_pontual, df or data_pontual)
-
-        flash("Lançamento registrado para TODOS.", "success")
+        flash("Selecione pelo menos um cooperado.", "warning")
         return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
-    # Divide o valor entre selecionados
-    qtd = len(ids)
-    valor_unit = float(valor_total) / qtd if qtd else 0.0
+    # se não veio data válida, usa hoje
+    if not d:
+        d = date.today()
 
+    # se quiser dividir o valor igualmente entre os cooperados:
+    qtd = len(ids)
+    valor_unit = valor_total / qtd if qtd > 0 else 0.0
+
+    # cria uma despesa para cada cooperado selecionado
     for cid in ids:
-        dc = DespesaCooperado(
-            cooperado_id=int(cid),
+        db.session.add(DespesaCooperado(
+            cooperado_id=cid,
             descricao=descricao,
             valor=valor_unit,
-            data=data_pontual,
-            data_inicio=di,
-            data_fim=df,
-            beneficio_id=beneficio_id,
-            eh_adiantamento=eh_adiantamento
-        )
-        db.session.add(dc)
+            data=d,
+            eh_adiantamento=eh_adiantamento,  # grava a flag de adiantamento
+        ))
 
     db.session.commit()
-
-    # atualizar_aba_resumo(di or data_pontual, df or data_pontual)
-
-    flash("Lançamento(s) registrado(s).", "success")
+    flash("Despesa(s) lançada(s).", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
 
 @app.route("/coop/despesas/<int:id>/edit", methods=["POST"])
 @admin_required
 def edit_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
     f = request.form
-
-    # cooperado_id pode ser None ("Todos")
-    if f.get("cooperado_id") in (None, "", "None"):
-        dc.cooperado_id = None
-    else:
-        dc.cooperado_id = f.get("cooperado_id", type=int)
-
-    dc.descricao = (f.get("descricao") or "").strip()
-    dc.valor = f.get("valor", type=float) or 0.0
-
-    d = _parse_date(f.get("data"))
-    di = _parse_date(f.get("data_inicio"))
-    df = _parse_date(f.get("data_fim"))
-
-    dc.eh_adiantamento = _checkbox_true(f, "eh_adiantamento")
-    dc.beneficio_id = f.get("beneficio_id", type=int)
-
-    if not dc.descricao:
-        flash("Informe a descrição.", "warning")
-        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-    if dc.valor <= 0:
-        flash("Informe um valor válido (maior que zero).", "warning")
-        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-    # Regra de data (igual add)
-    if di or df:
-        if di and not df:
-            df = di
-        if df and not di:
-            di = df
-        if di and df and df < di:
-            flash("Data fim não pode ser menor que data início.", "warning")
-            return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-        dc.data = None
-        dc.data_inicio = di
-        dc.data_fim = df
-    else:
-        dc.data = d or dc.data or date.today()
-        dc.data_inicio = None
-        dc.data_fim = None
-
+    dc.cooperado_id = f.get("cooperado_id", type=int)
+    dc.descricao = f.get("descricao", "").strip()
+    dc.valor = f.get("valor", type=float)
+    dc.data = _parse_date(f.get("data"))
     db.session.commit()
-
-    # atualizar_aba_resumo(dc.data_inicio or dc.data, dc.data_fim or dc.data)
-
-    flash("Lançamento atualizado.", "success")
+    flash("Despesa do cooperado atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
-
-@app.route("/coop/despesas/<int:id>/delete", methods=["POST"])
+@app.route("/coop/despesas/<int:id>/delete")
 @admin_required
 def delete_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
-
-    # guarde datas para atualizar resumo depois de excluir
-    ref_ini = dc.data_inicio or dc.data or date.today()
-    ref_fim = dc.data_fim or dc.data or ref_ini
-
     db.session.delete(dc)
     db.session.commit()
-
-    # atualizar_aba_resumo(ref_ini, ref_fim)
-
-    flash("Lançamento excluído.", "success")
+    flash("Despesa do cooperado excluída.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
-    
 # =========================
 # Benefícios — Editar / Excluir (Admin)
 # =========================
