@@ -4009,39 +4009,112 @@ def delete_receita_coop(id):
     return redirect(url_for("admin_dashboard", tab="coop_receitas"))
 
 # -------------------------
-# DESPESAS
+# DESPESAS (COOPERADO)
 # -------------------------
+from datetime import date
+from flask import request, redirect, url_for, flash
+# from yourapp import db
+# from yourapp.models import DespesaCooperado, Cooperado
+
 @app.route("/coop/despesas/add", methods=["POST"])
 @admin_required
 def add_despesa_coop():
     f = request.form
 
-    # lista de cooperados selecionados (vários checkboxes ou select múltiplo)
+    # se você usar checkboxes no HTML:
+    # <input type="checkbox" name="cooperado_ids[]" value="{{c.id}}">
     ids = f.getlist("cooperado_ids[]")  # ex.: ["3","5","8"]
 
-    descricao = f.get("descricao", "").strip()
+    descricao = (f.get("descricao") or "").strip()
     valor_total = f.get("valor", type=float) or 0.0
-    d = _parse_date(f.get("data")) or date.today()
 
-    # checkbox no HTML: <input type="checkbox" name="eh_adiantamento">
-    # quando marcado => despesa fica como adiantamento (sem aprovar/desaprovar)
+    # legado (pontual)
+    d = _parse_date(f.get("data"))  # pode vir vazio
+
+    # novo (período)
+    di = _parse_date(f.get("data_inicio"))
+    df = _parse_date(f.get("data_fim"))
+
+    # checkbox: <input type="checkbox" name="eh_adiantamento" value="1">
     eh_adiantamento = bool(f.get("eh_adiantamento"))
 
-    if not ids:
-        flash("Selecione pelo menos um cooperado.", "warning")
+    # opcional: se sua despesa pode vir vinculada a beneficio
+    beneficio_id = f.get("beneficio_id", type=int)  # pode ser None
+
+    if not descricao:
+        flash("Informe a descrição.", "warning")
         return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
+    if valor_total <= 0:
+        flash("Informe um valor válido (maior que zero).", "warning")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    # Regra de data:
+    # - Se período preenchido, usamos data_inicio/data_fim
+    # - Senão, usamos data (pontual). Se vier vazio, cai no dia de hoje.
+    if di or df:
+        # se começou mas não informou fim (ou vice-versa), completa
+        if di and not df:
+            df = di
+        if df and not di:
+            di = df
+
+        if di and df and df < di:
+            flash("Data fim não pode ser menor que data início.", "warning")
+            return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+        data_pontual = None  # não usa legado
+    else:
+        data_pontual = d or date.today()
+        di = None
+        df = None
+
+    # ---------------------------
+    # REGRA DE "TODOS" vs "SELECIONADOS"
+    # ---------------------------
+    # Aqui você escolhe:
+    #
+    # OPÇÃO 1 (RECOMENDADA): exigir ao menos 1 cooperado sempre
+    #
+    # if not ids:
+    #     flash("Selecione pelo menos um cooperado.", "warning")
+    #     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+    #
+    # OPÇÃO 2: se não selecionar ninguém => lança para TODOS (cooperado_id=None)
+    #
+    if not ids:
+        # Lança como "Todos" (cooperado_id = None)
+        dc = DespesaCooperado(
+            cooperado_id=None,
+            descricao=descricao,
+            valor=float(valor_total),
+            data=data_pontual,
+            data_inicio=di,
+            data_fim=df,
+            beneficio_id=beneficio_id,
+            eh_adiantamento=eh_adiantamento
+        )
+        db.session.add(dc)
+        db.session.commit()
+        flash("Despesa lançada para TODOS.", "success")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    # Se selecionou cooperados: divide o valor
     qtd = len(ids)
-    valor_unit = (valor_total / qtd) if qtd > 0 else 0.0
+    valor_unit = float(valor_total) / qtd if qtd else 0.0
 
     for cid in ids:
-        db.session.add(DespesaCooperado(
+        dc = DespesaCooperado(
             cooperado_id=int(cid),
             descricao=descricao,
             valor=valor_unit,
-            data=d,
-            eh_adiantamento=eh_adiantamento,  # <- marca como adiantamento
-        ))
+            data=data_pontual,
+            data_inicio=di,
+            data_fim=df,
+            beneficio_id=beneficio_id,
+            eh_adiantamento=eh_adiantamento
+        )
+        db.session.add(dc)
 
     db.session.commit()
     flash("Despesa(s) lançada(s).", "success")
@@ -4055,26 +4128,67 @@ def edit_despesa_coop(id):
     f = request.form
 
     dc.cooperado_id = f.get("cooperado_id", type=int)
-    dc.descricao = f.get("descricao", "").strip()
-    dc.valor = f.get("valor", type=float) or 0.0
-    dc.data = _parse_date(f.get("data")) or dc.data or date.today()
+    # se quiser permitir "Todos" no edit:
+    # se no HTML você mandar cooperado_id vazio => vira None
+    if f.get("cooperado_id") in (None, "", "None"):
+        dc.cooperado_id = None
 
-    # IMPORTANTE: manter a mesma regra na edição
-    # se marcar, fica como adiantamento; se desmarcar, deixa de ser
+    dc.descricao = (f.get("descricao") or "").strip()
+    dc.valor = f.get("valor", type=float) or 0.0
+
+    # legado (pontual)
+    d = _parse_date(f.get("data"))
+
+    # novo (período)
+    di = _parse_date(f.get("data_inicio"))
+    df = _parse_date(f.get("data_fim"))
+
+    # checkbox
     dc.eh_adiantamento = bool(f.get("eh_adiantamento"))
 
+    # opcional
+    dc.beneficio_id = f.get("beneficio_id", type=int)
+
+    if not dc.descricao:
+        flash("Informe a descrição.", "warning")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    if dc.valor <= 0:
+        flash("Informe um valor válido (maior que zero).", "warning")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    # Regra de data (igual add)
+    if di or df:
+        if di and not df:
+            df = di
+        if df and not di:
+            di = df
+
+        if di and df and df < di:
+            flash("Data fim não pode ser menor que data início.", "warning")
+            return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+        dc.data = None
+        dc.data_inicio = di
+        dc.data_fim = df
+    else:
+        dc.data = d or dc.data or date.today()
+        dc.data_inicio = None
+        dc.data_fim = None
+
     db.session.commit()
-    flash("Despesa do cooperado atualizada.", "success")
+    flash("Despesa atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
 
-@app.route("/coop/despesas/<int:id>/delete")
+# Recomendo DELETE via POST. Mantive POST para ficar “como tem que ser” em segurança.
+@app.route("/coop/despesas/<int:id>/delete", methods=["POST"])
 @admin_required
 def delete_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
     db.session.delete(dc)
     db.session.commit()
-    flash("Despesa do cooperado excluída.", "success")
+    flash("Despesa excluída.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
     
 # =========================
