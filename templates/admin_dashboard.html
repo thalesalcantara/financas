@@ -520,7 +520,7 @@
   <main class="main">
     <div class="tab-content">
 
-     <!-- === RESUMO (Dashboard Financeiro Completo) === -->
+    <!-- === RESUMO (Dashboard Financeiro Completo) === -->
 <section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
   <div class="resumo-shell">
 
@@ -619,24 +619,17 @@
     {% endfor %}
     {% set total_receitas_coop_f = ns_rec_coop.total %}
 
-    {% set ns_desp_coop = namespace(total=0, total_adiant=0) %}
+    {# Despesas Cooperados (SEM coluna de adiantamento: tudo soma aqui) #}
+    {% set ns_desp_coop = namespace(total=0) %}
     {% for d in despesas_coop %}
       {% set dt  = ymd(d.data) %}
       {% set okd = (not ri or dt >= ri) and (not rf or dt <= rf) %}
       {% set okc = (not cid or (d.cooperado and d.cooperado.id==cid)) %}
       {% if okd and okc %}
-        {% set _is_ad = (d.adiantamento in [True, 1, '1', 'true', 'True', 'on']) %}
-        {% if _is_ad %}
-          {# SOMENTE adiantamento, fora do total de Despesas Cooperados #}
-          {% set ns_desp_coop.total_adiant = ns_desp_coop.total_adiant + (d.valor or 0) %}
-        {% else %}
-          {# Despesa “normal” (entra no total de Despesas Cooperados) #}
-          {% set ns_desp_coop.total = ns_desp_coop.total + (d.valor or 0) %}
-        {% endif %}
+        {% set ns_desp_coop.total = ns_desp_coop.total + (d.valor or 0) %}
       {% endif %}
     {% endfor %}
     {% set total_despesas_coop_f = ns_desp_coop.total %}
-    {% set total_adiantamentos_f = ns_desp_coop.total_adiant %}
 
     {# Ajuste: Receitas dos cooperados = Produções + Receitas individuais #}
     {% set total_receitas_coop_full_f = (total_producoes_f|default(0)) + (total_receitas_coop_f|default(0)) %}
@@ -656,7 +649,7 @@
             <div>
               <h5 class="mb-0 resumo-title">Resumo geral financeiro</h5>
               <small class="text-muted">
-                Use os filtros para enxergar produção, INSS (4,0%), SEST/SENAT (0,5%), receitas, despesas e adiantamentos por período, estabelecimento e cooperado.
+                Use os filtros para enxergar produção, INSS (4,0%), SEST/SENAT (0,5%), receitas e despesas por período, estabelecimento e cooperado.
               </small>
             </div>
           </div>
@@ -876,7 +869,7 @@
               <h6 class="m-0">Resumo por Cooperado (filtro aplicado)</h6>
               <small class="text-muted">
                 Líquido = Produções + <span class="text-success">Receitas</span> − INSS (4,0%) − SEST/SENAT (0,5%) −
-                <span class="text-danger">Despesas</span> − <span class="text-primary">Adiant.</span>
+                <span class="text-danger">Despesas</span>
               </small>
             </div>
           </div>
@@ -891,12 +884,11 @@
                 <th class="text-end">SEST/SENAT (0,5%)</th>
                 <th class="text-end text-success">Receitas</th>
                 <th class="text-end text-danger">Despesas</th>
-                <th class="text-end text-primary">Adiant.</th>
                 <th class="text-end">Líquido</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="8" class="text-center text-muted">Carregando…</td></tr>
+              <tr><td colspan="7" class="text-center text-muted">Carregando…</td></tr>
             </tbody>
             <tfoot>
               <tr class="table-light fw-bold">
@@ -906,7 +898,6 @@
                 <td class="text-end" id="tSEST05">R$ 0,00</td>
                 <td class="text-end text-success" id="tRec">R$ 0,00</td>
                 <td class="text-end text-danger" id="tDes">R$ 0,00</td>
-                <td class="text-end text-primary" id="tAd">R$ 0,00</td>
                 <td class="text-end fw-bold" id="tLiq">R$ 0,00</td>
               </tr>
             </tfoot>
@@ -1074,6 +1065,7 @@
       }
     }
   </style>
+</section>
 
   <!-- Dados (seguros p/ JS) + Scripts (Chart.js + XLSX) -->
   <script>
@@ -2483,30 +2475,19 @@
 </section>
 
 
-<!-- DESPESAS COOPERADOS (versão profissional/compacta – drop-in) -->
+<!-- DESPESAS COOPERADOS (versão profissional/compacta – SEM ADIANTAMENTO + PESQUISA) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='coop_despesas' else '' }}" id="coop_despesas" role="tabpanel">
   {% set _despesas = (despesas_coop | default([]) | list) %}
 
-  {# Totais robustos (adiantamento pode vir como bool/int/str) #}
-  {% set ns_dc = namespace(qtd_total=0, qtd_adiant=0, qtd_normais=0, total_normais=0, total_adiant=0) %}
+  {# Totais (tudo entra como despesa) #}
+  {% set ns_dc = namespace(qtd_total=0, total=0) %}
   {% for dc in _despesas %}
     {% set ns_dc.qtd_total = ns_dc.qtd_total + 1 %}
-    {% set _is_ad = (dc.adiantamento in [True, 1, '1', 'true', 'True', 'on']) %}
-    {% if _is_ad %}
-      {% set ns_dc.qtd_adiant = ns_dc.qtd_adiant + 1 %}
-      {% set ns_dc.total_adiant = ns_dc.total_adiant + (dc.valor or 0) %}
-    {% else %}
-      {% set ns_dc.qtd_normais = ns_dc.qtd_normais + 1 %}
-      {% set ns_dc.total_normais = ns_dc.total_normais + (dc.valor or 0) %}
-    {% endif %}
+    {% set ns_dc.total = ns_dc.total + (dc.valor or 0) %}
   {% endfor %}
 
-  {% set _qtd_total     = ns_dc.qtd_total %}
-  {% set _qtd_adiant    = ns_dc.qtd_adiant %}
-  {% set _qtd_normais   = ns_dc.qtd_normais %}
-  {% set _total_normais = ns_dc.total_normais %}
-  {% set _total_adiant  = ns_dc.total_adiant %}
-  {% set _total_geral   = (_total_normais + _total_adiant) %}
+  {% set _qtd_total   = ns_dc.qtd_total %}
+  {% set _total_geral = ns_dc.total %}
 
   <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
     <h5 class="m-0 d-flex align-items-center gap-2">
@@ -2517,27 +2498,21 @@
         Registros: <b>{{ _qtd_total }}</b>
       </span>
       <span class="badge bg-danger-subtle text-danger border">
-        Total (exclui adiant.): <b>R$ {{ '%.2f'|format(_total_normais) }}</b>
-      </span>
-      <span class="badge bg-secondary-subtle text-secondary border">
-        Adiant. (fora do total): <b>R$ {{ '%.2f'|format(_total_adiant) }}</b>
+        Total: <b>R$ {{ '%.2f'|format(_total_geral) }}</b>
       </span>
     </div>
   </div>
 
+  <!-- Filtros -->
   <div class="card border-0 shadow-sm rounded-3 mb-3">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
         <h6 class="m-0"><i class="bi bi-funnel"></i> Filtrar</h6>
-        <div class="form-check form-switch">
-          <input class="form-check-input" type="checkbox" id="toggleOcultarAdiant">
-          <label class="form-check-label small" for="toggleOcultarAdiant">
-            Ocultar adiantamentos
-          </label>
-        </div>
       </div>
+
       <form method="GET" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="coop_despesas">
+
         <div class="col-md-3">
           <label class="form-label">Data Início</label>
           <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
@@ -2546,20 +2521,33 @@
           <label class="form-label">Data Fim</label>
           <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ request.args.get('data_fim','') }}">
         </div>
-        <div class="col-md-3">
-          <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+
+        <div class="col-md-4">
+          <label class="form-label">Pesquisar (Cooperado ou Descrição)</label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" id="qDespCoop" placeholder="Ex: João / capacete / manutenção...">
+            <button class="btn btn-outline-secondary" type="button" id="btnClearQDesp" title="Limpar">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <small class="text-muted">A pesquisa filtra a tabela abaixo (não altera o banco).</small>
         </div>
-        <div class="col-md-3 d-none d-md-block"></div>
+
+        <div class="col-md-2">
+          <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Aplicar datas</button>
+        </div>
       </form>
     </div>
   </div>
 
+  <!-- Adicionar Despesa -->
   <div class="card border-0 shadow-sm rounded-3 mb-3">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h6 class="m-0"><i class="bi bi-plus-circle"></i> Adicionar Despesa</h6>
         <span class="text-muted small">
-          Se marcar como <b>adiantamento</b>, não entra no total de “Despesas Cooperados” e será descontado na Folha.
+          Lançamento de despesa/benefício para cooperado(s).
         </span>
       </div>
 
@@ -2572,10 +2560,12 @@
           </select>
           <small class="text-muted">Use Ctrl/Cmd para múltiplos.</small>
         </div>
+
         <div class="col-md-3">
           <label class="form-label">Descrição</label>
           <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
         </div>
+
         <div class="col-md-2">
           <label class="form-label">Valor (R$)</label>
           <div class="input-group input-group-sm">
@@ -2583,24 +2573,23 @@
             <input type="number" step="0.01" class="form-control" name="valor" placeholder="0,00" required>
           </div>
         </div>
+
         <div class="col-md-2">
           <label class="form-label">Data</label>
           <input type="date" class="form-control form-control-sm" name="data" required>
         </div>
+
         <div class="col-md-1 d-flex flex-column">
           <label class="form-label d-none d-md-block">&nbsp;</label>
-          <button class="btn btn-danger btn-sm w-100 mb-2" title="Salvar">
+          <button class="btn btn-danger btn-sm w-100" title="Salvar">
             <i class="bi bi-plus-circle"></i>
           </button>
-          <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" name="adiantamento" value="1" id="switchAdiantamento">
-            <label class="form-check-label small" for="switchAdiantamento">Adiant.</label>
-          </div>
         </div>
       </form>
     </div>
   </div>
 
+  <!-- Tabela -->
   <div class="card border-0 shadow-sm rounded-3">
     <div class="card-body p-2 p-md-3">
       <div class="table-responsive">
@@ -2614,19 +2603,19 @@
               <th class="text-center" style="width:140px">Ações</th>
             </tr>
           </thead>
+
           <tbody>
             {% for dc in despesas_coop %}
-              {% set _is_ad = (dc.adiantamento in [True, 1, '1', 'true', 'True', 'on']) %}
-              <tr data-adiant="{{ 1 if _is_ad else 0 }}">
+              {% set coop_nome = (dc.cooperado.nome if dc.cooperado else 'Todos') %}
+              <tr
+                data-coop="{{ coop_nome|lower }}"
+                data-desc="{{ (dc.descricao or '')|lower }}"
+              >
                 <td>{{ dc.data.strftime('%d/%m/%Y') if dc.data else '-' }}</td>
-                <td class="text-break">{{ dc.cooperado.nome if dc.cooperado else 'Todos' }}</td>
-                <td class="text-break">
-                  {{ dc.descricao }}
-                  {% if _is_ad %}
-                    <span class="badge bg-secondary ms-2">Adiantamento</span>
-                  {% endif %}
-                </td>
+                <td class="text-break">{{ coop_nome }}</td>
+                <td class="text-break">{{ dc.descricao }}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(dc.valor) }}</td>
+
                 <td class="text-center text-nowrap">
                   <button class="btn btn-warning btn-sm"
                           data-bs-toggle="modal"
@@ -2636,28 +2625,29 @@
                           data-descricao="{{ dc.descricao }}"
                           data-valor="{{ dc.valor }}"
                           data-data="{{ dc.data.strftime('%Y-%m-%d') if dc.data else '' }}"
-                          data-adiantamento="{{ 1 if _is_ad else 0 }}"
                           data-url="{{ url_for('edit_despesa_coop', id=dc.id) }}">
                     <i class="bi bi-pencil"></i>
                   </button>
-                  <a class="btn btn-danger btn-sm btn-del" href="{{ url_for('delete_despesa_coop', id=dc.id) }}">
-                    <i class="bi bi-trash"></i>
-                  </a>
+
+                  <!-- EXCLUIR via POST (evita 405) -->
+                  <form method="POST" action="{{ url_for('delete_despesa_coop', id=dc.id) }}" class="d-inline">
+                    {# Se você usa Flask-WTF/CSRF, descomente a linha abaixo #}
+                    {# {{ csrf_token() }} #}
+                    <button type="submit" class="btn btn-danger btn-sm btn-del" onclick="return confirm('Excluir esta despesa?');">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
                 </td>
               </tr>
             {% else %}
               <tr><td colspan="5" class="text-center text-muted">Nenhuma despesa</td></tr>
             {% endfor %}
           </tbody>
+
           <tfoot>
             <tr class="table-light">
-              <th colspan="3" class="text-end">Total (exclui adiant.)</th>
-              <th class="text-end">R$ {{ '%.2f'|format(_total_normais) }}</th>
-              <th></th>
-            </tr>
-            <tr class="table-light">
-              <th colspan="3" class="text-end text-muted">Adiantamentos (fora do total)</th>
-              <th class="text-end text-muted">R$ {{ '%.2f'|format(_total_adiant) }}</th>
+              <th colspan="3" class="text-end">Total</th>
+              <th class="text-end">R$ {{ '%.2f'|format(_total_geral) }}</th>
               <th></th>
             </tr>
           </tfoot>
@@ -2667,43 +2657,47 @@
   </div>
 
   <script>
-    // Toggle "Ocultar adiantamentos" (só front-end)
+    // Pesquisa na tabela por cooperado OU descrição (front-end)
     (function(){
-      const chk = document.getElementById('toggleOcultarAdiant');
+      const input = document.getElementById('qDespCoop');
+      const btnClear = document.getElementById('btnClearQDesp');
       const tbl = document.getElementById('tblDespesasCoop');
-      if(!chk || !tbl) return;
+      if(!input || !tbl) return;
+
+      function norm(s){
+        return (s || '')
+          .toString()
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g,'')
+          .trim();
+      }
 
       function apply(){
-        const hide = chk.checked;
-        tbl.querySelectorAll('tbody tr').forEach(tr=>{
-          const isAd = String(tr.getAttribute('data-adiant')||'0') === '1';
-          tr.style.display = (hide && isAd) ? 'none' : '';
+        const q = norm(input.value);
+        const rows = tbl.querySelectorAll('tbody tr');
+
+        // Se não tem linhas de dados (ex: "Nenhuma despesa"), não faz nada
+        rows.forEach(tr=>{
+          const coop = norm(tr.getAttribute('data-coop') || '');
+          const desc = norm(tr.getAttribute('data-desc') || '');
+          const ok = !q || coop.includes(q) || desc.includes(q);
+          tr.style.display = ok ? '' : 'none';
         });
       }
-      chk.addEventListener('change', apply);
+
+      input.addEventListener('input', apply);
+      if(btnClear){
+        btnClear.addEventListener('click', ()=>{
+          input.value = '';
+          input.focus();
+          apply();
+        });
+      }
       apply();
     })();
   </script>
 </section>
-
-<script>
-  // Toggle "Ocultar adiantamentos" (só front-end)
-  (function(){
-    const chk = document.getElementById('toggleOcultarAdiant');
-    const tbl = document.getElementById('tblDespesasCoop');
-    if(!chk || !tbl) return;
-
-    function apply(){
-      const hide = chk.checked;
-      tbl.querySelectorAll('tbody tr').forEach(tr=>{
-        const isAd = String(tr.getAttribute('data-adiant')||'0') === '1';
-        tr.style.display = (hide && isAd) ? 'none' : '';
-      });
-    }
-    chk.addEventListener('change', apply);
-    apply();
-  })();
-</script>
 
      <!-- BENEFÍCIOS (versão profissional / sem alterar backend) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='beneficios' else '' }}" id="beneficios" role="tabpanel">
