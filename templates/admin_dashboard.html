@@ -578,7 +578,9 @@
       {% endif %}
     {% endfor %}
     {% set total_producoes_f = ns_prod.total %}
-    {% set total_inss_f      = total_producoes_f * 0.045 %}
+    {% set total_inss_4_f    = total_producoes_f * 0.04 %}
+    {% set total_sest_05_f   = total_producoes_f * 0.005 %}
+    {% set total_encargos_f  = total_inss_4_f + total_sest_05_f %}
 
     {# Coop (geral) — mesma lógica da aba RECEITAS: valor|default(valor_total, true)|default(0, true) #}
     {% set ns_rec_corp = namespace(total=0) %}
@@ -614,22 +616,23 @@
     {% set total_receitas_coop_f = ns_rec_coop.total %}
 
     {% set ns_desp_coop = namespace(total=0, total_adiant=0) %}
-{% for d in despesas_coop %}
-  {% set dt  = ymd(d.data) %}
-  {% set okd = (not ri or dt >= ri) and (not rf or dt <= rf) %}
-  {% set okc = (not cid or (d.cooperado and d.cooperado.id==cid)) %}
-  {% if okd and okc %}
-    {% if d.adiantamento %}
-      {# SOMENTE adiantamento, fora do total de Despesas Cooperados #}
-      {% set ns_desp_coop.total_adiant = ns_desp_coop.total_adiant + (d.valor or 0) %}
-    {% else %}
-      {# Despesa “normal” (entra no total de Despesas Cooperados) #}
-      {% set ns_desp_coop.total = ns_desp_coop.total + (d.valor or 0) %}
-    {% endif %}
-  {% endif %}
-{% endfor %}
-{% set total_despesas_coop_f = ns_desp_coop.total %}
-{% set total_adiantamentos_f = ns_desp_coop.total_adiant %}
+    {% for d in despesas_coop %}
+      {% set dt  = ymd(d.data) %}
+      {% set okd = (not ri or dt >= ri) and (not rf or dt <= rf) %}
+      {% set okc = (not cid or (d.cooperado and d.cooperado.id==cid)) %}
+      {% if okd and okc %}
+      {% set _is_ad = (d.adiantamento in [True, 1, '1', 'true', 'True', 'on']) %}
+      {% if _is_ad %}
+          {# SOMENTE adiantamento, fora do total de Despesas Cooperados #}
+          {% set ns_desp_coop.total_adiant = ns_desp_coop.total_adiant + (d.valor or 0) %}
+        {% else %}
+          {# Despesa “normal” (entra no total de Despesas Cooperados) #}
+          {% set ns_desp_coop.total = ns_desp_coop.total + (d.valor or 0) %}
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+    {% set total_despesas_coop_f = ns_desp_coop.total %}
+    {% set total_adiantamentos_f = ns_desp_coop.total_adiant %}
 
     {# Ajuste: Receitas dos cooperados = Produções + Receitas individuais #}
     {% set total_receitas_coop_full_f = (total_producoes_f|default(0)) + (total_receitas_coop_f|default(0)) %}
@@ -649,7 +652,7 @@
             <div>
               <h5 class="mb-0 resumo-title">Resumo geral financeiro</h5>
               <small class="text-muted">
-                Use os filtros para enxergar produção, INSS, receitas, despesas e adiantamentos por período, estabelecimento e cooperado.
+                Use os filtros para enxergar produção, INSS (4,0%), SEST/SENAT (0,5%), receitas, despesas e adiantamentos por período, estabelecimento e cooperado.
               </small>
             </div>
           </div>
@@ -739,16 +742,32 @@
         </div>
       </div>
 
+      <!-- INSS 4% -->
       <div class="col-12 col-sm-6 col-lg-3">
         <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
           <div class="kpi-border kpi-inss"></div>
           <div class="d-flex align-items-center justify-content-between">
             <div>
               <div class="text-uppercase text-muted small">Total INSS</div>
-              <div id="kpiINSS" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_inss_f) }}</div>
-              <div class="small text-muted">4,5% s/ produções</div>
+              <div id="kpiINSS4" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_inss_4_f) }}</div>
+              <div class="small text-muted">4,0% s/ produções</div>
             </div>
             <div class="kpi-icon"><i class="bi bi-shield-check"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEST/SENAT 0,5% -->
+      <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+          <div class="kpi-border kpi-sest"></div>
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="text-uppercase text-muted small">Total SEST/SENAT</div>
+              <div id="kpiSEST05" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_sest_05_f) }}</div>
+              <div class="small text-muted">0,5% s/ produções</div>
+            </div>
+            <div class="kpi-icon"><i class="bi bi-shield"></i></div>
           </div>
         </div>
       </div>
@@ -851,7 +870,7 @@
             <div>
               <h6 class="m-0">Resumo por Cooperado (filtro aplicado)</h6>
               <small class="text-muted">
-                Líquido = Produções + <span class="text-success">Receitas</span> − INSS −
+                Líquido = Produções + <span class="text-success">Receitas</span> − INSS (4,0%) − SEST/SENAT (0,5%) −
                 <span class="text-danger">Despesas</span> − <span class="text-primary">Adiant.</span>
               </small>
             </div>
@@ -863,7 +882,8 @@
               <tr class="text-nowrap">
                 <th>Cooperado</th>
                 <th class="text-end">Produções</th>
-                <th class="text-end">INSS (4,5%)</th>
+                <th class="text-end">INSS (4,0%)</th>
+                <th class="text-end">SEST/SENAT (0,5%)</th>
                 <th class="text-end text-success">Receitas</th>
                 <th class="text-end text-danger">Despesas</th>
                 <th class="text-end text-primary">Adiant.</th>
@@ -871,13 +891,14 @@
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="7" class="text-center text-muted">Carregando…</td></tr>
+              <tr><td colspan="8" class="text-center text-muted">Carregando…</td></tr>
             </tbody>
             <tfoot>
               <tr class="table-light fw-bold">
                 <td>Total</td>
                 <td class="text-end" id="tProd">R$ 0,00</td>
-                <td class="text-end" id="tINSS">R$ 0,00</td>
+                <td class="text-end" id="tINSS4">R$ 0,00</td>
+                <td class="text-end" id="tSEST05">R$ 0,00</td>
                 <td class="text-end text-success" id="tRec">R$ 0,00</td>
                 <td class="text-end text-danger" id="tDes">R$ 0,00</td>
                 <td class="text-end text-primary" id="tAd">R$ 0,00</td>
@@ -969,6 +990,7 @@
     }
     #resumo .kpi-prod{ border-color: rgba(37,99,235,0.55); }
     #resumo .kpi-inss{ border-color: rgba(56,189,248,0.55); }
+    #resumo .kpi-sest{ border-color: rgba(2,132,199,0.55); } /* novo */
     #resumo .kpi-rec-coop{ border-color: rgba(16,185,129,0.55); }
     #resumo .kpi-desp-coop{ border-color: rgba(239,68,68,0.55); }
     #resumo .kpi-rec-coop2{ border-color: rgba(34,197,94,0.55); }
@@ -1047,6 +1069,7 @@
       }
     }
   </style>
+
 <!-- Dados (seguros p/ JS) + Scripts (Chart.js + XLSX) -->
 <script>
 (function(){
@@ -1164,15 +1187,10 @@
 
   // helper robusto para flag de adiantamento (pega número, string ou boolean)
   const isAdiantamento = (raw) => {
-    return (
-      raw === 1 ||
-      raw === '1' ||
-      raw === true ||
-      raw === 'true'
-    );
+    return (raw === 1 || raw === '1' || raw === true || raw === 'true');
   };
 
-  // ---- Filtro de despesas com fallback por nome quando filtrar por cooperado ----
+  // ---- Filtro ----
   const filteredPROD = PRODUCOES.filter(p =>
     inRange(p.data) &&
     (FILTER.cid == null || p.cooperado_id === FILTER.cid) &&
@@ -1188,10 +1206,8 @@
     if (!inRange(d.data)) return false;
     if (FILTER.cid == null) return true;
 
-    // tenta bater por ID primeiro
     if (d.cooperado_id === FILTER.cid) return true;
 
-    // fallback por nome, se o lançamento não tiver id mas tiver nome
     const coop = COOPS.find(c => c.id === FILTER.cid);
     if (coop && d.cooperado_nome) {
       return d.cooperado_nome.trim().toUpperCase() === coop.nome.trim().toUpperCase();
@@ -1203,29 +1219,27 @@
   const filteredDESc = DESP_COOP_CORP.filter(d => inRange(d.data));
 
   // ---- KPIs (front) ----
-  const kpiProd               = sumBy(filteredPROD, x => x.valor);
-  const kpiINSS               = kpiProd * 0.045;
-  const kpiRecCoopCorp        = sumBy(filteredRECc, x => x.valor);
-  const kpiDespCoopCorp       = sumBy(filteredDESc, x => x.valor);
-  const kpiRecCooperadosFull  = kpiProd + sumBy(filteredRECp, x => x.valor);
+  const kpiProd         = sumBy(filteredPROD, x => x.valor);
 
-  // separa despesas “normais” e adiantamentos dos cooperados
-  const kpiDespCooperados = sumBy(
-    filteredDESp,
-    x => isAdiantamento(x.adiantamento) ? 0 : x.valor
-  );
+  const kpiINSS4        = kpiProd * 0.04;
+  const kpiSEST05       = kpiProd * 0.005;
+  const kpiEncargos45   = kpiINSS4 + kpiSEST05;
 
-  const kpiAdiantCooperados = sumBy(
-    filteredDESp,
-    x => isAdiantamento(x.adiantamento) ? x.valor : 0
-  );
+  const kpiRecCoopCorp  = sumBy(filteredRECc, x => x.valor);
+  const kpiDespCoopCorp = sumBy(filteredDESc, x => x.valor);
+
+  const kpiRecCooperadosFull = kpiProd + sumBy(filteredRECp, x => x.valor);
+
+  const kpiDespCooperados = sumBy(filteredDESp, x => isAdiantamento(x.adiantamento) ? 0 : x.valor);
+  const kpiAdiantCooperados = sumBy(filteredDESp, x => isAdiantamento(x.adiantamento) ? x.valor : 0);
 
   const kpiResultadoCoop      = kpiRecCoopCorp - kpiDespCoopCorp;
   const kpiTotalReceitasGeral = kpiRecCoopCorp + kpiRecCooperadosFull;
 
   // aplica KPIs na tela
   document.getElementById('kpiTotalProds').textContent         = fmtBR(kpiProd);
-  document.getElementById('kpiINSS').textContent               = fmtBR(kpiINSS);
+  document.getElementById('kpiINSS4').textContent              = fmtBR(kpiINSS4);
+  document.getElementById('kpiSEST05').textContent             = fmtBR(kpiSEST05);
   document.getElementById('kpiRecCoopCorp').textContent        = fmtBR(kpiRecCoopCorp);
   document.getElementById('kpiDespCoopCorp').textContent       = fmtBR(kpiDespCoopCorp);
   document.getElementById('kpiRecCooperadosFull').textContent  = fmtBR(kpiRecCooperadosFull);
@@ -1253,15 +1267,16 @@
     const ensure = (id, nome) => {
       const key = coopKey(id, nome);
       if (!map.has(key)) {
-        map.set(key, { key, id, nome, prod: 0, inss: 0, rec: 0, des: 0, ad: 0 });
+        map.set(key, { key, id, nome, prod: 0, inss4: 0, sest05: 0, rec: 0, des: 0, ad: 0 });
       }
       return map.get(key);
     };
 
     filteredPROD.forEach(p => {
       const row = ensure(p.cooperado_id, p.cooperado_nome);
-      row.prod += p.valor;
-      row.inss += p.valor * 0.045;
+      row.prod   += p.valor;
+      row.inss4  += p.valor * 0.04;
+      row.sest05 += p.valor * 0.005;
     });
 
     filteredRECp.forEach(r => {
@@ -1271,11 +1286,8 @@
 
     filteredDESp.forEach(d => {
       const row = ensure(d.cooperado_id, d.cooperado_nome || '—');
-      if (isAdiantamento(d.adiantamento)) {
-        row.ad += d.valor;   // adiantamento vai para coluna AD
-      } else {
-        row.des += d.valor;  // demais despesas
-      }
+      if (isAdiantamento(d.adiantamento)) row.ad += d.valor;
+      else row.des += d.valor;
     });
 
     return Array.from(map.values()).sort((a, b) =>
@@ -1285,23 +1297,23 @@
 
   const RESUMO_COOP_ROWS = computeResumoCoopRows();
 
-  // ---- Tabela Resumo por Cooperado (incluindo Adiant.) na tela ----
+  // ---- Tabela Resumo por Cooperado ----
   (function renderResumoCoopTable() {
     const rows  = RESUMO_COOP_ROWS;
     const tbody = document.querySelector('#tblResumoCoop tbody');
-
     if (!tbody) return;
 
     tbody.innerHTML = rows.length
       ? ''
-      : '<tr><td colspan="7" class="text-center text-muted">Sem dados no filtro.</td></tr>';
+      : '<tr><td colspan="8" class="text-center text-muted">Sem dados no filtro.</td></tr>';
 
-    let tProd = 0, tINSS = 0, tRec = 0, tDes = 0, tAd = 0, tLiq = 0;
+    let tProd = 0, tINSS4 = 0, tSEST05 = 0, tRec = 0, tDes = 0, tAd = 0, tLiq = 0;
 
     rows.forEach(r => {
-      const liq = r.prod + r.rec - r.inss - r.des - r.ad;
+      const liq = r.prod + r.rec - r.inss4 - r.sest05 - r.des - r.ad;
       tProd += r.prod;
-      tINSS += r.inss;
+      tINSS4 += r.inss4;
+      tSEST05 += r.sest05;
       tRec  += r.rec;
       tDes  += r.des;
       tAd   += r.ad;
@@ -1311,7 +1323,8 @@
       tr.innerHTML = `
         <td class="text-break">${r.nome || '—'}</td>
         <td class="text-end">${fmtBR(r.prod)}</td>
-        <td class="text-end">${fmtBR(r.inss)}</td>
+        <td class="text-end">${fmtBR(r.inss4)}</td>
+        <td class="text-end">${fmtBR(r.sest05)}</td>
         <td class="text-end text-success">${fmtBR(r.rec)}</td>
         <td class="text-end text-danger">${fmtBR(r.des)}</td>
         <td class="text-end text-primary">${fmtBR(r.ad)}</td>
@@ -1319,9 +1332,9 @@
       tbody.appendChild(tr);
     });
 
-    // Totais com cores
-    document.getElementById('tProd').textContent = fmtBR(tProd);
-    document.getElementById('tINSS').textContent = fmtBR(tINSS);
+    document.getElementById('tProd').textContent   = fmtBR(tProd);
+    document.getElementById('tINSS4').textContent  = fmtBR(tINSS4);
+    document.getElementById('tSEST05').textContent = fmtBR(tSEST05);
 
     const tRecEl = document.getElementById('tRec');
     const tDesEl = document.getElementById('tDes');
@@ -1335,7 +1348,7 @@
     if (tLiqEl) {
       tLiqEl.textContent = fmtBR(tLiq);
       tLiqEl.classList.remove('text-danger', 'text-success');
-      if (tLiq < 0) tLiqEl.classList.add('text-danger'); // negativo em vermelho
+      if (tLiq < 0) tLiqEl.classList.add('text-danger');
     }
   })();
 
@@ -1383,7 +1396,7 @@
       }
     };
 
-    // Cooperativa: Receitas vs Despesas por mês (barras)
+    // Cooperativa: Receitas vs Despesas por mês
     (function () {
       const byM = {};
       filteredRECc.forEach(r => {
@@ -1407,43 +1420,28 @@
         data: {
           labels,
           datasets: [
-            {
-              label: 'Receitas',
-              data: rec,
-              backgroundColor: 'rgba(37, 99, 235, 0.75)',
-              borderRadius: 6,
-            },
-            {
-              label: 'Despesas',
-              data: des,
-              backgroundColor: 'rgba(239, 68, 68, 0.75)',
-              borderRadius: 6,
-            }
+            { label: 'Receitas', data: rec, backgroundColor: 'rgba(37, 99, 235, 0.75)', borderRadius: 6 },
+            { label: 'Despesas', data: des, backgroundColor: 'rgba(239, 68, 68, 0.75)', borderRadius: 6 }
           ]
         },
-        options: {
-          ...baseChartOptions,
-          scales: {
-            ...baseChartOptions.scales,
-            x: { ...baseChartOptions.scales.x, stacked: false },
-            y: { ...baseChartOptions.scales.y }
-          }
-        }
+        options: baseChartOptions
       });
     })();
 
-    // Cooperados: Produções (bruto) e INSS por mês (linha/área)
+    // Cooperados: Produções + INSS 4% + SEST 0,5% por mês
     (function () {
       const byM = {};
       filteredPROD.forEach(p => {
         const k = byMonthKey(p.data) || '—';
-        (byM[k] ??= { prod: 0, inss: 0 }).prod += p.valor;
-        byM[k].inss += p.valor * 0.045;
+        (byM[k] ??= { prod: 0, inss4: 0, sest05: 0 }).prod += p.valor;
+        byM[k].inss4  += p.valor * 0.04;
+        byM[k].sest05 += p.valor * 0.005;
       });
 
       const labels = Object.keys(byM).sort();
       const prod   = labels.map(k => byM[k].prod);
-      const inss   = labels.map(k => byM[k].inss);
+      const inss4  = labels.map(k => byM[k].inss4);
+      const sest05 = labels.map(k => byM[k].sest05);
 
       const ctx = document.getElementById('chartCooperados');
       if (!ctx) return;
@@ -1465,10 +1463,21 @@
               pointHoverRadius: 4
             },
             {
-              label: 'INSS (4,5%)',
-              data: inss,
+              label: 'INSS (4,0%)',
+              data: inss4,
               borderColor: 'rgba(56, 189, 248, 1)',
               backgroundColor: 'rgba(56, 189, 248, 0.12)',
+              borderWidth: 2,
+              tension: 0.3,
+              fill: true,
+              pointRadius: 3,
+              pointHoverRadius: 4
+            },
+            {
+              label: 'SEST/SENAT (0,5%)',
+              data: sest05,
+              borderColor: 'rgba(2, 132, 199, 1)',
+              backgroundColor: 'rgba(2, 132, 199, 0.10)',
               borderWidth: 2,
               tension: 0.3,
               fill: true,
@@ -1481,7 +1490,7 @@
       });
     })();
 
-    // Estabelecimentos (ranking no período) — barra horizontal
+    // Estabelecimentos — barra horizontal
     (function () {
       const byR = {};
       filteredPROD.forEach(p => {
@@ -1489,10 +1498,7 @@
         byR[p.restaurante_nome] = (byR[p.restaurante_nome] || 0) + p.valor;
       });
 
-      const entries = Object.entries(byR)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 20);
-
+      const entries = Object.entries(byR).sort((a, b) => b[1] - a[1]).slice(0, 20);
       const labels = entries.map(e => e[0]);
       const vals   = entries.map(e => e[1]);
 
@@ -1503,21 +1509,9 @@
         type: 'bar',
         data: {
           labels,
-          datasets: [{
-            label: 'Produções por Estabelecimento',
-            data: vals,
-            backgroundColor: 'rgba(16, 185, 129, 0.8)',
-            borderRadius: 6,
-          }]
+          datasets: [{ label: 'Produções por Estabelecimento', data: vals, backgroundColor: 'rgba(16, 185, 129, 0.8)', borderRadius: 6 }]
         },
-        options: {
-          ...baseChartOptions,
-          plugins: {
-            ...baseChartOptions.plugins,
-            legend: { display: false }
-          },
-          indexAxis: 'y'
-        }
+        options: { ...baseChartOptions, plugins: { ...baseChartOptions.plugins, legend: { display: false } }, indexAxis: 'y' }
       });
     })();
   });
@@ -1554,7 +1548,9 @@
       [],
       ['KPIs'],
       ['Total Produções', kpiProd],
-      ['INSS (4,5%)', kpiINSS],
+      ['INSS (4,0%)', kpiINSS4],
+      ['SEST/SENAT (0,5%)', kpiSEST05],
+      ['Encargos (4,5%)', kpiEncargos45],
       ['Receitas Coop (período)', kpiRecCoopCorp],
       ['Despesas Coop (período)', kpiDespCoopCorp],
       ['Receitas Cooperados (Prod + Rec)', kpiRecCooperadosFull],
@@ -1565,10 +1561,14 @@
     ];
     aoaToSheet('KPIs', k1, wb);
 
-    // Produções (geral)
-    const prodAOA = [['Data', 'Cooperado', 'Estabelecimento', 'Descrição', 'Valor', 'INSS(4,5%)']];
+    // Produções
+    const prodAOA = [['Data', 'Cooperado', 'Estabelecimento', 'Valor', 'INSS(4,0%)', 'SEST/SENAT(0,5%)', 'Encargos(4,5%)', 'Líquido']];
     filteredPROD.forEach(p => {
-      prodAOA.push([p.data, p.cooperado_nome || '', p.restaurante_nome || '', 'Produção', p.valor, p.valor * 0.045]);
+      const inss4  = p.valor * 0.04;
+      const sest05 = p.valor * 0.005;
+      const enc    = inss4 + sest05;
+      const liq    = p.valor - enc;
+      prodAOA.push([p.data, p.cooperado_nome || '', p.restaurante_nome || '', p.valor, inss4, sest05, enc, liq]);
     });
     aoaToSheet('Producoes', prodAOA, wb);
 
@@ -1588,45 +1588,27 @@
         byR[p.restaurante_nome] = (byR[p.restaurante_nome] || 0) + p.valor;
     });
     const estAOA = [['Estabelecimento', 'Total Produções (R$)']];
-    Object.entries(byR)
-      .sort((a, b) => b[1] - a[1])
-      .forEach(([nome, v]) => estAOA.push([nome, v]));
+    Object.entries(byR).sort((a, b) => b[1] - a[1]).forEach(([nome, v]) => estAOA.push([nome, v]));
     aoaToSheet('Estabelecimentos', estAOA, wb);
 
-    // RESUMO por cooperado (com ADT separado)
-    const resumoAOA = [['Cooperado', 'Produções', 'INSS', 'Receitas', 'Despesas', 'Adiantamentos', 'Líquido']];
-    let tProd = 0, tINSS = 0, tRec = 0, tDes = 0, tAd = 0, tLiq = 0;
+    // RESUMO por cooperado
+    const resumoAOA = [['Cooperado', 'Produções', 'INSS (4,0%)', 'SEST/SENAT (0,5%)', 'Receitas', 'Despesas', 'Adiantamentos', 'Líquido']];
+    let tProd = 0, tINSS4 = 0, tSEST05 = 0, tRec = 0, tDes = 0, tAd = 0, tLiq = 0;
 
     RESUMO_COOP_ROWS.forEach(r => {
-      const liq = r.prod + r.rec - r.inss - r.des - r.ad;
-      tProd += r.prod;
-      tINSS += r.inss;
-      tRec  += r.rec;
-      tDes  += r.des;
-      tAd   += r.ad;
-      tLiq  += liq;
+      const liq = r.prod + r.rec - r.inss4 - r.sest05 - r.des - r.ad;
+      tProd  += r.prod;
+      tINSS4 += r.inss4;
+      tSEST05 += r.sest05;
+      tRec   += r.rec;
+      tDes   += r.des;
+      tAd    += r.ad;
+      tLiq   += liq;
 
-      resumoAOA.push([
-        r.nome || '—',
-        r.prod,
-        r.inss,
-        r.rec,
-        r.des,
-        r.ad,
-        liq
-      ]);
+      resumoAOA.push([r.nome || '—', r.prod, r.inss4, r.sest05, r.rec, r.des, r.ad, liq]);
     });
 
-    resumoAOA.push([
-      'TOTAIS',
-      tProd,
-      tINSS,
-      tRec,
-      tDes,
-      tAd,
-      tLiq
-    ]);
-
+    resumoAOA.push(['TOTAIS', tProd, tINSS4, tSEST05, tRec, tDes, tAd, tLiq]);
     aoaToSheet('Resumo_Cooperados', resumoAOA, wb);
 
     // Uma aba por Cooperado — Receitas
@@ -1668,10 +1650,12 @@
     
      <!-- LANÇAMENTOS (versão moderna/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='lancamentos' else '' }}" id="lancamentos" role="tabpanel">
-  {% set soma_valor = (lancamentos|sum(attribute='valor')) if lancamentos else 0 %}
-  {% set soma_inss  = (soma_valor * 0.045) %}
-  {% set soma_liq   = (soma_valor - soma_inss) %}
-  {% set soma_qtd = (lancamentos | map(attribute='qtd_entregas') | select('number') | sum) if lancamentos else 0 %}
+  {# ====== TOTAIS DO FILTRO (já vem filtrado do backend) ====== #}
+  {% set soma_valor    = (lancamentos|sum(attribute='valor')) if lancamentos else 0 %}
+  {% set soma_inss_4   = (soma_valor * 0.04) %}
+  {% set soma_sest_05  = (soma_valor * 0.005) %}
+  {% set soma_liq      = (soma_valor - soma_inss_4 - soma_sest_05) %}
+  {% set soma_qtd      = (lancamentos | map(attribute='qtd_entregas') | select('number') | sum) if lancamentos else 0 %}
 
   <!-- Header + KPIs -->
   <div class="card lanc-card-header mb-3">
@@ -1684,7 +1668,7 @@
           <span>Lançamentos & Produção</span>
         </h5>
         <small class="text-muted-2">
-          Controle de produção por restaurante, cooperado e período, com INSS e líquido calculados.
+          Controle de produção por restaurante, cooperado e período, com INSS (4,0%), SEST/SENAT (0,5%) e líquido calculados.
         </small>
       </div>
 
@@ -1697,14 +1681,22 @@
           <span class="kpi-label">Bruto</span>
           <span class="kpi-value">R$ {{ '%.2f'|format(soma_valor) }}</span>
         </div>
+
         <div class="kpi-chip kpi-soft">
-          <span class="kpi-label">INSS (4,5%)</span>
-          <span class="kpi-value">R$ {{ '%.2f'|format(soma_inss) }}</span>
+          <span class="kpi-label">INSS (4,0%)</span>
+          <span class="kpi-value">R$ {{ '%.2f'|format(soma_inss_4) }}</span>
         </div>
+
+        <div class="kpi-chip kpi-soft">
+          <span class="kpi-label">SEST/SENAT (0,5%)</span>
+          <span class="kpi-value">R$ {{ '%.2f'|format(soma_sest_05) }}</span>
+        </div>
+
         <div class="kpi-chip {{ 'kpi-success' if soma_liq >= 0 else 'kpi-danger' }}">
           <span class="kpi-label">Líquido</span>
           <span class="kpi-value">R$ {{ '%.2f'|format(soma_liq) }}</span>
         </div>
+
         <div class="kpi-chip kpi-neutral">
           <span class="kpi-label">Entregas</span>
           <span class="kpi-value">{{ soma_qtd }}</span>
@@ -1803,10 +1795,13 @@
           <button class="btn btn-royal btn-sm rounded-pill">
             <i class="bi bi-funnel"></i> Filtrar
           </button>
+
+          {# EXPORTA COM OS MESMOS FILTROS DO REQUEST (CSV) #}
           <a href="{{ url_for('exportar_lancamentos', **request.args) }}"
              class="btn btn-outline-secondary btn-sm rounded-pill">
             <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
           </a>
+
           <button type="reset" class="btn btn-light btn-sm rounded-pill">
             Limpar
           </button>
@@ -1905,8 +1900,9 @@
       </form>
 
       <div class="mt-2 text-muted small">
-        Nota: o INSS abaixo é o cálculo bruto linha-a-linha (4,5%). <b>Isenções por benefício</b> entram na
-        <u>Folha</u> e nos <u>totais</u> do Resumo.
+        Nota: os descontos abaixo são cálculo bruto linha-a-linha:
+        <b>INSS 4,0%</b> + <b>SEST/SENAT 0,5%</b> = <b>4,5%</b>.
+        <b>Isenções por benefício</b> entram na <u>Folha</u> e nos <u>totais</u> do Resumo.
       </div>
     </div>
   </div>
@@ -1926,15 +1922,17 @@
               <th class="text-center">Entregas</th>
               <th>Data</th>
               <th>Horário</th>
-              <th class="text-end">INSS (4,5%)</th>
+              <th class="text-end">INSS (4,0%)</th>
+              <th class="text-end">SEST/SENAT (0,5%)</th>
               <th class="text-end">Líquido</th>
               <th class="text-center">Ações</th>
             </tr>
           </thead>
           <tbody>
             {% for l in lancamentos %}
-              {% set inss = (l.valor or 0)*0.045 %}
-              {% set liq  = (l.valor or 0) - inss %}
+              {% set inss_4  = (l.valor or 0) * 0.04 %}
+              {% set sest_05 = (l.valor or 0) * 0.005 %}
+              {% set liq     = (l.valor or 0) - inss_4 - sest_05 %}
               <tr>
                 <td class="text-nowrap">
                   <span class="table-main-text">{{ l.restaurante.nome }}</span>
@@ -1965,7 +1963,10 @@
                   {{ l.hora_inicio }}{% if l.hora_fim %} às {{ l.hora_fim }}{% endif %}
                 </td>
                 <td class="text-end">
-                  R$ {{ "%.2f"|format(inss) }}
+                  R$ {{ "%.2f"|format(inss_4) }}
+                </td>
+                <td class="text-end">
+                  R$ {{ "%.2f"|format(sest_05) }}
                 </td>
                 <td class="text-end">
                   R$ {{ "%.2f"|format(liq) }}
@@ -1994,7 +1995,7 @@
               </tr>
             {% else %}
               <tr>
-                <td colspan="11" class="text-center text-muted py-3">
+                <td colspan="12" class="text-center text-muted py-3">
                   Nenhum lançamento encontrado
                 </td>
               </tr>
@@ -2007,7 +2008,8 @@
               <th class="text-center">{{ soma_qtd }}</th>
               <th></th>
               <th></th>
-              <th class="text-end">R$ {{ "%.2f"|format(soma_inss) }}</th>
+              <th class="text-end">R$ {{ "%.2f"|format(soma_inss_4) }}</th>
+              <th class="text-end">R$ {{ "%.2f"|format(soma_sest_05) }}</th>
               <th class="text-end">R$ {{ "%.2f"|format(soma_liq) }}</th>
               <th></th>
             </tr>
@@ -2019,9 +2021,7 @@
 </section>
 
 <style>
-  .text-muted-2 {
-    color: #9aa0ac;
-  }
+  .text-muted-2 { color: #9aa0ac; }
 
   .lanc-card-header {
     border-radius: 1rem;
@@ -2052,14 +2052,8 @@
     background: #ffffff;
   }
 
-  .kpi-label {
-    font-size: 0.7rem;
-    color: #6b7280;
-  }
-
-  .kpi-value {
-    font-weight: 600;
-  }
+  .kpi-label { font-size: 0.7rem; color: #6b7280; }
+  .kpi-value { font-weight: 600; }
 
   .kpi-info {
     background: #eef2ff;
@@ -2103,10 +2097,7 @@
     box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
   }
 
-  .lanc-label {
-    font-size: 0.78rem;
-    font-weight: 500;
-  }
+  .lanc-label { font-size: 0.78rem; font-weight: 500; }
 
   .lanc-launch-card {
     border-radius: 0.9rem;
@@ -2140,37 +2131,22 @@
     border-bottom: 1px solid #e5e7eb;
   }
 
-  .lanc-table th,
-  .lanc-table td {
+  .lanc-table th, .lanc-table td {
     font-size: 0.78rem;
     vertical-align: middle;
     padding: 0.45rem 0.55rem;
   }
 
-  .lanc-table tbody tr:hover {
-    background: #f9fafb;
-  }
+  .lanc-table tbody tr:hover { background: #f9fafb; }
 
-  .table-main-text {
-    font-weight: 500;
-  }
+  .table-main-text { font-weight: 500; }
 
-  .bg-soft-count {
-    background: #eef2ff;
-    color: #1f2937;
-  }
+  .bg-soft-count { background: #eef2ff; color: #1f2937; }
 
-  .lanc-tfoot-row {
-    background: #f8fafc;
-    font-size: 0.78rem;
-  }
+  .lanc-tfoot-row { background: #f8fafc; font-size: 0.78rem; }
 
-  .btn-del {
-    transition: transform 0.12s ease-out;
-  }
-  .btn-del:hover {
-    transform: translateY(-1px);
-  }
+  .btn-del { transition: transform 0.12s ease-out; }
+  .btn-del:hover { transform: translateY(-1px); }
 </style>
 
     <!-- RECEITAS COOP (versão profissional/compacta – drop-in) -->
