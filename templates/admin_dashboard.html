@@ -860,51 +860,56 @@
     </div>
 
     <!-- Resumo por Cooperado -->
-    <div class="card border-0 shadow-sm rounded-4 mt-3">
-      <div class="card-body">
-        <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
-          <div class="d-flex align-items-center gap-2">
-            <div class="resumo-pill-label"><i class="bi bi-people"></i></div>
-            <div>
-              <h6 class="m-0">Resumo por Cooperado (filtro aplicado)</h6>
-              <small class="text-muted">
-                Líquido = Produções + <span class="text-success">Receitas</span> − INSS (4,0%) − SEST/SENAT (0,5%) −
-                <span class="text-danger">Despesas</span>
-              </small>
-            </div>
-          </div>
-        </div>
-        <div class="table-responsive">
-          <table id="tblResumoCoop" class="table table-sm table-bordered table-hover align-middle table-resumo">
-            <thead class="table-light">
-              <tr class="text-nowrap">
-                <th>Cooperado</th>
-                <th class="text-end">Produções</th>
-                <th class="text-end">INSS (4,0%)</th>
-                <th class="text-end">SEST/SENAT (0,5%)</th>
-                <th class="text-end text-success">Receitas</th>
-                <th class="text-end text-danger">Despesas</th>
-                <th class="text-end">Líquido</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="7" class="text-center text-muted">Carregando…</td></tr>
-            </tbody>
-            <tfoot>
-              <tr class="table-light fw-bold">
-                <td>Total</td>
-                <td class="text-end" id="tProd">R$ 0,00</td>
-                <td class="text-end" id="tINSS4">R$ 0,00</td>
-                <td class="text-end" id="tSEST05">R$ 0,00</td>
-                <td class="text-end text-success" id="tRec">R$ 0,00</td>
-                <td class="text-end text-danger" id="tDes">R$ 0,00</td>
-                <td class="text-end fw-bold" id="tLiq">R$ 0,00</td>
-              </tr>
-            </tfoot>
-          </table>
+<div class="card border-0 shadow-sm rounded-4 mt-3">
+  <div class="card-body">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+      <div class="d-flex align-items-center gap-2">
+        <div class="resumo-pill-label"><i class="bi bi-people"></i></div>
+        <div>
+          <h6 class="m-0">Resumo por Cooperado (filtro aplicado)</h6>
+          <small class="text-muted">
+            Líquido = Produções + <span class="text-success">Receitas</span> − INSS (4,0%) − SEST/SENAT (0,5%) −
+            <span class="text-danger">Despesas</span>
+          </small>
         </div>
       </div>
     </div>
+
+    <div class="table-responsive">
+      <table id="tblResumoCoop" class="table table-sm table-bordered table-hover align-middle table-resumo">
+        <thead class="table-light">
+          <tr class="text-nowrap">
+            <th>Cooperado</th>
+            <th class="text-end">Produções</th>
+            <th class="text-end">INSS (4,0%)</th>
+            <th class="text-end">SEST/SENAT (0,5%)</th>
+            <th class="text-end text-success">Receitas</th>
+            <th class="text-end text-danger">Despesas</th>
+            <th class="text-end">Líquido</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <!-- era colspan="8", agora é 7 -->
+          <tr><td colspan="7" class="text-center text-muted">Carregando…</td></tr>
+        </tbody>
+
+        <tfoot>
+          <tr class="table-light fw-bold">
+            <td>Total</td>
+            <td class="text-end" id="tProd">R$ 0,00</td>
+            <td class="text-end" id="tINSS4">R$ 0,00</td>
+            <td class="text-end" id="tSEST05">R$ 0,00</td>
+            <td class="text-end text-success" id="tRec">R$ 0,00</td>
+            <td class="text-end text-danger" id="tDes">R$ 0,00</td>
+            <!-- removido tAd -->
+            <td class="text-end fw-bold" id="tLiq">R$ 0,00</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
 
     <!-- Gráficos -->
     <div class="row g-2 mt-3">
