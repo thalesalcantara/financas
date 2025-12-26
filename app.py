@@ -5304,6 +5304,11 @@ def portal_restaurante():
     total_bruto = 0.0
     total_qtd = 0
     total_entregas = 0
+
+    # 4% INSS + 0,5% SEST (4,5% no total) - aplicado sobre lançamentos
+    total_inss = 0.0
+    total_sest = 0.0
+
     for c in cooperados:
         q = (
             Lancamento.query
@@ -5312,13 +5317,22 @@ def portal_restaurante():
             .order_by(Lancamento.data.desc(), Lancamento.id.desc())
         )
         c.lancamentos = q.all()
+
         c.total_periodo = sum((l.valor or 0.0) for l in c.lancamentos)
+        c.inss_periodo  = sum((l.valor or 0.0) * 0.04 for l in c.lancamentos)
+        c.sest_periodo  = sum((l.valor or 0.0) * 0.005 for l in c.lancamentos)
+        c.encargos_periodo = c.inss_periodo + c.sest_periodo
+        c.liquido_periodo  = c.total_periodo - c.encargos_periodo
+
         total_bruto += c.total_periodo
         total_qtd += len(c.lancamentos)
         total_entregas += sum((l.qtd_entregas or 0) for l in c.lancamentos)
 
-    total_inss = total_bruto * 0.045
-    total_liquido = total_bruto - total_inss
+        total_inss += c.inss_periodo
+        total_sest += c.sest_periodo
+
+    total_encargos = total_inss + total_sest
+    total_liquido = total_bruto - total_encargos
 
     # -------------------- ESCALA (Quem trabalha) --------------------
     def contrato_bate_restaurante(contrato: str, rest_nome: str) -> bool:
@@ -5461,7 +5475,6 @@ def portal_restaurante():
         url_lancar_producao=url_lancar_producao,
         has_editar_lanc=has_editar_lanc,
     )
-
 
 # =========================
 # Rotas de CRUD de lançamento
