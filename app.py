@@ -4008,59 +4008,65 @@ def delete_receita_coop(id):
     flash("Receita do cooperado excluída.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_receitas"))
 
+# -------------------------
+# DESPESAS
+# -------------------------
 @app.route("/coop/despesas/add", methods=["POST"])
 @admin_required
 def add_despesa_coop():
     f = request.form
 
-    # lista de cooperados selecionados (vários checkboxes ou um select múltiplo)
-    ids = f.getlist("cooperado_ids[]")  # ex.: ["3", "5", "8"]
+    # lista de cooperados selecionados (vários checkboxes ou select múltiplo)
+    ids = f.getlist("cooperado_ids[]")  # ex.: ["3","5","8"]
 
     descricao = f.get("descricao", "").strip()
     valor_total = f.get("valor", type=float) or 0.0
-    d = _parse_date(f.get("data"))
-    # nome do checkbox no HTML: <input type="checkbox" name="eh_adiantamento">
+    d = _parse_date(f.get("data")) or date.today()
+
+    # checkbox no HTML: <input type="checkbox" name="eh_adiantamento">
+    # quando marcado => despesa fica como adiantamento (sem aprovar/desaprovar)
     eh_adiantamento = bool(f.get("eh_adiantamento"))
 
-    # segurança: se ninguém foi selecionado
     if not ids:
         flash("Selecione pelo menos um cooperado.", "warning")
         return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
-    # se não veio data válida, usa hoje
-    if not d:
-        d = date.today()
-
-    # se quiser dividir o valor igualmente entre os cooperados:
     qtd = len(ids)
-    valor_unit = valor_total / qtd if qtd > 0 else 0.0
+    valor_unit = (valor_total / qtd) if qtd > 0 else 0.0
 
-    # cria uma despesa para cada cooperado selecionado
     for cid in ids:
         db.session.add(DespesaCooperado(
-            cooperado_id=cid,
+            cooperado_id=int(cid),
             descricao=descricao,
             valor=valor_unit,
             data=d,
-            eh_adiantamento=eh_adiantamento,  # grava a flag de adiantamento
+            eh_adiantamento=eh_adiantamento,  # <- marca como adiantamento
         ))
 
     db.session.commit()
     flash("Despesa(s) lançada(s).", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
+
 @app.route("/coop/despesas/<int:id>/edit", methods=["POST"])
 @admin_required
 def edit_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
     f = request.form
+
     dc.cooperado_id = f.get("cooperado_id", type=int)
     dc.descricao = f.get("descricao", "").strip()
-    dc.valor = f.get("valor", type=float)
-    dc.data = _parse_date(f.get("data"))
+    dc.valor = f.get("valor", type=float) or 0.0
+    dc.data = _parse_date(f.get("data")) or dc.data or date.today()
+
+    # IMPORTANTE: manter a mesma regra na edição
+    # se marcar, fica como adiantamento; se desmarcar, deixa de ser
+    dc.eh_adiantamento = bool(f.get("eh_adiantamento"))
+
     db.session.commit()
     flash("Despesa do cooperado atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
 
 @app.route("/coop/despesas/<int:id>/delete")
 @admin_required
@@ -4070,7 +4076,7 @@ def delete_despesa_coop(id):
     db.session.commit()
     flash("Despesa do cooperado excluída.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
+    
 # =========================
 # Benefícios — Editar / Excluir (Admin)
 # =========================
