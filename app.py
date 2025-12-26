@@ -4008,37 +4008,129 @@ def delete_receita_coop(id):
     flash("Receita do cooperado excluída.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_receitas"))
 
+from datetime import date
+from flask import request, redirect, url_for, flash
+from sqlalchemy import func, case, and_, or_
+
+# models esperados:
+# DespesaCooperado (id, cooperado_id, descricao, valor, data, data_inicio, data_fim, beneficio_id, eh_adiantamento)
+# Cooperado (id, nome, ...)
+# db = SQLAlchemy()
+
+def _checkbox_true(form, name: str) -> bool:
+    """
+    Suporta:
+      - <input type="checkbox" name="eh_adiantamento" value="1">
+      - <input type="checkbox" name="eh_adiantamento">
+    """
+    v = form.get(name)
+    return v in ("1", "true", "True", "on", "yes", "sim")
+
+def _parse_date(value: str):
+    # Use o seu _parse_date real aqui.
+    # Deve retornar date ou None
+    if not value:
+        return None
+    try:
+        y, m, d = value.split("-")
+        return date(int(y), int(m), int(d))
+    except Exception:
+        return None
+
+def _range_filter_despesas(di: date, df: date):
+    """
+    Filtra despesas que caem no intervalo [di, df], cobrindo:
+      - pontual: dc.data
+      - período: dc.data_inicio / dc.data_fim com sobreposição
+    """
+    return or_(
+        # pontual dentro do intervalo
+        and_(DespesaCooperado.data.isnot(None),
+             DespesaCooperado.data >= di,
+             DespesaCooperado.data <= df),
+
+        # período sobrepõe o intervalo
+        and_(DespesaCooperado.data.is_(None),
+             DespesaCooperado.data_inicio.isnot(None),
+             DespesaCooperado.data_fim.isnot(None),
+             DespesaCooperado.data_inicio <= df,
+             DespesaCooperado.data_fim >= di)
+    )
+
+def calcular_resumo_por_cooperado(di: date, df: date):
+    """
+    Retorna lista com:
+      cooperado_id, total_despesas (SEM adiantamento), total_adiantamento
+    """
+    filtro = _range_filter_despesas(di, df)
+
+    total_despesas = func.coalesce(func.sum(
+        case(
+            (DespesaCooperado.eh_adiantamento.is_(False), DespesaCooperado.valor),
+            else_=0
+        )
+    ), 0)
+
+    total_adiant = func.coalesce(func.sum(
+        case(
+            (DespesaCooperado.eh_adiantamento.is_(True), DespesaCooperado.valor),
+            else_=0
+        )
+    ), 0)
+
+    rows = (
+        db.session.query(
+            DespesaCooperado.cooperado_id.label("cooperado_id"),
+            total_despesas.label("total_despesas"),
+            total_adiant.label("total_adiantamento"),
+        )
+        .filter(filtro)
+        .group_by(DespesaCooperado.cooperado_id)
+        .all()
+    )
+    return rows
+
+def atualizar_aba_resumo(di: date, df: date):
+    """
+    Aqui você atualiza a ABA 'resumo' (planilha).
+    Eu deixei pronto para você plugar seu método (Google Sheets / Excel / etc).
+    Regra: Adiantamento vai na coluna 'Adiantamento' e NÃO soma com 'Despesas'.
+    """
+    # Exemplo: obter totais do período:
+    rows = calcular_resumo_por_cooperado(di, df)
+
+    # Você deve mapear cada cooperado_id para a linha correspondente na aba "resumo"
+    # e escrever:
+    #   col_despesas = total_despesas
+    #   col_adiantamento = total_adiantamento
+    #
+    # Se você já tem uma função que escreve na planilha, altere ela para usar:
+    #   total_despesas = soma de eh_adiantamento == False
+    #   total_adiantamento = soma de eh_adiantamento == True
+    #
+    # Não implemento a escrita aqui porque cada projeto usa uma lib diferente.
+    return
+
+
 # -------------------------
 # DESPESAS (COOPERADO)
 # -------------------------
-from datetime import date
-from flask import request, redirect, url_for, flash
-# from yourapp import db
-# from yourapp.models import DespesaCooperado, Cooperado
 
 @app.route("/coop/despesas/add", methods=["POST"])
 @admin_required
 def add_despesa_coop():
     f = request.form
 
-    # se você usar checkboxes no HTML:
-    # <input type="checkbox" name="cooperado_ids[]" value="{{c.id}}">
-    ids = f.getlist("cooperado_ids[]")  # ex.: ["3","5","8"]
+    ids = f.getlist("cooperado_ids[]")  # ["3","5","8"]
 
     descricao = (f.get("descricao") or "").strip()
     valor_total = f.get("valor", type=float) or 0.0
 
-    # legado (pontual)
     d = _parse_date(f.get("data"))  # pode vir vazio
-
-    # novo (período)
     di = _parse_date(f.get("data_inicio"))
     df = _parse_date(f.get("data_fim"))
 
-    # checkbox: <input type="checkbox" name="eh_adiantamento" value="1">
-    eh_adiantamento = bool(f.get("eh_adiantamento"))
-
-    # opcional: se sua despesa pode vir vinculada a beneficio
+    eh_adiantamento = _checkbox_true(f, "eh_adiantamento")
     beneficio_id = f.get("beneficio_id", type=int)  # pode ser None
 
     if not descricao:
@@ -4050,40 +4142,22 @@ def add_despesa_coop():
         return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
     # Regra de data:
-    # - Se período preenchido, usamos data_inicio/data_fim
-    # - Senão, usamos data (pontual). Se vier vazio, cai no dia de hoje.
     if di or df:
-        # se começou mas não informou fim (ou vice-versa), completa
         if di and not df:
             df = di
         if df and not di:
             di = df
-
         if di and df and df < di:
             flash("Data fim não pode ser menor que data início.", "warning")
             return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-        data_pontual = None  # não usa legado
+        data_pontual = None
     else:
         data_pontual = d or date.today()
         di = None
         df = None
 
-    # ---------------------------
-    # REGRA DE "TODOS" vs "SELECIONADOS"
-    # ---------------------------
-    # Aqui você escolhe:
-    #
-    # OPÇÃO 1 (RECOMENDADA): exigir ao menos 1 cooperado sempre
-    #
-    # if not ids:
-    #     flash("Selecione pelo menos um cooperado.", "warning")
-    #     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-    #
-    # OPÇÃO 2: se não selecionar ninguém => lança para TODOS (cooperado_id=None)
-    #
+    # Se não selecionou ninguém -> "Todos" (cooperado_id=None)
     if not ids:
-        # Lança como "Todos" (cooperado_id = None)
         dc = DespesaCooperado(
             cooperado_id=None,
             descricao=descricao,
@@ -4096,10 +4170,14 @@ def add_despesa_coop():
         )
         db.session.add(dc)
         db.session.commit()
-        flash("Despesa lançada para TODOS.", "success")
+
+        # Se você atualiza a aba resumo por período, chame aqui:
+        # atualizar_aba_resumo(di or data_pontual, df or data_pontual)
+
+        flash("Lançamento registrado para TODOS.", "success")
         return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
-    # Se selecionou cooperados: divide o valor
+    # Divide o valor entre selecionados
     qtd = len(ids)
     valor_unit = float(valor_total) / qtd if qtd else 0.0
 
@@ -4117,7 +4195,10 @@ def add_despesa_coop():
         db.session.add(dc)
 
     db.session.commit()
-    flash("Despesa(s) lançada(s).", "success")
+
+    # atualizar_aba_resumo(di or data_pontual, df or data_pontual)
+
+    flash("Lançamento(s) registrado(s).", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
 
@@ -4127,26 +4208,20 @@ def edit_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
     f = request.form
 
-    dc.cooperado_id = f.get("cooperado_id", type=int)
-    # se quiser permitir "Todos" no edit:
-    # se no HTML você mandar cooperado_id vazio => vira None
+    # cooperado_id pode ser None ("Todos")
     if f.get("cooperado_id") in (None, "", "None"):
         dc.cooperado_id = None
+    else:
+        dc.cooperado_id = f.get("cooperado_id", type=int)
 
     dc.descricao = (f.get("descricao") or "").strip()
     dc.valor = f.get("valor", type=float) or 0.0
 
-    # legado (pontual)
     d = _parse_date(f.get("data"))
-
-    # novo (período)
     di = _parse_date(f.get("data_inicio"))
     df = _parse_date(f.get("data_fim"))
 
-    # checkbox
-    dc.eh_adiantamento = bool(f.get("eh_adiantamento"))
-
-    # opcional
+    dc.eh_adiantamento = _checkbox_true(f, "eh_adiantamento")
     dc.beneficio_id = f.get("beneficio_id", type=int)
 
     if not dc.descricao:
@@ -4163,7 +4238,6 @@ def edit_despesa_coop(id):
             df = di
         if df and not di:
             di = df
-
         if di and df and df < di:
             flash("Data fim não pode ser menor que data início.", "warning")
             return redirect(url_for("admin_dashboard", tab="coop_despesas"))
@@ -4177,19 +4251,30 @@ def edit_despesa_coop(id):
         dc.data_fim = None
 
     db.session.commit()
-    flash("Despesa atualizada.", "success")
+
+    # atualizar_aba_resumo(dc.data_inicio or dc.data, dc.data_fim or dc.data)
+
+    flash("Lançamento atualizado.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
 
-# Recomendo DELETE via POST. Mantive POST para ficar “como tem que ser” em segurança.
 @app.route("/coop/despesas/<int:id>/delete", methods=["POST"])
 @admin_required
 def delete_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
+
+    # guarde datas para atualizar resumo depois de excluir
+    ref_ini = dc.data_inicio or dc.data or date.today()
+    ref_fim = dc.data_fim or dc.data or ref_ini
+
     db.session.delete(dc)
     db.session.commit()
-    flash("Despesa excluída.", "success")
+
+    # atualizar_aba_resumo(ref_ini, ref_fim)
+
+    flash("Lançamento excluído.", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
     
 # =========================
 # Benefícios — Editar / Excluir (Admin)
