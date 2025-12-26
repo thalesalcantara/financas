@@ -5109,6 +5109,7 @@ def portal_cooperado():
         despesas_coop=despesas_coop,
         total_bruto=total_bruto,
         inss_valor=inss_valor,
+        sest_senat_valor=sest_valor,  # <-- ADICIONE ISSO
         total_descontos=total_descontos,
         total_liquido=total_liquido,
         inss_complemento=inss_complemento,
