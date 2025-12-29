@@ -3743,7 +3743,7 @@
         </form>
       </div>
 
-      <!-- Busca por cooperado -->
+      <!-- Busca por cooperado / placa / CNH -->
       <div class="escala-search-box">
         <span class="section-subtitle d-block mb-1">Pesquisar cooperado</span>
         <div class="input-group input-group-sm">
@@ -3753,7 +3753,7 @@
           <input type="text"
                  id="filtroCooperado"
                  class="form-control border-0 shadow-none search-input"
-                 placeholder="Digite o nome do cooperado...">
+                 placeholder="Digite nome, placa ou CNH...">
         </div>
         <div class="d-flex gap-2 mt-2 justify-content-end">
           <span class="badge-soft">
@@ -3793,105 +3793,116 @@
         </thead>
         <tbody>
           {% for c in cooperados %}
-            {% set lst = (escalas_por_coop[c.id] if (escalas_por_coop is defined and c.id in escalas_por_coop) else []) %}
-            {% set sdoc = status_doc_por_coop.get(c.id) if status_doc_por_coop is defined else None %}
-            {% set ok_cnh   = sdoc.cnh_ok if sdoc is not none and 'cnh_ok' in sdoc else None %}
-            {% set ok_placa = sdoc.placa_ok if sdoc is not none and 'placa_ok' in sdoc else None %}
+            {# ===== SOMENTE ATIVOS (fallback seguro) =====
+               - Se existir c.ativo (bool), usa.
+               - Se existir c.status, considera "ativo"/"ATIVO".
+               - Se não existir nada disso, assume ativo (para não quebrar template).
+            #}
+            {% set is_ativo = (c.ativo if c.ativo is defined else ( (c.status|string|lower) in ['ativo','active'] if c.status is defined else true )) %}
+            {% if is_ativo %}
+              {% set lst = (escalas_por_coop[c.id] if (escalas_por_coop is defined and c.id in escalas_por_coop) else []) %}
+              {% set sdoc = status_doc_por_coop.get(c.id) if status_doc_por_coop is defined else None %}
+              {% set ok_cnh   = sdoc.cnh_ok if sdoc is not none and 'cnh_ok' in sdoc else None %}
+              {% set ok_placa = sdoc.placa_ok if sdoc is not none and 'placa_ok' in sdoc else None %}
 
-            <tr data-coop-nome="{{ c.nome|lower }}">
-              <!-- Cooperado -->
-              <td>
-                <div class="small fw-semibold text-truncate">
-                  {{ c.nome }}
-                </div>
-                <div class="extra-small text-muted-2">
-                  ID {{ c.id }}
-                </div>
-              </td>
+              <tr data-coop-nome="{{ c.nome|lower }}"
+                  data-coop-cnh="{{ (c.cnh_numero if c.cnh_numero is defined and c.cnh_numero else '')|lower }}"
+                  data-coop-placa="{{ (c.placa if c.placa is defined and c.placa else '')|lower }}"
+                  data-coop-ativo="1">
+                <!-- Cooperado -->
+                <td>
+                  <div class="small fw-semibold text-truncate">
+                    {{ c.nome }}
+                  </div>
+                  <div class="extra-small text-muted-2">
+                    ID {{ c.id }}
+                  </div>
+                </td>
 
-              <!-- CNH -->
-              <td>
-                <div class="extra-small text-muted">
-                  {{ c.cnh_numero if c.cnh_numero is defined and c.cnh_numero else '—' }}
-                </div>
-                <div class="extra-small text-muted-2">
-                  Validade:
-                  {% if c.cnh_validade is defined and c.cnh_validade %}
-                    {{ c.cnh_validade.strftime('%d/%m') }}
+                <!-- CNH -->
+                <td>
+                  <div class="extra-small text-muted">
+                    {{ c.cnh_numero if c.cnh_numero is defined and c.cnh_numero else '—' }}
+                  </div>
+                  <div class="extra-small text-muted-2">
+                    Validade:
+                    {% if c.cnh_validade is defined and c.cnh_validade %}
+                      {{ c.cnh_validade.strftime('%d/%m') }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </td>
+
+                <!-- Placa -->
+                <td>
+                  <div class="extra-small text-muted">
+                    {{ c.placa if c.placa is defined and c.placa else '—' }}
+                  </div>
+                  <div class="extra-small text-muted-2">
+                    Validade:
+                    {% if c.placa_validade is defined and c.placa_validade %}
+                      {{ c.placa_validade.strftime('%d/%m') }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </td>
+
+                <!-- Situação Docs -->
+                <td class="text-nowrap">
+                  {% if ok_cnh is not none %}
+                    <span class="badge badge-doc {{ 'badge-doc-ok' if ok_cnh else 'badge-doc-pend' }} me-1">
+                      CNH {{ 'OK' if ok_cnh else 'Pend.' }}
+                    </span>
                   {% else %}
-                    —
+                    <span class="badge badge-doc badge-doc-na">CNH —</span>
                   {% endif %}
-                </div>
-              </td>
 
-              <!-- Placa -->
-              <td>
-                <div class="extra-small text-muted">
-                  {{ c.placa if c.placa is defined and c.placa else '—' }}
-                </div>
-                <div class="extra-small text-muted-2">
-                  Validade:
-                  {% if c.placa_validade is defined and c.placa_validade %}
-                    {{ c.placa_validade.strftime('%d/%m') }}
+                  {% if ok_placa is not none %}
+                    <span class="badge badge-doc {{ 'badge-doc-ok' if ok_placa else 'badge-doc-pend' }} mt-1 mt-sm-0">
+                      Placa {{ 'OK' if ok_placa else 'Pend.' }}
+                    </span>
                   {% else %}
-                    —
+                    <span class="badge badge-doc badge-doc-na mt-1 mt-sm-0">Placa —</span>
                   {% endif %}
-                </div>
-              </td>
 
-              <!-- Situação Docs -->
-              <td class="text-nowrap">
-                {% if ok_cnh is not none %}
-                  <span class="badge badge-doc {{ 'badge-doc-ok' if ok_cnh else 'badge-doc-pend' }} me-1">
-                    CNH {{ 'OK' if ok_cnh else 'Pend.' }}
+                  {% if ok_cnh and ok_placa %}
+                    <span class="ms-1 text-success">👏</span>
+                  {% endif %}
+                </td>
+
+                <!-- Última atualização -->
+                <td>
+                  <div class="extra-small text-muted">
+                    {{ c.ultima_atualizacao.strftime('%d/%m/%Y %H:%M') if c.ultima_atualizacao else '—' }}
+                  </div>
+                </td>
+
+                <!-- Qtde linhas -->
+                <td class="text-center">
+                  <span class="badge-soft d-inline-flex align-items-center justify-content-center px-2">
+                    {{ lst|length }}
                   </span>
-                {% else %}
-                  <span class="badge badge-doc badge-doc-na">CNH —</span>
-                {% endif %}
+                </td>
 
-                {% if ok_placa is not none %}
-                  <span class="badge badge-doc {{ 'badge-doc-ok' if ok_placa else 'badge-doc-pend' }} mt-1 mt-sm-0">
-                    Placa {{ 'OK' if ok_placa else 'Pend.' }}
-                  </span>
-                {% else %}
-                  <span class="badge badge-doc badge-doc-na mt-1 mt-sm-0">Placa —</span>
-                {% endif %}
-
-                {% if ok_cnh and ok_placa %}
-                  <span class="ms-1 text-success">👏</span>
-                {% endif %}
-              </td>
-
-              <!-- Última atualização -->
-              <td>
-                <div class="extra-small text-muted">
-                  {{ c.ultima_atualizacao.strftime('%d/%m/%Y %H:%M') if c.ultima_atualizacao else '—' }}
-                </div>
-              </td>
-
-              <!-- Qtde linhas -->
-              <td class="text-center">
-                <span class="badge-soft d-inline-flex align-items-center justify-content-center px-2">
-                  {{ lst|length }}
-                </span>
-              </td>
-
-              <!-- Ações -->
-              <td class="text-center">
-                <div class="d-flex flex-column flex-sm-row gap-1 justify-content-center">
-                  <button class="btn btn-royal btn-xs"
-                          data-bs-toggle="modal"
-                          data-bs-target="#modalEscalas"
-                          data-coopid="{{ c.id }}">
-                    <i class="bi bi-eye me-1"></i> Ver escala
-                  </button>
-                  <a class="btn btn-outline-secondary btn-xs"
-                     href="{{ url_for('editar_documentos', coop_id=c.id) }}">
-                    <i class="bi bi-pen me-1"></i> Documentos
-                  </a>
-                </div>
-              </td>
-            </tr>
+                <!-- Ações -->
+                <td class="text-center">
+                  <div class="d-flex flex-column flex-sm-row gap-1 justify-content-center">
+                    <button class="btn btn-royal btn-xs"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalEscalas"
+                            data-coopid="{{ c.id }}">
+                      <i class="bi bi-eye me-1"></i> Ver escala
+                    </button>
+                    <a class="btn btn-outline-secondary btn-xs"
+                       href="{{ url_for('editar_documentos', coop_id=c.id) }}">
+                      <i class="bi bi-pen me-1"></i> Documentos
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% endif %}
           {% else %}
             <tr>
               <td colspan="7" class="text-center text-muted py-4">
@@ -4502,19 +4513,24 @@
 </style>
 
 <script>
-  // Filtro por nome do cooperado
+  // Filtro por nome / placa / CNH (somente ativos já renderizados no template)
   document.addEventListener('DOMContentLoaded', function () {
     const input = document.getElementById('filtroCooperado');
     const tabela = document.getElementById('tabela-escalas');
 
     if (input && tabela) {
+      const linhas = tabela.querySelectorAll('tbody tr[data-coop-nome]');
+
       input.addEventListener('input', function () {
-        const termo = this.value.toLowerCase().trim();
-        const linhas = tabela.querySelectorAll('tbody tr[data-coop-nome]');
+        const termo = (this.value || '').toLowerCase().trim();
 
         linhas.forEach(function (tr) {
-          const nome = (tr.getAttribute('data-coop-nome') || '').toLowerCase();
-          tr.style.display = (!termo || nome.includes(termo)) ? '' : 'none';
+          const nome  = (tr.getAttribute('data-coop-nome')  || '').toLowerCase();
+          const cnh   = (tr.getAttribute('data-coop-cnh')   || '').toLowerCase();
+          const placa = (tr.getAttribute('data-coop-placa') || '').toLowerCase();
+
+          const ok = (!termo || nome.includes(termo) || cnh.includes(termo) || placa.includes(termo));
+          tr.style.display = ok ? '' : 'none';
         });
       });
     }
