@@ -26,6 +26,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from dateutil.relativedelta import relativedelta
+from sqlalchemy import text
 
 from sqlalchemy import func, text as sa_text, or_, and_, case
 from sqlalchemy import func, text as sa_text, or_, and_, case, literal
@@ -235,18 +236,27 @@ def _is_sqlite() -> bool:
     except Exception:
         return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
 
-# =========================
-# Models
-# =========================
-from flask_login import UserMixin
+
+
+# ==========================================
+# MODELOS
+# ==========================================
 
 class Usuario(db.Model, UserMixin):
     __tablename__ = "usuarios"
+
     id = db.Column(db.Integer, primary_key=True)
     usuario = db.Column(db.String(80), unique=True, nullable=False)
     senha_hash = db.Column(db.String(200), nullable=False)
     tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
-    ativo = db.Column(db.Boolean, nullable=False, default=True)
+
+    # Importante: default no Python + default no BANCO
+    ativo = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true")  # Postgres; funciona bem no Render
+    )
 
     @property
     def is_active(self) -> bool:
@@ -259,13 +269,17 @@ class Usuario(db.Model, UserMixin):
     def check_password(self, raw: str) -> bool:
         return check_password_hash(self.senha_hash, raw)
 
-        
+
 class Cooperado(db.Model):
     __tablename__ = "cooperados"
+
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)
-    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
-    usuario_ref = db.relationship("Usuario", backref="coop_account", uselist=False)
+
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False, unique=True)
+
+    # 1 usuário -> 1 cooperado
+    usuario_ref = db.relationship("Usuario", backref=db.backref("coop_account", uselist=False))
 
     # NOVO
     telefone = db.Column(db.String(30))
@@ -275,42 +289,60 @@ class Cooperado(db.Model):
     foto_mime = db.Column(db.String(100))
     foto_filename = db.Column(db.String(255))
     foto_url = db.Column(db.String(255))
+
     cnh_numero = db.Column(db.String(50))
     cnh_validade = db.Column(db.Date)
+
     placa = db.Column(db.String(20))
     placa_validade = db.Column(db.Date)
+
     ultima_atualizacao = db.Column(db.DateTime)
 
 
 class Restaurante(db.Model):
     __tablename__ = "restaurantes"
+
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)
     periodo = db.Column(db.String(20), nullable=False)  # seg-dom | sab-sex | sex-qui
-    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
-    usuario_ref = db.relationship("Usuario", backref="rest_account", uselist=False)
+
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False, unique=True)
+
+    # 1 usuário -> 1 restaurante
+    usuario_ref = db.relationship("Usuario", backref=db.backref("rest_account", uselist=False))
+
     # Foto no banco (bytea)
     foto_bytes = db.Column(db.LargeBinary)
     foto_mime = db.Column(db.String(100))
     foto_filename = db.Column(db.String(255))
+
     # compatibilidade
     foto_url = db.Column(db.String(255))
 
 
 class Lancamento(db.Model):
     __tablename__ = "lancamentos"
+
     id = db.Column(db.Integer, primary_key=True)
+
     restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False)
     cooperado_id = db.Column(db.Integer, db.ForeignKey("cooperados.id"), nullable=False)
+
     restaurante = db.relationship("Restaurante")
     cooperado = db.relationship("Cooperado")
+
     descricao = db.Column(db.String(200))
     valor = db.Column(db.Float, default=0.0)
-    data = db.Column(db.Date)
+
+    # Se sempre precisa de data, deixe nullable=False
+    data = db.Column(db.Date, nullable=False)
+
     hora_inicio = db.Column(db.String(10))
     hora_fim = db.Column(db.String(10))
+
     # opcional: quantidade de entregas
     qtd_entregas = db.Column(db.Integer)
+
 
 # === AVALIAÇÕES DE COOPERADO (NOVO) =========================================
 class AvaliacaoCooperado(db.Model):
@@ -2015,28 +2047,70 @@ def logout():
 # Admin Dashboard
 # =========================
 
-from flask import jsonify, request
+from flask import jsonify, request, render_template
+from sqlalchemy import func, inspect
+from sqlalchemy.exc import SQLAlchemyError, OperationalError, ProgrammingError
+from datetime import date, timedelta
+from collections import defaultdict, namedtuple
+import re
+
 
 @app.post("/admin/cooperados/<int:id>/toggle-status")
 def toggle_status_cooperado(id):
+    """
+    Alterna o status 'ativo' do usuário vinculado ao cooperado.
+
+    Observação crítica:
+    - Se o campo/coluna 'ativo' ainda não existir no MODEL/DB, retorna erro orientando migração.
+    """
     try:
         coop = db.session.get(Cooperado, id)
-        if not coop or not coop.usuario_ref:
+        if not coop or not getattr(coop, "usuario_ref", None):
             return jsonify(ok=False, error="Cooperado não encontrado"), 404
 
         user = coop.usuario_ref
 
-        # se o atributo não existe (código antigo em produção), trate como True
-        atual = bool(getattr(user, "ativo", True))
+        # 1) Checa se o MODELO tem o atributo
         if not hasattr(user, "ativo"):
             return jsonify(
                 ok=False,
-                error="Campo 'ativo' ausente no modelo/DB. Faça deploy com o modelo atualizado e a migração."
+                error="Campo 'ativo' ausente no modelo. Atualize o models.py (Usuario.ativo) e faça deploy."
             ), 500
 
-        user.ativo = not atual
+        # 2) Checa se o BANCO tem a coluna (produção pode estar sem migração)
+        try:
+            insp = inspect(db.engine)
+            table = getattr(Usuario, "__tablename__", None)
+            if not table:
+                return jsonify(ok=False, error="Não foi possível identificar a tabela do modelo Usuario."), 500
+
+            cols = {c["name"] for c in insp.get_columns(table)}
+            if "ativo" not in cols:
+                return jsonify(
+                    ok=False,
+                    error=(
+                        "Coluna 'ativo' ausente no banco. Faça a migração/ALTER TABLE em produção "
+                        f"(tabela: {table})."
+                    ),
+                    table=table
+                ), 409
+        except Exception:
+            # Se falhar a inspeção, seguimos e deixamos o commit dizer se dá erro,
+            # mas com uma mensagem tratada no except abaixo.
+            pass
+
+        atual = bool(getattr(user, "ativo", True))
+        user.ativo = (not atual)
+
         db.session.commit()
         return jsonify(ok=True, ativo=bool(user.ativo))
+
+    except (OperationalError, ProgrammingError):
+        db.session.rollback()
+        return jsonify(
+            ok=False,
+            error="Falha ao salvar: provável falta da coluna 'ativo' no banco. Faça migração/ALTER TABLE."
+        ), 409
     except SQLAlchemyError:
         db.session.rollback()
         return jsonify(ok=False, error="Falha ao salvar no banco"), 500
@@ -2045,9 +2119,6 @@ def toggle_status_cooperado(id):
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_dashboard():
-    from collections import namedtuple
-    import re
-
     args = request.args
 
     # --- Controle de abas
@@ -2149,18 +2220,10 @@ def admin_dashboard():
     total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
 
     # Despesas normais (eh_adiantamento = False ou None)
-    total_despesas_coop = sum(
-        (d.valor or 0.0)
-        for d in despesas_coop
-        if not d.eh_adiantamento
-    )
+    total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop if not d.eh_adiantamento)
 
     # Adiantamentos (eh_adiantamento = True)
-    total_adiantamentos_coop = sum(
-        (d.valor or 0.0)
-        for d in despesas_coop
-        if d.eh_adiantamento
-    )
+    total_adiantamentos_coop = sum((d.valor or 0.0) for d in despesas_coop if d.eh_adiantamento)
 
     cfg = get_config()
     cooperados = Cooperado.query.order_by(Cooperado.nome).all()
@@ -2263,13 +2326,15 @@ def admin_dashboard():
                 .order_by(ReceitaCooperado.data.asc(), ReceitaCooperado.id.asc())
                 .all()
             )
+
+            # Despesa semanal: usa sobreposição do intervalo (mais seguro que "DespesaCooperado.data")
             d = (
                 DespesaCooperado.query.filter(
                     (DespesaCooperado.cooperado_id == c.id) | (DespesaCooperado.cooperado_id.is_(None)),
-                    DespesaCooperado.data >= folha_inicio,
-                    DespesaCooperado.data <= folha_fim,
+                    DespesaCooperado.data_inicio <= folha_fim,
+                    DespesaCooperado.data_fim >= folha_inicio,
                 )
-                .order_by(DespesaCooperado.data.asc(), DespesaCooperado.id.asc())
+                .order_by(DespesaCooperado.data_inicio.asc(), DespesaCooperado.id.asc())
                 .all()
             )
 
@@ -2317,10 +2382,10 @@ def admin_dashboard():
         s = s.strip()
         try:
             if "/" in s:
-                d, m, y = s.split("/")
-                return date(int(y), int(m), int(d))
-            y, m, d = s.split("-")
-            return date(int(y), int(m), int(d))
+                d_, m_, y_ = s.split("/")
+                return date(int(y_), int(m_), int(d_))
+            y_, m_, d_ = s.split("-")
+            return date(int(y_), int(m_), int(d_))
         except Exception:
             return None
 
@@ -2375,7 +2440,7 @@ def admin_dashboard():
         })
 
     # ======== Trocas no admin ========
-    def _escala_desc(e: Escala | None) -> str:
+    def _escala_desc(e):
         return _escala_label(e) if e else ""
 
     def _split_turno_horario(s: str) -> tuple[str, str]:
@@ -2410,9 +2475,7 @@ def admin_dashboard():
         linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
 
         if t.status == "aprovada" and not linhas_afetadas and orig and solicitante and destinatario:
-            linhas_afetadas.append(
-                _linha_from_escala(orig, saiu=solicitante.nome, entrou=destinatario.nome)
-            )
+            linhas_afetadas.append(_linha_from_escala(orig, saiu=solicitante.nome, entrou=destinatario.nome))
 
             wd_o = _weekday_from_data_str(orig.data)
             buck_o = _turno_bucket(orig.turno, orig.horario)
@@ -2426,9 +2489,7 @@ def admin_dashboard():
                     if best is None:
                         best = e
             if best:
-                linhas_afetadas.append(
-                    _linha_from_escala(best, saiu=destinatario.nome, entrou=solicitante.nome)
-                )
+                linhas_afetadas.append(_linha_from_escala(best, saiu=destinatario.nome, entrou=solicitante.nome))
 
         destino_data = ""
         destino_turno = ""
@@ -2437,9 +2498,9 @@ def admin_dashboard():
 
         if t.status == "aprovada" and linhas_afetadas and solicitante and destinatario:
             linha_dest = None
-            for r in linhas_afetadas:
-                if r.get("saiu") == destinatario.nome and r.get("entrou") == solicitante.nome:
-                    linha_dest = r
+            for r_ in linhas_afetadas:
+                if r_.get("saiu") == destinatario.nome and r_.get("entrou") == solicitante.nome:
+                    linha_dest = r_
                     break
             if linha_dest:
                 destino_data = linha_dest.get("dia", "")
@@ -2478,10 +2539,7 @@ def admin_dashboard():
             "destino": destinatario,
             "origem_desc": _escala_desc(orig),
             "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
-            "origem_turno_bucket": _turno_bucket(
-                orig.turno if orig else None,
-                orig.horario if orig else None,
-            ),
+            "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
             "destino_data": destino_data,
             "destino_turno": destino_turno,
             "destino_horario": destino_horario,
@@ -2491,26 +2549,26 @@ def admin_dashboard():
 
         if t.status == "aprovada" and linhas_afetadas:
             itens = []
-            for r in linhas_afetadas:
-                turno_txt, horario_txt = _split_turno_horario(r.get("turno_horario", ""))
+            for r_ in linhas_afetadas:
+                turno_txt, horario_txt = _split_turno_horario(r_.get("turno_horario", ""))
                 itens.append(
                     {
-                        "data": r.get("dia", ""),
+                        "data": r_.get("dia", ""),
                         "turno": turno_txt,
                         "horario": horario_txt,
-                        "contrato": r.get("contrato", ""),
-                        "saiu_nome": r.get("saiu", ""),
-                        "entrou_nome": r.get("entrou", ""),
+                        "contrato": r_.get("contrato", ""),
+                        "saiu_nome": r_.get("saiu", ""),
+                        "entrou_nome": r_.get("entrou", ""),
                     }
                 )
                 trocas_historico_flat.append(
                     {
-                        "data": r.get("dia", ""),
+                        "data": r_.get("dia", ""),
                         "turno": turno_txt,
                         "horario": horario_txt,
-                        "contrato": r.get("contrato", ""),
-                        "saiu_nome": r.get("saiu", ""),
-                        "entrou_nome": r.get("entrou", ""),
+                        "contrato": r_.get("contrato", ""),
+                        "saiu_nome": r_.get("saiu", ""),
+                        "entrou_nome": r_.get("entrou", ""),
                         "aplicada_em": t.aplicada_em,
                     }
                 )
@@ -2558,6 +2616,7 @@ def admin_dashboard():
         trocas_historico=trocas_historico,
         trocas_historico_flat=trocas_historico_flat,
     )
+    
 
 # =========================
 # Navegação/Export util
