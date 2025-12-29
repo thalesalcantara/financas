@@ -26,6 +26,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from dateutil.relativedelta import relativedelta
+from sqlalchemy import text
 
 from sqlalchemy import func, text as sa_text, or_, and_, case
 from sqlalchemy import func, text as sa_text, or_, and_, case, literal
