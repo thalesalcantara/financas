@@ -26,8 +26,18 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from dateutil.relativedelta import relativedelta
-from sqlalchemy import text
 
+# ✅ FALTAVA ISSO (resolve o erro do UserMixin e já deixa pronto p/ login)
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    login_user,
+    login_required,
+    logout_user,
+    current_user,
+)
+
+from sqlalchemy import text
 from sqlalchemy import func, text as sa_text, or_, and_, case
 from sqlalchemy import func, text as sa_text, or_, and_, case, literal
 from sqlalchemy.inspection import inspect as sa_inspect
@@ -64,6 +74,7 @@ os.makedirs(STATIC_TABLES, exist_ok=True)
 # 🔹 Documentos (persistente em disco)
 DOCS_PERSIST_DIR = os.path.join(PERSIST_ROOT, "docs")
 os.makedirs(DOCS_PERSIST_DIR, exist_ok=True)
+
 
 
 def _merge_qs(url: str, extra: dict[str, str]) -> str:
