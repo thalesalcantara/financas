@@ -1006,151 +1006,57 @@ def init_db():
         db.session.rollback()
 
     # 5) Bootstrap mínimo (admin e config) — só se os modelos existirem
-try:
-    # Garante que o model Usuario está acessível
-    _ = Usuario  # type: ignore[name-defined]
-
-    # Admin
     try:
-        tem_admin = Usuario.query.filter_by(tipo="admin").first()  # type: ignore[name-defined]
-    except Exception:
-        tem_admin = None
+        # Garante que o model Usuario está acessível
+        _ = Usuario  # type: ignore[name-defined]
 
-    if not tem_admin:
-        admin_user = os.environ.get("ADMIN_USER", "admin")
-        admin_pass = os.environ.get("ADMIN_PASS", os.urandom(8).hex())
-        admin = Usuario(usuario=admin_user, tipo="admin", senha_hash="")  # type: ignore[name-defined]
+        # Admin
         try:
-            admin.set_password(admin_pass)  # type: ignore[attr-defined]
+            tem_admin = Usuario.query.filter_by(tipo="admin").first()  # type: ignore[name-defined]
         except Exception:
+            tem_admin = None
+
+        if not tem_admin:
+            admin_user = os.environ.get("ADMIN_USER", "admin")
+            admin_pass = os.environ.get("ADMIN_PASS", os.urandom(8).hex())
+            admin = Usuario(usuario=admin_user, tipo="admin", senha_hash="")  # type: ignore[name-defined]
             try:
-                from werkzeug.security import generate_password_hash
-                admin.senha_hash = generate_password_hash(admin_pass)  # type: ignore[attr-defined]
+                admin.set_password(admin_pass)  # type: ignore[attr-defined]
             except Exception:
-                pass
-        db.session.add(admin)
-        db.session.commit()
-
-    # Admin Escala (NOVO) - usuario: coopex / senha: 84253700
-    try:
-        tem_admin_escala = Usuario.query.filter_by(tipo="admin_escala").first()  # type: ignore[name-defined]
-    except Exception:
-        tem_admin_escala = None
-
-    if not tem_admin_escala:
-        escala_user = os.environ.get("ESCALA_USER", "coopex")
-        escala_pass = os.environ.get("ESCALA_PASS", "84253700")
-
-        admin_escala = Usuario(usuario=escala_user, tipo="admin_escala", senha_hash="")  # type: ignore[name-defined]
-        try:
-            admin_escala.set_password(escala_pass)  # type: ignore[attr-defined]
-        except Exception:
-            try:
-                from werkzeug.security import generate_password_hash
-                admin_escala.senha_hash = generate_password_hash(escala_pass)  # type: ignore[attr-defined]
-            except Exception:
-                pass
-
-        db.session.add(admin_escala)
-        db.session.commit()
-
-except Exception:
-    db.session.rollback()
-
-try:
-    # Se o model Config existir, cria default
-    try:
-        Config  # type: ignore[name-defined]
-        has_config_model = True
-    except NameError:
-        has_config_model = False
-
-    if has_config_model:
-        if not Config.query.get(1):  # type: ignore[name-defined]
-            db.session.add(Config(id=1, salario_minimo=0.0))  # type: ignore[name-defined]
+                try:
+                    from werkzeug.security import generate_password_hash
+                    admin.senha_hash = generate_password_hash(admin_pass)  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+            db.session.add(admin)
             db.session.commit()
-except Exception:
-    db.session.rollback()
-
-
-# ============================================================
-#  Bootstrap de Banco (Render/Gunicorn) - seguro com app_context
-# ============================================================
-
-import os
-from datetime import datetime
-
-from sqlalchemy.exc import IntegrityError
-
-# Se você usa Werkzeug para hash:
-from werkzeug.security import generate_password_hash
-
-
-def init_db():
-    """
-    Inicializa o banco de forma segura.
-    IMPORTANTE:
-      - Importar models aqui garante que as tabelas sejam registradas antes do create_all().
-      - Qualquer .query / db.session / create_all deve ficar dentro deste fluxo.
-    """
-    # Ajuste os imports conforme seus nomes reais
-    # Ex: from models import db, Usuario, Entrega
-    # Aqui assumo que `db` já existe no app.py e seus models ficam em models.py
-    from models import Usuario  # ajuste se seu model tem outro nome/caminho
-
-    # 1) cria tabelas
-    db.create_all()
-
-    # 2) seed (idempotente) do admin master (opcional)
-    # Ajuste conforme sua regra de login fixo
-    seed_master_admin(Usuario)
-
-
-def seed_master_admin(UsuarioModel):
-    """
-    Cria o admin master apenas se não existir.
-    Ajuste os campos do seu model (username/login/email/senha/nivel).
-    """
-    master_user = os.environ.get("MASTER_USER", "coopex")
-    master_pass = os.environ.get("MASTER_PASS", "05289")
-
-    # Ajuste o campo de busca conforme seu model: (username) / (login) / (email)
-    existente = UsuarioModel.query.filter_by(username=master_user).first()
-    if existente:
-        return
-
-    novo = UsuarioModel(
-        username=master_user,
-        # Se seu model usa outro campo, ajuste:
-        # email="...",
-        # tipo="admin",
-        # nivel="master",
-        password_hash=generate_password_hash(master_pass),
-    )
-
-    db.session.add(novo)
-    try:
-        db.session.commit()
-    except IntegrityError:
+    except Exception:
         db.session.rollback()
-        # Em caso de corrida (2 instâncias subindo ao mesmo tempo), apenas ignora.
-        return
 
+    try:
+        # Se o model Config existir, cria default
+        try:
+            Config  # type: ignore[name-defined]
+            has_config_model = True
+        except NameError:
+            has_config_model = False
 
-# ============================================================
-# Executa init_db no boot (Render/Gunicorn)
-# ============================================================
+        if has_config_model:
+            if not Config.query.get(1):  # type: ignore[name-defined]
+                db.session.add(Config(id=1, salario_minimo=0.0))  # type: ignore[name-defined]
+                db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+# === Bootstrap do banco no start (Render/Gunicorn) ===
 try:
     if os.environ.get("INIT_DB_ON_START", "1") == "1":
         _t0 = datetime.utcnow()
         with app.app_context():
+       
             init_db()
-
-        # logger pode não estar pronto em alguns cenários; por isso try/except
         try:
-            app.logger.info(
-                f"init_db concluído em {(datetime.utcnow() - _t0).total_seconds():.2f}s"
-            )
+            app.logger.info(f"init_db concluído em {(datetime.utcnow() - _t0).total_seconds():.2f}s")
         except Exception:
             pass
     else:
@@ -1159,7 +1065,6 @@ try:
         except Exception:
             pass
 except Exception as e:
-    # Se você preferir que o deploy falhe quando o init_db falhar, remova este try/except.
     try:
         app.logger.warning(f"init_db falhou/pulado: {e}")
     except Exception:
@@ -1175,29 +1080,19 @@ def get_config() -> Config:
     return cfg
 
 
-from functools import wraps
-from flask import session, redirect, url_for, request
-
-def roles_required(*roles: str):
+def role_required(role: str):
     def deco(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            user_tipo = session.get("user_tipo")
-            if user_tipo not in roles:
-                # opcional: manter o "next" pra voltar após login
-                return redirect(url_for("login", next=request.path))
+            if session.get("user_tipo") != role:
+                return redirect(url_for("login"))
             return fn(*args, **kwargs)
         return wrapper
     return deco
 
-def role_required(role: str):
-    return roles_required(role)
 
 def admin_required(fn):
-    return roles_required("admin")(fn)
-
-def escala_required(fn):
-    return roles_required("admin", "admin_escala")(fn)
+    return role_required("admin")(fn)
 
 
 def _normalize_name(s: str) -> list[str]:
@@ -2046,115 +1941,6 @@ def _send_bytes_with_cache(data: bytes, mime: str, filename: str):
     rv.headers["Cache-Control"] = "public, max-age=604800, immutable"
     return rv
 
-def _append_afetacao_json(msg: str | None, linhas: list[dict]) -> str:
-    base = _strip_afetacao_blob(msg or "")
-    payload = {"linhas": linhas}
-    blob = "__AFETACAO_JSON__=" + json.dumps(payload, ensure_ascii=False)
-    return (base + "\n\n" + blob).strip() if base else blob
-
-
-def _find_escala_destino(destinatario_id: int, origem: Escala) -> Escala | None:
-    """
-    Encontra a escala do DESTINATÁRIO que “casa” com a origem por:
-      - mesmo weekday
-      - mesmo bucket (dia/noite)
-      - (preferência) mesmo contrato
-    """
-    wd_o = _weekday_from_data_str(origem.data)
-    buck_o = _turno_bucket(origem.turno, origem.horario)
-    contrato_o = (origem.contrato or "").strip().lower()
-
-    candidatas = Escala.query.filter_by(cooperado_id=destinatario_id).all()
-
-    best = None
-    for e in candidatas:
-        if _weekday_from_data_str(e.data) != wd_o:
-            continue
-        if _turno_bucket(e.turno, e.horario) != buck_o:
-            continue
-
-        # preferência forte: contrato igual
-        if contrato_o and (e.contrato or "").strip().lower() == contrato_o:
-            return e
-
-        # fallback: primeira que casar por weekday/bucket
-        if best is None:
-            best = e
-
-    return best
-
-
-@app.post("/admin/trocas/<int:troca_id>/aprovar")
-@escala_required
-@with_db_retry
-def admin_aprovar_troca(troca_id: int):
-    t = TrocaSolicitacao.query.get_or_404(troca_id)
-
-    if t.status != "pendente":
-        flash("Esta solicitação já foi decidida.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
-    solicitante = Cooperado.query.get(t.solicitante_id)
-    destinatario = Cooperado.query.get(t.destino_id)
-    origem = Escala.query.get(t.origem_escala_id)
-
-    if not solicitante or not destinatario or not origem:
-        flash("Troca inválida (dados incompletos).", "danger")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
-    destino = _find_escala_destino(destinatario.id, origem)
-    if not destino:
-        flash("Não encontrei a escala do destinatário para casar com a origem (weekday/turno).", "danger")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
-    # === aplica a troca nas escalas (swap cooperado_id + cooperado_nome) ===
-    # mantém contrato/turno/horario/cor como estão
-    origem.cooperado_id, destino.cooperado_id = destino.cooperado_id, origem.cooperado_id
-
-    # garante nomes visíveis na planilha mesmo se cooperado_id ficar None futuramente
-    origem.cooperado_nome = destinatario.nome
-    destino.cooperado_nome = solicitante.nome
-
-    # monta linhas afetadas (do jeito que seu dashboard sabe ler)
-    linhas = [
-        _linha_from_escala(origem, saiu=solicitante.nome, entrou=destinatario.nome),
-        _linha_from_escala(destino, saiu=destinatario.nome, entrou=solicitante.nome),
-    ]
-
-    t.status = "aprovada"
-    t.aplicada_em = datetime.utcnow()
-    t.mensagem = _append_afetacao_json(t.mensagem, linhas)
-
-    db.session.commit()
-    flash("Troca aprovada e aplicada nas escalas.", "success")
-    return redirect(url_for("admin_dashboard", tab="escalas"))
-
-
-@app.post("/admin/trocas/<int:troca_id>/recusar")
-@escala_required
-@with_db_retry
-def admin_recusar_troca(troca_id: int):
-    t = TrocaSolicitacao.query.get_or_404(troca_id)
-
-    if t.status != "pendente":
-        flash("Esta solicitação já foi decidida.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
-    motivo = (request.form.get("motivo") or "").strip()
-
-    t.status = "recusada"
-    t.aplicada_em = datetime.utcnow()
-
-    # como seu modelo não tem campo 'motivo', grava no texto
-    if motivo:
-        base = (t.mensagem or "").strip()
-        t.mensagem = (base + "\n\n" if base else "") + f"[RECUSADA] Motivo: {motivo}"
-
-    db.session.commit()
-    flash("Troca recusada.", "success")
-    return redirect(url_for("admin_dashboard", tab="escalas"))
-
-
 @app.get("/media/coop/<int:coop_id>")
 def media_coop(coop_id: int):
     # Retry simples para conexões quebradas (evita 500 pontual)
@@ -2190,44 +1976,23 @@ def media_rest(rest_id: int):
     return redirect(url_for("static", filename="img/default.png"))
 
 # =========================
-# Helpers (opcional, mas recomendado)
-# =========================
-def _get_usuario_logado():
-    """Retorna o usuário logado ou None."""
-    uid = session.get("user_id")
-    if not uid:
-        return None
-
-    # Compatível com Flask-SQLAlchemy antigo e SQLAlchemy 2.x
-    try:
-        # SQLAlchemy 2.x (se você tiver `db`)
-        from extensions import db  # ajuste se necessário
-        return db.session.get(Usuario, uid)
-    except Exception:
-        # Flask-SQLAlchemy antigo
-        return Usuario.query.get(uid)
-
-
-# =========================
 # Rota raiz
 # =========================
 @app.route("/")
 def index():
-    u = _get_usuario_logado()
+    uid = session.get("user_id")
+    if not uid:
+        return redirect(url_for("login"))
+    u = Usuario.query.get(uid)
     if not u:
         return redirect(url_for("login"))
-
-    if u.tipo == "admin_escala":
-        return redirect(url_for("admin_dashboard", tab="escalas"))
     if u.tipo == "admin":
         return redirect(url_for("admin_dashboard"))
     if u.tipo == "cooperado":
         return redirect(url_for("portal_cooperado"))
     if u.tipo == "restaurante":
         return redirect(url_for("portal_restaurante"))
-
     return redirect(url_for("login"))
-
 
 # =========================
 # Auth
@@ -2238,20 +2003,15 @@ def login():
 
     if request.method == "POST":
         usuario = (request.form.get("usuario") or "").strip()
-        senha = request.form.get("senha") or ""
+        senha   = request.form.get("senha") or ""
 
-        u = None
-        if usuario:
-            u = Usuario.query.filter_by(usuario=usuario).first()
+        u = Usuario.query.filter_by(usuario=usuario).first()
 
         # Fallback: permitir login usando o NOME do restaurante
-        # (busca exata por ilike e depois parcial)
-        if not u and usuario:
-            r = (
-                Restaurante.query.filter(Restaurante.nome.ilike(usuario)).first()
-                or Restaurante.query.filter(Restaurante.nome.ilike(f"%{usuario}%")).first()
-            )
-            if r and getattr(r, "usuario_ref", None):
+        if not u:
+            r = (Restaurante.query.filter(Restaurante.nome.ilike(usuario)).first()
+                 or Restaurante.query.filter(Restaurante.nome.ilike(f"%{usuario}%")).first())
+            if r and r.usuario_ref:
                 u = r.usuario_ref
 
         if u and u.check_password(senha):
@@ -2263,31 +2023,18 @@ def login():
             # Autentica e direciona de acordo com o tipo
             session["user_id"] = u.id
             session["user_tipo"] = u.tipo
-
-            # (Opcional) respeitar parâmetro next, se você usar
-            next_url = request.args.get("next")
-            if next_url:
-                return redirect(next_url)
-
             if u.tipo == "admin":
                 return redirect(url_for("admin_dashboard"))
-            elif u.tipo == "admin_escala":
-                return redirect(url_for("admin_dashboard", tab="escalas"))
             elif u.tipo == "cooperado":
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
                 return redirect(url_for("portal_restaurante"))
 
-            # Se cair aqui, tipo desconhecido
-            return redirect(url_for("login"))
-
         erro_login = "Usuário/senha inválidos."
         flash(erro_login, "danger")
 
     # Renderização do formulário (template se existir; fallback simples se não)
-    templates_dir = os.path.join(current_app.root_path, "templates")
-    login_tpl = os.path.join(templates_dir, "login.html")
-
+    login_tpl = os.path.join("templates", "login.html")
     if os.path.exists(login_tpl):
         return render_template("login.html", erro_login=erro_login)
 
@@ -2381,21 +2128,12 @@ def toggle_status_cooperado(id):
 
 
 @app.route("/admin", methods=["GET"])
-@escala_required
+@admin_required
 def admin_dashboard():
     args = request.args
 
     # --- Controle de abas
-    active_tab = args.get("tab", "resumo")
-
-    # trava total para admin_escala
-    if session.get("user_tipo") == "admin_escala":
-        # Só deixa entrar em Escalas (onde fica Trocas)
-        active_tab = "escalas"  # ajuste para o nome real do seu tab no HTML
-
-        # (opcional mas recomendado) se tentarem forçar outra tab por querystring
-        if args.get("tab") not in (None, "", "escalas"):
-            return redirect(url_for("admin_dashboard", tab="escalas"))
+    active_tab = args.get("tab", "lancamentos")
 
     # --- Helper: escolhe a primeira data válida de uma lista de chaves
     def _pick_date(*keys):
@@ -2889,7 +2627,7 @@ def admin_dashboard():
         trocas_historico=trocas_historico,
         trocas_historico_flat=trocas_historico_flat,
     )
-
+    
 
 # =========================
 # Navegação/Export util
@@ -2897,11 +2635,6 @@ def admin_dashboard():
 @app.route("/filtrar_lancamentos")
 @admin_required
 def filtrar_lancamentos():
-    # trava para admin_escala (somente Escalas/Trocas)
-    if session.get("user_tipo") == "admin_escala":
-        flash("Seu usuário tem acesso apenas à aba Escalas/Trocas.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
     qs = request.query_string.decode("utf-8")
     base = url_for("admin_dashboard", tab="lancamentos")
     joiner = "&" if qs else ""
@@ -2937,11 +2670,6 @@ def _fmt_time(t) -> str:
 @app.route("/exportar_lancamentos")
 @admin_required
 def exportar_lancamentos():
-    # trava para admin_escala (somente Escalas/Trocas)
-    if session.get("user_tipo") == "admin_escala":
-        flash("Seu usuário tem acesso apenas à aba Escalas/Trocas.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
     import io
     from collections import defaultdict
 
@@ -3354,11 +3082,6 @@ def exportar_lancamentos():
 @app.route("/admin/lancamentos/add", methods=["POST"])
 @admin_required
 def admin_add_lancamento():
-    # trava para admin_escala (somente Escalas/Trocas)
-    if session.get("user_tipo") == "admin_escala":
-        flash("Seu usuário tem acesso apenas à aba Escalas/Trocas.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
     f = request.form
     l = Lancamento(
         restaurante_id=f.get("restaurante_id", type=int),
@@ -3378,11 +3101,6 @@ def admin_add_lancamento():
 @app.route("/admin/lancamentos/<int:id>/edit", methods=["POST"])
 @admin_required
 def admin_edit_lancamento(id):
-    # trava para admin_escala (somente Escalas/Trocas)
-    if session.get("user_tipo") == "admin_escala":
-        flash("Seu usuário tem acesso apenas à aba Escalas/Trocas.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
     l = Lancamento.query.get_or_404(id)
     f = request.form
     l.restaurante_id = f.get("restaurante_id", type=int)
@@ -3400,11 +3118,6 @@ def admin_edit_lancamento(id):
 @app.route("/admin/lancamentos/<int:id>/delete")
 @admin_required
 def admin_delete_lancamento(id):
-    # trava para admin_escala (somente Escalas/Trocas)
-    if session.get("user_tipo") == "admin_escala":
-        flash("Seu usuário tem acesso apenas à aba Escalas/Trocas.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
     l = Lancamento.query.get_or_404(id)
 
     # 👇 LIMPEZA MANUAL: apaga avaliações amarradas a este lançamento
@@ -3419,11 +3132,6 @@ def admin_delete_lancamento(id):
 @app.route("/admin/avaliacoes", methods=["GET"])
 @admin_required
 def admin_avaliacoes():
-    # trava para admin_escala (somente Escalas/Trocas)
-    if session.get("user_tipo") == "admin_escala":
-        flash("Seu usuário tem acesso apenas à aba Escalas/Trocas.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
     # tipo=cooperado (padrão): Restaurante avalia Cooperado
     # tipo=restaurante: Cooperado avalia Restaurante
     tipo_raw = (request.args.get("tipo") or "cooperado").strip().lower()
@@ -3694,11 +3402,6 @@ def admin_export_avaliacoes_csv():
     Endpoint usado pelo botão 'Exportar CSV' em admin_avaliacoes.html.
     Por enquanto só volta para a tela com um aviso, para não dar erro 500.
     """
-    # trava para admin_escala (somente Escalas/Trocas)
-    if session.get("user_tipo") == "admin_escala":
-        flash("Seu usuário tem acesso apenas à aba Escalas/Trocas.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
     from flask import flash, redirect, url_for, request
 
     flash("Exportação em CSV ainda não foi implementada.", "warning")
@@ -3710,18 +3413,13 @@ def admin_export_avaliacoes_csv():
         "tipo": request.args.get("tipo") or "",
     }
     return redirect(url_for("admin_avaliacoes", **args))
-
+ 
 # =========================
 # CRUD Receitas/Despesas Coop (Admin)
 # =========================
 @app.route("/receitas/add", methods=["POST"])
 @admin_required
 def add_receita():
-    # trava para admin_escala (somente Escalas/Trocas)
-    if session.get("user_tipo") == "admin_escala":
-        flash("Seu usuário tem acesso apenas à aba Escalas/Trocas.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
     f = request.form
     r = ReceitaCooperativa(
         descricao=f.get("descricao", "").strip(),
@@ -3736,11 +3434,6 @@ def add_receita():
 @app.route("/receitas/<int:id>/edit", methods=["POST"])
 @admin_required
 def edit_receita(id):
-    # trava para admin_escala (somente Escalas/Trocas)
-    if session.get("user_tipo") == "admin_escala":
-        flash("Seu usuário tem acesso apenas à aba Escalas/Trocas.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
     r = ReceitaCooperativa.query.get_or_404(id)
     f = request.form
     r.descricao = f.get("descricao", "").strip()
@@ -3754,11 +3447,6 @@ def edit_receita(id):
 @app.route("/receitas/<int:id>/delete")
 @admin_required
 def delete_receita(id):
-    # trava para admin_escala (somente Escalas/Trocas)
-    if session.get("user_tipo") == "admin_escala":
-        flash("Seu usuário tem acesso apenas à aba Escalas/Trocas.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
     r = ReceitaCooperativa.query.get_or_404(id)
     db.session.delete(r)
     db.session.commit()
@@ -3768,11 +3456,6 @@ def delete_receita(id):
 @app.route("/despesas/add", methods=["POST"])
 @admin_required
 def add_despesa():
-    # trava para admin_escala (somente Escalas/Trocas)
-    if session.get("user_tipo") == "admin_escala":
-        flash("Seu usuário tem acesso apenas à aba Escalas/Trocas.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
     f = request.form
     d = DespesaCooperativa(
         descricao=f.get("descricao", "").strip(),
@@ -3787,11 +3470,6 @@ def add_despesa():
 @app.route("/despesas/<int:id>/edit", methods=["POST"])
 @admin_required
 def edit_despesa(id):
-    # trava para admin_escala (somente Escalas/Trocas)
-    if session.get("user_tipo") == "admin_escala":
-        flash("Seu usuário tem acesso apenas à aba Escalas/Trocas.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
     d = DespesaCooperativa.query.get_or_404(id)
     f = request.form
     d.descricao = f.get("descricao", "").strip()
@@ -3804,11 +3482,6 @@ def edit_despesa(id):
 @app.route("/despesas/<int:id>/delete")
 @admin_required
 def delete_despesa(id):
-    # trava para admin_escala (somente Escalas/Trocas)
-    if session.get("user_tipo") == "admin_escala":
-        flash("Seu usuário tem acesso apenas à aba Escalas/Trocas.", "warning")
-        return redirect(url_for("admin_dashboard", tab="escalas"))
-
     d = DespesaCooperativa.query.get_or_404(id)
     db.session.delete(d)
     db.session.commit()
