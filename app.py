@@ -1073,14 +1073,84 @@ except Exception:
     db.session.rollback()
 
 
-# === Bootstrap do banco no start (Render/Gunicorn) ===
+# ============================================================
+#  Bootstrap de Banco (Render/Gunicorn) - seguro com app_context
+# ============================================================
+
+import os
+from datetime import datetime
+
+from sqlalchemy.exc import IntegrityError
+
+# Se você usa Werkzeug para hash:
+from werkzeug.security import generate_password_hash
+
+
+def init_db():
+    """
+    Inicializa o banco de forma segura.
+    IMPORTANTE:
+      - Importar models aqui garante que as tabelas sejam registradas antes do create_all().
+      - Qualquer .query / db.session / create_all deve ficar dentro deste fluxo.
+    """
+    # Ajuste os imports conforme seus nomes reais
+    # Ex: from models import db, Usuario, Entrega
+    # Aqui assumo que `db` já existe no app.py e seus models ficam em models.py
+    from models import Usuario  # ajuste se seu model tem outro nome/caminho
+
+    # 1) cria tabelas
+    db.create_all()
+
+    # 2) seed (idempotente) do admin master (opcional)
+    # Ajuste conforme sua regra de login fixo
+    seed_master_admin(Usuario)
+
+
+def seed_master_admin(UsuarioModel):
+    """
+    Cria o admin master apenas se não existir.
+    Ajuste os campos do seu model (username/login/email/senha/nivel).
+    """
+    master_user = os.environ.get("MASTER_USER", "coopex")
+    master_pass = os.environ.get("MASTER_PASS", "05289")
+
+    # Ajuste o campo de busca conforme seu model: (username) / (login) / (email)
+    existente = UsuarioModel.query.filter_by(username=master_user).first()
+    if existente:
+        return
+
+    novo = UsuarioModel(
+        username=master_user,
+        # Se seu model usa outro campo, ajuste:
+        # email="...",
+        # tipo="admin",
+        # nivel="master",
+        password_hash=generate_password_hash(master_pass),
+    )
+
+    db.session.add(novo)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        # Em caso de corrida (2 instâncias subindo ao mesmo tempo), apenas ignora.
+        return
+
+
+# ============================================================
+# Executa init_db no boot (Render/Gunicorn)
+# ============================================================
 try:
     if os.environ.get("INIT_DB_ON_START", "1") == "1":
         _t0 = datetime.utcnow()
         with app.app_context():
             init_db()
+
+        # logger pode não estar pronto em alguns cenários; por isso try/except
         try:
-            app.logger.info(f"init_db concluído em {(datetime.utcnow() - _t0).total_seconds():.2f}s")
+            app.logger.info(
+                f"init_db concluído em {(datetime.utcnow() - _t0).total_seconds():.2f}s"
+            )
         except Exception:
             pass
     else:
@@ -1089,11 +1159,11 @@ try:
         except Exception:
             pass
 except Exception as e:
+    # Se você preferir que o deploy falhe quando o init_db falhar, remova este try/except.
     try:
         app.logger.warning(f"init_db falhou/pulado: {e}")
     except Exception:
         pass
-
 
 
 def get_config() -> Config:
