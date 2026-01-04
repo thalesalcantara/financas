@@ -168,24 +168,26 @@ app.config.update(
 db = SQLAlchemy(app)
 
 def ajustar_banco():
-    try:
-        # se você tiver essa função _is_sqlite, use; senão pode checar pela URI
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(despesas_cooperado);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "eh_adiantamento" not in colnames:
-                db.session.execute(sa_text(
-                    "ALTER TABLE despesas_cooperado ADD COLUMN eh_adiantamento BOOLEAN DEFAULT 0"
-                ))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text("""
-                ALTER TABLE IF EXISTS public.despesas_cooperado
-                ADD COLUMN IF NOT EXISTS eh_adiantamento BOOLEAN DEFAULT FALSE
-            """))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
+    # ✅ IMPORTANTE: garante contexto de app, mesmo se essa função for chamada no boot/import
+    with app.app_context():
+        try:
+            # se você tiver essa função _is_sqlite, use; senão pode checar pela URI
+            if _is_sqlite():
+                cols = db.session.execute(sa_text("PRAGMA table_info(despesas_cooperado);")).fetchall()
+                colnames = {row[1] for row in cols}
+                if "eh_adiantamento" not in colnames:
+                    db.session.execute(sa_text(
+                        "ALTER TABLE despesas_cooperado ADD COLUMN eh_adiantamento BOOLEAN DEFAULT 0"
+                    ))
+                db.session.commit()
+            else:
+                db.session.execute(sa_text("""
+                    ALTER TABLE IF EXISTS public.despesas_cooperado
+                    ADD COLUMN IF NOT EXISTS eh_adiantamento BOOLEAN DEFAULT FALSE
+                """))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
 
 
 # ========= Retry de conexão p/ rotas críticas =========
@@ -242,12 +244,12 @@ def _set_sqlite_pragma(dbapi_con, con_record):
 
 
 def _is_sqlite() -> bool:
+    # ✅ NÃO usa db.session aqui (evita "Working outside of application context")
     try:
-        return db.session.get_bind().dialect.name == "sqlite"
+        uri = app.config.get("SQLALCHEMY_DATABASE_URI") or ""
+        return uri.startswith("sqlite") or "sqlite" in uri
     except Exception:
-        return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
-
-
+        return False
 
 # ==========================================
 # MODELOS
