@@ -167,37 +167,25 @@ app.config.update(
 
 db = SQLAlchemy(app)
 
-
-def admin_ou_escala_required(fn):
-    @wraps(fn)
-    def w(*args, **kwargs):
-        if session.get("user_tipo") not in ("admin", "admin_escala"):
-            abort(403)
-        return fn(*args, **kwargs)
-    return w
-
-
 def ajustar_banco():
-    # ✅ IMPORTANTE: garante contexto de app, mesmo se essa função for chamada no boot/import
-    with app.app_context():
-        try:
-            # se você tiver essa função _is_sqlite, use; senão pode checar pela URI
-            if _is_sqlite():
-                cols = db.session.execute(sa_text("PRAGMA table_info(despesas_cooperado);")).fetchall()
-                colnames = {row[1] for row in cols}
-                if "eh_adiantamento" not in colnames:
-                    db.session.execute(sa_text(
-                        "ALTER TABLE despesas_cooperado ADD COLUMN eh_adiantamento BOOLEAN DEFAULT 0"
-                    ))
-                db.session.commit()
-            else:
-                db.session.execute(sa_text("""
-                    ALTER TABLE IF EXISTS public.despesas_cooperado
-                    ADD COLUMN IF NOT EXISTS eh_adiantamento BOOLEAN DEFAULT FALSE
-                """))
-                db.session.commit()
-        except Exception:
-            db.session.rollback()
+    try:
+        # se você tiver essa função _is_sqlite, use; senão pode checar pela URI
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(despesas_cooperado);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "eh_adiantamento" not in colnames:
+                db.session.execute(sa_text(
+                    "ALTER TABLE despesas_cooperado ADD COLUMN eh_adiantamento BOOLEAN DEFAULT 0"
+                ))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("""
+                ALTER TABLE IF EXISTS public.despesas_cooperado
+                ADD COLUMN IF NOT EXISTS eh_adiantamento BOOLEAN DEFAULT FALSE
+            """))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 # ========= Retry de conexão p/ rotas críticas =========
@@ -254,12 +242,12 @@ def _set_sqlite_pragma(dbapi_con, con_record):
 
 
 def _is_sqlite() -> bool:
-    # ✅ NÃO usa db.session aqui (evita "Working outside of application context")
     try:
-        uri = app.config.get("SQLALCHEMY_DATABASE_URI") or ""
-        return uri.startswith("sqlite") or "sqlite" in uri
+        return db.session.get_bind().dialect.name == "sqlite"
     except Exception:
-        return False
+        return "sqlite" in (app.config.get("SQLALCHEMY_DATABASE_URI") or "")
+
+
 
 # ==========================================
 # MODELOS
@@ -271,7 +259,7 @@ class Usuario(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     usuario = db.Column(db.String(80), unique=True, nullable=False)
     senha_hash = db.Column(db.String(200), nullable=False)
-    tipo = db.Column(db.String(20), nullable=False)  # admin | admin_escala | cooperado | restaurante
+    tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
 
     # Importante: default no Python + default no BANCO
     ativo = db.Column(
@@ -1059,23 +1047,6 @@ def init_db():
                 db.session.commit()
     except Exception:
         db.session.rollback()
-
-# 5.x) Bootstrap do usuário "coopex" (admin_escala) - idempotente
-    try:
-        u_esc = Usuario.query.filter_by(usuario="coopex").first()
-        if not u_esc:
-            u_esc = Usuario(usuario="coopex", tipo="admin_escala", senha_hash="")
-            u_esc.set_password(os.environ.get("COOPEX_ESCALA_PASS", "84253700"))
-            db.session.add(u_esc)
-        else:
-            u_esc.tipo = "admin_escala"
-        if not u_esc.check_password(os.environ.get("COOPEX_ESCALA_PASS", "84253700")):
-            u_esc.set_password(os.environ.get("COOPEX_ESCALA_PASS", "84253700"))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-
-
 
 # === Bootstrap do banco no start (Render/Gunicorn) ===
 try:
@@ -2012,24 +1983,16 @@ def index():
     uid = session.get("user_id")
     if not uid:
         return redirect(url_for("login"))
-
     u = Usuario.query.get(uid)
     if not u:
         return redirect(url_for("login"))
-
     if u.tipo == "admin":
         return redirect(url_for("admin_dashboard"))
     if u.tipo == "cooperado":
         return redirect(url_for("portal_cooperado"))
     if u.tipo == "restaurante":
         return redirect(url_for("portal_restaurante"))
-
-    # ✅ NOVO: usuário de escala
-    if u.tipo == "admin_escala":
-        return redirect(url_for("admin_dashboard", tab="escala"))
-
     return redirect(url_for("login"))
-
 
 # =========================
 # Auth
@@ -2046,11 +2009,9 @@ def login():
 
         # Fallback: permitir login usando o NOME do restaurante
         if not u:
-            r = (
-                Restaurante.query.filter(Restaurante.nome.ilike(usuario)).first()
-                or Restaurante.query.filter(Restaurante.nome.ilike(f"%{usuario}%")).first()
-            )
-            if r and getattr(r, "usuario_ref", None):
+            r = (Restaurante.query.filter(Restaurante.nome.ilike(usuario)).first()
+                 or Restaurante.query.filter(Restaurante.nome.ilike(f"%{usuario}%")).first())
+            if r and r.usuario_ref:
                 u = r.usuario_ref
 
         if u and u.check_password(senha):
@@ -2062,15 +2023,12 @@ def login():
             # Autentica e direciona de acordo com o tipo
             session["user_id"] = u.id
             session["user_tipo"] = u.tipo
-
             if u.tipo == "admin":
                 return redirect(url_for("admin_dashboard"))
             elif u.tipo == "cooperado":
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
                 return redirect(url_for("portal_restaurante"))
-            elif u.tipo == "admin_escala":
-                return redirect(url_for("admin_dashboard", tab="escala"))
 
         erro_login = "Usuário/senha inválidos."
         flash(erro_login, "danger")
@@ -2170,67 +2128,9 @@ def toggle_status_cooperado(id):
 
 
 @app.route("/admin", methods=["GET"])
-@admin_ou_escala_required
+@admin_required
 def admin_dashboard():
     args = request.args
-    user_tipo = session.get("user_tipo")
-
-    # =========================================================
-    # RESTRIÇÃO REAL: admin_escala só pode ver ABA "escala"
-    # =========================================================
-    if user_tipo == "admin_escala":
-        # trava qualquer tentativa de abrir outra aba via ?tab=
-        tab_req = args.get("tab")
-        if tab_req and tab_req != "escala":
-            return redirect(url_for("admin_dashboard", tab="escala"))
-
-        active_tab = "escala"
-
-        # Carrega SOMENTE o que a aba Escala/Trocas precisa
-        cooperados = Cooperado.query.order_by(Cooperado.nome).all()
-
-        # Se você tiver "escala" vinculada a cooperado_id
-        escalas_all = Escala.query.order_by(Escala.id.asc()).all()
-        escalas_por_coop = defaultdict(list)
-        for e in escalas_all:
-            k = e.cooperado_id if e.cooperado_id is not None else 0
-            escalas_por_coop[k].append(e)
-
-        # Trocas de escala (se existir no seu sistema)
-        trocas_all = TrocaSolicitacao.query.order_by(TrocaSolicitacao.id.desc()).all()
-
-        # Para não estourar UndefinedError no template (caso ele referencie)
-        cfg = get_config()
-        restaurantes = []
-        lancamentos = []
-        receitas = []
-        despesas = []
-        receitas_coop = []
-        despesas_coop = []
-        status_doc_por_coop = {}
-        total_docs_pendentes = 0
-
-        return render_template(
-            "dashboard_admin.html",
-            active_tab=active_tab,
-            cooperados=cooperados,
-            escalas_por_coop=escalas_por_coop,
-            trocas_all=trocas_all,
-            # “placeholders” seguros para o template
-            cfg=cfg,
-            restaurantes=restaurantes,
-            lancamentos=lancamentos,
-            receitas=receitas,
-            despesas=despesas,
-            receitas_coop=receitas_coop,
-            despesas_coop=despesas_coop,
-            status_doc_por_coop=status_doc_por_coop,
-            total_docs_pendentes=total_docs_pendentes,
-        )
-
-    # =========================================================
-    # ADMIN NORMAL: mantém tudo como você já tinha
-    # =========================================================
 
     # --- Controle de abas
     active_tab = args.get("tab", "lancamentos")
@@ -2299,15 +2199,8 @@ def admin_dashboard():
         rq = rq.filter(ReceitaCooperativa.data <= data_fim)
         dq = dq.filter(DespesaCooperativa.data <= data_fim)
 
-    receitas = rq.order_by(
-        ReceitaCooperativa.data.desc().nullslast(),
-        ReceitaCooperativa.id.desc()
-    ).all()
-    despesas = dq.order_by(
-        DespesaCooperativa.data.desc(),
-        DespesaCooperativa.id.desc()
-    ).all()
-
+    receitas = rq.order_by(ReceitaCooperativa.data.desc().nullslast(), ReceitaCooperativa.id.desc()).all()
+    despesas = dq.order_by(DespesaCooperativa.data.desc(), DespesaCooperativa.id.desc()).all()
     total_receitas = sum((r.valor_total or 0.0) for r in receitas)
     total_despesas = sum((d.valor or 0.0) for d in despesas)
 
@@ -2356,47 +2249,6 @@ def admin_dashboard():
         }
         for c in cooperados
     }
-
-    # (opcional) contadores rápidos (se seu template usar)
-    docs_pendentes = [
-        c for c in cooperados
-        if not status_doc_por_coop[c.id]["cnh_ok"] or not status_doc_por_coop[c.id]["placa_ok"]
-    ]
-    total_docs_pendentes = len(docs_pendentes)
-
-    return render_template(
-        "dashboard_admin.html",
-        active_tab=active_tab,
-        # filtros
-        data_inicio=data_inicio,
-        data_fim=data_fim,
-        restaurante_id=restaurante_id,
-        cooperado_id=cooperado_id,
-        considerar_periodo=considerar_periodo,
-        dows=dows,
-        # listas
-        lancamentos=lancamentos,
-        receitas=receitas,
-        despesas=despesas,
-        receitas_coop=receitas_coop,
-        despesas_coop=despesas_coop,
-        cooperados=cooperados,
-        restaurantes=restaurantes,
-        # totais
-        total_producoes=total_producoes,
-        total_inss=total_inss,
-        total_sest=total_sest,
-        total_encargos=total_encargos,
-        total_receitas=total_receitas,
-        total_despesas=total_despesas,
-        total_receitas_coop=total_receitas_coop,
-        total_despesas_coop=total_despesas_coop,
-        total_adiantamentos_coop=total_adiantamentos_coop,
-        # docs/config
-        cfg=cfg,
-        status_doc_por_coop=status_doc_por_coop,
-        total_docs_pendentes=total_docs_pendentes,
-    )
 
     # -------- Escalas agrupadas e contagem por cooperado ----------
     escalas_all = Escala.query.order_by(Escala.id.asc()).all()
