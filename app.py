@@ -1071,7 +1071,7 @@ def init_db():
             u_esc.tipo = "admin_escala"
         if not u_esc.check_password(os.environ.get("COOPEX_ESCALA_PASS", "84253700")):
             u_esc.set_password(os.environ.get("COOPEX_ESCALA_PASS", "84253700"))
-                db.session.commit()
+        db.session.commit()
     except Exception:
         db.session.rollback()
 
