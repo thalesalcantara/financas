@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 # ============ Stdlib ============
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import os, io, csv, re, json, time, difflib, unicodedata
 from datetime import datetime, date, timedelta, time as dtime
 from collections import defaultdict, namedtuple
@@ -166,6 +167,31 @@ app.config.update(
 )
 
 db = SQLAlchemy(app)
+
+def _sso_serializer():
+    secret = os.environ.get("SSO_SHARED_SECRET") or app.secret_key
+    # "salt" separa o token SSO de outros usos do secret
+    return URLSafeTimedSerializer(secret_key=secret, salt="coopex-sso-v1")
+
+def sso_load(token: str, max_age_seconds: int = 45) -> dict:
+    s = _sso_serializer()
+    return s.loads(token, max_age=max_age_seconds)
+
+def _get_or_create_sso_user(tipo: str = "admin") -> Usuario:
+    """
+    Garante um usuário técnico para sessão SSO, evitando quebrar rotas que consultam Usuario.
+    """
+    username = f"sso_{tipo}"
+    u = Usuario.query.filter_by(usuario=username).first()
+    if u:
+        return u
+
+    # cria user técnico sem senha (não loga pelo /login)
+    u = Usuario(usuario=username, tipo=tipo, senha_hash="!")
+    db.session.add(u)
+    db.session.commit()
+    return u
+    
 
 def ajustar_banco():
     try:
@@ -2052,6 +2078,42 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+@app.get("/sso/entrar")
+def sso_entrar():
+    token = (request.args.get("token") or "").strip()
+    if not token:
+        return redirect(url_for("login"))
+
+    try:
+        data = sso_load(token, max_age_seconds=45)
+    except SignatureExpired:
+        flash("Link expirou. Clique novamente no botão.", "danger")
+        return redirect(url_for("login"))
+    except BadSignature:
+        flash("Link inválido.", "danger")
+        return redirect(url_for("login"))
+
+    # validações simples
+    if data.get("aud") != "painel-destino":
+        flash("Token com destino inválido.", "danger")
+        return redirect(url_for("login"))
+
+    # Só aceita SSO para admin/supervisao (ajuste conforme seu uso)
+    tipo = (data.get("tipo") or "admin").strip().lower()
+    if tipo not in ("admin", "supervisao"):
+        tipo = "admin"
+
+    u = _get_or_create_sso_user(tipo=tipo)
+
+    session["user_id"] = u.id
+    session["user_tipo"] = u.tipo
+
+    # para onde entrar:
+    # - se você criar um painel /supervisao, redirecione para ele
+    # - caso contrário, use admin_dashboard (já existe no seu app) :contentReference[oaicite:1]{index=1}
+    next_url = data.get("next") or url_for("admin_dashboard")
+    return redirect(next_url)
     
 
 # =========================
