@@ -4419,7 +4419,9 @@
 
               <div class="col-12">
                 <label class="form-label">Usuário atual</label>
-                <input type="text" class="form-control form-control-sm" value="{{ current_user.usuario }}" disabled>
+                <input type="text" class="form-control form-control-sm"
+       value="{{ admin.usuario if admin is defined and admin and admin.usuario is defined else '' }}"
+      disabled>
               </div>
 
               <div class="col-12">
