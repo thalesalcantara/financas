@@ -4100,6 +4100,56 @@ def alterar_admin():
     flash("Conta do administrador atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="config"))
 
+from io import BytesIO, StringIO
+import csv
+import zipfile
+from flask import send_file
+
+@app.route("/download_db_backup", methods=["GET"])
+@admin_required
+def download_db_backup():
+    """
+    Baixa um backup completo do banco em .zip contendo um CSV por tabela.
+    Funciona tanto para SQLite quanto Postgres (ou qualquer engine suportada pelo SQLAlchemy).
+    """
+    mem_zip = BytesIO()
+
+    # db.metadata.sorted_tables já contém todas as tabelas conhecidas do SQLAlchemy
+    tables = list(db.metadata.sorted_tables)
+
+    with zipfile.ZipFile(mem_zip, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for table in tables:
+            # Lê todas as linhas da tabela
+            result = db.session.execute(table.select()).mappings().all()
+            rows = list(result)
+
+            # Monta CSV
+            csv_buf = StringIO()
+            writer = None
+
+            if rows:
+                fieldnames = list(rows[0].keys())
+                writer = csv.DictWriter(csv_buf, fieldnames=fieldnames, extrasaction="ignore")
+                writer.writeheader()
+                for r in rows:
+                    writer.writerow(dict(r))
+            else:
+                # tabela vazia: escreve só o header com as colunas
+                fieldnames = [c.name for c in table.columns]
+                writer = csv.DictWriter(csv_buf, fieldnames=fieldnames)
+                writer.writeheader()
+
+            zf.writestr(f"{table.name}.csv", csv_buf.getvalue().encode("utf-8-sig"))
+
+    mem_zip.seek(0)
+    return send_file(
+        mem_zip,
+        as_attachment=True,
+        download_name="backup_banco_coopex.zip",
+        mimetype="application/zip",
+    )
+
+
 # =========================
 # Receitas/Despesas Cooperado (Admin)
 # =========================
