@@ -4038,13 +4038,35 @@ def reset_senha_restaurante(id):
     db.session.commit()
     flash("Senha do restaurante atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
-# app.py (ou onde ficam suas rotas)
-from flask import request, redirect, url_for, flash, session
+    
+# =========================
+# ROTAS - CONFIG / ADMIN
+# =========================
+
+from flask import request, redirect, url_for, flash, session, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
+from io import BytesIO, StringIO
+import csv
+import zipfile
+
+# Certifique-se que existem no seu projeto:
+# - db (SQLAlchemy)
+# - Usuario, Restaurante (models)
+# - decorators: admin_required, role_required
+# - get_config() (retorna 1 registro de config, cria se não existir)
+# - portal_restaurante e admin_dashboard (views)
+
+# ---------------------------------------------------------
+# RESTAURANTE: ALTERAR SENHA (ABA CONFIG DO RESTAURANTE)
+# ---------------------------------------------------------
 @app.route("/rest/alterar-senha", methods=["POST"], endpoint="rest_alterar_senha")
 @role_required("restaurante")
 def alterar_senha_rest():
     u_id = session.get("user_id")
+    if not u_id:
+        flash("Sessão expirada. Faça login novamente.", "warning")
+        return redirect(url_for("login"))
+
     rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
     user = rest.usuario_ref  # Usuario vinculado ao restaurante
 
@@ -4062,70 +4084,88 @@ def alterar_senha_rest():
         flash("A nova senha deve ter pelo menos 6 caracteres.", "warning")
         return redirect(url_for("portal_restaurante", view="config"))
 
-    # exige senha atual somente se já houver uma definida
-    if user.senha_hash and not atual:
-        flash("Informe a senha atual.", "warning")
-        return redirect(url_for("portal_restaurante", view="config"))
-    if user.senha_hash and not check_password_hash(user.senha_hash, atual):
-        flash("Senha atual incorreta.", "danger")
-        return redirect(url_for("portal_restaurante", view="config"))
+    # Exige senha atual somente se já houver uma definida
+    if getattr(user, "senha_hash", None):
+        if not atual:
+            flash("Informe a senha atual.", "warning")
+            return redirect(url_for("portal_restaurante", view="config"))
+        if not check_password_hash(user.senha_hash, atual):
+            flash("Senha atual incorreta.", "danger")
+            return redirect(url_for("portal_restaurante", view="config"))
 
     user.senha_hash = generate_password_hash(nova)
     db.session.commit()
     flash("Senha alterada com sucesso!", "success")
     return redirect(url_for("portal_restaurante", view="config"))
 
-@app.route("/config/update", methods=["POST"])
+
+# ---------------------------------------------------------
+# ADMIN: ATUALIZAR CONFIG GLOBAL (ABA CONFIG DO ADMIN)
+# ---------------------------------------------------------
+@app.route("/config/update", methods=["POST"], endpoint="update_config")
 @admin_required
 def update_config():
     cfg = get_config()
+
+    # Exemplo de campo (mantenha os que você já usa no HTML)
     cfg.salario_minimo = request.form.get("salario_minimo", type=float) or 0.0
+
     db.session.commit()
     flash("Configuração atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="config"))
 
-@app.route("/admin/alterar_admin", methods=["POST"])
+
+# ---------------------------------------------------------
+# ADMIN (LEGACY): ALTERAR USUÁRIO E SENHA (NUMA ÚNICA ROTA)
+# Se você usa esse form no HTML, mantenha.
+# Caso não use, pode remover sem impactar as rotas novas.
+# ---------------------------------------------------------
+@app.route("/admin/alterar_admin", methods=["POST"], endpoint="alterar_admin")
 @admin_required
 def alterar_admin():
     admin = Usuario.query.filter_by(tipo="admin").first()
-    admin.usuario = request.form.get("usuario", admin.usuario).strip()
-    nova = request.form.get("nova_senha", "")
-    confirmar = request.form.get("confirmar_senha", "")
+    if not admin:
+        flash("Administrador não encontrado.", "danger")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    admin.usuario = (request.form.get("usuario") or admin.usuario or "").strip()
+
+    nova = (request.form.get("nova_senha") or "").strip()
+    confirmar = (request.form.get("confirmar_senha") or "").strip()
+
     if nova or confirmar:
         if nova != confirmar:
             flash("As senhas não conferem.", "warning")
             return redirect(url_for("admin_dashboard", tab="config"))
+        if len(nova) < 6:
+            flash("A nova senha deve ter pelo menos 6 caracteres.", "warning")
+            return redirect(url_for("admin_dashboard", tab="config"))
         admin.set_password(nova)
+
     db.session.commit()
     flash("Conta do administrador atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="config"))
 
-from io import BytesIO, StringIO
-import csv
-import zipfile
-from flask import send_file
 
-@app.route("/download_db_backup", methods=["GET"])
+# ---------------------------------------------------------
+# ADMIN: BACKUP ZIP DO BANCO (1 CSV POR TABELA)
+# ---------------------------------------------------------
+@app.route("/download_db_backup", methods=["GET"], endpoint="download_db_backup")
 @admin_required
 def download_db_backup():
     """
     Baixa um backup completo do banco em .zip contendo um CSV por tabela.
-    Funciona tanto para SQLite quanto Postgres (ou qualquer engine suportada pelo SQLAlchemy).
+    Funciona tanto para SQLite quanto Postgres (ou qualquer engine SQLAlchemy).
     """
     mem_zip = BytesIO()
-
-    # db.metadata.sorted_tables já contém todas as tabelas conhecidas do SQLAlchemy
     tables = list(db.metadata.sorted_tables)
 
     with zipfile.ZipFile(mem_zip, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         for table in tables:
-            # Lê todas as linhas da tabela
             result = db.session.execute(table.select()).mappings().all()
             rows = list(result)
 
-            # Monta CSV
             csv_buf = StringIO()
-            writer = None
 
             if rows:
                 fieldnames = list(rows[0].keys())
@@ -4134,7 +4174,6 @@ def download_db_backup():
                 for r in rows:
                     writer.writerow(dict(r))
             else:
-                # tabela vazia: escreve só o header com as colunas
                 fieldnames = [c.name for c in table.columns]
                 writer = csv.DictWriter(csv_buf, fieldnames=fieldnames)
                 writer.writeheader()
@@ -4149,9 +4188,11 @@ def download_db_backup():
         mimetype="application/zip",
     )
 
-from flask import request, redirect, url_for, flash
-from werkzeug.security import check_password_hash
 
+# ---------------------------------------------------------
+# ADMIN: ATUALIZAR USUÁRIO DO ADMIN  (ENDPOINT QUE QUEBROU SEU /admin)
+# Template usava: url_for('admin_update_admin_user')
+# ---------------------------------------------------------
 @app.route("/admin/update_admin_user", methods=["POST"], endpoint="admin_update_admin_user")
 @admin_required
 def admin_update_admin_user():
@@ -4171,6 +4212,9 @@ def admin_update_admin_user():
     return redirect(url_for("admin_dashboard", tab="config"))
 
 
+# ---------------------------------------------------------
+# ADMIN: ATUALIZAR SENHA DO ADMIN (ROTA SEPARADA E SEGURA)
+# ---------------------------------------------------------
 @app.route("/admin/update_admin_password", methods=["POST"], endpoint="admin_update_admin_password")
 @admin_required
 def admin_update_admin_password():
