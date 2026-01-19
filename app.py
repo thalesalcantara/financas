@@ -4149,6 +4149,66 @@ def download_db_backup():
         mimetype="application/zip",
     )
 
+from flask import request, redirect, url_for, flash
+from werkzeug.security import check_password_hash
+
+@app.route("/admin/update_admin_user", methods=["POST"], endpoint="admin_update_admin_user")
+@admin_required
+def admin_update_admin_user():
+    admin = Usuario.query.filter_by(tipo="admin").first()
+    if not admin:
+        flash("Administrador não encontrado.", "danger")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    novo_usuario = (request.form.get("novo_usuario") or "").strip()
+    if not novo_usuario:
+        flash("Informe o novo usuário.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    admin.usuario = novo_usuario
+    db.session.commit()
+    flash("Usuário do administrador atualizado.", "success")
+    return redirect(url_for("admin_dashboard", tab="config"))
+
+
+@app.route("/admin/update_admin_password", methods=["POST"], endpoint="admin_update_admin_password")
+@admin_required
+def admin_update_admin_password():
+    admin = Usuario.query.filter_by(tipo="admin").first()
+    if not admin:
+        flash("Administrador não encontrado.", "danger")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    senha_atual = (request.form.get("senha_atual") or "").strip()
+    senha_nova  = (request.form.get("senha_nova")  or "").strip()
+    senha_conf  = (request.form.get("senha_conf")  or "").strip()
+
+    if not senha_nova or not senha_conf:
+        flash("Preencha a nova senha e a confirmação.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    if senha_nova != senha_conf:
+        flash("A confirmação não confere com a nova senha.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    if len(senha_nova) < 6:
+        flash("A nova senha deve ter pelo menos 6 caracteres.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    # Se já existe senha, exige a senha atual correta
+    if getattr(admin, "senha_hash", None):
+        if not senha_atual:
+            flash("Informe a senha atual.", "warning")
+            return redirect(url_for("admin_dashboard", tab="config"))
+        if not check_password_hash(admin.senha_hash, senha_atual):
+            flash("Senha atual incorreta.", "danger")
+            return redirect(url_for("admin_dashboard", tab="config"))
+
+    admin.set_password(senha_nova)
+    db.session.commit()
+    flash("Senha do administrador atualizada.", "success")
+    return redirect(url_for("admin_dashboard", tab="config"))
+
 
 # =========================
 # Receitas/Despesas Cooperado (Admin)
