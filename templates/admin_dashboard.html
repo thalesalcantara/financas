@@ -4371,6 +4371,223 @@
   </div>
 </section>
 
+<!-- CONFIGURAÇÕES (drop-in, mesmo design) -->
+<section class="tab-pane fade {{ 'show active' if _tab=='config' else '' }}" id="config" role="tabpanel">
+
+  <div class="config-shell">
+
+    <div class="page-header mb-3">
+      <h3 class="d-flex align-items-center gap-2">
+        <span class="badge-soft"><i class="bi bi-gear"></i></span>
+        Configurações
+      </h3>
+      <small>Atualize dados do administrador, senha, salário (config do sistema) e gere backups.</small>
+    </div>
+
+    {# Flash messages (se você usa flash no Flask) #}
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% if msgs %}
+        <div class="mb-3">
+          {% for cat, msg in msgs %}
+            <div class="alert alert-{{ 'success' if cat in ['success','ok'] else ('warning' if cat in ['warning'] else 'danger') }} mb-2">
+              {{ msg }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <div class="row g-3">
+
+      <!-- DADOS DO ADMIN -->
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4">
+          <div class="card-body">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <div class="config-icon"><i class="bi bi-person-gear"></i></div>
+              <div>
+                <h6 class="m-0">Administrador</h6>
+                <small class="text-muted">Altere o nome de usuário do admin.</small>
+              </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('admin_update_admin_user') }}" class="row g-2 align-items-end">
+              {% if csrf_token is defined %}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {% endif %}
+              <input type="hidden" name="tab" value="config">
+
+              <div class="col-12">
+                <label class="form-label">Usuário atual</label>
+                <input type="text" class="form-control form-control-sm" value="{{ current_user.usuario }}" disabled>
+              </div>
+
+              <div class="col-12">
+                <label class="form-label">Novo usuário</label>
+                <input type="text" class="form-control form-control-sm" name="novo_usuario" placeholder="Ex.: admin.coopex" required>
+                <small class="text-muted">Recomendado: sem espaços, minúsculo e fácil de lembrar.</small>
+              </div>
+
+              <div class="col-12 mt-2">
+                <button class="btn btn-royal btn-sm">
+                  <i class="bi bi-save"></i> Salvar usuário
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- SENHA DO ADMIN -->
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4">
+          <div class="card-body">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <div class="config-icon"><i class="bi bi-shield-lock"></i></div>
+              <div>
+                <h6 class="m-0">Senha</h6>
+                <small class="text-muted">Troque a senha do administrador com segurança.</small>
+              </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('admin_update_admin_password') }}" class="row g-2 align-items-end">
+              {% if csrf_token is defined %}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {% endif %}
+              <input type="hidden" name="tab" value="config">
+
+              <div class="col-12">
+                <label class="form-label">Senha atual</label>
+                <input type="password" class="form-control form-control-sm" name="senha_atual" required>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label">Nova senha</label>
+                <input type="password" class="form-control form-control-sm" name="nova_senha" minlength="6" required>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label">Confirmar nova senha</label>
+                <input type="password" class="form-control form-control-sm" name="confirmar_senha" minlength="6" required>
+              </div>
+
+              <div class="col-12 mt-2">
+                <button class="btn btn-royal btn-sm">
+                  <i class="bi bi-key"></i> Atualizar senha
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- SALÁRIO (CONFIG DO SISTEMA) -->
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4">
+          <div class="card-body">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <div class="config-icon"><i class="bi bi-cash-coin"></i></div>
+              <div>
+                <h6 class="m-0">Salário (Configuração)</h6>
+                <small class="text-muted">Defina um salário/base usado pelo sistema (relatórios, painel, etc.).</small>
+              </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('admin_update_salario_base') }}" class="row g-2 align-items-end">
+              {% if csrf_token is defined %}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {% endif %}
+              <input type="hidden" name="tab" value="config">
+
+              <div class="col-12">
+                <label class="form-label">Salário base atual</label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">R$</span>
+                  <input type="text" class="form-control" value="{{ salario_base or '0.00' }}" disabled>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <label class="form-label">Novo salário base</label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">R$</span>
+                  <input type="number" step="0.01" min="0" class="form-control" name="salario_base" placeholder="0.00" required>
+                </div>
+              </div>
+
+              <div class="col-12 mt-2">
+                <button class="btn btn-royal btn-sm">
+                  <i class="bi bi-save"></i> Salvar salário
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- BACKUP -->
+      <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4">
+          <div class="card-body">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <div class="config-icon"><i class="bi bi-database-down"></i></div>
+              <div>
+                <h6 class="m-0">Backup</h6>
+                <small class="text-muted">Gera um arquivo .zip com banco e arquivos importantes.</small>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-3" style="background:#f8fafc;border:1px solid #e5e7eb;">
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div>
+                  <div class="fw-semibold">Backup completo</div>
+                  <div class="text-muted small">Recomendado antes de grandes alterações.</div>
+                </div>
+
+                <form method="POST" action="{{ url_for('admin_backup_download') }}" target="_blank" class="m-0">
+                  {% if csrf_token is defined %}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  {% endif %}
+                  <input type="hidden" name="tab" value="config">
+                  <button type="submit" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-download"></i> Baixar backup (.zip)
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <small class="text-muted d-block mt-2">
+              Dica: guarde o .zip fora do servidor (Drive/pendrive). Em hospedagens, o disco pode ser limitado/temporário.
+            </small>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <style>
+    #config .config-shell{
+      background: radial-gradient(circle at top left, rgba(48,71,214,0.10), transparent 55%),
+                  radial-gradient(circle at bottom right, rgba(16,185,129,0.10), transparent 55%);
+      border-radius: 1.5rem;
+      padding: 0.85rem;
+    }
+    #config .config-icon{
+      width: 36px;
+      height: 36px;
+      border-radius: 14px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background: rgba(48,71,214,0.08);
+      color:#3047d6;
+      font-size: 1.05rem;
+    }
+  </style>
+
+</section>
+
 <style>
   .section-title {
     font-size: 0.95rem;
