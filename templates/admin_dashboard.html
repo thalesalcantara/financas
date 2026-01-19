@@ -4411,7 +4411,7 @@
               </div>
             </div>
 
-            <form method="POST" action="{{ url_for('admin_update_admin_user') }}" class="row g-2 align-items-end">
+            <form method="POST" action="{{ url_for('admin_update_admin_password') }}" class="row g-2 align-items-end">
               {% if csrf_token is defined %}
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               {% endif %}
