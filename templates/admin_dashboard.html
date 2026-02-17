@@ -3684,7 +3684,7 @@
   </script>
 </section>
 
-       <!-- ESCALAS -->
+     <!-- ESCALAS -->
 <section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
   <!-- Cabeçalho Escalas -->
   <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 align-items-lg-center mb-3">
@@ -4104,21 +4104,32 @@
 
                 <td class="text-end">
                   <div class="d-flex flex-column gap-1 align-items-end">
+
+                    <!-- ✅ AQUI: forms corrigidos (id sempre válido + volta para a mesma página) -->
                     <form method="POST"
-                          action="{{ url_for('admin_aprovar_troca', id=t.id if t.id is defined else none) }}"
+                          action="{{ url_for('admin_aprovar_troca', id=t.id) }}"
                           onsubmit="return confirm('Confirmar aprovação desta troca?');">
+                      {% if csrf_token is defined %}
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      {% endif %}
+                      <input type="hidden" name="next" value="{{ request.full_path }}">
                       <button type="submit" class="btn btn-success btn-xs w-100">
                         Aprovar
                       </button>
                     </form>
 
                     <form method="POST"
-                          action="{{ url_for('admin_recusar_troca', id=t.id if t.id is defined else none) }}"
+                          action="{{ url_for('admin_recusar_troca', id=t.id) }}"
                           onsubmit="return confirm('Recusar esta solicitação?');">
+                      {% if csrf_token is defined %}
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      {% endif %}
+                      <input type="hidden" name="next" value="{{ request.full_path }}">
                       <button type="submit" class="btn btn-outline-danger btn-xs w-100">
                         Recusar
                       </button>
                     </form>
+
                   </div>
                 </td>
               </tr>
@@ -4372,20 +4383,10 @@
 </section>
 
 <style>
-  .section-title {
-    font-size: 0.95rem;
-    font-weight: 600;
-  }
+  .section-title { font-size: 0.95rem; font-weight: 600; }
+  .section-subtitle { font-size: 0.78rem; color: #6c757d; }
 
-  .section-subtitle {
-    font-size: 0.78rem;
-    color: #6c757d;
-  }
-
-  .card {
-    border-radius: 0.75rem;
-    border: 1px solid #e4e7f0;
-  }
+  .card { border-radius: 0.75rem; border: 1px solid #e4e7f0; }
 
   .badge-soft {
     background: #eef2ff;
@@ -4395,24 +4396,12 @@
     font-size: 0.75rem;
   }
 
-  .extra-small {
-    font-size: 0.74rem;
-    line-height: 1.1;
-  }
+  .extra-small { font-size: 0.74rem; line-height: 1.1; }
+  .text-muted-2 { color: #9aa0ac; }
 
-  .text-muted-2 {
-    color: #9aa0ac;
-  }
+  .btn-xs { padding: 0.18rem 0.5rem; font-size: 0.74rem; border-radius: 999px; }
 
-  .btn-xs {
-    padding: 0.18rem 0.5rem;
-    font-size: 0.74rem;
-    border-radius: 999px;
-  }
-
-  .escala-upload-card {
-    background: linear-gradient(135deg, #f5f7ff 0%, #ffffff 100%);
-  }
+  .escala-upload-card { background: linear-gradient(135deg, #f5f7ff 0%, #ffffff 100%); }
 
   .escala-search-box {
     min-width: 240px;
@@ -4423,20 +4412,11 @@
     border: 1px solid #e0e4ff;
   }
 
-  .search-input::placeholder {
-    font-size: 0.78rem;
-  }
+  .search-input::placeholder { font-size: 0.78rem; }
 
-  .escalas-wrapper {
-    max-height: 420px;
-    overflow-y: auto;
-  }
+  .escalas-wrapper { max-height: 420px; overflow-y: auto; }
 
-  .table-escalas {
-    border-collapse: separate;
-    border-spacing: 0;
-  }
-
+  .table-escalas { border-collapse: separate; border-spacing: 0; }
   .table-escalas thead th {
     font-size: 0.72rem;
     text-transform: uppercase;
@@ -4444,9 +4424,7 @@
     background-color: #f5f7fb;
     border-bottom: 1px solid #e4e7f0;
   }
-
-  .table-escalas th,
-  .table-escalas td {
+  .table-escalas th, .table-escalas td {
     padding: 0.4rem 0.55rem;
     vertical-align: middle;
     font-size: 0.78rem;
@@ -4458,37 +4436,13 @@
     padding: 0.15rem 0.55rem;
     border: 1px solid transparent;
   }
+  .badge-doc-ok { background: #e9f9ee; color: #1c7c3c; border-color: #b7e4c7; }
+  .badge-doc-pend { background: #fff0f0; color: #b02a37; border-color: #f5c2c7; }
+  .badge-doc-na { background: #f2f3f7; color: #6c757d; border-color: #dde1ee; }
 
-  .badge-doc-ok {
-    background: #e9f9ee;
-    color: #1c7c3c;
-    border-color: #b7e4c7;
-  }
+  .troca-pendentes-wrapper, .troca-historico-wrapper { max-height: 380px; overflow-y: auto; }
 
-  .badge-doc-pend {
-    background: #fff0f0;
-    color: #b02a37;
-    border-color: #f5c2c7;
-  }
-
-  .badge-doc-na {
-    background: #f2f3f7;
-    color: #6c757d;
-    border-color: #dde1ee;
-  }
-
-  /* Trocas – mesmo padrão visual */
-  .troca-pendentes-wrapper,
-  .troca-historico-wrapper {
-    max-height: 380px;
-    overflow-y: auto;
-  }
-
-  .table-troca {
-    border-collapse: separate;
-    border-spacing: 0;
-  }
-
+  .table-troca { border-collapse: separate; border-spacing: 0; }
   .table-troca thead th {
     font-size: 0.72rem;
     text-transform: uppercase;
@@ -4496,9 +4450,7 @@
     background-color: #f5f7fb;
     border-bottom: 1px solid #e4e7f0;
   }
-
-  .table-troca th,
-  .table-troca td {
+  .table-troca th, .table-troca td {
     padding: 0.4rem 0.55rem;
     vertical-align: middle;
     font-size: 0.78rem;
@@ -4513,7 +4465,6 @@
 </style>
 
 <script>
-  // Filtro por nome / placa / CNH (somente ativos já renderizados no template)
   document.addEventListener('DOMContentLoaded', function () {
     const input = document.getElementById('filtroCooperado');
     const tabela = document.getElementById('tabela-escalas');
