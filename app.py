@@ -1118,38 +1118,50 @@ def role_required(role: str):
     return deco
 
 
-
 def admin_required(fn):
-    """Requer login como admin e aplica restrições por perfil."""
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        if session.get("user_tipo") != "admin":
-            return redirect(url_for("login"))
+    return role_required("admin")(fn)
 
-        uid = session.get("user_id")
-        user = Usuario.query.get(uid) if uid else None
-        if not user or user.tipo != "admin":
-            session.clear()
-            return redirect(url_for("login"))
+def _admin_has_perm(perm: str) -> bool:
+    uid = session.get("user_id")
+    if not uid:
+        return False
 
-        perfil = (user.admin_perfil or "admin_full").strip().lower()
+    u = Usuario.query.get(uid)
+    if not u or u.tipo != "admin":
+        return False
 
-        # Visualizador: nunca pode fazer alterações
-        if request.method != "GET" and perfil == "admin_view":
-            abort(403)
+    # 1) PRIMEIRO: respeita o admin_perfil (seu modelo já tem isso)
+    perfil = (getattr(u, "admin_perfil", "") or "").strip().lower()
 
-        # Supervisão: só Escala + Trocas (aprovar/recusar)
-        if perfil == "admin_supervisao":
-            allowed_endpoints = {"admin_dashboard", "admin_aprovar_troca", "admin_recusar_troca", "logout"}
-            if request.endpoint not in allowed_endpoints:
-                abort(403)
-            if request.endpoint == "admin_dashboard":
-                tab = (request.args.get("tab") or "escalas").strip().lower()
-                if tab not in {"escalas", "trocas"}:
-                    return redirect(url_for("admin_dashboard", tab="escalas"))
+    # master / full: pode tudo
+    if perfil in ("full", "admin_full", "master"):
+        return True
 
-        return fn(*args, **kwargs)
-    return wrapper
+    # perfil que só mexe em trocas de escala
+    if perfil in ("admin_escala_trocas", "escala_trocas"):
+        return perm in ("escala_trocas", "view_only")
+
+    # 
+    # perfil supervisão: acesso limitado (escala + aprovar/desaprovar trocas)
+    if perfil in ("supervisao", "supervisor", "adm_supervisao"):
+        return perm in {"escala_trocas"}
+perfil apenas visualização
+    if perfil in ("admin_view", "view", "view_only", "leitura"):
+        return perm == "view_only"
+
+    # 2) COMPATIBILIDADE: se você tiver algum admin antigo usando permissoes/nivel_admin, continua funcionando
+    if int(getattr(u, "nivel_admin", 0) or 0) >= 100:
+        return True
+
+    raw = getattr(u, "permissoes", "") or ""
+    try:
+        perms = set(json.loads(raw)) if raw else set()
+    except Exception:
+        perms = set()
+
+    if "*" in perms:
+        return True
+    return perm in perms
 
 
 def admin_perm_required(perm: str):
@@ -2239,6 +2251,17 @@ def admin_dashboard():
 
     # --- Controle de abas
     active_tab = args.get("tab", "lancamentos")
+    # Restrições por perfil de admin
+    perfil = (getattr(current_user, "admin_perfil", "") or "full").lower()
+    if perfil in ("supervisao", "supervisor", "adm_supervisao"):
+        allowed_tabs = ["escala", "avaliacoes"]
+    elif perfil in ("visualizar", "view", "view_only", "leitura"):
+        allowed_tabs = ["lancamentos", "avaliacoes", "escala", "config"]
+    else:
+        allowed_tabs = None  # tudo liberado
+
+    if allowed_tabs is not None and active_tab not in allowed_tabs:
+        active_tab = allowed_tabs[0]
 
     # --- Helper: escolhe a primeira data válida de uma lista de chaves
     def _pick_date(*keys):
@@ -2695,6 +2718,7 @@ def admin_dashboard():
     current_date = date.today()
     data_limite = date(current_date.year, 12, 31)
 
+    admins = Usuario.query.filter_by(tipo='admin').order_by(Usuario.nome.asc()).all()
     return render_template(
         "admin_dashboard.html",
         tab=active_tab,
@@ -2837,46 +2861,82 @@ def admin_backup_zip():
 
 @app.post("/admin/config/create-admin")
 @admin_required
-
 def admin_create_admin():
-    # Somente master pode criar outros admins
-    uid = session.get("user_id")
-    user = Usuario.query.get(uid) if uid else None
-    if not user or (user.admin_perfil or "").strip().lower() != "master":
-        abort(403)
+    usuario = (request.form.get("usuario") or "").strip()
+    senha = request.form.get("senha") or ""
+    perfil = (request.form.get("perfil") or "admin_view").strip()
 
-    nome = (request.form.get("nome") or "").strip()
-    email = (request.form.get("email") or "").strip().lower()
-    senha = (request.form.get("senha") or "").strip()
-    perfil = (request.form.get("admin_perfil") or "admin_full").strip().lower()
+    if not usuario or len(senha) < 4:
+        flash("Usuário e senha (mín. 4) são obrigatórios.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
 
-    perfis_validos = {"admin_full", "admin_supervisao", "admin_view"}
-    if perfil not in perfis_validos:
-        perfil = "admin_full"
+    if Usuario.query.filter_by(usuario=usuario).first():
+        flash("Esse usuário já existe.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
 
-    if not nome or not email or not senha:
-        flash("Preencha nome, email e senha.", "warning")
-        return redirect(url_for("admin_dashboard", tab="usuarios"))
+    # Mapeia perfil -> permissões (JSON simples)
+    perfil_map = {
+        "admin_full": {"nivel": 100, "perms": ["*"]},
+        "admin_view": {"nivel": 10, "perms": ["view_only"]},
+        "admin_escala_trocas": {"nivel": 20, "perms": ["escala_trocas"]},
+    }
+    cfg = perfil_map.get(perfil, perfil_map["admin_view"])
 
-    existe = Usuario.query.filter_by(email=email).first()
-    if existe:
-        flash("Já existe um usuário com esse email.", "warning")
-        return redirect(url_for("admin_dashboard", tab="usuarios"))
+    u = Usuario(usuario=usuario, tipo="admin", senha_hash="")
+    u.set_password(senha)
 
-    u = Usuario(
-        nome=nome,
-        email=email,
-        senha_hash=generate_password_hash(senha),
-        tipo="admin",
-        admin_perfil=perfil,
-    )
+    # Guardar como JSON no campo 'permissoes' (vamos criar já já)
+    u = Usuario(usuario=usuario, tipo="admin", senha_hash="")
+    u.set_password(senha)
+    u.permissoes = json.dumps(cfg["perms"], ensure_ascii=False)
+    u.nivel_admin = int(cfg["nivel"])
+    u = Usuario(usuario=usuario, tipo="admin", senha_hash="")
+    u.set_password(senha)
+
+    # usa o campo que você já tem no model
+    u.admin_perfil = perfil
+
+
     db.session.add(u)
     db.session.commit()
 
-    flash(f"Admin criado: {nome} ({perfil}).", "success")
-    return redirect(url_for("admin_dashboard", tab="usuarios"))
+    flash("Administrador criado com sucesso!", "success")
+    return redirect(url_for("admin_dashboard", tab="config"))
 
+@app.post("/admin/config/admins/<int:user_id>/toggle")
+@admin_required
+def admin_toggle_admin(user_id):
+    u = Usuario.query.get_or_404(user_id)
 
+    if u.tipo != "admin":
+        flash("Este usuário não é administrador.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    # Não deixa desativar a si mesmo
+    if u.id == session.get("user_id"):
+        flash("Você não pode desativar o próprio usuário logado.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    # Se não existir coluna 'ativo', não quebra: faz fallback por 'status'
+    if hasattr(u, "ativo"):
+        u.ativo = not bool(u.ativo)
+        estado = "ativado" if u.ativo else "desativado"
+    else:
+        # fallback simples (se existir 'status')
+        if hasattr(u, "status"):
+            u.status = "ativo" if str(getattr(u, "status") or "").lower() != "ativo" else "inativo"
+            estado = f"marcado como {u.status}"
+        else:
+            flash("Seu modelo Usuario não tem campo 'ativo' nem 'status'.", "danger")
+            return redirect(url_for("admin_dashboard", tab="config"))
+
+    db.session.commit()
+    flash(f"Administrador {estado} com sucesso.", "success")
+    return redirect(url_for("admin_dashboard", tab="config"))
+
+# =========================
+# Navegação/Export util
+# =========================
 @app.route("/filtrar_lancamentos")
 @admin_required
 def filtrar_lancamentos():
@@ -3390,6 +3450,13 @@ def admin_avaliacoes():
     # Datas (aceita YYYY-MM-DD ou DD/MM/YYYY)
     di = _parse_date(data_inicio)
     df = _parse_date(data_fim)
+    # Se não passar datas, padrão é semana atual (segunda a domingo)
+    if not di_str and not df_str:
+        today = date.today()
+        monday = today - timedelta(days=today.weekday())
+        sunday = monday + timedelta(days=6)
+        di = datetime.combine(monday, datetime.min.time())
+        df = datetime.combine(sunday, datetime.max.time())
 
     # Model por tipo
     Model = AvaliacaoRestaurante if (tipo == "restaurante") else AvaliacaoCooperado
@@ -5166,7 +5233,21 @@ def portal_cooperado():
     except Exception:
         coop.usuario = ""
 
-    # ---------- FILTRO POR DATA (padrão = HOJE) ----------
+        # ---------- MÉTRICAS GERAIS (desde o início)
+    cooperado_score_geral = db.session.query(func.avg(AvaliacaoCooperado.nota)).filter(
+        AvaliacaoCooperado.cooperado_id == coop.id
+    ).scalar()
+    cooperado_score_geral = float(cooperado_score_geral) if cooperado_score_geral is not None else None
+
+    total_entregas_geral = db.session.query(func.coalesce(func.sum(Lancamento.qtd_entregas), 0)).filter(
+        Lancamento.cooperado_id == coop.id
+    ).scalar() or 0
+    try:
+        total_entregas_geral = int(total_entregas_geral)
+    except Exception:
+        total_entregas_geral = 0
+
+# ---------- FILTRO POR DATA (padrão = HOJE) ----------
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
 
@@ -5422,6 +5503,8 @@ def portal_cooperado():
     return render_template(
         "painel_cooperado.html",
         cooperado=coop,
+        cooperado_score_geral=cooperado_score_geral,
+        total_entregas_geral=total_entregas_geral,
         producoes=producoes,
         receitas_coop=receitas_coop,
         despesas_coop=despesas_coop,
@@ -6726,7 +6809,16 @@ def init_db_command():
 # =========================
 # Main
 # =========================
+
+@app.get("/api/rest/avisos/unread_count")
+def api_rest_avisos_unread_count():
+    # Endpoint usado no painel do restaurante para badge de avisos.
+    # Como o módulo de avisos pode não estar habilitado, retornamos 0.
+    return jsonify({"count": 0})
+
+
 if __name__ == "__main__":
     with app.app_context():
         init_db()
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    
