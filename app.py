@@ -2411,6 +2411,7 @@ def admin_dashboard():
     chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
 
     admin_user = Usuario.query.filter_by(tipo="admin").first()
+    admins = Usuario.query.filter_by(tipo="admin").all()
 
     # =====================================================================
     # 7) Folha de pagamento  -> SÓ CALCULA SE A ABA "folha" ESTIVER ABERTA
@@ -6770,6 +6771,15 @@ def init_db_command():
 # =========================
 # Main
 # =========================
+
+
+@app.route("/api/rest/avisos/unread_count")
+@login_required
+def api_rest_avisos_unread_count():
+    # Endpoint simples para evitar 404 em telas do portal do restaurante.
+    # Caso você implemente avisos/notifications depois, substitua este retorno.
+    return jsonify({"count": 0})
+
 if __name__ == "__main__":
     with app.app_context():
         init_db()
