@@ -1145,7 +1145,7 @@ def _admin_has_perm(perm: str) -> bool:
     # perfil supervisão: acesso limitado (escala + aprovar/desaprovar trocas)
     if perfil in ("supervisao", "supervisor", "adm_supervisao"):
         return perm in {"escala_trocas"}
-perfil apenas visualização
+# perfil apenas visualização
     if perfil in ("admin_view", "view", "view_only", "leitura"):
         return perm == "view_only"
 
@@ -5233,24 +5233,24 @@ def portal_cooperado():
     except Exception:
         coop.usuario = ""
 
-        # ---------- MÉTRICAS GERAIS (desde o início)
+    # ---------- MÉTRICAS GERAIS (desde o início)
     cooperado_score_geral = db.session.query(func.avg(AvaliacaoCooperado.nota)).filter(
-        AvaliacaoCooperado.cooperado_id == coop.id
+    AvaliacaoCooperado.cooperado_id == coop.id
     ).scalar()
     cooperado_score_geral = float(cooperado_score_geral) if cooperado_score_geral is not None else None
-
+    
     total_entregas_geral = db.session.query(func.coalesce(func.sum(Lancamento.qtd_entregas), 0)).filter(
-        Lancamento.cooperado_id == coop.id
+    Lancamento.cooperado_id == coop.id
     ).scalar() or 0
     try:
         total_entregas_geral = int(total_entregas_geral)
     except Exception:
         total_entregas_geral = 0
-
-# ---------- FILTRO POR DATA (padrão = HOJE) ----------
+    
+    # ---------- FILTRO POR DATA (padrão = HOJE) ----------
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
-
+    
     # padrão: mostrar SOMENTE a data do lançamento (hoje)
     if di and not df:
         df = di
