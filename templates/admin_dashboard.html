@@ -3684,809 +3684,486 @@
   </script>
 </section>
 
-     <!-- ESCALAS -->
-<section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
-  <!-- Cabeçalho Escalas -->
-  <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 align-items-lg-center mb-3">
-    <div>
-      <h5 class="mb-0 section-title">Gestão de Escalas</h5>
-      <small class="section-subtitle">
-        Upload da planilha, consulta rápida por cooperado e histórico de trocas em um só lugar.
-      </small>
-    </div>
+      <!-- ===== ESCALAS ===== -->
+<section data-view="escalas">
+  <div class="section-title"><i class="bi bi-calendar-week"></i> Escala semanal</div>
 
-    <div class="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center">
-      <div class="alert alert-info py-1 px-2 mb-0 small shadow-sm border-0">
-        <b>Prazo-limite geral:</b> 31/12/<span id="prazoAno">—</span>
-        <span class="mx-1">•</span>
-        faltam <b><span id="prazoDias">0</span> dias</b>.
+  <div class="card card-body">
+    <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
+      <input type="hidden" name="view" value="escalas">
+
+      <div class="col-md-3">
+        <label class="form-label">Ver</label>
+        <select name="modo" class="form-select" id="selectModoEscala">
+          <option value="semana" {{ 'selected' if (_modo=='semana') }}>Semana completa</option>
+          <option value="dia" {{ 'selected' if (_modo=='dia') }}>Somente 1 dia</option>
+        </select>
       </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Referência</label>
+        <input type="date" name="ref" class="form-control"
+               value="{{ _ref_data and _ref_data.strftime('%Y-%m-%d') }}">
+      </div>
+
+      <!-- NOVO: PERÍODO -->
+      <div class="col-md-3">
+        <label class="form-label">Início (período)</label>
+        <input type="date" id="periodoInicio" class="form-control" value="">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Fim (período)</label>
+        <input type="date" id="periodoFim" class="form-control" value="">
+      </div>
+
+      <div class="col-12 d-flex justify-content-end gap-2 mt-1">
+        <button class="btn btn-royal">
+          <i class="bi bi-funnel"></i> Aplicar
+        </button>
+
+        <button type="button" class="btn btn-outline-royal" id="btnAplicarPeriodo">
+          <i class="bi bi-calendar-range"></i> Aplicar Período
+        </button>
+
+        <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='escalas') }}">
+          <i class="bi bi-arrow-counterclockwise"></i> Hoje
+        </a>
+      </div>
+    </form>
+
+    {% if _modo == 'semana' %}
+    <!-- ======================= MODO SEMANA COMPLETA ======================= -->
+    <hr class="my-3">
+
+    <!-- (Opcional) chip informativo do período renderizado pelo JS -->
+    <div id="chipPeriodoEscala" class="mb-2" style="display:none;">
+      <span class="chip">
+        Período exibido:
+        <strong class="ms-1" id="chipPeriodoTxt"></strong>
+      </span>
     </div>
-  </div>
 
-  <!-- Upload + Busca -->
-  <div class="card p-3 mb-3 escala-upload-card">
-    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
-      <div class="flex-grow-1">
-        <h6 class="mb-1 section-title">Upload da Escala (.xlsx)</h6>
-        <small class="section-subtitle">
-          Envie a planilha oficial de escalas. A associação do cooperado é feita por login (quando existir) ou por nome,
-          ignorando acentos.
-        </small>
+    <div class="row g-3" id="gridEscalaSemana">
+      {# DEDUPE: evita repetir o mesmo dia se vier duplicado do backend #}
+      {% set seen = namespace(d={}) %}
 
-        <form method="POST"
-              action="{{ url_for('upload_escala') }}"
-              enctype="multipart/form-data"
-              class="row g-2 align-items-end mt-2">
+      {% for dia in _dias_list %}
+        {% set k = dia.strftime('%Y-%m-%d') %}
+        {% if not seen.d.get(k) %}
+          {% set _ = seen.d.update({k: 1}) %}
 
-          {% if csrf_token is defined %}
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="col-md-6 col-lg-4">
+            <div class="card-soft h-100 d-flex flex-column">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="badge text-bg-primary fw-semibold">
+                  {{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][dia.weekday()] }} — {{ dia.strftime('%d/%m/%Y') }}
+                </span>
+                <i class="bi bi-people"></i>
+              </div>
+
+              {% set lista = _agenda.get(dia, []) %}
+              {% if lista %}
+                {# ---- CONTAGENS POR TURNO (DIA / NOITE / INDEFINIDO) ---- #}
+                {% set ns = namespace(dia_total=0, noite_total=0, indef_total=0) %}
+                {% for item in lista %}
+                  {% set t = (item.turno or '')|lower %}
+                  {% if 'noite' not in t and ( 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t ) %}
+                    {% set ns.dia_total = ns.dia_total + 1 %}
+                  {% elif 'noite' in t %}
+                    {% set ns.noite_total = ns.noite_total + 1 %}
+                  {% else %}
+                    {% set ns.indef_total = ns.indef_total + 1 %}
+                  {% endif %}
+                {% endfor %}
+
+                <div class="small text-muted mb-1">
+                  <span class="me-3">Dia: <strong>{{ ns.dia_total }}</strong></span>
+                  <span class="me-3">Noite: <strong>{{ ns.noite_total }}</strong></span>
+                  <span>Indef.: <strong>{{ ns.indef_total }}</strong></span>
+                </div>
+
+                <div style="max-height:360px; overflow:auto; border-top:1px dashed var(--border); padding-top:0.5rem;">
+                  <div class="row g-2">
+                    <!-- COLUNA ESQUERDA: DIA -->
+                    <div class="col-6 border-end">
+                      <div class="small text-uppercase text-muted mb-1">Dia ({{ ns.dia_total }})</div>
+                      {% set tem_dia = false %}
+                      {% for grupo in (lista | groupby('contrato')) %}
+                        {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                        {% set gns = namespace(tem_no_contrato=false) %}
+                        {% for item in grupo.list %}
+                          {% set t = (item.turno or '')|lower %}
+                          {% if 'noite' not in t and ( 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t ) %}
+                            {% if not gns.tem_no_contrato %}
+                              <div class="fw-semibold mt-2">{{ contrato_nome }}</div>
+                              {% set gns.tem_no_contrato = true %}
+                              {% set tem_dia = true %}
+                            {% endif %}
+                            <div class="py-1 border-bottom small">
+                              <div class="fw-semibold">
+                                {{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}
+                              </div>
+                              <div class="text-muted">
+                                {{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}
+                              </div>
+                            </div>
+                          {% endif %}
+                        {% endfor %}
+                      {% endfor %}
+                      {% if not tem_dia %}
+                        <div class="text-muted small mt-2">Sem escala de dia.</div>
+                      {% endif %}
+                    </div>
+
+                    <!-- COLUNA DIREITA: NOITE -->
+                    <div class="col-6">
+                      <div class="small text-uppercase text-muted mb-1">Noite ({{ ns.noite_total }})</div>
+                      {% set tem_noite = false %}
+                      {% for grupo in (lista | groupby('contrato')) %}
+                        {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                        {% set gns = namespace(tem_no_contrato=false) %}
+                        {% for item in grupo.list %}
+                          {% set t = (item.turno or '')|lower %}
+                          {% if 'noite' in t %}
+                            {% if not gns.tem_no_contrato %}
+                              <div class="fw-semibold mt-2">{{ contrato_nome }}</div>
+                              {% set gns.tem_no_contrato = true %}
+                              {% set tem_noite = true %}
+                            {% endif %}
+                            <div class="py-1 border-bottom small">
+                              <div class="fw-semibold">
+                                {{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}
+                              </div>
+                              <div class="text-muted">
+                                {{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}
+                              </div>
+                            </div>
+                          {% endif %}
+                        {% endfor %}
+                      {% endfor %}
+                      {% if not tem_noite %}
+                        <div class="text-muted small mt-2">Sem escala de noite.</div>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  {% if ns.indef_total > 0 %}
+                    <div class="mt-3 pt-2 border-top">
+                      <div class="small text-uppercase text-muted mb-1">Indefinido ({{ ns.indef_total }})</div>
+                      {% for grupo in (lista | groupby('contrato')) %}
+                        {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                        {% set gns = namespace(tem_no_contrato=false) %}
+                        {% for item in grupo.list %}
+                          {% set t = (item.turno or '')|lower %}
+                          {% if not ('noite' in t or 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
+                            {% if not gns.tem_no_contrato %}
+                              <div class="fw-semibold mt-2">{{ contrato_nome }}</div>
+                              {% set gns.tem_no_contrato = true %}
+                            {% endif %}
+                            <div class="py-1 border-bottom small">
+                              <div class="fw-semibold">
+                                {{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}
+                              </div>
+                              <div class="text-muted">
+                                {{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}
+                              </div>
+                            </div>
+                          {% endif %}
+                        {% endfor %}
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+              {% else %}
+                <div class="text-muted small py-2">Sem escala registrada.</div>
+              {% endif %}
+            </div>
+          </div>
+
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <!-- ======================= MODO SOMENTE 1 DIA ======================= -->
+    <hr class="my-3">
+    <div class="card-soft">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="badge text-bg-primary fw-semibold">
+          {{ _ref_data and ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][_ref_data.weekday()] }} — {{ _ref_data and _ref_data.strftime('%d/%m/%Y') }}
+        </span>
+        <i class="bi bi-calendar-day"></i>
+      </div>
+
+      {% set lista = _agenda.get(_ref_data, []) if _ref_data else [] %}
+      {% if lista %}
+        {% set ns = namespace(dia_total=0, noite_total=0, indef_total=0) %}
+        {% for item in lista %}
+          {% set t = (item.turno or '')|lower %}
+          {% if 'noite' not in t and ( 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t ) %}
+            {% set ns.dia_total = ns.dia_total + 1 %}
+          {% elif 'noite' in t %}
+            {% set ns.noite_total = ns.noite_total + 1 %}
+          {% else %}
+            {% set ns.indef_total = ns.indef_total + 1 %}
           {% endif %}
+        {% endfor %}
+
+        <div class="small text-muted mb-2">
+          <span class="me-3">Dia: <strong>{{ ns.dia_total }}</strong></span>
+          <span class="me-3">Noite: <strong>{{ ns.noite_total }}</strong></span>
+          <span>Indef.: <strong>{{ ns.indef_total }}</strong></span>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="table-responsive">
+              <table class="table table-bordered table-hover align-middle table-compact mb-0">
+                <thead class="table-primary">
+                  <tr><th colspan="4" class="text-center text-uppercase">Turno de DIA ({{ ns.dia_total }})</th></tr>
+                  <tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr>
+                </thead>
+                <tbody>
+                  {% set tem_dia = false %}
+                  {% for grupo in (lista | groupby('contrato')) %}
+                    {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                    {% for item in grupo.list %}
+                      {% set t = (item.turno or '')|lower %}
+                      {% if 'noite' not in t and ( 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t ) %}
+                        {% set tem_dia = true %}
+                        <tr>
+                          <td>{{ contrato_nome }}</td>
+                          <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
+                          <td>{{ item.turno or '—' }}</td>
+                          <td>{{ item.horario or '—' }}</td>
+                        </tr>
+                      {% endif %}
+                    {% endfor %}
+                  {% endfor %}
+                  {% if not tem_dia %}
+                    <tr><td colspan="4" class="text-center text-muted">Sem escala de dia.</td></tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           <div class="col-md-6">
-            <label for="arquivo_escala" class="form-label extra-small text-muted-2 mb-1">
-              Planilha de escala (.xlsx)
-            </label>
-            <input type="file"
-                   class="form-control form-control-sm"
-                   id="arquivo_escala"
-                   name="file"
-                   accept=".xlsx"
-                   required>
+            <div class="table-responsive">
+              <table class="table table-bordered table-hover align-middle table-compact mb-0">
+                <thead class="table-primary">
+                  <tr><th colspan="4" class="text-center text-uppercase">Turno de NOITE ({{ ns.noite_total }})</th></tr>
+                  <tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr>
+                </thead>
+                <tbody>
+                  {% set tem_noite = false %}
+                  {% for grupo in (lista | groupby('contrato')) %}
+                    {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                    {% for item in grupo.list %}
+                      {% set t = (item.turno or '')|lower %}
+                      {% if 'noite' in t %}
+                        {% set tem_noite = true %}
+                        <tr>
+                          <td>{{ contrato_nome }}</td>
+                          <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
+                          <td>{{ item.turno or '—' }}</td>
+                          <td>{{ item.horario or '—' }}</td>
+                        </tr>
+                      {% endif %}
+                    {% endfor %}
+                  {% endfor %}
+                  {% if not tem_noite %}
+                    <tr><td colspan="4" class="text-center text-muted">Sem escala de noite.</td></tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
           </div>
+        </div>
 
-          <div class="col-md-3">
-            <button type="submit" class="btn btn-royal btn-sm w-100 mt-1">
-              <i class="bi bi-upload me-1"></i> Enviar Planilha
-            </button>
+        {% if ns.indef_total > 0 %}
+          <div class="mt-3">
+            <div class="table-responsive">
+              <table class="table table-bordered table-hover align-middle table-compact mb-0">
+                <thead class="table-light">
+                  <tr><th colspan="4" class="text-center text-uppercase">Turno INDEFINIDO ({{ ns.indef_total }})</th></tr>
+                  <tr><th>Contrato</th><th>Cooperado</th><th>Turno</th><th>Horário</th></tr>
+                </thead>
+                <tbody>
+                  {% for grupo in (lista | groupby('contrato')) %}
+                    {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                    {% for item in grupo.list %}
+                      {% set t = (item.turno or '')|lower %}
+                      {% if not ('noite' in t or 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
+                        <tr>
+                          <td>{{ contrato_nome }}</td>
+                          <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
+                          <td>{{ item.turno or '—' }}</td>
+                          <td>{{ item.horario or '—' }}</td>
+                        </tr>
+                      {% endif %}
+                    {% endfor %}
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </form>
-      </div>
+        {% endif %}
 
-      <!-- Busca por cooperado / placa / CNH -->
-      <div class="escala-search-box">
-        <span class="section-subtitle d-block mb-1">Pesquisar cooperado</span>
-        <div class="input-group input-group-sm">
-          <span class="input-group-text bg-light border-0 pe-1">
-            <i class="bi bi-search text-muted-2"></i>
-          </span>
-          <input type="text"
-                 id="filtroCooperado"
-                 class="form-control border-0 shadow-none search-input"
-                 placeholder="Digite nome, placa ou CNH...">
-        </div>
-        <div class="d-flex gap-2 mt-2 justify-content-end">
-          <span class="badge-soft">
-            Cooperados: {{ cooperados|length if cooperados else 0 }}
-          </span>
-          <span class="badge-soft">
-            Com escala: {{ escalas_por_coop|length if escalas_por_coop is defined else 0 }}
-          </span>
-        </div>
-      </div>
+      {% else %}
+        <div class="text-center text-muted py-3">Sem escala registrada.</div>
+      {% endif %}
     </div>
-  </div>
-
-  <!-- Cooperados & Escalas -->
-  <div class="card p-3 mb-3">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <div>
-        <h6 class="mb-0 section-title">Resumo dos Cooperados</h6>
-        <small class="section-subtitle">
-          Documentação, quantidade de linhas na escala e acesso rápido ao detalhamento.
-        </small>
-      </div>
-    </div>
-
-    <div class="table-responsive escalas-wrapper">
-      <table class="table table-sm align-middle mb-0 table-escalas" id="tabela-escalas">
-        <thead>
-          <tr>
-            <th>Cooperado</th>
-            <th>CNH</th>
-            <th>Placa</th>
-            <th>Situação Docs</th>
-            <th>Última atualização</th>
-            <th class="text-center">Qtde de linhas</th>
-            <th class="text-center">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for c in cooperados %}
-            {# ===== SOMENTE ATIVOS (fallback seguro) =====
-               - Se existir c.ativo (bool), usa.
-               - Se existir c.status, considera "ativo"/"ATIVO".
-               - Se não existir nada disso, assume ativo (para não quebrar template).
-            #}
-            {% set is_ativo = (c.ativo if c.ativo is defined else ( (c.status|string|lower) in ['ativo','active'] if c.status is defined else true )) %}
-            {% if is_ativo %}
-              {% set lst = (escalas_por_coop[c.id] if (escalas_por_coop is defined and c.id in escalas_por_coop) else []) %}
-              {% set sdoc = status_doc_por_coop.get(c.id) if status_doc_por_coop is defined else None %}
-              {% set ok_cnh   = sdoc.cnh_ok if sdoc is not none and 'cnh_ok' in sdoc else None %}
-              {% set ok_placa = sdoc.placa_ok if sdoc is not none and 'placa_ok' in sdoc else None %}
-
-              <tr data-coop-nome="{{ c.nome|lower }}"
-                  data-coop-cnh="{{ (c.cnh_numero if c.cnh_numero is defined and c.cnh_numero else '')|lower }}"
-                  data-coop-placa="{{ (c.placa if c.placa is defined and c.placa else '')|lower }}"
-                  data-coop-ativo="1">
-                <!-- Cooperado -->
-                <td>
-                  <div class="small fw-semibold text-truncate">
-                    {{ c.nome }}
-                  </div>
-                  <div class="extra-small text-muted-2">
-                    ID {{ c.id }}
-                  </div>
-                </td>
-
-                <!-- CNH -->
-                <td>
-                  <div class="extra-small text-muted">
-                    {{ c.cnh_numero if c.cnh_numero is defined and c.cnh_numero else '—' }}
-                  </div>
-                  <div class="extra-small text-muted-2">
-                    Validade:
-                    {% if c.cnh_validade is defined and c.cnh_validade %}
-                      {{ c.cnh_validade.strftime('%d/%m') }}
-                    {% else %}
-                      —
-                    {% endif %}
-                  </div>
-                </td>
-
-                <!-- Placa -->
-                <td>
-                  <div class="extra-small text-muted">
-                    {{ c.placa if c.placa is defined and c.placa else '—' }}
-                  </div>
-                  <div class="extra-small text-muted-2">
-                    Validade:
-                    {% if c.placa_validade is defined and c.placa_validade %}
-                      {{ c.placa_validade.strftime('%d/%m') }}
-                    {% else %}
-                      —
-                    {% endif %}
-                  </div>
-                </td>
-
-                <!-- Situação Docs -->
-                <td class="text-nowrap">
-                  {% if ok_cnh is not none %}
-                    <span class="badge badge-doc {{ 'badge-doc-ok' if ok_cnh else 'badge-doc-pend' }} me-1">
-                      CNH {{ 'OK' if ok_cnh else 'Pend.' }}
-                    </span>
-                  {% else %}
-                    <span class="badge badge-doc badge-doc-na">CNH —</span>
-                  {% endif %}
-
-                  {% if ok_placa is not none %}
-                    <span class="badge badge-doc {{ 'badge-doc-ok' if ok_placa else 'badge-doc-pend' }} mt-1 mt-sm-0">
-                      Placa {{ 'OK' if ok_placa else 'Pend.' }}
-                    </span>
-                  {% else %}
-                    <span class="badge badge-doc badge-doc-na mt-1 mt-sm-0">Placa —</span>
-                  {% endif %}
-
-                  {% if ok_cnh and ok_placa %}
-                    <span class="ms-1 text-success">👏</span>
-                  {% endif %}
-                </td>
-
-                <!-- Última atualização -->
-                <td>
-                  <div class="extra-small text-muted">
-                    {{ c.ultima_atualizacao.strftime('%d/%m/%Y %H:%M') if c.ultima_atualizacao else '—' }}
-                  </div>
-                </td>
-
-                <!-- Qtde linhas -->
-                <td class="text-center">
-                  <span class="badge-soft d-inline-flex align-items-center justify-content-center px-2">
-                    {{ lst|length }}
-                  </span>
-                </td>
-
-                <!-- Ações -->
-                <td class="text-center">
-                  <div class="d-flex flex-column flex-sm-row gap-1 justify-content-center">
-                    <button class="btn btn-royal btn-xs"
-                            data-bs-toggle="modal"
-                            data-bs-target="#modalEscalas"
-                            data-coopid="{{ c.id }}">
-                      <i class="bi bi-eye me-1"></i> Ver escala
-                    </button>
-                    <a class="btn btn-outline-secondary btn-xs"
-                       href="{{ url_for('editar_documentos', coop_id=c.id) }}">
-                      <i class="bi bi-pen me-1"></i> Documentos
-                    </a>
-                  </div>
-                </td>
-              </tr>
-            {% endif %}
-          {% else %}
-            <tr>
-              <td colspan="7" class="text-center text-muted py-4">
-                Nenhum cooperado encontrado.
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- SOLICITAÇÕES DE TROCA (pendentes) -->
-  <div class="card p-3 mb-3">
-    <div class="d-flex justify-content-between align-items-center">
-      <div>
-        <h5 class="mb-0 section-title">
-          Trocas de Escala - Pendentes
-        </h5>
-        <small class="section-subtitle">
-          Visualização dos dois contratos e de quem é cada um.
-        </small>
-      </div>
-      <span class="badge-soft">
-        Pendentes: {{ trocas_pendentes|length if trocas_pendentes else 0 }}
-      </span>
-    </div>
-
-    {% if trocas_pendentes %}
-      <div class="table-responsive mt-3 troca-pendentes-wrapper">
-        <table class="table table-sm align-middle mb-0 table-troca">
-          <thead>
-            <tr>
-              <th style="width: 80px;">#</th>
-              <th>Cooperado 1</th>
-              <th>Escala 1</th>
-              <th>Cooperado 2</th>
-              <th>Escala 2</th>
-              <th style="width: 220px;">Mensagem</th>
-              <th style="width: 130px;" class="text-end">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for t in trocas_pendentes or [] %}
-              {% set solicitante  = t.solicitante  if t.solicitante  else None %}
-              {% set destinatario = t.destinatario if t.destinatario else None %}
-              {% set origem       = t.origem       if t.origem       else None %}
-
-              {% set solicitante_nome = (solicitante.nome if solicitante else t.solicitante_nome)|default('—', true) %}
-              {% set solicitante_id   = (solicitante.id   if solicitante else t.solicitante_id)|default('—', true) %}
-
-              {% set coop2_nome = (destinatario.nome if destinatario else t.destinatario_nome)|default('—', true) %}
-              {% set coop2_id   = (destinatario.id   if destinatario else t.destinatario_id)|default('—', true) %}
-
-              {% if origem and origem.data is defined %}
-                {% set origem_data = origem.data %}
-              {% elif t.origem_data is defined %}
-                {% set origem_data = t.origem_data %}
-              {% else %}
-                {% set origem_data = '—' %}
-              {% endif %}
-
-              {% if origem and origem.turno is defined %}
-                {% set origem_turno = origem.turno %}
-              {% elif t.origem_turno is defined %}
-                {% set origem_turno = t.origem_turno %}
-              {% else %}
-                {% set origem_turno = '—' %}
-              {% endif %}
-
-              {% if origem and origem.horario is defined %}
-                {% set origem_horario = origem.horario %}
-              {% elif t.origem_horario is defined %}
-                {% set origem_horario = t.origem_horario %}
-              {% else %}
-                {% set origem_horario = '—' %}
-              {% endif %}
-
-              {% if origem and origem.contrato is defined %}
-                {% set origem_contrato = origem.contrato %}
-              {% elif t.origem_contrato is defined %}
-                {% set origem_contrato = t.origem_contrato %}
-              {% else %}
-                {% set origem_contrato = '—' %}
-              {% endif %}
-
-              {% if t.destino_data is defined and t.destino_data %}
-                {% set destino_data = t.destino_data %}
-              {% elif t.destino and t.destino.data is defined %}
-                {% set destino_data = t.destino.data %}
-              {% else %}
-                {% set destino_data = '—' %}
-              {% endif %}
-
-              {% if t.destino_turno is defined and t.destino_turno %}
-                {% set destino_turno = t.destino_turno %}
-              {% elif t.destino and t.destino.turno is defined %}
-                {% set destino_turno = t.destino.turno %}
-              {% else %}
-                {% set destino_turno = '—' %}
-              {% endif %}
-
-              {% if t.destino_horario is defined and t.destino_horario %}
-                {% set destino_horario = t.destino_horario %}
-              {% elif t.destino and t.destino.horario is defined %}
-                {% set destino_horario = t.destino.horario %}
-              {% else %}
-                {% set destino_horario = '—' %}
-              {% endif %}
-
-              {% if t.destino_contrato is defined and t.destino_contrato %}
-                {% set destino_contrato = t.destino_contrato %}
-              {% elif t.destino and t.destino.contrato is defined %}
-                {% set destino_contrato = t.destino.contrato %}
-              {% else %}
-                {% set destino_contrato = '—' %}
-              {% endif %}
-
-              <tr>
-                <td>
-                  <div class="small fw-semibold">#{{ t.id|default('—', true) }}</div>
-                  <div class="text-muted-2 extra-small">
-                    {% if t.criada_em %}
-                      {% if t.criada_em.strftime is defined %}
-                        {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}
-                      {% else %}
-                        {{ t.criada_em }}
-                      {% endif %}
-                    {% else %}
-                      —
-                    {% endif %}
-                  </div>
-                </td>
-
-                <td>
-                  <div class="small fw-semibold text-truncate">
-                    {{ solicitante_nome }}
-                  </div>
-                  <div class="text-muted-2 extra-small">
-                    ID {{ solicitante_id }}
-                  </div>
-                </td>
-
-                <td>
-                  <div class="extra-small text-muted">
-                    {{ origem_contrato }}
-                  </div>
-                  <div class="extra-small text-muted">
-                    {{ origem_data }}
-                  </div>
-                  <div class="extra-small text-muted">
-                    {{ origem_turno }}
-                  </div>
-                  <div class="extra-small text-muted">
-                    {{ origem_horario }}
-                  </div>
-                </td>
-
-                <td>
-                  <div class="small fw-semibold text-truncate text-success">
-                    {{ coop2_nome }}
-                  </div>
-                  <div class="text-muted-2 extra-small">
-                    ID {{ coop2_id }}
-                  </div>
-                </td>
-
-                <td>
-                  <div class="extra-small text-muted">
-                    {{ destino_contrato }}
-                  </div>
-                  <div class="extra-small text-muted">
-                    {{ destino_data }}
-                  </div>
-                  <div class="extra-small text-muted">
-                    {{ destino_turno }}
-                  </div>
-                  <div class="extra-small text-muted">
-                    {{ destino_horario }}
-                  </div>
-                </td>
-
-                <td class="mensagem-col">
-                  {% set raw_msg = t.mensagem or '' %}
-                  {% if 'AFETACAO_JSON' in raw_msg %}
-                    <div class="extra-small text-muted">
-                      Sem mensagem adicional.
-                    </div>
-                  {% elif raw_msg %}
-                    <div class="extra-small text-muted">
-                      {{ raw_msg }}
-                    </div>
-                  {% else %}
-                    <div class="extra-small text-muted">
-                      Sem mensagem adicional.
-                    </div>
-                  {% endif %}
-                </td>
-
-                <td class="text-end">
-                  <div class="d-flex flex-column gap-1 align-items-end">
-
-                    <!-- ✅ AQUI: forms corrigidos (id sempre válido + volta para a mesma página) -->
-                    <form method="POST"
-                          action="{{ url_for('admin_aprovar_troca', id=t.id) }}"
-                          onsubmit="return confirm('Confirmar aprovação desta troca?');">
-                      {% if csrf_token is defined %}
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      {% endif %}
-                      <input type="hidden" name="next" value="{{ request.full_path }}">
-                      <button type="submit" class="btn btn-success btn-xs w-100">
-                        Aprovar
-                      </button>
-                    </form>
-
-                    <form method="POST"
-                          action="{{ url_for('admin_recusar_troca', id=t.id) }}"
-                          onsubmit="return confirm('Recusar esta solicitação?');">
-                      {% if csrf_token is defined %}
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      {% endif %}
-                      <input type="hidden" name="next" value="{{ request.full_path }}">
-                      <button type="submit" class="btn btn-outline-danger btn-xs w-100">
-                        Recusar
-                      </button>
-                    </form>
-
-                  </div>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <div class="text-center text-muted mt-3">
-        Nenhuma solicitação pendente.
-      </div>
     {% endif %}
   </div>
 
-  <!-- HISTÓRICO DE TROCAS (aplicadas) -->
-  <div class="card p-3 mb-3">
-    <div class="d-flex justify-content-between align-items-center">
-      <div>
-        <h5 class="mb-0 section-title">
-          Trocas de Escala - Aplicadas
-        </h5>
-        <small class="section-subtitle">
-          Registro das trocas já aprovadas.
-        </small>
-      </div>
-      <span class="badge-soft">
-        {{ trocas_historico|length if trocas_historico else 0 }} registro(s)
-      </span>
-    </div>
-
-    {% if trocas_historico %}
-      <div class="table-responsive mt-3 troca-historico-wrapper">
-        <table class="table table-sm align-middle mb-0 table-troca">
-          <thead>
-            <tr>
-              <th style="width: 80px;">#</th>
-              <th>Cooperado 1</th>
-              <th>Escala 1</th>
-              <th>Cooperado 2</th>
-              <th>Escala 2</th>
-              <th style="width: 220px;">Mensagem</th>
-              <th style="width: 150px;">Aplicada em</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for t in trocas_historico or [] %}
-              {% set solicitante  = t.solicitante  if t.solicitante  else None %}
-              {% set destinatario = t.destinatario if t.destinatario else None %}
-              {% set origem       = t.origem       if t.origem       else None %}
-
-              {% set solicitante_nome = (solicitante.nome if solicitante else t.solicitante_nome)|default('—', true) %}
-              {% set solicitante_id   = (solicitante.id   if solicitante else t.solicitante_id)|default('—', true) %}
-
-              {% set coop2_nome = (destinatario.nome if destinatario else t.destinatario_nome)|default('—', true) %}
-              {% set coop2_id   = (destinatario.id   if destinatario else t.destinatario_id)|default('—', true) %}
-
-              {% if origem and origem.data is defined %}
-                {% set origem_data = origem.data %}
-              {% elif t.origem_data is defined %}
-                {% set origem_data = t.origem_data %}
-              {% else %}
-                {% set origem_data = '—' %}
-              {% endif %}
-
-              {% if origem and origem.turno is defined %}
-                {% set origem_turno = origem.turno %}
-              {% elif t.origem_turno is defined %}
-                {% set origem_turno = t.origem_turno %}
-              {% else %}
-                {% set origem_turno = '—' %}
-              {% endif %}
-
-              {% if origem and origem.horario is defined %}
-                {% set origem_horario = origem.horario %}
-              {% elif t.origem_horario is defined %}
-                {% set origem_horario = t.origem_horario %}
-              {% else %}
-                {% set origem_horario = '—' %}
-              {% endif %}
-
-              {% if origem and origem.contrato is defined %}
-                {% set origem_contrato = origem.contrato %}
-              {% elif t.origem_contrato is defined %}
-                {% set origem_contrato = t.origem_contrato %}
-              {% else %}
-                {% set origem_contrato = '—' %}
-              {% endif %}
-
-              {% if t.destino_data is defined and t.destino_data %}
-                {% set destino_data = t.destino_data %}
-              {% else %}
-                {% set destino_data = '—' %}
-              {% endif %}
-
-              {% if t.destino_turno is defined and t.destino_turno %}
-                {% set destino_turno = t.destino_turno %}
-              {% else %}
-                {% set destino_turno = '—' %}
-              {% endif %}
-
-              {% if t.destino_horario is defined and t.destino_horario %}
-                {% set destino_horario = t.destino_horario %}
-              {% else %}
-                {% set destino_horario = '—' %}
-              {% endif %}
-
-              {% if t.destino_contrato is defined and t.destino_contrato %}
-                {% set destino_contrato = t.destino_contrato %}
-              {% else %}
-                {% set destino_contrato = '—' %}
-              {% endif %}
-
-              <tr>
-                <td>
-                  <div class="small fw-semibold">#{{ t.id|default('—', true) }}</div>
-                  <div class="text-muted-2 extra-small">
-                    {% if t.criada_em %}
-                      {% if t.criada_em.strftime is defined %}
-                        {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}
-                      {% else %}
-                        {{ t.criada_em }}
-                      {% endif %}
-                    {% else %}
-                      —
-                    {% endif %}
-                  </div>
-                </td>
-
-                <td>
-                  <div class="small fw-semibold text-truncate">
-                    {{ solicitante_nome }}
-                  </div>
-                  <div class="text-muted-2 extra-small">
-                    ID {{ solicitante_id }}
-                  </div>
-                </td>
-
-                <td>
-                  <div class="extra-small text-muted">
-                    {{ origem_contrato }}
-                  </div>
-                  <div class="extra-small text-muted">
-                    {{ origem_data }}
-                  </div>
-                  <div class="extra-small text-muted">
-                    {{ origem_turno }}
-                  </div>
-                  <div class="extra-small text-muted">
-                    {{ origem_horario }}
-                  </div>
-                </td>
-
-                <td>
-                  <div class="small fw-semibold text-truncate text-success">
-                    {{ coop2_nome }}
-                  </div>
-                  <div class="text-muted-2 extra-small">
-                    ID {{ coop2_id }}
-                  </div>
-                </td>
-
-                <td>
-                  <div class="extra-small text-muted">
-                    {{ destino_contrato }}
-                  </div>
-                  <div class="extra-small text-muted">
-                    {{ destino_data }}
-                  </div>
-                  <div class="extra-small text-muted">
-                    {{ destino_turno }}
-                  </div>
-                  <div class="extra-small text-muted">
-                    {{ destino_horario }}
-                  </div>
-                </td>
-
-                <td class="mensagem-col">
-                  {% set raw_msg = t.mensagem or '' %}
-                  {% if 'AFETACAO_JSON' in raw_msg %}
-                    <div class="extra-small text-muted">
-                      Sem mensagem adicional.
-                    </div>
-                  {% elif raw_msg %}
-                    <div class="extra-small text-muted">
-                      {{ raw_msg }}
-                    </div>
-                  {% else %}
-                    <div class="extra-small text-muted">
-                      Sem mensagem adicional.
-                    </div>
-                  {% endif %}
-                </td>
-
-                <td>
-                  <div class="extra-small text-muted">
-                    {% if t.aplicada_em %}
-                      {% if t.aplicada_em.strftime is defined %}
-                        {{ t.aplicada_em.strftime('%d/%m/%Y %H:%M') }}
-                      {% else %}
-                        {{ t.aplicada_em }}
-                      {% endif %}
-                    {% else %}
-                      —
-                    {% endif %}
-                  </div>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <div class="text-center text-muted mt-2">
-        Sem trocas aplicadas.
-      </div>
-    {% endif %}
-  </div>
-
-  <!-- Modal visualizar escala do cooperado -->
-  <div class="modal fade" id="modalEscalas" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content">
-        <div class="modal-header border-0 pb-0">
-          <div>
-            <h5 class="modal-title section-title">Escala do Cooperado</h5>
-            <small class="section-subtitle" id="modalEscalaCoopNome">Detalhamento da escala selecionada.</small>
-          </div>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body pt-2">
-          <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0 table-escalas">
-              <thead>
-                <tr>
-                  <th>Data</th>
-                  <th>Turno</th>
-                  <th>Horário</th>
-                  <th>Contrato</th>
-                </tr>
-              </thead>
-              <tbody id="tbody-escala"></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="modal-footer border-0">
-          <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<style>
-  .section-title { font-size: 0.95rem; font-weight: 600; }
-  .section-subtitle { font-size: 0.78rem; color: #6c757d; }
-
-  .card { border-radius: 0.75rem; border: 1px solid #e4e7f0; }
-
-  .badge-soft {
-    background: #eef2ff;
-    color: #3047d6;
-    border-radius: 999px;
-    padding: 0.25rem 0.7rem;
-    font-size: 0.75rem;
-  }
-
-  .extra-small { font-size: 0.74rem; line-height: 1.1; }
-  .text-muted-2 { color: #9aa0ac; }
-
-  .btn-xs { padding: 0.18rem 0.5rem; font-size: 0.74rem; border-radius: 999px; }
-
-  .escala-upload-card { background: linear-gradient(135deg, #f5f7ff 0%, #ffffff 100%); }
-
-  .escala-search-box {
-    min-width: 240px;
-    max-width: 260px;
-    padding: 0.6rem 0.75rem;
-    border-radius: 0.75rem;
-    background: #f8f9ff;
-    border: 1px solid #e0e4ff;
-  }
-
-  .search-input::placeholder { font-size: 0.78rem; }
-
-  .escalas-wrapper { max-height: 420px; overflow-y: auto; }
-
-  .table-escalas { border-collapse: separate; border-spacing: 0; }
-  .table-escalas thead th {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    background-color: #f5f7fb;
-    border-bottom: 1px solid #e4e7f0;
-  }
-  .table-escalas th, .table-escalas td {
-    padding: 0.4rem 0.55rem;
-    vertical-align: middle;
-    font-size: 0.78rem;
-  }
-
-  .badge-doc {
-    font-size: 0.68rem;
-    border-radius: 999px;
-    padding: 0.15rem 0.55rem;
-    border: 1px solid transparent;
-  }
-  .badge-doc-ok { background: #e9f9ee; color: #1c7c3c; border-color: #b7e4c7; }
-  .badge-doc-pend { background: #fff0f0; color: #b02a37; border-color: #f5c2c7; }
-  .badge-doc-na { background: #f2f3f7; color: #6c757d; border-color: #dde1ee; }
-
-  .troca-pendentes-wrapper, .troca-historico-wrapper { max-height: 380px; overflow-y: auto; }
-
-  .table-troca { border-collapse: separate; border-spacing: 0; }
-  .table-troca thead th {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    background-color: #f5f7fb;
-    border-bottom: 1px solid #e4e7f0;
-  }
-  .table-troca th, .table-troca td {
-    padding: 0.4rem 0.55rem;
-    vertical-align: middle;
-    font-size: 0.78rem;
-  }
-
-  .mensagem-col {
-    max-width: 220px;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-  }
-</style>
-
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const input = document.getElementById('filtroCooperado');
-    const tabela = document.getElementById('tabela-escalas');
-
-    if (input && tabela) {
-      const linhas = tabela.querySelectorAll('tbody tr[data-coop-nome]');
-
-      input.addEventListener('input', function () {
-        const termo = (this.value || '').toLowerCase().trim();
-
-        linhas.forEach(function (tr) {
-          const nome  = (tr.getAttribute('data-coop-nome')  || '').toLowerCase();
-          const cnh   = (tr.getAttribute('data-coop-cnh')   || '').toLowerCase();
-          const placa = (tr.getAttribute('data-coop-placa') || '').toLowerCase();
-
-          const ok = (!termo || nome.includes(termo) || cnh.includes(termo) || placa.includes(termo));
-          tr.style.display = ok ? '' : 'none';
-        });
-      });
+  <!-- ===== JS DO PERÍODO (SEM PY) ===== -->
+  <script>
+  (function(){
+    function ymdToDate(s){
+      if(!s) return null;
+      const [y,m,d]=s.split('-').map(Number);
+      const dt = new Date(y, m-1, d);
+      dt.setHours(0,0,0,0);
+      return dt;
     }
-  });
-</script>
+    function dateToYMD(dt){
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth()+1).padStart(2,'0');
+      const d = String(dt.getDate()).padStart(2,'0');
+      return `${y}-${m}-${d}`;
+    }
+    function startOfWeekMonday(dt){
+      const d = new Date(dt);
+      const wd = (d.getDay() + 6) % 7; // Mon=0 ... Sun=6
+      d.setDate(d.getDate() - wd);
+      d.setHours(0,0,0,0);
+      return d;
+    }
+    function fmtBR(dt){
+      const dd = String(dt.getDate()).padStart(2,'0');
+      const mm = String(dt.getMonth()+1).padStart(2,'0');
+      const yy = dt.getFullYear();
+      return `${dd}/${mm}/${yy}`;
+    }
+
+    async function fetchSemanaHTML(refYMD){
+      const u = new URL(location.href);
+      u.searchParams.set('view','escalas');
+      u.searchParams.set('modo','semana');
+      u.searchParams.set('ref', refYMD);
+      const r = await fetch(u.toString(), {credentials:'same-origin'});
+      if(!r.ok) throw new Error(String(r.status));
+      return await r.text();
+    }
+
+    function extractCardsBetween(html, ini, fim){
+      const dom = new DOMParser().parseFromString(html, 'text/html');
+      const grid = dom.querySelector('#gridEscalaSemana');
+      if(!grid) return [];
+
+      const cols = Array.from(grid.querySelectorAll('.col-md-6.col-lg-4'));
+      const out = [];
+
+      cols.forEach(col=>{
+        const badge = col.querySelector('.badge');
+        if(!badge) return;
+        const m = badge.textContent.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if(!m) return;
+
+        const dt = new Date(Number(m[3]), Number(m[2])-1, Number(m[1]));
+        dt.setHours(0,0,0,0);
+
+        if(dt >= ini && dt <= fim){
+          out.push({dt, node: col});
+        }
+      });
+
+      out.sort((a,b)=>a.dt-b.dt);
+
+      // dedupe por data
+      const seen = new Set();
+      const filtered = [];
+      for(const x of out){
+        const k = dateToYMD(x.dt);
+        if(seen.has(k)) continue;
+        seen.add(k);
+        filtered.push(x.node);
+      }
+      return filtered;
+    }
+
+    function setChipPeriodo(ini, fim){
+      const chip = document.getElementById('chipPeriodoEscala');
+      const txt = document.getElementById('chipPeriodoTxt');
+      if(!chip || !txt) return;
+      txt.textContent = `${fmtBR(ini)} a ${fmtBR(fim)}`;
+      chip.style.display = '';
+    }
+
+    async function aplicarPeriodo(){
+      const iniS = document.getElementById('periodoInicio')?.value;
+      const fimS = document.getElementById('periodoFim')?.value;
+      const ini = ymdToDate(iniS);
+      const fim = ymdToDate(fimS);
+
+      if(!ini || !fim) return alert('Preencha início e fim.');
+      if(fim < ini) return alert('Fim não pode ser menor que o início.');
+
+      const w1 = startOfWeekMonday(ini);
+      const w2 = startOfWeekMonday(fim);
+
+      const refs = [dateToYMD(w1)];
+      const r2 = dateToYMD(w2);
+      if(r2 !== refs[0]) refs.push(r2);
+
+      const grid = document.getElementById('gridEscalaSemana');
+      if(!grid) return;
+
+      const old = grid.innerHTML;
+      grid.innerHTML = '<div class="text-muted small">Carregando período…</div>';
+
+      try{
+        const htmls = await Promise.all(refs.map(fetchSemanaHTML));
+        const nodes = [];
+        for(const h of htmls){
+          nodes.push(...extractCardsBetween(h, ini, fim));
+        }
+
+        grid.innerHTML = '';
+        if(!nodes.length){
+          grid.innerHTML = '<div class="text-muted small">Sem escala no período selecionado.</div>';
+          setChipPeriodo(ini, fim);
+          return;
+        }
+
+        nodes.forEach(n=>{
+          grid.appendChild(document.importNode(n, true));
+        });
+
+        setChipPeriodo(ini, fim);
+
+        // mantém o select "semana" selecionado (período funciona em cima do modo semana)
+        const selModo = document.getElementById('selectModoEscala');
+        if(selModo) selModo.value = 'semana';
+
+      }catch(e){
+        grid.innerHTML = old;
+        alert('Falha ao carregar período. (' + (e?.message || 'erro') + ')');
+      }
+    }
+
+    document.getElementById('btnAplicarPeriodo')?.addEventListener('click', aplicarPeriodo);
+
+    // Pré-preenche com a sua semana especial (14/02/2026 → 22/02/2026)
+    const iniEl = document.getElementById('periodoInicio');
+    const fimEl = document.getElementById('periodoFim');
+    if(iniEl && !iniEl.value) iniEl.value = '2026-02-14';
+    if(fimEl && !fimEl.value) fimEl.value = '2026-02-22';
+  })();
+  </script>
+</section>
 
   <!-- MODAIS =================================================== -->
   <div class="modal fade" id="modalEditLancamento" tabindex="-1">
