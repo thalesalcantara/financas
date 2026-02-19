@@ -2702,9 +2702,8 @@ def admin_dashboard():
 
     current_date = date.today()
     data_limite = date(current_date.year, 12, 31)
-    # Lista de admins para o modal/listagem (corrige NameError)
-    admins = Usuario.query.filter_by(tipo="admin").order_by(Usuario.usuario.asc()).all()
 
+    admins = Usuario.query.filter(Usuario.tipo.in_(['admin','master'])).order_by(Usuario.nome.asc()).all()
 
     return render_template(
         "admin_dashboard.html",
@@ -5467,30 +5466,29 @@ def portal_cooperado():
 
     # return TEM que ficar aqui (fora do for)
 
-# --- Indicadores permanentes do cooperado (não reinicia com filtro) ---
-try:
-    total_entregas_total = db.session.query(func.coalesce(func.sum(Lancamento.qtd_entregas), 0)).filter(
-        Lancamento.cooperado_id == cooperado.id,
-        Lancamento.qtd_entregas.isnot(None),
-    ).scalar() or 0
-except Exception:
-    total_entregas_total = 0
+    # --- Estatísticas permanentes (desde o início) ---
+    total_entregas_desde_inicio = Lancamento.query.filter_by(cooperado_id=coop.id).count()
 
-try:
-    nota_media_total = db.session.query(func.avg(AvaliacaoCooperado.estrelas_geral)).filter(
-        AvaliacaoCooperado.cooperado_id == cooperado.id
-    ).scalar()
-    nota_media_total = float(nota_media_total) if nota_media_total is not None else 0.0
-    qtd_avaliacoes_total = db.session.query(func.count(AvaliacaoCooperado.id)).filter(
-        AvaliacaoCooperado.cooperado_id == cooperado.id
-    ).scalar() or 0
-except Exception:
-    nota_media_total = 0.0
-    qtd_avaliacoes_total = 0
+    nota_media_cooperado = (
+        db.session.query(func.avg(AvaliacaoRestaurante.estrelas_geral))
+        .filter(AvaliacaoRestaurante.cooperado_id == coop.id)
+        .scalar()
+    )
+    qtd_avaliacoes_cooperado = (
+        db.session.query(func.count(AvaliacaoRestaurante.id))
+        .filter(AvaliacaoRestaurante.cooperado_id == coop.id)
+        .scalar()
+    )
+
+    nota_media_cooperado = float(nota_media_cooperado or 0.0)
+    qtd_avaliacoes_cooperado = int(qtd_avaliacoes_cooperado or 0)
 
     return render_template(
         "painel_cooperado.html",
         cooperado=coop,
+        total_entregas_desde_inicio=total_entregas_desde_inicio,
+        nota_media_cooperado=nota_media_cooperado,
+        qtd_avaliacoes_cooperado=qtd_avaliacoes_cooperado,
         producoes=producoes,
         receitas_coop=receitas_coop,
         despesas_coop=despesas_coop,
@@ -5510,11 +5508,7 @@ except Exception:
         trocas_recebidas_pendentes=trocas_recebidas_pendentes,
         trocas_recebidas_historico=trocas_recebidas_historico,
         trocas_enviadas=trocas_enviadas,
-    
-        total_entregas_total=total_entregas_total,
-        nota_media_total=nota_media_total,
-        qtd_avaliacoes_total=qtd_avaliacoes_total,
-)
+    )
 
 # === AVALIAR RESTAURANTE (cooperado -> restaurante)
 # Duas rotas para a MESMA função e MESMO endpoint (o do template):
@@ -6800,14 +6794,12 @@ def init_db_command():
 # Main
 # =========================
 
-
-# ---------------------------------------------------------------------
-# API: avisos (compatibilidade - evita 404 no portal restaurante)
-# ---------------------------------------------------------------------
 @app.route("/api/rest/avisos/unread_count")
 @login_required
 def api_rest_avisos_unread_count():
+    # Endpoint simples para evitar 404 no front (avisos não implementados neste módulo)
     return jsonify({"count": 0})
+
 
 if __name__ == "__main__":
     with app.app_context():
