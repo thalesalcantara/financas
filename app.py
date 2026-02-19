@@ -1,4 +1,4 @@
-
+    
 from __future__ import annotations
 
 # ============ Stdlib ============
@@ -2410,8 +2410,9 @@ def admin_dashboard():
     chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
     chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
 
+    # --- CORREÇÃO AQUI: Buscando as variáveis de Admin ---
     admin_user = Usuario.query.filter_by(tipo="admin").first()
-    admins = Usuario.query.filter_by(tipo="admin").all()
+    admins = Usuario.query.filter_by(tipo="admin").all() # <--- Adicionado para resolver o NameError
 
     # =====================================================================
     # 7) Folha de pagamento  -> SÓ CALCULA SE A ABA "folha" ESTIVER ABERTA
@@ -2452,7 +2453,7 @@ def admin_dashboard():
                 .all()
             )
 
-            # Despesa semanal: usa sobreposição do intervalo (mais seguro que "DespesaCooperado.data")
+            # Despesa semanal: usa sobreposição do intervalo
             d = (
                 DespesaCooperado.query.filter(
                     (DespesaCooperado.cooperado_id == c.id) | (DespesaCooperado.cooperado_id.is_(None)),
@@ -2496,7 +2497,7 @@ def admin_dashboard():
             )
 
     # ----------------------------
-    # Benefícios para template (com filtros + id)
+    # Benefícios para template
     # ----------------------------
     def _tokenize(s: str):
         return [x.strip() for x in re.split(r"[;,]", s or "") if x.strip()]
@@ -6771,15 +6772,6 @@ def init_db_command():
 # =========================
 # Main
 # =========================
-
-
-@app.route("/api/rest/avisos/unread_count")
-@login_required
-def api_rest_avisos_unread_count():
-    # Endpoint simples para evitar 404 em telas do portal do restaurante.
-    # Caso você implemente avisos/notifications depois, substitua este retorno.
-    return jsonify({"count": 0})
-
 if __name__ == "__main__":
     with app.app_context():
         init_db()
