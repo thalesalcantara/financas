@@ -1118,46 +1118,38 @@ def role_required(role: str):
     return deco
 
 
+
 def admin_required(fn):
-    return role_required("admin")(fn)
+    """Requer login como admin e aplica restrições por perfil."""
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if session.get("user_tipo") != "admin":
+            return redirect(url_for("login"))
 
-def _admin_has_perm(perm: str) -> bool:
-    uid = session.get("user_id")
-    if not uid:
-        return False
+        uid = session.get("user_id")
+        user = Usuario.query.get(uid) if uid else None
+        if not user or user.tipo != "admin":
+            session.clear()
+            return redirect(url_for("login"))
 
-    u = Usuario.query.get(uid)
-    if not u or u.tipo != "admin":
-        return False
+        perfil = (user.admin_perfil or "admin_full").strip().lower()
 
-    # 1) PRIMEIRO: respeita o admin_perfil (seu modelo já tem isso)
-    perfil = (getattr(u, "admin_perfil", "") or "").strip().lower()
+        # Visualizador: nunca pode fazer alterações
+        if request.method != "GET" and perfil == "admin_view":
+            abort(403)
 
-    # master / full: pode tudo
-    if perfil in ("full", "admin_full", "master"):
-        return True
+        # Supervisão: só Escala + Trocas (aprovar/recusar)
+        if perfil == "admin_supervisao":
+            allowed_endpoints = {"admin_dashboard", "admin_aprovar_troca", "admin_recusar_troca", "logout"}
+            if request.endpoint not in allowed_endpoints:
+                abort(403)
+            if request.endpoint == "admin_dashboard":
+                tab = (request.args.get("tab") or "escalas").strip().lower()
+                if tab not in {"escalas", "trocas"}:
+                    return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    # perfil que só mexe em trocas de escala
-    if perfil in ("admin_escala_trocas", "escala_trocas"):
-        return perm in ("escala_trocas", "view_only")
-
-    # perfil apenas visualização
-    if perfil in ("admin_view", "view", "view_only", "leitura"):
-        return perm == "view_only"
-
-    # 2) COMPATIBILIDADE: se você tiver algum admin antigo usando permissoes/nivel_admin, continua funcionando
-    if int(getattr(u, "nivel_admin", 0) or 0) >= 100:
-        return True
-
-    raw = getattr(u, "permissoes", "") or ""
-    try:
-        perms = set(json.loads(raw)) if raw else set()
-    except Exception:
-        perms = set()
-
-    if "*" in perms:
-        return True
-    return perm in perms
+        return fn(*args, **kwargs)
+    return wrapper
 
 
 def admin_perm_required(perm: str):
@@ -2411,7 +2403,6 @@ def admin_dashboard():
     chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
 
     admin_user = Usuario.query.filter_by(tipo="admin").first()
-    admins = Usuario.query.filter_by(tipo="admin").all()
 
     # =====================================================================
     # 7) Folha de pagamento  -> SÓ CALCULA SE A ABA "folha" ESTIVER ABERTA
@@ -2846,82 +2837,46 @@ def admin_backup_zip():
 
 @app.post("/admin/config/create-admin")
 @admin_required
+
 def admin_create_admin():
-    usuario = (request.form.get("usuario") or "").strip()
-    senha = request.form.get("senha") or ""
-    perfil = (request.form.get("perfil") or "admin_view").strip()
+    # Somente master pode criar outros admins
+    uid = session.get("user_id")
+    user = Usuario.query.get(uid) if uid else None
+    if not user or (user.admin_perfil or "").strip().lower() != "master":
+        abort(403)
 
-    if not usuario or len(senha) < 4:
-        flash("Usuário e senha (mín. 4) são obrigatórios.", "warning")
-        return redirect(url_for("admin_dashboard", tab="config"))
+    nome = (request.form.get("nome") or "").strip()
+    email = (request.form.get("email") or "").strip().lower()
+    senha = (request.form.get("senha") or "").strip()
+    perfil = (request.form.get("admin_perfil") or "admin_full").strip().lower()
 
-    if Usuario.query.filter_by(usuario=usuario).first():
-        flash("Esse usuário já existe.", "warning")
-        return redirect(url_for("admin_dashboard", tab="config"))
+    perfis_validos = {"admin_full", "admin_supervisao", "admin_view"}
+    if perfil not in perfis_validos:
+        perfil = "admin_full"
 
-    # Mapeia perfil -> permissões (JSON simples)
-    perfil_map = {
-        "admin_full": {"nivel": 100, "perms": ["*"]},
-        "admin_view": {"nivel": 10, "perms": ["view_only"]},
-        "admin_escala_trocas": {"nivel": 20, "perms": ["escala_trocas"]},
-    }
-    cfg = perfil_map.get(perfil, perfil_map["admin_view"])
+    if not nome or not email or not senha:
+        flash("Preencha nome, email e senha.", "warning")
+        return redirect(url_for("admin_dashboard", tab="usuarios"))
 
-    u = Usuario(usuario=usuario, tipo="admin", senha_hash="")
-    u.set_password(senha)
+    existe = Usuario.query.filter_by(email=email).first()
+    if existe:
+        flash("Já existe um usuário com esse email.", "warning")
+        return redirect(url_for("admin_dashboard", tab="usuarios"))
 
-    # Guardar como JSON no campo 'permissoes' (vamos criar já já)
-    u = Usuario(usuario=usuario, tipo="admin", senha_hash="")
-    u.set_password(senha)
-    u.permissoes = json.dumps(cfg["perms"], ensure_ascii=False)
-    u.nivel_admin = int(cfg["nivel"])
-    u = Usuario(usuario=usuario, tipo="admin", senha_hash="")
-    u.set_password(senha)
-
-    # usa o campo que você já tem no model
-    u.admin_perfil = perfil
-
-
+    u = Usuario(
+        nome=nome,
+        email=email,
+        senha_hash=generate_password_hash(senha),
+        tipo="admin",
+        admin_perfil=perfil,
+    )
     db.session.add(u)
     db.session.commit()
 
-    flash("Administrador criado com sucesso!", "success")
-    return redirect(url_for("admin_dashboard", tab="config"))
+    flash(f"Admin criado: {nome} ({perfil}).", "success")
+    return redirect(url_for("admin_dashboard", tab="usuarios"))
 
-@app.post("/admin/config/admins/<int:user_id>/toggle")
-@admin_required
-def admin_toggle_admin(user_id):
-    u = Usuario.query.get_or_404(user_id)
 
-    if u.tipo != "admin":
-        flash("Este usuário não é administrador.", "warning")
-        return redirect(url_for("admin_dashboard", tab="config"))
-
-    # Não deixa desativar a si mesmo
-    if u.id == session.get("user_id"):
-        flash("Você não pode desativar o próprio usuário logado.", "warning")
-        return redirect(url_for("admin_dashboard", tab="config"))
-
-    # Se não existir coluna 'ativo', não quebra: faz fallback por 'status'
-    if hasattr(u, "ativo"):
-        u.ativo = not bool(u.ativo)
-        estado = "ativado" if u.ativo else "desativado"
-    else:
-        # fallback simples (se existir 'status')
-        if hasattr(u, "status"):
-            u.status = "ativo" if str(getattr(u, "status") or "").lower() != "ativo" else "inativo"
-            estado = f"marcado como {u.status}"
-        else:
-            flash("Seu modelo Usuario não tem campo 'ativo' nem 'status'.", "danger")
-            return redirect(url_for("admin_dashboard", tab="config"))
-
-    db.session.commit()
-    flash(f"Administrador {estado} com sucesso.", "success")
-    return redirect(url_for("admin_dashboard", tab="config"))
-
-# =========================
-# Navegação/Export util
-# =========================
 @app.route("/filtrar_lancamentos")
 @admin_required
 def filtrar_lancamentos():
@@ -6771,17 +6726,43 @@ def init_db_command():
 # =========================
 # Main
 # =========================
-
-
-@app.route("/api/rest/avisos/unread_count")
-@login_required
-def api_rest_avisos_unread_count():
-    # Endpoint simples para evitar 404 em telas do portal do restaurante.
-    # Caso você implemente avisos/notifications depois, substitua este retorno.
-    return jsonify({"count": 0})
-
 if __name__ == "__main__":
     with app.app_context():
         init_db()
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
     
+
+# Impede acesso à aba "folha" (removida)
+if active_tab == "folha":
+    active_tab = "dashboard"
+
+# Define período padrão (segunda a domingo) quando não for informado
+from datetime import date, timedelta
+if not data_inicio and not data_fim:
+    hoje = date.today()
+    segunda = hoje - timedelta(days=hoje.weekday())
+    domingo = segunda + timedelta(days=6)
+    data_inicio = segunda
+    data_fim = domingo
+else:
+    # amplia para semana completa (seg->dom)
+    if data_inicio and not data_fim:
+        seg = data_inicio - timedelta(days=data_inicio.weekday())
+        data_inicio = seg
+        data_fim = seg + timedelta(days=6)
+    elif data_fim and not data_inicio:
+        seg = data_fim - timedelta(days=data_fim.weekday())
+        data_inicio = seg
+        data_fim = seg + timedelta(days=6)
+    else:
+        seg_ini = data_inicio - timedelta(days=data_inicio.weekday())
+        seg_fim = data_fim - timedelta(days=data_fim.weekday())
+        data_inicio = seg_ini
+        data_fim = seg_fim + timedelta(days=6)
+
+# lista de admins (corrige NameError no template)
+admins = Usuario.query.filter_by(tipo="admin").order_by(Usuario.nome.asc()).all()
+
+# perfil do admin logado (para controlar visibilidade/permissões no template)
+admin_logado = Usuario.query.get(session.get("user_id")) if session.get("user_id") else None
+admin_perfil = (getattr(admin_logado, "admin_perfil", None) or "admin_full").strip().lower()
