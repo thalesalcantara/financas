@@ -471,7 +471,7 @@
         <a class="nav-sublink {{ 'active' if _tab=='escalas' else '' }}"
            data-bs-toggle="tab"
            data-bs-target="#escalas"
-           href="{{ url_for('admin_dashboard', tab='escalas') }}"
+           href="#escalas"
            role="tab"
            aria-controls="escalas"
            aria-selected="{{ 'true' if _tab=='escalas' else 'false' }}">
@@ -494,7 +494,7 @@
         <a class="nav-link-main {{ 'active' if _tab=='config' else '' }}"
            data-bs-toggle="tab"
            data-bs-target="#config"
-           href="{{ url_for('admin_dashboard', tab='config') }}"
+           href="#config"
            role="tab"
            aria-controls="config"
            aria-selected="{{ 'true' if _tab=='config' else 'false' }}">
@@ -1863,7 +1863,6 @@
       <div class="mt-2 text-muted small">
         Nota: os descontos abaixo são cálculo bruto linha-a-linha:
         <b>INSS 4,0%</b> + <b>SEST/SENAT 0,5%</b> = <b>4,5%</b>.
-        <b>Isenções por benefício</b> entram na <u>Folha</u> e nos <u>totais</u> do Resumo.
       </div>
     </div>
   </div>
