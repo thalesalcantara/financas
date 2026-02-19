@@ -1141,11 +1141,7 @@ def _admin_has_perm(perm: str) -> bool:
     if perfil in ("admin_escala_trocas", "escala_trocas"):
         return perm in ("escala_trocas", "view_only")
 
-    # 
-    # perfil supervisão: acesso limitado (escala + aprovar/desaprovar trocas)
-    if perfil in ("supervisao", "supervisor", "adm_supervisao"):
-        return perm in {"escala_trocas"}
-# perfil apenas visualização
+    # perfil apenas visualização
     if perfil in ("admin_view", "view", "view_only", "leitura"):
         return perm == "view_only"
 
@@ -2251,17 +2247,6 @@ def admin_dashboard():
 
     # --- Controle de abas
     active_tab = args.get("tab", "lancamentos")
-    # Restrições por perfil de admin
-    perfil = (getattr(current_user, "admin_perfil", "") or "full").lower()
-    if perfil in ("supervisao", "supervisor", "adm_supervisao"):
-        allowed_tabs = ["escala", "avaliacoes"]
-    elif perfil in ("visualizar", "view", "view_only", "leitura"):
-        allowed_tabs = ["lancamentos", "avaliacoes", "escala", "config"]
-    else:
-        allowed_tabs = None  # tudo liberado
-
-    if allowed_tabs is not None and active_tab not in allowed_tabs:
-        active_tab = allowed_tabs[0]
 
     # --- Helper: escolhe a primeira data válida de uma lista de chaves
     def _pick_date(*keys):
@@ -2717,8 +2702,10 @@ def admin_dashboard():
 
     current_date = date.today()
     data_limite = date(current_date.year, 12, 31)
+    # Lista de admins para o modal/listagem (corrige NameError)
+    admins = Usuario.query.filter_by(tipo="admin").order_by(Usuario.usuario.asc()).all()
 
-    admins = Usuario.query.filter_by(tipo='admin').order_by(Usuario.nome.asc()).all()
+
     return render_template(
         "admin_dashboard.html",
         tab=active_tab,
@@ -3450,13 +3437,6 @@ def admin_avaliacoes():
     # Datas (aceita YYYY-MM-DD ou DD/MM/YYYY)
     di = _parse_date(data_inicio)
     df = _parse_date(data_fim)
-    # Se não passar datas, padrão é semana atual (segunda a domingo)
-    if not di_str and not df_str:
-        today = date.today()
-        monday = today - timedelta(days=today.weekday())
-        sunday = monday + timedelta(days=6)
-        di = datetime.combine(monday, datetime.min.time())
-        df = datetime.combine(sunday, datetime.max.time())
 
     # Model por tipo
     Model = AvaliacaoRestaurante if (tipo == "restaurante") else AvaliacaoCooperado
@@ -5233,24 +5213,10 @@ def portal_cooperado():
     except Exception:
         coop.usuario = ""
 
-    # ---------- MÉTRICAS GERAIS (desde o início)
-    cooperado_score_geral = db.session.query(func.avg(AvaliacaoCooperado.nota)).filter(
-    AvaliacaoCooperado.cooperado_id == coop.id
-    ).scalar()
-    cooperado_score_geral = float(cooperado_score_geral) if cooperado_score_geral is not None else None
-    
-    total_entregas_geral = db.session.query(func.coalesce(func.sum(Lancamento.qtd_entregas), 0)).filter(
-    Lancamento.cooperado_id == coop.id
-    ).scalar() or 0
-    try:
-        total_entregas_geral = int(total_entregas_geral)
-    except Exception:
-        total_entregas_geral = 0
-    
     # ---------- FILTRO POR DATA (padrão = HOJE) ----------
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
-    
+
     # padrão: mostrar SOMENTE a data do lançamento (hoje)
     if di and not df:
         df = di
@@ -5500,11 +5466,31 @@ def portal_cooperado():
         })
 
     # return TEM que ficar aqui (fora do for)
+
+# --- Indicadores permanentes do cooperado (não reinicia com filtro) ---
+try:
+    total_entregas_total = db.session.query(func.coalesce(func.sum(Lancamento.qtd_entregas), 0)).filter(
+        Lancamento.cooperado_id == cooperado.id,
+        Lancamento.qtd_entregas.isnot(None),
+    ).scalar() or 0
+except Exception:
+    total_entregas_total = 0
+
+try:
+    nota_media_total = db.session.query(func.avg(AvaliacaoCooperado.estrelas_geral)).filter(
+        AvaliacaoCooperado.cooperado_id == cooperado.id
+    ).scalar()
+    nota_media_total = float(nota_media_total) if nota_media_total is not None else 0.0
+    qtd_avaliacoes_total = db.session.query(func.count(AvaliacaoCooperado.id)).filter(
+        AvaliacaoCooperado.cooperado_id == cooperado.id
+    ).scalar() or 0
+except Exception:
+    nota_media_total = 0.0
+    qtd_avaliacoes_total = 0
+
     return render_template(
         "painel_cooperado.html",
         cooperado=coop,
-        cooperado_score_geral=cooperado_score_geral,
-        total_entregas_geral=total_entregas_geral,
         producoes=producoes,
         receitas_coop=receitas_coop,
         despesas_coop=despesas_coop,
@@ -5524,7 +5510,11 @@ def portal_cooperado():
         trocas_recebidas_pendentes=trocas_recebidas_pendentes,
         trocas_recebidas_historico=trocas_recebidas_historico,
         trocas_enviadas=trocas_enviadas,
-    )
+    
+        total_entregas_total=total_entregas_total,
+        nota_media_total=nota_media_total,
+        qtd_avaliacoes_total=qtd_avaliacoes_total,
+)
 
 # === AVALIAR RESTAURANTE (cooperado -> restaurante)
 # Duas rotas para a MESMA função e MESMO endpoint (o do template):
@@ -6810,12 +6800,14 @@ def init_db_command():
 # Main
 # =========================
 
-@app.get("/api/rest/avisos/unread_count")
-def api_rest_avisos_unread_count():
-    # Endpoint usado no painel do restaurante para badge de avisos.
-    # Como o módulo de avisos pode não estar habilitado, retornamos 0.
-    return jsonify({"count": 0})
 
+# ---------------------------------------------------------------------
+# API: avisos (compatibilidade - evita 404 no portal restaurante)
+# ---------------------------------------------------------------------
+@app.route("/api/rest/avisos/unread_count")
+@login_required
+def api_rest_avisos_unread_count():
+    return jsonify({"count": 0})
 
 if __name__ == "__main__":
     with app.app_context():
