@@ -6730,39 +6730,3 @@ if __name__ == "__main__":
     with app.app_context():
         init_db()
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-    
-
-# Impede acesso à aba "folha" (removida)
-if active_tab == "folha":
-    active_tab = "dashboard"
-
-# Define período padrão (segunda a domingo) quando não for informado
-from datetime import date, timedelta
-if not data_inicio and not data_fim:
-    hoje = date.today()
-    segunda = hoje - timedelta(days=hoje.weekday())
-    domingo = segunda + timedelta(days=6)
-    data_inicio = segunda
-    data_fim = domingo
-else:
-    # amplia para semana completa (seg->dom)
-    if data_inicio and not data_fim:
-        seg = data_inicio - timedelta(days=data_inicio.weekday())
-        data_inicio = seg
-        data_fim = seg + timedelta(days=6)
-    elif data_fim and not data_inicio:
-        seg = data_fim - timedelta(days=data_fim.weekday())
-        data_inicio = seg
-        data_fim = seg + timedelta(days=6)
-    else:
-        seg_ini = data_inicio - timedelta(days=data_inicio.weekday())
-        seg_fim = data_fim - timedelta(days=data_fim.weekday())
-        data_inicio = seg_ini
-        data_fim = seg_fim + timedelta(days=6)
-
-# lista de admins (corrige NameError no template)
-admins = Usuario.query.filter_by(tipo="admin").order_by(Usuario.nome.asc()).all()
-
-# perfil do admin logado (para controlar visibilidade/permissões no template)
-admin_logado = Usuario.query.get(session.get("user_id")) if session.get("user_id") else None
-admin_perfil = (getattr(admin_logado, "admin_perfil", None) or "admin_full").strip().lower()
