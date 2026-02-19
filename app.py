@@ -281,7 +281,8 @@ def _is_sqlite() -> bool:
 
 class Usuario(db.Model, UserMixin):
     __tablename__ = "usuarios"
-
+    
+    admin_perfil = db.Column(db.String(30), default="full", server_default="full")
     id = db.Column(db.Integer, primary_key=True)
     usuario = db.Column(db.String(80), unique=True, nullable=False)
     senha_hash = db.Column(db.String(200), nullable=False)
@@ -1119,6 +1120,56 @@ def role_required(role: str):
 
 def admin_required(fn):
     return role_required("admin")(fn)
+
+def _admin_has_perm(perm: str) -> bool:
+    uid = session.get("user_id")
+    if not uid:
+        return False
+
+    u = Usuario.query.get(uid)
+    if not u or u.tipo != "admin":
+        return False
+
+    # 1) PRIMEIRO: respeita o admin_perfil (seu modelo já tem isso)
+    perfil = (getattr(u, "admin_perfil", "") or "").strip().lower()
+
+    # master / full: pode tudo
+    if perfil in ("full", "admin_full", "master"):
+        return True
+
+    # perfil que só mexe em trocas de escala
+    if perfil in ("admin_escala_trocas", "escala_trocas"):
+        return perm in ("escala_trocas", "view_only")
+
+    # perfil apenas visualização
+    if perfil in ("admin_view", "view", "view_only", "leitura"):
+        return perm == "view_only"
+
+    # 2) COMPATIBILIDADE: se você tiver algum admin antigo usando permissoes/nivel_admin, continua funcionando
+    if int(getattr(u, "nivel_admin", 0) or 0) >= 100:
+        return True
+
+    raw = getattr(u, "permissoes", "") or ""
+    try:
+        perms = set(json.loads(raw)) if raw else set()
+    except Exception:
+        perms = set()
+
+    if "*" in perms:
+        return True
+    return perm in perms
+
+
+def admin_perm_required(perm: str):
+    def deco(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if not _admin_has_perm(perm):
+                flash("Seu usuário não tem permissão para essa ação.", "danger")
+                return redirect(url_for("admin_dashboard", tab="escalas"))
+            return fn(*args, **kwargs)
+        return wrapper
+    return deco
 
 
 def _normalize_name(s: str) -> list[str]:
@@ -2674,6 +2725,7 @@ def admin_dashboard():
         current_date=current_date,
         data_limite=data_limite,
         admin=admin_user,
+        admins=admins,
         docinfo_map=docinfo_map,
         escalas_por_coop=esc_by_int,
         escalas_por_coop_json=esc_by_str,
@@ -2690,6 +2742,181 @@ def admin_dashboard():
         trocas_historico_flat=trocas_historico_flat,
     )
     
+@app.post("/admin/config/credentials")
+@admin_required
+def admin_update_credentials():
+    user_id = session.get("user_id")
+    u = Usuario.query.get_or_404(user_id)
+
+    senha_atual = request.form.get("senha_atual") or ""
+    novo_usuario = (request.form.get("novo_usuario") or "").strip()
+    nova_senha = request.form.get("nova_senha") or ""
+    nova_senha2 = request.form.get("nova_senha2") or ""
+
+    if not u.check_password(senha_atual):
+        flash("Senha atual incorreta.", "danger")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    if novo_usuario:
+        existe = Usuario.query.filter(Usuario.usuario == novo_usuario, Usuario.id != u.id).first()
+        if existe:
+            flash("Esse usuário já existe.", "warning")
+            return redirect(url_for("admin_dashboard", tab="config"))
+        u.usuario = novo_usuario
+
+    if nova_senha or nova_senha2:
+        if nova_senha != nova_senha2:
+            flash("Nova senha e confirmação não conferem.", "warning")
+            return redirect(url_for("admin_dashboard", tab="config"))
+        if len(nova_senha) < 4:
+            flash("Nova senha muito curta.", "warning")
+            return redirect(url_for("admin_dashboard", tab="config"))
+        u.set_password(nova_senha)
+
+    db.session.commit()
+    flash("Credenciais atualizadas com sucesso!", "success")
+    return redirect(url_for("admin_dashboard", tab="config"))
+
+@app.post("/admin/config/salario-minimo")
+@admin_required
+def admin_update_salario_minimo():
+    v = (request.form.get("salario_minimo") or "").replace(",", ".").strip()
+    try:
+        salario = float(v)
+        if salario <= 0:
+            raise ValueError()
+    except Exception:
+        flash("Informe um salário mínimo válido.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    cfg = get_config()
+    cfg.salario_minimo = salario
+    db.session.commit()
+
+    flash("Salário mínimo atualizado com sucesso!", "success")
+    return redirect(url_for("admin_dashboard", tab="config"))
+
+
+@app.post("/admin/config/backup")
+@admin_required
+def admin_backup_zip():
+    import zipfile
+
+    # Export “de tudo” de forma portátil (sem depender de pg_dump)
+    tables = {
+        "usuarios": Usuario,
+        "cooperados": Cooperado,
+        "restaurantes": Restaurante,
+        "lancamentos": Lancamento,
+        "receitas_coop": ReceitaCooperativa,
+        "despesas_coop": DespesaCooperativa,
+        "receitas_cooperado": ReceitaCooperado,
+        "despesas_cooperado": DespesaCooperado,
+        "escalas": Escala,
+        "trocas": TrocaSolicitacao,
+        "documentos": Documento,
+        "tabelas": Tabela,
+        "beneficios": BeneficioRegistro,
+    }
+
+    def to_dict(obj):
+        data = {}
+        for col in obj.__table__.columns:
+            val = getattr(obj, col.name)
+            if isinstance(val, (datetime, date)):
+                val = val.isoformat()
+            data[col.name] = val
+        return data
+
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        for name, Model in tables.items():
+            try:
+                rows = Model.query.all()
+            except Exception:
+                rows = []
+            payload = [to_dict(r) for r in rows]
+            z.writestr(f"{name}.json", json.dumps(payload, ensure_ascii=False, indent=2))
+
+    mem.seek(0)
+    fname = f"backup_coopex_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.zip"
+    return send_file(mem, as_attachment=True, download_name=fname, mimetype="application/zip")
+
+
+@app.post("/admin/config/create-admin")
+@admin_required
+def admin_create_admin():
+    usuario = (request.form.get("usuario") or "").strip()
+    senha = request.form.get("senha") or ""
+    perfil = (request.form.get("perfil") or "admin_view").strip()
+
+    if not usuario or len(senha) < 4:
+        flash("Usuário e senha (mín. 4) são obrigatórios.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    if Usuario.query.filter_by(usuario=usuario).first():
+        flash("Esse usuário já existe.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    # Mapeia perfil -> permissões (JSON simples)
+    perfil_map = {
+        "admin_full": {"nivel": 100, "perms": ["*"]},
+        "admin_view": {"nivel": 10, "perms": ["view_only"]},
+        "admin_escala_trocas": {"nivel": 20, "perms": ["escala_trocas"]},
+    }
+    cfg = perfil_map.get(perfil, perfil_map["admin_view"])
+
+    u = Usuario(usuario=usuario, tipo="admin", senha_hash="")
+    u.set_password(senha)
+
+    # Guardar como JSON no campo 'permissoes' (vamos criar já já)
+    u = Usuario(usuario=usuario, tipo="admin", senha_hash="")
+    u.set_password(senha)
+    u.permissoes = json.dumps(cfg["perms"], ensure_ascii=False)
+    u.nivel_admin = int(cfg["nivel"])
+    u = Usuario(usuario=usuario, tipo="admin", senha_hash="")
+    u.set_password(senha)
+
+    # usa o campo que você já tem no model
+    u.admin_perfil = perfil
+
+
+    db.session.add(u)
+    db.session.commit()
+
+    flash("Administrador criado com sucesso!", "success")
+    return redirect(url_for("admin_dashboard", tab="config"))
+
+@app.post("/admin/config/admins/<int:user_id>/toggle")
+@admin_required
+def admin_toggle_admin(user_id):
+    u = Usuario.query.get_or_404(user_id)
+
+    if u.tipo != "admin":
+        flash("Este usuário não é administrador.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    # Não deixa desativar a si mesmo
+    if u.id == session.get("user_id"):
+        flash("Você não pode desativar o próprio usuário logado.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    # Se não existir coluna 'ativo', não quebra: faz fallback por 'status'
+    if hasattr(u, "ativo"):
+        u.ativo = not bool(u.ativo)
+        estado = "ativado" if u.ativo else "desativado"
+    else:
+        # fallback simples (se existir 'status')
+        if hasattr(u, "status"):
+            u.status = "ativo" if str(getattr(u, "status") or "").lower() != "ativo" else "inativo"
+            estado = f"marcado como {u.status}"
+        else:
+            flash("Seu modelo Usuario não tem campo 'ativo' nem 'status'.", "danger")
+            return redirect(url_for("admin_dashboard", tab="config"))
+
+    db.session.commit()
+    flash(f"Administrador {estado} com sucesso.", "success")
+    return redirect(url_for("admin_dashboard", tab="config"))
 
 # =========================
 # Navegação/Export util
@@ -3454,6 +3681,7 @@ def admin_avaliacoes():
         per_page=pager.per_page,
         preserve=preserve,
         admin=admin_user,
+        admins=admins,
         salario_minimo=cfg.salario_minimo or 0.0,
     )
 
@@ -4698,6 +4926,7 @@ def escalas_purge_restaurante(rest_id):
 # =========================
 @app.post("/admin/trocas/<int:id>/aprovar")
 @admin_required
+@admin_perm_required("escala_trocas")
 def admin_aprovar_troca(id):
     t = TrocaSolicitacao.query.get_or_404(id)
     if t.status != "pendente":
@@ -4766,6 +4995,7 @@ def admin_aprovar_troca(id):
 
 @app.post("/admin/trocas/<int:id>/recusar")
 @admin_required
+@admin_perm_required("escala_trocas")
 def admin_recusar_troca(id):
     t = TrocaSolicitacao.query.get_or_404(id)
     if t.status != "pendente":
