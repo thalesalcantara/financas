@@ -2193,8 +2193,6 @@ def toggle_status_cooperado(id):
 @admin_required
 def admin_dashboard():
     args = request.args
-
-    # --- Controle de abas
     active_tab = args.get("tab", "lancamentos")
 
     # --- Helper: escolhe a primeira data válida de uma lista de chaves
@@ -2207,81 +2205,254 @@ def admin_dashboard():
                     return d
         return None
 
-    # --- Datas unificadas para o RESUMO (prioriza resumo_inicio/fim)
+    # Datas unificadas (prioriza resumo_inicio/fim quando existir)
     data_inicio = _pick_date("resumo_inicio", "data_inicio")
     data_fim = _pick_date("resumo_fim", "data_fim")
 
     restaurante_id = args.get("restaurante_id", type=int)
     cooperado_id = args.get("cooperado_id", type=int)
     considerar_periodo = bool(args.get("considerar_periodo"))
-    dows = set(args.getlist("dow"))  # {"1","2",...}
+    dows = set(args.getlist("dow"))  # {"0","1","2","3","4","5","6"} (conforme _dow)
 
-    # ---- Lançamentos (com filtros + DOW)
-    q = Lancamento.query
-    if restaurante_id:
-        q = q.filter(Lancamento.restaurante_id == restaurante_id)
-    if cooperado_id:
-        q = q.filter(Lancamento.cooperado_id == cooperado_id)
-    if data_inicio:
-        q = q.filter(Lancamento.data >= data_inicio)
-    if data_fim:
-        q = q.filter(Lancamento.data <= data_fim)
+    # Sempre: config + user atual
+    cfg = get_config()
+    admin_user = None
+    try:
+        admin_user = Usuario.query.get(session.get("user_id"))
+    except Exception:
+        admin_user = None
 
-    lanc_base = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
+    # Listas pequenas (usadas em selects/filtros em várias abas)
+    cooperados = Cooperado.query.order_by(Cooperado.nome).all()
+    restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
 
-    if dows:
-        lancamentos = [l for l in lanc_base if l.data and _dow(l.data) in dows]
-    else:
+    # Defaults (para não quebrar template)
+    lancamentos = []
+    receitas = []
+    despesas = []
+    receitas_coop = []
+    despesas_coop = []
+    total_producoes = 0.0
+    total_inss = 0.0
+    total_receitas = 0.0
+    total_despesas = 0.0
+    total_receitas_coop = 0.0
+    total_despesas_coop = 0.0
+    beneficios_view = []
+    historico_beneficios = []
+    docinfo_map = {}
+    status_doc_por_coop = {}
+    esc_by_int = defaultdict(list)
+    esc_by_str = defaultdict(list)
+    qtd_escalas_map = {}
+    qtd_sem_cadastro = 0
+    chart_data_lancamentos_coop = []
+    chart_data_lancamentos_cooperados = []
+    folha_inicio = None
+    folha_fim = None
+    folha_por_coop = {}
+    trocas_pendentes = []
+    trocas_historico = []
+    trocas_historico_flat = []
+    current_date = date.today()
+    data_limite = None
+
+    # -------------------------------
+    # ABA: LANÇAMENTOS (otimizada)
+    # -------------------------------
+    if active_tab == "lancamentos":
+        q = Lancamento.query
+
+        if restaurante_id:
+            q = q.filter(Lancamento.restaurante_id == restaurante_id)
+        if cooperado_id:
+            q = q.filter(Lancamento.cooperado_id == cooperado_id)
+        if data_inicio:
+            q = q.filter(Lancamento.data >= data_inicio)
+        if data_fim:
+            q = q.filter(Lancamento.data <= data_fim)
+
+        # Paginação para não travar (e acelerar pós editar/excluir)
+        page = args.get("page", default=1, type=int) or 1
+        per_page = args.get("per_page", default=200, type=int) or 200
+        if per_page < 50:
+            per_page = 50
+        if per_page > 500:
+            per_page = 500
+
+        q = q.order_by(Lancamento.data.desc(), Lancamento.id.desc())
+
+        # Se existir .paginate (Flask-SQLAlchemy), usa. Senão faz LIMIT/OFFSET manual.
+        try:
+            pag = q.paginate(page=page, per_page=per_page, error_out=False)
+            lanc_base = list(pag.items)
+            # expõe paginação para template (se ele quiser)
+            page_args = dict(args)
+            page_args["page"] = page
+            page_args["per_page"] = per_page
+            # Guarda em g via contexto do template (sem precisar alterar HTML agora)
+        except Exception:
+            lanc_base = q.limit(per_page).offset((page - 1) * per_page).all()
+            page_args = dict(args)
+
+        # Filtro por DOW e período (em memória, mas em lista pequena por causa da paginação)
+        if dows:
+            lanc_base = [l for l in lanc_base if l.data and _dow(l.data) in dows]
+
+        if considerar_periodo and restaurante_id:
+            rest = Restaurante.query.get(restaurante_id)
+            if rest:
+                mapa = {
+                    "seg-dom": {"1", "2", "3", "4", "5", "6", "7"},
+                    "sab-sex": {"6", "7", "1", "2", "3", "4", "5"},
+                    "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
+                }
+                permitidos = mapa.get(rest.periodo, {"1", "2", "3", "4", "5", "6", "7"})
+                lanc_base = [l for l in lanc_base if l.data and _dow(l.data) in permitidos]
+
         lancamentos = lanc_base
 
-    # Se marcar "considerar_periodo", só mantemos dias do período do restaurante
-    if considerar_periodo and restaurante_id:
-        rest = Restaurante.query.get(restaurante_id)
-        if rest:
-            mapa = {
-                "seg-dom": {"1", "2", "3", "4", "5", "6", "7"},
-                "sab-sex": {"6", "7", "1", "2", "3", "4", "5"},
-                "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
+        total_producoes = float(sum((l.valor or 0.0) for l in lancamentos))
+        total_inss = round(total_producoes * INSS_ALIQ, 2)
+
+    # -------------------------------
+    # ABA: RESUMO (pesada, mas só aqui)
+    # -------------------------------
+    elif active_tab == "resumo":
+        q = Lancamento.query
+        if restaurante_id:
+            q = q.filter(Lancamento.restaurante_id == restaurante_id)
+        if cooperado_id:
+            q = q.filter(Lancamento.cooperado_id == cooperado_id)
+        if data_inicio:
+            q = q.filter(Lancamento.data >= data_inicio)
+        if data_fim:
+            q = q.filter(Lancamento.data <= data_fim)
+
+        lanc_base = q.all()
+        if dows:
+            lanc_base = [l for l in lanc_base if l.data and _dow(l.data) in dows]
+
+        if considerar_periodo and restaurante_id:
+            rest = Restaurante.query.get(restaurante_id)
+            if rest:
+                mapa = {
+                    "seg-dom": {"1", "2", "3", "4", "5", "6", "7"},
+                    "sab-sex": {"6", "7", "1", "2", "3", "4", "5"},
+                    "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
+                }
+                permitidos = mapa.get(rest.periodo, {"1", "2", "3", "4", "5", "6", "7"})
+                lanc_base = [l for l in lanc_base if l.data and _dow(l.data) in permitidos]
+
+        lancamentos = lanc_base
+        total_producoes = float(sum((l.valor or 0.0) for l in lancamentos))
+        total_inss = round(total_producoes * INSS_ALIQ, 2)
+
+        # Coop institucional (apenas no resumo)
+        rq = ReceitaCooperativa.query
+        dq = DespesaCooperativa.query
+        if data_inicio:
+            rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
+            dq = dq.filter(DespesaCooperativa.data >= data_inicio)
+        if data_fim:
+            rq = rq.filter(ReceitaCooperativa.data <= data_fim)
+            dq = dq.filter(DespesaCooperativa.data <= data_fim)
+
+        receitas_coop = rq.order_by(ReceitaCooperativa.data.desc(), ReceitaCooperativa.id.desc()).all()
+        despesas_coop = dq.order_by(DespesaCooperativa.data.desc(), DespesaCooperativa.id.desc()).all()
+
+        total_receitas_coop = float(sum((r.valor or 0.0) for r in receitas_coop))
+        total_despesas_coop = float(sum((d.valor or 0.0) for d in despesas_coop))
+
+        # Restaurante (receitas/despesas internas) só se suas models existirem
+        try:
+            rqq = ReceitaRestaurante.query
+            dqq = DespesaRestaurante.query
+            if restaurante_id:
+                rqq = rqq.filter(ReceitaRestaurante.restaurante_id == restaurante_id)
+                dqq = dqq.filter(DespesaRestaurante.restaurante_id == restaurante_id)
+            if data_inicio:
+                rqq = rqq.filter(ReceitaRestaurante.data >= data_inicio)
+                dqq = dqq.filter(DespesaRestaurante.data >= data_inicio)
+            if data_fim:
+                rqq = rqq.filter(ReceitaRestaurante.data <= data_fim)
+                dqq = dqq.filter(DespesaRestaurante.data <= data_fim)
+
+            receitas = rqq.order_by(ReceitaRestaurante.data.desc(), ReceitaRestaurante.id.desc()).all()
+            despesas = dqq.order_by(DespesaRestaurante.data.desc(), DespesaRestaurante.id.desc()).all()
+            total_receitas = float(sum((r.valor or 0.0) for r in receitas))
+            total_despesas = float(sum((d.valor or 0.0) for d in despesas))
+        except Exception:
+            pass
+
+    # -------------------------------
+    # ABA: ESCALAS (docs, placa, etc.)
+    # -------------------------------
+    elif active_tab == "escalas":
+        docinfo_map = {c.id: _build_docinfo(c) for c in cooperados}
+        status_doc_por_coop = {
+            c.id: {
+                "cnh_ok": docinfo_map[c.id]["cnh"]["ok"],
+                "placa_ok": docinfo_map[c.id]["placa"]["ok"],
             }
-            permitidos = mapa.get(rest.periodo, {"1", "2", "3", "4", "5", "6", "7"})
-            lancamentos = [l for l in lancamentos if l.data and _dow(l.data) in permitidos]
+            for c in cooperados
+        }
 
-    total_producoes = sum((l.valor or 0.0) for l in lancamentos)
-    total_inss = round(total_producoes * INSS_ALIQ, 2)
-    total_sest = round(total_producoes * SEST_ALIQ, 2)
-    total_encargos = round(total_inss + total_sest, 2)
+        escalas_all = Escala.query.order_by(Escala.id.asc()).all()
+        for e in escalas_all:
+            if getattr(e, "cooperado_id", None):
+                esc_by_int[int(e.cooperado_id)].append(e)
+                esc_by_str[str(e.cooperado_id)].append({
+                    "id": e.id,
+                    "dia": getattr(e, "dia", None),
+                    "turno": getattr(e, "turno", None),
+                    "inicio": getattr(e, "inicio", None),
+                    "fim": getattr(e, "fim", None),
+                    "cor": getattr(e, "cor", None),
+                })
 
-    # ---- Coop (institucional)
-    rq = ReceitaCooperativa.query
-    dq = DespesaCooperativa.query
-    if data_inicio:
-        rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
-        dq = dq.filter(DespesaCooperativa.data >= data_inicio)
-    if data_fim:
-        rq = rq.filter(ReceitaCooperativa.data <= data_fim)
-        dq = dq.filter(DespesaCooperativa.data <= data_fim)
+        qtd_escalas_map = {cid: len(lst) for cid, lst in esc_by_int.items()}
+        qtd_sem_cadastro = 0
 
-    receitas = rq.order_by(ReceitaCooperativa.data.desc().nullslast(), ReceitaCooperativa.id.desc()).all()
-    despesas = dq.order_by(DespesaCooperativa.data.desc(), DespesaCooperativa.id.desc()).all()
-    total_receitas = sum((r.valor_total or 0.0) for r in receitas)
-    total_despesas = sum((d.valor or 0.0) for d in despesas)
+    # Outras abas continuam funcionando com o que o template já renderiza (dados carregados nas rotas próprias)
 
-    # ---- Cooperados (pessoa física)
-    rq2 = ReceitaCooperado.query
-    dq2 = DespesaCooperado.query
-
-    # Receitas (pontuais): filtra por data simples
-    if data_inicio:
-        rq2 = rq2.filter(ReceitaCooperado.data >= data_inicio)
-    if data_fim:
-        rq2 = rq2.filter(ReceitaCooperado.data <= data_fim)
-
-    # Despesas (semanais): usa sobreposição do intervalo [data_inicio, data_fim]
-    if data_inicio and data_fim:
-        dq2 = dq2.filter(
-            DespesaCooperado.data_inicio <= data_fim,
-            DespesaCooperado.data_fim >= data_inicio,
-        )
+    return render_template(
+        "admin_dashboard.html",
+        tab=active_tab,
+        total_producoes=total_producoes,
+        total_inss=total_inss,
+        total_receitas=total_receitas,
+        total_despesas=total_despesas,
+        total_receitas_coop=total_receitas_coop,
+        total_despesas_coop=total_despesas_coop,
+        salario_minimo=cfg.salario_minimo or 0.0,
+        lancamentos=lancamentos,
+        receitas=receitas,
+        despesas=despesas,
+        receitas_coop=receitas_coop,
+        despesas_coop=despesas_coop,
+        cooperados=cooperados,
+        restaurantes=restaurantes,
+        beneficios_view=beneficios_view,
+        historico_beneficios=historico_beneficios,
+        current_date=current_date,
+        data_limite=data_limite,
+        admin=admin_user,
+        docinfo_map=docinfo_map,
+        escalas_por_coop=esc_by_int,
+        escalas_por_coop_json=esc_by_str,
+        qtd_escalas_map=qtd_escalas_map,
+        qtd_escalas_sem_cadastro=qtd_sem_cadastro,
+        status_doc_por_coop=status_doc_por_coop,
+        chart_data_lancamentos_coop=chart_data_lancamentos_coop,
+        chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
+        folha_inicio=folha_inicio,
+        folha_fim=folha_fim,
+        folha_por_coop=folha_por_coop,
+        trocas_pendentes=trocas_pendentes,
+        trocas_historico=trocas_historico,
+        trocas_historico_flat=trocas_historico_flat,
+    )
     elif data_inicio:
         dq2 = dq2.filter(DespesaCooperado.data_fim >= data_inicio)
     elif data_fim:
@@ -3158,7 +3329,7 @@ def admin_add_lancamento():
     db.session.add(l)
     db.session.commit()
     flash("Lançamento inserido.", "success")
-    return redirect(url_for("admin_dashboard", tab="lancamentos"))
+    return redirect(request.referrer or url_for("admin_dashboard", tab="lancamentos"))
 
 @app.route("/admin/lancamentos/<int:id>/edit", methods=["POST"])
 @admin_required
@@ -3175,7 +3346,7 @@ def admin_edit_lancamento(id):
     l.qtd_entregas = f.get("qtd_entregas", type=int)
     db.session.commit()
     flash("Lançamento atualizado.", "success")
-    return redirect(url_for("admin_dashboard", tab="lancamentos"))
+    return redirect(request.referrer or url_for("admin_dashboard", tab="lancamentos"))
 
 @app.route("/admin/lancamentos/<int:id>/delete")
 @admin_required
@@ -3189,7 +3360,7 @@ def admin_delete_lancamento(id):
     db.session.delete(l)
     db.session.commit()
     flash("Lançamento excluído.", "success")
-    return redirect(url_for("admin_dashboard", tab="lancamentos"))
+    return redirect(request.referrer or url_for("admin_dashboard", tab="lancamentos"))
 
 @app.route("/admin/avaliacoes", methods=["GET"])
 @admin_required
@@ -6540,6 +6711,17 @@ def init_db_command():
 # =========================
 # Main
 # =========================
+
+
+# =========================
+# API Restaurante - Avisos (fallback para não gerar 404)
+# =========================
+@app.route("/api/rest/avisos/unread_count", methods=["GET"])
+def api_rest_avisos_unread_count():
+    # Alguns templates fazem polling desse endpoint; se você não usa avisos ainda,
+    # devolvemos 0 para evitar erro/ruído em log.
+    return jsonify(count=0)
+
 if __name__ == "__main__":
     with app.app_context():
         init_db()
