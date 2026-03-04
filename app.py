@@ -2208,8 +2208,33 @@ def admin_dashboard():
         return None
 
     # --- Datas unificadas para o RESUMO (prioriza resumo_inicio/fim)
-    data_inicio = _pick_date("resumo_inicio", "data_inicio")
-    data_fim = _pick_date("resumo_fim", "data_fim")
+    raw_data_inicio = _pick_date("resumo_inicio", "data_inicio")
+    raw_data_fim = _pick_date("resumo_fim", "data_fim")
+
+    # Se o admin NÃO estiver na aba "resumo" e NÃO tiver filtro explícito de datas,
+    # aplicamos janela padrão da SEMANA ATUAL (segunda->domingo) para deixar tudo rápido.
+    # Na aba "resumo", sem filtro => mostra tudo (histórico completo).
+    data_inicio = raw_data_inicio
+    data_fim = raw_data_fim
+
+    has_date_filter = bool(raw_data_inicio or raw_data_fim)
+    if (active_tab != "resumo") and (not has_date_filter):
+        hoje = date.today()
+        # segunda = 0 ... domingo = 6
+        di_auto = hoje - timedelta(days=hoje.weekday())
+        df_auto = di_auto + timedelta(days=6)
+        data_inicio, data_fim = di_auto, df_auto
+
+    # "Filtro aplicado" para o JS do resumo (se tiver qualquer filtro relevante)
+    resumo_filtro_aplicado = bool(
+        has_date_filter
+        or args.get("resumo_restaurante_id")
+        or args.get("resumo_cooperado_id")
+        or args.get("restaurante_id")
+        or args.get("cooperado_id")
+        or dows
+        or considerar_periodo
+    )
 
     restaurante_id = args.get("restaurante_id", type=int)
     cooperado_id = args.get("cooperado_id", type=int)
@@ -2287,20 +2312,48 @@ def admin_dashboard():
     elif data_fim:
         dq2 = dq2.filter(DespesaCooperado.data_inicio <= data_fim)
 
-    receitas_coop = rq2.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
-    despesas_coop = dq2.order_by(DespesaCooperado.data_fim.desc().nullslast(), DespesaCooperado.id.desc()).all()
+    receitas_coop_all = rq2.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
+    despesas_coop_all = dq2.order_by(DespesaCooperado.data_fim.desc().nullslast(), DespesaCooperado.id.desc()).all()
 
-    total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
+    # Na aba RESUMO precisamos do histórico completo; nas demais abas, esconde cooperado desativado
+    if active_tab == "resumo":
+        receitas_coop = receitas_coop_all
+        despesas_coop = despesas_coop_all
+    else:
+        receitas_coop = [r for r in receitas_coop_all if coop_ativo_por_id.get(r.cooperado_id, True)]
+        despesas_coop = [d for d in despesas_coop_all if coop_ativo_por_id.get(d.cooperado_id, True)]
+
+    # Totais SEMPRE consideram TODOS (ativos + desativados), para não "sumir" produção histórica
+    total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop_all)
 
     # Despesas normais (eh_adiantamento = False ou None)
-    total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop if not d.eh_adiantamento)
+    total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop_all if not d.eh_adiantamento)
 
     # Adiantamentos (eh_adiantamento = True)
-    total_adiantamentos_coop = sum((d.valor or 0.0) for d in despesas_coop if d.eh_adiantamento)
+    total_adiantamentos_coop = sum((d.valor or 0.0) for d in despesas_coop_all if d.eh_adiantamento)
 
     cfg = get_config()
-    cooperados = Cooperado.query.order_by(Cooperado.nome).all()
+
+    cooperados_all = Cooperado.query.order_by(Cooperado.nome).all()
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
+
+    def _coop_is_ativo(c: Cooperado) -> bool:
+        # O "ativo" está no Usuario (c.usuario_ref.ativo). Se não existir por algum motivo,
+        # assume ativo para não quebrar telas antigas.
+        try:
+            return bool(getattr(getattr(c, "usuario_ref", None), "ativo", True))
+        except Exception:
+            return True
+
+    cooperados_ativos = [c for c in cooperados_all if _coop_is_ativo(c)]
+    cooperados_inativos_ids = {c.id for c in cooperados_all if not _coop_is_ativo(c)}
+
+    # Mantém "cooperados" como TODOS (para aba Cooperados e reativação), mas passa também a lista de ATIVOS
+    cooperados = cooperados_all
+
+    # Mapas rápidos (evita n consultas)
+    coop_nome_por_id = {c.id: c.nome for c in cooperados_all}
+    coop_ativo_por_id = {c.id: _coop_is_ativo(c) for c in cooperados_all}
 
     # documentos OK?
     docinfo_map = {c.id: _build_docinfo(c) for c in cooperados}
@@ -2317,6 +2370,10 @@ def admin_dashboard():
     esc_by_int: dict[int, list] = defaultdict(list)
     esc_by_str: dict[str, list] = defaultdict(list)
     for e in escalas_all:
+        # Se o cooperado foi desativado, não aparece na ABA ESCALAS (mas continua existindo no histórico/BD)
+        if (e.cooperado_id is not None) and (e.cooperado_id in cooperados_inativos_ids):
+            continue
+
         k_int = e.cooperado_id if e.cooperado_id is not None else 0  # 0 = sem cadastro
         esc_item = {
             "data": e.data,
@@ -2334,7 +2391,8 @@ def admin_dashboard():
         .group_by(Escala.cooperado_id)
         .all()
     )
-    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
+    # Contagem de escalas: só ATIVOS aparecem na aba de escalas (inativos ficam 0 para não confundir)
+    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados_ativos}
     qtd_sem_cadastro = int(cont_rows.get(None, 0))
 
     # ---- Gráficos (por mês)
@@ -2495,6 +2553,10 @@ def admin_dashboard():
                     rid = None
 
             if coop_filter and (rid is not None) and (rid != coop_filter):
+                continue
+
+            # Se o cooperado foi desativado, não mostra na ABA BENEFÍCIOS (histórico permanece no banco)
+            if (rid is not None) and (not coop_ativo_por_id.get(rid, True)) and (active_tab != "resumo"):
                 continue
 
             recs.append({"id": rid, "nome": nome})
@@ -2668,7 +2730,9 @@ def admin_dashboard():
         receitas_coop=receitas_coop,
         despesas_coop=despesas_coop,
         cooperados=cooperados,
+        cooperados_ativos=cooperados_ativos,
         restaurantes=restaurantes,
+        resumo_filtro_aplicado=resumo_filtro_aplicado,
         beneficios_view=beneficios_view,
         historico_beneficios=historico_beneficios,
         current_date=current_date,
@@ -5566,7 +5630,8 @@ def portal_restaurante():
     else:
         periodo_desc = periodo_desc or "personalizado"
 
-    cooperados = Cooperado.query.order_by(Cooperado.nome).all()
+    cooperados_all = Cooperado.query.order_by(Cooperado.nome).all()
+    cooperados = [c for c in cooperados_all if bool(getattr(getattr(c, "usuario_ref", None), "ativo", True))]
 
     total_bruto = 0.0
     total_qtd = 0
