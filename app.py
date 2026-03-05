@@ -4851,6 +4851,9 @@ def editar_documentos(coop_id):
 @app.route("/portal/cooperado")
 @role_required("cooperado")
 def portal_cooperado():
+
+    from sqlalchemy import func
+
     u_id = session.get("user_id")
     coop = Cooperado.query.filter_by(usuario_id=u_id).first()
     if not coop:
@@ -4865,7 +4868,6 @@ def portal_cooperado():
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
 
-    # padrão: mostrar SOMENTE a data do lançamento (hoje)
     if di and not df:
         df = di
     if df and not di:
@@ -4876,59 +4878,56 @@ def portal_cooperado():
     def in_range(qs, col):
         return qs.filter(col >= di, col <= df)
 
-  # =========================
-# Produções (Lançamentos)
-# =========================
-ql = in_range(
-    Lancamento.query.filter_by(cooperado_id=coop.id),
-    Lancamento.data
-)
-
-producoes = ql.order_by(
-    Lancamento.data.desc(),
-    Lancamento.id.desc()
-).all()
-
-# 🔵 TOTAL HISTÓRICO DE ENTREGAS (SEM FILTRO DE DATA)
-total_entregas = (
-    db.session.query(func.count(Lancamento.id))
-    .filter(Lancamento.cooperado_id == coop.id)
-    .scalar()
-)
-
-# --- Marca se o cooperado já avaliou cada produção ---
-ids = [l.id for l in producoes]
-minhas = {}
-
-if ids:
-    rows = (
-        db.session.query(
-            AvaliacaoRestaurante.lancamento_id,
-            AvaliacaoRestaurante.estrelas_geral
-        )
-        .filter(
-            AvaliacaoRestaurante.lancamento_id.in_(ids),
-            AvaliacaoRestaurante.cooperado_id == coop.id
-        )
-        .all()
+    # =========================
+    # Produções (Lançamentos)
+    # =========================
+    ql = in_range(
+        Lancamento.query.filter_by(cooperado_id=coop.id),
+        Lancamento.data
     )
-    minhas = {lid: nota for lid, nota in rows}
 
-for l in producoes:
-    l.minha_avaliacao = minhas.get(l.id)
+    producoes = ql.order_by(
+        Lancamento.data.desc(),
+        Lancamento.id.desc()
+    ).all()
 
-# =========================
+    # 🔵 TOTAL HISTÓRICO DE ENTREGAS (SEM FILTRO DE DATA)
+    total_entregas = (
+        db.session.query(func.count(Lancamento.id))
+        .filter(Lancamento.cooperado_id == coop.id)
+        .scalar()
+    ) or 0
+
+    # --- Marca se o cooperado já avaliou cada produção ---
+    ids = [l.id for l in producoes]
+    minhas = {}
+
+    if ids:
+        rows = (
+            db.session.query(
+                AvaliacaoRestaurante.lancamento_id,
+                AvaliacaoRestaurante.estrelas_geral
+            )
+            .filter(
+                AvaliacaoRestaurante.lancamento_id.in_(ids),
+                AvaliacaoRestaurante.cooperado_id == coop.id
+            )
+            .all()
+        )
+        minhas = {lid: nota for lid, nota in rows}
+
+    for l in producoes:
+        l.minha_avaliacao = minhas.get(l.id)
+
+    # =========================
     # 💎 NOTA VIDA (MÉDIA HISTÓRICA REAL)
     # =========================
-    from sqlalchemy import func
-
     nota_vida = (
         db.session.query(func.avg(AvaliacaoCooperado.media_ponderada))
         .filter(AvaliacaoCooperado.cooperado_id == coop.id)
         .scalar()
     )
 
-    # Se nunca foi avaliado → começa com 5.00
     if nota_vida is None:
         nota_vida = 5.00
     else:
@@ -4937,14 +4936,26 @@ for l in producoes:
     # =========================
     # Receitas / Despesas
     # =========================
-    qr = in_range(ReceitaCooperado.query.filter_by(cooperado_id=coop.id), ReceitaCooperado.data)
-    receitas_coop = qr.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
+    qr = in_range(
+        ReceitaCooperado.query.filter_by(cooperado_id=coop.id),
+        ReceitaCooperado.data
+    )
+    receitas_coop = qr.order_by(
+        ReceitaCooperado.data.desc(),
+        ReceitaCooperado.id.desc()
+    ).all()
 
-    qd = in_range(DespesaCooperado.query.filter_by(cooperado_id=coop.id), DespesaCooperado.data)
-    despesas_coop = qd.order_by(DespesaCooperado.data.desc(), DespesaCooperado.id.desc()).all()
+    qd = in_range(
+        DespesaCooperado.query.filter_by(cooperado_id=coop.id),
+        DespesaCooperado.data
+    )
+    despesas_coop = qd.order_by(
+        DespesaCooperado.data.desc(),
+        DespesaCooperado.id.desc()
+    ).all()
 
     # =========================
-    # Totais (INSS 4% + SEST 0,5% = 4,5% só sobre produções)
+    # Totais
     # =========================
     total_bruto = (
         sum((l.valor or 0.0) for l in producoes)
@@ -4953,10 +4964,24 @@ for l in producoes:
 
     inss_valor = sum((l.valor or 0.0) * 0.04 for l in producoes)
     sest_valor = sum((l.valor or 0.0) * 0.005 for l in producoes)
-    encargos_valor = inss_valor + sest_valor  # 4,5% no total
 
     total_descontos = sum((d.valor or 0.0) for d in despesas_coop)
-    total_liquido = total_bruto - encargos_valor - total_descontos
+    total_liquido = total_bruto - (inss_valor + sest_valor) - total_descontos
+
+    return render_template(
+        "painel_cooperado.html",
+        cooperado=coop,
+        producoes=producoes,
+        receitas_coop=receitas_coop,
+        despesas_coop=despesas_coop,
+        total_bruto=total_bruto,
+        inss_valor=inss_valor,
+        sest_senat_valor=sest_valor,
+        total_descontos=total_descontos,
+        total_liquido=total_liquido,
+        nota_vida=nota_vida,
+        total_entregas=total_entregas
+    )
 
     # =========================
     # Config / Complemento
