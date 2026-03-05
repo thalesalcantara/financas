@@ -242,7 +242,7 @@
       <div class="nav-actions d-flex align-items-center gap-2 flex-shrink-0">
         <span class="pill" title="{{ _score_title }}">
           <i class="bi bi-star-fill" aria-hidden="true"></i>
-          <span class="mono">{{ "%.2f"|format(nota_vida).replace(".",",") }}</span>
+          <span class="mono">{{ "%.2f"|format(nota_vida)|replace(".",",") }}</span>
         </span>
         <span class="pill" title="Entregas no período">
           <i class="bi bi-bag-check-fill" aria-hidden="true"></i>
