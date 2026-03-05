@@ -3211,6 +3211,7 @@ def admin_delete_lancamento(id):
 @app.route("/admin/avaliacoes", methods=["GET"])
 @admin_required
 def admin_avaliacoes():
+
     # tipo=cooperado (padrão): Restaurante avalia Cooperado
     # tipo=restaurante: Cooperado avalia Restaurante
     tipo_raw = (request.args.get("tipo") or "cooperado").strip().lower()
@@ -3218,17 +3219,18 @@ def admin_avaliacoes():
 
     restaurante_id = request.args.get("restaurante_id", type=int)
     cooperado_id   = request.args.get("cooperado_id", type=int)
-    data_inicio    = (request.args.get("data_inicio") or "").strip()
-    data_fim       = (request.args.get("data_fim") or "").strip()
 
-    # Datas (aceita YYYY-MM-DD ou DD/MM/YYYY)
+    data_inicio = (request.args.get("data_inicio") or "").strip()
+    data_fim    = (request.args.get("data_fim") or "").strip()
+
+    # Datas
     di = _parse_date(data_inicio)
     df = _parse_date(data_fim)
 
-    # Model por tipo
-    Model = AvaliacaoRestaurante if (tipo == "restaurante") else AvaliacaoCooperado
+    # Model
+    Model = AvaliacaoRestaurante if tipo == "restaurante" else AvaliacaoCooperado
 
-    # Helper: checa se coluna existe (migrações)
+    # Helper coluna (evita erro de migração)
     def col(*names):
         for n in names:
             if hasattr(Model, n):
@@ -3237,17 +3239,19 @@ def admin_avaliacoes():
 
     f_geral = col("estrelas_geral")
 
-    if tipo == "restaurante":  # Cooperado -> Restaurante
+    if tipo == "restaurante":
         f_trat = col("estrelas_tratamento", "estrelas_pontualidade")
-        f_amb  = col("estrelas_ambiente",   "estrelas_educacao")
-        f_sup  = col("estrelas_suporte",    "estrelas_eficiencia")
-    else:                       # Restaurante -> Cooperado
+        f_amb  = col("estrelas_ambiente", "estrelas_educacao")
+        f_sup  = col("estrelas_suporte", "estrelas_eficiencia")
+    else:
         f_pont  = col("estrelas_pontualidade")
         f_educ  = col("estrelas_educacao")
         f_efic  = col("estrelas_eficiencia")
         f_apres = col("estrelas_apresentacao")
 
-    # Query base
+    # ==============================
+    # QUERY BASE
+    # ==============================
     base = (
         db.session.query(
             Model,
@@ -3257,10 +3261,12 @@ def admin_avaliacoes():
             Cooperado.nome.label("coop_nome"),
         )
         .join(Restaurante, Model.restaurante_id == Restaurante.id)
-        .join(Cooperado,   Model.cooperado_id   == Cooperado.id)
+        .join(Cooperado, Model.cooperado_id == Cooperado.id)
     )
 
-    # Filtros
+    # ==============================
+    # FILTROS
+    # ==============================
     filtros = []
 
     if restaurante_id:
@@ -3278,20 +3284,46 @@ def admin_avaliacoes():
     if filtros:
         base = base.filter(and_(*filtros))
 
+    # ==============================
+    # PAGINAÇÃO
+    # ==============================
+    page = request.args.get("page", type=int) or 1
+    per_page = request.args.get("per_page", type=int) or 50
 
-    # RESULTADO FINAL (SEM LIMITAÇÃO)
-    rows = base.order_by(Model.criado_em.desc()).all()
+    if per_page > 200:
+        per_page = 200
 
-    # Total
+    offset = (page - 1) * per_page
+
+    rows = (
+        base.order_by(Model.criado_em.desc())
+        .limit(per_page)
+        .offset(offset)
+        .all()
+    )
+
+    # ==============================
+    # TOTAL
+    # ==============================
     cnt_q = db.session.query(func.count(Model.id))
+
     if filtros:
         cnt_q = cnt_q.filter(and_(*filtros))
+
     total = int(cnt_q.scalar() or 0)
+
     pages = max(1, (total + per_page - 1) // per_page)
 
+    # ==============================
+    # PAGER
+    # ==============================
     pager = SimpleNamespace(
-        page=page, per_page=per_page, total=total, pages=pages,
-        has_prev=(page > 1), has_next=(page < pages)
+        page=page,
+        per_page=per_page,
+        total=total,
+        pages=pages,
+        has_prev=(page > 1),
+        has_next=(page < pages)
     )
 
     # Achata para o template
