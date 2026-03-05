@@ -5091,19 +5091,24 @@ def portal_cooperado():
     total_liquido = total_bruto - encargos_valor - total_descontos
 
 
-    # =====================================================
+       # =====================================================
     # MÉTRICAS DA VIDA (NÃO DEPENDE DO FILTRO DE DATA)
     # =====================================================
 
-    total_entregas_vida = db.session.query(func.count(Lancamento.id))\
-        .filter(Lancamento.cooperado_id == coop.id)\
-        .scalar() or 0
-
-    nota_vida = db.session.query(func.avg(AvaliacaoRestaurante.estrelas_geral))\
-        .filter(AvaliacaoRestaurante.cooperado_id == coop.id)\
+    total_entregas_vida = (
+        db.session.query(func.count(Lancamento.id))
+        .filter(Lancamento.cooperado_id == coop.id)
         .scalar()
+        or 0
+    )
 
-    nota_vida = float(nota_vida or 5.0)
+    nota_vida = (
+        db.session.query(func.avg(AvaliacaoCooperado.estrelas_geral))
+        .filter(AvaliacaoCooperado.cooperado_id == coop.id)
+        .scalar()
+    )
+
+    nota_vida = float(nota_vida or 0)
 
 
     # =========================
