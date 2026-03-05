@@ -5028,7 +5028,6 @@ def portal_cooperado():
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
 
-    # padrão: mostrar SOMENTE a data do lançamento (hoje)
     if di and not df:
         df = di
     if df and not di:
@@ -5045,9 +5044,9 @@ def portal_cooperado():
     ql = in_range(Lancamento.query.filter_by(cooperado_id=coop.id), Lancamento.data)
     producoes = ql.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
 
-    # --- Marca se o cooperado já avaliou cada produção ---
     ids = [l.id for l in producoes]
     minhas = {}
+
     if ids:
         rows = (
             db.session.query(
@@ -5075,7 +5074,7 @@ def portal_cooperado():
     despesas_coop = qd.order_by(DespesaCooperado.data.desc(), DespesaCooperado.id.desc()).all()
 
     # =========================
-    # Totais (INSS 4% + SEST 0,5% = 4,5% só sobre produções)
+    # Totais
     # =========================
     total_bruto = (
         sum((l.valor or 0.0) for l in producoes)
@@ -5084,16 +5083,36 @@ def portal_cooperado():
 
     inss_valor = sum((l.valor or 0.0) * 0.04 for l in producoes)
     sest_valor = sum((l.valor or 0.0) * 0.005 for l in producoes)
-    encargos_valor = inss_valor + sest_valor  # 4,5% no total
+
+    encargos_valor = inss_valor + sest_valor
 
     total_descontos = sum((d.valor or 0.0) for d in despesas_coop)
+
     total_liquido = total_bruto - encargos_valor - total_descontos
 
+
+    # =====================================================
+    # MÉTRICAS DA VIDA (NÃO DEPENDE DO FILTRO DE DATA)
+    # =====================================================
+
+    total_entregas_vida = db.session.query(func.count(Lancamento.id))\
+        .filter(Lancamento.cooperado_id == coop.id)\
+        .scalar() or 0
+
+    nota_vida = db.session.query(func.avg(AvaliacaoRestaurante.estrelas_geral))\
+        .filter(AvaliacaoRestaurante.cooperado_id == coop.id)\
+        .scalar()
+
+    nota_vida = float(nota_vida or 5.0)
+
+
     # =========================
-    # Config / Complemento
+    # Config
     # =========================
     cfg = get_config()
+
     salario_minimo = cfg.salario_minimo or 0.0
+
     inss_complemento = salario_minimo * 0.20
 
     today = date.today()
@@ -5110,12 +5129,37 @@ def portal_cooperado():
         "ok": (coop.cnh_validade is not None and coop.cnh_validade >= today),
         "dias_para_prazo": dias_para_3112(),
     }
+
     doc_placa = {
         "numero": coop.placa,
         "vencimento": coop.placa_validade,
         "ok": (coop.placa_validade is not None and coop.placa_validade >= today),
         "dias_para_prazo": dias_para_3112(),
     }
+
+
+    # return TEM que ficar aqui
+    return render_template(
+        "painel_cooperado.html",
+        cooperado=coop,
+        producoes=producoes,
+        receitas_coop=receitas_coop,
+        despesas_coop=despesas_coop,
+        total_bruto=total_bruto,
+        inss_valor=inss_valor,
+        sest_senat_valor=sest_valor,
+        total_descontos=total_descontos,
+        total_liquido=total_liquido,
+        inss_complemento=inss_complemento,
+        salario_minimo=salario_minimo,
+        current_year=today.year,
+        doc_cnh=doc_cnh,
+        doc_placa=doc_placa,
+
+        # MÉTRICAS DA VIDA
+        nota_vida=nota_vida,
+        total_entregas_vida=total_entregas_vida,
+    )
 
     # ---------- ESCALA (dedupe + ordenação cronológica robusta) ----------
     raw_escala = (Escala.query
