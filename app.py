@@ -111,6 +111,21 @@ def _build_db_uri() -> str:
 
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
+
+
+# =========================
+# Compat: Restaurante Avisos (evita 404 no front)
+# =========================
+@app.get("/api/rest/avisos/unread_count")
+def api_rest_avisos_unread_count():
+    """Endpoint de compatibilidade usado pelo painel do restaurante.
+    Se você não usa módulo de avisos por restaurante, retorna 0.
+    """
+    try:
+        return jsonify(count=0)
+    except Exception:
+        return jsonify(count=0)
+
 app.secret_key = os.environ.get("SECRET_KEY", "coopex-secret")
 
 URI = _build_db_uri()
@@ -413,18 +428,6 @@ class AvaliacaoCooperado(db.Model):
     feedback_motoboy = db.Column(db.Text)
 
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
-
-def calcular_nota_vida(cooperado_id):
-    media = db.session.query(
-        func.avg(AvaliacaoCooperado.estrelas_geral)
-    ).filter(
-        AvaliacaoCooperado.cooperado_id == cooperado_id
-    ).scalar()
-
-    if media is None:
-        return 5.00
-
-    return round(float(media), 2)
 
 
 class ReceitaCooperativa(db.Model):
@@ -2206,6 +2209,8 @@ def toggle_status_cooperado(id):
 def admin_dashboard():
     args = request.args
 
+    considerar_periodo = False
+    dows = set()
     # --- Controle de abas
     active_tab = args.get("tab", "lancamentos")
 
@@ -4992,13 +4997,11 @@ def portal_cooperado():
     except Exception:
         coop.usuario = ""
 
-    # 🔵 NOTA VIDA REAL (INDEPENDENTE DE FILTRO)
-    nota_vida = calcular_nota_vida(coop.id)
-
     # ---------- FILTRO POR DATA (padrão = HOJE) ----------
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
 
+    # padrão: mostrar SOMENTE a data do lançamento (hoje)
     if di and not df:
         df = di
     if df and not di:
@@ -5015,6 +5018,7 @@ def portal_cooperado():
     ql = in_range(Lancamento.query.filter_by(cooperado_id=coop.id), Lancamento.data)
     producoes = ql.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
 
+    # --- Marca se o cooperado já avaliou cada produção ---
     ids = [l.id for l in producoes]
     minhas = {}
     if ids:
@@ -5043,6 +5047,9 @@ def portal_cooperado():
     qd = in_range(DespesaCooperado.query.filter_by(cooperado_id=coop.id), DespesaCooperado.data)
     despesas_coop = qd.order_by(DespesaCooperado.data.desc(), DespesaCooperado.id.desc()).all()
 
+    # =========================
+    # Totais (INSS 4% + SEST 0,5% = 4,5% só sobre produções)
+    # =========================
     total_bruto = (
         sum((l.valor or 0.0) for l in producoes)
         + sum((r.valor or 0.0) for r in receitas_coop)
@@ -5050,46 +5057,10 @@ def portal_cooperado():
 
     inss_valor = sum((l.valor or 0.0) * 0.04 for l in producoes)
     sest_valor = sum((l.valor or 0.0) * 0.005 for l in producoes)
-    encargos_valor = inss_valor + sest_valor
+    encargos_valor = inss_valor + sest_valor  # 4,5% no total
 
     total_descontos = sum((d.valor or 0.0) for d in despesas_coop)
     total_liquido = total_bruto - encargos_valor - total_descontos
-
-    cfg = get_config()
-    salario_minimo = cfg.salario_minimo or 0.0
-    inss_complemento = salario_minimo * 0.20
-
-    today = date.today()
-
-doc_cnh = {
-    "numero": coop.cnh_numero,
-    "vencimento": coop.cnh_validade,
-    "ok": (coop.cnh_validade is not None and coop.cnh_validade >= today),
-}
-
-doc_placa = {
-    "numero": coop.placa,
-    "vencimento": coop.placa_validade,
-    "ok": (coop.placa_validade is not None and coop.placa_validade >= today),
-}
-
-    return render_template(
-        "painel_cooperado.html",
-        cooperado=coop,
-        producoes=producoes,
-        receitas_coop=receitas_coop,
-        despesas_coop=despesas_coop,
-        total_bruto=total_bruto,
-        inss_valor=inss_valor,
-        sest_senat_valor=sest_valor,
-        total_descontos=total_descontos,
-        total_liquido=total_liquido,
-        nota_vida=nota_vida,
-        total_entregas=total_entregas,
-        doc_cnh=doc_cnh,          # 🔴 ESSA LINHA É O QUE ESTÁ FALTANDO
-        doc_placa=doc_placa,      # 🔴 ESSA TAMBÉM
-        current_year=today.year
-)
 
     # =========================
     # Config / Complemento
