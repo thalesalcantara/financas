@@ -3264,7 +3264,7 @@ def admin_avaliacoes():
         .join(Cooperado, Model.cooperado_id == Cooperado.id)
     )
 
-    # ==============================
+        # ==============================
     # FILTROS
     # ==============================
     filtros = []
@@ -3285,6 +3285,11 @@ def admin_avaliacoes():
         base = base.filter(and_(*filtros))
 
     # ==============================
+    # TOTAL (USA A MESMA QUERY FILTRADA)
+    # ==============================
+    total = base.with_entities(func.count(Model.id)).scalar() or 0
+
+    # ==============================
     # PAGINAÇÃO
     # ==============================
     page = request.args.get("page", type=int) or 1
@@ -3295,6 +3300,9 @@ def admin_avaliacoes():
 
     offset = (page - 1) * per_page
 
+    # ==============================
+    # RESULTADOS
+    # ==============================
     rows = (
         base.order_by(Model.criado_em.desc())
         .limit(per_page)
@@ -3302,21 +3310,8 @@ def admin_avaliacoes():
         .all()
     )
 
-    # ==============================
-    # TOTAL
-    # ==============================
-    cnt_q = db.session.query(func.count(Model.id))
-
-    if filtros:
-        cnt_q = cnt_q.filter(and_(*filtros))
-
-    total = int(cnt_q.scalar() or 0)
-
     pages = max(1, (total + per_page - 1) // per_page)
 
-    # ==============================
-    # PAGER
-    # ==============================
     pager = SimpleNamespace(
         page=page,
         per_page=per_page,
