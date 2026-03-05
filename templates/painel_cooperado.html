@@ -139,9 +139,8 @@
   {% endif %}
 {% endfor %}
 {% set media_minhas = (ns.sum / ns.cnt) if ns.cnt>0 else None %}
-{% set _score_header = (media_minhas if media_minhas is not none else (cooperado_score|default(5.0))) %}
-{% set _score_title  = ('Média pessoal (período filtrado)' if media_minhas is not none else 'Sua pontuação geral') %}
-
+{% set _score_header = nota_vida %}
+{% set _score_title  = 'Sua pontuação geral (vida inteira)' %}
 <!-- ===== MENU LATERAL (drawer) ===== -->
 <div id="menuLateral" aria-label="Menu lateral">
   <div class="p-3 border-bottom d-flex align-items-center gap-2">
