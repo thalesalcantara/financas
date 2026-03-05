@@ -1,21 +1,4 @@
 
-
-# =========================
-# NOTA VIDA DO COOPERADO
-# =========================
-def calcular_nota_vida(cooperado_id):
-    resultado = db.session.query(
-        func.avg(AvaliacaoCooperado.estrelas_geral)
-    ).filter(
-        AvaliacaoCooperado.cooperado_id == cooperado_id
-    ).scalar()
-
-    if resultado is None:
-        return 5.0
-
-    return round(float(resultado), 2)
-
-
 from __future__ import annotations
 
 # ============ Stdlib ============
@@ -128,6 +111,21 @@ def _build_db_uri() -> str:
 
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
+
+
+# =========================
+# Compat: Restaurante Avisos (evita 404 no front)
+# =========================
+@app.get("/api/rest/avisos/unread_count")
+def api_rest_avisos_unread_count():
+    """Endpoint de compatibilidade usado pelo painel do restaurante.
+    Se você não usa módulo de avisos por restaurante, retorna 0.
+    """
+    try:
+        return jsonify(count=0)
+    except Exception:
+        return jsonify(count=0)
+
 app.secret_key = os.environ.get("SECRET_KEY", "coopex-secret")
 
 URI = _build_db_uri()
@@ -430,6 +428,19 @@ class AvaliacaoCooperado(db.Model):
     feedback_motoboy = db.Column(db.Text)
 
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+
+def calcular_nota_vida(cooperado_id):
+    media = db.session.query(
+        func.avg(AvaliacaoCooperado.estrelas_geral)
+    ).filter(
+        AvaliacaoCooperado.cooperado_id == cooperado_id
+    ).scalar()
+
+    # Se nunca recebeu avaliação → começa com 5.00
+    if media is None:
+        return 5.00
+
+    return round(float(media), 2)
 
 
 class ReceitaCooperativa(db.Model):
@@ -2211,6 +2222,8 @@ def toggle_status_cooperado(id):
 def admin_dashboard():
     args = request.args
 
+    considerar_periodo = False
+    dows = set()
     # --- Controle de abas
     active_tab = args.get("tab", "lancamentos")
 
@@ -5250,7 +5263,8 @@ def portal_cooperado():
         })
 
     # return TEM que ficar aqui (fora do for)
-    return render_template("painel_cooperado.html", nota_vida=calcular_nota_vida(cooperado.id),,
+    return render_template(
+        "painel_cooperado.html",
         cooperado=coop,
         producoes=producoes,
         receitas_coop=receitas_coop,
@@ -5263,6 +5277,7 @@ def portal_cooperado():
         inss_complemento=inss_complemento,
         salario_minimo=salario_minimo,
         current_year=today.year,
+        nota_vida=nota_vida,
         doc_cnh=doc_cnh,
         doc_placa=doc_placa,
         minha_escala=minha_escala,
