@@ -3289,16 +3289,25 @@ def admin_avaliacoes():
     # ==============================
     total = base.with_entities(func.count(Model.id)).scalar() or 0
 
+        # ==============================
+    # RESULTADOS (SEM PAGINAÇÃO)
     # ==============================
-    # PAGINAÇÃO
-    # ==============================
-    page = request.args.get("page", type=int) or 1
-    per_page = request.args.get("per_page", type=int) or 50
+    rows = (
+        base
+        .order_by(Model.criado_em.desc())
+        .all()
+    )
 
-    if per_page > 200:
-        per_page = 200
+    total = len(rows)
 
-    offset = (page - 1) * per_page
+    pager = SimpleNamespace(
+        page=1,
+        per_page=total,
+        total=total,
+        pages=1,
+        has_prev=False,
+        has_next=False
+    )
 
     # ==============================
     # RESULTADOS
