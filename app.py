@@ -5051,6 +5051,23 @@ def portal_cooperado():
     for l in producoes:
         l.minha_avaliacao = minhas.get(l.id)
 
+# =========================
+    # 💎 NOTA VIDA (MÉDIA HISTÓRICA REAL)
+    # =========================
+    from sqlalchemy import func
+
+    nota_vida = (
+        db.session.query(func.avg(AvaliacaoCooperado.media_ponderada))
+        .filter(AvaliacaoCooperado.cooperado_id == coop.id)
+        .scalar()
+    )
+
+    # Se nunca foi avaliado → começa com 5.00
+    if nota_vida is None:
+        nota_vida = 5.00
+    else:
+        nota_vida = round(float(nota_vida), 2)
+
     # =========================
     # Receitas / Despesas
     # =========================
