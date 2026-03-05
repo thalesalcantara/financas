@@ -5110,6 +5110,14 @@ def portal_cooperado():
 
     nota_vida = float(nota_vida or 5.0)
 
+# =====================================================
+# TOTAL DE ENTREGAS DA VIDA (SEM FILTRO DE DATA)
+# =====================================================
+
+    total_entregas_vida = db.session.query(func.count(Lancamento.id))\
+        .filter(Lancamento.cooperado_id == coop.id)\
+        .scalar() or 0
+
 
     # =========================
     # Config / Complemento
