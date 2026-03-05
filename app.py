@@ -5061,7 +5061,18 @@ def portal_cooperado():
 
     today = date.today()
 
-    # 🔽 SEU RETURN ORIGINAL, SEM REMOVER NADA
+doc_cnh = {
+    "numero": coop.cnh_numero,
+    "vencimento": coop.cnh_validade,
+    "ok": (coop.cnh_validade is not None and coop.cnh_validade >= today),
+}
+
+doc_placa = {
+    "numero": coop.placa,
+    "vencimento": coop.placa_validade,
+    "ok": (coop.placa_validade is not None and coop.placa_validade >= today),
+}
+
     return render_template(
         "painel_cooperado.html",
         cooperado=coop,
@@ -5073,11 +5084,12 @@ def portal_cooperado():
         sest_senat_valor=sest_valor,
         total_descontos=total_descontos,
         total_liquido=total_liquido,
-        inss_complemento=inss_complemento,
-        salario_minimo=salario_minimo,
-        current_year=today.year,
-        nota_vida=nota_vida,  # 🔵 ADICIONADO AQUI
-    )
+        nota_vida=nota_vida,
+        total_entregas=total_entregas,
+        doc_cnh=doc_cnh,          # 🔴 ESSA LINHA É O QUE ESTÁ FALTANDO
+        doc_placa=doc_placa,      # 🔴 ESSA TAMBÉM
+        current_year=today.year
+)
 
     # =========================
     # Config / Complemento
