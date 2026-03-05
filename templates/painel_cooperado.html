@@ -139,7 +139,7 @@
   {% endif %}
 {% endfor %}
 {% set media_minhas = (ns.sum / ns.cnt) if ns.cnt>0 else None %}
-{% set _score_header = nota_vida %}
+{% set _score_header = (media_minhas if media_minhas is not none else (cooperado_score|default(5.0))) %}
 {% set _score_title  = ('Média pessoal (período filtrado)' if media_minhas is not none else 'Sua pontuação geral') %}
 
 <!-- ===== MENU LATERAL (drawer) ===== -->
