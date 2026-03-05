@@ -3262,25 +3262,25 @@ def admin_avaliacoes():
 
     # Filtros
     filtros = []
+
     if restaurante_id:
         filtros.append(Model.restaurante_id == restaurante_id)
+
     if cooperado_id:
         filtros.append(Model.cooperado_id == cooperado_id)
 
     if di:
         filtros.append(func.date(Model.criado_em) >= di)
+
     if df:
         filtros.append(func.date(Model.criado_em) <= df)
 
     if filtros:
         base = base.filter(and_(*filtros))
 
-    # Paginação
-    page = max(1, request.args.get("page", type=int) or 1)
-    per_page = min(200, max(1, request.args.get("per_page", type=int) or 50))
-    offset = (page - 1) * per_page
 
-    rows = base.order_by(Model.criado_em.desc()).limit(per_page).offset(offset).all()
+    # RESULTADO FINAL (SEM LIMITAÇÃO)
+    rows = base.order_by(Model.criado_em.desc()).all()
 
     # Total
     cnt_q = db.session.query(func.count(Model.id))
