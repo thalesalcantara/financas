@@ -309,7 +309,7 @@
 
         <div class="kpi-card">
           <div class="kpi-title">Média de avaliação</div>
-          <div class="kpi-value mono">{{ "%.2f"|format(nota_vida).replace(".",",") }}</div>
+          <div class="kpi-value mono">{{ "%.2f"|format(nota_vida)|replace(".",",") }}</div>
           <div class="kpi-sub">{{ _score_title }}</div>
         </div>
 
