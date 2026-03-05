@@ -5108,16 +5108,14 @@ def portal_cooperado():
         .scalar()
     )
 
-    nota_vida = float(nota_vida or 0)
+    nota_vida = float(nota_vida or 5.0)
 
 
     # =========================
-    # Config
+    # Config / Complemento
     # =========================
     cfg = get_config()
-
     salario_minimo = cfg.salario_minimo or 0.0
-
     inss_complemento = salario_minimo * 0.20
 
     today = date.today()
@@ -5134,37 +5132,12 @@ def portal_cooperado():
         "ok": (coop.cnh_validade is not None and coop.cnh_validade >= today),
         "dias_para_prazo": dias_para_3112(),
     }
-
     doc_placa = {
         "numero": coop.placa,
         "vencimento": coop.placa_validade,
         "ok": (coop.placa_validade is not None and coop.placa_validade >= today),
         "dias_para_prazo": dias_para_3112(),
     }
-
-
-    # return TEM que ficar aqui
-    return render_template(
-        "painel_cooperado.html",
-        cooperado=coop,
-        producoes=producoes,
-        receitas_coop=receitas_coop,
-        despesas_coop=despesas_coop,
-        total_bruto=total_bruto,
-        inss_valor=inss_valor,
-        sest_senat_valor=sest_valor,
-        total_descontos=total_descontos,
-        total_liquido=total_liquido,
-        inss_complemento=inss_complemento,
-        salario_minimo=salario_minimo,
-        current_year=today.year,
-        doc_cnh=doc_cnh,
-        doc_placa=doc_placa,
-
-        # MÉTRICAS DA VIDA
-        nota_vida=nota_vida,
-        total_entregas_vida=total_entregas_vida,
-    )
 
     # ---------- ESCALA (dedupe + ordenação cronológica robusta) ----------
     raw_escala = (Escala.query
@@ -5325,6 +5298,7 @@ def portal_cooperado():
             "linhas_afetadas": linhas_afetadas,
         })
 
+
     # return TEM que ficar aqui (fora do for)
     return render_template(
         "painel_cooperado.html",
@@ -5334,7 +5308,7 @@ def portal_cooperado():
         despesas_coop=despesas_coop,
         total_bruto=total_bruto,
         inss_valor=inss_valor,
-        sest_senat_valor=sest_valor,  # <-- ADICIONE ISSO
+        sest_senat_valor=sest_valor,
         total_descontos=total_descontos,
         total_liquido=total_liquido,
         inss_complemento=inss_complemento,
@@ -5348,6 +5322,10 @@ def portal_cooperado():
         trocas_recebidas_pendentes=trocas_recebidas_pendentes,
         trocas_recebidas_historico=trocas_recebidas_historico,
         trocas_enviadas=trocas_enviadas,
+        
+        # MÉTRICAS DA VIDA
+        nota_vida=nota_vida,
+        total_entregas_vida=total_entregas_vida,
     )
 
 # === AVALIAR RESTAURANTE (cooperado -> restaurante)
