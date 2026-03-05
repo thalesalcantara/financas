@@ -3224,8 +3224,7 @@ def admin_delete_lancamento(id):
 @app.route("/admin/avaliacoes", methods=["GET"])
 @admin_required
 def admin_avaliacoes():
-    # tipo=cooperado (padrão): Restaurante avalia Cooperado
-    # tipo=restaurante: Cooperado avalia Restaurante
+
     tipo_raw = (request.args.get("tipo") or "cooperado").strip().lower()
     tipo = "restaurante" if tipo_raw == "restaurante" else "cooperado"
 
@@ -3234,255 +3233,107 @@ def admin_avaliacoes():
     data_inicio    = (request.args.get("data_inicio") or "").strip()
     data_fim       = (request.args.get("data_fim") or "").strip()
 
-    # Datas (aceita YYYY-MM-DD ou DD/MM/YYYY)
     di = _parse_date(data_inicio)
     df = _parse_date(data_fim)
 
-    # Model por tipo
-    Model = AvaliacaoRestaurante if (tipo == "restaurante") else AvaliacaoCooperado
+    Model = AvaliacaoRestaurante if tipo == "restaurante" else AvaliacaoCooperado
 
-    # Helper: checa se coluna existe (migrações)
-    def col(*names):
-        for n in names:
-            if hasattr(Model, n):
-                return getattr(Model, n)
-        return None
-
-    f_geral = col("estrelas_geral")
-
-    if tipo == "restaurante":  # Cooperado -> Restaurante
-        f_trat = col("estrelas_tratamento", "estrelas_pontualidade")
-        f_amb  = col("estrelas_ambiente",   "estrelas_educacao")
-        f_sup  = col("estrelas_suporte",    "estrelas_eficiencia")
-    else:                       # Restaurante -> Cooperado
-        f_pont  = col("estrelas_pontualidade")
-        f_educ  = col("estrelas_educacao")
-        f_efic  = col("estrelas_eficiencia")
-        f_apres = col("estrelas_apresentacao")
-
-    # Query base
-    base = (
-        db.session.query(
-            Model,
-            Restaurante.id.label("rest_id"),
-            Restaurante.nome.label("rest_nome"),
-            Cooperado.id.label("coop_id"),
-            Cooperado.nome.label("coop_nome"),
-        )
+    # =========================
+    # QUERY BASE ÚNICA
+    # =========================
+    query_base = (
+        db.session.query(Model)
         .join(Restaurante, Model.restaurante_id == Restaurante.id)
         .join(Cooperado,   Model.cooperado_id   == Cooperado.id)
     )
 
-    # Filtros
-    filtros = []
     if restaurante_id:
-        filtros.append(Model.restaurante_id == restaurante_id)
+        query_base = query_base.filter(Model.restaurante_id == restaurante_id)
+
     if cooperado_id:
-        filtros.append(Model.cooperado_id == cooperado_id)
+        query_base = query_base.filter(Model.cooperado_id == cooperado_id)
 
     if di:
-        filtros.append(func.date(Model.criado_em) >= di)
+        query_base = query_base.filter(Model.criado_em >= di)
+
     if df:
-        filtros.append(func.date(Model.criado_em) <= df)
+        df = df.replace(hour=23, minute=59, second=59)
+        query_base = query_base.filter(Model.criado_em <= df)
 
-    if filtros:
-        base = base.filter(and_(*filtros))
+    # =========================
+    # LISTA DETALHE
+    # =========================
+    rows = query_base.order_by(Model.criado_em.desc()).all()
 
-    # Paginação
-    page = max(1, request.args.get("page", type=int) or 1)
-    per_page = min(200, max(1, request.args.get("per_page", type=int) or 50))
-    offset = (page - 1) * per_page
-
-    rows = base.order_by(Model.criado_em.desc()).limit(per_page).offset(offset).all()
-
-    # Total
-    cnt_q = db.session.query(func.count(Model.id))
-    if filtros:
-        cnt_q = cnt_q.filter(and_(*filtros))
-    total = int(cnt_q.scalar() or 0)
-    pages = max(1, (total + per_page - 1) // per_page)
-
-    pager = SimpleNamespace(
-        page=page, per_page=per_page, total=total, pages=pages,
-        has_prev=(page > 1), has_next=(page < pages)
-    )
-
-    # Achata para o template
     avaliacoes = []
-    for a, rest_id, rest_nome, coop_id, coop_nome in rows:
-        item = {
-            "criado_em": a.criado_em,
-            "rest_id":   rest_id,
-            "rest_nome": rest_nome,
-            "coop_id":   coop_id,
-            "coop_nome": coop_nome,
+    for a in rows:
+        avaliacoes.append(SimpleNamespace(
+            criado_em=a.criado_em,
+            rest_id=a.restaurante_id,
+            rest_nome=a.restaurante.nome,
+            coop_id=a.cooperado_id,
+            coop_nome=a.cooperado.nome,
+            geral=getattr(a, "estrelas_geral", 0) or 0,
+            trat=getattr(a, "estrelas_tratamento", 0) or 0,
+            amb=getattr(a, "estrelas_ambiente", 0) or 0,
+            sup=getattr(a, "estrelas_suporte", 0) or 0,
+            pont=getattr(a, "estrelas_pontualidade", 0) or 0,
+            educ=getattr(a, "estrelas_educacao", 0) or 0,
+            efic=getattr(a, "estrelas_eficiencia", 0) or 0,
+            apres=getattr(a, "estrelas_apresentacao", 0) or 0,
+            comentario=(getattr(a, "comentario", "") or "").strip(),
+            media=getattr(a, "media_ponderada", None),
+            sentimento=getattr(a, "sentimento", None),
+            temas=getattr(a, "temas", None),
+            alerta=bool(getattr(a, "alerta_crise", False)),
+        ))
 
-            "geral":      getattr(a, "estrelas_geral", 0) or 0,
-            "comentario": (getattr(a, "comentario", "") or "").strip(),
-            "media":       getattr(a, "media_ponderada", None),
-            "sentimento":  getattr(a, "sentimento", None),
-            "temas":       getattr(a, "temas", None),
-            "alerta":      bool(getattr(a, "alerta_crise", False)),
+    total = len(avaliacoes)
 
-            "tratamento": 0, "ambiente": 0, "suporte": 0,
-            "trat": 0, "amb": 0, "sup": 0,
-            "pont": 0, "educ": 0, "efic": 0, "apres": 0,
-        }
-
-        if tipo == "restaurante":
-            trat = getattr(a, "estrelas_tratamento", None)
-            if trat is None:
-                trat = getattr(a, "estrelas_pontualidade", 0)
-            amb  = getattr(a, "estrelas_ambiente", None)
-            if amb is None:
-                amb = getattr(a, "estrelas_educacao", 0)
-            sup  = getattr(a, "estrelas_suporte", None)
-            if sup is None:
-                sup = getattr(a, "estrelas_eficiencia", 0)
-
-            item.update({
-                "tratamento": trat or 0,
-                "ambiente":   amb  or 0,
-                "suporte":    sup  or 0,
-                "trat": trat or 0, "amb": amb or 0, "sup": sup or 0,
-            })
-        else:
-            item.update({
-                "pont":  getattr(a, "estrelas_pontualidade", 0) or 0,
-                "educ":  getattr(a, "estrelas_educacao", 0) or 0,
-                "efic":  getattr(a, "estrelas_eficiencia", 0) or 0,
-                "apres": getattr(a, "estrelas_apresentacao", 0) or 0,
-            })
-
-        avaliacoes.append(SimpleNamespace(**item))
-
-    # KPIs
-    def avg_or_zero(coluna):
-        if coluna is None:
+    # =========================
+    # KPIs (USANDO A MESMA QUERY)
+    # =========================
+    def avg(col):
+        if not col:
             return 0.0
-        q = db.session.query(func.coalesce(func.avg(coluna), 0.0))
-        if filtros:
-            q = q.filter(and_(*filtros))
-        return float(q.scalar() or 0.0)
-
-    kpis = {"qtd": total, "geral": avg_or_zero(f_geral)}
-    if tipo == "restaurante":
-        kpis.update({
-            "trat": avg_or_zero(f_trat),
-            "amb":  avg_or_zero(f_amb),
-            "sup":  avg_or_zero(f_sup),
-        })
-    else:
-        kpis.update({
-            "pont":  avg_or_zero(f_pont),
-            "educ":  avg_or_zero(f_educ),
-            "efic":  avg_or_zero(f_efic),
-            "apres": avg_or_zero(f_apres),
-        })
-
-    # Ranking + chart
-    ranking, chart_top = [], {"labels": [], "values": []}
-    if tipo == "restaurante":
-        q_rank = (
-            db.session.query(
-                Restaurante.id.label("id"),
-                Restaurante.nome.label("nome"),
-                func.count(Model.id).label("qtd"),
-                func.coalesce(func.avg(f_geral), 0.0).label("m_geral"),
-                (func.coalesce(func.avg(f_trat), 0.0) if f_trat is not None else literal(0.0)).label("m_trat"),
-                (func.coalesce(func.avg(f_amb),  0.0) if f_amb  is not None else literal(0.0)).label("m_amb"),
-                (func.coalesce(func.avg(f_sup),  0.0) if f_sup  is not None else literal(0.0)).label("m_sup"),
-            )
-            .join(Model, Model.restaurante_id == Restaurante.id)
+        return float(
+            db.session.query(func.coalesce(func.avg(col), 0.0))
+            .select_from(Model)
+            .filter(Model.id.in_([a.id for a in rows]))
+            .scalar() or 0.0
         )
-        if filtros:
-            q_rank = q_rank.filter(and_(*filtros))
-        ranking_rows = q_rank.group_by(Restaurante.id, Restaurante.nome).all()
-        ranking = [{
-            "rest_nome": r.nome, "qtd": int(r.qtd or 0),
-            "m_geral": float(r.m_geral or 0),
-            "m_trat":  float(r.m_trat or 0),
-            "m_amb":   float(r.m_amb or 0),
-            "m_sup":   float(r.m_sup or 0),
-        } for r in ranking_rows]
-        top = sorted([x for x in ranking if x["qtd"] >= 3], key=lambda x: x["m_geral"], reverse=True)[:10]
-        chart_top = {"labels": [r["rest_nome"] for r in top], "values": [round(r["m_geral"], 2) for r in top]}
-    else:
-        q_rank = (
-            db.session.query(
-                Cooperado.id.label("id"),
-                Cooperado.nome.label("nome"),
-                func.count(Model.id).label("qtd"),
-                func.coalesce(func.avg(f_geral), 0.0).label("m_geral"),
-                (func.coalesce(func.avg(f_pont), 0.0) if f_pont is not None else literal(0.0)).label("m_pont"),
-                (func.coalesce(func.avg(f_educ), 0.0) if f_educ is not None else literal(0.0)).label("m_educ"),
-                (func.coalesce(func.avg(f_efic), 0.0) if f_efic is not None else literal(0.0)).label("m_efic"),
-                (func.coalesce(func.avg(f_apres),0.0) if f_apres is not None else literal(0.0)).label("m_apres"),
-            )
-            .join(Model, Model.cooperado_id == Cooperado.id)
-        )
-        if filtros:
-            q_rank = q_rank.filter(and_(*filtros))
-        ranking_rows = q_rank.group_by(Cooperado.id, Cooperado.nome).all()
-        ranking = [{
-            "coop_nome": r.nome, "qtd": int(r.qtd or 0),
-            "m_geral": float(r.m_geral or 0),
-            "m_pont":  float(r.m_pont or 0),
-            "m_educ":  float(r.m_educ or 0),
-            "m_efic":  float(r.m_efic or 0),
-            "m_apres": float(r.m_apres or 0),
-        } for r in ranking_rows]
-        top = sorted([x for x in ranking if x["qtd"] >= 3], key=lambda x: x["m_geral"], reverse=True)[:10]
-        chart_top = {"labels": [r["coop_nome"] for r in top], "values": [round(r["m_geral"], 2) for r in top]}
 
-    # Compatibilidade
-    compat_map = {}
-    for a in avaliacoes:
-        key = (a.coop_id, a.rest_id)
-        d = compat_map.get(key)
-        if not d:
-            d = {"coop": a.coop_nome, "rest": a.rest_nome, "sum": 0.0, "count": 0}
-        d["sum"] += (a.geral or 0)
-        d["count"] += 1
-        compat_map[key] = d
+    f_geral = getattr(Model, "estrelas_geral", None)
 
-    compat = []
-    for d in compat_map.values():
-        avg = (d["sum"] / d["count"]) if d["count"] else 0.0
-        compat.append({"coop": d["coop"], "rest": d["rest"], "avg": avg, "count": d["count"]})
-    compat.sort(key=lambda x: (-(x["avg"] or 0), -(x["count"] or 0), x["coop"], x["rest"]))
+    kpis = {
+        "qtd": total,
+        "geral": avg(f_geral),
+    }
 
-    # Filtros p/ repopular form + preserva args para paginação
+    # =========================
+    # RENDER
+    # =========================
     _flt = SimpleNamespace(
         restaurante_id=restaurante_id,
         cooperado_id=cooperado_id,
         data_inicio=data_inicio or "",
         data_fim=data_fim or "",
     )
-    preserve = request.args.to_dict(flat=True)
-    preserve.pop("page", None)
 
-    # Config/admin pra header, se seu layout usa
     cfg = get_config()
     admin_user = Usuario.query.filter_by(tipo="admin").first()
 
-    # 🔥 AQUI é a mudança principal: aponta pro novo HTML
     return render_template(
         "admin_avaliacoes.html",
-        tab="avaliacoes",                  # se o menu lateral usar
         tipo=tipo,
         avaliacoes=avaliacoes,
         kpis=kpis,
-        ranking=ranking,
-        chart_top=chart_top,
-        compat=compat,
+        ranking=[],
+        chart_top={"labels": [], "values": []},
+        compat=[],
         _flt=_flt,
         restaurantes=Restaurante.query.order_by(Restaurante.nome).all(),
         cooperados=Cooperado.query.order_by(Cooperado.nome).all(),
-        pager=pager,
-        page=pager.page,
-        per_page=pager.per_page,
-        preserve=preserve,
         admin=admin_user,
         salario_minimo=cfg.salario_minimo or 0.0,
     )
@@ -5025,31 +4876,46 @@ def portal_cooperado():
     def in_range(qs, col):
         return qs.filter(col >= di, col <= df)
 
-    # =========================
-    # Produções (Lançamentos)
-    # =========================
-    ql = in_range(Lancamento.query.filter_by(cooperado_id=coop.id), Lancamento.data)
-    producoes = ql.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
+  # =========================
+# Produções (Lançamentos)
+# =========================
+ql = in_range(
+    Lancamento.query.filter_by(cooperado_id=coop.id),
+    Lancamento.data
+)
 
-    # --- Marca se o cooperado já avaliou cada produção ---
-    ids = [l.id for l in producoes]
-    minhas = {}
-    if ids:
-        rows = (
-            db.session.query(
-                AvaliacaoRestaurante.lancamento_id,
-                AvaliacaoRestaurante.estrelas_geral
-            )
-            .filter(
-                AvaliacaoRestaurante.lancamento_id.in_(ids),
-                AvaliacaoRestaurante.cooperado_id == coop.id
-            )
-            .all()
+producoes = ql.order_by(
+    Lancamento.data.desc(),
+    Lancamento.id.desc()
+).all()
+
+# 🔵 TOTAL HISTÓRICO DE ENTREGAS (SEM FILTRO DE DATA)
+total_entregas = (
+    db.session.query(func.count(Lancamento.id))
+    .filter(Lancamento.cooperado_id == coop.id)
+    .scalar()
+)
+
+# --- Marca se o cooperado já avaliou cada produção ---
+ids = [l.id for l in producoes]
+minhas = {}
+
+if ids:
+    rows = (
+        db.session.query(
+            AvaliacaoRestaurante.lancamento_id,
+            AvaliacaoRestaurante.estrelas_geral
         )
-        minhas = {lid: nota for lid, nota in rows}
+        .filter(
+            AvaliacaoRestaurante.lancamento_id.in_(ids),
+            AvaliacaoRestaurante.cooperado_id == coop.id
+        )
+        .all()
+    )
+    minhas = {lid: nota for lid, nota in rows}
 
-    for l in producoes:
-        l.minha_avaliacao = minhas.get(l.id)
+for l in producoes:
+    l.minha_avaliacao = minhas.get(l.id)
 
 # =========================
     # 💎 NOTA VIDA (MÉDIA HISTÓRICA REAL)
