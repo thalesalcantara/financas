@@ -2397,7 +2397,7 @@ def admin_dashboard():
     }
 
     # -------- Escalas agrupadas e contagem por cooperado ----------
-        escalas_all = (
+    escalas_all = (
         db.session.query(
             Escala.cooperado_id,
             func.count(Escala.id).label("qtd")
