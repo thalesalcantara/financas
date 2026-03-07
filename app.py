@@ -28,6 +28,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from dateutil.relativedelta import relativedelta
 
+# ✅ FALTAVA ISSO (resolve o erro do UserMixin e já deixa pronto p/ login)
 from flask_login import (
     LoginManager,
     UserMixin,
@@ -47,6 +48,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError, DisconnectionError
 from sqlalchemy import delete as sa_delete
 
+# 👉 Novo: para gerar XLSX em memória
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
@@ -75,6 +77,7 @@ DOCS_PERSIST_DIR = os.path.join(PERSIST_ROOT, "docs")
 os.makedirs(DOCS_PERSIST_DIR, exist_ok=True)
 
 
+
 def _merge_qs(url: str, extra: dict[str, str]) -> str:
     """Insere parâmetros de query no URI sem duplicar os já existentes."""
     p = urlparse(url)
@@ -85,23 +88,21 @@ def _merge_qs(url: str, extra: dict[str, str]) -> str:
 
 
 def _build_db_uri() -> str:
-    raw = (os.environ.get("DATABASE_URL") or "").strip()
-
-    # Sem DATABASE_URL => usa SQLite local
+    raw = os.environ.get("DATABASE_URL")
     if not raw:
         return "sqlite:///" + os.path.join(BASE_DIR, "app.db")
 
-    # força driver psycopg/psycopg3 no Postgres
+    # força driver psycopg3 (SQLAlchemy)
     if raw.startswith("postgres://"):
         raw = raw.replace("postgres://", "postgresql+psycopg://", 1)
     elif raw.startswith("postgresql://") and "+psycopg" not in raw:
         raw = raw.replace("postgresql://", "postgresql+psycopg://", 1)
 
-    # parâmetros extras só para Postgres/libpq
+    # SSL + keepalive + app name via libpq (idempotente)
     extras = {
         "sslmode": "require",
         "keepalives": "1",
-        "keepalives_idle": "30",
+        "keepalives_idle": "30",   # segundos ocioso antes de mandar keepalive
         "keepalives_interval": "10",
         "keepalives_count": "3",
         "application_name": os.environ.get("APP_NAME", "financas-dxsu"),
@@ -110,36 +111,6 @@ def _build_db_uri() -> str:
 
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
-
-# ============================================================
-# BANCO DE DADOS - PREPARADO PARA SQLITE E POSTGRES
-# ============================================================
-DATABASE_URI = _build_db_uri()
-
-app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URI
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-engine_options = {
-    "pool_pre_ping": True
-}
-
-if DATABASE_URI.startswith("sqlite"):
-    # SQLite local / teste
-    engine_options["connect_args"] = {
-        "timeout": 10
-    }
-else:
-    # Postgres / Render
-    engine_options["connect_args"] = {
-        "connect_timeout": 10
-    }
-    engine_options["pool_recycle"] = 300
-    engine_options["pool_size"] = 5
-    engine_options["max_overflow"] = 10
-
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = engine_options
-
-db = SQLAlchemy(app)
 
 
 # =========================
@@ -2057,7 +2028,7 @@ def index():
     if not u:
         return redirect(url_for("login"))
     if u.tipo == "admin":
-        return redirect(url_for("admin_dashboard", tab="resumo"))
+        return redirect(url_for("admin_dashboard"))
     if u.tipo == "cooperado":
         return redirect(url_for("portal_cooperado"))
     if u.tipo == "restaurante":
@@ -2094,7 +2065,7 @@ def login():
             session["user_id"] = u.id
             session["user_tipo"] = u.tipo
             if u.tipo == "admin":
-                return redirect(url_for("admin_dashboard", tab="resumo"))
+                return redirect(url_for("admin_dashboard"))
             elif u.tipo == "cooperado":
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
@@ -2236,8 +2207,6 @@ def toggle_status_cooperado(id):
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_dashboard():
-    import time
-    t0 = time.time()
     args = request.args
 
     considerar_periodo = False
@@ -2264,59 +2233,23 @@ def admin_dashboard():
     considerar_periodo = bool(args.get("considerar_periodo"))
     dows = set(args.getlist("dow"))  # {"1","2",...}
 
-        # ---- Lançamentos (com filtros + DOW)
+    # ---- Lançamentos (com filtros + DOW)
     q = Lancamento.query
-
     if restaurante_id:
         q = q.filter(Lancamento.restaurante_id == restaurante_id)
-
     if cooperado_id:
         q = q.filter(Lancamento.cooperado_id == cooperado_id)
-
     if data_inicio:
         q = q.filter(Lancamento.data >= data_inicio)
-
     if data_fim:
         q = q.filter(Lancamento.data <= data_fim)
 
-    # ============================================================
-    # FILTRO DE DIA DA SEMANA DIRETO NO BANCO (MUCHO MAIS RÁPIDO)
-    # ============================================================
+    lanc_base = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
 
     if dows:
-        try:
-            dows_int = [int(x) for x in dows if str(x).isdigit()]
-        except Exception:
-            dows_int = []
-
-        if dows_int:
-
-            # Python usa 1..7 (seg..dom)
-            # PostgreSQL usa 0..6 (dom..sab)
-
-            dow_map = {
-                1: 1,  # seg
-                2: 2,  # ter
-                3: 3,  # qua
-                4: 4,  # qui
-                5: 5,  # sex
-                6: 6,  # sab
-                7: 0   # dom
-            }
-
-            db_dows = [dow_map[d] for d in dows_int if d in dow_map]
-
-            if db_dows:
-                q = q.filter(
-                    db.extract("dow", Lancamento.data).in_(db_dows)
-                )
-
-    lanc_base = q.order_by(
-        Lancamento.data.desc(),
-        Lancamento.id.desc()
-    ).all()
-
-    lancamentos = lanc_base
+        lancamentos = [l for l in lanc_base if l.data and _dow(l.data) in dows]
+    else:
+        lancamentos = lanc_base
 
     # Se marcar "considerar_periodo", só mantemos dias do período do restaurante
     if considerar_periodo and restaurante_id:
@@ -2328,10 +2261,7 @@ def admin_dashboard():
                 "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
             }
             permitidos = mapa.get(rest.periodo, {"1", "2", "3", "4", "5", "6", "7"})
-            lancamentos = [
-                l for l in lancamentos
-                if l.data and _dow(l.data) in permitidos
-            ]
+            lancamentos = [l for l in lancamentos if l.data and _dow(l.data) in permitidos]
 
     total_producoes = sum((l.valor or 0.0) for l in lancamentos)
     total_inss = round(total_producoes * INSS_ALIQ, 2)
@@ -2341,25 +2271,15 @@ def admin_dashboard():
     # ---- Coop (institucional)
     rq = ReceitaCooperativa.query
     dq = DespesaCooperativa.query
-
     if data_inicio:
         rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
         dq = dq.filter(DespesaCooperativa.data >= data_inicio)
-
     if data_fim:
         rq = rq.filter(ReceitaCooperativa.data <= data_fim)
         dq = dq.filter(DespesaCooperativa.data <= data_fim)
 
-    receitas = rq.order_by(
-        ReceitaCooperativa.data.desc().nullslast(),
-        ReceitaCooperativa.id.desc()
-    ).all()
-
-    despesas = dq.order_by(
-        DespesaCooperativa.data.desc(),
-        DespesaCooperativa.id.desc()
-    ).all()
-
+    receitas = rq.order_by(ReceitaCooperativa.data.desc().nullslast(), ReceitaCooperativa.id.desc()).all()
+    despesas = dq.order_by(DespesaCooperativa.data.desc(), DespesaCooperativa.id.desc()).all()
     total_receitas = sum((r.valor_total or 0.0) for r in receitas)
     total_despesas = sum((d.valor or 0.0) for d in despesas)
 
@@ -2370,7 +2290,6 @@ def admin_dashboard():
     # Receitas (pontuais): filtra por data simples
     if data_inicio:
         rq2 = rq2.filter(ReceitaCooperado.data >= data_inicio)
-
     if data_fim:
         rq2 = rq2.filter(ReceitaCooperado.data <= data_fim)
 
@@ -2380,39 +2299,22 @@ def admin_dashboard():
             DespesaCooperado.data_inicio <= data_fim,
             DespesaCooperado.data_fim >= data_inicio,
         )
-
     elif data_inicio:
         dq2 = dq2.filter(DespesaCooperado.data_fim >= data_inicio)
-
     elif data_fim:
         dq2 = dq2.filter(DespesaCooperado.data_inicio <= data_fim)
 
-    receitas_coop = rq2.order_by(
-        ReceitaCooperado.data.desc(),
-        ReceitaCooperado.id.desc()
-    ).all()
-
-    despesas_coop = dq2.order_by(
-        DespesaCooperado.data_fim.desc().nullslast(),
-        DespesaCooperado.id.desc()
-    ).all()
+    receitas_coop = rq2.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
+    despesas_coop = dq2.order_by(DespesaCooperado.data_fim.desc().nullslast(), DespesaCooperado.id.desc()).all()
 
     total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
 
     # Despesas normais (eh_adiantamento = False ou None)
-    total_despesas_coop = sum(
-        (d.valor or 0.0)
-        for d in despesas_coop
-        if not d.eh_adiantamento
-    )
+    total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop if not d.eh_adiantamento)
 
     # Adiantamentos (eh_adiantamento = True)
-    total_adiantamentos_coop = sum(
-        (d.valor or 0.0)
-        for d in despesas_coop
-        if d.eh_adiantamento
-    )
-    
+    total_adiantamentos_coop = sum((d.valor or 0.0) for d in despesas_coop if d.eh_adiantamento)
+
     cfg = get_config()
     cooperados = Cooperado.query.order_by(Cooperado.nome).all()
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
@@ -2767,8 +2669,6 @@ def admin_dashboard():
     current_date = date.today()
     data_limite = date(current_date.year, 12, 31)
 
-    print("TEMPO ADMIN:", time.time() - t0)
-    
     return render_template(
         "admin_dashboard.html",
         tab=active_tab,
@@ -2857,60 +2757,30 @@ def exportar_lancamentos():
     from openpyxl.styles import Font, Alignment, PatternFill
     from openpyxl.utils import get_column_letter
 
-         # -----------------------
+    # -----------------------
     # Filtros
     # -----------------------
     args = request.args
-
     restaurante_id = args.get("restaurante_id", type=int)
     cooperado_id   = args.get("cooperado_id", type=int)
-
-    data_inicio = _parse_date(args.get("data_inicio"))
-    data_fim    = _parse_date(args.get("data_fim"))
-
-    dows = set(args.getlist("dow"))  # '0'..'6'
-
-    from datetime import date, timedelta
-
-    hoje = date.today()
-
-    # segunda-feira da semana atual
-    inicio_semana = hoje - timedelta(days=hoje.weekday())
-
-    # domingo da semana atual
-    fim_semana = inicio_semana + timedelta(days=6)
-
-    # se não tiver filtro manual, usar semana atual
-    if args.get("data_inicio") is None and args.get("data_fim") is None:
-        data_inicio = inicio_semana
-        data_fim = fim_semana
+    data_inicio    = _parse_date(args.get("data_inicio"))
+    data_fim       = _parse_date(args.get("data_fim"))
+    dows           = set(args.getlist("dow"))  # '0'..'6'
 
     q = Lancamento.query
-
     if restaurante_id:
         q = q.filter(Lancamento.restaurante_id == restaurante_id)
-
     if cooperado_id:
         q = q.filter(Lancamento.cooperado_id == cooperado_id)
-
     if data_inicio:
         q = q.filter(Lancamento.data >= data_inicio)
-
     if data_fim:
         q = q.filter(Lancamento.data <= data_fim)
 
-    lancs = (
-        q.order_by(
-            Lancamento.data.desc(),
-            Lancamento.id.desc()
-        ).all()
-    )
-
+    lancs = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
     if dows:
-        lancs = [
-            l for l in lancs
-            if l.data and str(_dow(l.data)) in dows
-        ]
+        lancs = [l for l in lancs if l.data and _dow(l.data) in dows]
+
     # ===============================
     # Estilos
     # ===============================
