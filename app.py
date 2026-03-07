@@ -78,7 +78,12 @@ os.makedirs(DOCS_PERSIST_DIR, exist_ok=True)
 
 def _redirect_admin(tab):
     args = request.args.to_dict(flat=True)
+
+    if not args:
+        args = request.form.to_dict(flat=True)
+
     args["tab"] = tab
+
     return redirect(url_for("admin_dashboard", **args))
     
 
