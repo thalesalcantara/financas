@@ -2828,7 +2828,7 @@ def exportar_lancamentos():
     from openpyxl.styles import Font, Alignment, PatternFill
     from openpyxl.utils import get_column_letter
 
-    # -----------------------
+        # -----------------------
     # Filtros
     # -----------------------
     args = request.args
@@ -2838,20 +2838,47 @@ def exportar_lancamentos():
     data_fim       = _parse_date(args.get("data_fim"))
     dows           = set(args.getlist("dow"))  # '0'..'6'
 
+    from datetime import date, timedelta
+
+    hoje = date.today()
+
+    # segunda-feira da semana atual
+    inicio_semana = hoje - timedelta(days=hoje.weekday())
+
+    # domingo da semana atual
+    fim_semana = inicio_semana + timedelta(days=6)
+
+    # se não houver filtro, usa semana atual
+    if not data_inicio and not data_fim:
+        data_inicio = inicio_semana
+        data_fim = fim_semana
+
     q = Lancamento.query
+
     if restaurante_id:
         q = q.filter(Lancamento.restaurante_id == restaurante_id)
+
     if cooperado_id:
         q = q.filter(Lancamento.cooperado_id == cooperado_id)
+
     if data_inicio:
         q = q.filter(Lancamento.data >= data_inicio)
+
     if data_fim:
         q = q.filter(Lancamento.data <= data_fim)
 
-    lancs = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
-    if dows:
-        lancs = [l for l in lancs if l.data and _dow(l.data) in dows]
+    lancs = (
+        q.order_by(
+            Lancamento.data.desc(),
+            Lancamento.id.desc()
+        ).all()
+    )
 
+    if dows:
+        lancs = [
+            l for l in lancs
+            if l.data and str(_dow(l.data)) in dows
+        ]
     # ===============================
     # Estilos
     # ===============================
