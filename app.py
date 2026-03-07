@@ -2399,8 +2399,6 @@ def admin_dashboard():
     }
 
     # -------- Escalas agrupadas e contagem por cooperado ----------
-        from datetime import date, timedelta
-
     escalas_all = Escala.query.order_by(Escala.id.asc()).all()
     esc_by_int: dict[int, list] = defaultdict(list)
     esc_by_str: dict[str, list] = defaultdict(list)
