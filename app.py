@@ -2233,23 +2233,59 @@ def admin_dashboard():
     considerar_periodo = bool(args.get("considerar_periodo"))
     dows = set(args.getlist("dow"))  # {"1","2",...}
 
-    # ---- Lançamentos (com filtros + DOW)
+        # ---- Lançamentos (com filtros + DOW)
     q = Lancamento.query
+
     if restaurante_id:
         q = q.filter(Lancamento.restaurante_id == restaurante_id)
+
     if cooperado_id:
         q = q.filter(Lancamento.cooperado_id == cooperado_id)
+
     if data_inicio:
         q = q.filter(Lancamento.data >= data_inicio)
+
     if data_fim:
         q = q.filter(Lancamento.data <= data_fim)
 
-    lanc_base = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
+    # ============================================================
+    # FILTRO DE DIA DA SEMANA DIRETO NO BANCO (MUCHO MAIS RÁPIDO)
+    # ============================================================
 
     if dows:
-        lancamentos = [l for l in lanc_base if l.data and _dow(l.data) in dows]
-    else:
-        lancamentos = lanc_base
+        try:
+            dows_int = [int(x) for x in dows if str(x).isdigit()]
+        except Exception:
+            dows_int = []
+
+        if dows_int:
+
+            # Python usa 1..7 (seg..dom)
+            # PostgreSQL usa 0..6 (dom..sab)
+
+            dow_map = {
+                1: 1,  # seg
+                2: 2,  # ter
+                3: 3,  # qua
+                4: 4,  # qui
+                5: 5,  # sex
+                6: 6,  # sab
+                7: 0   # dom
+            }
+
+            db_dows = [dow_map[d] for d in dows_int if d in dow_map]
+
+            if db_dows:
+                q = q.filter(
+                    db.extract("dow", Lancamento.data).in_(db_dows)
+                )
+
+    lanc_base = q.order_by(
+        Lancamento.data.desc(),
+        Lancamento.id.desc()
+    ).all()
+
+    lancamentos = lanc_base
 
     # Se marcar "considerar_periodo", só mantemos dias do período do restaurante
     if considerar_periodo and restaurante_id:
@@ -2261,7 +2297,10 @@ def admin_dashboard():
                 "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
             }
             permitidos = mapa.get(rest.periodo, {"1", "2", "3", "4", "5", "6", "7"})
-            lancamentos = [l for l in lancamentos if l.data and _dow(l.data) in permitidos]
+            lancamentos = [
+                l for l in lancamentos
+                if l.data and _dow(l.data) in permitidos
+            ]
 
     total_producoes = sum((l.valor or 0.0) for l in lancamentos)
     total_inss = round(total_producoes * INSS_ALIQ, 2)
@@ -2271,15 +2310,25 @@ def admin_dashboard():
     # ---- Coop (institucional)
     rq = ReceitaCooperativa.query
     dq = DespesaCooperativa.query
+
     if data_inicio:
         rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
         dq = dq.filter(DespesaCooperativa.data >= data_inicio)
+
     if data_fim:
         rq = rq.filter(ReceitaCooperativa.data <= data_fim)
         dq = dq.filter(DespesaCooperativa.data <= data_fim)
 
-    receitas = rq.order_by(ReceitaCooperativa.data.desc().nullslast(), ReceitaCooperativa.id.desc()).all()
-    despesas = dq.order_by(DespesaCooperativa.data.desc(), DespesaCooperativa.id.desc()).all()
+    receitas = rq.order_by(
+        ReceitaCooperativa.data.desc().nullslast(),
+        ReceitaCooperativa.id.desc()
+    ).all()
+
+    despesas = dq.order_by(
+        DespesaCooperativa.data.desc(),
+        DespesaCooperativa.id.desc()
+    ).all()
+
     total_receitas = sum((r.valor_total or 0.0) for r in receitas)
     total_despesas = sum((d.valor or 0.0) for d in despesas)
 
@@ -2290,6 +2339,7 @@ def admin_dashboard():
     # Receitas (pontuais): filtra por data simples
     if data_inicio:
         rq2 = rq2.filter(ReceitaCooperado.data >= data_inicio)
+
     if data_fim:
         rq2 = rq2.filter(ReceitaCooperado.data <= data_fim)
 
@@ -2299,22 +2349,39 @@ def admin_dashboard():
             DespesaCooperado.data_inicio <= data_fim,
             DespesaCooperado.data_fim >= data_inicio,
         )
+
     elif data_inicio:
         dq2 = dq2.filter(DespesaCooperado.data_fim >= data_inicio)
+
     elif data_fim:
         dq2 = dq2.filter(DespesaCooperado.data_inicio <= data_fim)
 
-    receitas_coop = rq2.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
-    despesas_coop = dq2.order_by(DespesaCooperado.data_fim.desc().nullslast(), DespesaCooperado.id.desc()).all()
+    receitas_coop = rq2.order_by(
+        ReceitaCooperado.data.desc(),
+        ReceitaCooperado.id.desc()
+    ).all()
+
+    despesas_coop = dq2.order_by(
+        DespesaCooperado.data_fim.desc().nullslast(),
+        DespesaCooperado.id.desc()
+    ).all()
 
     total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
 
     # Despesas normais (eh_adiantamento = False ou None)
-    total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop if not d.eh_adiantamento)
+    total_despesas_coop = sum(
+        (d.valor or 0.0)
+        for d in despesas_coop
+        if not d.eh_adiantamento
+    )
 
     # Adiantamentos (eh_adiantamento = True)
-    total_adiantamentos_coop = sum((d.valor or 0.0) for d in despesas_coop if d.eh_adiantamento)
-
+    total_adiantamentos_coop = sum(
+        (d.valor or 0.0)
+        for d in despesas_coop
+        if d.eh_adiantamento
+    )
+    
     cfg = get_config()
     cooperados = Cooperado.query.order_by(Cooperado.nome).all()
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
