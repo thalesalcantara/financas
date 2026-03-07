@@ -2435,122 +2435,125 @@ def admin_dashboard():
     ]:
         restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
 
-    # documentos OK?
+        # documentos OK?
     docinfo_map = {}
 
-if active_tab in ["cooperados", "documentos", "config"]:
-    docinfo_map = {
-        c.id: _build_docinfo(c)
-        for c in cooperados
-    }
-    sstatus_doc_por_coop = {}
-
-if docinfo_map:
-    status_doc_por_coop = {
-        c.id: {
-            "cnh_ok": docinfo_map[c.id]["cnh"]["ok"],
-            "placa_ok": docinfo_map[c.id]["placa"]["ok"],
+    if active_tab in ["cooperados", "documentos", "config"]:
+        docinfo_map = {
+            c.id: _build_docinfo(c)
+            for c in cooperados
         }
-        for c in cooperados
-    }
+        status_doc_por_coop = {}
 
-    # -------- Escalas agrupadas e contagem por cooperado ----------
-    escalas_all = Escala.query.order_by(Escala.id.asc()).all()
-    esc_by_int: dict[int, list] = defaultdict(list)
-    esc_by_str: dict[str, list] = defaultdict(list)
-    for e in escalas_all:
-        k_int = e.cooperado_id if e.cooperado_id is not None else 0  # 0 = sem cadastro
-        esc_item = {
-            "data": e.data,
-            "turno": e.turno,
-            "horario": e.horario,
-            "contrato": e.contrato,
-            "cor": e.cor,
-            "nome_planilha": e.cooperado_nome,
+    if docinfo_map:
+        status_doc_por_coop = {
+            c.id: {
+                "cnh_ok": docinfo_map[c.id]["cnh"]["ok"],
+                "placa_ok": docinfo_map[c.id]["placa"]["ok"],
+            }
+            for c in cooperados
         }
-        esc_by_int[k_int].append(esc_item)
-        esc_by_str[str(k_int)].append(esc_item)
 
-    cont_rows = dict(
-        db.session.query(Escala.cooperado_id, func.count(Escala.id))
-        .group_by(Escala.cooperado_id)
-        .all()
-    )
-    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
-    qtd_sem_cadastro = int(cont_rows.get(None, 0))
+        # -------- Escalas agrupadas e contagem por cooperado ----------
+        escalas_all = Escala.query.order_by(Escala.id.asc()).all()
+        esc_by_int: dict[int, list] = defaultdict(list)
+        esc_by_str: dict[str, list] = defaultdict(list)
 
-    # ---- Gráficos (por mês)
-    sums = {}
-    for l in lancamentos:
-        if not l.data:
-            continue
-        key = l.data.strftime("%Y-%m")
-        sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
+        for e in escalas_all:
+            k_int = e.cooperado_id if e.cooperado_id is not None else 0
+            esc_item = {
+                "data": e.data,
+                "turno": e.turno,
+                "horario": e.horario,
+                "contrato": e.contrato,
+                "cor": e.cor,
+                "nome_planilha": e.cooperado_nome,
+            }
+            esc_by_int[k_int].append(esc_item)
+            esc_by_str[str(k_int)].append(esc_item)
 
-    labels_ord = sorted(sums.keys())
-
-    def _fmt_label(k: str) -> str:
-        parts = k.split("-")
-        if len(parts) == 2 and parts[0] and parts[1]:
-            year, month = parts[0], parts[1]
-            return f"{month}/{year[-2:]}"
-        return k
-
-    labels_fmt = [_fmt_label(k) for k in labels_ord]
-    values = [round(sums[k], 2) for k in labels_ord]
-    chart_data_lancamentos_coop = []
-
-if active_tab in ["resumo", "lancamentos"]:
-
-    dados = (
-        db.session.query(
-            db.func.date(Lancamento.data),
-            db.func.sum(Lancamento.valor)
+        cont_rows = dict(
+            db.session.query(Escala.cooperado_id, func.count(Escala.id))
+            .group_by(Escala.cooperado_id)
+            .all()
         )
-        .group_by(db.func.date(Lancamento.data))
-        .order_by(db.func.date(Lancamento.data))
-        .all()
-    )
 
-    chart_data_lancamentos_coop = [
-        {
-            "data": str(data),
-            "valor": float(valor or 0)
-        }
-        for data, valor in dados
-    ]
+        qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
+        qtd_sem_cadastro = int(cont_rows.get(None, 0))
+
+        # ---- Gráficos (por mês)
+        sums = {}
+        for l in lancamentos:
+            if not l.data:
+                continue
+            key = l.data.strftime("%Y-%m")
+            sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
+
+        labels_ord = sorted(sums.keys())
+
+        def _fmt_label(k: str) -> str:
+            parts = k.split("-")
+            if len(parts) == 2 and parts[0] and parts[1]:
+                year, month = parts[0], parts[1]
+                return f"{month}/{year[-2:]}"
+            return k
+
+        labels_fmt = [_fmt_label(k) for k in labels_ord]
+        values = [round(sums[k], 2) for k in labels_ord]
+
+    chart_data_lancamentos_coop = []
     chart_data_lancamentos_cooperados = []
 
-if active_tab in ["resumo", "lancamentos"]:
+    if active_tab in ["resumo", "lancamentos"]:
 
-    dados = (
-        db.session.query(
-            Cooperado.nome,
-            db.func.sum(Lancamento.valor)
+        dados = (
+            db.session.query(
+                db.func.date(Lancamento.data),
+                db.func.sum(Lancamento.valor)
+            )
+            .group_by(db.func.date(Lancamento.data))
+            .order_by(db.func.date(Lancamento.data))
+            .all()
         )
-        .join(Cooperado, Cooperado.id == Lancamento.cooperado_id)
-        .group_by(Cooperado.nome)
-        .all()
-    )
 
-    chart_data_lancamentos_cooperados = [
-        {
-            "nome": nome,
-            "valor": float(valor or 0)
-        }
-        for nome, valor in dados
-    ]
+        chart_data_lancamentos_coop = [
+            {
+                "data": str(data),
+                "valor": float(valor or 0)
+            }
+            for data, valor in dados
+        ]
+
+        dados = (
+            db.session.query(
+                Cooperado.nome,
+                db.func.sum(Lancamento.valor)
+            )
+            .join(Cooperado, Cooperado.id == Lancamento.cooperado_id)
+            .group_by(Cooperado.nome)
+            .all()
+        )
+
+        chart_data_lancamentos_cooperados = [
+            {
+                "nome": nome,
+                "valor": float(valor or 0)
+            }
+            for nome, valor in dados
+        ]
 
     admin_user = Usuario.query.filter_by(tipo="admin").first()
 
     # =====================================================================
-    # 7) Folha de pagamento  -> SÓ CALCULA SE A ABA "folha" ESTIVER ABERTA
+    # Folha de pagamento (só quando abre a aba folha)
     # =====================================================================
+
     folha_por_coop = []
     folha_inicio = None
     folha_fim = None
 
     if active_tab == "folha":
+
         folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
         folha_fim = _parse_date(args.get("folha_fim")) or date.today()
 
@@ -2563,6 +2566,7 @@ if active_tab in ["resumo", "lancamentos"]:
         )
 
         for c in cooperados:
+
             l = (
                 Lancamento.query.filter(
                     Lancamento.cooperado_id == c.id,
@@ -2572,6 +2576,7 @@ if active_tab in ["resumo", "lancamentos"]:
                 .order_by(Lancamento.data.asc(), Lancamento.id.asc())
                 .all()
             )
+
             r = (
                 ReceitaCooperado.query.filter(
                     ReceitaCooperado.cooperado_id == c.id,
@@ -2582,10 +2587,10 @@ if active_tab in ["resumo", "lancamentos"]:
                 .all()
             )
 
-            # Despesa semanal: usa sobreposição do intervalo (mais seguro que "DespesaCooperado.data")
             d = (
                 DespesaCooperado.query.filter(
-                    (DespesaCooperado.cooperado_id == c.id) | (DespesaCooperado.cooperado_id.is_(None)),
+                    (DespesaCooperado.cooperado_id == c.id) |
+                    (DespesaCooperado.cooperado_id.is_(None)),
                     DespesaCooperado.data_inicio <= folha_fim,
                     DespesaCooperado.data_fim >= folha_inicio,
                 )
@@ -2602,13 +2607,6 @@ if active_tab in ["resumo", "lancamentos"]:
             outras_desp = sum((x.valor or 0) for x in d)
             bruto_total = bruto_lanc + sum((x.valor or 0) for x in r)
             liquido = round(bruto_total - encargos - outras_desp, 2)
-
-            for x in l:
-                x.conta_inss = True
-                x.isento_benef = False
-                x.inss = round((x.valor or 0) * INSS_ALIQ_FOLHA, 2)
-                x.sest = round((x.valor or 0) * SEST_ALIQ_FOLHA, 2)
-                x.encargos = round((x.inss or 0) + (x.sest or 0), 2)
 
             folha_por_coop.append(
                 FolhaItem(
