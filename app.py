@@ -2412,8 +2412,10 @@ def admin_dashboard():
         if d.eh_adiantamento
     )
 
-    cfg = get_config()
-        cooperados = []
+        cfg = get_config()
+
+    cooperados = []
+    restaurantes = []
 
     if active_tab in [
         "lancamentos",
@@ -2424,7 +2426,6 @@ def admin_dashboard():
         "config"
     ]:
         cooperados = Cooperado.query.order_by(Cooperado.nome).all()
-        restaurantes = []
 
     if active_tab in [
         "lancamentos",
