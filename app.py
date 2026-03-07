@@ -2738,7 +2738,7 @@ def admin_dashboard():
     current_date = date.today()
     data_limite = date(current_date.year, 12, 31)
 
-    print("TEMPO ADMIN:", time.time() - t0
+    print("TEMPO ADMIN:", time.time() - t0)
     return render_template(
         "admin_dashboard.html",
         tab=active_tab,
