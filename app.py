@@ -2216,7 +2216,7 @@ def admin_dashboard():
     active_tab = args.get("tab", "lancamentos")
 
     # ============================================================
-    # CONTROLE DE CARREGAMENTO (ACELERA MUITO O ADMIN)
+    # CONTROLE DE CARREGAMENTO (ACELERA O ADMIN)
     # ============================================================
 
     carregar_escalas = active_tab == "escalas"
@@ -2233,40 +2233,46 @@ def admin_dashboard():
                     return d
         return None
 
-    # --- Datas unificadas para o RESUMO (prioriza resumo_inicio/fim)
+    # --- Datas unificadas para o RESUMO
     data_inicio = _pick_date("resumo_inicio", "data_inicio")
     data_fim = _pick_date("resumo_fim", "data_fim")
 
     restaurante_id = args.get("restaurante_id", type=int)
     cooperado_id = args.get("cooperado_id", type=int)
     considerar_periodo = bool(args.get("considerar_periodo"))
-    dows = set(args.getlist("dow"))  # {"1","2",...}
+    dows = set(args.getlist("dow"))
 
-    # ---- Lançamentos (com filtros + DOW)
+    # ============================================================
+    # LANÇAMENTOS
+    # ============================================================
+
     q = Lancamento.query
+
     if restaurante_id:
         q = q.filter(Lancamento.restaurante_id == restaurante_id)
+
     if cooperado_id:
         q = q.filter(Lancamento.cooperado_id == cooperado_id)
+
     if data_inicio:
         q = q.filter(Lancamento.data >= data_inicio)
+
     if data_fim:
         q = q.filter(Lancamento.data <= data_fim)
 
-        lanc_base = []
+    lanc_base = []
 
-    if active_tab in ["lancamentos", "resumo"]:
+    if carregar_lancamentos:
         lanc_base = q.order_by(
             Lancamento.data.desc(),
             Lancamento.id.desc()
-        ).limit(3000).all()
+        ).all()
 
     if dows:
         lancamentos = [l for l in lanc_base if l.data and _dow(l.data) in dows]
     else:
         lancamentos = lanc_base
 
-    # Se marcar "considerar_periodo", só mantemos dias do período do restaurante
     if considerar_periodo and restaurante_id:
         rest = Restaurante.query.get(restaurante_id)
         if rest:
@@ -2275,67 +2281,110 @@ def admin_dashboard():
                 "sab-sex": {"6", "7", "1", "2", "3", "4", "5"},
                 "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
             }
-            permitidos = mapa.get(rest.periodo, {"1", "2", "3", "4", "5", "6", "7"})
-            lancamentos = [l for l in lancamentos if l.data and _dow(l.data) in permitidos]
+
+            permitidos = mapa.get(
+                rest.periodo,
+                {"1", "2", "3", "4", "5", "6", "7"}
+            )
+
+            lancamentos = [
+                l for l in lancamentos
+                if l.data and _dow(l.data) in permitidos
+            ]
 
     total_producoes = sum((l.valor or 0.0) for l in lancamentos)
     total_inss = round(total_producoes * INSS_ALIQ, 2)
     total_sest = round(total_producoes * SEST_ALIQ, 2)
     total_encargos = round(total_inss + total_sest, 2)
 
-    # ---- Coop (institucional)
+    # ============================================================
+    # RECEITAS E DESPESAS DA COOPERATIVA
+    # ============================================================
+
     rq = ReceitaCooperativa.query
     dq = DespesaCooperativa.query
+
     if data_inicio:
         rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
         dq = dq.filter(DespesaCooperativa.data >= data_inicio)
+
     if data_fim:
         rq = rq.filter(ReceitaCooperativa.data <= data_fim)
         dq = dq.filter(DespesaCooperativa.data <= data_fim)
 
-    receitas = rq.order_by(ReceitaCooperativa.data.desc().nullslast(), ReceitaCooperativa.id.desc()).all()
-    despesas = dq.order_by(DespesaCooperativa.data.desc(), DespesaCooperativa.id.desc()).all()
+    receitas = rq.order_by(
+        ReceitaCooperativa.data.desc().nullslast(),
+        ReceitaCooperativa.id.desc()
+    ).all()
+
+    despesas = dq.order_by(
+        DespesaCooperativa.data.desc(),
+        DespesaCooperativa.id.desc()
+    ).all()
+
     total_receitas = sum((r.valor_total or 0.0) for r in receitas)
     total_despesas = sum((d.valor or 0.0) for d in despesas)
 
-    # ---- Cooperados (pessoa física)
+    # ============================================================
+    # RECEITAS / DESPESAS DOS COOPERADOS
+    # ============================================================
+
     rq2 = ReceitaCooperado.query
     dq2 = DespesaCooperado.query
 
-    # Receitas (pontuais): filtra por data simples
     if data_inicio:
         rq2 = rq2.filter(ReceitaCooperado.data >= data_inicio)
+
     if data_fim:
         rq2 = rq2.filter(ReceitaCooperado.data <= data_fim)
 
-    # Despesas (semanais): usa sobreposição do intervalo [data_inicio, data_fim]
     if data_inicio and data_fim:
         dq2 = dq2.filter(
             DespesaCooperado.data_inicio <= data_fim,
-            DespesaCooperado.data_fim >= data_inicio,
+            DespesaCooperado.data_fim >= data_inicio
         )
+
     elif data_inicio:
         dq2 = dq2.filter(DespesaCooperado.data_fim >= data_inicio)
+
     elif data_fim:
         dq2 = dq2.filter(DespesaCooperado.data_inicio <= data_fim)
 
-    receitas_coop = rq2.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
-    despesas_coop = dq2.order_by(DespesaCooperado.data_fim.desc().nullslast(), DespesaCooperado.id.desc()).all()
+    receitas_coop = rq2.order_by(
+        ReceitaCooperado.data.desc(),
+        ReceitaCooperado.id.desc()
+    ).all()
+
+    despesas_coop = dq2.order_by(
+        DespesaCooperado.data_fim.desc().nullslast(),
+        DespesaCooperado.id.desc()
+    ).all()
 
     total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
 
-    # Despesas normais (eh_adiantamento = False ou None)
-    total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop if not d.eh_adiantamento)
+    total_despesas_coop = sum(
+        (d.valor or 0.0) for d in despesas_coop if not d.eh_adiantamento
+    )
 
-    # Adiantamentos (eh_adiantamento = True)
-    total_adiantamentos_coop = sum((d.valor or 0.0) for d in despesas_coop if d.eh_adiantamento)
+    total_adiantamentos_coop = sum(
+        (d.valor or 0.0) for d in despesas_coop if d.eh_adiantamento
+    )
+
+    # ============================================================
+    # CONFIGURAÇÕES E LISTAS
+    # ============================================================
 
     cfg = get_config()
+
     cooperados = Cooperado.query.order_by(Cooperado.nome).all()
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
 
-    # documentos OK?
+    # ============================================================
+    # DOCUMENTOS
+    # ============================================================
+
     docinfo_map = {c.id: _build_docinfo(c) for c in cooperados}
+
     status_doc_por_coop = {
         c.id: {
             "cnh_ok": docinfo_map[c.id]["cnh"]["ok"],
@@ -2344,17 +2393,22 @@ def admin_dashboard():
         for c in cooperados
     }
 
-    # -------- Escalas agrupadas e contagem por cooperado ----------
-        escalas_all = []
+    # ============================================================
+    # ESCALAS
+    # ============================================================
 
-    if active_tab == "escalas":
-        escalas_all = Escala.query.order_by(
-            Escala.id.asc()
-        ).all()
-    esc_by_int: dict[int, list] = defaultdict(list)
-    esc_by_str: dict[str, list] = defaultdict(list)
+    escalas_all = []
+
+    if carregar_escalas:
+        escalas_all = Escala.query.order_by(Escala.id.asc()).all()
+
+    esc_by_int = defaultdict(list)
+    esc_by_str = defaultdict(list)
+
     for e in escalas_all:
-        k_int = e.cooperado_id if e.cooperado_id is not None else 0  # 0 = sem cadastro
+
+        k_int = e.cooperado_id if e.cooperado_id is not None else 0
+
         esc_item = {
             "data": e.data,
             "turno": e.turno,
@@ -2363,55 +2417,62 @@ def admin_dashboard():
             "cor": e.cor,
             "nome_planilha": e.cooperado_nome,
         }
+
         esc_by_int[k_int].append(esc_item)
         esc_by_str[str(k_int)].append(esc_item)
 
     cont_rows = dict(
-        db.session.query(Escala.cooperado_id, func.count(Escala.id))
-        .group_by(Escala.cooperado_id)
-        .all()
+        db.session.query(
+            Escala.cooperado_id,
+            func.count(Escala.id)
+        ).group_by(Escala.cooperado_id).all()
     )
-    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
+
+    qtd_escalas_map = {
+        c.id: int(cont_rows.get(c.id, 0))
+        for c in cooperados
+    }
+
     qtd_sem_cadastro = int(cont_rows.get(None, 0))
 
-    # ---- Gráficos (por mês)
-        labels_ord = []
-    values = []
+    # ============================================================
+    # GRÁFICOS
+    # ============================================================
 
-    if active_tab in ["resumo", "lancamentos"]:
+    sums = {}
 
-        dados = (
-            db.session.query(
-                db.func.date_trunc("month", Lancamento.data),
-                db.func.sum(Lancamento.valor)
-            )
-            .group_by(
-                db.func.date_trunc("month", Lancamento.data)
-            )
-            .order_by(
-                db.func.date_trunc("month", Lancamento.data)
-            )
-            .all()
-        )
+    for l in lancamentos:
 
-        labels_ord = [
-            d[0].strftime("%m/%y") for d in dados if d[0]
-        ]
+        if not l.data:
+            continue
 
-        values = [
-            float(d[1] or 0) for d in dados
-        ]
+        key = l.data.strftime("%Y-%m")
 
-    def _fmt_label(k: str) -> str:
+        sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
+
+    labels_ord = sorted(sums.keys())
+
+    def _fmt_label(k: str):
+
         parts = k.split("-")
+
         if len(parts) == 2 and parts[0] and parts[1]:
+
             year, month = parts[0], parts[1]
+
             return f"{month}/{year[-2:]}"
+
         return k
 
     labels_fmt = [_fmt_label(k) for k in labels_ord]
+
     values = [round(sums[k], 2) for k in labels_ord]
-    chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
+
+    chart_data_lancamentos_coop = {
+        "labels": labels_fmt,
+        "values": values
+    }
+
     chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
 
     admin_user = Usuario.query.filter_by(tipo="admin").first()
