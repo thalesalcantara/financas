@@ -2211,8 +2211,17 @@ def admin_dashboard():
 
     considerar_periodo = False
     dows = set()
+
     # --- Controle de abas
     active_tab = args.get("tab", "lancamentos")
+
+    # ============================================================
+    # CONTROLE DE CARREGAMENTO (ACELERA MUITO O ADMIN)
+    # ============================================================
+
+    carregar_escalas = active_tab == "escalas"
+    carregar_lancamentos = active_tab in ["lancamentos", "resumo"]
+    carregar_cooperados = active_tab in ["cooperados", "documentos", "config"]
 
     # --- Helper: escolhe a primeira data válida de uma lista de chaves
     def _pick_date(*keys):
@@ -2244,7 +2253,13 @@ def admin_dashboard():
     if data_fim:
         q = q.filter(Lancamento.data <= data_fim)
 
-    lanc_base = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
+        lanc_base = []
+
+    if active_tab in ["lancamentos", "resumo"]:
+        lanc_base = q.order_by(
+            Lancamento.data.desc(),
+            Lancamento.id.desc()
+        ).limit(3000).all()
 
     if dows:
         lancamentos = [l for l in lanc_base if l.data and _dow(l.data) in dows]
@@ -2330,7 +2345,12 @@ def admin_dashboard():
     }
 
     # -------- Escalas agrupadas e contagem por cooperado ----------
-    escalas_all = Escala.query.order_by(Escala.id.asc()).all()
+        escalas_all = []
+
+    if active_tab == "escalas":
+        escalas_all = Escala.query.order_by(
+            Escala.id.asc()
+        ).all()
     esc_by_int: dict[int, list] = defaultdict(list)
     esc_by_str: dict[str, list] = defaultdict(list)
     for e in escalas_all:
@@ -2355,14 +2375,32 @@ def admin_dashboard():
     qtd_sem_cadastro = int(cont_rows.get(None, 0))
 
     # ---- Gráficos (por mês)
-    sums = {}
-    for l in lancamentos:
-        if not l.data:
-            continue
-        key = l.data.strftime("%Y-%m")
-        sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
+        labels_ord = []
+    values = []
 
-    labels_ord = sorted(sums.keys())
+    if active_tab in ["resumo", "lancamentos"]:
+
+        dados = (
+            db.session.query(
+                db.func.date_trunc("month", Lancamento.data),
+                db.func.sum(Lancamento.valor)
+            )
+            .group_by(
+                db.func.date_trunc("month", Lancamento.data)
+            )
+            .order_by(
+                db.func.date_trunc("month", Lancamento.data)
+            )
+            .all()
+        )
+
+        labels_ord = [
+            d[0].strftime("%m/%y") for d in dados if d[0]
+        ]
+
+        values = [
+            float(d[1] or 0) for d in dados
+        ]
 
     def _fmt_label(k: str) -> str:
         parts = k.split("-")
