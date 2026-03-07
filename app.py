@@ -2435,24 +2435,24 @@ def admin_dashboard():
     ]:
         restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
 
-        # documentos OK?
+            # documentos OK?
     docinfo_map = {}
+    status_doc_por_coop = {}
 
     if active_tab in ["cooperados", "documentos", "config"]:
         docinfo_map = {
             c.id: _build_docinfo(c)
             for c in cooperados
         }
-        status_doc_por_coop = {}
 
     if docinfo_map:
-            status_doc_por_coop = {
-        c.id: {
-            "cnh_ok": docinfo_map[c.id]["cnh"]["ok"],
-            "placa_ok": docinfo_map[c.id]["placa"]["ok"],
+        status_doc_por_coop = {
+            c.id: {
+                "cnh_ok": docinfo_map[c.id]["cnh"]["ok"],
+                "placa_ok": docinfo_map[c.id]["placa"]["ok"],
+            }
+            for c in cooperados
         }
-        for c in cooperados
-    }
 
     # ============================================================
     # VARIÁVEIS PADRÃO (EVITA ERRO DE VARIÁVEL NÃO DEFINIDA)
