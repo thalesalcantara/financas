@@ -2454,6 +2454,16 @@ def admin_dashboard():
             for c in cooperados
         }
 
+        # ============================================================
+# VARIÁVEIS PADRÃO (EVITA ERRO DE VARIÁVEL NÃO DEFINIDA)
+# ============================================================
+
+esc_by_int = {}
+esc_by_str = {}
+qtd_escalas_map = {}
+qtd_sem_cadastro = 0
+escalas_all = []
+
         # -------- Escalas agrupadas e contagem por cooperado ----------
         escalas_all = Escala.query.order_by(Escala.id.asc()).all()
         esc_by_int: dict[int, list] = defaultdict(list)
