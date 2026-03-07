@@ -2828,15 +2828,18 @@ def exportar_lancamentos():
     from openpyxl.styles import Font, Alignment, PatternFill
     from openpyxl.utils import get_column_letter
 
-        # -----------------------
+         # -----------------------
     # Filtros
     # -----------------------
     args = request.args
+
     restaurante_id = args.get("restaurante_id", type=int)
     cooperado_id   = args.get("cooperado_id", type=int)
-    data_inicio    = _parse_date(args.get("data_inicio"))
-    data_fim       = _parse_date(args.get("data_fim"))
-    dows           = set(args.getlist("dow"))  # '0'..'6'
+
+    data_inicio = _parse_date(args.get("data_inicio"))
+    data_fim    = _parse_date(args.get("data_fim"))
+
+    dows = set(args.getlist("dow"))  # '0'..'6'
 
     from datetime import date, timedelta
 
@@ -2848,8 +2851,8 @@ def exportar_lancamentos():
     # domingo da semana atual
     fim_semana = inicio_semana + timedelta(days=6)
 
-    # se não houver filtro, usa semana atual
-    if not data_inicio and not data_fim:
+    # se não tiver filtro manual, usar semana atual
+    if args.get("data_inicio") is None and args.get("data_fim") is None:
         data_inicio = inicio_semana
         data_fim = fim_semana
 
