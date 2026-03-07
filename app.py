@@ -2412,7 +2412,7 @@ def admin_dashboard():
         if d.eh_adiantamento
     )
 
-        cfg = get_config()
+    cfg = get_config()
 
     cooperados = []
     restaurantes = []
