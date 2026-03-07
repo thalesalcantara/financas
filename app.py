@@ -2446,70 +2446,87 @@ def admin_dashboard():
         status_doc_por_coop = {}
 
     if docinfo_map:
-        status_doc_por_coop = {
-            c.id: {
-                "cnh_ok": docinfo_map[c.id]["cnh"]["ok"],
-                "placa_ok": docinfo_map[c.id]["placa"]["ok"],
-            }
-            for c in cooperados
+            status_doc_por_coop = {
+        c.id: {
+            "cnh_ok": docinfo_map[c.id]["cnh"]["ok"],
+            "placa_ok": docinfo_map[c.id]["placa"]["ok"],
+        }
+        for c in cooperados
+    }
+
+    # ============================================================
+    # VARIÁVEIS PADRÃO (EVITA ERRO DE VARIÁVEL NÃO DEFINIDA)
+    # ============================================================
+
+    esc_by_int = {}
+    esc_by_str = {}
+    qtd_escalas_map = {}
+    qtd_sem_cadastro = 0
+    escalas_all = []
+
+    # -------- Escalas agrupadas e contagem por cooperado ----------
+    escalas_all = Escala.query.order_by(Escala.id.asc()).all()
+
+    esc_by_int = defaultdict(list)
+    esc_by_str = defaultdict(list)
+
+    for e in escalas_all:
+        k_int = e.cooperado_id if e.cooperado_id is not None else 0
+
+        esc_item = {
+            "data": e.data,
+            "turno": e.turno,
+            "horario": e.horario,
+            "contrato": e.contrato,
+            "cor": e.cor,
+            "nome_planilha": e.cooperado_nome,
         }
 
-        # ============================================================
-# VARIÁVEIS PADRÃO (EVITA ERRO DE VARIÁVEL NÃO DEFINIDA)
-# ============================================================
+        esc_by_int[k_int].append(esc_item)
+        esc_by_str[str(k_int)].append(esc_item)
 
-esc_by_int = {}
-esc_by_str = {}
-qtd_escalas_map = {}
-qtd_sem_cadastro = 0
-escalas_all = []
-
-        # -------- Escalas agrupadas e contagem por cooperado ----------
-        escalas_all = Escala.query.order_by(Escala.id.asc()).all()
-        esc_by_int: dict[int, list] = defaultdict(list)
-        esc_by_str: dict[str, list] = defaultdict(list)
-
-        for e in escalas_all:
-            k_int = e.cooperado_id if e.cooperado_id is not None else 0
-            esc_item = {
-                "data": e.data,
-                "turno": e.turno,
-                "horario": e.horario,
-                "contrato": e.contrato,
-                "cor": e.cor,
-                "nome_planilha": e.cooperado_nome,
-            }
-            esc_by_int[k_int].append(esc_item)
-            esc_by_str[str(k_int)].append(esc_item)
-
-        cont_rows = dict(
-            db.session.query(Escala.cooperado_id, func.count(Escala.id))
-            .group_by(Escala.cooperado_id)
-            .all()
+    cont_rows = dict(
+        db.session.query(
+            Escala.cooperado_id,
+            func.count(Escala.id)
         )
+        .group_by(Escala.cooperado_id)
+        .all()
+    )
 
-        qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
-        qtd_sem_cadastro = int(cont_rows.get(None, 0))
+    qtd_escalas_map = {
+        c.id: int(cont_rows.get(c.id, 0))
+        for c in cooperados
+    }
 
-        # ---- Gráficos (por mês)
-        sums = {}
-        for l in lancamentos:
-            if not l.data:
-                continue
-            key = l.data.strftime("%Y-%m")
-            sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
+    qtd_sem_cadastro = int(cont_rows.get(None, 0))
 
-        labels_ord = sorted(sums.keys())
+    # ============================================================
+    # GRÁFICOS (LANÇAMENTOS POR MÊS)
+    # ============================================================
 
-        def _fmt_label(k: str) -> str:
-            parts = k.split("-")
-            if len(parts) == 2 and parts[0] and parts[1]:
-                year, month = parts[0], parts[1]
-                return f"{month}/{year[-2:]}"
-            return k
+    sums = {}
 
-        labels_fmt = [_fmt_label(k) for k in labels_ord]
-        values = [round(sums[k], 2) for k in labels_ord]
+    for l in lancamentos:
+        if not l.data:
+            continue
+
+        key = l.data.strftime("%Y-%m")
+        sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
+
+    labels_ord = sorted(sums.keys())
+
+    def _fmt_label(k: str):
+        parts = k.split("-")
+
+        if len(parts) == 2 and parts[0] and parts[1]:
+            year, month = parts
+            return f"{month}/{year[-2:]}"
+
+        return k
+
+    labels_fmt = [_fmt_label(k) for k in labels_ord]
+    values = [round(sums[k], 2) for k in labels_ord]
 
     chart_data_lancamentos_coop = []
     chart_data_lancamentos_cooperados = []
