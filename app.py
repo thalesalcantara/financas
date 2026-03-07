@@ -2401,19 +2401,7 @@ def admin_dashboard():
     # -------- Escalas agrupadas e contagem por cooperado ----------
         from datetime import date, timedelta
 
-    hoje = date.today()
-
-    inicio_semana = hoje - timedelta(days=hoje.weekday())
-
-    fim_semana = inicio_semana + timedelta(days=6)
-
-    escalas_all = (
-        Escala.query
-        .filter(Escala.data >= inicio_semana)
-        .filter(Escala.data <= fim_semana)
-        .order_by(Escala.id.asc())
-        .all()
-    )
+    escalas_all = Escala.query.order_by(Escala.id.asc()).all()
     esc_by_int: dict[int, list] = defaultdict(list)
     esc_by_str: dict[str, list] = defaultdict(list)
     for e in escalas_all:
