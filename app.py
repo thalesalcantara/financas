@@ -2207,6 +2207,8 @@ def toggle_status_cooperado(id):
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_dashboard():
+    import time
+    t0 = time.time()
     args = request.args
 
     considerar_periodo = False
@@ -2736,6 +2738,7 @@ def admin_dashboard():
     current_date = date.today()
     data_limite = date(current_date.year, 12, 31)
 
+    print("TEMPO ADMIN:", time.time() - t0
     return render_template(
         "admin_dashboard.html",
         tab=active_tab,
