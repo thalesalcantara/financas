@@ -76,7 +76,11 @@ os.makedirs(STATIC_TABLES, exist_ok=True)
 DOCS_PERSIST_DIR = os.path.join(PERSIST_ROOT, "docs")
 os.makedirs(DOCS_PERSIST_DIR, exist_ok=True)
 
-
+def _redirect_admin(tab):
+    args = request.args.to_dict(flat=True)
+    args["tab"] = tab
+    return redirect(url_for("admin_dashboard", **args))
+    
 
 def _merge_qs(url: str, extra: dict[str, str]) -> str:
     """Insere parâmetros de query no URI sem duplicar os já existentes."""
@@ -3536,7 +3540,8 @@ def add_receita():
     db.session.add(r)
     db.session.commit()
     flash("Receita adicionada.", "success")
-    return redirect(url_for("admin_dashboard", tab="receitas"))
+    return _redirect_admin("receitas")
+
 
 @app.route("/receitas/<int:id>/edit", methods=["POST"])
 @admin_required
@@ -3544,12 +3549,12 @@ def edit_receita(id):
     r = ReceitaCooperativa.query.get_or_404(id)
     f = request.form
     r.descricao = f.get("descricao", "").strip()
-    # CORREÇÃO: campo correto é valor_total
     r.valor_total = f.get("valor", type=float)
     r.data = _parse_date(f.get("data"))
     db.session.commit()
     flash("Receita atualizada.", "success")
-    return redirect(url_for("admin_dashboard", tab="receitas"))
+    return _redirect_admin("receitas")
+
 
 @app.route("/receitas/<int:id>/delete")
 @admin_required
@@ -3558,7 +3563,8 @@ def delete_receita(id):
     db.session.delete(r)
     db.session.commit()
     flash("Receita excluída.", "success")
-    return redirect(url_for("admin_dashboard", tab="receitas"))
+    return _redirect_admin("receitas")
+
 
 @app.route("/despesas/add", methods=["POST"])
 @admin_required
@@ -3572,7 +3578,8 @@ def add_despesa():
     db.session.add(d)
     db.session.commit()
     flash("Despesa adicionada.", "success")
-    return redirect(url_for("admin_dashboard", tab="despesas"))
+    return _redirect_admin("despesas")
+
 
 @app.route("/despesas/<int:id>/edit", methods=["POST"])
 @admin_required
@@ -3584,7 +3591,8 @@ def edit_despesa(id):
     d.data = _parse_date(f.get("data"))
     db.session.commit()
     flash("Despesa atualizada.", "success")
-    return redirect(url_for("admin_dashboard", tab="despesas"))
+    return _redirect_admin("despesas")
+
 
 @app.route("/despesas/<int:id>/delete")
 @admin_required
@@ -3593,7 +3601,7 @@ def delete_despesa(id):
     db.session.delete(d)
     db.session.commit()
     flash("Despesa excluída.", "success")
-    return redirect(url_for("admin_dashboard", tab="despesas"))
+    return _redirect_admin("despesas")
 
 # =========================
 # Avisos (admin + públicos)
