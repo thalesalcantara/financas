@@ -2705,6 +2705,7 @@ def admin_dashboard():
         trocas_pendentes=trocas_pendentes,
         trocas_historico=trocas_historico,
         trocas_historico_flat=trocas_historico_flat,
+        fast_mode=True
     )
     
 
