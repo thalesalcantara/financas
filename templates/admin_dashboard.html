@@ -2160,6 +2160,11 @@
       </div>
 
       <form method="POST" action="{{ url_for('add_receita') }}" class="row g-2 align-items-end mt-2">
+
+      <input type="hidden" name="resumo_inicio" value="{{ request.args.get('resumo_inicio','') }}">
+      <input type="hidden" name="resumo_fim" value="{{ request.args.get('resumo_fim','') }}">
+      <input type="hidden" name="resumo_restaurante_id" value="{{ request.args.get('resumo_restaurante_id','') }}">
+      <input type="hidden" name="resumo_cooperado_id" value="{{ request.args.get('resumo_cooperado_id','') }}">
         <div class="col-md-5">
           <label class="form-label">Descrição</label>
           <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
@@ -2284,6 +2289,11 @@
       </div>
 
       <form method="POST" action="{{ url_for('add_despesa') }}" class="row g-2 align-items-end mt-2">
+
+      <input type="hidden" name="resumo_inicio" value="{{ request.args.get('resumo_inicio','') }}">
+      <input type="hidden" name="resumo_fim" value="{{ request.args.get('resumo_fim','') }}">
+      <input type="hidden" name="resumo_restaurante_id" value="{{ request.args.get('resumo_restaurante_id','') }}">
+      <input type="hidden" name="resumo_cooperado_id" value="{{ request.args.get('resumo_cooperado_id','') }}">
         <div class="col-md-5">
           <label class="form-label">Descrição</label>
           <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
@@ -2407,6 +2417,11 @@
       </div>
 
       <form method="POST" action="{{ url_for('add_receita_coop') }}" class="row g-2 align-items-end mt-2">
+
+      <input type="hidden" name="resumo_inicio" value="{{ request.args.get('resumo_inicio','') }}">
+      <input type="hidden" name="resumo_fim" value="{{ request.args.get('resumo_fim','') }}">
+      <input type="hidden" name="resumo_restaurante_id" value="{{ request.args.get('resumo_restaurante_id','') }}">
+      <input type="hidden" name="resumo_cooperado_id" value="{{ request.args.get('resumo_cooperado_id','') }}">
         <div class="col-md-3">
           <label class="form-label">Cooperado</label>
           <select class="form-select form-select-sm" name="cooperado_id" required>
@@ -2571,6 +2586,11 @@
       </div>
 
       <form method="POST" action="{{ url_for('add_despesa_coop') }}" class="row g-2 align-items-end mt-2">
+
+      <input type="hidden" name="resumo_inicio" value="{{ request.args.get('resumo_inicio','') }}">
+      <input type="hidden" name="resumo_fim" value="{{ request.args.get('resumo_fim','') }}">
+      <input type="hidden" name="resumo_restaurante_id" value="{{ request.args.get('resumo_restaurante_id','') }}">
+      <input type="hidden" name="resumo_cooperado_id" value="{{ request.args.get('resumo_cooperado_id','') }}">
         <div class="col-md-4">
           <label class="form-label">Cooperados</label>
           <select class="form-select form-select-sm" name="cooperado_ids[]" multiple size="5">
@@ -2650,6 +2670,11 @@
 
                   <!-- EXCLUIR via POST (evita 405) -->
                   <form method="POST" action="{{ url_for('delete_despesa_coop', id=dc.id) }}" class="d-inline">
+
+                  <input type="hidden" name="resumo_inicio" value="{{ request.args.get('resumo_inicio','') }}">
+                  <input type="hidden" name="resumo_fim" value="{{ request.args.get('resumo_fim','') }}">
+                  <input type="hidden" name="resumo_restaurante_id" value="{{ request.args.get('resumo_restaurante_id','') }}">
+                  <input type="hidden" name="resumo_cooperado_id" value="{{ request.args.get('resumo_cooperado_id','') }}">
                     {# Se você usa Flask-WTF/CSRF, descomente a linha abaixo #}
                     {# {{ csrf_token() }} #}
                     <button type="submit" class="btn btn-danger btn-sm btn-del" onclick="return confirm('Excluir esta despesa?');">
