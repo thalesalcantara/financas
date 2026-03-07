@@ -2028,7 +2028,7 @@ def index():
     if not u:
         return redirect(url_for("login"))
     if u.tipo == "admin":
-        return redirect(url_for("admin_dashboard"))
+        return redirect(url_for("admin_dashboard", tab="resumo"))
     if u.tipo == "cooperado":
         return redirect(url_for("portal_cooperado"))
     if u.tipo == "restaurante":
@@ -2065,7 +2065,7 @@ def login():
             session["user_id"] = u.id
             session["user_tipo"] = u.tipo
             if u.tipo == "admin":
-                return redirect(url_for("admin_dashboard"))
+                return redirect(url_for("admin_dashboard", tab="resumo"))
             elif u.tipo == "cooperado":
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
