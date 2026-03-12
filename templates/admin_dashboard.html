@@ -755,9 +755,6 @@
                 </div>
                 <div>
                   <h5 class="mb-0 resumo-title">Resumo geral financeiro</h5>
-                  <small class="text-muted">
-                    Use os filtros para enxergar produção, INSS (4,0%), SEST/SENAT (0,5%), receitas e despesas por período, estabelecimento e cooperado.
-                  </small>
                 </div>
               </div>
 
@@ -974,10 +971,6 @@
                 <div class="resumo-pill-label"><i class="bi bi-people"></i></div>
                 <div>
                   <h6 class="m-0">Resumo por Cooperado (filtro aplicado)</h6>
-                  <small class="text-muted">
-                    Líquido = Produções + <span class="text-success">Receitas</span> − INSS (4,0%) − SEST/SENAT (0,5%) −
-                    <span class="text-danger">Despesas</span>
-                  </small>
                 </div>
               </div>
             </div>
@@ -1756,9 +1749,6 @@
           </span>
           <span>Lançamentos & Produção</span>
         </h5>
-        <small class="text-muted-2">
-          Controle de produção por restaurante, cooperado e período, com INSS (4,0%), SEST/SENAT (0,5%) e líquido calculados.
-        </small>
       </div>
 
       <div class="d-flex flex-wrap gap-2 justify-content-end">
@@ -1902,9 +1892,6 @@
           </span>
           <div>
             <h6 class="m-0">Lançar Produção</h6>
-            <small class="text-muted-2">
-              A competência por <b>período do restaurante</b> é aplicada no back-end.
-            </small>
           </div>
         </div>
       </div>
@@ -1966,12 +1953,6 @@
           </button>
         </div>
       </form>
-
-      <div class="mt-2 text-muted small">
-        Nota: os descontos abaixo são cálculo bruto linha-a-linha:
-        <b>INSS 4,0%</b> + <b>SEST/SENAT 0,5%</b> = <b>4,5%</b>.
-        <b>Isenções por benefício</b> entram na <u>Folha</u> e nos <u>totais</u> do Resumo.
-      </div>
     </div>
   </div>
 
@@ -2841,11 +2822,6 @@
   <!-- Formulário de rateio -->
   <div class="card border-0 shadow-sm rounded-3 mb-3">
     <div class="card-body">
-      <p class="mb-3 text-muted">
-        Informe o <b>período semanal</b> e, para cada tipo, o <b>valor unitário por beneficiado</b>. Na submissão
-        calculamos: <b>Total</b> (= unitário × nº beneficiados) e <b>Rateio por pagante</b>
-        (pagantes = <i>todos</i> − <i>beneficiados</i> − <i>isentos</i>).
-      </p>
 
       <form id="form-beneficios" method="POST" action="{{ url_for('ratear_beneficios') }}" class="row g-3">
         <div class="col-12 col-md-3">
@@ -2948,7 +2924,6 @@
           <button class="btn btn-royal">
             <i class="bi bi-scissors"></i> Aplicar rateios
           </button>
-          <small class="muted ms-2">Os lançamentos aparecerão em <b>Despesas para Cooperados</b> como “(rateio ref mm/aaaa)”.</small>
         </div>
       </form>
     </div>
@@ -2995,7 +2970,6 @@
   <button type="submit" class="btn btn-outline-danger btn-sm" id="btn-bulk-delete" disabled>
     <i class="bi bi-trash"></i> Excluir selecionados
   </button>
-  <span class="text-muted small">Selecione vários e exclua de uma vez.</span>
 </form>
 
 <div class="table-responsive mt-3">
