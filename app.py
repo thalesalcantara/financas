@@ -2592,6 +2592,31 @@ def admin_dashboard():
         .all()
     )
 
+    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
+    qtd_sem_cadastro = int(cont_rows.get(None, 0))
+    esc_by_int: dict[int, list] = defaultdict(list)
+    esc_by_str: dict[str, list] = defaultdict(list)
+    for e in escalas_all:
+        k_int = e.cooperado_id if e.cooperado_id is not None else 0  # 0 = sem cadastro
+        esc_item = {
+            "data": e.data,
+            "turno": e.turno,
+            "horario": e.horario,
+            "contrato": e.contrato,
+            "cor": e.cor,
+            "nome_planilha": e.cooperado_nome,
+        }
+        esc_by_int[k_int].append(esc_item)
+        esc_by_str[str(k_int)].append(esc_item)
+
+    cont_rows = dict(
+        db.session.query(Escala.cooperado_id, func.count(Escala.id))
+        .group_by(Escala.cooperado_id)
+        .all()
+    )
+    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
+    qtd_sem_cadastro = int(cont_rows.get(None, 0))
+
     # ---- Gráficos (por mês)
     sums = {}
     for l in lancamentos:
