@@ -3543,9 +3543,33 @@ def admin_avaliacoes():
     data_inicio = (request.args.get("data_inicio") or "").strip()
     data_fim    = (request.args.get("data_fim") or "").strip()
 
-    # Datas
-    di = _parse_date(data_inicio)
-    df = _parse_date(data_fim)
+    # =========================================================
+    # SEM FILTRO -> CARREGA SOMENTE A SEMANA ATUAL
+    # COM FILTRO -> USA O PERÍODO INFORMADO
+    # =========================================================
+    filtro_manual = bool(
+        restaurante_id
+        or cooperado_id
+        or data_inicio
+        or data_fim
+    )
+
+    if not filtro_manual:
+        hoje = date.today()
+        di = hoje - timedelta(days=hoje.weekday())   # segunda
+        df = di + timedelta(days=6)                  # domingo
+        data_inicio = di.strftime("%Y-%m-%d")
+        data_fim = df.strftime("%Y-%m-%d")
+    else:
+        di = _parse_date(data_inicio)
+        df = _parse_date(data_fim)
+
+        if di and not df:
+            df = di
+            data_fim = df.strftime("%Y-%m-%d")
+        elif df and not di:
+            di = df
+            data_inicio = di.strftime("%Y-%m-%d")
 
     # Model
     Model = AvaliacaoRestaurante if tipo == "restaurante" else AvaliacaoCooperado
@@ -3584,7 +3608,7 @@ def admin_avaliacoes():
         .join(Cooperado, Model.cooperado_id == Cooperado.id)
     )
 
-        # ==============================
+    # ==============================
     # FILTROS
     # ==============================
     filtros = []
@@ -3595,11 +3619,12 @@ def admin_avaliacoes():
     if cooperado_id:
         filtros.append(Model.cooperado_id == cooperado_id)
 
+    # IMPORTANTE: usa datetime real para filtrar corretamente
     if di:
-        filtros.append(func.date(Model.criado_em) >= di)
+        filtros.append(Model.criado_em >= datetime.combine(di, datetime.min.time()))
 
     if df:
-        filtros.append(func.date(Model.criado_em) <= df)
+        filtros.append(Model.criado_em <= datetime.combine(df, datetime.max.time()))
 
     if filtros:
         base = base.filter(and_(*filtros))
@@ -3653,32 +3678,43 @@ def admin_avaliacoes():
 
             "geral":      getattr(a, "estrelas_geral", 0) or 0,
             "comentario": (getattr(a, "comentario", "") or "").strip(),
-            "media":       getattr(a, "media_ponderada", None),
-            "sentimento":  getattr(a, "sentimento", None),
-            "temas":       getattr(a, "temas", None),
-            "alerta":      bool(getattr(a, "alerta_crise", False)),
+            "media":      getattr(a, "media_ponderada", None),
+            "sentimento": getattr(a, "sentimento", None),
+            "temas":      getattr(a, "temas", None),
+            "alerta":     bool(getattr(a, "alerta_crise", False)),
 
-            "tratamento": 0, "ambiente": 0, "suporte": 0,
-            "trat": 0, "amb": 0, "sup": 0,
-            "pont": 0, "educ": 0, "efic": 0, "apres": 0,
+            "tratamento": 0,
+            "ambiente": 0,
+            "suporte": 0,
+            "trat": 0,
+            "amb": 0,
+            "sup": 0,
+            "pont": 0,
+            "educ": 0,
+            "efic": 0,
+            "apres": 0,
         }
 
         if tipo == "restaurante":
             trat = getattr(a, "estrelas_tratamento", None)
             if trat is None:
                 trat = getattr(a, "estrelas_pontualidade", 0)
-            amb  = getattr(a, "estrelas_ambiente", None)
+
+            amb = getattr(a, "estrelas_ambiente", None)
             if amb is None:
                 amb = getattr(a, "estrelas_educacao", 0)
-            sup  = getattr(a, "estrelas_suporte", None)
+
+            sup = getattr(a, "estrelas_suporte", None)
             if sup is None:
                 sup = getattr(a, "estrelas_eficiencia", 0)
 
             item.update({
                 "tratamento": trat or 0,
-                "ambiente":   amb  or 0,
-                "suporte":    sup  or 0,
-                "trat": trat or 0, "amb": amb or 0, "sup": sup or 0,
+                "ambiente":   amb or 0,
+                "suporte":    sup or 0,
+                "trat": trat or 0,
+                "amb": amb or 0,
+                "sup": sup or 0,
             })
         else:
             item.update({
@@ -3694,12 +3730,19 @@ def admin_avaliacoes():
     def avg_or_zero(coluna):
         if coluna is None:
             return 0.0
+
         q = db.session.query(func.coalesce(func.avg(coluna), 0.0))
+
         if filtros:
-            q = q.filter(and_(*filtros))
+            q = q.select_from(Model).filter(and_(*filtros))
+
         return float(q.scalar() or 0.0)
 
-    kpis = {"qtd": total, "geral": avg_or_zero(f_geral)}
+    kpis = {
+        "qtd": total,
+        "geral": avg_or_zero(f_geral)
+    }
+
     if tipo == "restaurante":
         kpis.update({
             "trat": avg_or_zero(f_trat),
@@ -3715,7 +3758,9 @@ def admin_avaliacoes():
         })
 
     # Ranking + chart
-    ranking, chart_top = [], {"labels": [], "values": []}
+    ranking = []
+    chart_top = {"labels": [], "values": []}
+
     if tipo == "restaurante":
         q_rank = (
             db.session.query(
@@ -3729,18 +3774,32 @@ def admin_avaliacoes():
             )
             .join(Model, Model.restaurante_id == Restaurante.id)
         )
+
         if filtros:
             q_rank = q_rank.filter(and_(*filtros))
+
         ranking_rows = q_rank.group_by(Restaurante.id, Restaurante.nome).all()
+
         ranking = [{
-            "rest_nome": r.nome, "qtd": int(r.qtd or 0),
+            "rest_nome": r.nome,
+            "qtd": int(r.qtd or 0),
             "m_geral": float(r.m_geral or 0),
             "m_trat":  float(r.m_trat or 0),
             "m_amb":   float(r.m_amb or 0),
             "m_sup":   float(r.m_sup or 0),
         } for r in ranking_rows]
-        top = sorted([x for x in ranking if x["qtd"] >= 3], key=lambda x: x["m_geral"], reverse=True)[:10]
-        chart_top = {"labels": [r["rest_nome"] for r in top], "values": [round(r["m_geral"], 2) for r in top]}
+
+        top = sorted(
+            [x for x in ranking if x["qtd"] >= 3],
+            key=lambda x: x["m_geral"],
+            reverse=True
+        )[:10]
+
+        chart_top = {
+            "labels": [r["rest_nome"] for r in top],
+            "values": [round(r["m_geral"], 2) for r in top]
+        }
+
     else:
         q_rank = (
             db.session.query(
@@ -3751,31 +3810,52 @@ def admin_avaliacoes():
                 (func.coalesce(func.avg(f_pont), 0.0) if f_pont is not None else literal(0.0)).label("m_pont"),
                 (func.coalesce(func.avg(f_educ), 0.0) if f_educ is not None else literal(0.0)).label("m_educ"),
                 (func.coalesce(func.avg(f_efic), 0.0) if f_efic is not None else literal(0.0)).label("m_efic"),
-                (func.coalesce(func.avg(f_apres),0.0) if f_apres is not None else literal(0.0)).label("m_apres"),
+                (func.coalesce(func.avg(f_apres), 0.0) if f_apres is not None else literal(0.0)).label("m_apres"),
             )
             .join(Model, Model.cooperado_id == Cooperado.id)
         )
+
         if filtros:
             q_rank = q_rank.filter(and_(*filtros))
+
         ranking_rows = q_rank.group_by(Cooperado.id, Cooperado.nome).all()
+
         ranking = [{
-            "coop_nome": r.nome, "qtd": int(r.qtd or 0),
+            "coop_nome": r.nome,
+            "qtd": int(r.qtd or 0),
             "m_geral": float(r.m_geral or 0),
             "m_pont":  float(r.m_pont or 0),
             "m_educ":  float(r.m_educ or 0),
             "m_efic":  float(r.m_efic or 0),
             "m_apres": float(r.m_apres or 0),
         } for r in ranking_rows]
-        top = sorted([x for x in ranking if x["qtd"] >= 3], key=lambda x: x["m_geral"], reverse=True)[:10]
-        chart_top = {"labels": [r["coop_nome"] for r in top], "values": [round(r["m_geral"], 2) for r in top]}
+
+        top = sorted(
+            [x for x in ranking if x["qtd"] >= 3],
+            key=lambda x: x["m_geral"],
+            reverse=True
+        )[:10]
+
+        chart_top = {
+            "labels": [r["coop_nome"] for r in top],
+            "values": [round(r["m_geral"], 2) for r in top]
+        }
 
     # Compatibilidade
     compat_map = {}
+
     for a in avaliacoes:
         key = (a.coop_id, a.rest_id)
         d = compat_map.get(key)
+
         if not d:
-            d = {"coop": a.coop_nome, "rest": a.rest_nome, "sum": 0.0, "count": 0}
+            d = {
+                "coop": a.coop_nome,
+                "rest": a.rest_nome,
+                "sum": 0.0,
+                "count": 0
+            }
+
         d["sum"] += (a.geral or 0)
         d["count"] += 1
         compat_map[key] = d
@@ -3783,8 +3863,16 @@ def admin_avaliacoes():
     compat = []
     for d in compat_map.values():
         avg = (d["sum"] / d["count"]) if d["count"] else 0.0
-        compat.append({"coop": d["coop"], "rest": d["rest"], "avg": avg, "count": d["count"]})
-    compat.sort(key=lambda x: (-(x["avg"] or 0), -(x["count"] or 0), x["coop"], x["rest"]))
+        compat.append({
+            "coop": d["coop"],
+            "rest": d["rest"],
+            "avg": avg,
+            "count": d["count"]
+        })
+
+    compat.sort(
+        key=lambda x: (-(x["avg"] or 0), -(x["count"] or 0), x["coop"], x["rest"])
+    )
 
     # Filtros p/ repopular form + preserva args para paginação
     _flt = SimpleNamespace(
@@ -3793,6 +3881,7 @@ def admin_avaliacoes():
         data_inicio=data_inicio or "",
         data_fim=data_fim or "",
     )
+
     preserve = request.args.to_dict(flat=True)
     preserve.pop("page", None)
 
@@ -3800,10 +3889,9 @@ def admin_avaliacoes():
     cfg = get_config()
     admin_user = Usuario.query.filter_by(tipo="admin").first()
 
-    # 🔥 AQUI é a mudança principal: aponta pro novo HTML
     return render_template(
         "admin_avaliacoes.html",
-        tab="avaliacoes",                  # se o menu lateral usar
+        tab="avaliacoes",
         tipo=tipo,
         avaliacoes=avaliacoes,
         kpis=kpis,
@@ -3820,7 +3908,7 @@ def admin_avaliacoes():
         admin=admin_user,
         salario_minimo=cfg.salario_minimo or 0.0,
     )
-
+    
 @app.route("/admin/avaliacoes/export")
 @role_required("admin")
 def admin_export_avaliacoes_csv():
