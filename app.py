@@ -1580,17 +1580,6 @@ def _prox_ocorrencia_anual(dt: date | None) -> date | None:
         alvo = date(hoje.year + 1, dt.month, dt.day)
     return alvo
 
-def _parse_date(s: str | None) -> date | None:
-    if not s:
-        return None
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
-        try:
-            return datetime.strptime(s, fmt).date()
-        except Exception:
-            pass
-    return None
-    
-
 def _parse_ymd(s):
     try:
         return datetime.strptime(s, "%Y-%m-%d").date()
@@ -1603,7 +1592,15 @@ def _bounds_mes(yyyy_mm: str):
     ini = date(y, m, 1)
     fim = (ini + relativedelta(months=1))
     return ini, fim
-    
+
+def _bounds_semana_atual(ref: date | None = None) -> tuple[date, date]:
+    """
+    Retorna o intervalo da semana atual (segunda a domingo).
+    """
+    ref = ref or date.today()
+    ini = ref - timedelta(days=ref.weekday())   # segunda
+    fim = ini + timedelta(days=6)               # domingo
+    return ini, fim
 
 def _parse_data_ymd(s):
     try:
@@ -1613,11 +1610,6 @@ def _parse_data_ymd(s):
 
 def _fmt_br(d: date | None) -> str:
     return d.strftime("%d/%m/%Y") if d else ""
-
-
-def _dow(dt: date) -> str:
-    return str((dt.weekday() % 7) + 1)
-
 
 # === Helpers de Avaliação (NLP leve + métricas) =============================
 def _clamp_star(v):
@@ -2439,10 +2431,28 @@ def admin_dashboard():
     data_inicio = _pick_date("resumo_inicio", "data_inicio")
     data_fim = _pick_date("resumo_fim", "data_fim")
 
+    # Se não houver filtro explícito, usa somente a semana atual
+    filtro_periodo_aplicado = bool(data_inicio or data_fim)
+
+    if data_inicio and not data_fim:
+        data_fim = data_inicio
+    elif data_fim and not data_inicio:
+        data_inicio = data_fim
+    elif not data_inicio and not data_fim:
+        hoje_ref = date.today()
+        data_inicio = hoje_ref - timedelta(days=hoje_ref.weekday())
+        data_fim = data_inicio + timedelta(days=6)
+
     restaurante_id = args.get("restaurante_id", type=int)
     cooperado_id = args.get("cooperado_id", type=int)
     considerar_periodo = bool(args.get("considerar_periodo"))
     dows = set(args.getlist("dow"))  # {"1","2",...}
+
+    lancamentos = []
+    total_producoes = 0.0
+    total_inss = 0.0
+    total_sest = 0.0
+    total_encargos = 0.0
 
     # ---- Lançamentos (com filtros + DOW)
     q = Lancamento.query
@@ -2480,51 +2490,78 @@ def admin_dashboard():
     total_encargos = round(total_inss + total_sest, 2)
 
     # ---- Coop (institucional)
-    rq = ReceitaCooperativa.query
-    dq = DespesaCooperativa.query
-    if data_inicio:
-        rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
-        dq = dq.filter(DespesaCooperativa.data >= data_inicio)
-    if data_fim:
-        rq = rq.filter(ReceitaCooperativa.data <= data_fim)
-        dq = dq.filter(DespesaCooperativa.data <= data_fim)
+    receitas = []
+    despesas = []
+    total_receitas = 0.0
+    total_despesas = 0.0
 
-    receitas = rq.order_by(ReceitaCooperativa.data.desc().nullslast(), ReceitaCooperativa.id.desc()).all()
-    despesas = dq.order_by(DespesaCooperativa.data.desc(), DespesaCooperativa.id.desc()).all()
-    total_receitas = sum((r.valor_total or 0.0) for r in receitas)
-    total_despesas = sum((d.valor or 0.0) for d in despesas)
+    if active_tab in {"receitas", "despesas"}:
+        rq = ReceitaCooperativa.query
+        dq = DespesaCooperativa.query
+
+        if data_inicio:
+            rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
+            dq = dq.filter(DespesaCooperativa.data >= data_inicio)
+        if data_fim:
+            rq = rq.filter(ReceitaCooperativa.data <= data_fim)
+            dq = dq.filter(DespesaCooperativa.data <= data_fim)
+
+        receitas = rq.order_by(
+            ReceitaCooperativa.data.desc().nullslast(),
+            ReceitaCooperativa.id.desc()
+        ).all()
+        despesas = dq.order_by(
+            DespesaCooperativa.data.desc(),
+            DespesaCooperativa.id.desc()
+        ).all()
+
+        total_receitas = sum((r.valor_total or 0.0) for r in receitas)
+        total_despesas = sum((d.valor or 0.0) for d in despesas)
 
     # ---- Cooperados (pessoa física)
-    rq2 = ReceitaCooperado.query
-    dq2 = DespesaCooperado.query
+    receitas_coop = []
+    despesas_coop = []
+    total_receitas_coop = 0.0
+    total_despesas_coop = 0.0
+    total_adiantamentos_coop = 0.0
 
-    # Receitas (pontuais): filtra por data simples
-    if data_inicio:
-        rq2 = rq2.filter(ReceitaCooperado.data >= data_inicio)
-    if data_fim:
-        rq2 = rq2.filter(ReceitaCooperado.data <= data_fim)
+    if active_tab in {"coop_receitas", "coop_despesas", "beneficios"}:
+        rq2 = ReceitaCooperado.query
+        dq2 = DespesaCooperado.query
 
-    # Despesas (semanais): usa sobreposição do intervalo [data_inicio, data_fim]
-    if data_inicio and data_fim:
-        dq2 = dq2.filter(
-            DespesaCooperado.data_inicio <= data_fim,
-            DespesaCooperado.data_fim >= data_inicio,
-        )
-    elif data_inicio:
-        dq2 = dq2.filter(DespesaCooperado.data_fim >= data_inicio)
-    elif data_fim:
-        dq2 = dq2.filter(DespesaCooperado.data_inicio <= data_fim)
+        # Receitas (pontuais): filtra por data simples
+        if data_inicio:
+            rq2 = rq2.filter(ReceitaCooperado.data >= data_inicio)
+        if data_fim:
+            rq2 = rq2.filter(ReceitaCooperado.data <= data_fim)
 
-    receitas_coop = rq2.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
-    despesas_coop = dq2.order_by(DespesaCooperado.data_fim.desc().nullslast(), DespesaCooperado.id.desc()).all()
+        # Despesas (semanais): usa sobreposição do intervalo [data_inicio, data_fim]
+        if data_inicio and data_fim:
+            dq2 = dq2.filter(
+                DespesaCooperado.data_inicio <= data_fim,
+                DespesaCooperado.data_fim >= data_inicio,
+            )
+        elif data_inicio:
+            dq2 = dq2.filter(DespesaCooperado.data_fim >= data_inicio)
+        elif data_fim:
+            dq2 = dq2.filter(DespesaCooperado.data_inicio <= data_fim)
 
-    total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
+        receitas_coop = rq2.order_by(
+            ReceitaCooperado.data.desc(),
+            ReceitaCooperado.id.desc()
+        ).all()
+        despesas_coop = dq2.order_by(
+            DespesaCooperado.data_fim.desc().nullslast(),
+            DespesaCooperado.id.desc()
+        ).all()
 
-    # Despesas normais (eh_adiantamento = False ou None)
-    total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop if not d.eh_adiantamento)
+        total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
 
-    # Adiantamentos (eh_adiantamento = True)
-    total_adiantamentos_coop = sum((d.valor or 0.0) for d in despesas_coop if d.eh_adiantamento)
+        # Despesas normais (eh_adiantamento = False ou None)
+        total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop if not d.eh_adiantamento)
+
+        # Adiantamentos (eh_adiantamento = True)
+        total_adiantamentos_coop = sum((d.valor or 0.0) for d in despesas_coop if d.eh_adiantamento)
 
     cfg = get_config()
 
@@ -2617,7 +2654,7 @@ def admin_dashboard():
     qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
     qtd_sem_cadastro = int(cont_rows.get(None, 0))
 
-    # ---- Gráficos (por mês)
+        # ---- Gráficos (por mês)
     sums = {}
     for l in lancamentos:
         if not l.data:
@@ -2642,15 +2679,24 @@ def admin_dashboard():
     admin_user = Usuario.query.filter_by(tipo="admin").first()
 
     # =====================================================================
-    # 7) Folha de pagamento  -> SÓ CALCULA SE A ABA "folha" ESTIVER ABERTA
+    # 7) Folha de pagamento -> SÓ CALCULA SE A ABA "folha" ESTIVER ABERTA
     # =====================================================================
     folha_por_coop = []
     folha_inicio = None
     folha_fim = None
 
     if active_tab == "folha":
-        folha_inicio = _parse_date(args.get("folha_inicio")) or (date.today() - timedelta(days=30))
-        folha_fim = _parse_date(args.get("folha_fim")) or date.today()
+        folha_inicio = _parse_date(args.get("folha_inicio"))
+        folha_fim = _parse_date(args.get("folha_fim"))
+
+        if folha_inicio and not folha_fim:
+            folha_fim = folha_inicio
+        elif folha_fim and not folha_inicio:
+            folha_inicio = folha_fim
+        elif not folha_inicio and not folha_fim:
+            hoje_ref = date.today()
+            folha_inicio = hoje_ref - timedelta(days=hoje_ref.weekday())
+            folha_fim = folha_inicio + timedelta(days=6)
 
         INSS_ALIQ_FOLHA = 0.04
         SEST_ALIQ_FOLHA = 0.005
@@ -2670,6 +2716,7 @@ def admin_dashboard():
                 .order_by(Lancamento.data.asc(), Lancamento.id.asc())
                 .all()
             )
+
             r = (
                 ReceitaCooperado.query.filter(
                     ReceitaCooperado.cooperado_id == c.id,
@@ -2680,7 +2727,6 @@ def admin_dashboard():
                 .all()
             )
 
-            # Despesa semanal: usa sobreposição do intervalo (mais seguro que "DespesaCooperado.data")
             d = (
                 DespesaCooperado.query.filter(
                     (DespesaCooperado.cooperado_id == c.id) | (DespesaCooperado.cooperado_id.is_(None)),
@@ -2725,6 +2771,7 @@ def admin_dashboard():
 
     # ----------------------------
     # Benefícios para template (com filtros + id)
+    # SÓ CARREGA QUANDO A ABA "beneficios" ESTIVER ABERTA
     # ----------------------------
     def _tokenize(s: str):
         return [x.strip() for x in re.split(r"[;,]", s or "") if x.strip()]
@@ -2746,52 +2793,62 @@ def admin_dashboard():
     b_fim = _d(request.args.get("b_fim"))
     coop_filter = request.args.get("coop_benef_id", type=int)
 
-    q_benef = BeneficioRegistro.query
+    historico_beneficios = []
+    beneficios_view = []
 
-    if b_ini and b_fim:
+    if active_tab == "beneficios":
+        if b_ini and not b_fim:
+            b_fim = b_ini
+        elif b_fim and not b_ini:
+            b_ini = b_fim
+        elif not b_ini and not b_fim:
+            hoje_ref = date.today()
+            b_ini = hoje_ref - timedelta(days=hoje_ref.weekday())
+            b_fim = b_ini + timedelta(days=6)
+
+        q_benef = BeneficioRegistro.query
+
         q_benef = q_benef.filter(
             BeneficioRegistro.data_inicial <= b_fim,
             BeneficioRegistro.data_final >= b_ini,
         )
-    elif b_ini:
-        q_benef = q_benef.filter(BeneficioRegistro.data_final >= b_ini)
-    elif b_fim:
-        q_benef = q_benef.filter(BeneficioRegistro.data_inicial <= b_fim)
 
-    historico_beneficios = q_benef.order_by(BeneficioRegistro.id.desc()).all()
+        historico_beneficios = q_benef.order_by(BeneficioRegistro.id.desc()).all()
 
-    beneficios_view = []
-    for b in historico_beneficios:
-        nomes = _tokenize(b.recebedores_nomes or "")
-        ids = _tokenize(b.recebedores_ids or "")
+        for b in historico_beneficios:
+            nomes = _tokenize(b.recebedores_nomes or "")
+            ids = _tokenize(b.recebedores_ids or "")
 
-        recs = []
-        for i, nome in enumerate(nomes):
-            rid = None
-            if i < len(ids) and str(ids[i]).isdigit():
-                try:
-                    rid = int(ids[i])
-                except Exception:
-                    rid = None
+            recs = []
+            for i, nome in enumerate(nomes):
+                rid = None
+                if i < len(ids) and str(ids[i]).isdigit():
+                    try:
+                        rid = int(ids[i])
+                    except Exception:
+                        rid = None
 
-            if coop_filter and (rid is not None) and (rid != coop_filter):
+                if coop_filter and (rid is not None) and (rid != coop_filter):
+                    continue
+
+                recs.append({
+                    "id": rid,
+                    "nome": nome,
+                })
+
+            if coop_filter and not recs:
                 continue
 
-            recs.append({"id": rid, "nome": nome})
-
-        if coop_filter and not recs:
-            continue
-
-        beneficios_view.append({
-            "id": b.id,
-            "data_inicial": b.data_inicial,
-            "data_final": b.data_final,
-            "data_lancamento": b.data_lancamento,
-            "tipo": b.tipo,
-            "valor_total": b.valor_total or 0.0,
-            "recebedores": recs,
-        })
-
+            beneficios_view.append({
+                "id": b.id,
+                "data_inicial": b.data_inicial,
+                "data_final": b.data_final,
+                "data_lancamento": b.data_lancamento,
+                "tipo": b.tipo,
+                "valor_total": b.valor_total or 0.0,
+                "recebedores": recs,
+            })
+            
     # ======== Trocas no admin ========
     def _escala_desc(e):
         return _escala_label(e) if e else ""
@@ -2997,7 +3054,7 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 def _dow(d: date) -> str:
-    return str(d.weekday()) if d else ""
+    return str((d.weekday() % 7) + 1) if d else ""
 
 def _fmt_time(t) -> str:
     if not t:
@@ -5333,8 +5390,22 @@ def portal_cooperado():
     qr = in_range(ReceitaCooperado.query.filter_by(cooperado_id=coop.id), ReceitaCooperado.data)
     receitas_coop = qr.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
 
-    qd = in_range(DespesaCooperado.query.filter_by(cooperado_id=coop.id), DespesaCooperado.data)
-    despesas_coop = qd.order_by(DespesaCooperado.data.desc(), DespesaCooperado.id.desc()).all()
+        qd = DespesaCooperado.query.filter_by(cooperado_id=coop.id)
+
+    if di and df:
+        qd = qd.filter(
+            DespesaCooperado.data_inicio <= df,
+            DespesaCooperado.data_fim >= di,
+        )
+    elif di:
+        qd = qd.filter(DespesaCooperado.data_fim >= di)
+    elif df:
+        qd = qd.filter(DespesaCooperado.data_inicio <= df)
+
+    despesas_coop = qd.order_by(
+        DespesaCooperado.data_fim.desc().nullslast(),
+        DespesaCooperado.id.desc()
+    ).all()
 
     # =========================
     # Totais
