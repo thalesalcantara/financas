@@ -47,6 +47,7 @@
     .layout{
       display:flex;
       min-height:100vh;
+      width:100%;
     }
 
     /* SIDEBAR ============================================================ */
@@ -232,16 +233,21 @@
     .main{
       flex:1;
       margin-left:var(--sidebar-w);
-      padding:22px;
+      width:calc(100% - var(--sidebar-w));
+      max-width:none;
+      padding:22px 24px 32px;
     }
 
+    /* AQUI FOI A CORREÇÃO PRINCIPAL */
     .content-shell{
-      max-width:1400px;
-      margin:0 auto 38px;
+      width:100%;
+      max-width:none !important;
+      margin:0 0 38px 0;
     }
 
     .hero{
       position:relative;
+      width:100%;
       padding:22px;
       border-radius:28px;
       background:
@@ -366,6 +372,7 @@
     }
 
     .card-modern{
+      width:100%;
       background:var(--card);
       border:1px solid var(--border);
       border-radius:var(--radius);
@@ -390,6 +397,7 @@
       display:grid;
       grid-template-columns:1.2fr 1.2fr .8fr .8fr;
       gap:12px;
+      width:100%;
     }
 
     .input-shell label{
@@ -487,6 +495,7 @@
 
     .subtab-pane{
       display:none;
+      width:100%;
     }
 
     .subtab-pane.active{
@@ -498,6 +507,7 @@
       grid-template-columns:repeat(6, minmax(0, 1fr));
       gap:14px;
       margin-bottom:16px;
+      width:100%;
     }
 
     .kpi-card{
@@ -568,6 +578,7 @@
       gap:16px;
       align-items:start;
       margin-bottom:16px;
+      width:100%;
     }
 
     .table-wrap{
@@ -575,10 +586,12 @@
       border-radius:18px;
       border:1px solid var(--border);
       background:#fff;
+      width:100%;
     }
 
     .table-modern{
       margin:0;
+      width:100%;
     }
 
     .table-modern thead th{
@@ -765,9 +778,12 @@
       grid-template-columns:1fr 1fr;
       gap:16px;
       margin-bottom:16px;
+      width:100%;
     }
 
     .detail-card{
+      width:100%;
+      min-width:0;
       border:1px solid var(--border);
       border-radius:18px;
       background:#fff;
@@ -797,10 +813,12 @@
 
     .detail-body{
       padding:0;
+      width:100%;
     }
 
     .table-slim{
       margin:0;
+      width:100%;
     }
 
     .table-slim thead th{
@@ -859,7 +877,14 @@
 
       .main{
         margin-left:var(--sidebar-w);
+        width:calc(100% - var(--sidebar-w));
         padding:16px 10px;
+      }
+
+      .content-shell{
+        width:100%;
+        max-width:none !important;
+        margin:0 0 30px 0;
       }
 
       .filter-grid{
@@ -1171,7 +1196,6 @@
         </button>
       </div>
 
-      <!-- PRINCIPAL ====================================================== -->
       <section id="tab-detalhes" class="subtab-pane active">
 
         <div class="detail-grid">
@@ -1446,7 +1470,6 @@
         </section>
       </section>
 
-      <!-- INDICADORES ==================================================== -->
       <section id="tab-indicadores" class="subtab-pane">
         {% set _k = kpis|default({}) %}
 
