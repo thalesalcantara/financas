@@ -24,7 +24,7 @@
       --warning:#f59e0b;
       --danger:#ef4444;
       --shadow:0 10px 30px rgba(17,24,39,.08);
-      --sidebar-w:270px;
+      --sidebar-w:278px;
       --radius:20px;
     }
 
@@ -79,13 +79,13 @@
 
     .brand{
       position:relative;
-      padding:14px;
+      padding:16px 16px 14px;
       margin-bottom:14px;
       border-radius:18px;
       background:rgba(255,255,255,.10);
       border:1px solid rgba(255,255,255,.12);
       backdrop-filter:blur(8px);
-      overflow:hidden;
+      overflow:visible;
     }
 
     .brand::after{
@@ -101,16 +101,28 @@
     .brand-title{
       margin:0;
       font-family:'Orbitron',sans-serif;
-      font-size:1.16rem;
-      letter-spacing:1.8px;
+      font-size:clamp(.98rem, 1.08vw, 1.14rem);
+      letter-spacing:.9px;
       text-transform:uppercase;
+      line-height:1.28;
+      white-space:normal;
+      word-break:break-word;
+      max-width:100%;
+      position:relative;
+      z-index:1;
+    }
+
+    .brand-title .brand-line{
+      display:block;
     }
 
     .brand-sub{
       display:block;
-      margin-top:4px;
+      margin-top:6px;
       font-size:.74rem;
       opacity:.82;
+      position:relative;
+      z-index:1;
     }
 
     .sidebar-nav{
@@ -224,7 +236,7 @@
     }
 
     .content-shell{
-      max-width:1380px;
+      max-width:1400px;
       margin:0 auto 38px;
     }
 
@@ -441,6 +453,46 @@
       color:#1f2937;
     }
 
+    .subtab-wrap{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:16px;
+    }
+
+    .subtab-btn{
+      border:1px solid var(--border);
+      background:#fff;
+      color:#334155;
+      border-radius:14px;
+      padding:10px 14px;
+      font-size:.88rem;
+      font-weight:800;
+      cursor:pointer;
+      transition:all .18s ease;
+      box-shadow:0 4px 14px rgba(17,24,39,.04);
+    }
+
+    .subtab-btn:hover{
+      transform:translateY(-1px);
+      background:#f8fbff;
+    }
+
+    .subtab-btn.active{
+      background:linear-gradient(135deg,var(--royal-blue),var(--royal-blue-2));
+      color:#fff;
+      border-color:transparent;
+      box-shadow:0 12px 24px rgba(39,71,217,.18);
+    }
+
+    .subtab-pane{
+      display:none;
+    }
+
+    .subtab-pane.active{
+      display:block;
+    }
+
     .kpi-grid{
       display:grid;
       grid-template-columns:repeat(6, minmax(0, 1fr));
@@ -558,6 +610,10 @@
       background:#f8fbff;
     }
 
+    .table-detail td{
+      font-size:.92rem;
+    }
+
     .mini-badge{
       display:inline-flex;
       align-items:center;
@@ -612,6 +668,7 @@
     }
 
     .chart-shell{
+      height:350px;
       padding:14px 14px 8px;
       border:1px solid var(--border);
       border-radius:18px;
@@ -634,8 +691,7 @@
       padding:16px;
       border-radius:18px;
       border:1px solid var(--border);
-      background:
-        linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+      background:linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
       min-height:108px;
     }
 
@@ -704,6 +760,70 @@
       color:var(--muted);
     }
 
+    .detail-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+      margin-bottom:16px;
+    }
+
+    .detail-card{
+      border:1px solid var(--border);
+      border-radius:18px;
+      background:#fff;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+
+    .detail-head{
+      padding:14px 16px;
+      border-bottom:1px solid var(--border);
+      background:linear-gradient(180deg, #fbfcff, #f7faff);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .detail-title{
+      margin:0;
+      font-size:.95rem;
+      font-weight:800;
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+
+    .detail-body{
+      padding:0;
+    }
+
+    .table-slim{
+      margin:0;
+    }
+
+    .table-slim thead th{
+      background:#fcfdff;
+      font-size:.74rem;
+      color:#667085;
+      font-weight:800;
+      letter-spacing:.03em;
+      border-bottom:1px solid var(--border);
+      white-space:nowrap;
+    }
+
+    .table-slim tbody td{
+      font-size:.88rem;
+      padding:.75rem .8rem;
+      border-color:#eef2f8;
+      vertical-align:middle;
+    }
+
+    .table-slim tbody tr:hover{
+      background:#fafcff;
+    }
+
     @media (max-width: 1200px){
       .kpi-grid{
         grid-template-columns:repeat(3, minmax(0, 1fr));
@@ -713,6 +833,9 @@
       }
       .insight-grid{
         grid-template-columns:repeat(2, minmax(0, 1fr));
+      }
+      .detail-grid{
+        grid-template-columns:1fr;
       }
     }
 
@@ -771,8 +894,14 @@
       }
 
       .table-modern thead th,
-      .table-modern tbody td{
+      .table-modern tbody td,
+      .table-slim thead th,
+      .table-slim tbody td{
         padding:.72rem .68rem;
+      }
+
+      .chart-shell{
+        height:300px;
       }
     }
   </style>
@@ -784,7 +913,10 @@
   <aside class="sidebar">
 
     <div class="brand">
-      <h1 class="brand-title">PAINEL COOPEX</h1>
+      <h1 class="brand-title">
+        <span class="brand-line">PAINEL</span>
+        <span class="brand-line">COOPEX</span>
+      </h1>
       <span class="brand-sub">Administração Central</span>
     </div>
 
@@ -1030,371 +1162,577 @@
         </form>
       </section>
 
-      {% set _k = kpis|default({}) %}
+      <div class="subtab-wrap">
+        <button type="button" class="subtab-btn active" data-target="tab-detalhes">
+          <i class="bi bi-list-ul"></i> Principal — Detalhes
+        </button>
+        <button type="button" class="subtab-btn" data-target="tab-indicadores">
+          <i class="bi bi-grid-1x2-fill"></i> Cards e Indicadores
+        </button>
+      </div>
 
-      <section class="kpi-grid">
-        <div class="kpi-card">
-          <div class="kpi-top">
-            <div class="kpi-label">Avaliações</div>
-            <div class="kpi-icon"><i class="bi bi-chat-square-heart"></i></div>
-          </div>
-          <div class="kpi-value">{{ _k.qtd|default(0) }}</div>
+      <!-- PRINCIPAL ====================================================== -->
+      <section id="tab-detalhes" class="subtab-pane active">
+
+        <div class="detail-grid">
+          {% if (tipo|default('restaurante'))=='restaurante' %}
+            <div class="detail-card">
+              <div class="detail-head">
+                <h4 class="detail-title">
+                  <i class="bi bi-shop-window"></i>
+                  Detalhes por restaurante
+                </h4>
+                <span class="mini-badge">{{ ranking|default([])|length }}</span>
+              </div>
+              <div class="detail-body table-wrap">
+                <table class="table table-slim align-middle">
+                  <thead>
+                    <tr>
+                      <th>Restaurante</th>
+                      <th class="text-center">Qtd</th>
+                      <th class="text-center">Geral</th>
+                      <th class="text-center">Trat.</th>
+                      <th class="text-center">Amb.</th>
+                      <th class="text-center">Sup.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% set _rk = ranking|default([]) %}
+                    {% if _rk and (_rk|length) > 0 %}
+                      {% for r in _rk %}
+                        <tr>
+                          <td class="fw-semibold">{{ r.rest_nome }}</td>
+                          <td class="text-center"><span class="mini-badge">{{ r.qtd|default(0) }}</span></td>
+                          <td class="text-center"><span class="score-pill">{{ '%.2f'|format(r.m_geral|default(0)) }}</span></td>
+                          <td class="text-center">{{ '%.2f'|format(r.m_trat|default(0)) }}</td>
+                          <td class="text-center">{{ '%.2f'|format(r.m_amb|default(0)) }}</td>
+                          <td class="text-center">{{ '%.2f'|format(r.m_sup|default(0)) }}</td>
+                        </tr>
+                      {% endfor %}
+                    {% else %}
+                      <tr>
+                        <td colspan="6" class="text-center text-muted-soft">Sem dados.</td>
+                      </tr>
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <div class="detail-head">
+                <h4 class="detail-title">
+                  <i class="bi bi-person-circle"></i>
+                  Detalhes por cooperado
+                </h4>
+                <span class="text-muted-soft small">Agrupado pela média enviada a cada restaurante</span>
+              </div>
+              <div class="detail-body table-wrap">
+                <table class="table table-slim align-middle">
+                  <thead>
+                    <tr>
+                      <th>Cooperado</th>
+                      <th class="text-center">Qtd</th>
+                      <th class="text-center">Média</th>
+                      <th>Observação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% set coop_resumo = {} %}
+                    {% for a in (avaliacoes|default([])) %}
+                      {% set _ = coop_resumo.update({
+                        a.coop_nome: {
+                          'sum': (coop_resumo.get(a.coop_nome, {}).get('sum', 0) + (a.geral or 0)),
+                          'count': (coop_resumo.get(a.coop_nome, {}).get('count', 0) + 1)
+                        }
+                      }) %}
+                    {% endfor %}
+
+                    {% if coop_resumo %}
+                      {% for nome, item in coop_resumo.items() %}
+                        {% set media = (item.sum / item.count) if item.count else 0 %}
+                        <tr>
+                          <td class="fw-semibold">{{ nome }}</td>
+                          <td class="text-center"><span class="mini-badge">{{ item.count }}</span></td>
+                          <td class="text-center"><span class="score-pill">{{ '%.2f'|format(media) }}</span></td>
+                          <td class="text-muted-soft">Avaliações feitas pelo cooperado no período filtrado</td>
+                        </tr>
+                      {% endfor %}
+                    {% else %}
+                      <tr>
+                        <td colspan="4" class="text-center text-muted-soft">Sem dados.</td>
+                      </tr>
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          {% else %}
+            <div class="detail-card">
+              <div class="detail-head">
+                <h4 class="detail-title">
+                  <i class="bi bi-person-badge"></i>
+                  Detalhes por cooperado
+                </h4>
+                <span class="mini-badge">{{ ranking|default([])|length }}</span>
+              </div>
+              <div class="detail-body table-wrap">
+                <table class="table table-slim align-middle">
+                  <thead>
+                    <tr>
+                      <th>Cooperado</th>
+                      <th class="text-center">Qtd</th>
+                      <th class="text-center">Geral</th>
+                      <th class="text-center">Pont.</th>
+                      <th class="text-center">Educ.</th>
+                      <th class="text-center">Efic.</th>
+                      <th class="text-center">Apres.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% set _rk = ranking|default([]) %}
+                    {% if _rk and (_rk|length) > 0 %}
+                      {% for r in _rk %}
+                        <tr>
+                          <td class="fw-semibold">{{ r.coop_nome }}</td>
+                          <td class="text-center"><span class="mini-badge">{{ r.qtd|default(0) }}</span></td>
+                          <td class="text-center"><span class="score-pill">{{ '%.2f'|format(r.m_geral|default(0)) }}</span></td>
+                          <td class="text-center">{{ '%.2f'|format(r.m_pont|default(0)) }}</td>
+                          <td class="text-center">{{ '%.2f'|format(r.m_educ|default(0)) }}</td>
+                          <td class="text-center">{{ '%.2f'|format(r.m_efic|default(0)) }}</td>
+                          <td class="text-center">{{ '%.2f'|format(r.m_apres|default(0)) }}</td>
+                        </tr>
+                      {% endfor %}
+                    {% else %}
+                      <tr>
+                        <td colspan="7" class="text-center text-muted-soft">Sem dados.</td>
+                      </tr>
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <div class="detail-head">
+                <h4 class="detail-title">
+                  <i class="bi bi-shop"></i>
+                  Detalhes por restaurante
+                </h4>
+                <span class="text-muted-soft small">Agrupado pelas avaliações recebidas dos restaurantes</span>
+              </div>
+              <div class="detail-body table-wrap">
+                <table class="table table-slim align-middle">
+                  <thead>
+                    <tr>
+                      <th>Restaurante</th>
+                      <th class="text-center">Qtd</th>
+                      <th class="text-center">Média</th>
+                      <th>Observação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% set rest_resumo = {} %}
+                    {% for a in (avaliacoes|default([])) %}
+                      {% set _ = rest_resumo.update({
+                        a.rest_nome: {
+                          'sum': (rest_resumo.get(a.rest_nome, {}).get('sum', 0) + (a.geral or 0)),
+                          'count': (rest_resumo.get(a.rest_nome, {}).get('count', 0) + 1)
+                        }
+                      }) %}
+                    {% endfor %}
+
+                    {% if rest_resumo %}
+                      {% for nome, item in rest_resumo.items() %}
+                        {% set media = (item.sum / item.count) if item.count else 0 %}
+                        <tr>
+                          <td class="fw-semibold">{{ nome }}</td>
+                          <td class="text-center"><span class="mini-badge">{{ item.count }}</span></td>
+                          <td class="text-center"><span class="score-pill">{{ '%.2f'|format(media) }}</span></td>
+                          <td class="text-muted-soft">Notas lançadas por este restaurante no período filtrado</td>
+                        </tr>
+                      {% endfor %}
+                    {% else %}
+                      <tr>
+                        <td colspan="4" class="text-center text-muted-soft">Sem dados.</td>
+                      </tr>
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          {% endif %}
         </div>
 
-        <div class="kpi-card">
-          <div class="kpi-top">
-            <div class="kpi-label">Média geral</div>
-            <div class="kpi-icon"><i class="bi bi-star-half"></i></div>
-          </div>
-          <div class="kpi-value">{{ '%.2f'|format(_k.geral|default(0)) }}</div>
-        </div>
-
-        {% if (tipo|default('restaurante'))=='restaurante' %}
-          <div class="kpi-card">
-            <div class="kpi-top">
-              <div class="kpi-label">Tratamento</div>
-              <div class="kpi-icon"><i class="bi bi-emoji-smile"></i></div>
-            </div>
-            <div class="kpi-value">{{ '%.2f'|format(_k.trat|default(0)) }}</div>
-          </div>
-
-          <div class="kpi-card">
-            <div class="kpi-top">
-              <div class="kpi-label">Ambiente</div>
-              <div class="kpi-icon"><i class="bi bi-shop-window"></i></div>
-            </div>
-            <div class="kpi-value">{{ '%.2f'|format(_k.amb|default(0)) }}</div>
-          </div>
-
-          <div class="kpi-card">
-            <div class="kpi-top">
-              <div class="kpi-label">Suporte</div>
-              <div class="kpi-icon"><i class="bi bi-headset"></i></div>
-            </div>
-            <div class="kpi-value">{{ '%.2f'|format(_k.sup|default(0)) }}</div>
-          </div>
-
-          <div class="kpi-card">
-            <div class="kpi-top">
-              <div class="kpi-label">Compatibilidade</div>
-              <div class="kpi-icon"><i class="bi bi-heart-pulse"></i></div>
-            </div>
-            <div class="kpi-value">{{ '%.0f'|format((_k.geral|default(0) / 5) * 100) }}%</div>
-          </div>
-        {% else %}
-          <div class="kpi-card">
-            <div class="kpi-top">
-              <div class="kpi-label">Pontualidade</div>
-              <div class="kpi-icon"><i class="bi bi-clock-history"></i></div>
-            </div>
-            <div class="kpi-value">{{ '%.2f'|format(_k.pont|default(0)) }}</div>
-          </div>
-
-          <div class="kpi-card">
-            <div class="kpi-top">
-              <div class="kpi-label">Educação</div>
-              <div class="kpi-icon"><i class="bi bi-hand-thumbs-up"></i></div>
-            </div>
-            <div class="kpi-value">{{ '%.2f'|format(_k.educ|default(0)) }}</div>
-          </div>
-
-          <div class="kpi-card">
-            <div class="kpi-top">
-              <div class="kpi-label">Eficiência</div>
-              <div class="kpi-icon"><i class="bi bi-lightning-charge"></i></div>
-            </div>
-            <div class="kpi-value">{{ '%.2f'|format(_k.efic|default(0)) }}</div>
-          </div>
-
-          <div class="kpi-card">
-            <div class="kpi-top">
-              <div class="kpi-label">Apresentação</div>
-              <div class="kpi-icon"><i class="bi bi-person-badge"></i></div>
-            </div>
-            <div class="kpi-value">{{ '%.2f'|format(_k.apres|default(0)) }}</div>
-          </div>
-
-          <div class="kpi-card">
-            <div class="kpi-top">
-              <div class="kpi-label">Compatibilidade</div>
-              <div class="kpi-icon"><i class="bi bi-heart-pulse"></i></div>
-            </div>
-            <div class="kpi-value">{{ '%.0f'|format((_k.geral|default(0) / 5) * 100) }}%</div>
-          </div>
-        {% endif %}
-      </section>
-
-      <section class="content-grid">
-        <div class="card-modern section-card">
+        <section class="card-modern section-card">
           <h3 class="section-title">
-            <i class="bi bi-trophy"></i>
-            Ranking por {{ 'restaurante' if (tipo|default('restaurante'))=='restaurante' else 'cooperado' }}
+            <i class="bi bi-list-stars"></i>
+            Avaliações detalhadas
           </h3>
 
           <div class="table-wrap">
-            <table class="table table-modern align-middle">
+            <table class="table table-modern table-detail align-middle">
               <thead>
                 <tr>
+                  <th>Data</th>
+                  <th>Restaurante</th>
+                  <th>Cooperado</th>
+                  <th class="text-center">Geral</th>
                   {% if (tipo|default('restaurante'))=='restaurante' %}
-                    <th>Restaurante</th>
-                    <th class="text-center">Avaliações</th>
-                    <th class="text-center">Média</th>
                     <th class="text-center">Trat.</th>
                     <th class="text-center">Amb.</th>
                     <th class="text-center">Sup.</th>
                   {% else %}
-                    <th>Cooperado</th>
-                    <th class="text-center">Avaliações</th>
-                    <th class="text-center">Média</th>
                     <th class="text-center">Pont.</th>
                     <th class="text-center">Educ.</th>
                     <th class="text-center">Efic.</th>
                     <th class="text-center">Apres.</th>
                   {% endif %}
+                  <th>Comentário</th>
+                  <th class="text-center">Média</th>
+                  <th class="text-center">Sentimento</th>
+                  <th>Temas</th>
+                  <th class="text-center">Crítico?</th>
                 </tr>
               </thead>
               <tbody>
-                {% if (tipo|default('restaurante'))=='restaurante' %}
-                  {% set _rk = ranking|default([]) %}
-                  {% set _have = false %}
-                  {% for r in _rk %}
-                    {% if (r.qtd|default(0)) >= 3 %}
-                      {% set _have = true %}
-                      <tr>
-                        <td class="fw-semibold">{{ r.rest_nome }}</td>
-                        <td class="text-center"><span class="mini-badge">{{ r.qtd }}</span></td>
-                        <td class="text-center"><span class="score-pill"><i class="bi bi-star-fill text-warning"></i>{{ '%.2f'|format(r.m_geral|default(0)) }}</span></td>
-                        <td class="text-center">{{ '%.2f'|format(r.m_trat|default(0)) }}</td>
-                        <td class="text-center">{{ '%.2f'|format(r.m_amb|default(0)) }}</td>
-                        <td class="text-center">{{ '%.2f'|format(r.m_sup|default(0)) }}</td>
-                      </tr>
-                    {% endif %}
-                  {% endfor %}
-                  {% if not _have %}
+                {% set _avs = avaliacoes|default([]) %}
+                {% if _avs and (_avs|length) > 0 %}
+                  {% for a in _avs %}
                     <tr>
-                      <td colspan="6" class="text-center text-muted-soft">Sem dados suficientes</td>
+                      <td class="text-nowrap">{{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em else '-' }}</td>
+                      <td class="fw-semibold">{{ a.rest_nome|default('-') }}</td>
+                      <td class="fw-semibold">{{ a.coop_nome|default('-') }}</td>
+                      <td class="text-center"><span class="score-pill">{{ a.geral|default('') }}</span></td>
+
+                      {% if (tipo|default('restaurante'))=='restaurante' %}
+                        <td class="text-center">{{ a.trat|default('') }}</td>
+                        <td class="text-center">{{ a.amb|default('') }}</td>
+                        <td class="text-center">{{ a.sup|default('') }}</td>
+                      {% else %}
+                        <td class="text-center">{{ a.pont|default('') }}</td>
+                        <td class="text-center">{{ a.educ|default('') }}</td>
+                        <td class="text-center">{{ a.efic|default('') }}</td>
+                        <td class="text-center">{{ a.apres|default('') }}</td>
+                      {% endif %}
+
+                      <td>{{ a.comentario|default('') }}</td>
+                      <td class="text-center">{{ a.media if a.media is not none else '' }}</td>
+                      <td class="text-center">
+                        {% set sent = (a.sentimento|default('')|lower) %}
+                        <span class="sent-pill {{ sent if sent in ['positivo','neutro','negativo'] else 'neutro' }}">
+                          {{ a.sentimento|default('-') }}
+                        </span>
+                      </td>
+                      <td>{{ a.temas|default('') }}</td>
+                      <td class="text-center">
+                        <span class="critico-pill {{ 'sim' if a.alerta else 'nao' }}">
+                          {{ 'SIM' if a.alerta else 'NÃO' }}
+                        </span>
+                      </td>
                     </tr>
-                  {% endif %}
+                  {% endfor %}
                 {% else %}
-                  {% set _rk = ranking|default([]) %}
-                  {% set _have = false %}
-                  {% for r in _rk %}
-                    {% if (r.qtd|default(0)) >= 3 %}
-                      {% set _have = true %}
-                      <tr>
-                        <td class="fw-semibold">{{ r.coop_nome }}</td>
-                        <td class="text-center"><span class="mini-badge">{{ r.qtd }}</span></td>
-                        <td class="text-center"><span class="score-pill"><i class="bi bi-star-fill text-warning"></i>{{ '%.2f'|format(r.m_geral|default(0)) }}</span></td>
-                        <td class="text-center">{{ '%.2f'|format(r.m_pont|default(0)) }}</td>
-                        <td class="text-center">{{ '%.2f'|format(r.m_educ|default(0)) }}</td>
-                        <td class="text-center">{{ '%.2f'|format(r.m_efic|default(0)) }}</td>
-                        <td class="text-center">{{ '%.2f'|format(r.m_apres|default(0)) }}</td>
-                      </tr>
-                    {% endif %}
-                  {% endfor %}
-                  {% if not _have %}
-                    <tr>
-                      <td colspan="7" class="text-center text-muted-soft">Sem dados suficientes</td>
-                    </tr>
-                  {% endif %}
+                  <tr>
+                    <td colspan="{{ 11 if (tipo|default('restaurante'))=='restaurante' else 13 }}"
+                        class="text-center text-muted-soft">
+                      Nenhuma avaliação
+                    </td>
+                  </tr>
                 {% endif %}
               </tbody>
             </table>
           </div>
-        </div>
-
-        <div class="card-modern section-card">
-          <h3 class="section-title">
-            <i class="bi bi-bar-chart-line"></i>
-            Top 10 — Média geral
-          </h3>
-
-          <div class="chart-shell">
-            <canvas id="chartTop" height="260"></canvas>
-          </div>
-
-          <div class="legend-note">
-            Gráfico único para manter a página leve e com carregamento mais rápido.
-          </div>
-        </div>
+        </section>
       </section>
 
-      <section class="card-modern section-card">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-          <h3 class="section-title m-0">
-            <i class="bi bi-heart-fill text-danger"></i>
-            Compatibilidade Cooperado × Restaurante
-          </h3>
-          <div class="text-muted-soft" style="font-size:.82rem;">
-            Percentual = <strong>(média ★ ÷ 5) × 100</strong>
-          </div>
-        </div>
+      <!-- INDICADORES ==================================================== -->
+      <section id="tab-indicadores" class="subtab-pane">
+        {% set _k = kpis|default({}) %}
 
-        <div class="table-wrap">
-          <table class="table table-modern align-middle">
-            <thead>
-              <tr>
-                <th style="min-width:220px;">Cooperado</th>
-                <th style="min-width:220px;">Restaurante</th>
-                <th class="text-center">Média ★</th>
-                <th style="min-width:220px;">Compatibilidade</th>
-                <th class="text-center">Avaliações</th>
-                <th class="text-center">360°</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% set _compat = compat|default([]) %}
-              {% if _compat and (_compat|length) > 0 %}
-                {% set shown = 0 %}
-                {% for row in _compat %}
-                  {% if (row.count|default(0)) >= 1 %}
-                    {% set shown = shown + 1 %}
-                    {% set pct = ((row.avg|default(0) / 5.0) * 100.0) %}
-                    <tr>
-                      <td class="fw-semibold">{{ row.coop|default('-') }}</td>
-                      <td class="fw-semibold">{{ row.rest|default('-') }}</td>
-                      <td class="text-center">
-                        <span class="score-pill">
-                          <i class="bi bi-star-fill text-warning"></i>
-                          {{ '%.2f'|format(row.avg|default(0)) }}
-                        </span>
-                      </td>
-                      <td>
-                        <div class="progress-modern">
-                          <div class="progress-bar-modern {{ 'success' if pct>=80 else ('warning' if pct>=60 else 'danger') }}"
-                               style="width: {{ '%.0f'|format(pct) }}%;"></div>
-                        </div>
-                        <div class="small text-muted-soft mt-2">
-                          {{ '%.0f'|format(pct) }}%
-                          {% if (tipo|default('restaurante'))=='restaurante' %}
-                            (coop → rest)
-                          {% else %}
-                            (rest → coop)
-                          {% endif %}
-                        </div>
-                      </td>
-                      <td class="text-center"><span class="mini-badge">{{ row.count|default(0) }}</span></td>
-                      <td class="text-center">
-                        {% if compat360 is defined %}
-                          {% set k = row.key if row.key is defined else (row.pair_key if row.pair_key is defined else None) %}
-                          {% set x = (compat360.get(k) if k else None) %}
-                          {% if x %}
-                            {% set pct_cr = ((x.avg_cr|default(0) / 5.0)*100.0) %}
-                            {% set pct_rc = ((x.avg_rc|default(0) / 5.0)*100.0) %}
-                            {% set pct_mix = ((pct_cr + pct_rc)/2.0) %}
-                            <span class="score-pill">{{ '%.0f'|format(pct_mix) }}%</span>
+        <section class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <div class="kpi-label">Avaliações</div>
+              <div class="kpi-icon"><i class="bi bi-chat-square-heart"></i></div>
+            </div>
+            <div class="kpi-value">{{ _k.qtd|default(0) }}</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <div class="kpi-label">Média geral</div>
+              <div class="kpi-icon"><i class="bi bi-star-half"></i></div>
+            </div>
+            <div class="kpi-value">{{ '%.2f'|format(_k.geral|default(0)) }}</div>
+          </div>
+
+          {% if (tipo|default('restaurante'))=='restaurante' %}
+            <div class="kpi-card">
+              <div class="kpi-top">
+                <div class="kpi-label">Tratamento</div>
+                <div class="kpi-icon"><i class="bi bi-emoji-smile"></i></div>
+              </div>
+              <div class="kpi-value">{{ '%.2f'|format(_k.trat|default(0)) }}</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-top">
+                <div class="kpi-label">Ambiente</div>
+                <div class="kpi-icon"><i class="bi bi-shop-window"></i></div>
+              </div>
+              <div class="kpi-value">{{ '%.2f'|format(_k.amb|default(0)) }}</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-top">
+                <div class="kpi-label">Suporte</div>
+                <div class="kpi-icon"><i class="bi bi-headset"></i></div>
+              </div>
+              <div class="kpi-value">{{ '%.2f'|format(_k.sup|default(0)) }}</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-top">
+                <div class="kpi-label">Compatibilidade</div>
+                <div class="kpi-icon"><i class="bi bi-heart-pulse"></i></div>
+              </div>
+              <div class="kpi-value">{{ '%.0f'|format((_k.geral|default(0) / 5) * 100) }}%</div>
+            </div>
+          {% else %}
+            <div class="kpi-card">
+              <div class="kpi-top">
+                <div class="kpi-label">Pontualidade</div>
+                <div class="kpi-icon"><i class="bi bi-clock-history"></i></div>
+              </div>
+              <div class="kpi-value">{{ '%.2f'|format(_k.pont|default(0)) }}</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-top">
+                <div class="kpi-label">Educação</div>
+                <div class="kpi-icon"><i class="bi bi-hand-thumbs-up"></i></div>
+              </div>
+              <div class="kpi-value">{{ '%.2f'|format(_k.educ|default(0)) }}</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-top">
+                <div class="kpi-label">Eficiência</div>
+                <div class="kpi-icon"><i class="bi bi-lightning-charge"></i></div>
+              </div>
+              <div class="kpi-value">{{ '%.2f'|format(_k.efic|default(0)) }}</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-top">
+                <div class="kpi-label">Apresentação</div>
+                <div class="kpi-icon"><i class="bi bi-person-badge"></i></div>
+              </div>
+              <div class="kpi-value">{{ '%.2f'|format(_k.apres|default(0)) }}</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-top">
+                <div class="kpi-label">Compatibilidade</div>
+                <div class="kpi-icon"><i class="bi bi-heart-pulse"></i></div>
+              </div>
+              <div class="kpi-value">{{ '%.0f'|format((_k.geral|default(0) / 5) * 100) }}%</div>
+            </div>
+          {% endif %}
+        </section>
+
+        <section class="content-grid">
+          <div class="card-modern section-card">
+            <h3 class="section-title">
+              <i class="bi bi-trophy"></i>
+              Ranking por {{ 'restaurante' if (tipo|default('restaurante'))=='restaurante' else 'cooperado' }}
+            </h3>
+
+            <div class="table-wrap">
+              <table class="table table-modern align-middle">
+                <thead>
+                  <tr>
+                    {% if (tipo|default('restaurante'))=='restaurante' %}
+                      <th>Restaurante</th>
+                      <th class="text-center">Avaliações</th>
+                      <th class="text-center">Média</th>
+                      <th class="text-center">Trat.</th>
+                      <th class="text-center">Amb.</th>
+                      <th class="text-center">Sup.</th>
+                    {% else %}
+                      <th>Cooperado</th>
+                      <th class="text-center">Avaliações</th>
+                      <th class="text-center">Média</th>
+                      <th class="text-center">Pont.</th>
+                      <th class="text-center">Educ.</th>
+                      <th class="text-center">Efic.</th>
+                      <th class="text-center">Apres.</th>
+                    {% endif %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% if (tipo|default('restaurante'))=='restaurante' %}
+                    {% set _rk = ranking|default([]) %}
+                    {% set _have = false %}
+                    {% for r in _rk %}
+                      {% if (r.qtd|default(0)) >= 3 %}
+                        {% set _have = true %}
+                        <tr>
+                          <td class="fw-semibold">{{ r.rest_nome }}</td>
+                          <td class="text-center"><span class="mini-badge">{{ r.qtd }}</span></td>
+                          <td class="text-center"><span class="score-pill"><i class="bi bi-star-fill text-warning"></i>{{ '%.2f'|format(r.m_geral|default(0)) }}</span></td>
+                          <td class="text-center">{{ '%.2f'|format(r.m_trat|default(0)) }}</td>
+                          <td class="text-center">{{ '%.2f'|format(r.m_amb|default(0)) }}</td>
+                          <td class="text-center">{{ '%.2f'|format(r.m_sup|default(0)) }}</td>
+                        </tr>
+                      {% endif %}
+                    {% endfor %}
+                    {% if not _have %}
+                      <tr>
+                        <td colspan="6" class="text-center text-muted-soft">Sem dados suficientes</td>
+                      </tr>
+                    {% endif %}
+                  {% else %}
+                    {% set _rk = ranking|default([]) %}
+                    {% set _have = false %}
+                    {% for r in _rk %}
+                      {% if (r.qtd|default(0)) >= 3 %}
+                        {% set _have = true %}
+                        <tr>
+                          <td class="fw-semibold">{{ r.coop_nome }}</td>
+                          <td class="text-center"><span class="mini-badge">{{ r.qtd }}</span></td>
+                          <td class="text-center"><span class="score-pill"><i class="bi bi-star-fill text-warning"></i>{{ '%.2f'|format(r.m_geral|default(0)) }}</span></td>
+                          <td class="text-center">{{ '%.2f'|format(r.m_pont|default(0)) }}</td>
+                          <td class="text-center">{{ '%.2f'|format(r.m_educ|default(0)) }}</td>
+                          <td class="text-center">{{ '%.2f'|format(r.m_efic|default(0)) }}</td>
+                          <td class="text-center">{{ '%.2f'|format(r.m_apres|default(0)) }}</td>
+                        </tr>
+                      {% endif %}
+                    {% endfor %}
+                    {% if not _have %}
+                      <tr>
+                        <td colspan="7" class="text-center text-muted-soft">Sem dados suficientes</td>
+                      </tr>
+                    {% endif %}
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card-modern section-card">
+            <h3 class="section-title">
+              <i class="bi bi-bar-chart-line"></i>
+              Top 10 — Média geral
+            </h3>
+
+            <div class="chart-shell">
+              <canvas id="chartTop"></canvas>
+            </div>
+
+            <div class="legend-note">
+              Gráfico único para manter a página leve e com carregamento mais rápido.
+            </div>
+          </div>
+        </section>
+
+        <section class="card-modern section-card">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <h3 class="section-title m-0">
+              <i class="bi bi-heart-fill text-danger"></i>
+              Compatibilidade Cooperado × Restaurante
+            </h3>
+            <div class="text-muted-soft" style="font-size:.82rem;">
+              Percentual = <strong>(média ★ ÷ 5) × 100</strong>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="table table-modern align-middle">
+              <thead>
+                <tr>
+                  <th style="min-width:220px;">Cooperado</th>
+                  <th style="min-width:220px;">Restaurante</th>
+                  <th class="text-center">Média ★</th>
+                  <th style="min-width:220px;">Compatibilidade</th>
+                  <th class="text-center">Avaliações</th>
+                  <th class="text-center">360°</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% set _compat = compat|default([]) %}
+                {% if _compat and (_compat|length) > 0 %}
+                  {% set shown = 0 %}
+                  {% for row in _compat %}
+                    {% if (row.count|default(0)) >= 1 %}
+                      {% set shown = shown + 1 %}
+                      {% set pct = ((row.avg|default(0) / 5.0) * 100.0) %}
+                      <tr>
+                        <td class="fw-semibold">{{ row.coop|default('-') }}</td>
+                        <td class="fw-semibold">{{ row.rest|default('-') }}</td>
+                        <td class="text-center">
+                          <span class="score-pill">
+                            <i class="bi bi-star-fill text-warning"></i>
+                            {{ '%.2f'|format(row.avg|default(0)) }}
+                          </span>
+                        </td>
+                        <td>
+                          <div class="progress-modern">
+                            <div class="progress-bar-modern {{ 'success' if pct>=80 else ('warning' if pct>=60 else 'danger') }}"
+                                 style="width: {{ '%.0f'|format(pct) }}%;"></div>
+                          </div>
+                          <div class="small text-muted-soft mt-2">
+                            {{ '%.0f'|format(pct) }}%
+                            {% if (tipo|default('restaurante'))=='restaurante' %}
+                              (coop → rest)
+                            {% else %}
+                              (rest → coop)
+                            {% endif %}
+                          </div>
+                        </td>
+                        <td class="text-center"><span class="mini-badge">{{ row.count|default(0) }}</span></td>
+                        <td class="text-center">
+                          {% if compat360 is defined %}
+                            {% set k = row.key if row.key is defined else (row.pair_key if row.pair_key is defined else None) %}
+                            {% set x = (compat360.get(k) if k else None) %}
+                            {% if x %}
+                              {% set pct_cr = ((x.avg_cr|default(0) / 5.0)*100.0) %}
+                              {% set pct_rc = ((x.avg_rc|default(0) / 5.0)*100.0) %}
+                              {% set pct_mix = ((pct_cr + pct_rc)/2.0) %}
+                              <span class="score-pill">{{ '%.0f'|format(pct_mix) }}%</span>
+                            {% else %}
+                              <span class="text-muted-soft">—</span>
+                            {% endif %}
                           {% else %}
                             <span class="text-muted-soft">—</span>
                           {% endif %}
-                        {% else %}
-                          <span class="text-muted-soft">—</span>
-                        {% endif %}
-                      </td>
+                        </td>
+                      </tr>
+                    {% endif %}
+                  {% endfor %}
+                  {% if shown == 0 %}
+                    <tr>
+                      <td colspan="6" class="text-center text-muted-soft">Sem dados suficientes.</td>
                     </tr>
                   {% endif %}
-                {% endfor %}
-                {% if shown == 0 %}
+                {% else %}
                   <tr>
                     <td colspan="6" class="text-center text-muted-soft">Sem dados suficientes.</td>
                   </tr>
                 {% endif %}
-              {% else %}
-                <tr>
-                  <td colspan="6" class="text-center text-muted-soft">Sem dados suficientes.</td>
-                </tr>
-              {% endif %}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-      <section class="card-modern section-card">
-        <h3 class="section-title">
-          <i class="bi bi-graph-up-arrow"></i>
-          Insights rápidos
-        </h3>
-        <div id="insightsWrap" class="insight-grid"></div>
-      </section>
-
-      <section class="card-modern section-card">
-        <h3 class="section-title">
-          <i class="bi bi-list-stars"></i>
-          Avaliações detalhadas
-        </h3>
-
-        <div class="table-wrap">
-          <table class="table table-modern align-middle">
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>Restaurante</th>
-                <th>Cooperado</th>
-                <th class="text-center">Geral</th>
-                {% if (tipo|default('restaurante'))=='restaurante' %}
-                  <th class="text-center">Trat.</th>
-                  <th class="text-center">Amb.</th>
-                  <th class="text-center">Sup.</th>
-                {% else %}
-                  <th class="text-center">Pont.</th>
-                  <th class="text-center">Educ.</th>
-                  <th class="text-center">Efic.</th>
-                  <th class="text-center">Apres.</th>
-                {% endif %}
-                <th>Comentário</th>
-                <th class="text-center">Média</th>
-                <th class="text-center">Sentimento</th>
-                <th>Temas</th>
-                <th class="text-center">Crítico?</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% set _avs = avaliacoes|default([]) %}
-              {% if _avs and (_avs|length) > 0 %}
-                {% for a in _avs %}
-                  <tr>
-                    <td class="text-nowrap">{{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em else '-' }}</td>
-                    <td class="fw-semibold">{{ a.rest_nome|default('-') }}</td>
-                    <td class="fw-semibold">{{ a.coop_nome|default('-') }}</td>
-                    <td class="text-center"><span class="score-pill">{{ a.geral|default('') }}</span></td>
-
-                    {% if (tipo|default('restaurante'))=='restaurante' %}
-                      <td class="text-center">{{ a.trat|default('') }}</td>
-                      <td class="text-center">{{ a.amb|default('') }}</td>
-                      <td class="text-center">{{ a.sup|default('') }}</td>
-                    {% else %}
-                      <td class="text-center">{{ a.pont|default('') }}</td>
-                      <td class="text-center">{{ a.educ|default('') }}</td>
-                      <td class="text-center">{{ a.efic|default('') }}</td>
-                      <td class="text-center">{{ a.apres|default('') }}</td>
-                    {% endif %}
-
-                    <td>{{ a.comentario|default('') }}</td>
-                    <td class="text-center">{{ a.media if a.media is not none else '' }}</td>
-                    <td class="text-center">
-                      {% set sent = (a.sentimento|default('')|lower) %}
-                      <span class="sent-pill {{ sent if sent in ['positivo','neutro','negativo'] else 'neutro' }}">
-                        {{ a.sentimento|default('-') }}
-                      </span>
-                    </td>
-                    <td>{{ a.temas|default('') }}</td>
-                    <td class="text-center">
-                      <span class="critico-pill {{ 'sim' if a.alerta else 'nao' }}">
-                        {{ 'SIM' if a.alerta else 'NÃO' }}
-                      </span>
-                    </td>
-                  </tr>
-                {% endfor %}
-              {% else %}
-                <tr>
-                  <td colspan="{{ 11 if (tipo|default('restaurante'))=='restaurante' else 13 }}"
-                      class="text-center text-muted-soft">
-                    Nenhuma avaliação
-                  </td>
-                </tr>
-              {% endif %}
-            </tbody>
-          </table>
-        </div>
+        <section class="card-modern section-card">
+          <h3 class="section-title">
+            <i class="bi bi-graph-up-arrow"></i>
+            Insights rápidos
+          </h3>
+          <div id="insightsWrap" class="insight-grid"></div>
+        </section>
       </section>
 
     </div>
@@ -1422,7 +1760,7 @@
 
       btn.addEventListener('click', ()=>{
         const now = new Date();
-        const day = now.getDay(); // 0 domingo
+        const day = now.getDay();
         const diffToMonday = day === 0 ? -6 : (1 - day);
 
         const first = new Date(now);
@@ -1463,6 +1801,28 @@
       });
     })();
 
+    (function initSubtabs(){
+      const buttons = document.querySelectorAll('.subtab-btn');
+      const panes = document.querySelectorAll('.subtab-pane');
+
+      buttons.forEach(btn => {
+        btn.addEventListener('click', function(){
+          const target = this.getAttribute('data-target');
+
+          buttons.forEach(b => b.classList.remove('active'));
+          panes.forEach(p => p.classList.remove('active'));
+
+          this.classList.add('active');
+          const pane = document.getElementById(target);
+          if (pane) pane.classList.add('active');
+
+          if (target === 'tab-indicadores' && window._coopexChart && typeof window._coopexChart.resize === 'function') {
+            setTimeout(() => window._coopexChart.resize(), 80);
+          }
+        });
+      });
+    })();
+
     (function initChart(){
       const ensureChartJS = () => new Promise((resolve)=>{
         if (window.Chart) return resolve();
@@ -1478,7 +1838,7 @@
       if (!el || !dataTop || !Array.isArray(dataTop.labels) || dataTop.labels.length === 0) return;
 
       ensureChartJS().then(()=>{
-        new Chart(el, {
+        window._coopexChart = new Chart(el, {
           type: 'bar',
           data: {
             labels: dataTop.labels,
