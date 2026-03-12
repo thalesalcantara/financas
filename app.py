@@ -2549,7 +2549,7 @@ def admin_dashboard():
     }
 
     # -------- Escalas agrupadas e contagem por cooperado ----------
-        escalas_all = (
+    escalas_all = (
         db.session.query(Escala)
         .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
         .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
