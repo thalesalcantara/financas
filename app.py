@@ -5390,7 +5390,7 @@ def portal_cooperado():
     qr = in_range(ReceitaCooperado.query.filter_by(cooperado_id=coop.id), ReceitaCooperado.data)
     receitas_coop = qr.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
 
-        qd = DespesaCooperado.query.filter_by(cooperado_id=coop.id)
+    qd = DespesaCooperado.query.filter_by(cooperado_id=coop.id)
 
     if di and df:
         qd = qd.filter(
