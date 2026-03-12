@@ -5440,8 +5440,10 @@ def portal_cooperado():
         df = di
     if df and not di:
         di = df
-    if not di and not df:
-        di = df = date.today()
+    elif not di and not df:
+        hoje = date.today()
+        di = hoje - timedelta(days=hoje.weekday())   # segunda
+        df = di + timedelta(days=6)                  # domingo
 
     def in_range(qs, col):
         return qs.filter(col >= di, col <= df)
@@ -5756,6 +5758,8 @@ def portal_cooperado():
         # MÉTRICAS DA VIDA
         nota_vida=nota_vida,
         total_entregas_vida=total_entregas_vida,
+        data_inicio=di,
+        data_fim=df,
     )
 
 # === AVALIAR RESTAURANTE (cooperado -> restaurante)
