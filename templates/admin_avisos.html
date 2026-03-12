@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@600&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 
   <!-- Bootstrap / Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
@@ -171,7 +171,6 @@
       width:calc(100% - var(--sidebar-w));
     }
 
-    /* AJUSTE PEDIDO: conteúdo mais espalhado na tela */
     .content-shell,
     .main > .tab-content,
     .main .tab-pane > .content-shell,
@@ -179,33 +178,6 @@
       max-width:none !important;
       width:100%;
       margin:0 auto 26px;
-    }
-
-    .panel-head{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:14px;
-      padding:18px 20px;
-      border-radius:28px;
-      background:linear-gradient(135deg, rgba(39,71,217,1) 0%, rgba(51,88,240,1) 52%, rgba(22,37,138,1) 100%);
-      color:#fff;
-      box-shadow:0 18px 40px rgba(39,71,217,.22);
-      overflow:hidden;
-      margin-bottom:18px;
-    }
-    .panel-head-title{
-      margin:0;
-      font-size:1.55rem;
-      font-weight:800;
-      display:flex;
-      align-items:center;
-      gap:10px;
-    }
-    .panel-head-sub{
-      margin-top:6px;
-      color:rgba(255,255,255,.86);
-      font-size:.95rem;
     }
 
     .card,
@@ -230,12 +202,12 @@
     .section-subtitle,
     .text-muted-2,
     .text-muted,
-    small.text-muted{
+    small.text-muted,
+    .muted{
       color:var(--muted) !important;
     }
 
-    .form-label,
-    .lanc-label{
+    .form-label{
       display:block;
       margin:0 0 6px;
       font-size:.78rem !important;
@@ -273,11 +245,7 @@
 
     .btn,.btn-sm{ border-radius:12px !important; }
 
-    .table-responsive,
-    .table-wrap,
-    .escalas-wrapper,
-    .troca-pendentes-wrapper,
-    .troca-historico-wrapper{
+    .table-responsive{
       overflow:auto;
       border-radius:18px;
       border:1px solid var(--border);
@@ -326,6 +294,119 @@
       border:none !important;
     }
 
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      background:#eef3ff;
+      color:#2747d9;
+      font-size:.78rem;
+      font-weight:700;
+      border:1px solid #d9e4ff;
+    }
+
+    .form-help{
+      margin-top:6px;
+      font-size:.74rem;
+      color:var(--muted);
+    }
+
+    .search-wrap{
+      max-width:460px;
+    }
+
+    .sticky-actions{
+      position:sticky;
+      bottom:0;
+      z-index:5;
+      background:linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,.95) 30%, rgba(255,255,255,1) 100%);
+      padding-top:14px;
+      margin-top:18px;
+    }
+
+    .listbox{
+      max-height:280px;
+      overflow:auto;
+      border:1px solid var(--border);
+      border-radius:16px;
+      background:#fbfcff;
+      padding:8px;
+    }
+
+    .listbox::-webkit-scrollbar{ width:8px; }
+    .listbox::-webkit-scrollbar-thumb{ background:#dce6fb; border-radius:999px; }
+
+    .item{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid transparent;
+      transition:.18s ease;
+      cursor:pointer;
+      margin-bottom:6px;
+      background:#fff;
+    }
+
+    .item:last-child{ margin-bottom:0; }
+
+    .item:hover{
+      background:#f4f7ff;
+      border-color:#dfe8ff;
+    }
+
+    .item input[type="checkbox"]{
+      margin-top:0;
+      flex-shrink:0;
+    }
+
+    .avatar{
+      width:38px !important;
+      height:38px !important;
+      min-width:38px !important;
+      min-height:38px !important;
+      max-width:38px !important;
+      max-height:38px !important;
+      border-radius:50% !important;
+      object-fit:cover !important;
+      display:block;
+      background:#eef2ff;
+      flex-shrink:0;
+    }
+
+    .aviso-card .title{
+      font-size:1rem;
+      font-weight:800;
+      color:#172033;
+    }
+
+    .aviso-card .meta{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      align-items:center;
+      margin-top:6px;
+      font-size:.78rem;
+      color:var(--muted);
+    }
+
+    .kpi-card-icon{
+      font-size:2rem;
+      opacity:.9;
+    }
+
+    .empty{
+      color:var(--muted);
+      border-style:dashed !important;
+    }
+
+    .page-header small{
+      color:var(--muted);
+    }
+
     .tab-pane{ animation:fadePane .2s ease; }
     @keyframes fadePane{
       from{ opacity:.35; transform:translateY(3px); }
@@ -343,6 +424,10 @@
         margin-left:var(--sidebar-w);
         width:calc(100% - var(--sidebar-w));
         padding:16px 10px;
+      }
+
+      .listbox{
+        max-height:240px;
       }
     }
   </style>
@@ -363,13 +448,11 @@
 
       <div class="nav-section-label">Visão Geral</div>
 
-      <!-- Resumo -->
       <a class="nav-sublink"
          href="{{ url_for('admin_dashboard', tab='resumo') }}">
         <i class="bi bi-graph-up"></i> <span class="nav-link-label">Resumo</span>
       </a>
 
-      <!-- Avaliações -->
       <a class="nav-link-main {% if request.endpoint == 'admin_avaliacoes' %}active{% endif %}"
          href="{{ url_for('admin_avaliacoes') }}">
         <div class="nav-link-left">
@@ -380,7 +463,6 @@
 
       <hr class="sidebar-divider">
 
-      <!-- FINANCEIRO ------------------------------------------------------->
       <button class="nav-link-group-toggle"
               type="button"
               data-bs-toggle="collapse"
@@ -394,38 +476,31 @@
       </button>
 
       <div id="menuFinanceiro" class="collapse show nav-sublinks">
-        <a class="nav-sublink"
-           href="{{ url_for('admin_dashboard', tab='lancamentos') }}">
+        <a class="nav-sublink" href="{{ url_for('admin_dashboard', tab='lancamentos') }}">
           <i class="bi bi-journal-text"></i> <span class="nav-link-label">Lançamentos</span>
         </a>
 
-        <a class="nav-sublink"
-           href="{{ url_for('admin_dashboard', tab='receitas') }}">
+        <a class="nav-sublink" href="{{ url_for('admin_dashboard', tab='receitas') }}">
           <i class="bi bi-cash"></i> <span class="nav-link-label">Receitas Coop</span>
         </a>
 
-        <a class="nav-sublink"
-           href="{{ url_for('admin_dashboard', tab='despesas') }}">
+        <a class="nav-sublink" href="{{ url_for('admin_dashboard', tab='despesas') }}">
           <i class="bi bi-cart-dash"></i> <span class="nav-link-label">Despesas Coop</span>
         </a>
 
-        <a class="nav-sublink"
-           href="{{ url_for('admin_dashboard', tab='coop_receitas') }}">
+        <a class="nav-sublink" href="{{ url_for('admin_dashboard', tab='coop_receitas') }}">
           <i class="bi bi-cash-coin"></i> <span class="nav-link-label">Receitas Cooperados</span>
         </a>
 
-        <a class="nav-sublink"
-           href="{{ url_for('admin_dashboard', tab='coop_despesas') }}">
+        <a class="nav-sublink" href="{{ url_for('admin_dashboard', tab='coop_despesas') }}">
           <i class="bi bi-people"></i> <span class="nav-link-label">Despesas Cooperados</span>
         </a>
 
-        <a class="nav-sublink"
-           href="{{ url_for('admin_dashboard', tab='beneficios') }}">
+        <a class="nav-sublink" href="{{ url_for('admin_dashboard', tab='beneficios') }}">
           <i class="bi bi-heart-pulse"></i> <span class="nav-link-label">Benefícios</span>
         </a>
       </div>
 
-      <!-- CADASTROS -------------------------------------------------------->
       <button class="nav-link-group-toggle"
               type="button"
               data-bs-toggle="collapse"
@@ -439,13 +514,11 @@
       </button>
 
       <div id="menuCadastros" class="collapse show nav-sublinks">
-        <a class="nav-sublink"
-           href="{{ url_for('admin_dashboard', tab='cooperados') }}">
+        <a class="nav-sublink" href="{{ url_for('admin_dashboard', tab='cooperados') }}">
           <i class="bi bi-person-badge"></i> <span class="nav-link-label">Cooperados</span>
         </a>
 
-        <a class="nav-sublink"
-           href="{{ url_for('admin_dashboard', tab='restaurantes') }}">
+        <a class="nav-sublink" href="{{ url_for('admin_dashboard', tab='restaurantes') }}">
           <i class="bi bi-shop"></i> <span class="nav-link-label">Estabelecimentos</span>
         </a>
 
@@ -460,7 +533,6 @@
         </a>
       </div>
 
-      <!-- OPERAÇÃO --------------------------------------------------------->
       <button class="nav-link-group-toggle"
               type="button"
               data-bs-toggle="collapse"
@@ -474,8 +546,7 @@
       </button>
 
       <div id="menuOperacao" class="collapse show nav-sublinks">
-        <a class="nav-sublink"
-           href="{{ url_for('admin_dashboard', tab='escalas') }}">
+        <a class="nav-sublink" href="{{ url_for('admin_dashboard', tab='escalas') }}">
           <i class="bi bi-calendar2-week"></i> <span class="nav-link-label">Escalas</span>
         </a>
 
@@ -487,7 +558,6 @@
 
       <hr class="sidebar-divider">
 
-      <!-- Config + Sair ------------------------------------------------------>
       <div class="sidebar-footer">
         <a class="nav-link-main {% if request.endpoint == 'admin_dashboard' and request.args.get('tab') == 'config' %}active{% endif %}"
            href="{{ url_for('admin_dashboard', tab='config') }}">
@@ -497,8 +567,7 @@
           </div>
         </a>
 
-        <a class="nav-link-main"
-           href="{{ url_for('logout') }}">
+        <a class="nav-link-main" href="{{ url_for('logout') }}">
           <div class="nav-link-left">
             <span class="nav-link-icon"><i class="bi bi-box-arrow-right"></i></span>
             <span class="nav-link-label">Sair</span>
@@ -513,7 +582,6 @@
   <main class="main">
     <div class="content-shell">
 
-      <!-- Cabeçalho da página -->
       <div class="page-header d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div>
           <h3 class="mb-0 d-flex align-items-center gap-2">
@@ -539,7 +607,6 @@
           </div>
 
           <form id="formNovoAviso" method="POST" action="{{ url_for('admin_avisos') }}">
-            <!-- Conteúdo do aviso -->
             <div class="row g-3">
               <div class="col-12">
                 <label class="form-label">Título</label>
@@ -578,7 +645,6 @@
 
             <hr class="my-3">
 
-            <!-- Destino do aviso -->
             <div class="row g-3">
               <div class="col-12">
                 <div class="section-title mb-1">Destino do aviso</div>
@@ -634,7 +700,7 @@
                     {% for c in cooperados %}
                     <label class="item">
                       <input class="form-check-input chk-coop" type="checkbox" name="dest_cooperados[]" value="{{ c.id }}">
-                      <img class="avatar" src="{{ c.foto_url or url_for('static', filename='img/default.png') }}" alt="">
+                      <img class="avatar border" src="{{ c.foto_url or url_for('static', filename='img/default.png') }}" alt="{{ c.nome }}">
                       <span class="flex-fill">{{ c.nome }}</span>
                     </label>
                     {% else %}
@@ -722,7 +788,7 @@
                         {% for c in cooperados %}
                         <label class="item">
                           <input class="form-check-input chk-amb-coop" type="checkbox" name="dest_cooperados_ambos[]" value="{{ c.id }}">
-                          <img class="avatar" src="{{ c.foto_url or url_for('static', filename='img/default.png') }}" alt="">
+                          <img class="avatar border" src="{{ c.foto_url or url_for('static', filename='img/default.png') }}" alt="{{ c.nome }}">
                           <span class="flex-fill">{{ c.nome }}</span>
                         </label>
                         {% else %}
@@ -775,7 +841,7 @@
                 </div>
               </div>
 
-            </div><!-- /row destino -->
+            </div>
 
             <div class="sticky-actions d-flex flex-wrap gap-2 justify-content-end">
               <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPreviewNovo" data-bs-toggle="modal" data-bs-target="#novoPreviewModal">
@@ -792,7 +858,6 @@
         </div>
       </div>
 
-      <!-- Modal de pré-visualização do NOVO aviso -->
       <div class="modal fade" id="novoPreviewModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
           <div class="modal-content">
@@ -819,7 +884,6 @@
         </div>
       </div>
 
-      <!-- ====== LISTA DE AVISOS EXISTENTES ================================ -->
       {% set total = avisos|length %}
       {% set ativos_list = avisos|selectattr('ativo')|list %}
       {% set qtd_ativos = ativos_list|length %}
@@ -915,7 +979,6 @@
           </div>
         </div>
 
-        <!-- Modal de pré-visualização do AVISO existente -->
         <div class="modal fade" id="previewModal{{ a.id }}" tabindex="-1" aria-hidden="true">
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -944,14 +1007,15 @@
         {% endfor %}
       </div>
 
-    </div> <!-- /content-shell -->
+    </div>
   </main>
 
-</div> <!-- /layout -->
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  // ====== Filtro local de avisos ======
   const busca = document.getElementById('busca');
   const lista = document.getElementById('listaAvisos');
 
@@ -972,7 +1036,6 @@ document.addEventListener('DOMContentLoaded', () => {
     tFilter = setTimeout(filtroAvisos, 80);
   });
 
-  // ====== Alterna blocos de destino ======
   const destCoops = document.getElementById('destCoops');
   const destRests = document.getElementById('destRests');
   const destAmbos = document.getElementById('destAmbos');
@@ -989,8 +1052,6 @@ document.addEventListener('DOMContentLoaded', () => {
   [destCoops, destRests, destAmbos].forEach(el => el?.addEventListener('change', aplicarModoDestino));
   aplicarModoDestino();
 
-  // ====== util contadores/busca ======
-  // COOPERADOS
   const coopSelCount = document.getElementById('coopSelCount');
   const listaCoops = document.getElementById('listaCoops');
   const buscaCoop = document.getElementById('buscaCoop');
@@ -1026,7 +1087,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // RESTAURANTES
   const restSelCount = document.getElementById('restSelCount');
   const listaRests = document.getElementById('listaRests');
   const buscaRest = document.getElementById('buscaRest');
@@ -1062,7 +1122,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // AMBOS
   const ambCoopSelCount = document.getElementById('ambCoopSelCount');
   const ambRestSelCount = document.getElementById('ambRestSelCount');
   const listaAmbCoops = document.getElementById('listaAmbCoops');
@@ -1134,7 +1193,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // ====== Pré-visualização do NOVO aviso ======
   const novoTitulo = document.getElementById('novoTitulo');
   const novoMensagem = document.getElementById('novoMensagem');
   const novoPrioridade = document.getElementById('novoPrioridade');
@@ -1164,7 +1222,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return n ? `${n} restaurante(s) selecionado(s)` : 'Nenhum restaurante selecionado';
     }
 
-    // modo === 'ambos'
     const alcCoop = document.querySelector('input[name="coop_alcance_ambos"]:checked')?.value;
     const alcRest = document.querySelector('input[name="rest_alcance_ambos"]:checked')?.value;
     const nC = document.querySelectorAll('#listaAmbCoops .chk-amb-coop:checked').length;
@@ -1229,17 +1286,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   atualizarPreviewNovo();
 
-  // contadores iniciais
   function bootCounts(){
-    const ev = new Event('change');
-    document.getElementById('listaCoops')?.dispatchEvent(ev);
-    document.getElementById('listaRests')?.dispatchEvent(ev);
-    document.getElementById('listaAmbCoops')?.dispatchEvent(ev);
-    document.getElementById('listaAmbRests')?.dispatchEvent(ev);
+    atualizarContadorCoop();
+    atualizarContadorRest();
+    atualizarContadorAmbCoop();
+    atualizarContadorAmbRest();
   }
   bootCounts();
 
-  // Publicar direto pelo botão dentro do modal
   document.getElementById('btnConfirmarPublicacao')?.addEventListener('click', () => {
     document.getElementById('formNovoAviso')?.submit();
   });
