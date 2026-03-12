@@ -1734,7 +1734,8 @@ def _cooperado_atual() -> Cooperado | None:
         return None
     return Cooperado.query.filter_by(usuario_id=uid).first()
 
-    # --- Blueprint Portal (topo do arquivo, depois de criar `app`) ---
+
+# --- Blueprint Portal ---
 portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
 
 @portal_bp.get("/avisos", endpoint="portal_cooperado_avisos")
@@ -2526,7 +2527,15 @@ def admin_dashboard():
     total_adiantamentos_coop = sum((d.valor or 0.0) for d in despesas_coop if d.eh_adiantamento)
 
     cfg = get_config()
-    cooperados = Cooperado.query.order_by(Cooperado.nome).all()
+
+    cooperados = (
+        Cooperado.query
+        .join(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(Usuario.ativo.is_(True))
+        .order_by(Cooperado.nome)
+        .all()
+    )
+
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
 
     # documentos OK?
@@ -2540,7 +2549,51 @@ def admin_dashboard():
     }
 
     # -------- Escalas agrupadas e contagem por cooperado ----------
-    escalas_all = Escala.query.order_by(Escala.id.asc()).all()
+        escalas_all = (
+        db.session.query(Escala)
+        .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
+        .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(
+            or_(
+                Escala.cooperado_id.is_(None),   # mantém escalas sem vínculo
+                Usuario.ativo.is_(True)          # só vinculados ativos
+            )
+        )
+        .order_by(Escala.id.asc())
+        .all()
+    )
+
+    esc_by_int: dict[int, list] = defaultdict(list)
+    esc_by_str: dict[str, list] = defaultdict(list)
+    for e in escalas_all:
+        k_int = e.cooperado_id if e.cooperado_id is not None else 0  # 0 = sem cadastro
+        esc_item = {
+            "data": e.data,
+            "turno": e.turno,
+            "horario": e.horario,
+            "contrato": e.contrato,
+            "cor": e.cor,
+            "nome_planilha": e.cooperado_nome,
+        }
+        esc_by_int[k_int].append(esc_item)
+        esc_by_str[str(k_int)].append(esc_item)
+
+    cont_rows = dict(
+        db.session.query(Escala.cooperado_id, func.count(Escala.id))
+        .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
+        .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(
+            or_(
+                Escala.cooperado_id.is_(None),
+                Usuario.ativo.is_(True)
+            )
+        )
+        .group_by(Escala.cooperado_id)
+        .all()
+    )
+
+    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
+    qtd_sem_cadastro = int(cont_rows.get(None, 0))
     esc_by_int: dict[int, list] = defaultdict(list)
     esc_by_str: dict[str, list] = defaultdict(list)
     for e in escalas_all:
@@ -5855,7 +5908,13 @@ def portal_restaurante():
     else:
         periodo_desc = periodo_desc or "personalizado"
 
-    cooperados = Cooperado.query.order_by(Cooperado.nome).all()
+    cooperados = (
+        Cooperado.query
+        .join(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(Usuario.ativo.is_(True))
+        .order_by(Cooperado.nome)
+        .all()
+    )
 
     total_bruto = 0.0
     total_qtd = 0
@@ -5891,7 +5950,7 @@ def portal_restaurante():
     total_encargos = total_inss + total_sest
     total_liquido = total_bruto - total_encargos
 
-    # -------------------- ESCALA (Quem trabalha) --------------------
+       # -------------------- ESCALA (Quem trabalha) --------------------
     def contrato_bate_restaurante(contrato: str, rest_nome: str) -> bool:
         a = " ".join(_normalize_name(contrato or ""))
         b = " ".join(_normalize_name(rest_nome or ""))
@@ -5907,7 +5966,28 @@ def portal_restaurante():
         semana_inicio = ref - timedelta(days=ref.weekday())
         dias_list = [semana_inicio + timedelta(days=i) for i in range(7)]
 
-    escalas_all = Escala.query.order_by(Escala.id.asc()).all()
+    escalas_all = (
+        db.session.query(Escala)
+        .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
+        .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(
+            or_(
+                Escala.cooperado_id.is_(None),   # mantém linhas sem vínculo
+                Usuario.ativo.is_(True)          # só mostra vinculados ativos
+            )
+        )
+        .order_by(Escala.id.asc())
+        .all()
+    )
+
+    cooperados = (
+        Cooperado.query
+        .join(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(Usuario.ativo.is_(True))
+        .order_by(Cooperado.nome)
+        .all()
+    )
+
     eff_map = _carry_forward_contrato(escalas_all)
 
     escalas_rest = [
@@ -5932,7 +6012,18 @@ def portal_restaurante():
             if not hit:
                 continue
 
-            coop = Cooperado.query.get(e.cooperado_id) if e.cooperado_id else None
+            coop = None
+            if e.cooperado_id:
+                coop = (
+                    Cooperado.query
+                    .join(Usuario, Cooperado.usuario_id == Usuario.id)
+                    .filter(
+                        Cooperado.id == e.cooperado_id,
+                        Usuario.ativo.is_(True)
+                    )
+                    .first()
+                )
+
             nome_fallback = (e.cooperado_nome or "").strip()
             nome_show = (coop.nome if coop else nome_fallback) or "—"
             contrato_eff = (eff_map.get(e.id, e.contrato or "") or "").strip()
