@@ -116,17 +116,68 @@ app = Flask(__name__, static_folder="static", template_folder="templates")
 
 
 # =========================
-# Compat: Restaurante Avisos (evita 404 no front)
+# Compat: Restaurante Avisos
 # =========================
 @app.get("/api/rest/avisos/unread_count")
+@role_required("restaurante")
 def api_rest_avisos_unread_count():
-    """Endpoint de compatibilidade usado pelo painel do restaurante.
-    Se você não usa módulo de avisos por restaurante, retorna 0.
-    """
+    def _nocache(resp):
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        return resp
+
     try:
-        return jsonify(count=0)
-    except Exception:
-        return jsonify(count=0)
+        u_id = session.get("user_id")
+        rest = Restaurante.query.filter_by(usuario_id=u_id).first()
+
+        if not rest:
+            return _nocache(
+                jsonify(
+                    ok=False,
+                    unread=0,
+                    count=0,
+                    error="Restaurante não encontrado"
+                )
+            ), 404
+
+        avisos_rest = get_avisos_for_restaurante(rest)
+
+        lidos_ids_rest = {
+            row[0]
+            for row in db.session.query(AvisoLeitura.aviso_id)
+            .filter_by(restaurante_id=rest.id)
+            .all()
+        }
+
+        avisos_nao_lidos_count = sum(
+            1 for a in avisos_rest if a.id not in lidos_ids_rest
+        )
+
+        return _nocache(
+            jsonify(
+                ok=True,
+                unread=int(avisos_nao_lidos_count),
+                count=int(avisos_nao_lidos_count)
+            )
+        ), 200
+
+    except Exception as e:
+        db.session.rollback()
+
+        try:
+            current_app.logger.exception(
+                "Erro ao calcular /api/rest/avisos/unread_count"
+            )
+        except Exception:
+            pass
+
+        return _nocache(
+            jsonify(
+                ok=False,
+                unread=0,
+                count=0,
+                error=str(e)
+            )
+        ), 500
 
 app.secret_key = os.environ.get("SECRET_KEY", "coopex-secret")
 
