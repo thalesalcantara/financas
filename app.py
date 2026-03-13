@@ -2746,6 +2746,36 @@ def admin_delete_admin(usuario_id):
 
     return redirect(url_for("admin_dashboard", tab="config"))
 
+@app.route("/admin/admins/<int:usuario_id>/reset-password", methods=["POST"])
+@admin_required
+def admin_reset_admin_password(usuario_id):
+    if not is_admin_master():
+        flash("Apenas o administrador master pode redefinir senhas de administradores.", "danger")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    admin = Usuario.query.filter_by(id=usuario_id, tipo="admin").first_or_404()
+
+    if admin.is_master:
+        flash("A senha do administrador master não pode ser redefinida por esta tela.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    nova_senha = (request.form.get("nova_senha") or "").strip()
+    confirmar_senha = (request.form.get("confirmar_senha") or "").strip()
+
+    if not nova_senha or not confirmar_senha:
+        flash("Preencha a nova senha e a confirmação.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    if nova_senha != confirmar_senha:
+        flash("As senhas não conferem.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    admin.set_password(nova_senha)
+    db.session.commit()
+
+    flash("Senha do administrador redefinida com sucesso.", "success")
+    return redirect(url_for("admin_dashboard", tab="config"))
+
 
 @app.route("/admin", methods=["GET"])
 @admin_required
