@@ -1493,8 +1493,8 @@
                           data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}"
                           data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
                           data-fone-raw="{{ coop.telefone or '' }}"
-                          data-escalado="{{ '1' if (coop.escalado_hoje if coop.escalado_hoje is defined else false) else '0' }}"
-                          {% if not (coop.escalado_hoje if coop.escalado_hoje is defined else false) %}hidden{% endif %}
+                          data-escalado="{{ '1' if (coop.escalado_hoje is defined and coop.escalado_hoje) else '0' }}"
+                          {% if not (coop.escalado_hoje is defined and coop.escalado_hoje) %}hidden{% endif %}
                         >
                           {{ coop.nome }}
                         </option>
@@ -1524,7 +1524,7 @@
                           <div class="coop-left">
                             <span class="coop-name">{{ coop.nome }}</span>
                             <span class="coop-meta">
-                              {% if coop.escalado_hoje if coop.escalado_hoje is defined else false %}
+                              {% if coop.escalado_hoje is defined and coop.escalado_hoje %}
                                 Escalado hoje
                               {% else %}
                                 Busca manual
