@@ -4002,7 +4002,6 @@ def admin_dashboard():
         admins_permissoes=admins_permissoes,
     )
     
-
 # =========================
 # Navegação/Export util
 # =========================
@@ -5622,6 +5621,59 @@ def add_admin_secundario():
     flash("Administrador criado com sucesso.", "success")
     return redirect(url_for("admin_dashboard", tab="config"))
 
+@app.route("/admin/admins/add", methods=["POST"])
+@admin_required
+def add_admin_secundario():
+    if not is_admin_master():
+        flash("Apenas o administrador master pode criar outros administradores.", "danger")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    nome = (request.form.get("nome") or "").strip()
+    usuario = (request.form.get("usuario") or "").strip()
+    senha = (request.form.get("senha") or "").strip()
+    confirmar_senha = (request.form.get("confirmar_senha") or "").strip()
+    ativo = str(request.form.get("ativo") or "1").strip() == "1"
+
+    if not nome or not usuario or not senha or not confirmar_senha:
+        flash("Preencha nome, usuário, senha e confirmação.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    if senha != confirmar_senha:
+        flash("As senhas não conferem.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    if Usuario.query.filter_by(usuario=usuario).first():
+        flash("Já existe um usuário com esse login.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    u = Usuario(
+        nome=nome,
+        usuario=usuario,
+        tipo="admin",
+        senha_hash="",
+        is_master=False,
+        ativo=ativo,
+    )
+    u.set_password(senha)
+
+    db.session.add(u)
+    db.session.flush()
+
+    for aba in ADMIN_ABAS.keys():
+        db.session.add(
+            AdminPermissao(
+                usuario_id=u.id,
+                aba=aba,
+                pode_ver=False,
+                pode_criar=False,
+                pode_editar=False,
+                pode_excluir=False,
+            )
+        )
+
+    db.session.commit()
+    flash("Administrador criado com sucesso.", "success")
+    return redirect(url_for("admin_dashboard", tab="config"))
 
 @app.route("/admin/admins/<int:usuario_id>/permissoes", methods=["POST"])
 @admin_required
