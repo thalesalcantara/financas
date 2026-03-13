@@ -5519,24 +5519,42 @@ def update_config():
     flash("Configuração atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="config"))
 
+
 @app.route("/admin/alterar_admin", methods=["POST"])
 @admin_perm_required("config", "editar")
 def alterar_admin():
     admin = Usuario.query.filter_by(tipo="admin", is_master=True).first()
+
     if not admin:
         flash("Administrador master não encontrado.", "danger")
         return redirect(url_for("admin_dashboard", tab="config"))
-    admin.usuario = request.form.get("usuario", admin.usuario).strip()
-    nova = request.form.get("nova_senha", "")
-    confirmar = request.form.get("confirmar_senha", "")
+
+    novo_usuario = (request.form.get("usuario") or "").strip()
+    nova = (request.form.get("nova_senha") or "").strip()
+    confirmar = (request.form.get("confirmar_senha") or "").strip()
+
+    if not novo_usuario:
+        flash("Informe o usuário do administrador.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    existente = Usuario.query.filter(Usuario.usuario == novo_usuario, Usuario.id != admin.id).first()
+    if existente:
+        flash("Já existe outro usuário com esse login.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    admin.usuario = novo_usuario
+
     if nova or confirmar:
         if nova != confirmar:
             flash("As senhas não conferem.", "warning")
             return redirect(url_for("admin_dashboard", tab="config"))
+
         admin.set_password(nova)
+
     db.session.commit()
     flash("Conta do administrador atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="config"))
+
 
 @app.route("/admin/admins/add", methods=["POST"])
 @admin_required
@@ -5547,9 +5565,15 @@ def add_admin_secundario():
 
     usuario = (request.form.get("usuario") or "").strip()
     senha = (request.form.get("senha") or "").strip()
+    confirmar_senha = (request.form.get("confirmar_senha") or "").strip()
+    ativo = str(request.form.get("ativo") or "1").strip() == "1"
 
-    if not usuario or not senha:
-        flash("Informe usuário e senha.", "warning")
+    if not usuario or not senha or not confirmar_senha:
+        flash("Preencha usuário, senha e confirmação.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    if senha != confirmar_senha:
+        flash("As senhas não conferem.", "warning")
         return redirect(url_for("admin_dashboard", tab="config"))
 
     if Usuario.query.filter_by(usuario=usuario).first():
@@ -5561,25 +5585,28 @@ def add_admin_secundario():
         tipo="admin",
         senha_hash="",
         is_master=False,
-        ativo=True,
+        ativo=ativo,
     )
     u.set_password(senha)
     db.session.add(u)
     db.session.flush()
 
     for aba in ADMIN_ABAS.keys():
-        db.session.add(AdminPermissao(
-            usuario_id=u.id,
-            aba=aba,
-            pode_ver=False,
-            pode_criar=False,
-            pode_editar=False,
-            pode_excluir=False,
-        ))
+        db.session.add(
+            AdminPermissao(
+                usuario_id=u.id,
+                aba=aba,
+                pode_ver=False,
+                pode_criar=False,
+                pode_editar=False,
+                pode_excluir=False,
+            )
+        )
 
     db.session.commit()
     flash("Administrador criado com sucesso.", "success")
     return redirect(url_for("admin_dashboard", tab="config"))
+
 
 @app.route("/admin/admins/<int:usuario_id>/permissoes", methods=["POST"])
 @admin_required
@@ -5598,13 +5625,20 @@ def salvar_permissoes_admin(usuario_id):
         perm = AdminPermissao.query.filter_by(usuario_id=admin.id, aba=aba).first()
 
         if not perm:
-            perm = AdminPermissao(usuario_id=admin.id, aba=aba)
+            perm = AdminPermissao(
+                usuario_id=admin.id,
+                aba=aba,
+                pode_ver=False,
+                pode_criar=False,
+                pode_editar=False,
+                pode_excluir=False,
+            )
             db.session.add(perm)
 
-        perm.pode_ver = bool(request.form.get(f"{aba}_ver"))
-        perm.pode_criar = bool(request.form.get(f"{aba}_criar"))
-        perm.pode_editar = bool(request.form.get(f"{aba}_editar"))
-        perm.pode_excluir = bool(request.form.get(f"{aba}_excluir"))
+        perm.pode_ver = bool(request.form.get(f"perm_{aba}_ver"))
+        perm.pode_criar = bool(request.form.get(f"perm_{aba}_criar"))
+        perm.pode_editar = bool(request.form.get(f"perm_{aba}_editar"))
+        perm.pode_excluir = bool(request.form.get(f"perm_{aba}_excluir"))
 
     db.session.commit()
     flash("Permissões atualizadas com sucesso.", "success")
