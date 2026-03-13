@@ -297,25 +297,23 @@ class Usuario(db.Model, UserMixin):
         server_default=text("false")
     )
 
-    # Importante: default no Python + default no BANCO
     ativo = db.Column(
         db.Boolean,
         nullable=False,
         default=True,
-        server_default=text("true")  # Postgres; funciona bem no Render
+        server_default=text("true")
     )
 
     @property
     def is_active(self) -> bool:
-        # Flask-Login usa isso para bloquear login de usuário inativo
-        return bool(self.ativo)
+        return bool(self.ativo is not False)
 
     def set_password(self, raw: str):
         self.senha_hash = generate_password_hash(raw)
 
     def check_password(self, raw: str) -> bool:
         return check_password_hash(self.senha_hash, raw)
-
+        
 class AdminPermissao(db.Model):
     __tablename__ = "admin_permissoes"
 
@@ -836,6 +834,24 @@ def init_db():
     except Exception:
         db.session.rollback()
 
+    # 3.99) corrige registros antigos com ativo NULL
+    try:
+        if _is_sqlite():
+            db.session.execute(sa_text("""
+                UPDATE usuarios
+                   SET ativo = 1
+                 WHERE ativo IS NULL
+            """))
+        else:
+            db.session.execute(sa_text("""
+                UPDATE public.usuarios
+                   SET ativo = TRUE
+                 WHERE ativo IS NULL
+            """))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
     # 4.x) período em despesas_cooperado (data_inicio / data_fim) + backfill
     try:
         if _is_sqlite():
@@ -1217,20 +1233,29 @@ def admin_required(fn):
             return redirect(url_for("login"))
 
         u = Usuario.query.get(uid)
-        if not u or u.tipo != "admin":
+        if not u:
+            session.clear()
+            flash("Sessão inválida. Faça login novamente.", "danger")
+            return redirect(url_for("login"))
+
+        if u.tipo != "admin":
             session.clear()
             flash("Acesso restrito ao administrador.", "danger")
             return redirect(url_for("login"))
 
-        if not getattr(u, "ativo", True):
+        # corrige admin antigo com ativo nulo
+        if getattr(u, "ativo", None) is None:
+            u.ativo = True
+            db.session.commit()
+
+        if u.ativo is False:
             session.clear()
             flash("Conta desativada. Fale com o administrador master.", "danger")
             return redirect(url_for("login"))
 
         return fn(*args, **kwargs)
     return wrapper
-
-
+    
 ADMIN_ABAS = {
     "lancamentos": "Lançamentos",
     "receitas": "Receitas Coop",
@@ -2471,7 +2496,7 @@ def login():
 
         u = Usuario.query.filter_by(usuario=usuario).first()
 
-        # Fallback: permitir login usando o NOME do restaurante
+        # fallback: login pelo nome do restaurante
         if not u:
             r = (
                 Restaurante.query.filter(Restaurante.nome.ilike(usuario)).first()
@@ -2481,19 +2506,20 @@ def login():
                 u = r.usuario_ref
 
         if u and u.check_password(senha):
-            # bloqueia usuário inativo
-            if not getattr(u, "ativo", True):
+            # corrige registros antigos com ativo nulo
+            if getattr(u, "ativo", None) is None:
+                u.ativo = True
+                db.session.commit()
+
+            if u.ativo is False:
                 session.clear()
                 flash("Conta desativada. Fale com o administrador.", "danger")
                 return redirect(url_for("login"))
 
-            # limpa sessão antiga e recria
             session.clear()
             session.permanent = True
             session["user_id"] = u.id
             session["user_tipo"] = u.tipo
-
-            flash("Login realizado com sucesso.", "success")
 
             if u.tipo == "admin":
                 return redirect(url_for("admin_dashboard"))
@@ -2521,7 +2547,6 @@ def login():
       <button style="padding:10px 16px">Entrar</button>
     </form>
     """
-
 
 @app.route("/logout")
 def logout():
