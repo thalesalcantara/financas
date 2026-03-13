@@ -2535,26 +2535,51 @@ def toggle_status_cooperado(id):
 @admin_required
 def admin_dashboard():
     args = request.args
-    active_tab = args.get("tab", "lancamentos")
+    active_tab = (args.get("tab") or "lancamentos").strip()
 
-    if not admin_has_perm(active_tab, "ver"):
-        flash("Você não tem permissão para acessar essa aba.", "danger")
+    admin_logado = _usuario_logado()
+    if not admin_logado:
+        flash("Sessão inválida. Faça login novamente.", "danger")
+        session.clear()
+        return redirect(url_for("login"))
 
-        for aba in ADMIN_ABAS.keys():
-            if admin_has_perm(aba, "ver"):
-                return redirect(url_for("admin_dashboard", tab=aba))
+    # Se for master, libera tudo
+    if getattr(admin_logado, "is_master", False):
+        if active_tab not in ADMIN_ABAS:
+            active_tab = "lancamentos"
 
-        flash("Seu usuário admin não possui nenhuma aba liberada.", "warning")
-        return redirect(url_for("logout"))
+    else:
+        # monta lista de abas permitidas para esse admin
+        abas_liberadas = [
+            aba for aba in ADMIN_ABAS.keys()
+            if admin_has_perm(aba, "ver")
+        ]
 
-    if active_tab == "config" and not is_admin_master():
+        # se não tiver nenhuma aba liberada, não desloga: mostra mensagem e volta pro login
+        if not abas_liberadas:
+            flash("Seu usuário admin está sem permissões liberadas. Fale com o administrador master.", "danger")
+            session.clear()
+            return redirect(url_for("login"))
+
+        # se pediu aba inválida ou aba sem permissão, joga para a primeira aba liberada
+        if active_tab not in ADMIN_ABAS or active_tab not in abas_liberadas:
+            flash("Você não tem permissão para acessar essa aba.", "warning")
+            return redirect(url_for("admin_dashboard", tab=abas_liberadas[0]))
+
+    # aba config só para master
+    if active_tab == "config" and not getattr(admin_logado, "is_master", False):
+        abas_liberadas = [
+            aba for aba in ADMIN_ABAS.keys()
+            if aba != "config" and admin_has_perm(aba, "ver")
+        ]
+
         flash("A aba de configurações é restrita ao administrador master.", "danger")
 
-        for aba in ADMIN_ABAS.keys():
-            if aba != "config" and admin_has_perm(aba, "ver"):
-                return redirect(url_for("admin_dashboard", tab=aba))
+        if abas_liberadas:
+            return redirect(url_for("admin_dashboard", tab=abas_liberadas[0]))
 
-        return redirect(url_for("logout"))
+        session.clear()
+        return redirect(url_for("login"))
 
     considerar_periodo = False
     dows = set()
