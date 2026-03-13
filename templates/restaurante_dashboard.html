@@ -40,6 +40,7 @@
     }
 
     html,body{height:100%;}
+
     body{
       margin:0;
       background:var(--bg);
@@ -53,12 +54,14 @@
 
     .shell{
       display:grid;
-      grid-template-columns:260px minmax(0,1fr);
+      grid-template-columns:280px minmax(0,1fr);
       min-height:100vh;
     }
 
     .aside{
-      background:linear-gradient(180deg,#2141d9 0%,#3654e6 100%);
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,.16), transparent 28%),
+        linear-gradient(180deg, #1736c9 0%, #2141d9 38%, #3654e6 100%);
       color:#f9fafb;
       padding:18px 14px;
       position:sticky;
@@ -67,65 +70,113 @@
       display:flex;
       flex-direction:column;
       gap:14px;
+      box-shadow:inset -1px 0 0 rgba(255,255,255,.08);
     }
 
     .brand{
       font-weight:800;
-      font-size:1.02rem;
-      padding:10px 12px;
-      border-radius:12px;
-      background:rgba(15,23,42,0.18);
+      font-size:1.04rem;
+      padding:12px 14px;
+      border-radius:16px;
+      background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.14);
       display:flex;
       align-items:center;
-      gap:8px;
+      gap:10px;
+      backdrop-filter:blur(8px);
+      box-shadow:0 10px 24px rgba(0,0,0,.12);
+    }
+
+    .brand i{
+      width:34px;
+      height:34px;
+      border-radius:10px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      background:rgba(255,255,255,.16);
     }
 
     .theme-toggle{
-      margin-top:4px;
-      border-radius:10px;
-      border:1px solid rgba(255,255,255,0.35);
-      background:rgba(15,23,42,0.18);
-      color:#e5e7eb;
-      padding:8px 10px;
+      margin-top:2px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.08);
+      color:#eef2ff;
+      padding:10px 12px;
       display:flex;
       align-items:center;
       gap:8px;
       cursor:pointer;
-      font-size:.82rem;
+      font-size:.84rem;
+      font-weight:700;
+      transition:all .18s ease;
+      backdrop-filter:blur(8px);
+    }
+
+    .theme-toggle:hover{
+      background:rgba(255,255,255,.14);
+      transform:translateY(-1px);
     }
 
     .navmenu{
-      margin-top:12px;
+      margin-top:10px;
       display:flex;
       flex-direction:column;
-      gap:4px;
+      gap:7px;
     }
 
     .navmenu a{
-      color:#f9fafb;
-      padding:8px 10px;
-      border-radius:10px;
+      color:#f8fbff;
+      padding:11px 12px;
+      border-radius:14px;
       display:flex;
       align-items:center;
-      gap:8px;
-      font-weight:600;
-      font-size:.9rem;
-      opacity:.9;
-      transition:background .12s ease,opacity .12s ease;
+      gap:10px;
+      font-weight:700;
+      font-size:.92rem;
+      opacity:.96;
+      transition:all .16s ease;
+      border:1px solid transparent;
+      position:relative;
     }
 
-    .navmenu a i{font-size:1rem;}
-    .navmenu a:hover{background:rgba(15,23,42,0.25); opacity:1;}
+    .navmenu a i{
+      font-size:1rem;
+      width:20px;
+      text-align:center;
+    }
+
+    .navmenu a:hover{
+      background:rgba(255,255,255,.10);
+      border-color:rgba(255,255,255,.10);
+      transform:translateX(2px);
+    }
+
     .navmenu a.active{
-      background:#1d3ad3;
+      background:rgba(255,255,255,.16);
+      border-color:rgba(255,255,255,.18);
+      box-shadow:0 10px 22px rgba(0,0,0,.14);
       opacity:1;
     }
 
+    .navmenu a.active::before{
+      content:"";
+      position:absolute;
+      left:-6px;
+      top:10px;
+      bottom:10px;
+      width:4px;
+      border-radius:999px;
+      background:#ffffff;
+    }
+
     .content{
-      padding:22px clamp(14px,3vw,32px);
-      max-width:1200px;
+      padding:24px 24px 28px 24px;
       width:100%;
-      margin:0 auto;
+      max-width:none;
+      margin:0;
+      min-width:0;
     }
 
     .section-title{
@@ -193,7 +244,7 @@
       border-radius:999px;
       font-size:.9rem;
       font-weight:600;
-      padding:.4rem .9rem;
+      padding:.45rem .95rem;
       display:inline-flex;
       align-items:center;
       gap:6px;
@@ -211,7 +262,7 @@
       color:var(--royal);
       font-size:.86rem;
       font-weight:600;
-      padding:.3rem .8rem;
+      padding:.35rem .85rem;
       display:inline-flex;
       align-items:center;
       gap:6px;
@@ -267,177 +318,6 @@
       border-left-color:var(--danger);
     }
 
-    #buscaCoop{
-      font-size:.86rem;
-    }
-
-    #selectCoop{
-      font-size:.86rem;
-      margin-top:4px;
-    }
-
-    #listaCooperados{
-      margin-top:8px;
-      padding-top:4px;
-      border-top:1px dashed var(--border);
-    }
-
-    .cooperado-item{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:8px;
-      padding:10px 12px;
-      border-radius:12px;
-      cursor:pointer;
-      border:1px solid var(--border);
-      background:var(--card);
-      transition:background .12s ease,border-color .12s ease,transform .08s ease;
-      margin-bottom:8px;
-    }
-
-    .cooperado-item:hover{
-      background:#edf2ff;
-      border-color:#d0ddff;
-      transform:translateY(-1px);
-    }
-
-    .cooperado-item.selected{
-      background:var(--royal-soft);
-      border-color:var(--royal);
-      box-shadow:0 0 0 1px rgba(33,65,217,.15) inset;
-    }
-
-    .coop-left{
-      display:flex;
-      flex-direction:column;
-      gap:2px;
-    }
-
-    .coop-name{
-      font-weight:700;
-      color:var(--text);
-    }
-
-    .coop-meta{
-      font-size:.8rem;
-      color:var(--muted);
-    }
-
-    #blocoLancamento{
-      border-radius:16px;
-    }
-
-    #hintSelecione{
-      border-radius:12px;
-      background:#eef2ff;
-      border:1px dashed #c7d2fe;
-      font-size:.9rem;
-    }
-
-    .selected-header{
-      border-radius:12px;
-      background:linear-gradient(135deg, rgba(33,65,217,.08), rgba(54,84,230,.04));
-      border:1px solid rgba(33,65,217,.12);
-      padding:10px 12px;
-    }
-
-    .selected-header img.big{
-      width:70px;
-      height:70px;
-      border-radius:50%;
-      object-fit:cover;
-    }
-
-    section[data-view="lancar"] #formLancamento{
-      border-radius:12px;
-      background:#f9fafb;
-      padding:10px 12px;
-      margin-top:8px;
-    }
-
-    section[data-view="lancar"] #formLancamento .form-label{
-      margin-bottom:2px;
-    }
-
-    .rating-group{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      flex-wrap:wrap;
-    }
-
-    .rating-label{
-      min-width:150px;
-      font-weight:600;
-      font-size:.9rem;
-      color:var(--muted);
-    }
-
-    .stars{
-      display:inline-flex;
-      gap:3px;
-      font-size:1.1rem;
-      cursor:pointer;
-    }
-
-    .star{
-      color:#cbd5f5;
-    }
-
-    .star.active,
-    .star.hover{
-      color:#facc15;
-    }
-
-    .rating-group[data-name="av_geral"] .stars{
-      pointer-events:none;
-      opacity:.9;
-    }
-
-    .kpi{
-      background:#f9fbff;
-      border-radius:12px;
-      border:1px solid var(--border);
-      padding:8px 10px;
-      font-size:.86rem;
-    }
-
-    .doc-row{
-      border:1px solid var(--border);
-      border-radius:14px;
-      padding:12px 14px;
-      background:var(--card);
-      box-shadow:0 3px 8px rgba(15,23,42,0.08);
-    }
-
-    .doc-row:hover{
-      box-shadow:0 5px 12px rgba(15,23,42,0.12);
-    }
-
-    .doc-title{font-weight:700; font-size:.96rem;}
-
-    .doc-cat{
-      font-size:.72rem;
-      color:var(--royal);
-      text-transform:uppercase;
-      letter-spacing:.05em;
-      font-weight:700;
-    }
-
-    .doc-date{
-      font-size:.84rem;
-      color:var(--muted);
-    }
-
-    .doc-desc{
-      margin-top:.25rem;
-      font-size:.9rem;
-      background:#f3f4ff;
-      border-radius:10px;
-      padding:.5rem .75rem;
-    }
-
     .form-label{
       font-size:.8rem;
       font-weight:600;
@@ -461,6 +341,14 @@
 
     textarea.form-control{
       border-radius:12px;
+    }
+
+    .kpi{
+      background:#f9fbff;
+      border-radius:12px;
+      border:1px solid var(--border);
+      padding:8px 10px;
+      font-size:.86rem;
     }
 
     .lanc-overlay{
@@ -525,11 +413,14 @@
     }
 
     .hero-panel{
-      background:linear-gradient(135deg, rgba(33,65,217,.10), rgba(54,84,230,.04));
+      background:
+        radial-gradient(circle at right top, rgba(54,84,230,.18), transparent 28%),
+        linear-gradient(135deg, rgba(33,65,217,.12), rgba(54,84,230,.05));
       border:1px solid rgba(33,65,217,.14);
-      border-radius:18px;
-      padding:18px;
+      border-radius:22px;
+      padding:20px 22px;
       margin-bottom:16px;
+      box-shadow:0 14px 34px rgba(33,65,217,.08);
     }
 
     .hero-title{
@@ -552,14 +443,18 @@
       margin-bottom:16px;
     }
 
+    .pending-col{
+      grid-column:span 6;
+    }
+
     .pending-card{
-      grid-column:span 12;
       background:var(--card);
       border:1px solid #fecaca;
       border-left:5px solid var(--danger);
       border-radius:16px;
       padding:14px 16px;
       box-shadow:0 8px 24px rgba(231,76,60,.08);
+      height:100%;
     }
 
     .pending-card.ok{
@@ -663,22 +558,101 @@
       overflow:auto;
     }
 
+    .cooperado-item{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      border:1px solid var(--border);
+      background:var(--card);
+      transition:background .12s ease,border-color .12s ease,transform .08s ease;
+      margin-bottom:8px;
+    }
+
+    .cooperado-item:hover{
+      background:#edf2ff;
+      border-color:#d0ddff;
+      transform:translateY(-1px);
+    }
+
+    .cooperado-item.selected{
+      background:var(--royal-soft);
+      border-color:var(--royal);
+      box-shadow:0 0 0 1px rgba(33,65,217,.15) inset;
+    }
+
+    .coop-left{
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+    }
+
+    .coop-name{
+      font-weight:700;
+      color:var(--text);
+    }
+
+    .coop-meta{
+      font-size:.8rem;
+      color:var(--muted);
+    }
+
     .lancar-layout-card{
       background:var(--card);
       border:1px solid var(--border);
-      border-radius:18px;
-      box-shadow:0 10px 30px rgba(15,23,42,.06);
+      border-radius:22px;
+      box-shadow:0 12px 34px rgba(15,23,42,.06);
+      width:100%;
     }
 
     .lancar-layout-card .card-body{
-      padding:18px;
+      padding:20px;
+    }
+
+    #blocoLancamento{
+      border-radius:16px;
+    }
+
+    #hintSelecione{
+      border-radius:12px;
+      background:#eef2ff;
+      border:1px dashed #c7d2fe;
+      font-size:.9rem;
+    }
+
+    .selected-header{
+      border-radius:12px;
+      background:linear-gradient(135deg, rgba(33,65,217,.08), rgba(54,84,230,.04));
+      border:1px solid rgba(33,65,217,.12);
+      padding:10px 12px;
+    }
+
+    .selected-header img.big{
+      width:70px;
+      height:70px;
+      border-radius:50%;
+      object-fit:cover;
+    }
+
+    section[data-view="lancar"] #formLancamento{
+      border-radius:12px;
+      background:#f9fafb;
+      padding:10px 12px;
+      margin-top:8px;
+    }
+
+    section[data-view="lancar"] #formLancamento .form-label{
+      margin-bottom:2px;
     }
 
     .form-highlight{
       border:1px solid var(--border);
-      border-radius:14px;
-      background:#fafbff;
-      padding:14px;
+      border-radius:18px;
+      background:linear-gradient(180deg, #fbfcff 0%, #f7f9ff 100%);
+      padding:16px;
     }
 
     .table-box{
@@ -697,14 +671,97 @@
       font-size:.85rem;
     }
 
+    .rating-group{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    .rating-label{
+      min-width:150px;
+      font-weight:600;
+      font-size:.9rem;
+      color:var(--muted);
+    }
+
+    .stars{
+      display:inline-flex;
+      gap:3px;
+      font-size:1.1rem;
+      cursor:pointer;
+    }
+
+    .star{
+      color:#cbd5f5;
+    }
+
+    .star.active,
+    .star.hover{
+      color:#facc15;
+    }
+
+    .rating-group[data-name="av_geral"] .stars{
+      pointer-events:none;
+      opacity:.9;
+    }
+
     @media(max-width:920px){
-      .shell{grid-template-columns:70px minmax(0,1fr);}
-      .brand span{display:none;}
-      .navmenu a span{display:none;}
+      .shell{
+        grid-template-columns:78px minmax(0,1fr);
+      }
+
+      .aside{
+        padding:14px 10px;
+      }
+
+      .brand{
+        justify-content:center;
+        padding:10px;
+      }
+
+      .brand span{
+        display:none;
+      }
+
+      .theme-toggle{
+        justify-content:center;
+        padding:10px;
+      }
+
+      .theme-toggle span{
+        display:none;
+      }
+
+      .navmenu a{
+        justify-content:center;
+        padding:12px 10px;
+      }
+
+      .navmenu a span{
+        display:none;
+      }
+
+      .navmenu a.active::before{
+        left:4px;
+        top:8px;
+        bottom:8px;
+      }
+
+      .content{
+        padding:18px 14px 24px 14px;
+      }
+
+      .pending-col{
+        grid-column:span 12;
+      }
     }
 
     @media(max-width:720px){
-      .content{padding-inline:14px;}
+      .content{
+        padding-inline:14px;
+      }
+
       section[data-view="lancar"] #formLancamento{
         padding:10px;
       }
@@ -1309,57 +1366,58 @@
             <span>Lançar Produção Diária</span>
           </div>
           <p class="hero-subtitle">
-            Mostra primeiro quem está escalado no período atual, permite busca manual por nome
-            e deixa preparado o painel de pendências de lançamento.
+            A lista mostra apenas os cooperados escalados hoje. Os demais ficam ocultos e só aparecem quando você pesquisar pelo nome.
           </p>
         </div>
 
+        {% set _pendencias = pendencias_lancamento if pendencias_lancamento is defined and pendencias_lancamento is not none else [] %}
         <div class="pending-wrap">
-          {% set _pendencias = pendencias_lancamento if pendencias_lancamento is defined and pendencias_lancamento is not none else [] %}
-          {% if _pendencias %}
-            <div class="pending-card">
-              <div class="pending-title">
-                <i class="bi bi-exclamation-triangle-fill"></i>
-                <span>Lançamentos pendentes</span>
-              </div>
-              <div class="pending-sub">
-                Estes cooperados estão com horário encerrado e ainda não tiveram produção lançada no dia.
-              </div>
+          <div class="pending-col" style="grid-column:span 12;">
+            {% if _pendencias %}
+              <div class="pending-card">
+                <div class="pending-title">
+                  <i class="bi bi-exclamation-triangle-fill"></i>
+                  <span>Lançamentos pendentes</span>
+                </div>
+                <div class="pending-sub">
+                  Estes cooperados estão com horário encerrado e ainda não tiveram produção lançada no dia.
+                </div>
 
-              <div class="pending-list">
-                {% for p in _pendencias %}
-                  <div class="pending-item">
-                    <div class="pending-item-main">
-                      <strong>{{ p.cooperado_nome }}</strong>
-                      <div class="pending-item-meta">
-                        {{ p.data }} • {{ p.turno }}{% if p.horario %} • {{ p.horario }}{% endif %}{% if p.contrato %} • {{ p.contrato }}{% endif %}
+                <div class="pending-list">
+                  {% for p in _pendencias %}
+                    <div class="pending-item">
+                      <div class="pending-item-main">
+                        <strong>{{ p.cooperado_nome }}</strong>
+                        <div class="pending-item-meta">
+                          {{ p.data }} • {{ p.turno }}{% if p.horario %} • {{ p.horario }}{% endif %}{% if p.contrato %} • {{ p.contrato }}{% endif %}
+                        </div>
+                      </div>
+
+                      <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <div class="pending-badge">
+                          <i class="bi bi-clock-history"></i>
+                          Pendente
+                        </div>
+                        <button type="button" class="btn btn-outline-royal btn-sm" onclick="selecionarCooperadoPendente('{{ p.cooperado_id }}', '{{ p.horario or '' }}')">
+                          <i class="bi bi-cursor-fill"></i> Selecionar
+                        </button>
                       </div>
                     </div>
-
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                      <div class="pending-badge">
-                        <i class="bi bi-clock-history"></i>
-                        Pendente
-                      </div>
-                      <button type="button" class="btn btn-outline-royal btn-sm" onclick="selecionarCooperadoPendente('{{ p.cooperado_id }}', '{{ p.horario }}')">
-                        <i class="bi bi-cursor-fill"></i> Selecionar
-                      </button>
-                    </div>
-                  </div>
-                {% endfor %}
+                  {% endfor %}
+                </div>
               </div>
-            </div>
-          {% else %}
-            <div class="pending-card ok">
-              <div class="pending-title">
-                <i class="bi bi-check2-circle"></i>
-                <span>Nenhuma pendência agora</span>
+            {% else %}
+              <div class="pending-card ok">
+                <div class="pending-title">
+                  <i class="bi bi-check2-circle"></i>
+                  <span>Nenhuma pendência agora</span>
+                </div>
+                <div class="pending-sub">
+                  Todos os horários encerrados no dia já estão lançados.
+                </div>
               </div>
-              <div class="pending-sub">
-                Todos os horários encerrados no dia já estão lançados.
-              </div>
-            </div>
-          {% endif %}
+            {% endif %}
+          </div>
         </div>
 
         <div class="card card-body mb-3 shadow-sm border-0">
@@ -1398,14 +1456,14 @@
           </form>
         </div>
 
-        <div class="row g-3">
-          <div class="col-lg-4">
+        <div class="row g-4 align-items-start">
+          <div class="col-xl-3 col-lg-4">
             <div class="lancar-layout-card h-100">
               <div class="card-body">
                 <div class="coop-list-box">
                   <div class="coop-list-head">
                     <div class="d-flex justify-content-between align-items-center">
-                      <div class="coop-list-head-title">Cooperados escalados / busca manual</div>
+                      <div class="coop-list-head-title">Escalados de hoje / busca manual</div>
                       <span class="badge bg-light text-dark border">{{ _cooperados|length }}</span>
                     </div>
                   </div>
@@ -1435,15 +1493,16 @@
                           data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}"
                           data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
                           data-fone-raw="{{ coop.telefone or '' }}"
-                          data-escalado="{{ '1' if coop.escalado else '0' }}"
+                          data-escalado="{{ '1' if (coop.escalado_hoje if coop.escalado_hoje is defined else false) else '0' }}"
+                          {% if not (coop.escalado_hoje if coop.escalado_hoje is defined else false) %}hidden{% endif %}
                         >
-                          {% if coop.escalado %}🟢 {% endif %}{{ coop.nome }}
+                          {{ coop.nome }}
                         </option>
                       {% endfor %}
                     </select>
 
                     <div class="muted-note mt-2">
-                      Primeiro aparecem os escalados. Mesmo assim, você pode buscar manualmente qualquer nome.
+                      Sem busca: aparecem só os escalados de hoje. Ao pesquisar, os demais nomes também aparecem.
                     </div>
                   </div>
 
@@ -1458,14 +1517,15 @@
                         data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}"
                         data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
                         data-fone-raw="{{ coop.telefone or '' }}"
-                        data-escalado="{{ '1' if coop.escalado else '0' }}"
+                        data-escalado="{{ '1' if (coop.escalado_hoje if coop.escalado_hoje is defined else false) else '0' }}"
+                        style="{% if not (coop.escalado_hoje if coop.escalado_hoje is defined else false) %}display:none;{% endif %}"
                       >
                         <div class="d-flex justify-content-between align-items-center w-100">
                           <div class="coop-left">
-                            <span class="coop-name">{% if coop.escalado %}🟢 {% endif %}{{ coop.nome }}</span>
+                            <span class="coop-name">{{ coop.nome }}</span>
                             <span class="coop-meta">
-                              {% if coop.escalado %}
-                                Escalado no período
+                              {% if coop.escalado_hoje if coop.escalado_hoje is defined else false %}
+                                Escalado hoje
                               {% else %}
                                 Busca manual
                               {% endif %}
@@ -1485,7 +1545,7 @@
             </div>
           </div>
 
-          <div class="col-lg-8">
+          <div class="col-xl-9 col-lg-8">
             <div class="lancar-layout-card" id="blocoLancamento">
               <div class="card-body">
                 <div class="selected-header text-center mb-3" id="selectedHeader" style="display:none;">
@@ -1692,7 +1752,7 @@
               </p>
 
               <ul class="small text-muted mb-3 ps-3">
-                <li><strong>Avaliar agora:</strong> abre os campos de avaliação (estrelas e comentário).</li>
+                <li><strong>Avaliar agora:</strong> abre os campos de avaliação.</li>
                 <li><strong>Lançar sem avaliar:</strong> grava o lançamento sem nenhuma avaliação.</li>
               </ul>
             </div>
@@ -1866,11 +1926,14 @@
         if (card) {
           clearSelection();
           card.classList.add('selected');
+          if (card.style.display === 'none') {
+            card.style.display = '';
+          }
         }
 
         selectCoop({
           id: opt.value,
-          nome: opt.textContent.trim(),
+          nome: opt.dataset.nome || opt.textContent.trim(),
           foto: card ? card.dataset.foto : '',
           total: card ? (parseFloat(card.dataset.total || '0').toFixed(2).replace('.', ',')) : '0,00',
           foneDigits: opt.getAttribute('data-fone') || (card ? card.dataset.fone : '')
@@ -1881,7 +1944,17 @@
     function selecionarCooperadoPendente(coopId, horario){
       const card = document.querySelector('.cooperado-item[data-id="' + coopId + '"]');
       if (card) {
+        card.style.display = '';
         card.click();
+      }
+
+      const select = document.getElementById('selectCoop');
+      if (select) {
+        const opt = Array.from(select.options).find(o => o.value === String(coopId));
+        if (opt) {
+          opt.hidden = false;
+          select.value = String(coopId);
+        }
       }
 
       const form = document.getElementById('formLancamento');
@@ -2149,7 +2222,7 @@
           setAvisosBadge(unreadLocal, {showToast:false});
           pollAvisos();
         }else{
-          cont.innerHTML='<div class="card card-body"><div class="text-muted"><i class="bi bi-inbox me-1"></i> Nenhum aviso disponível.</div></div>';
+          cont.innerHTML='<div class="card card-body text-muted">Nenhum aviso disponível.</div>';
           setAvisosBadge(0, {showToast:false});
           pollAvisos();
         }
@@ -2177,34 +2250,57 @@
           const bEsc = b.dataset.escalado === '1' ? 0 : 1;
 
           if (aEsc !== bEsc) return aEsc - bEsc;
+
           return (a.dataset.nome || '').localeCompare((b.dataset.nome || ''), 'pt-BR');
         });
 
         ordenados.forEach(el => lista.appendChild(el));
       }
 
-      function filtrarESelecionar(valor, autoSelecionar){
+      function aplicarFiltro(valor, autoSelecionar){
         const q = (valor || '').trim().toLowerCase();
         const visiveis = [];
 
         itens.forEach(el => {
           const nome = (el.dataset.nome || '').toLowerCase();
-          const match = !q || nome.includes(q);
-          el.style.display = match ? '' : 'none';
-          if (match) visiveis.push(el);
+          const escalado = el.dataset.escalado === '1';
+          const matchBusca = nome.includes(q);
+
+          let mostrar = false;
+
+          if (!q) {
+            mostrar = escalado;
+          } else {
+            mostrar = matchBusca;
+          }
+
+          el.style.display = mostrar ? '' : 'none';
+
+          if (mostrar) {
+            visiveis.push(el);
+          }
         });
 
         if (select) {
           Array.from(select.options).forEach((opt, idx) => {
             if (idx === 0) return;
+
             const nome = (opt.dataset.nome || opt.textContent || '').toLowerCase();
-            opt.hidden = !!q && !nome.includes(q);
+            const escalado = opt.dataset.escalado === '1';
+            const matchBusca = nome.includes(q);
+
+            if (!q) {
+              opt.hidden = !escalado;
+            } else {
+              opt.hidden = !matchBusca;
+            }
           });
         }
 
         if (!autoSelecionar) return;
 
         let alvo = visiveis.find(el => (el.dataset.nome || '').toLowerCase() === q);
+
         if (!alvo && visiveis.length === 1) {
           alvo = visiveis[0];
         }
@@ -2216,19 +2312,20 @@
       }
 
       ordenarLista();
+      aplicarFiltro('', false);
 
       busca?.addEventListener('input', function(){
-        filtrarESelecionar(this.value, false);
+        aplicarFiltro(this.value, false);
       });
 
       busca?.addEventListener('change', function(){
-        filtrarESelecionar(this.value, true);
+        aplicarFiltro(this.value, true);
       });
 
       busca?.addEventListener('keydown', function(e){
         if (e.key === 'Enter') {
           e.preventDefault();
-          filtrarESelecionar(this.value, true);
+          aplicarFiltro(this.value, true);
         }
       });
 
