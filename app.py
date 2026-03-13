@@ -2629,8 +2629,8 @@ def sso_entrar():
 # Admin Dashboard
 # =========================
 
-from flask import jsonify, request, render_template, session, flash, redirect, url_for
-from sqlalchemy import func, inspect, or_
+from flask import jsonify, request, render_template
+from sqlalchemy import func, inspect
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, ProgrammingError
 from datetime import date, timedelta
 from collections import defaultdict, namedtuple
@@ -2638,7 +2638,6 @@ import re
 
 
 @app.post("/admin/cooperados/<int:id>/toggle-status")
-@admin_required
 def toggle_status_cooperado(id):
     """
     Alterna o status 'ativo' do usuário vinculado ao cooperado.
@@ -2653,21 +2652,19 @@ def toggle_status_cooperado(id):
 
         user = coop.usuario_ref
 
+        # 1) Checa se o MODELO tem o atributo
         if not hasattr(user, "ativo"):
             return jsonify(
                 ok=False,
                 error="Campo 'ativo' ausente no modelo. Atualize o models.py (Usuario.ativo) e faça deploy."
             ), 500
 
+        # 2) Checa se o BANCO tem a coluna (produção pode estar sem migração)
         try:
             insp = inspect(db.engine)
             table = getattr(Usuario, "__tablename__", None)
-
             if not table:
-                return jsonify(
-                    ok=False,
-                    error="Não foi possível identificar a tabela do modelo Usuario."
-                ), 500
+                return jsonify(ok=False, error="Não foi possível identificar a tabela do modelo Usuario."), 500
 
             cols = {c["name"] for c in insp.get_columns(table)}
             if "ativo" not in cols:
@@ -2680,10 +2677,12 @@ def toggle_status_cooperado(id):
                     table=table
                 ), 409
         except Exception:
+            # Se falhar a inspeção, seguimos e deixamos o commit dizer se dá erro,
+            # mas com uma mensagem tratada no except abaixo.
             pass
 
         atual = bool(getattr(user, "ativo", True))
-        user.ativo = not atual
+        user.ativo = (not atual)
 
         db.session.commit()
         return jsonify(ok=True, ativo=bool(user.ativo))
@@ -2753,6 +2752,7 @@ def admin_dashboard():
     considerar_periodo = False
     dows = set()
 
+    # --- Helper: escolhe a primeira data válida de uma lista de chaves
     def _pick_date(*keys):
         for k in keys:
             v = args.get(k)
@@ -2762,9 +2762,11 @@ def admin_dashboard():
                     return d
         return None
 
+    # --- Datas unificadas para o RESUMO (prioriza resumo_inicio/fim)
     data_inicio = _pick_date("resumo_inicio", "data_inicio")
     data_fim = _pick_date("resumo_fim", "data_fim")
 
+    # Se não houver filtro explícito, usa somente a semana atual
     filtro_periodo_aplicado = bool(data_inicio or data_fim)
 
     if data_inicio and not data_fim:
@@ -2779,7 +2781,7 @@ def admin_dashboard():
     restaurante_id = args.get("restaurante_id", type=int)
     cooperado_id = args.get("cooperado_id", type=int)
     considerar_periodo = bool(args.get("considerar_periodo"))
-    dows = set(args.getlist("dow"))
+    dows = set(args.getlist("dow"))  # {"1","2",...}
 
     lancamentos = []
     total_producoes = 0.0
@@ -2787,8 +2789,8 @@ def admin_dashboard():
     total_sest = 0.0
     total_encargos = 0.0
 
+    # ---- Lançamentos (com filtros + DOW)
     q = Lancamento.query
-
     if restaurante_id:
         q = q.filter(Lancamento.restaurante_id == restaurante_id)
     if cooperado_id:
@@ -2805,6 +2807,7 @@ def admin_dashboard():
     else:
         lancamentos = lanc_base
 
+    # Se marcar "considerar_periodo", só mantemos dias do período do restaurante
     if considerar_periodo and restaurante_id:
         rest = Restaurante.query.get(restaurante_id)
         if rest:
@@ -2821,12 +2824,13 @@ def admin_dashboard():
     total_sest = round(total_producoes * SEST_ALIQ, 2)
     total_encargos = round(total_inss + total_sest, 2)
 
+    # ---- Coop (institucional)
     receitas = []
     despesas = []
     total_receitas = 0.0
     total_despesas = 0.0
 
-    if active_tab in {"receitas", "despesas", "resumo", "config"}:
+    if active_tab in {"receitas", "despesas"}:
         rq = ReceitaCooperativa.query
         dq = DespesaCooperativa.query
 
@@ -2841,22 +2845,22 @@ def admin_dashboard():
             ReceitaCooperativa.data.desc().nullslast(),
             ReceitaCooperativa.id.desc()
         ).all()
-
         despesas = dq.order_by(
             DespesaCooperativa.data.desc(),
             DespesaCooperativa.id.desc()
         ).all()
 
-        total_receitas = sum((getattr(r, "valor", None) or getattr(r, "valor_total", 0.0) or 0.0) for r in receitas)
+        total_receitas = sum((r.valor_total or 0.0) for r in receitas)
         total_despesas = sum((d.valor or 0.0) for d in despesas)
 
+    # ---- Cooperados (pessoa física)
     receitas_coop = []
     despesas_coop = []
     total_receitas_coop = 0.0
     total_despesas_coop = 0.0
     total_adiantamentos_coop = 0.0
 
-    if active_tab in {"coop_receitas", "coop_despesas", "beneficios", "resumo", "config"}:
+    if active_tab in {"coop_receitas", "coop_despesas", "beneficios"}:
         rq2 = ReceitaCooperado.query
         dq2 = DespesaCooperado.query
 
@@ -2879,15 +2883,14 @@ def admin_dashboard():
             ReceitaCooperado.data.desc(),
             ReceitaCooperado.id.desc()
         ).all()
-
         despesas_coop = dq2.order_by(
             DespesaCooperado.data_fim.desc().nullslast(),
             DespesaCooperado.id.desc()
         ).all()
 
         total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
-        total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop if not getattr(d, "eh_adiantamento", False))
-        total_adiantamentos_coop = sum((d.valor or 0.0) for d in despesas_coop if getattr(d, "eh_adiantamento", False))
+        total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop if not d.eh_adiantamento)
+        total_adiantamentos_coop = sum((d.valor or 0.0) for d in despesas_coop if d.eh_adiantamento)
 
     cfg = get_config()
 
@@ -2934,8 +2937,8 @@ def admin_dashboard():
             "turno": e.turno,
             "horario": e.horario,
             "contrato": e.contrato,
-            "cor": getattr(e, "cor", None),
-            "nome_planilha": getattr(e, "cooperado_nome", None),
+            "cor": e.cor,
+            "nome_planilha": e.cooperado_nome,
         }
         esc_by_int[k_int].append(esc_item)
         esc_by_str[str(k_int)].append(esc_item)
@@ -2957,6 +2960,7 @@ def admin_dashboard():
     qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
     qtd_sem_cadastro = int(cont_rows.get(None, 0))
 
+    # ---- Gráficos (por mês)
     sums = {}
     for l in lancamentos:
         if not l.data:
@@ -2976,9 +2980,9 @@ def admin_dashboard():
     labels_fmt = [_fmt_label(k) for k in labels_ord]
     values = [round(sums[k], 2) for k in labels_ord]
     chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
-    chart_data_lancamentos_cooperados = {"labels": labels_fmt, "values": values}
+    chart_data_lancamentos_cooperados = chart_data_lancamentos_coop
 
-    admin_user = Usuario.query.filter_by(tipo="admin", is_master=True).order_by(Usuario.id.asc()).first()
+    admin_user = Usuario.query.filter_by(tipo="admin").first()
 
     folha_por_coop = []
     folha_inicio = None
@@ -3037,9 +3041,11 @@ def admin_dashboard():
             )
 
             bruto_lanc = sum((x.valor or 0) for x in l)
+
             inss = round(bruto_lanc * INSS_ALIQ_FOLHA, 2)
             sest = round(bruto_lanc * SEST_ALIQ_FOLHA, 2)
             encargos = round(inss + sest, 2)
+
             outras_desp = sum((x.valor or 0) for x in d)
             bruto_total = bruto_lanc + sum((x.valor or 0) for x in r)
             liquido = round(bruto_total - encargos - outras_desp, 2)
@@ -3099,7 +3105,9 @@ def admin_dashboard():
             b_ini = hoje_ref - timedelta(days=hoje_ref.weekday())
             b_fim = b_ini + timedelta(days=6)
 
-        q_benef = BeneficioRegistro.query.filter(
+        q_benef = BeneficioRegistro.query
+
+        q_benef = q_benef.filter(
             BeneficioRegistro.data_inicial <= b_fim,
             BeneficioRegistro.data_final >= b_ini,
         )
@@ -3113,7 +3121,6 @@ def admin_dashboard():
             recs = []
             for i, nome in enumerate(nomes):
                 rid = None
-
                 if i < len(ids) and str(ids[i]).isdigit():
                     try:
                         rid = int(ids[i])
@@ -3182,7 +3189,6 @@ def admin_dashboard():
             buck_o = _turno_bucket(orig.turno, orig.horario)
             candidatas = Escala.query.filter_by(cooperado_id=destinatario.id).all()
             best = None
-
             for e in candidatas:
                 if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
                     if (orig.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
@@ -3190,7 +3196,6 @@ def admin_dashboard():
                         break
                     if best is None:
                         best = e
-
             if best:
                 linhas_afetadas.append(_linha_from_escala(best, saiu=destinatario.nome, entrou=solicitante.nome))
 
@@ -3205,7 +3210,6 @@ def admin_dashboard():
                 if r_.get("saiu") == destinatario.nome and r_.get("entrou") == solicitante.nome:
                     linha_dest = r_
                     break
-
             if linha_dest:
                 destino_data = linha_dest.get("dia", "")
                 turno_txt, horario_txt = _split_turno_horario(linha_dest.get("turno_horario", ""))
@@ -3218,7 +3222,6 @@ def admin_dashboard():
             buck_o = _turno_bucket(orig.turno, orig.horario)
             candidatas = Escala.query.filter_by(cooperado_id=destinatario.id).all()
             best = None
-
             for e in candidatas:
                 if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
                     if (orig.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
@@ -3226,7 +3229,6 @@ def admin_dashboard():
                         break
                     if best is None:
                         best = e
-
             if best:
                 destino_data = best.data
                 destino_turno = (best.turno or "").strip()
@@ -3267,7 +3269,6 @@ def admin_dashboard():
                         "entrou_nome": r_.get("entrou", ""),
                     }
                 )
-
                 trocas_historico_flat.append(
                     {
                         "data": r_.get("dia", ""),
@@ -3279,13 +3280,9 @@ def admin_dashboard():
                         "aplicada_em": t.aplicada_em,
                     }
                 )
-
             item["itens"] = itens
 
-        if t.status == "pendente":
-            trocas_pendentes.append(item)
-        else:
-            trocas_historico.append(item)
+        (trocas_pendentes if t.status == "pendente" else trocas_historico).append(item)
 
     if getattr(admin_logado, "is_master", False):
         admin_perms = {
@@ -3300,19 +3297,11 @@ def admin_dashboard():
     else:
         admin_perms = get_admin_permissions_map(admin_logado.id)
 
-    admins = (
-        Usuario.query
-        .filter_by(tipo="admin", is_master=False)
-        .order_by(Usuario.id.asc())
-        .all()
-    )
+    admins_secundarios = Usuario.query.filter_by(tipo="admin").order_by(Usuario.id.asc()).all()
 
-    admin_permissions_map = {}
-    for adm in admins:
-        admin_permissions_map[adm.id] = get_admin_permissions_map(adm.id)
-
-    admins_secundarios = admins
-    admins_permissoes = admin_permissions_map
+    admins_permissoes = {}
+    for adm in admins_secundarios:
+        admins_permissoes[adm.id] = get_admin_permissions_map(adm.id)
 
     current_date = date.today()
     data_limite = date(current_date.year, 12, 31)
@@ -3322,14 +3311,12 @@ def admin_dashboard():
         tab=active_tab,
         total_producoes=total_producoes,
         total_inss=total_inss,
-        total_sest=total_sest,
-        total_encargos=total_encargos,
         total_receitas=total_receitas,
         total_despesas=total_despesas,
         total_receitas_coop=total_receitas_coop,
         total_despesas_coop=total_despesas_coop,
         total_adiantamentos_coop=total_adiantamentos_coop,
-        salario_minimo=(cfg.salario_minimo or 0.0) if cfg else 0.0,
+        salario_minimo=cfg.salario_minimo or 0.0,
         lancamentos=lancamentos,
         receitas=receitas,
         despesas=despesas,
@@ -3342,7 +3329,6 @@ def admin_dashboard():
         current_date=current_date,
         data_limite=data_limite,
         admin=admin_user,
-        admin_user=admin_user,
         docinfo_map=docinfo_map,
         escalas_por_coop=esc_by_int,
         escalas_por_coop_json=esc_by_str,
@@ -3360,12 +3346,11 @@ def admin_dashboard():
         admin_perms=admin_perms,
         admin_is_master=is_admin_master(),
         ADMIN_ABAS=ADMIN_ABAS,
-        admins=admins,
-        admin_permissions_map=admin_permissions_map,
         admins_secundarios=admins_secundarios,
         admins_permissoes=admins_permissoes,
         filtro_periodo_aplicado=filtro_periodo_aplicado,
     )
+
     # --- Helper: escolhe a primeira data válida de uma lista de chaves
     def _pick_date(*keys):
         for k in keys:
@@ -4002,6 +3987,7 @@ def admin_dashboard():
         admins_permissoes=admins_permissoes,
     )
     
+
 # =========================
 # Navegação/Export util
 # =========================
@@ -5533,43 +5519,25 @@ def update_config():
     flash("Configuração atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="config"))
 
-
 @app.route("/admin/alterar_admin", methods=["POST"])
 @admin_perm_required("config", "editar")
 def alterar_admin():
     admin = Usuario.query.filter_by(tipo="admin", is_master=True).first()
-
     if not admin:
         flash("Administrador master não encontrado.", "danger")
         return redirect(url_for("admin_dashboard", tab="config"))
-
-    novo_usuario = (request.form.get("usuario") or "").strip()
-    nova = (request.form.get("nova_senha") or "").strip()
-    confirmar = (request.form.get("confirmar_senha") or "").strip()
-
-    if not novo_usuario:
-        flash("Informe o usuário do administrador.", "warning")
-        return redirect(url_for("admin_dashboard", tab="config"))
-
-    existente = Usuario.query.filter(Usuario.usuario == novo_usuario, Usuario.id != admin.id).first()
-    if existente:
-        flash("Já existe outro usuário com esse login.", "warning")
-        return redirect(url_for("admin_dashboard", tab="config"))
-
-    admin.usuario = novo_usuario
-
+    admin.usuario = request.form.get("usuario", admin.usuario).strip()
+    nova = request.form.get("nova_senha", "")
+    confirmar = request.form.get("confirmar_senha", "")
     if nova or confirmar:
         if nova != confirmar:
             flash("As senhas não conferem.", "warning")
             return redirect(url_for("admin_dashboard", tab="config"))
-
         admin.set_password(nova)
-
     db.session.commit()
     flash("Conta do administrador atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="config"))
 
-
 @app.route("/admin/admins/add", methods=["POST"])
 @admin_required
 def add_admin_secundario():
@@ -5579,15 +5547,9 @@ def add_admin_secundario():
 
     usuario = (request.form.get("usuario") or "").strip()
     senha = (request.form.get("senha") or "").strip()
-    confirmar_senha = (request.form.get("confirmar_senha") or "").strip()
-    ativo = str(request.form.get("ativo") or "1").strip() == "1"
 
-    if not usuario or not senha or not confirmar_senha:
-        flash("Preencha usuário, senha e confirmação.", "warning")
-        return redirect(url_for("admin_dashboard", tab="config"))
-
-    if senha != confirmar_senha:
-        flash("As senhas não conferem.", "warning")
+    if not usuario or not senha:
+        flash("Informe usuário e senha.", "warning")
         return redirect(url_for("admin_dashboard", tab="config"))
 
     if Usuario.query.filter_by(usuario=usuario).first():
@@ -5599,77 +5561,21 @@ def add_admin_secundario():
         tipo="admin",
         senha_hash="",
         is_master=False,
-        ativo=ativo,
+        ativo=True,
     )
     u.set_password(senha)
     db.session.add(u)
     db.session.flush()
 
     for aba in ADMIN_ABAS.keys():
-        db.session.add(
-            AdminPermissao(
-                usuario_id=u.id,
-                aba=aba,
-                pode_ver=False,
-                pode_criar=False,
-                pode_editar=False,
-                pode_excluir=False,
-            )
-        )
-
-    db.session.commit()
-    flash("Administrador criado com sucesso.", "success")
-    return redirect(url_for("admin_dashboard", tab="config"))
-
-@app.route("/admin/admins/add", methods=["POST"])
-@admin_required
-def add_admin_secundario():
-    if not is_admin_master():
-        flash("Apenas o administrador master pode criar outros administradores.", "danger")
-        return redirect(url_for("admin_dashboard", tab="config"))
-
-    nome = (request.form.get("nome") or "").strip()
-    usuario = (request.form.get("usuario") or "").strip()
-    senha = (request.form.get("senha") or "").strip()
-    confirmar_senha = (request.form.get("confirmar_senha") or "").strip()
-    ativo = str(request.form.get("ativo") or "1").strip() == "1"
-
-    if not nome or not usuario or not senha or not confirmar_senha:
-        flash("Preencha nome, usuário, senha e confirmação.", "warning")
-        return redirect(url_for("admin_dashboard", tab="config"))
-
-    if senha != confirmar_senha:
-        flash("As senhas não conferem.", "warning")
-        return redirect(url_for("admin_dashboard", tab="config"))
-
-    if Usuario.query.filter_by(usuario=usuario).first():
-        flash("Já existe um usuário com esse login.", "warning")
-        return redirect(url_for("admin_dashboard", tab="config"))
-
-    u = Usuario(
-        nome=nome,
-        usuario=usuario,
-        tipo="admin",
-        senha_hash="",
-        is_master=False,
-        ativo=ativo,
-    )
-    u.set_password(senha)
-
-    db.session.add(u)
-    db.session.flush()
-
-    for aba in ADMIN_ABAS.keys():
-        db.session.add(
-            AdminPermissao(
-                usuario_id=u.id,
-                aba=aba,
-                pode_ver=False,
-                pode_criar=False,
-                pode_editar=False,
-                pode_excluir=False,
-            )
-        )
+        db.session.add(AdminPermissao(
+            usuario_id=u.id,
+            aba=aba,
+            pode_ver=False,
+            pode_criar=False,
+            pode_editar=False,
+            pode_excluir=False,
+        ))
 
     db.session.commit()
     flash("Administrador criado com sucesso.", "success")
@@ -5692,20 +5598,13 @@ def salvar_permissoes_admin(usuario_id):
         perm = AdminPermissao.query.filter_by(usuario_id=admin.id, aba=aba).first()
 
         if not perm:
-            perm = AdminPermissao(
-                usuario_id=admin.id,
-                aba=aba,
-                pode_ver=False,
-                pode_criar=False,
-                pode_editar=False,
-                pode_excluir=False,
-            )
+            perm = AdminPermissao(usuario_id=admin.id, aba=aba)
             db.session.add(perm)
 
-        perm.pode_ver = bool(request.form.get(f"perm_{aba}_ver"))
-        perm.pode_criar = bool(request.form.get(f"perm_{aba}_criar"))
-        perm.pode_editar = bool(request.form.get(f"perm_{aba}_editar"))
-        perm.pode_excluir = bool(request.form.get(f"perm_{aba}_excluir"))
+        perm.pode_ver = bool(request.form.get(f"{aba}_ver"))
+        perm.pode_criar = bool(request.form.get(f"{aba}_criar"))
+        perm.pode_editar = bool(request.form.get(f"{aba}_editar"))
+        perm.pode_excluir = bool(request.form.get(f"{aba}_excluir"))
 
     db.session.commit()
     flash("Permissões atualizadas com sucesso.", "success")
