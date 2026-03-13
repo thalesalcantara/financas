@@ -6009,7 +6009,7 @@ def recusar_troca(troca_id):
 @app.route("/portal/restaurante")
 @role_required("restaurante")
 def portal_restaurante():
-    from datetime import date, timedelta
+    from datetime import date, timedelta, datetime
     import re
     from werkzeug.routing import BuildError
 
@@ -6022,7 +6022,7 @@ def portal_restaurante():
             "</p>"
         )
 
-    # Abas/visões: 'lancar', 'escalas', 'lancamentos', 'config', 'avisos'
+    # Abas/visões
     view = (request.args.get("view", "lancar") or "lancar").strip().lower()
 
     # ---- helper mês YYYY-MM
@@ -6044,13 +6044,13 @@ def portal_restaurante():
         except Exception:
             return None, None
 
-    # -------------------- LANÇAMENTOS (totais por período) --------------------
+    # -------------------- FILTRO DE PERÍODO --------------------
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
 
-    # NOVO: filtro por mês (?mes=YYYY-MM)
     mes = (request.args.get("mes") or "").strip()
     periodo_desc = None
+
     if mes:
         di_mes, df_mes = _parse_yyyy_mm_local(mes)
         if di_mes and df_mes:
@@ -6058,8 +6058,7 @@ def portal_restaurante():
             periodo_desc = "mês"
 
     if not di or not df:
-        # Sem filtro => janela semanal baseada no período do restaurante
-        wd_map = {"seg-dom": 0, "sab-sex": 5, "sex-qui": 4}  # seg=0 ... dom=6
+        wd_map = {"seg-dom": 0, "sab-sex": 5, "sex-qui": 4}
         start_wd = wd_map.get(getattr(rest, "periodo", None), 0)
         hoje = date.today()
         delta = (hoje.weekday() - start_wd) % 7
@@ -6071,49 +6070,7 @@ def portal_restaurante():
     else:
         periodo_desc = periodo_desc or "personalizado"
 
-    cooperados = (
-        Cooperado.query
-        .join(Usuario, Cooperado.usuario_id == Usuario.id)
-        .filter(Usuario.ativo.is_(True))
-        .order_by(Cooperado.nome)
-        .all()
-    )
-
-    total_bruto = 0.0
-    total_qtd = 0
-    total_entregas = 0
-
-    # 4% INSS + 0,5% SEST/SENAT (separados)
-    total_inss = 0.0
-    total_sest = 0.0
-
-    for c in cooperados:
-        q = (
-            Lancamento.query
-            .filter_by(restaurante_id=rest.id, cooperado_id=c.id)
-            .filter(Lancamento.data >= di, Lancamento.data <= df)
-            .order_by(Lancamento.data.desc(), Lancamento.id.desc())
-        )
-        c.lancamentos = q.all()
-
-        c.total_periodo = sum((l.valor or 0.0) for l in c.lancamentos)
-        c.inss_periodo = sum((l.valor or 0.0) * 0.04 for l in c.lancamentos)
-        c.sest_periodo = sum((l.valor or 0.0) * 0.005 for l in c.lancamentos)
-
-        c.encargos_periodo = c.inss_periodo + c.sest_periodo
-        c.liquido_periodo = c.total_periodo - c.encargos_periodo
-
-        total_bruto += c.total_periodo
-        total_qtd += len(c.lancamentos)
-        total_entregas += sum((l.qtd_entregas or 0) for l in c.lancamentos)
-
-        total_inss += c.inss_periodo
-        total_sest += c.sest_periodo
-
-    total_encargos = total_inss + total_sest
-    total_liquido = total_bruto - total_encargos
-
-    # -------------------- ESCALA (Quem trabalha) --------------------
+    # -------------------- HELPER: contrato do restaurante --------------------
     def contrato_bate_restaurante(contrato: str, rest_nome: str) -> bool:
         a = " ".join(_normalize_name(contrato or ""))
         b = " ".join(_normalize_name(rest_nome or ""))
@@ -6121,8 +6078,9 @@ def portal_restaurante():
             return False
         return a == b or a in b or b in a
 
+    # -------------------- ESCALA (Quem trabalha) --------------------
     ref = _parse_date(request.args.get("ref")) or date.today()
-    modo = request.args.get("modo", "semana")  # 'semana' ou 'dia'
+    modo = request.args.get("modo", "semana")
 
     if modo == "dia":
         dias_list = [ref]
@@ -6141,14 +6099,6 @@ def portal_restaurante():
             )
         )
         .order_by(Escala.id.asc())
-        .all()
-    )
-
-    cooperados = (
-        Cooperado.query
-        .join(Usuario, Cooperado.usuario_id == Usuario.id)
-        .filter(Usuario.ativo.is_(True))
-        .order_by(Cooperado.nome)
         .all()
     )
 
@@ -6224,6 +6174,259 @@ def portal_restaurante():
                 (x.get("nome_planilha") or (x["coop"].nome if x["coop"] else "")).lower(),
             )
         )
+
+    # -------------------- COOPERADOS ESCALADOS NO PERÍODO --------------------
+    ids_escalados = set()
+    nomes_escalados_sem_cadastro = set()
+
+    for d in dias_list:
+        for item in agenda.get(d, []):
+            if item.get("coop") and item["coop"].id:
+                ids_escalados.add(item["coop"].id)
+            else:
+                nome_pl = (item.get("nome_planilha") or "").strip()
+                if nome_pl:
+                    nomes_escalados_sem_cadastro.add(nome_pl)
+
+    cooperados_escalados = (
+        Cooperado.query
+        .join(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(
+            Usuario.ativo.is_(True),
+            Cooperado.id.in_(ids_escalados) if ids_escalados else literal(False)
+        )
+        .order_by(Cooperado.nome)
+        .all()
+    )
+
+    # todos ativos, para busca manual no lançamento
+    cooperados_ativos = (
+        Cooperado.query
+        .join(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(Usuario.ativo.is_(True))
+        .order_by(Cooperado.nome)
+        .all()
+    )
+
+    ids_escalados_set = {c.id for c in cooperados_escalados}
+
+    # marca quem está escalado
+    for c in cooperados_ativos:
+        c.escalado = c.id in ids_escalados_set
+
+    # lista exibida no painel "lancar":
+    # primeiro os escalados, mas continua permitindo busca manual
+    cooperados = sorted(
+        cooperados_ativos,
+        key=lambda c: (0 if getattr(c, "escalado", False) else 1, (c.nome or "").lower())
+    )
+
+    # -------------------- LANÇAMENTOS / TOTAIS POR PERÍODO --------------------
+    total_bruto = 0.0
+    total_qtd = 0
+    total_entregas = 0
+    total_inss = 0.0
+    total_sest = 0.0
+
+    for c in cooperados:
+        q = (
+            Lancamento.query
+            .filter_by(restaurante_id=rest.id, cooperado_id=c.id)
+            .filter(Lancamento.data >= di, Lancamento.data <= df)
+            .order_by(Lancamento.data.desc(), Lancamento.id.desc())
+        )
+
+        c.lancamentos = q.all()
+        c.total_periodo = sum((l.valor or 0.0) for l in c.lancamentos)
+        c.inss_periodo = sum((l.valor or 0.0) * 0.04 for l in c.lancamentos)
+        c.sest_periodo = sum((l.valor or 0.0) * 0.005 for l in c.lancamentos)
+        c.encargos_periodo = c.inss_periodo + c.sest_periodo
+        c.liquido_periodo = c.total_periodo - c.encargos_periodo
+
+        total_bruto += c.total_periodo
+        total_qtd += len(c.lancamentos)
+        total_entregas += sum((l.qtd_entregas or 0) for l in c.lancamentos)
+        total_inss += c.inss_periodo
+        total_sest += c.sest_periodo
+
+    total_encargos = total_inss + total_sest
+    total_liquido = total_bruto - total_encargos
+
+    # -------------------- LISTA DE LANÇAMENTOS --------------------
+    lancamentos_periodo = []
+    total_lanc_valor = 0.0
+    total_lanc_entregas = 0
+
+    if view == "lancamentos":
+        q = (
+            db.session.query(Lancamento, Cooperado)
+            .join(Cooperado, Cooperado.id == Lancamento.cooperado_id)
+            .filter(
+                Lancamento.restaurante_id == rest.id,
+                Lancamento.data >= di,
+                Lancamento.data <= df,
+            )
+            .order_by(Lancamento.data.asc(), Lancamento.id.asc())
+        )
+
+        for lanc, coop in q.all():
+            item = {
+                "id": lanc.id,
+                "data": lanc.data.strftime("%d/%m/%Y") if lanc.data else "",
+                "hora_inicio": (
+                    lanc.hora_inicio if isinstance(lanc.hora_inicio, str)
+                    else (lanc.hora_inicio.strftime("%H:%M") if lanc.hora_inicio else "")
+                ),
+                "hora_fim": (
+                    lanc.hora_fim if isinstance(lanc.hora_fim, str)
+                    else (lanc.hora_fim.strftime("%H:%M") if lanc.hora_fim else "")
+                ),
+                "qtd_entregas": lanc.qtd_entregas or 0,
+                "valor": float(lanc.valor or 0.0),
+                "descricao": (lanc.descricao or ""),
+                "cooperado_id": coop.id,
+                "cooperado_nome": coop.nome,
+                "contrato_nome": rest.nome,
+            }
+            lancamentos_periodo.append(item)
+
+        total_lanc_valor = sum(x["valor"] for x in lancamentos_periodo)
+        total_lanc_entregas = sum(x["qtd_entregas"] for x in lancamentos_periodo)
+
+    # -------------------- PENDÊNCIAS DE LANÇAMENTO DO DIA --------------------
+    pendencias_lancamento = []
+    hoje = date.today()
+    agora = datetime.now()
+
+    def _hora_inicial_min(horario_txt: str) -> int | None:
+        m = re.search(r"(\d{1,2}):(\d{2})", str(horario_txt or ""))
+        if not m:
+            return None
+        return int(m.group(1)) * 60 + int(m.group(2))
+
+    def _hora_final_min(horario_txt: str) -> int | None:
+        txt = str(horario_txt or "")
+        pares = re.findall(r"(\d{1,2}):(\d{2})", txt)
+        if len(pares) >= 2:
+            hh, mm = pares[-1]
+            return int(hh) * 60 + int(mm)
+
+        m = re.search(r"\b(?:as|às|a)\s*(\d{1,2}):(\d{2})", txt.lower())
+        if m:
+            return int(m.group(1)) * 60 + int(m.group(2))
+
+        return None
+
+    minutos_agora = agora.hour * 60 + agora.minute
+
+    escalas_hoje = agenda.get(hoje, [])
+    for item in escalas_hoje:
+        coop = item.get("coop")
+        if not coop:
+            continue
+
+        horario_txt = (item.get("horario") or "").strip()
+        turno_txt = (item.get("turno") or "").strip()
+        contrato_txt = (item.get("contrato") or rest.nome).strip()
+
+        hora_ini = _hora_inicial_min(horario_txt)
+        hora_fim = _hora_final_min(horario_txt)
+
+        if hora_fim is None and hora_ini is not None:
+            if "noite" in turno_txt.lower():
+                hora_fim = 23 * 60 + 59
+            else:
+                hora_fim = hora_ini + 240
+
+        if hora_fim is None:
+            continue
+
+        if minutos_agora < hora_fim:
+            continue
+
+        lanc_do_dia = (
+            Lancamento.query
+            .filter(
+                Lancamento.restaurante_id == rest.id,
+                Lancamento.cooperado_id == coop.id,
+                Lancamento.data == hoje,
+            )
+            .all()
+        )
+
+        existe_mesmo_horario = False
+        for lanc in lanc_do_dia:
+            hi = (lanc.hora_inicio or "").strip() if isinstance(lanc.hora_inicio, str) else (
+                lanc.hora_inicio.strftime("%H:%M") if lanc.hora_inicio else ""
+            )
+            hf = (lanc.hora_fim or "").strip() if isinstance(lanc.hora_fim, str) else (
+                lanc.hora_fim.strftime("%H:%M") if lanc.hora_fim else ""
+            )
+
+            if hi and hf and horario_txt:
+                if hi in horario_txt and hf in horario_txt:
+                    existe_mesmo_horario = True
+                    break
+
+            if hi and not hf and horario_txt and hi in horario_txt:
+                existe_mesmo_horario = True
+                break
+
+        if not existe_mesmo_horario:
+            pendencias_lancamento.append({
+                "cooperado_id": coop.id,
+                "cooperado_nome": coop.nome,
+                "turno": turno_txt or "—",
+                "horario": horario_txt or "—",
+                "contrato": contrato_txt or "—",
+                "data": hoje.strftime("%d/%m/%Y"),
+            })
+
+    pendencias_lancamento.sort(
+        key=lambda x: (
+            x["cooperado_nome"].lower(),
+            x["horario"].lower(),
+            x["turno"].lower(),
+        )
+    )
+
+    # -------------------- URLs auxiliares --------------------
+    try:
+        url_lancar_producao = url_for("lancar_producao")
+    except BuildError:
+        url_lancar_producao = "/restaurante/lancar_producao"
+
+    has_editar_lanc = ("editar_lancamento" in app.view_functions)
+
+    # -------------------- Render --------------------
+    return render_template(
+        "restaurante_dashboard.html",
+        rest=rest,
+        cooperados=cooperados,
+        cooperados_escalados=cooperados_escalados,
+        pendencias_lancamento=pendencias_lancamento,
+        filtro_inicio=di,
+        filtro_fim=df,
+        filtro_mes=(mes or ""),
+        periodo_desc=periodo_desc,
+        total_bruto=total_bruto,
+        total_inss=total_inss,
+        total_sest=total_sest,
+        total_encargos=total_encargos,
+        total_liquido=total_liquido,
+        total_qtd=total_qtd,
+        total_entregas=total_entregas,
+        view=view,
+        agenda=agenda,
+        dias_list=dias_list,
+        ref_data=ref,
+        modo=modo,
+        lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
+        total_lanc_valor=total_lanc_valor,
+        total_lanc_entregas=total_lanc_entregas,
+        url_lancar_producao=url_lancar_producao,
+        has_editar_lanc=has_editar_lanc,
+    )
     # =====================================================
     # COOPERADOS ESCALADOS HOJE PARA ESTE RESTAURANTE
     # =====================================================
