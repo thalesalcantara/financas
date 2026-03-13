@@ -2721,43 +2721,7 @@ def admin_toggle_admin_status(usuario_id):
         flash("Administrador desativado com sucesso.", "success")
 
     return redirect(url_for("admin_dashboard", tab="config"))
-
-@app.route("/admin/admins/<int:usuario_id>/permissoes", methods=["POST"], endpoint="admin_salvar_permissoes")
-@admin_required
-def salvar_permissoes_admin(usuario_id):
-    if not is_admin_master():
-        flash("Apenas o administrador master pode alterar permissões.", "danger")
-        return redirect(url_for("admin_dashboard", tab="config"))
-
-    admin = Usuario.query.filter_by(id=usuario_id, tipo="admin").first_or_404()
-
-    if admin.is_master:
-        flash("As permissões do administrador master não podem ser limitadas por esta tela.", "warning")
-        return redirect(url_for("admin_dashboard", tab="config"))
-
-    for aba in ADMIN_ABAS.keys():
-        perm = AdminPermissao.query.filter_by(usuario_id=admin.id, aba=aba).first()
-
-        if not perm:
-            perm = AdminPermissao(
-                usuario_id=admin.id,
-                aba=aba,
-                pode_ver=False,
-                pode_criar=False,
-                pode_editar=False,
-                pode_excluir=False,
-            )
-            db.session.add(perm)
-
-        perm.pode_ver = bool(request.form.get(f"perm_{aba}_ver"))
-        perm.pode_criar = bool(request.form.get(f"perm_{aba}_criar"))
-        perm.pode_editar = bool(request.form.get(f"perm_{aba}_editar"))
-        perm.pode_excluir = bool(request.form.get(f"perm_{aba}_excluir"))
-
-    db.session.commit()
-    flash("Permissões atualizadas com sucesso.", "success")
-    return redirect(url_for("admin_dashboard", tab="config"))
-
+    
 
 @app.route("/admin", methods=["GET"])
 @admin_required
