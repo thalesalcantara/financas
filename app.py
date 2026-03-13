@@ -6625,7 +6625,7 @@ def portal_restaurante():
     has_editar_lanc = ("editar_lancamento" in app.view_functions)
 
     # -------------------- Render --------------------
-        return render_template(
+    return render_template(
         "restaurante_dashboard.html",
         rest=rest,
         cooperados=cooperados,
