@@ -2699,6 +2699,29 @@ def toggle_status_cooperado(id):
         db.session.rollback()
         return jsonify(ok=False, error="Falha ao salvar no banco"), 500
 
+@app.route("/admin/admins/<int:usuario_id>/toggle-status", methods=["POST"])
+@admin_required
+def admin_toggle_admin_status(usuario_id):
+    if not is_admin_master():
+        flash("Apenas o administrador master pode alterar o status de administradores.", "danger")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    admin = Usuario.query.filter_by(id=usuario_id, tipo="admin").first_or_404()
+
+    if admin.is_master:
+        flash("O administrador master não pode ser desativado por esta tela.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    admin.ativo = not bool(admin.ativo)
+    db.session.commit()
+
+    if admin.ativo:
+        flash("Administrador ativado com sucesso.", "success")
+    else:
+        flash("Administrador desativado com sucesso.", "success")
+
+    return redirect(url_for("admin_dashboard", tab="config"))
+
 
 @app.route("/admin", methods=["GET"])
 @admin_required
