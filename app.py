@@ -6175,14 +6175,22 @@ def portal_restaurante():
             )
         )
 
-    # -------------------- COOPERADOS ESCALADOS NO PERÍODO --------------------
-    ids_escalados = set()
+    # -------------------- COOPERADOS ESCALADOS NO PERÍODO / HOJE --------------------
+    hoje = date.today()
+
+    ids_escalados_periodo = set()
+    ids_escalados_hoje = set()
     nomes_escalados_sem_cadastro = set()
 
     for d in dias_list:
         for item in agenda.get(d, []):
-            if item.get("coop") and item["coop"].id:
-                ids_escalados.add(item["coop"].id)
+            coop_item = item.get("coop")
+
+            if coop_item and coop_item.id:
+                ids_escalados_periodo.add(coop_item.id)
+
+                if d == hoje:
+                    ids_escalados_hoje.add(coop_item.id)
             else:
                 nome_pl = (item.get("nome_planilha") or "").strip()
                 if nome_pl:
@@ -6193,7 +6201,7 @@ def portal_restaurante():
         .join(Usuario, Cooperado.usuario_id == Usuario.id)
         .filter(
             Usuario.ativo.is_(True),
-            Cooperado.id.in_(ids_escalados) if ids_escalados else literal(False)
+            Cooperado.id.in_(ids_escalados_periodo) if ids_escalados_periodo else literal(False)
         )
         .order_by(Cooperado.nome)
         .all()
@@ -6208,19 +6216,20 @@ def portal_restaurante():
         .all()
     )
 
-    ids_escalados_set = {c.id for c in cooperados_escalados}
-
-    # marca quem está escalado
+    # marca quem está escalado no período e quem está escalado hoje
     for c in cooperados_ativos:
-        c.escalado = c.id in ids_escalados_set
+        c.escalado = c.id in ids_escalados_periodo
+        c.escalado_hoje = c.id in ids_escalados_hoje
 
     # lista exibida no painel "lancar":
-    # primeiro os escalados, mas continua permitindo busca manual
+    # primeiro os escalados de hoje, depois os demais
     cooperados = sorted(
         cooperados_ativos,
-        key=lambda c: (0 if getattr(c, "escalado", False) else 1, (c.nome or "").lower())
+        key=lambda c: (
+            0 if getattr(c, "escalado_hoje", False) else 1,
+            (c.nome or "").lower()
+        )
     )
-
     # -------------------- LANÇAMENTOS / TOTAIS POR PERÍODO --------------------
     total_bruto = 0.0
     total_qtd = 0
