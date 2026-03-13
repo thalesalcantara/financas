@@ -1188,7 +1188,29 @@ def role_required(role: str):
 
 
 def admin_required(fn):
-    return role_required("admin")(fn)
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        uid = session.get("user_id")
+        tipo = session.get("user_tipo")
+
+        if not uid or tipo != "admin":
+            session.clear()
+            return redirect(url_for("login"))
+
+        u = Usuario.query.get(uid)
+        if not u or u.tipo != "admin":
+            session.clear()
+            flash("Acesso restrito ao administrador.", "danger")
+            return redirect(url_for("login"))
+
+        if not getattr(u, "ativo", True):
+            session.clear()
+            flash("Conta desativada. Fale com o administrador master.", "danger")
+            return redirect(url_for("login"))
+
+        return fn(*args, **kwargs)
+    return wrapper
+
 
 ADMIN_ABAS = {
     "lancamentos": "Lançamentos",
@@ -1213,17 +1235,29 @@ def _usuario_logado() -> Usuario | None:
     uid = session.get("user_id")
     if not uid:
         return None
-    return Usuario.query.get(uid)
+
+    u = Usuario.query.get(uid)
+    if not u:
+        return None
+
+    if u.tipo != "admin":
+        return None
+
+    if not getattr(u, "ativo", True):
+        return None
+
+    return u
 
 
 def is_admin_master() -> bool:
     u = _usuario_logado()
-    return bool(u and u.tipo == "admin" and getattr(u, "is_master", False))
+    return bool(u and u.tipo == "admin" and getattr(u, "is_master", False) is True)
 
 
 def get_admin_permissions_map(usuario_id: int) -> dict:
     perms = AdminPermissao.query.filter_by(usuario_id=usuario_id).all()
     out = {}
+
     for p in perms:
         out[p.aba] = {
             "ver": bool(p.pode_ver),
@@ -1231,16 +1265,20 @@ def get_admin_permissions_map(usuario_id: int) -> dict:
             "editar": bool(p.pode_editar),
             "excluir": bool(p.pode_excluir),
         }
+
     return out
 
 
 def admin_has_perm(aba: str, acao: str = "ver") -> bool:
     u = _usuario_logado()
-    if not u or u.tipo != "admin":
+    if not u:
         return False
 
     if getattr(u, "is_master", False):
         return True
+
+    if aba not in ADMIN_ABAS:
+        return False
 
     mapa = get_admin_permissions_map(u.id)
     perm = mapa.get(aba, {})
@@ -1251,12 +1289,41 @@ def admin_perm_required(aba: str, acao: str = "ver"):
     def deco(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            if session.get("user_tipo") != "admin":
+            uid = session.get("user_id")
+            tipo = session.get("user_tipo")
+
+            if not uid or tipo != "admin":
+                session.clear()
+                return redirect(url_for("login"))
+
+            u = Usuario.query.get(uid)
+            if not u or u.tipo != "admin":
+                session.clear()
+                flash("Acesso restrito ao administrador.", "danger")
+                return redirect(url_for("login"))
+
+            if not getattr(u, "ativo", True):
+                session.clear()
+                flash("Conta desativada. Fale com o administrador master.", "danger")
                 return redirect(url_for("login"))
 
             if not admin_has_perm(aba, acao):
                 flash("Você não tem permissão para essa ação.", "danger")
-                return redirect(url_for("admin_dashboard"))
+
+                if getattr(u, "is_master", False):
+                    return redirect(url_for("admin_dashboard", tab="lancamentos"))
+
+                abas_liberadas = [
+                    nome_aba for nome_aba in ADMIN_ABAS.keys()
+                    if admin_has_perm(nome_aba, "ver")
+                ]
+
+                if abas_liberadas:
+                    return redirect(url_for("admin_dashboard", tab=abas_liberadas[0]))
+
+                session.clear()
+                flash("Seu usuário admin está sem permissões liberadas.", "warning")
+                return redirect(url_for("login"))
 
             return fn(*args, **kwargs)
         return wrapper
@@ -1272,23 +1339,24 @@ def _normalize_name(s: str) -> list[str]:
 
 
 def _norm_login(s: str) -> str:
-    # remove acento, minúsculo e sem espaços
     s = unicodedata.normalize("NFD", s or "")
     s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
     s = s.lower().strip()
     s = re.sub(r"\s+", "", s)
     return s
 
+
 def _match_cooperado_by_login(login_planilha: str, cooperados: list[Cooperado]) -> Cooperado | None:
     """Casa EXATAMENTE com Usuario.usuario após normalização."""
     key = _norm_login(login_planilha)
     if not key:
         return None
+
     for c in cooperados:
-        # c.usuario_ref.usuario é o login usado no sistema
         login = getattr(c.usuario_ref, "usuario", "") or ""
         if _norm_login(login) == key:
             return c
+
     return None
 
 
@@ -1296,6 +1364,7 @@ def _match_restaurante_id(contrato_txt: str) -> int | None:
     alvo = " ".join(_normalize_name(contrato_txt or ""))
     if not alvo:
         return None
+
     restaurantes = Restaurante.query.order_by(Restaurante.nome.asc()).all()
 
     for r in restaurantes:
@@ -1313,6 +1382,7 @@ def _match_restaurante_id(contrato_txt: str) -> int | None:
                     return r.id
     except Exception:
         pass
+
     return None
 
 
@@ -1331,19 +1401,23 @@ def _match_cooperado_by_name(nome_planilha: str, cooperados: list[Cooperado]) ->
             return c
 
     parts_sheet = set(sheet_tokens)
-    best, best_count = None, 0
+    best = None
+    best_count = 0
+
     for c in cooperados:
         parts_c = set(_normalize_name(c.nome))
         inter = parts_sheet & parts_c
         if len(inter) > best_count:
-            best, best_count = c, len(inter)
+            best = c
+            best_count = len(inter)
+
     if best and best_count >= 2:
         return best
 
     if len(sheet_tokens) == 1 and len(sheet_tokens[0]) >= 3:
         token = sheet_tokens[0]
         hits = [c for c in cooperados if token in set(_normalize_name(c.nome))]
-        if os.environ.get("INIT_DB_ON_START", "0") == "1":
+        if hits:
             return hits[0]
 
     names_norm = [norm_join(c.nome) for c in cooperados]
@@ -1353,6 +1427,7 @@ def _match_cooperado_by_name(nome_planilha: str, cooperados: list[Cooperado]) ->
         for c in cooperados:
             if norm_join(c.nome) == target:
                 return c
+
     return None
 
 
@@ -1360,16 +1435,21 @@ def _build_docinfo(c: Cooperado) -> dict:
     today = date.today()
     cnh_ok = (c.cnh_validade is not None and c.cnh_validade >= today)
     placa_ok = (c.placa_validade is not None and c.placa_validade >= today)
-    return {"cnh": {"ok": cnh_ok}, "placa": {"ok": placa_ok}}
+    return {
+        "cnh": {"ok": cnh_ok},
+        "placa": {"ok": placa_ok},
+    }
 
 
 def _save_upload(file_storage) -> str | None:
     # Mantido para compatibilidade com outras partes do app (ex.: uploads de xlsx)
     if not file_storage:
         return None
+
     fname = secure_filename(file_storage.filename or "")
     if not fname:
         return None
+
     path = os.path.join(UPLOAD_DIR, fname)
     file_storage.save(path)
     return f"/static/uploads/{fname}"
