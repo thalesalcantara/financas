@@ -6113,7 +6113,7 @@ def portal_restaurante():
     total_encargos = total_inss + total_sest
     total_liquido = total_bruto - total_encargos
 
-       # -------------------- ESCALA (Quem trabalha) --------------------
+    # -------------------- ESCALA (Quem trabalha) --------------------
     def contrato_bate_restaurante(contrato: str, rest_nome: str) -> bool:
         a = " ".join(_normalize_name(contrato or ""))
         b = " ".join(_normalize_name(rest_nome or ""))
@@ -6123,6 +6123,7 @@ def portal_restaurante():
 
     ref = _parse_date(request.args.get("ref")) or date.today()
     modo = request.args.get("modo", "semana")  # 'semana' ou 'dia'
+
     if modo == "dia":
         dias_list = [ref]
     else:
@@ -6135,8 +6136,8 @@ def portal_restaurante():
         .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
         .filter(
             or_(
-                Escala.cooperado_id.is_(None),   # mantém linhas sem vínculo
-                Usuario.ativo.is_(True)          # só mostra vinculados ativos
+                Escala.cooperado_id.is_(None),
+                Usuario.ativo.is_(True)
             )
         )
         .order_by(Escala.id.asc())
@@ -6157,6 +6158,7 @@ def portal_restaurante():
         e for e in escalas_all
         if contrato_bate_restaurante(eff_map.get(e.id, e.contrato or ""), rest.nome)
     ]
+
     if not escalas_rest:
         escalas_rest = [
             e for e in escalas_all
@@ -6164,11 +6166,11 @@ def portal_restaurante():
         ]
 
     agenda = {d: [] for d in dias_list}
-    seen = {d: set() for d in dias_list}  # evita duplicar
+    seen = {d: set() for d in dias_list}
 
     for e in escalas_rest:
-        dt = _parse_data_escala_str(e.data)  # date | None
-        wd = _weekday_from_data_str(e.data)  # 1..7 | None
+        dt = _parse_data_escala_str(e.data)
+        wd = _weekday_from_data_str(e.data)
 
         for d in dias_list:
             hit = (dt and dt == d) or (wd and wd == ((d.weekday() % 7) + 1))
@@ -6197,10 +6199,12 @@ def portal_restaurante():
                 _norm(e.horario),
                 _norm(contrato_eff),
             )
+
             if key in seen[d]:
                 break
 
             seen[d].add(key)
+
             agenda[d].append({
                 "coop": coop,
                 "cooperado_nome": nome_fallback or None,
@@ -6210,16 +6214,16 @@ def portal_restaurante():
                 "contrato": contrato_eff,
                 "cor": (e.cor or "").strip(),
             })
+
             break
 
-        for d in dias_list:
+    for d in dias_list:
         agenda[d].sort(
             key=lambda x: (
                 (x["contrato"] or "").lower(),
                 (x.get("nome_planilha") or (x["coop"].nome if x["coop"] else "")).lower(),
             )
         )
-
     # =====================================================
     # COOPERADOS ESCALADOS HOJE PARA ESTE RESTAURANTE
     # =====================================================
