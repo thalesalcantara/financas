@@ -2721,6 +2721,26 @@ def admin_toggle_admin_status(usuario_id):
         flash("Administrador desativado com sucesso.", "success")
 
     return redirect(url_for("admin_dashboard", tab="config"))
+
+@app.route("/admin/admins/<int:usuario_id>/delete", methods=["POST"])
+@admin_perm_required("config", "editar")
+def admin_delete_admin(usuario_id):
+    if not is_admin_master():
+        flash("Apenas o administrador master pode excluir administradores.", "danger")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    admin = Usuario.query.filter_by(id=usuario_id, tipo="admin").first_or_404()
+
+    if admin.is_master:
+        flash("O administrador master não pode ser excluído.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    AdminPermissao.query.filter_by(usuario_id=admin.id).delete()
+    db.session.delete(admin)
+    db.session.commit()
+
+    flash("Administrador excluído com sucesso.", "success")
+    return redirect(url_for("admin_dashboard", tab="config"))
     
 
 @app.route("/admin", methods=["GET"])
