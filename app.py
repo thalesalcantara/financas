@@ -1009,24 +1009,24 @@ def init_db():
     # 4.4) tabela avaliacoes_restaurante (se não existir)
     try:
         if _is_sqlite():
-        db.session.execute(sa_text("""
-            CREATE TABLE IF NOT EXISTS avaliacoes_restaurante (
-            id SERIAL PRIMARY KEY,
-            restaurante_id INTEGER NOT NULL,
-            cooperado_id INTEGER NOT NULL,
-            lancamento_id INTEGER UNIQUE,
-            estrelas_geral DOUBLE PRECISION,
-            estrelas_ambiente INTEGER,
-            estrelas_tratamento INTEGER,
-            estrelas_suporte INTEGER,
-            comentario TEXT,
-            media_ponderada DOUBLE PRECISION,
-            sentimento VARCHAR(12),
-            temas VARCHAR(255),
-            alerta_crise BOOLEAN DEFAULT FALSE,
-            criado_em TIMESTAMP
-          );
-       """))
+            db.session.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS avaliacoes_restaurante (
+                id SERIAL PRIMARY KEY,
+                restaurante_id INTEGER NOT NULL,
+                cooperado_id INTEGER NOT NULL,
+                lancamento_id INTEGER UNIQUE,
+                estrelas_geral DOUBLE PRECISION,
+                estrelas_ambiente INTEGER,
+                estrelas_tratamento INTEGER,
+                estrelas_suporte INTEGER,
+                comentario TEXT,
+                media_ponderada DOUBLE PRECISION,
+                sentimento VARCHAR(12),
+                temas VARCHAR(255),
+                alerta_crise BOOLEAN DEFAULT FALSE,
+                criado_em TIMESTAMP
+              );
+           """))
             db.session.execute(sa_text(
                 "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
             db.session.execute(sa_text(
