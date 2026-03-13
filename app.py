@@ -3364,22 +3364,6 @@ def admin_dashboard():
         else:
             trocas_historico.append(item)
 
-    # =========================
-    # Permissões dos admins
-    # =========================
-    if getattr(admin_logado, "is_master", False):
-        admin_perms = {
-            aba: {
-                "ver": True,
-                "criar": True,
-                "editar": True,
-                "excluir": True,
-            }
-            for aba in ADMIN_ABAS.keys()
-        }
-    else:
-        admin_perms = get_admin_permissions_map(admin_logado.id)
-
     admins = (
         Usuario.query
         .filter_by(tipo="admin", is_master=False)
