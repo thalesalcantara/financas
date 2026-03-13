@@ -290,6 +290,13 @@ class Usuario(db.Model, UserMixin):
     senha_hash = db.Column(db.String(200), nullable=False)
     tipo = db.Column(db.String(20), nullable=False)  # admin | cooperado | restaurante
 
+    is_master = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false")
+    )
+
     # Importante: default no Python + default no BANCO
     ativo = db.Column(
         db.Boolean,
@@ -309,6 +316,33 @@ class Usuario(db.Model, UserMixin):
     def check_password(self, raw: str) -> bool:
         return check_password_hash(self.senha_hash, raw)
 
+class AdminPermissao(db.Model):
+    __tablename__ = "admin_permissoes"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    usuario_id = db.Column(
+        db.Integer,
+        db.ForeignKey("usuarios.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    aba = db.Column(db.String(50), nullable=False)
+
+    pode_ver = db.Column(db.Boolean, default=False)
+    pode_criar = db.Column(db.Boolean, default=False)
+    pode_editar = db.Column(db.Boolean, default=False)
+    pode_excluir = db.Column(db.Boolean, default=False)
+
+    usuario = db.relationship(
+        "Usuario",
+        backref=db.backref("permissoes_admin", cascade="all, delete-orphan")
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint("usuario_id", "aba", name="uq_admin_permissao_usuario_aba"),
+    )
 
 class Cooperado(db.Model):
     __tablename__ = "cooperados"
@@ -768,6 +802,23 @@ def init_db():
     except Exception:
         db.session.rollback()
 
+    # 3.9) is_master em usuarios
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(usuarios);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "is_master" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE usuarios ADD COLUMN is_master BOOLEAN DEFAULT 0"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("""
+                ALTER TABLE IF EXISTS public.usuarios
+                ADD COLUMN IF NOT EXISTS is_master BOOLEAN DEFAULT FALSE
+            """))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
     # 4) Migração leve: garantir coluna qtd_entregas em lancamentos
     try:
         if _is_sqlite():
@@ -958,24 +1009,24 @@ def init_db():
     # 4.4) tabela avaliacoes_restaurante (se não existir)
     try:
         if _is_sqlite():
-            db.session.execute(sa_text("""
-                CREATE TABLE IF NOT EXISTS avaliacoes_restaurante (
-                id SERIAL PRIMARY KEY,
-                restaurante_id INTEGER NOT NULL,
-                cooperado_id   INTEGER NOT NULL,
-                lancamento_id  INTEGER UNIQUE,
-                estrelas_geral INTEGER,
-                estrelas_ambiente   INTEGER,
-                estrelas_tratamento INTEGER,
-                estrelas_suporte    INTEGER,
-                comentario TEXT,
-                media_ponderada DOUBLE PRECISION,
-                sentimento VARCHAR(12),
-                temas VARCHAR(255),
-                alerta_crise BOOLEAN DEFAULT FALSE,
-                criado_em TIMESTAMP
-              );
-          """))
+        db.session.execute(sa_text("""
+            CREATE TABLE IF NOT EXISTS avaliacoes_restaurante (
+            id SERIAL PRIMARY KEY,
+            restaurante_id INTEGER NOT NULL,
+            cooperado_id INTEGER NOT NULL,
+            lancamento_id INTEGER UNIQUE,
+            estrelas_geral DOUBLE PRECISION,
+            estrelas_ambiente INTEGER,
+            estrelas_tratamento INTEGER,
+            estrelas_suporte INTEGER,
+            comentario TEXT,
+            media_ponderada DOUBLE PRECISION,
+            sentimento VARCHAR(12),
+            temas VARCHAR(255),
+            alerta_crise BOOLEAN DEFAULT FALSE,
+            criado_em TIMESTAMP
+          );
+       """))
             db.session.execute(sa_text(
                 "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
             db.session.execute(sa_text(
@@ -1049,7 +1100,12 @@ def init_db():
         if not tem_admin:
             admin_user = os.environ.get("ADMIN_USER", "admin")
             admin_pass = os.environ.get("ADMIN_PASS", os.urandom(8).hex())
-            admin = Usuario(usuario=admin_user, tipo="admin", senha_hash="")  # type: ignore[name-defined]
+            admin = Usuario(
+                usuario=admin_user,
+                tipo="admin",
+                senha_hash="",
+                is_master=True
+            )  # type: ignore[name-defined]
             try:
                 admin.set_password(admin_pass)  # type: ignore[attr-defined]
             except Exception:
@@ -1060,6 +1116,16 @@ def init_db():
                     pass
             db.session.add(admin)
             db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    try:
+        admin_master = Usuario.query.filter_by(tipo="admin", is_master=True).first()
+        if not admin_master:
+            primeiro_admin = Usuario.query.filter_by(tipo="admin").order_by(Usuario.id.asc()).first()
+            if primeiro_admin:
+                primeiro_admin.is_master = True
+                db.session.commit()
     except Exception:
         db.session.rollback()
 
@@ -1123,6 +1189,78 @@ def role_required(role: str):
 
 def admin_required(fn):
     return role_required("admin")(fn)
+
+ADMIN_ABAS = {
+    "lancamentos": "Lançamentos",
+    "receitas": "Receitas Coop",
+    "despesas": "Despesas Coop",
+    "coop_receitas": "Receitas Cooperado",
+    "coop_despesas": "Despesas Cooperado",
+    "beneficios": "Benefícios",
+    "cooperados": "Cooperados",
+    "restaurantes": "Restaurantes",
+    "escalas": "Escalas",
+    "avisos": "Avisos",
+    "documentos": "Documentos",
+    "tabelas": "Tabelas",
+    "avaliacoes": "Avaliações",
+    "config": "Configurações",
+    "folha": "Folha",
+}
+
+
+def _usuario_logado() -> Usuario | None:
+    uid = session.get("user_id")
+    if not uid:
+        return None
+    return Usuario.query.get(uid)
+
+
+def is_admin_master() -> bool:
+    u = _usuario_logado()
+    return bool(u and u.tipo == "admin" and getattr(u, "is_master", False))
+
+
+def get_admin_permissions_map(usuario_id: int) -> dict:
+    perms = AdminPermissao.query.filter_by(usuario_id=usuario_id).all()
+    out = {}
+    for p in perms:
+        out[p.aba] = {
+            "ver": bool(p.pode_ver),
+            "criar": bool(p.pode_criar),
+            "editar": bool(p.pode_editar),
+            "excluir": bool(p.pode_excluir),
+        }
+    return out
+
+
+def admin_has_perm(aba: str, acao: str = "ver") -> bool:
+    u = _usuario_logado()
+    if not u or u.tipo != "admin":
+        return False
+
+    if getattr(u, "is_master", False):
+        return True
+
+    mapa = get_admin_permissions_map(u.id)
+    perm = mapa.get(aba, {})
+    return bool(perm.get(acao, False))
+
+
+def admin_perm_required(aba: str, acao: str = "ver"):
+    def deco(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if session.get("user_tipo") != "admin":
+                return redirect(url_for("login"))
+
+            if not admin_has_perm(aba, acao):
+                flash("Você não tem permissão para essa ação.", "danger")
+                return redirect(url_for("admin_dashboard"))
+
+            return fn(*args, **kwargs)
+        return wrapper
+    return deco
 
 
 def _normalize_name(s: str) -> list[str]:
@@ -2397,11 +2535,29 @@ def toggle_status_cooperado(id):
 @admin_required
 def admin_dashboard():
     args = request.args
+    active_tab = args.get("tab", "lancamentos")
+
+    if not admin_has_perm(active_tab, "ver"):
+        flash("Você não tem permissão para acessar essa aba.", "danger")
+
+        for aba in ADMIN_ABAS.keys():
+            if admin_has_perm(aba, "ver"):
+                return redirect(url_for("admin_dashboard", tab=aba))
+
+        flash("Seu usuário admin não possui nenhuma aba liberada.", "warning")
+        return redirect(url_for("logout"))
+
+    if active_tab == "config" and not is_admin_master():
+        flash("A aba de configurações é restrita ao administrador master.", "danger")
+
+        for aba in ADMIN_ABAS.keys():
+            if aba != "config" and admin_has_perm(aba, "ver"):
+                return redirect(url_for("admin_dashboard", tab=aba))
+
+        return redirect(url_for("logout"))
 
     considerar_periodo = False
     dows = set()
-    # --- Controle de abas
-    active_tab = args.get("tab", "lancamentos")
 
     # --- Helper: escolhe a primeira data válida de uma lista de chaves
     def _pick_date(*keys):
@@ -2972,6 +3128,27 @@ def admin_dashboard():
 
         (trocas_pendentes if t.status == "pendente" else trocas_historico).append(item)
 
+    admin_logado = _usuario_logado()
+
+    if admin_logado and getattr(admin_logado, "is_master", False):
+        admin_perms = {
+            aba: {
+                "ver": True,
+                "criar": True,
+                "editar": True,
+                "excluir": True,
+            }
+            for aba in ADMIN_ABAS.keys()
+        }
+    else:
+        admin_perms = get_admin_permissions_map(admin_logado.id) if admin_logado else {}
+
+    admins_secundarios = Usuario.query.filter_by(tipo="admin").order_by(Usuario.id.asc()).all()
+
+    admins_permissoes = {}
+    for adm in admins_secundarios:
+        admins_permissoes[adm.id] = get_admin_permissions_map(adm.id)
+
     current_date = date.today()
     data_limite = date(current_date.year, 12, 31)
 
@@ -3011,6 +3188,11 @@ def admin_dashboard():
         trocas_pendentes=trocas_pendentes,
         trocas_historico=trocas_historico,
         trocas_historico_flat=trocas_historico_flat,
+        admin_perms=admin_perms,
+        admin_is_master=is_admin_master(),
+        ADMIN_ABAS=ADMIN_ABAS,
+        admins_secundarios=admins_secundarios,
+        admins_permissoes=admins_permissoes,
     )
     
 
@@ -3465,7 +3647,7 @@ def exportar_lancamentos():
 # CRUD Lançamentos (Admin)
 # =========================
 @app.route("/admin/lancamentos/add", methods=["POST"])
-@admin_required
+@admin_perm_required("lancamentos", "criar")
 def admin_add_lancamento():
     f = request.form
     l = Lancamento(
@@ -3484,7 +3666,7 @@ def admin_add_lancamento():
     return redirect(url_for("admin_dashboard", tab="lancamentos"))
 
 @app.route("/admin/lancamentos/<int:id>/edit", methods=["POST"])
-@admin_required
+@admin_perm_required("lancamentos", "editar")
 def admin_edit_lancamento(id):
     l = Lancamento.query.get_or_404(id)
     f = request.form
@@ -3501,7 +3683,7 @@ def admin_edit_lancamento(id):
     return redirect(url_for("admin_dashboard", tab="lancamentos"))
 
 @app.route("/admin/lancamentos/<int:id>/delete")
-@admin_required
+@admin_perm_required("lancamentos", "excluir")
 def admin_delete_lancamento(id):
     l = Lancamento.query.get_or_404(id)
 
@@ -3515,7 +3697,7 @@ def admin_delete_lancamento(id):
     return redirect(url_for("admin_dashboard", tab="lancamentos"))
 
 @app.route("/admin/avaliacoes", methods=["GET"])
-@admin_required
+@admin_perm_required("avaliacoes", "ver")
 def admin_avaliacoes():
 
     # tipo=cooperado (padrão): Restaurante avalia Cooperado
@@ -3874,6 +4056,22 @@ def admin_avaliacoes():
     # Config/admin pra header, se seu layout usa
     cfg = get_config()
     admin_user = Usuario.query.filter_by(tipo="admin").first()
+    admin_logado = _usuario_logado()
+
+    if admin_logado and getattr(admin_logado, "is_master", False):
+        admin_perms = {
+            aba: {
+                "ver": True,
+                "criar": True,
+                "editar": True,
+                "excluir": True
+            }
+            for aba in ADMIN_ABAS.keys()
+        }
+    else:
+        admin_perms = get_admin_permissions_map(admin_logado.id) if admin_logado else {}
+
+    admins_secundarios = Usuario.query.filter_by(tipo="admin").order_by(Usuario.id.asc()).all()
 
     return render_template(
         "admin_avaliacoes.html",
@@ -3893,10 +4091,14 @@ def admin_avaliacoes():
         preserve=preserve,
         admin=admin_user,
         salario_minimo=cfg.salario_minimo or 0.0,
+        admin_perms=admin_perms,
+        admin_is_master=is_admin_master(),
+        ADMIN_ABAS=ADMIN_ABAS,
+        admins_secundarios=admins_secundarios,
     )
     
 @app.route("/admin/avaliacoes/export")
-@role_required("admin")
+@admin_perm_required("avaliacoes", "ver")
 def admin_export_avaliacoes_csv():
     """
     Endpoint usado pelo botão 'Exportar CSV' em admin_avaliacoes.html.
@@ -3918,7 +4120,7 @@ def admin_export_avaliacoes_csv():
 # CRUD Receitas/Despesas Coop (Admin)
 # =========================
 @app.route("/receitas/add", methods=["POST"])
-@admin_required
+@admin_perm_required("receitas", "criar")
 def add_receita():
     f = request.form
     r = ReceitaCooperativa(
@@ -3932,7 +4134,7 @@ def add_receita():
     return redirect(url_for("admin_dashboard", tab="receitas"))
 
 @app.route("/receitas/<int:id>/edit", methods=["POST"])
-@admin_required
+@admin_perm_required("receitas", "editar")
 def edit_receita(id):
     r = ReceitaCooperativa.query.get_or_404(id)
     f = request.form
@@ -3945,7 +4147,7 @@ def edit_receita(id):
     return redirect(url_for("admin_dashboard", tab="receitas"))
 
 @app.route("/receitas/<int:id>/delete")
-@admin_required
+@admin_perm_required("receitas", "excluir")
 def delete_receita(id):
     r = ReceitaCooperativa.query.get_or_404(id)
     db.session.delete(r)
@@ -3954,7 +4156,7 @@ def delete_receita(id):
     return redirect(url_for("admin_dashboard", tab="receitas"))
 
 @app.route("/despesas/add", methods=["POST"])
-@admin_required
+@admin_perm_required("despesas", "criar")
 def add_despesa():
     f = request.form
     d = DespesaCooperativa(
@@ -3968,7 +4170,7 @@ def add_despesa():
     return redirect(url_for("admin_dashboard", tab="despesas"))
 
 @app.route("/despesas/<int:id>/edit", methods=["POST"])
-@admin_required
+@admin_perm_required("despesas", "editar")
 def edit_despesa(id):
     d = DespesaCooperativa.query.get_or_404(id)
     f = request.form
@@ -3980,7 +4182,7 @@ def edit_despesa(id):
     return redirect(url_for("admin_dashboard", tab="despesas"))
 
 @app.route("/despesas/<int:id>/delete")
-@admin_required
+@admin_perm_required("despesas", "excluir")
 def delete_despesa(id):
     d = DespesaCooperativa.query.get_or_404(id)
     db.session.delete(d)
@@ -4006,13 +4208,16 @@ def avisos_publicos():
 
 
 @app.route("/admin/avisos", methods=["GET", "POST"])
-@admin_required
+@admin_perm_required("avisos", "ver")
 def admin_avisos():
     cooperados = Cooperado.query.order_by(Cooperado.nome.asc()).all()
     restaurantes = Restaurante.query.order_by(Restaurante.nome.asc()).all()
 
     if request.method == "POST":
         f = request.form
+        if not admin_has_perm("avisos", "criar"):
+            flash("Você não tem permissão para publicar avisos.", "danger")
+            return redirect(url_for("admin_avisos"))
 
         # ===== Alcance/destino vindos do form =====
         destino_tipo = (f.get("destino_tipo") or "").strip()  # 'cooperados' | 'restaurantes' | 'ambos'
@@ -4239,7 +4444,7 @@ def marcar_aviso_lido_universal(aviso_id: int):
 # CRUD Cooperados / Restaurantes / Senhas (Admin)
 # =========================
 @app.route("/cooperados/add", methods=["POST"])
-@admin_required
+@admin_perm_required("cooperados", "criar")
 def add_cooperado():
     f = request.form
     nome = (f.get("nome") or "").strip()
@@ -4279,7 +4484,7 @@ def add_cooperado():
 
 
 @app.route("/cooperados/<int:id>/edit", methods=["POST"])
-@admin_required
+@admin_perm_required("cooperados", "editar")
 def edit_cooperado(id):
     c = Cooperado.query.get_or_404(id)
     f = request.form
@@ -4298,7 +4503,7 @@ def edit_cooperado(id):
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
 @app.route("/cooperados/<int:id>/delete", methods=["POST"])
-@admin_required
+@admin_perm_required("cooperados", "excluir")
 def delete_cooperado(id):
     c = Cooperado.query.get_or_404(id)
     u = c.usuario_ref
@@ -4385,7 +4590,7 @@ def reset_senha_cooperado(id):
     return redirect(url_for("admin_dashboard", tab="cooperados"))
 
 @app.route("/restaurantes/add", methods=["POST"])
-@admin_required
+@admin_perm_required("restaurantes", "criar")
 def add_restaurante():
     f = request.form
     nome = f.get("nome", "").strip()
@@ -4412,7 +4617,7 @@ def add_restaurante():
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
 
 @app.route("/restaurantes/<int:id>/edit", methods=["POST"])
-@admin_required
+@admin_perm_required("restaurantes", "editar")
 def edit_restaurante(id):
     r = Restaurante.query.get_or_404(id)
     f = request.form
@@ -4429,7 +4634,7 @@ def edit_restaurante(id):
 from flask import current_app
 
 @app.route("/restaurantes/<int:id>/delete", methods=["POST"])
-@admin_required
+@admin_perm_required("restaurantes", "excluir")
 def delete_restaurante(id):
     r = Restaurante.query.get_or_404(id)
     u = r.usuario_ref
@@ -4514,7 +4719,7 @@ def alterar_senha_rest():
     return redirect(url_for("portal_restaurante", view="config"))
 
 @app.route("/config/update", methods=["POST"])
-@admin_required
+@admin_perm_required("config", "editar")
 def update_config():
     cfg = get_config()
     cfg.salario_minimo = request.form.get("salario_minimo", type=float) or 0.0
@@ -4523,9 +4728,12 @@ def update_config():
     return redirect(url_for("admin_dashboard", tab="config"))
 
 @app.route("/admin/alterar_admin", methods=["POST"])
-@admin_required
+@admin_perm_required("config", "editar")
 def alterar_admin():
-    admin = Usuario.query.filter_by(tipo="admin").first()
+    admin = Usuario.query.filter_by(tipo="admin", is_master=True).first()
+    if not admin:
+        flash("Administrador master não encontrado.", "danger")
+        return redirect(url_for("admin_dashboard", tab="config"))
     admin.usuario = request.form.get("usuario", admin.usuario).strip()
     nova = request.form.get("nova_senha", "")
     confirmar = request.form.get("confirmar_senha", "")
@@ -4538,11 +4746,83 @@ def alterar_admin():
     flash("Conta do administrador atualizada.", "success")
     return redirect(url_for("admin_dashboard", tab="config"))
 
+@app.route("/admin/admins/add", methods=["POST"])
+@admin_required
+def add_admin_secundario():
+    if not is_admin_master():
+        flash("Apenas o administrador master pode criar outros administradores.", "danger")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    usuario = (request.form.get("usuario") or "").strip()
+    senha = (request.form.get("senha") or "").strip()
+
+    if not usuario or not senha:
+        flash("Informe usuário e senha.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    if Usuario.query.filter_by(usuario=usuario).first():
+        flash("Já existe um usuário com esse login.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    u = Usuario(
+        usuario=usuario,
+        tipo="admin",
+        senha_hash="",
+        is_master=False,
+        ativo=True,
+    )
+    u.set_password(senha)
+    db.session.add(u)
+    db.session.flush()
+
+    for aba in ADMIN_ABAS.keys():
+        db.session.add(AdminPermissao(
+            usuario_id=u.id,
+            aba=aba,
+            pode_ver=False,
+            pode_criar=False,
+            pode_editar=False,
+            pode_excluir=False,
+        ))
+
+    db.session.commit()
+    flash("Administrador criado com sucesso.", "success")
+    return redirect(url_for("admin_dashboard", tab="config"))
+
+@app.route("/admin/admins/<int:usuario_id>/permissoes", methods=["POST"])
+@admin_required
+def salvar_permissoes_admin(usuario_id):
+    if not is_admin_master():
+        flash("Apenas o administrador master pode alterar permissões.", "danger")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    admin = Usuario.query.filter_by(id=usuario_id, tipo="admin").first_or_404()
+
+    if admin.is_master:
+        flash("As permissões do administrador master não podem ser limitadas por esta tela.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    for aba in ADMIN_ABAS.keys():
+        perm = AdminPermissao.query.filter_by(usuario_id=admin.id, aba=aba).first()
+
+        if not perm:
+            perm = AdminPermissao(usuario_id=admin.id, aba=aba)
+            db.session.add(perm)
+
+        perm.pode_ver = bool(request.form.get(f"{aba}_ver"))
+        perm.pode_criar = bool(request.form.get(f"{aba}_criar"))
+        perm.pode_editar = bool(request.form.get(f"{aba}_editar"))
+        perm.pode_excluir = bool(request.form.get(f"{aba}_excluir"))
+
+    db.session.commit()
+    flash("Permissões atualizadas com sucesso.", "success")
+    return redirect(url_for("admin_dashboard", tab="config"))
+
 # =========================
 # Receitas/Despesas Cooperado (Admin)
 # =========================
 @app.route("/coop/receitas/add", methods=["POST"])
-@admin_required
+@admin_perm_required("coop_receitas", "criar")
 def add_receita_coop():
     f = request.form
     rc = ReceitaCooperado(
@@ -4557,7 +4837,7 @@ def add_receita_coop():
     return redirect(url_for("admin_dashboard", tab="coop_receitas"))
 
 @app.route("/coop/receitas/<int:id>/edit", methods=["POST"])
-@admin_required
+@admin_perm_required("coop_receitas", "editar")
 def edit_receita_coop(id):
     rc = ReceitaCooperado.query.get_or_404(id)
     f = request.form
@@ -4570,7 +4850,7 @@ def edit_receita_coop(id):
     return redirect(url_for("admin_dashboard", tab="coop_receitas"))
 
 @app.route("/coop/receitas/<int:id>/delete")
-@admin_required
+@admin_perm_required("coop_receitas", "excluir")
 def delete_receita_coop(id):
     rc = ReceitaCooperado.query.get_or_404(id)
     db.session.delete(rc)
@@ -4579,7 +4859,7 @@ def delete_receita_coop(id):
     return redirect(url_for("admin_dashboard", tab="coop_receitas"))
 
 @app.route("/coop/despesas/add", methods=["POST"])
-@admin_required
+@admin_perm_required("coop_despesas", "criar")
 def add_despesa_coop():
     f = request.form
 
@@ -4620,7 +4900,7 @@ def add_despesa_coop():
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
 @app.route("/coop/despesas/<int:id>/edit", methods=["POST"])
-@admin_required
+@admin_perm_required("coop_despesas", "editar")
 def edit_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
     f = request.form
@@ -4633,7 +4913,7 @@ def edit_despesa_coop(id):
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
 @app.route("/coop/despesas/<int:id>/delete")
-@admin_required
+@admin_perm_required("coop_despesas", "excluir")
 def delete_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
     db.session.delete(dc)
@@ -4670,7 +4950,7 @@ TIPO_MAP = {
 }
 
 @app.post("/beneficios/<int:id>/edit")
-@admin_required
+@admin_perm_required("beneficios", "editar")
 def edit_beneficio(id):
     """
     Atualiza um registro de benefício existente.
@@ -4743,7 +5023,7 @@ def edit_beneficio(id):
 
 # 1) Excluir 1 (via modal, com hidden)
 @app.post("/beneficios/delete-one", endpoint="excluir_beneficio_one")
-@admin_required
+@admin_perm_required("beneficios", "excluir")
 def excluir_beneficio_one():
     bid = request.form.get("beneficio_id", type=int)
     if not bid:
@@ -4757,7 +5037,7 @@ def excluir_beneficio_one():
 
 # 2) Excluir vários (bulk)
 @app.post("/beneficios/delete-bulk", endpoint="excluir_beneficio_bulk")
-@admin_required
+@admin_perm_required("beneficios", "excluir")
 def excluir_beneficio_bulk():
     ids = {int(x) for x in request.form.getlist("ids[]") if str(x).isdigit()}
     if not ids:
@@ -4774,7 +5054,7 @@ def excluir_beneficio_bulk():
 # Benefícios — Criar/Ratear (Admin)
 # =========================
 @app.post("/beneficios/ratear", endpoint="ratear_beneficios")
-@admin_required
+@admin_perm_required("beneficios", "criar")
 def ratear_beneficios():
     """
     Cria um BeneficioRegistro a partir do form de 'Ratear benefícios'.
@@ -4848,7 +5128,7 @@ def ratear_beneficios():
 # Escalas — Upload (substituição TOTAL sempre)
 # =========================
 @app.route("/escalas/upload", methods=["POST"])
-@admin_required
+@admin_perm_required("escalas", "criar")
 def upload_escala():
     from datetime import datetime, date
     import os, re as _re, unicodedata as _u, difflib as _dif
@@ -5108,7 +5388,7 @@ def upload_escala():
 # Ações de exclusão de escalas
 # =========================
 @app.post("/escalas/purge_all")
-@admin_required
+@admin_perm_required("escalas", "excluir")
 def escalas_purge_all():
     res = db.session.execute(sa_delete(Escala))
     db.session.commit()
@@ -5116,7 +5396,7 @@ def escalas_purge_all():
     return redirect(url_for("admin_dashboard", tab="escalas"))
 
 @app.post("/escalas/purge_cooperado/<int:coop_id>")
-@admin_required
+@admin_perm_required("escalas", "excluir")
 def escalas_purge_cooperado(coop_id):
     res = db.session.execute(sa_delete(Escala).where(Escala.cooperado_id == coop_id))
     db.session.commit()
@@ -5124,7 +5404,7 @@ def escalas_purge_cooperado(coop_id):
     return redirect(url_for("admin_dashboard", tab="escalas"))
 
 @app.post("/escalas/purge_restaurante/<int:rest_id>")
-@admin_required
+@admin_perm_required("escalas", "excluir")
 def escalas_purge_restaurante(rest_id):
     res = db.session.execute(sa_delete(Escala).where(Escala.restaurante_id == rest_id))
     db.session.commit()
@@ -5135,7 +5415,7 @@ def escalas_purge_restaurante(rest_id):
 # Trocas (Admin aprovar/recusar)
 # =========================
 @app.post("/admin/trocas/<int:id>/aprovar")
-@admin_required
+@admin_perm_required("escalas", "editar")
 def admin_aprovar_troca(id):
     t = TrocaSolicitacao.query.get_or_404(id)
     if t.status != "pendente":
@@ -5203,7 +5483,7 @@ def admin_aprovar_troca(id):
     return redirect(url_for("admin_dashboard", tab="escalas"))
 
 @app.post("/admin/trocas/<int:id>/recusar")
-@admin_required
+@admin_perm_required("escalas", "editar")
 def admin_recusar_troca(id):
     t = TrocaSolicitacao.query.get_or_404(id)
     if t.status != "pendente":
@@ -6831,14 +7111,14 @@ def api_rest_avisos_unread_count():
 # Documentos (Admin + Público)
 # =========================
 @app.route("/admin/documentos")
-@admin_required
+@admin_perm_required("documentos", "ver")
 def admin_documentos():
     documentos = Documento.query.order_by(Documento.enviado_em.desc()).all()
     return render_template("admin_documentos.html", documentos=documentos)
 
 
 @app.post("/admin/documentos/upload")
-@admin_required
+@admin_perm_required("documentos", "criar")
 def admin_upload_documento():
     f = request.form
     titulo = (f.get("titulo") or "").strip()
@@ -6871,7 +7151,7 @@ def admin_upload_documento():
 
 
 @app.get("/admin/documentos/<int:doc_id>/delete")
-@admin_required
+@admin_perm_required("documentos", "excluir")
 def admin_delete_documento(doc_id):
     d = Documento.query.get_or_404(doc_id)
 
@@ -7054,14 +7334,14 @@ def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
 # Admin: listar / upload / delete
 # ---------------------------------------------------------------------------
 @app.get("/admin/tabelas", endpoint="admin_tabelas")
-@admin_required
+@admin_perm_required("tabelas", "ver")
 def admin_tabelas():
     tabelas = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
     return render_template("admin_tabelas.html", tabelas=tabelas)
 
 
 @app.post("/admin/tabelas/upload", endpoint="admin_upload_tabela")
-@admin_required
+@admin_perm_required("tabelas", "criar")
 def admin_upload_tabela():
     f = request.form
     titulo = (f.get("titulo") or "").strip()
@@ -7103,7 +7383,7 @@ def admin_upload_tabela():
 
 
 @app.get("/admin/tabelas/<int:tab_id>/delete", endpoint="admin_delete_tabela")
-@admin_required
+@admin_perm_required("tabelas", "excluir")
 def admin_delete_tabela(tab_id: int):
     t = Tabela.query.get_or_404(tab_id)
 
