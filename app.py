@@ -1197,7 +1197,8 @@ def role_required(role: str):
         @wraps(fn)
         def wrapper(*args, **kwargs):
             uid = session.get("user_id")
-            tipo = session.get("user_tipo")
+            tipo = (session.get("user_tipo") or "").strip().lower()
+            role_norm = (role or "").strip().lower()
 
             if not uid or not tipo:
                 session.clear()
@@ -1208,14 +1209,23 @@ def role_required(role: str):
                 session.clear()
                 return redirect(url_for("login"))
 
-            if not getattr(u, "ativo", True):
+            tipo_db = (u.tipo or "").strip().lower()
+
+            if getattr(u, "ativo", None) is None:
+                u.ativo = True
+                db.session.commit()
+
+            if u.ativo is False:
                 session.clear()
                 flash("Conta desativada. Fale com o administrador.", "danger")
                 return redirect(url_for("login"))
 
-            if u.tipo != role:
+            if tipo_db != role_norm:
                 session.clear()
                 return redirect(url_for("login"))
+
+            if tipo != tipo_db:
+                session["user_tipo"] = tipo_db
 
             return fn(*args, **kwargs)
         return wrapper
@@ -1226,9 +1236,9 @@ def admin_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
         uid = session.get("user_id")
-        tipo = session.get("user_tipo")
+        tipo = (session.get("user_tipo") or "").strip().lower()
 
-        if not uid or tipo != "admin":
+        if not uid:
             session.clear()
             return redirect(url_for("login"))
 
@@ -1238,12 +1248,13 @@ def admin_required(fn):
             flash("Sessão inválida. Faça login novamente.", "danger")
             return redirect(url_for("login"))
 
-        if u.tipo != "admin":
+        tipo_db = (u.tipo or "").strip().lower()
+
+        if tipo_db != "admin":
             session.clear()
             flash("Acesso restrito ao administrador.", "danger")
             return redirect(url_for("login"))
 
-        # corrige admin antigo com ativo nulo
         if getattr(u, "ativo", None) is None:
             u.ativo = True
             db.session.commit()
@@ -1253,9 +1264,15 @@ def admin_required(fn):
             flash("Conta desativada. Fale com o administrador master.", "danger")
             return redirect(url_for("login"))
 
+        if tipo != "admin":
+            session["user_tipo"] = "admin"
+
+        session["user_id"] = u.id
+
         return fn(*args, **kwargs)
     return wrapper
-    
+
+
 ADMIN_ABAS = {
     "lancamentos": "Lançamentos",
     "receitas": "Receitas Coop",
@@ -1284,7 +1301,11 @@ def _usuario_logado() -> Usuario | None:
     if not u:
         return None
 
-    if not getattr(u, "ativo", True):
+    if getattr(u, "ativo", None) is None:
+        u.ativo = True
+        db.session.commit()
+
+    if u.ativo is False:
         return None
 
     return u
@@ -1292,7 +1313,7 @@ def _usuario_logado() -> Usuario | None:
 
 def is_admin_master() -> bool:
     u = _usuario_logado()
-    return bool(u and u.tipo == "admin" and getattr(u, "is_master", False))
+    return bool(u and (u.tipo or "").strip().lower() == "admin" and getattr(u, "is_master", False))
 
 
 def get_admin_permissions_map(usuario_id: int) -> dict:
@@ -1312,7 +1333,10 @@ def get_admin_permissions_map(usuario_id: int) -> dict:
 
 def admin_has_perm(aba: str, acao: str = "ver") -> bool:
     u = _usuario_logado()
-    if not u or u.tipo != "admin":
+    if not u:
+        return False
+
+    if (u.tipo or "").strip().lower() != "admin":
         return False
 
     if getattr(u, "is_master", False):
@@ -1331,22 +1355,36 @@ def admin_perm_required(aba: str, acao: str = "ver"):
         @wraps(fn)
         def wrapper(*args, **kwargs):
             uid = session.get("user_id")
-            tipo = session.get("user_tipo")
+            tipo = (session.get("user_tipo") or "").strip().lower()
 
-            if not uid or tipo != "admin":
+            if not uid:
                 session.clear()
                 return redirect(url_for("login"))
 
             u = Usuario.query.get(uid)
-            if not u or u.tipo != "admin":
+            if not u:
+                session.clear()
+                flash("Sessão inválida. Faça login novamente.", "danger")
+                return redirect(url_for("login"))
+
+            tipo_db = (u.tipo or "").strip().lower()
+
+            if tipo_db != "admin":
                 session.clear()
                 flash("Acesso restrito ao administrador.", "danger")
                 return redirect(url_for("login"))
 
-            if not getattr(u, "ativo", True):
+            if getattr(u, "ativo", None) is None:
+                u.ativo = True
+                db.session.commit()
+
+            if u.ativo is False:
                 session.clear()
                 flash("Conta desativada. Fale com o administrador master.", "danger")
                 return redirect(url_for("login"))
+
+            if tipo != "admin":
+                session["user_tipo"] = "admin"
 
             if not admin_has_perm(aba, acao):
                 flash("Você não tem permissão para essa ação.", "danger")
@@ -1371,13 +1409,13 @@ def admin_perm_required(aba: str, acao: str = "ver"):
         return wrapper
     return deco
 
+
 def _normalize_name(s: str) -> list[str]:
     s = unicodedata.normalize("NFD", s or "")
     s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
     s = re.sub(r"[^a-zA-Z0-9\s]", " ", s)
     parts = [p.lower() for p in s.split() if p.strip()]
     return parts
-
 
 def _norm_login(s: str) -> str:
     s = unicodedata.normalize("NFD", s or "")
@@ -2664,42 +2702,42 @@ def toggle_status_cooperado(id):
 @admin_required
 def admin_dashboard():
     args = request.args
-    active_tab = (args.get("tab") or "lancamentos").strip()
+    active_tab = (args.get("tab") or "lancamentos").strip().lower()
 
     admin_logado = _usuario_logado()
-    if not admin_logado or admin_logado.tipo != "admin":
-        flash("Sessão inválida. Faça login novamente.", "danger")
+    if not admin_logado:
         session.clear()
+        flash("Sessão inválida. Faça login novamente.", "danger")
         return redirect(url_for("login"))
 
-    # garante aba válida
+    if (admin_logado.tipo or "").strip().lower() != "admin":
+        session.clear()
+        flash("Acesso restrito ao administrador.", "danger")
+        return redirect(url_for("login"))
+
     if active_tab not in ADMIN_ABAS:
         active_tab = "lancamentos"
 
-    # MASTER: acesso total
-    if getattr(admin_logado, "is_master", False):
-        pass
-    else:
-        # abas permitidas para admin secundário
+    if not getattr(admin_logado, "is_master", False):
         abas_liberadas = [
-            aba for aba in ADMIN_ABAS.keys()
+            aba
+            for aba in ADMIN_ABAS.keys()
             if admin_has_perm(aba, "ver")
         ]
 
         if not abas_liberadas:
-            flash("Seu usuário admin está sem permissões liberadas. Fale com o administrador master.", "danger")
             session.clear()
+            flash("Seu usuário admin está sem permissões liberadas. Fale com o administrador master.", "danger")
             return redirect(url_for("login"))
 
-        # se tentou entrar em aba sem permissão, redireciona para a primeira liberada
         if active_tab not in abas_liberadas:
             flash("Você não tem permissão para acessar essa aba.", "warning")
             return redirect(url_for("admin_dashboard", tab=abas_liberadas[0]))
 
-    # config só master
     if active_tab == "config" and not getattr(admin_logado, "is_master", False):
         abas_liberadas = [
-            aba for aba in ADMIN_ABAS.keys()
+            aba
+            for aba in ADMIN_ABAS.keys()
             if aba != "config" and admin_has_perm(aba, "ver")
         ]
 
