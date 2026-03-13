@@ -4489,81 +4489,404 @@
 </section>
 
     <!-- === CONFIGURAÇÕES === -->
-    <section class="tab-pane fade {{ 'show active' if _tab=='config' else '' }}" id="config" role="tabpanel">
-      <div class="content-shell">
-        <div class="page-header">
-          <h3><i class="bi bi-gear"></i> Configurações</h3>
-          <small>Altere dados do administrador e parâmetros do sistema.</small>
-        </div>
+<section class="tab-pane fade {{ 'show active' if _tab=='config' else '' }}" id="config" role="tabpanel">
+  <div class="content-shell">
+    <div class="page-header">
+      <h3><i class="bi bi-gear"></i> Configurações</h3>
+      <small>Altere dados do administrador, parâmetros do sistema e gerencie administradores secundários.</small>
+    </div>
 
-        <div class="row g-3">
-          <div class="col-12 col-lg-6">
-            <div class="card">
-              <div class="card-body">
-                <h5 class="mb-2">Conta do Administrador</h5>
-                <p class="text-muted small mb-3">
-                  Troque o usuário e, se quiser, defina uma nova senha. Se deixar senha em branco, mantém a atual.
-                </p>
+    {% set admins = admins if admins is defined else [] %}
+    {% set admin_permissions_map = admin_permissions_map if admin_permissions_map is defined else {} %}
+    {% set ADMIN_ABAS = ADMIN_ABAS if ADMIN_ABAS is defined else [
+      'resumo',
+      'lancamentos',
+      'receitas',
+      'despesas',
+      'coop_receitas',
+      'coop_despesas',
+      'beneficios',
+      'cooperados',
+      'restaurantes',
+      'escalas',
+      'documentos',
+      'tabelas',
+      'avisos',
+      'avaliacoes',
+      'config'
+    ] %}
 
-                <form method="POST" action="{{ url_for('alterar_admin') }}" class="row g-2">
-                  <div class="col-12">
-                    <label class="form-label">Usuário do admin</label>
-                    <input class="form-control" name="usuario" value="{{ admin_user.usuario if admin_user else '' }}" required>
-                  </div>
+    <div class="row g-3">
+      <!-- Conta admin principal -->
+      <div class="col-12 col-lg-6">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="mb-2">Conta do Administrador Principal</h5>
+            <p class="text-muted small mb-3">
+              Troque o usuário e, se quiser, defina uma nova senha. Se deixar senha em branco, mantém a atual.
+            </p>
 
-                  <div class="col-12 col-md-6">
-                    <label class="form-label">Nova senha</label>
-                    <input class="form-control" type="password" name="nova_senha" placeholder="(opcional)">
-                  </div>
+            <form method="POST" action="{{ url_for('alterar_admin') }}" class="row g-2">
+              {% if csrf_token is defined %}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {% endif %}
 
-                  <div class="col-12 col-md-6">
-                    <label class="form-label">Confirmar senha</label>
-                    <input class="form-control" type="password" name="confirmar_senha" placeholder="(opcional)">
-                  </div>
-
-                  <div class="col-12 d-flex justify-content-end mt-2">
-                    <button class="btn btn-royal" type="submit">
-                      <i class="bi bi-save"></i> Salvar admin
-                    </button>
-                  </div>
-                </form>
+              <div class="col-12">
+                <label class="form-label">Usuário do admin</label>
+                <input class="form-control" name="usuario" value="{{ admin_user.usuario if admin_user else '' }}" required>
               </div>
-            </div>
-          </div>
 
-          <div class="col-12 col-lg-6">
-            <div class="card">
-              <div class="card-body">
-                <h5 class="mb-2">Salário mínimo</h5>
-                <p class="text-muted small mb-3">
-                  Valor usado em cálculos internos (ex.: complementos/encargos, quando aplicável).
-                </p>
-
-                <form method="POST" action="{{ url_for('update_config') }}" class="row g-2">
-                  <div class="col-12">
-                    <label class="form-label">Salário mínimo (R$)</label>
-                    <input class="form-control" type="number" step="0.01" name="salario_minimo" value="{{ salario_minimo|default(0) }}" required>
-                  </div>
-
-                  <div class="col-12 d-flex justify-content-end mt-2">
-                    <button class="btn btn-royal" type="submit">
-                      <i class="bi bi-save"></i> Salvar salário mínimo
-                    </button>
-                  </div>
-                </form>
-
-                <div class="alert alert-light border mt-3 mb-0 small">
-                  <i class="bi bi-lightning-charge"></i>
-                  Dica: depois de salvar, você volta para esta aba automaticamente.
-                </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Nova senha</label>
+                <input class="form-control" type="password" name="nova_senha" placeholder="(opcional)">
               </div>
-            </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label">Confirmar senha</label>
+                <input class="form-control" type="password" name="confirmar_senha" placeholder="(opcional)">
+              </div>
+
+              <div class="col-12 d-flex justify-content-end mt-2">
+                <button class="btn btn-royal" type="submit">
+                  <i class="bi bi-save"></i> Salvar admin principal
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-
       </div>
-    </section>
 
+      <!-- Salário mínimo -->
+      <div class="col-12 col-lg-6">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="mb-2">Salário mínimo</h5>
+            <p class="text-muted small mb-3">
+              Valor usado em cálculos internos (ex.: complementos/encargos, quando aplicável).
+            </p>
+
+            <form method="POST" action="{{ url_for('update_config') }}" class="row g-2">
+              {% if csrf_token is defined %}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {% endif %}
+
+              <div class="col-12">
+                <label class="form-label">Salário mínimo (R$)</label>
+                <input class="form-control" type="number" step="0.01" name="salario_minimo" value="{{ salario_minimo|default(0) }}" required>
+              </div>
+
+              <div class="col-12 d-flex justify-content-end mt-2">
+                <button class="btn btn-royal" type="submit">
+                  <i class="bi bi-save"></i> Salvar salário mínimo
+                </button>
+              </div>
+            </form>
+
+            <div class="alert alert-light border mt-3 mb-0 small">
+              <i class="bi bi-lightning-charge"></i>
+              Dica: depois de salvar, você volta para esta aba automaticamente.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADMINS SECUNDÁRIOS -->
+    <div class="row g-3 mt-1">
+      <!-- Criar admin -->
+      <div class="col-12 col-xl-4">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="mb-2">Criar administrador</h5>
+            <p class="text-muted small mb-3">
+              Cadastre administradores secundários e depois defina exatamente o que cada um pode fazer.
+            </p>
+
+            <form method="POST" action="{{ url_for('admin_add_admin') }}" class="row g-2">
+              {% if csrf_token is defined %}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {% endif %}
+
+              <div class="col-12">
+                <label class="form-label">Nome</label>
+                <input class="form-control" name="nome" required>
+              </div>
+
+              <div class="col-12">
+                <label class="form-label">Usuário</label>
+                <input class="form-control" name="usuario" required>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label">Senha</label>
+                <input class="form-control" type="password" name="senha" required>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label">Confirmar senha</label>
+                <input class="form-control" type="password" name="confirmar_senha" required>
+              </div>
+
+              <div class="col-12">
+                <label class="form-label">Status inicial</label>
+                <select class="form-select" name="ativo">
+                  <option value="1" selected>Ativo</option>
+                  <option value="0">Inativo</option>
+                </select>
+              </div>
+
+              <div class="col-12 d-flex justify-content-end mt-2">
+                <button class="btn btn-royal" type="submit">
+                  <i class="bi bi-person-plus"></i> Criar admin
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de admins -->
+      <div class="col-12 col-xl-8">
+        <div class="card">
+          <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <div>
+                <h5 class="mb-1">Administradores cadastrados</h5>
+                <p class="text-muted small mb-0">
+                  Gerencie status, senha e permissões dos administradores secundários.
+                </p>
+              </div>
+              <span class="badge-soft">Total: <b>{{ admins|length }}</b></span>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-sm align-middle table-bordered table-hover">
+                <thead class="table-light">
+                  <tr class="text-nowrap">
+                    <th>Nome</th>
+                    <th>Usuário</th>
+                    <th class="text-center">Tipo</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-center" style="width:280px;">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for adm in admins %}
+                    {% set is_master = adm.is_master if adm.is_master is defined else False %}
+                    {% set is_ativo = adm.ativo if adm.ativo is defined else True %}
+
+                    <tr>
+                      <td>{{ adm.nome if adm.nome is defined else '—' }}</td>
+                      <td>{{ adm.usuario if adm.usuario is defined else '—' }}</td>
+
+                      <td class="text-center">
+                        {% if is_master %}
+                          <span class="badge bg-warning text-dark">Master</span>
+                        {% else %}
+                          <span class="badge bg-info text-dark">Secundário</span>
+                        {% endif %}
+                      </td>
+
+                      <td class="text-center">
+                        {% if is_ativo %}
+                          <span class="badge bg-success">Ativo</span>
+                        {% else %}
+                          <span class="badge bg-secondary">Inativo</span>
+                        {% endif %}
+                      </td>
+
+                      <td class="text-center">
+                        <div class="d-flex flex-wrap justify-content-center gap-1">
+                          {% if not is_master %}
+                            <button class="btn btn-sm btn-outline-primary"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#perms-{{ adm.id }}">
+                              <i class="bi bi-shield-lock"></i> Permissões
+                            </button>
+
+                            <button class="btn btn-sm btn-outline-warning"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#senha-admin-{{ adm.id }}">
+                              <i class="bi bi-key"></i> Senha
+                            </button>
+
+                            <form method="POST"
+                                  action="{{ url_for('admin_toggle_admin_status', usuario_id=adm.id) }}"
+                                  class="d-inline">
+                              {% if csrf_token is defined %}
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                              {% endif %}
+                              <button type="submit"
+                                      class="btn btn-sm {{ 'btn-outline-danger' if is_ativo else 'btn-outline-success' }}">
+                                <i class="bi {{ 'bi-person-dash' if is_ativo else 'bi-person-check' }}"></i>
+                                {{ 'Desativar' if is_ativo else 'Ativar' }}
+                              </button>
+                            </form>
+
+                            <form method="POST"
+                                  action="{{ url_for('admin_delete_admin', usuario_id=adm.id) }}"
+                                  class="d-inline"
+                                  onsubmit="return confirm('Excluir este administrador?');">
+                              {% if csrf_token is defined %}
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                              {% endif %}
+                              <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i> Excluir
+                              </button>
+                            </form>
+                          {% else %}
+                            <span class="text-muted small">Acesso total protegido</span>
+                          {% endif %}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {% if not is_master %}
+                      <!-- Alterar senha -->
+                      <tr class="collapse" id="senha-admin-{{ adm.id }}">
+                        <td colspan="5" class="bg-light">
+                          <div class="border rounded-3 p-3">
+                            <h6 class="mb-2">Alterar senha de {{ adm.nome }}</h6>
+
+                            <form method="POST"
+                                  action="{{ url_for('admin_reset_admin_password', usuario_id=adm.id) }}"
+                                  class="row g-2">
+                              {% if csrf_token is defined %}
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                              {% endif %}
+
+                              <div class="col-12 col-md-5">
+                                <label class="form-label">Nova senha</label>
+                                <input type="password" class="form-control" name="nova_senha" required>
+                              </div>
+
+                              <div class="col-12 col-md-5">
+                                <label class="form-label">Confirmar senha</label>
+                                <input type="password" class="form-control" name="confirmar_senha" required>
+                              </div>
+
+                              <div class="col-12 col-md-2 d-flex align-items-end">
+                                <button class="btn btn-royal w-100" type="submit">
+                                  <i class="bi bi-save"></i> Salvar
+                                </button>
+                              </div>
+                            </form>
+                          </div>
+                        </td>
+                      </tr>
+
+                      <!-- Permissões -->
+                      <tr class="collapse" id="perms-{{ adm.id }}">
+                        <td colspan="5" class="bg-light">
+                          <div class="border rounded-3 p-3">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                              <div>
+                                <h6 class="mb-1">Permissões de {{ adm.nome }}</h6>
+                                <p class="text-muted small mb-0">
+                                  Marque apenas o que este administrador pode acessar e fazer.
+                                </p>
+                              </div>
+                            </div>
+
+                            <form method="POST"
+                                  action="{{ url_for('admin_salvar_permissoes', usuario_id=adm.id) }}">
+                              {% if csrf_token is defined %}
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                              {% endif %}
+
+                              <div class="row g-3">
+                                {% for aba in ADMIN_ABAS %}
+                                  {% set perm = admin_permissions_map.get(adm.id, {}).get(aba, {}) %}
+
+                                  <div class="col-12 col-md-6 col-xl-4">
+                                    <div class="border rounded-3 p-3 h-100">
+                                      <div class="fw-bold mb-2 text-capitalize">
+                                        {{ aba.replace('_', ' ') }}
+                                      </div>
+
+                                      <div class="form-check mb-1">
+                                        <input class="form-check-input"
+                                               type="checkbox"
+                                               name="perm_{{ aba }}_ver"
+                                               id="perm_{{ adm.id }}_{{ aba }}_ver"
+                                               {{ 'checked' if perm.get('ver') else '' }}>
+                                        <label class="form-check-label" for="perm_{{ adm.id }}_{{ aba }}_ver">
+                                          Ver
+                                        </label>
+                                      </div>
+
+                                      <div class="form-check mb-1">
+                                        <input class="form-check-input"
+                                               type="checkbox"
+                                               name="perm_{{ aba }}_criar"
+                                               id="perm_{{ adm.id }}_{{ aba }}_criar"
+                                               {{ 'checked' if perm.get('criar') else '' }}>
+                                        <label class="form-check-label" for="perm_{{ adm.id }}_{{ aba }}_criar">
+                                          Criar
+                                        </label>
+                                      </div>
+
+                                      <div class="form-check mb-1">
+                                        <input class="form-check-input"
+                                               type="checkbox"
+                                               name="perm_{{ aba }}_editar"
+                                               id="perm_{{ adm.id }}_{{ aba }}_editar"
+                                               {{ 'checked' if perm.get('editar') else '' }}>
+                                        <label class="form-check-label" for="perm_{{ adm.id }}_{{ aba }}_editar">
+                                          Editar
+                                        </label>
+                                      </div>
+
+                                      <div class="form-check">
+                                        <input class="form-check-input"
+                                               type="checkbox"
+                                               name="perm_{{ aba }}_excluir"
+                                               id="perm_{{ adm.id }}_{{ aba }}_excluir"
+                                               {{ 'checked' if perm.get('excluir') else '' }}>
+                                        <label class="form-check-label" for="perm_{{ adm.id }}_{{ aba }}_excluir">
+                                          Excluir
+                                        </label>
+                                      </div>
+                                    </div>
+                                  </div>
+                                {% endfor %}
+                              </div>
+
+                              <div class="d-flex justify-content-end mt-3">
+                                <button class="btn btn-royal" type="submit">
+                                  <i class="bi bi-save"></i> Salvar permissões
+                                </button>
+                              </div>
+                            </form>
+                          </div>
+                        </td>
+                      </tr>
+                    {% endif %}
+
+                  {% else %}
+                    <tr>
+                      <td colspan="5" class="text-center text-muted py-3">
+                        Nenhum administrador cadastrado.
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="alert alert-light border mt-3 mb-0 small">
+              <i class="bi bi-info-circle"></i>
+              O administrador master continua com acesso total. Os secundários obedecem às permissões marcadas acima.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
 
 <style>
   .section-title { font-size: 0.95rem; font-weight: 600; }
