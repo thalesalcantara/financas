@@ -4033,9 +4033,24 @@
       </div>
 
       <div id="escalaEditorMount"
-           data-endpoint="{{ url_for('admin_api_escala_editor_rows') }}"
            data-csrf="{{ csrf_token() if csrf_token is defined else '' }}"
-           data-can-edit="{{ '1' if can_escalas_editar else '0' }}">
+           data-can-edit="{{ '1' if can_escalas_editar else '0' }}"
+           data-save-base="{{ url_for('admin_escala_salvar', escala_id=0)[:-1] }}"
+           data-rows='[
+             {% for row in escala_editor_rows or [] %}
+             {
+               "id": {{ row.id|int }},
+               "weekday_num": {{ (row.weekday_num or 0)|int }},
+               "weekday_label": {{ (row.weekday_label or 'Sem dia')|tojson }},
+               "data": {{ (row.data or '')|tojson }},
+               "turno": {{ (row.turno or '')|tojson }},
+               "horario": {{ (row.horario or '')|tojson }},
+               "contrato": {{ (row.contrato or '')|tojson }},
+               "cooperado_id": {{ (row.cooperado_id if row.cooperado_id is not none else 'null') }},
+               "cooperado_nome_livre": {{ ((row.cooperado_nome_livre if row.cooperado_nome_livre is defined else row.cooperado_nome) or '')|tojson }}
+             }{% if not loop.last %},{% endif %}
+             {% endfor %}
+           ]'>
         <div class="alert alert-light border mb-0">Clique em <strong>Abrir escala semanal</strong> para carregar a grade.</div>
       </div>
     </div>
@@ -6011,26 +6026,16 @@ document.addEventListener('DOMContentLoaded', function(){
       const disabled = canEdit ? '' : 'disabled';
       const nomeLivreDisabled = row.cooperado_id ? 'disabled' : '';
       return `
-        <tr class="${isLivre ? 'escala-row-vazia' : ''}" data-row-id="${escapeHtml(row.id)}" data-save-url="${escapeHtml(row.save_url)}">
+        <tr class="${isLivre ? 'escala-row-vazia' : ''} js-escala-row" data-escala-id="${escapeHtml(row.id)}">
           <td><span class="badge rounded-pill text-bg-light border">${escapeHtml(row.weekday_label || 'Sem dia')}</span></td>
           <td>${escapeHtml(row.data || '—')}</td>
           <td>${escapeHtml(row.turno || '—')}</td>
           <td>${escapeHtml(row.horario || '—')}</td>
-          <td>
-            <select name="contrato" class="form-select form-select-sm js-contrato-select" ${disabled}>${contractOptions(row.contrato || '')}</select>
-          </td>
-          <td>
-            <select name="cooperado_id" class="form-select form-select-sm js-cooperado-select" ${disabled}>${cooperadoOptions(row.cooperado_id || '')}</select>
-          </td>
-          <td>
-            <input type="text" name="cooperado_nome_livre" class="form-control form-control-sm js-nome-livre" value="${escapeHtml(row.cooperado_nome_livre || '')}" placeholder="Opcional" ${disabled} ${nomeLivreDisabled}>
-          </td>
-          <td class="text-center">
-            ${canEdit ? '<button type="button" class="btn btn-success btn-sm js-salvar-linha">Salvar</button>' : '<span class="badge text-bg-light border">Visualizar</span>'}
-          </td>
-          <td class="text-center">
-            ${canEdit ? '<button type="button" class="btn btn-outline-danger btn-sm js-retirar-coop">Retirar</button>' : '<span class="text-muted">—</span>'}
-          </td>
+          <td><select name="contrato" class="form-select form-select-sm js-contrato-select" ${disabled}>${contractOptions(row.contrato || '')}</select></td>
+          <td><select name="cooperado_id" class="form-select form-select-sm js-cooperado-select" ${disabled}>${cooperadoOptions(row.cooperado_id || '')}</select></td>
+          <td><input type="text" name="cooperado_nome_livre" class="form-control form-control-sm js-nome-livre" value="${escapeHtml(row.cooperado_nome_livre || '')}" placeholder="Opcional" ${disabled} ${nomeLivreDisabled}></td>
+          <td class="text-center">${canEdit ? '<button type="button" class="btn btn-success btn-sm js-salvar-linha">Salvar</button>' : '<span class="badge text-bg-light border">Visualizar</span>'}</td>
+          <td class="text-center">${canEdit ? '<button type="button" class="btn btn-outline-danger btn-sm js-retirar-coop">Retirar</button>' : '<span class="text-muted">—</span>'}</td>
         </tr>`;
     }).join('');
 
@@ -6056,91 +6061,17 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 
   async function loadRows(){
-    if (rowsLoaded || !editorEndpoint) return;
+    if (rowsLoaded) return;
     statusRows.textContent = 'Carregando grade…';
     renderRows();
     try {
-      const resp = await fetch(editorEndpoint, { headers: { 'X-Requested-With':'XMLHttpRequest' } });
-      const data = await resp.json();
-      if (!resp.ok || !data.ok) throw new Error(data.message || 'Erro ao carregar a grade');
-      rows = Array.isArray(data.rows) ? data.rows : [];
+      rows = JSON.parse(preloadedRowsRaw || '[]');
       rowsLoaded = true;
       statusRows.textContent = 'Grade carregada';
       renderRows();
     } catch (err) {
       statusRows.textContent = 'Erro ao carregar';
       mount.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(err.message || 'Erro ao carregar a grade semanal.')}</div>`;
-    }
-  }
-
-  async function saveEscalaRow(tr, opts = {}){
-    if (!tr) return;
-    const saveUrl = tr.dataset.saveUrl || '';
-    if (!saveUrl) return;
-
-    const btnSalvar = tr.querySelector('.js-salvar-linha');
-    const btnRetirar = tr.querySelector('.js-retirar-coop');
-    const contrato = tr.querySelector('[name="contrato"]');
-    const cooperado = tr.querySelector('[name="cooperado_id"]');
-    const nomeLivre = tr.querySelector('[name="cooperado_nome_livre"]');
-
-    const originalLabel = btnSalvar ? btnSalvar.innerHTML : '';
-    if (btnSalvar) {
-      btnSalvar.disabled = true;
-      btnSalvar.innerHTML = 'Salvando...';
-    }
-    if (btnRetirar) btnRetirar.disabled = true;
-
-    const fd = new FormData();
-    if (csrfToken) fd.append('csrf_token', csrfToken);
-    fd.append('redirect_day', currentDay);
-    fd.append('contrato', contrato?.value || '');
-    fd.append('cooperado_id', cooperado?.value || '');
-    fd.append('cooperado_nome_livre', nomeLivre?.value || '');
-
-    try {
-      const resp = await fetch(saveUrl, {
-        method: 'POST',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        body: fd,
-        credentials: 'same-origin'
-      });
-
-      if (!resp.ok) {
-        throw new Error('Erro ao salvar a linha da escala.');
-      }
-
-      const rowId = String(tr.dataset.rowId || '');
-      const idx = rows.findIndex(r => String(r.id) === rowId);
-      const coopId = cooperado?.value || '';
-      const coopObj = cooperadosFull.find(c => String(c.id) === String(coopId));
-      const coopNomeLivre = nomeLivre?.value || '';
-      if (idx >= 0) {
-        rows[idx].contrato = contrato?.value || '';
-        rows[idx].cooperado_id = coopId ? Number(coopId) : null;
-        rows[idx].cooperado_nome = coopObj ? coopObj.nome : '';
-        rows[idx].cooperado_nome_livre = coopId ? '' : coopNomeLivre;
-      }
-
-      tr.classList.toggle('escala-row-vazia', !coopId && !String(coopNomeLivre).trim());
-      statusRows.textContent = opts.retirar ? 'Cooperado retirado com sucesso' : 'Linha salva com sucesso';
-
-      if (btnSalvar) {
-        btnSalvar.innerHTML = 'Salvo';
-        setTimeout(() => {
-          btnSalvar.innerHTML = originalLabel || 'Salvar';
-          btnSalvar.disabled = false;
-        }, 900);
-      }
-      if (btnRetirar) btnRetirar.disabled = false;
-    } catch (err) {
-      if (btnSalvar) {
-        btnSalvar.innerHTML = originalLabel || 'Salvar';
-        btnSalvar.disabled = false;
-      }
-      if (btnRetirar) btnRetirar.disabled = false;
-      statusRows.textContent = err.message || 'Erro ao salvar';
-      alert(err.message || 'Não foi possível salvar a linha da escala.');
     }
   }
 
@@ -6169,11 +6100,55 @@ document.addEventListener('DOMContentLoaded', function(){
   [filtroNome, filtroContrato, filtroLivres].forEach(el => el?.addEventListener('input', renderRows));
   filtroLivres?.addEventListener('change', renderRows);
 
-  mount?.addEventListener('change', function(e){
-    const tr = e.target.closest('tr[data-row-id]');
-    if (!tr) return;
-    if (e.target.classList.contains('js-cooperado-select')) {
+
+  function rowPayload(tr){
+    return {
+      contrato: tr.querySelector('[name="contrato"]')?.value || '',
+      cooperado_id: tr.querySelector('[name="cooperado_id"]')?.value || '',
+      cooperado_nome_livre: tr.querySelector('[name="cooperado_nome_livre"]')?.value || '',
+      redirect_day: currentDay || 'semana',
+    };
+  }
+
+  async function salvarLinha(tr){
+    const id = tr?.dataset?.escalaId || '';
+    if (!id || !saveBase) return;
+    const fd = new FormData();
+    const payload = rowPayload(tr);
+    Object.entries(payload).forEach(([k,v]) => fd.append(k, v));
+    if (csrfToken) fd.append('csrf_token', csrfToken);
+
+    const btnSalvar = tr.querySelector('.js-salvar-linha');
+    const btnRetirar = tr.querySelector('.js-retirar-coop');
+    const before = btnSalvar ? btnSalvar.innerHTML : '';
+    if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerHTML = 'Salvando...'; }
+    if (btnRetirar) btnRetirar.disabled = true;
+
+    try {
+      const resp = await fetch(`${saveBase}${id}/salvar`, {
+        method: 'POST',
+        headers: { 'X-Requested-With':'XMLHttpRequest' },
+        body: fd
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.message || 'Erro ao salvar');
+      const select = tr.querySelector('.js-cooperado-select');
       const nomeLivre = tr.querySelector('.js-nome-livre');
+      const isLivre = !(select?.value) && !(String(nomeLivre?.value || '').trim());
+      tr.classList.toggle('escala-row-vazia', !!isLivre);
+      statusRows.textContent = 'Última atualização salva';
+    } catch (err) {
+      alert(err.message || 'Não foi possível salvar a linha.');
+    } finally {
+      if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerHTML = before || 'Salvar'; }
+      if (btnRetirar) btnRetirar.disabled = false;
+    }
+  }
+  mount?.addEventListener('change', function(e){
+    const form = e.target.closest('.js-escala-row-form');
+    if (!form) return;
+    if (e.target.classList.contains('js-cooperado-select')) {
+      const nomeLivre = form.querySelector('.js-nome-livre');
       if (nomeLivre) {
         const semCoop = !e.target.value;
         nomeLivre.disabled = !semCoop || !canEdit;
@@ -6182,29 +6157,27 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   });
 
-  mount?.addEventListener('click', async function(e){
+  mount?.addEventListener('click', function(e){
     const btnSalvar = e.target.closest('.js-salvar-linha');
     if (btnSalvar) {
-      e.preventDefault();
-      const tr = btnSalvar.closest('tr[data-row-id]');
-      await saveEscalaRow(tr);
+      const tr = btnSalvar.closest('.js-escala-row');
+      if (tr) salvarLinha(tr);
       return;
     }
 
-    const btnRetirar = e.target.closest('.js-retirar-coop');
-    if (btnRetirar) {
-      e.preventDefault();
-      const tr = btnRetirar.closest('tr[data-row-id]');
-      if (!tr) return;
-      const select = tr.querySelector('.js-cooperado-select');
-      const nomeLivre = tr.querySelector('.js-nome-livre');
-      if (select) select.value = '';
-      if (nomeLivre) {
-        nomeLivre.disabled = !canEdit ? true : false;
-        nomeLivre.value = '';
-      }
-      await saveEscalaRow(tr, { retirar: true });
+    const btn = e.target.closest('.js-retirar-coop');
+    if (!btn) return;
+    const form = btn.closest('.js-escala-row-form');
+    if (!form) return;
+    const select = form.querySelector('.js-cooperado-select');
+    const nomeLivre = form.querySelector('.js-nome-livre');
+    if (select) select.value = '';
+    if (nomeLivre) {
+      nomeLivre.disabled = !canEdit ? true : false;
+      nomeLivre.value = '';
     }
+    const tr = btn.closest('.js-escala-row');
+    if (tr) salvarLinha(tr);
   });
 
   function renderAlertas(alertas){
