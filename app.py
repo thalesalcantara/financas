@@ -7,6 +7,7 @@ import os, io, csv, re, json, time, difflib, unicodedata
 from datetime import datetime, date, timedelta, time as dtime
 from collections import defaultdict, namedtuple
 from functools import wraps
+from models import TrocaEscala
 from types import SimpleNamespace
 
 # MIME types (fixes p/ Office)
