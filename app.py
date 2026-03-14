@@ -6742,6 +6742,31 @@ def solicitar_troca():
         return _portal_cooperado_redirect_tab("trocas")
 
     destino = Cooperado.query.get(to_cooperado_id)
+
+    # BLOQUEIO TROCA RECIPROCA DUPLICADA
+    troca_existente = (
+        db.session.query(TrocaEscala)
+        .join(Escala, Escala.id == TrocaEscala.from_escala_id)
+        .filter(
+            TrocaEscala.status == "pendente",
+            or_(
+                and_(
+                    Escala.cooperado_id == me.id,
+                    TrocaEscala.to_cooperado_id == destino.id,
+                    Escala.data == origem.data
+                ),
+                and_(
+                    Escala.cooperado_id == destino.id,
+                    TrocaEscala.to_cooperado_id == me.id,
+                    Escala.data == origem.data
+                )
+            )
+        )
+        .first()
+    )
+    if troca_existente:
+        flash("Essa troca já está pendente entre vocês.", "warning")
+        return _portal_cooperado_redirect_tab("trocas")
     if not destino or destino.id == me.id:
         flash("Cooperado de destino inválido.", "danger")
         return _portal_cooperado_redirect_tab("trocas")
