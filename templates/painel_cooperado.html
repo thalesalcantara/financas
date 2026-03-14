@@ -5,26 +5,25 @@
   <title>Painel — Coopex</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#2747d9">
-
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 
   <style>
     :root{
       --royal:#2747d9;
-      --royal-2:#3558f0;
-      --ink:#111827;
-      --muted:#667085;
-      --bg:#f3f6ff;
-      --card:rgba(255,255,255,.92);
+      --royal-2:#3157ff;
+      --royal-3:#1838bb;
+      --royal-soft:#eef3ff;
+      --ink:#0f172a;
+      --muted:#64748b;
+      --bg:#f4f7ff;
+      --card:#ffffff;
       --line:rgba(15,23,42,.08);
       --ok:#16a34a;
       --bad:#dc2626;
       --warn:#f59e0b;
-      --chip:#eef2ff;
-      --glass:blur(14px);
-      --shadow:0 10px 28px rgba(39,71,217,.10);
+      --shadow:0 10px 30px rgba(39,71,217,.10);
       --radius:18px;
       --radius-sm:14px;
     }
@@ -33,479 +32,241 @@
     html,body{height:100%;overflow-x:hidden}
     body{
       margin:0;
-      font-family:'Roboto',system-ui,-apple-system,Segoe UI,Arial,sans-serif;
-      color:var(--ink);
       background:
-        radial-gradient(1200px 500px at 20% -10%, rgba(39,71,217,.18), transparent 60%),
-        radial-gradient(900px 420px at 100% 0%, rgba(53,88,240,.10), transparent 55%),
-        var(--bg);
+        radial-gradient(circle at top right, rgba(39,71,217,.10), transparent 24%),
+        linear-gradient(180deg, #f8faff 0%, #f4f7ff 100%);
+      color:var(--ink);
+      font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
     }
 
-    .mobile-wrap{
-      width:min(100%, 520px);
-      margin:0 auto;
-      min-height:100vh;
-      position:relative;
-    }
+    .mobile-wrap{max-width:520px;margin:0 auto;min-height:100vh;padding-bottom:28px}
+    .mono{font-variant-numeric:tabular-nums}
+    .muted{color:var(--muted)}
+    .soft-hide{display:none!important}
 
     .topbar{
-      position:sticky;
-      top:0;
-      z-index:120;
-      padding:10px 12px 8px;
-      backdrop-filter:var(--glass);
-      -webkit-backdrop-filter:var(--glass);
-      background:linear-gradient(to bottom, rgba(243,246,255,.95), rgba(243,246,255,.78));
-      border-bottom:1px solid rgba(15,23,42,.05);
+      position:sticky;top:0;z-index:60;
+      background:linear-gradient(135deg,var(--royal) 0%, #355cff 100%);
+      box-shadow:0 8px 24px rgba(39,71,217,.22);
+      border-bottom-left-radius:22px;
+      border-bottom-right-radius:22px;
+      overflow:hidden;
     }
-
-    .topbar-card{
-      background:linear-gradient(135deg, var(--royal), #3b5bff);
-      border-radius:22px;
-      color:#fff;
-      padding:12px;
-      box-shadow:0 14px 34px rgba(39,71,217,.24);
+    .topbar::before{
+      content:"";position:absolute;inset:auto -18% -45% auto;width:180px;height:180px;
+      background:radial-gradient(circle, rgba(255,255,255,.22), transparent 68%);
+      pointer-events:none;
     }
-
-    .topbar-row{
-      display:flex;
-      align-items:center;
-      gap:10px;
-    }
-
+    .topbar-inner{position:relative;padding:12px 14px 14px 14px}
+    .top-row{display:flex;align-items:center;gap:10px}
     .avatar-btn{
-      width:44px;height:44px;border-radius:50%;
-      border:2px solid rgba(255,255,255,.35);
-      overflow:hidden;background:transparent;padding:0;
-      flex:0 0 auto;
+      width:44px;height:44px;border-radius:50%;padding:0;border:0;background:transparent;
+      box-shadow:0 0 0 2px rgba(255,255,255,.18);
+      overflow:hidden;flex:0 0 44px;
     }
-    .avatar-btn img{width:100%;height:100%;object-fit:cover}
-
-    .brand-mini{
-      min-width:0;
-      flex:1;
-    }
-    .brand-mini .hello{
-      font-size:.76rem;
-      opacity:.88;
-      line-height:1.1;
-    }
-    .brand-mini .name{
-      font-weight:700;
-      font-size:1rem;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-
-    .top-actions{
-      display:flex;align-items:center;gap:8px;
-    }
-
-    .action-pill{
-      min-width:40px;height:40px;border:none;border-radius:14px;
-      background:rgba(255,255,255,.14);color:#fff;
-      display:flex;align-items:center;justify-content:center;
+    .avatar-btn img{width:100%;height:100%;object-fit:cover;display:block}
+    .brand-block{min-width:0;flex:1}
+    .brand-kicker{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.72);font-weight:700}
+    .brand-title{font-size:1rem;font-weight:800;color:#fff;line-height:1.15;margin-top:1px}
+    .top-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+    .pill-metric{
+      min-width:72px;
+      background:rgba(255,255,255,.16);
+      border:1px solid rgba(255,255,255,.20);
       backdrop-filter:blur(8px);
+      color:#fff;border-radius:14px;padding:6px 8px;
+      display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
     }
-
-    .logout-btn{
-      border:none;border-radius:14px;
-      padding:10px 12px;background:#fff;color:var(--royal);font-weight:700;
+    .pill-metric small{font-size:.62rem;color:rgba(255,255,255,.76);font-weight:700;line-height:1}
+    .pill-metric strong{font-size:.9rem;font-weight:800;line-height:1.1;margin-top:3px}
+    .score-badge{
+      display:inline-flex;align-items:center;justify-content:center;
+      width:22px;height:22px;border-radius:50%;margin-bottom:4px;
+      box-shadow:inset 0 1px 1px rgba(255,255,255,.35), 0 4px 10px rgba(2,6,23,.18)
     }
-
-    .hero-kpis{
-      display:grid;
-      grid-template-columns:1.15fr .85fr .85fr;
-      gap:8px;
-      margin-top:10px;
+    .score-badge i{font-size:.82rem;line-height:1}
+    .score-gold{background:linear-gradient(135deg,#ffd84d 0%,#f5b301 100%);color:#fff7d6}
+    .score-silver{background:linear-gradient(135deg,#d8dee9 0%,#9aa4b2 100%);color:#ffffff}
+    .score-bronze{background:linear-gradient(135deg,#d69a62 0%,#a85d28 100%);color:#fff3ea}
+    .score-danger{background:linear-gradient(135deg,#ff7878 0%,#dc2626 100%);color:#fff}
+    .btn-ghost-light{
+      border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.14);color:#fff;
+      border-radius:12px;padding:8px 10px;font-weight:700
     }
+    .btn-ghost-light:hover{background:rgba(255,255,255,.20);color:#fff}
 
-    .hero-kpi{
-      border-radius:16px;
-      padding:10px 10px 9px;
-      background:rgba(255,255,255,.12);
-      border:1px solid rgba(255,255,255,.12);
+    .menu-drawer{display:none;position:fixed;inset:0 auto 0 0;width:min(290px,86vw);background:#fff;z-index:220;transform:translateX(-100%);transition:.24s ease;box-shadow:10px 0 30px rgba(15,23,42,.18)}
+    .menu-drawer.aberto{display:block;transform:translateX(0)}
+    .menu-backdrop{display:none;position:fixed;inset:0;background:rgba(2,6,23,.42);z-index:210}
+    .menu-backdrop.aberto{display:block}
+    .menu-head{padding:16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+    .menu-avatar{width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--royal-soft)}
+    .menu-title{font-weight:800;color:var(--ink)}
+    .menu-sub{font-size:.8rem;color:var(--muted)}
+    .menu-links{padding:12px}
+    .menu-link{
+      display:flex;align-items:center;gap:12px;width:100%;text-decoration:none;
+      background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;
+      color:var(--ink);font-weight:700;margin-bottom:10px;
+      box-shadow:0 6px 16px rgba(15,23,42,.04)
+    }
+    .menu-link i{color:var(--royal);font-size:1.15rem}
+
+    .hero-cards{padding:12px 12px 6px 12px}
+    .hero-grid{
+      display:grid;grid-template-columns:1.1fr .9fr .9fr;gap:10px;
+    }
+    .hero-card{
+      background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+      box-shadow:var(--shadow);padding:12px 12px 11px;
       min-width:0;
     }
+    .hero-card.primary{
+      background:linear-gradient(145deg,#ffffff 0%,#f7faff 100%);
+      border-color:rgba(39,71,217,.12)
+    }
+    .hero-label{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+    .hero-value{font-size:1.18rem;font-weight:800;line-height:1.1;color:var(--ink);margin-top:4px}
+    .hero-sub{font-size:.74rem;color:var(--muted);margin-top:4px}
+    .hero-value.tight{font-size:1rem}
 
-    .hero-kpi.main{
-      background:rgba(255,255,255,.18);
+    .surface{padding:8px 12px}
+    .surface-card{
+      background:rgba(255,255,255,.88);backdrop-filter:blur(10px);
+      border:1px solid rgba(15,23,42,.06);
+      border-radius:20px;box-shadow:var(--shadow)
     }
 
-    .hero-kpi .label{
-      font-size:.68rem;
-      text-transform:uppercase;
-      letter-spacing:.04em;
-      opacity:.85;
-      margin-bottom:3px;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-
-    .hero-kpi .value{
-      font-weight:800;
-      font-size:1.1rem;
-      line-height:1.05;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-
-    .hero-kpi .sub{
-      font-size:.68rem;
-      opacity:.82;
-      margin-top:2px;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-
-    .page-pad{padding:10px 12px 20px}
-
-    .glass-card{
-      background:var(--card);
-      border:1px solid rgba(255,255,255,.45);
-      box-shadow:var(--shadow);
-      border-radius:var(--radius);
-      backdrop-filter:var(--glass);
-      -webkit-backdrop-filter:var(--glass);
-    }
-
-    .section-card{
-      padding:14px;
-      margin-bottom:10px;
-    }
-
-    .flash-wrap{display:grid;gap:8px;margin-bottom:10px}
-    .flash-item{
-      border-radius:14px;
-      padding:12px;
-      font-size:.93rem;
-      border:1px solid var(--line);
-    }
-    .flash-success{background:#ecfdf3;color:#166534}
-    .flash-danger{background:#fef2f2;color:#991b1b}
-    .flash-warning{background:#fff8eb;color:#92400e}
-    .flash-info{background:#eff6ff;color:#1d4ed8}
-
-    .quick-banner{
-      display:flex;align-items:center;justify-content:space-between;gap:10px;
-      padding:12px;
-      border-radius:16px;
-      background:linear-gradient(135deg, #fff6d8, #fff1b2);
-      border:1px solid #f4dd87;
-      margin-bottom:10px;
-    }
-
-    .form-grid{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:10px;
-    }
-
-    .form-grid .full{grid-column:1/-1}
-    .form-label{
-      font-size:.78rem;
-      font-weight:700;
-      margin-bottom:5px;
-      color:#334155;
-    }
-
+    .filter-card{padding:14px}
+    .form-label{font-size:.78rem;font-weight:700;color:#334155;margin-bottom:6px}
     .form-control,.form-select{
-      border-radius:14px;
-      border:1px solid rgba(15,23,42,.10);
-      min-height:44px;
-      box-shadow:none!important;
+      border-radius:14px;border:1px solid rgba(15,23,42,.10);
+      min-height:44px;font-size:.95rem;box-shadow:none
     }
-
+    .form-control:focus,.form-select:focus{border-color:rgba(39,71,217,.45);box-shadow:0 0 0 4px rgba(39,71,217,.10)}
     .btn-royal{
-      background:linear-gradient(135deg, var(--royal), var(--royal-2));
-      color:#fff;border:none;border-radius:14px;font-weight:700;min-height:44px;
+      background:linear-gradient(135deg,var(--royal) 0%, var(--royal-2) 100%);
+      color:#fff;border:0;border-radius:14px;min-height:44px;font-weight:800;box-shadow:0 10px 20px rgba(39,71,217,.22)
     }
-    .btn-royal:hover{color:#fff;filter:brightness(1.02)}
-    .btn-soft{
-      background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:14px;font-weight:700;
-      min-height:40px;
-    }
+    .btn-royal:hover{color:#fff;filter:brightness(1.03)}
 
-    .tabs-shell{
-      position:sticky;
-      top:112px;
-      z-index:110;
-      padding:0 12px 8px;
-      background:linear-gradient(to bottom, rgba(243,246,255,.96), rgba(243,246,255,.78));
-      backdrop-filter:blur(10px);
-      -webkit-backdrop-filter:blur(10px);
-    }
+    .flash-stack{padding:8px 12px 0}
+    .flash-stack .alert{border:0;border-radius:16px;box-shadow:0 8px 20px rgba(15,23,42,.06);font-size:.92rem}
 
-    .tabs-track{
-      display:flex;
-      gap:6px;
-      overflow:auto;
-      scrollbar-width:none;
-      padding:4px;
-      background:rgba(255,255,255,.65);
-      border:1px solid rgba(255,255,255,.55);
-      border-radius:18px;
-      box-shadow:0 8px 22px rgba(39,71,217,.07);
+    .tab-shell{padding:10px 12px 0}
+    .tabs-rail{
+      display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;
+      background:rgba(255,255,255,.86);border:1px solid rgba(15,23,42,.06);backdrop-filter:blur(10px);
+      padding:6px;border-radius:18px;box-shadow:var(--shadow)
     }
-    .tabs-track::-webkit-scrollbar{display:none}
-
     .tab-btn{
-      border:none;
-      background:transparent;
-      color:#475467;
-      font-weight:700;
-      font-size:.88rem;
-      border-radius:14px;
-      padding:10px 14px;
-      white-space:nowrap;
-      flex:0 0 auto;
+      border:0;background:transparent;border-radius:14px;padding:9px 4px 8px;
+      min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+      color:#5b6475;font-weight:800;transition:.18s ease;
     }
-    .tab-btn.is-active{
-      background:linear-gradient(135deg, var(--royal), var(--royal-2));
-      color:#fff;
-      box-shadow:0 8px 22px rgba(39,71,217,.24);
+    .tab-btn i{font-size:1rem;line-height:1}
+    .tab-btn span{
+      font-size:.58rem;line-height:1.05;text-align:center;white-space:normal;
+      word-break:break-word;letter-spacing:.01em
+    }
+    .tab-btn.active{
+      background:linear-gradient(135deg,var(--royal) 0%,var(--royal-2) 100%);
+      color:#fff;box-shadow:0 8px 18px rgba(39,71,217,.22)
     }
 
+    .tab-panel-wrap{padding:10px 12px 24px}
     .tab-pane-custom{display:none}
-    .tab-pane-custom.is-active{display:block}
+    .tab-pane-custom.active{display:block}
 
-    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .mini-kpi{
-      border:1px solid var(--line);
-      border-radius:16px;
-      padding:12px;
-      background:#fff;
-      min-width:0;
-    }
-    .mini-kpi .k-label{
-      font-size:.73rem;
-      color:var(--muted);
-      font-weight:700;
-      margin-bottom:4px;
-    }
-    .mini-kpi .k-value{
-      font-weight:800;
-      font-size:1.08rem;
-      line-height:1.1;
-      word-break:break-word;
-    }
-    .mini-kpi .k-sub{
-      color:var(--muted);
-      font-size:.74rem;
-      margin-top:3px;
-    }
+    .section-card{background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:14px;margin-bottom:12px}
+    .section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+    .section-title{font-size:1rem;font-weight:800;color:var(--ink);margin:0}
+    .section-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--royal-soft);color:var(--royal-3);font-size:.76rem;font-weight:800}
 
-    .section-head{
-      display:flex;align-items:center;justify-content:space-between;gap:10px;
-      margin-bottom:10px;
-    }
-    .section-title{
-      font-weight:800;
-      font-size:1rem;
-      margin:0;
-    }
-    .chip{
-      display:inline-flex;align-items:center;gap:6px;
-      border-radius:999px;padding:6px 10px;
-      background:var(--chip);font-weight:700;font-size:.78rem;
-      color:#243b8a;max-width:100%;
-    }
+    .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .kpi-card{border:1px solid var(--line);border-radius:16px;padding:12px;background:linear-gradient(180deg,#fff 0%,#fbfcff 100%)}
+    .kpi-title{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:800;color:var(--muted)}
+    .kpi-value{font-size:1.02rem;font-weight:800;line-height:1.15;color:var(--ink);margin-top:5px}
+    .kpi-sub{font-size:.74rem;color:var(--muted);margin-top:4px}
+    .kpi-card.span-2{grid-column:1/-1}
 
-    .list-stack{display:grid;gap:10px}
-    .list-card{
-      border:1px solid var(--line);
-      border-radius:16px;
-      padding:12px;
-      background:#fff;
-    }
+    .list-stack{display:flex;flex-direction:column;gap:10px}
+    .item-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:13px}
+    .item-row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    .item-title{font-weight:800;color:var(--ink);font-size:.96rem;word-break:break-word}
+    .item-meta,.item-small{font-size:.8rem;color:var(--muted);word-break:break-word}
+    .item-amount{font-weight:800;font-size:.98rem;white-space:nowrap}
+    .item-amount.success{color:var(--ok)}
+    .item-amount.danger{color:var(--bad)}
 
-    .prod-row{
-      display:grid;
-      grid-template-columns:1fr auto;
-      gap:10px;
-      align-items:flex-start;
-    }
+    .doc-block{padding:12px;border-radius:16px;border:1px solid var(--line)}
+    .doc-ok{background:#ecfff3;border-color:rgba(22,163,74,.16)}
+    .doc-bad{background:#fff0f0;border-color:rgba(220,38,38,.16)}
 
-    .title-strong{
-      font-weight:800;
-      font-size:.96rem;
-      line-height:1.2;
-      word-break:break-word;
-      overflow-wrap:anywhere;
-      margin-bottom:5px;
-    }
+    .esc-card{display:flex;gap:10px;padding:12px;border-radius:18px;border:1px solid var(--line);background:#fff;box-shadow:var(--shadow);margin-bottom:10px}
+    .esc-bar{width:5px;border-radius:999px;background:var(--stripe,#dbe4ff)}
+    .esc-body{flex:1;min-width:0}
+    .esc-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+    .esc-title{font-weight:800;color:var(--ink);font-size:.95rem;word-break:break-word}
+    .esc-meta{font-size:.82rem;color:var(--muted);margin-top:5px;word-break:break-word}
+    .esc-badge{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;background:var(--royal-soft);color:var(--royal-3);font-size:.68rem;font-weight:800}
+    .btn-xs{border-radius:12px;padding:7px 10px;font-size:.78rem;font-weight:700}
 
-    .muted{
-      color:var(--muted);
-      font-size:.84rem;
-      line-height:1.35;
-      word-break:break-word;
-      overflow-wrap:anywhere;
-    }
+    .status-soft{border-radius:999px;padding:5px 10px;font-size:.72rem;font-weight:800}
+    .status-pendente{background:#fff7e6;color:#9a6700}
+    .status-aprovada{background:#eafaf0;color:#166534}
+    .status-recusada{background:#fef1f1;color:#991b1b}
 
-    .money-main{
-      font-weight:800;
-      font-size:1.02rem;
-      text-align:right;
-      white-space:nowrap;
-    }
-
-    .money-sub{
-      font-size:.76rem;
-      color:var(--muted);
-      text-align:right;
-      line-height:1.35;
-    }
-
-    .rating-block{
-      margin-top:10px;
-      border-top:1px dashed rgba(15,23,42,.08);
-      padding-top:10px;
-    }
-
-    .rating-grid{
-      display:grid;
-      grid-template-columns:1fr;
-      gap:10px;
-    }
-
-    .rating-col .small-title{
-      font-size:.76rem;
-      font-weight:700;
-      color:var(--muted);
-      margin-bottom:4px;
-    }
-
-    .rating-stars{display:flex;gap:4px;flex-wrap:wrap}
-    .star-btn{
-      border:none;background:transparent;padding:0;line-height:1;
-    }
+    .rating-stars{display:flex;gap:.18rem;flex-wrap:wrap}
+    .star-btn{border:0;background:transparent;padding:0;cursor:pointer}
     .rating-stars .bi-star,.rating-stars .bi-star-fill{font-size:1.15rem}
     .rating-stars .bi-star-fill{color:#f5c518}
-    .rating-stars .bi-star{color:#c8ced8}
+    .rating-stars .bi-star{color:#cbd5e1}
 
-    .esc-card{
-      display:grid;
-      grid-template-columns:6px 1fr auto;
-      gap:10px;
-      align-items:start;
-      padding:12px;
-      border:1px solid var(--line);
-      border-radius:16px;
-      background:#fff;
-      margin-bottom:10px;
-    }
-    .esc-bar{border-radius:999px;background:var(--stripe,#dbe4ff);min-height:100%}
-    .esc-title{font-weight:800;font-size:.95rem;line-height:1.2;word-break:break-word}
-    .esc-meta{font-size:.84rem;color:var(--muted);line-height:1.42;word-break:break-word}
-    .esc-side{display:flex;align-items:center}
-    .btn-xs{
-      min-height:36px;border-radius:12px;padding:6px 10px;font-size:.78rem;font-weight:700;
-    }
+    .soft-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
+    .title-muted{font-size:.76rem;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.08em}
 
-    .drawer{
-      position:fixed;
-      inset:0 auto 0 0;
-      width:min(84vw, 305px);
-      background:rgba(255,255,255,.94);
-      backdrop-filter:blur(18px);
-      -webkit-backdrop-filter:blur(18px);
-      box-shadow:16px 0 40px rgba(15,23,42,.18);
-      z-index:300;
-      transform:translateX(-104%);
-      transition:transform .25s ease;
-      border-right:1px solid rgba(15,23,42,.06);
-      display:flex;
-      flex-direction:column;
-    }
-    .drawer.open{transform:translateX(0)}
-    .drawer-backdrop{
-      position:fixed;inset:0;background:rgba(15,23,42,.34);
-      z-index:299;opacity:0;pointer-events:none;transition:opacity .2s ease;
-    }
-    .drawer-backdrop.open{opacity:1;pointer-events:auto}
-
-    .drawer-head{
-      padding:16px 14px;
-      border-bottom:1px solid rgba(15,23,42,.06);
-      display:flex;align-items:center;gap:10px;
-    }
-    .drawer-avatar{
-      width:46px;height:46px;border-radius:50%;overflow:hidden;border:2px solid rgba(39,71,217,.14)
-    }
-    .drawer-avatar img{width:100%;height:100%;object-fit:cover}
-    .drawer-title{font-weight:800;font-size:1rem}
-    .drawer-sub{font-size:.78rem;color:var(--muted)}
-    .drawer-body{padding:12px;display:grid;gap:10px}
-    .drawer-link{
-      min-height:48px;border-radius:14px;
-      display:flex;align-items:center;gap:10px;
-      padding:0 14px;
-      text-decoration:none;
-      background:#fff;
-      color:var(--ink);
-      border:1px solid rgba(15,23,42,.08);
-      font-weight:700;
-    }
-    .drawer-link.primary{
-      background:linear-gradient(135deg, var(--royal), var(--royal-2));
-      color:#fff;border:none;
-    }
-
-    .badge-round{
-      display:inline-flex;align-items:center;justify-content:center;
-      min-width:22px;height:22px;border-radius:999px;
-      padding:0 7px;font-size:.74rem;font-weight:800;background:#ef4444;color:#fff;
-      margin-left:auto;
-    }
-
-    .offcanvas,.modal-content{border:none;border-radius:22px}
-    .calc-wrap{background:#000;border-radius:24px;overflow:hidden;box-shadow:0 16px 34px rgba(0,0,0,.38)}
-    .calc-status{color:#9aa0a6;text-align:right;padding:10px 16px;font-size:.9rem;min-height:24px}
-    .calc-display{color:#fff;text-align:right;font-weight:300;padding:0 16px 18px;font-size:2.3rem;min-height:64px}
+    .calc-wrap{background:#0f172a;border-radius:24px;overflow:hidden;box-shadow:0 14px 34px rgba(15,23,42,.34)}
+    .calc-status{color:#94a3b8;text-align:right;padding:10px 16px;font-size:.9rem;min-height:24px}
+    .calc-display{color:#fff;text-align:right;font-weight:300;padding:0 16px 18px 16px;font-size:2.3rem;min-height:64px}
     .calc-keys{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px}
-    .calc-btn{border:0;border-radius:32px;padding:16px 0;font-size:1.25rem;font-weight:600}
-    .k-gray{background:#a5a5a5;color:#000}.k-dark{background:#333;color:#fff}.k-orange{background:#fe9505;color:#fff}.k-zero{grid-column:span 2;text-align:left;padding-left:24px}
+    .calc-btn{border:0;border-radius:32px;padding:16px 0;font-size:1.25rem;font-weight:700}
+    .k-gray{background:#cbd5e1;color:#0f172a}.k-dark{background:#1e293b;color:#fff}.k-orange{background:var(--royal-2);color:#fff}.k-zero{grid-column:span 2;text-align:left;padding-left:24px}
 
-    .notes-wrap{display:flex;gap:.5rem;height:60vh;min-height:420px}
-    .notes-list{width:38%;max-width:260px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:auto}
-    .notes-editor{flex:1;background:#fff;border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
-    .notes-toolbar{display:flex;gap:.4rem;padding:.5rem;border-bottom:1px solid var(--line);background:#f8f9fe;align-items:center;flex-wrap:wrap}
-    .note-card{padding:.55rem .65rem;border-bottom:1px solid #00000010}
-    .note-card.active{background:#eef2ff}
+    .notes-wrap{display:flex;gap:.6rem;height:60vh;min-height:420px}
+    .notes-list{width:38%;max-width:260px;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:auto}
+    .notes-editor{flex:1;background:#fff;border:1px solid var(--line);border-radius:16px;display:flex;flex-direction:column;overflow:hidden}
+    .notes-toolbar{display:flex;gap:.4rem;flex-wrap:wrap;padding:.6rem;border-bottom:1px solid var(--line);background:#f8faff;align-items:center}
+    .note-card{padding:.55rem .65rem;border-bottom:1px solid rgba(15,23,42,.06)}
+    .note-card.active{background:#eef3ff}
 
-    .toast{border:none;border-radius:18px}
+    .offcanvas{border-top-left-radius:22px;border-top-right-radius:22px}
 
-    @media (max-width:390px){
-      .mobile-wrap{width:100%}
-      .topbar{padding:8px 10px 8px}
-      .page-pad{padding:8px 10px 18px}
-      .tabs-shell{padding:0 10px 8px;top:108px}
-      .hero-kpis{grid-template-columns:1fr 1fr 1fr;gap:7px}
-      .hero-kpi{padding:9px 8px}
-      .hero-kpi .value{font-size:.98rem}
-      .hero-kpi .label,.hero-kpi .sub{font-size:.64rem}
-      .grid-2{gap:8px}
-      .mini-kpi{padding:10px}
-      .mini-kpi .k-value{font-size:1rem}
-      .tab-btn{padding:9px 12px;font-size:.84rem}
-      .title-strong{font-size:.92rem}
-      .money-main{font-size:.96rem}
-      .btn-xs{padding:6px 8px}
+    @media (max-width:380px){
+      .topbar-inner{padding:10px 10px 12px}
+      .hero-cards{padding:10px 10px 6px}
+      .hero-grid{grid-template-columns:1fr 1fr;gap:8px}
+      .hero-card.primary{grid-column:1/-1}
+      .surface,.tab-shell,.tab-panel-wrap,.flash-stack{padding-left:10px;padding-right:10px}
+      .tabs-rail{gap:5px;padding:5px}
+      .tab-btn{padding:8px 2px 7px}
+      .tab-btn span{font-size:.54rem}
+      .kpi-grid{gap:8px}
+      .kpi-card{padding:10px}
+      .kpi-value{font-size:.95rem}
     }
 
     @media (max-width:575px){
-      .notes-wrap{flex-direction:column}
+      .notes-wrap{flex-direction:column;height:auto;min-height:0}
       .notes-list{width:100%;max-width:none;height:180px}
       .notes-editor{height:calc(60vh - 190px)}
     }
 
     @media print{
-      .no-print,.drawer,.drawer-backdrop,.modal,.offcanvas,.tabs-shell,.topbar{display:none!important}
+      .no-print,.menu-drawer,.menu-backdrop,.modal,.toast,.offcanvas{display:none!important}
+      .tab-pane-custom{display:block!important}
+      body{background:#fff}
+      .section-card,.item-card,.surface-card,.hero-card{box-shadow:none!important}
     }
   </style>
 </head>
@@ -513,230 +274,235 @@
 {% set _unread = unread if unread is defined else (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else (avisos_unread_count if avisos_unread_count is defined else 0)) %}
 {% set unread = _unread|int %}
 {% set _qtd_prod = total_entregas_vida %}
-{% set _score_header = (nota_vida if nota_vida is defined and nota_vida is not none else (cooperado_score|default(5.0))) %}
+{% set _score_header = nota_vida|default(5.0) %}
+{% set _score_title = 'Sua pontuação geral' %}
+{% if _score_header >= 4.5 %}
+  {% set _score_icon = 'bi-star-fill' %}
+  {% set _score_badge_class = 'score-gold' %}
+  {% set _score_label = 'Destaque' %}
+{% elif _score_header >= 3 %}
+  {% set _score_icon = 'bi-star-fill' %}
+  {% set _score_badge_class = 'score-silver' %}
+  {% set _score_label = 'Bom nível' %}
+{% elif _score_header > 1 %}
+  {% set _score_icon = 'bi-star-fill' %}
+  {% set _score_badge_class = 'score-bronze' %}
+  {% set _score_label = 'Atenção' %}
+{% else %}
+  {% set _score_icon = 'bi-exclamation-triangle-fill' %}
+  {% set _score_badge_class = 'score-danger' %}
+  {% set _score_label = 'Crítico' %}
+{% endif %}
+{% set _active_tab_req = request.args.get('active_tab', '') if request is defined else '' %}
 
-<div class="drawer-backdrop" id="drawerBackdrop"></div>
-<aside class="drawer" id="menuLateral" aria-label="Menu lateral">
-  <div class="drawer-head">
-    <div class="drawer-avatar">
-      <img src="{{ cooperado.foto_url or url_for('static', filename='img/default.png') }}" alt="Foto">
-    </div>
-    <div class="flex-fill min-w-0">
-      <div class="drawer-title">{{ cooperado.nome or 'Cooperado' }}</div>
-      <div class="drawer-sub">Painel Coopex</div>
+<div id="menuLateral" class="menu-drawer" aria-label="Menu lateral">
+  <div class="menu-head">
+    <img class="menu-avatar" src="{{ cooperado.foto_url or url_for('static', filename='img/default.png') }}" alt="Foto">
+    <div class="flex-grow-1 min-w-0">
+      <div class="menu-title">{{ cooperado.nome if cooperado and cooperado.nome else 'Cooperado' }}</div>
+      <div class="menu-sub">Painel Coopex</div>
     </div>
     <button class="btn-close" id="fecharMenu" aria-label="Fechar"></button>
   </div>
-
-  <div class="drawer-body">
-    <a class="drawer-link primary" href="{{ url_for('documentos_publicos') }}">
-      <i class="bi bi-folder-symlink-fill"></i><span>Documentos</span>
-    </a>
-    <a class="drawer-link primary" href="{{ url_for('tabelas_publicas') }}">
-      <i class="bi bi-table"></i><span>Tabelas</span>
-    </a>
-    <a class="drawer-link primary" href="{{ url_for('portal_cooperado_avisos') }}">
-      <i class="bi bi-megaphone-fill"></i><span>Avisos</span>
-      {% if unread > 0 %}<span class="badge-round">{{ unread }}</span>{% endif %}
-    </a>
-
-    <button class="drawer-link" type="button" data-bs-toggle="modal" data-bs-target="#calcModal">
-      <i class="bi bi-calculator"></i><span>Calculadora</span>
-    </button>
-    <button class="drawer-link" type="button" data-bs-toggle="offcanvas" data-bs-target="#financasSheet">
-      <i class="bi bi-wallet2"></i><span>Finanças pessoais</span>
-    </button>
-    <button class="drawer-link" type="button" data-bs-toggle="modal" data-bs-target="#cxbModal">
-      <i class="bi bi-cash-coin"></i><span>Custo x Benefício</span>
-    </button>
-    <button class="drawer-link" type="button" data-bs-toggle="modal" data-bs-target="#notesModal">
-      <i class="bi bi-sticky"></i><span>Bloco de notas</span>
-    </button>
+  <div class="menu-links">
+    <a href="{{ url_for('documentos_publicos') }}" class="menu-link"><i class="bi bi-folder2-open"></i><span>Documentos</span></a>
+    <a href="{{ url_for('tabelas_publicas') }}" class="menu-link"><i class="bi bi-table"></i><span>Tabelas</span></a>
+    <a href="{{ url_for('portal_cooperado_avisos') }}" class="menu-link"><i class="bi bi-megaphone"></i><span>Avisos</span>{% if unread>0 %}<span class="badge rounded-pill bg-danger ms-auto">{{ unread }}</span>{% endif %}</a>
+    <button class="menu-link" type="button" data-bs-toggle="modal" data-bs-target="#calcModal"><i class="bi bi-calculator"></i><span>Calculadora</span></button>
+    <button class="menu-link" type="button" data-bs-toggle="offcanvas" data-bs-target="#financasSheet"><i class="bi bi-wallet2"></i><span>Finanças pessoais</span></button>
+    <button class="menu-link" type="button" data-bs-toggle="modal" data-bs-target="#cxbModal"><i class="bi bi-cash-coin"></i><span>Custo x benefício</span></button>
+    <button class="menu-link" type="button" data-bs-toggle="modal" data-bs-target="#notesModal"><i class="bi bi-sticky"></i><span>Bloco de notas</span></button>
   </div>
-</aside>
+</div>
+<div id="fundoMenu" class="menu-backdrop" aria-hidden="true"></div>
 
 <div class="mobile-wrap">
   <header class="topbar">
-    <div class="topbar-card">
-      <div class="topbar-row">
-        <button class="avatar-btn" id="abrirMenu" aria-label="Abrir menu">
-          <img src="{{ cooperado.foto_url or url_for('static', filename='img/default.png') }}" alt="Abrir menu">
+    <div class="topbar-inner">
+      <div class="top-row">
+        <button class="avatar-btn" id="abrirMenu" title="Abrir menu" aria-label="Abrir menu">
+          <img src="{{ cooperado.foto_url or url_for('static', filename='img/default.png') }}" alt="Avatar">
         </button>
-
-        <div class="brand-mini">
-          <div class="hello">Painel do cooperado</div>
-          <div class="name">{{ cooperado.nome or 'Coopex' }}</div>
+        <div class="brand-block">
+          <div class="brand-kicker">coopex</div>
+          <div class="brand-title">Painel do cooperado</div>
         </div>
-
         <div class="top-actions">
-          <a class="logout-btn" href="{{ url_for('logout') }}">Sair</a>
-        </div>
-      </div>
-
-      <div class="hero-kpis">
-        <div class="hero-kpi main">
-          <div class="label">Líquido</div>
-          <div class="value">R$ {{ "%.2f"|format(total_liquido|default(0)) }}</div>
-          <div class="sub">Após descontos</div>
-        </div>
-        <div class="hero-kpi">
-          <div class="label">Nota</div>
-          <div class="value">{{ "%.2f"|format(_score_header)|replace('.',',') }}</div>
-          <div class="sub">Pontuação</div>
-        </div>
-        <div class="hero-kpi">
-          <div class="label">Entregas</div>
-          <div class="value">{{ _qtd_prod }}</div>
-          <div class="sub">Comandas</div>
+          <div class="pill-metric" title="{{ _score_title }}">
+            <span class="score-badge {{ _score_badge_class }}"><i class="bi {{ _score_icon }}"></i></span>
+            <small>NOTA</small>
+            <strong class="mono">{{ '%.2f'|format(_score_header)|replace('.',',') }}</strong>
+          </div>
+          <div class="pill-metric">
+            <small>ENTREGAS</small>
+            <strong class="mono">{{ _qtd_prod }}</strong>
+          </div>
+          <a class="btn btn-sm btn-ghost-light" href="{{ url_for('logout') }}">Sair</a>
         </div>
       </div>
     </div>
   </header>
 
-  <div class="page-pad">
+  <section class="hero-cards">
+    <div class="hero-grid">
+      <div class="hero-card primary">
+        <div class="hero-label">Líquido do período</div>
+        <div class="hero-value mono">R$ {{ '%.2f'|format(total_liquido|default(0)) }}</div>
+        <div class="hero-sub">Após descontos aplicados</div>
+      </div>
+      <div class="hero-card">
+        <div class="hero-label">Bruto</div>
+        <div class="hero-value tight mono">R$ {{ '%.2f'|format(total_bruto|default(0)) }}</div>
+        <div class="hero-sub">Total recebido</div>
+      </div>
+      <div class="hero-card">
+        <div class="hero-label">Avisos</div>
+        <div class="hero-value tight mono">{{ unread }}</div>
+        <div class="hero-sub">Não lidos</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="flash-stack">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        <div class="flash-wrap">
-          {% for category, message in messages %}
-            <div class="flash-item flash-{{ category if category in ['success','danger','warning','info'] else 'info' }}">
-              {{ message }}
-            </div>
-          {% endfor %}
-        </div>
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'warning' if category=='message' else category }} mb-2">
+            {{ message }}
+          </div>
+        {% endfor %}
       {% endif %}
     {% endwith %}
 
-    {% if unread>0 %}
-    <div class="quick-banner">
-      <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-megaphone-fill"></i>
-        <div>Você tem <b>{{ unread }}</b> aviso(s) não lido(s).</div>
-      </div>
+    {% if unread > 0 %}
+    <div class="alert alert-warning d-flex align-items-center justify-content-between gap-2 mb-0">
+      <div><i class="bi bi-megaphone-fill me-1"></i> Você tem <b>{{ unread }}</b> aviso(s) novo(s).</div>
       <a class="btn btn-sm btn-warning" href="{{ url_for('portal_cooperado_avisos') }}">Ver</a>
     </div>
     {% endif %}
-
-    <form class="glass-card section-card" method="GET" action="{{ url_for('portal_cooperado') }}">
-      <div class="section-head mb-2">
-        <h3 class="section-title">Período</h3>
-        <span class="chip"><i class="bi bi-calendar-range"></i> Semana atual</span>
-      </div>
-      <div class="form-grid">
-        <div>
-          <label class="form-label">Início</label>
-          <input type="date" class="form-control" id="dataInicioInput" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
-        </div>
-        <div>
-          <label class="form-label">Fim</label>
-          <input type="date" class="form-control" id="dataFimInput" name="data_fim" value="{{ request.args.get('data_fim','') }}">
-        </div>
-        <div class="full d-grid">
-          <button class="btn btn-royal" type="submit"><i class="bi bi-funnel"></i> Aplicar período</button>
-        </div>
-      </div>
-    </form>
   </div>
 
-  <div class="tabs-shell">
-    <div class="tabs-track" id="painelTabs">
-      <button class="tab-btn is-active" type="button" data-tab="resumo">Resumo</button>
-      <button class="tab-btn" type="button" data-tab="producoes">Produções</button>
-      <button class="tab-btn" type="button" data-tab="ajustes">Ajustes Coop</button>
-      <button class="tab-btn" type="button" data-tab="escalas">Escalas</button>
-      <button class="tab-btn" type="button" data-tab="trocas">Trocas</button>
+  <section class="surface">
+    <div class="surface-card filter-card">
+      <form method="GET" action="{{ url_for('portal_cooperado') }}" id="periodoForm">
+        <input type="hidden" name="active_tab" id="activeTabInput" value="{{ _active_tab_req or 'resumo' }}">
+        <div class="row g-2 align-items-end">
+          <div class="col-6">
+            <label class="form-label">Início</label>
+            <input type="date" class="form-control" name="data_inicio" value="{{ (data_inicio.strftime('%Y-%m-%d') if data_inicio else request.args.get('data_inicio','')) }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Fim</label>
+            <input type="date" class="form-control" name="data_fim" value="{{ (data_fim.strftime('%Y-%m-%d') if data_fim else request.args.get('data_fim','')) }}">
+          </div>
+          <div class="col-12 d-grid mt-1">
+            <button class="btn btn-royal" type="submit"><i class="bi bi-funnel me-1"></i>Aplicar período</button>
+          </div>
+        </div>
+        <div class="hero-sub mt-2">O painel permanece na mesma aba até você mudar.</div>
+      </form>
     </div>
-  </div>
+  </section>
 
-  <main class="page-pad pt-0">
-    <section class="tab-pane-custom is-active" id="tab-resumo">
-      <div class="glass-card section-card">
+  <section class="tab-shell no-print">
+    <div class="tabs-rail" id="painelTabs">
+      <button class="tab-btn" type="button" data-tab="resumo"><i class="bi bi-grid-1x2"></i><span>Resumo</span></button>
+      <button class="tab-btn" type="button" data-tab="producoes"><i class="bi bi-bag-check"></i><span>Produções</span></button>
+      <button class="tab-btn" type="button" data-tab="ajustes"><i class="bi bi-sliders2"></i><span>Ajust. Coop</span></button>
+      <button class="tab-btn" type="button" data-tab="escalas"><i class="bi bi-calendar3"></i><span>Escalas</span></button>
+      <button class="tab-btn" type="button" data-tab="trocas"><i class="bi bi-arrow-left-right"></i><span>Trocas</span></button>
+    </div>
+  </section>
+
+  <main class="tab-panel-wrap" id="painelTabsContent">
+    <section class="tab-pane-custom" id="tab-resumo">
+      <div class="section-card">
         <div class="section-head">
-          <h3 class="section-title">Resumo do período</h3>
-          <span class="chip">Atualizado</span>
+          <h2 class="section-title">Visão geral</h2>
+          <span class="section-chip"><i class="bi bi-stars"></i> Coopex</span>
         </div>
-
-        <div class="grid-2">
-          <div class="mini-kpi">
-            <div class="k-label">Total bruto</div>
-            <div class="k-value">R$ {{ "%.2f"|format(total_bruto|default(0)) }}</div>
-            <div class="k-sub">Recebido</div>
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-title">Total de comandas</div>
+            <div class="kpi-value mono">{{ _qtd_prod }}</div>
+            <div class="kpi-sub">Quantidade total</div>
           </div>
-
-          <div class="mini-kpi">
-            <div class="k-label">Descontos individuais</div>
-            <div class="k-value">R$ {{ "%.2f"|format(total_descontos|default(0)) }}</div>
-            <div class="k-sub">No período</div>
+          <div class="kpi-card">
+            <div class="kpi-title">Média de avaliação</div>
+            <div class="kpi-value mono">{{ '%.2f'|format(nota_vida|default(0))|replace('.',',') }}</div>
+            <div class="kpi-sub">{{ _score_title }} · {{ _score_label }}</div>
           </div>
-
-          <div class="mini-kpi">
-            <div class="k-label">INSS (4%)</div>
-            <div class="k-value">R$ {{ "%.2f"|format(inss_valor|default(0)) }}</div>
-            <div class="k-sub">Estimado</div>
+          <div class="kpi-card">
+            <div class="kpi-title">Total bruto</div>
+            <div class="kpi-value mono">R$ {{ '%.2f'|format(total_bruto|default(0)) }}</div>
+            <div class="kpi-sub">Recebido no período</div>
           </div>
-
-          <div class="mini-kpi">
-            <div class="k-label">SEST/SENAT (0,5%)</div>
-            <div class="k-value">R$ {{ "%.2f"|format(sest_senat_valor|default(0)) }}</div>
-            <div class="k-sub">Estimado</div>
+          <div class="kpi-card">
+            <div class="kpi-title">Descontos</div>
+            <div class="kpi-value mono">R$ {{ '%.2f'|format(total_descontos|default(0)) }}</div>
+            <div class="kpi-sub">Individuais</div>
           </div>
-
-          <div class="mini-kpi">
-            <div class="k-label">Complemento INSS</div>
-            <div class="k-value">R$ {{ "%.2f"|format(inss_complemento|default(0)) }}</div>
-            <div class="k-sub">Meta sugerida</div>
+          <div class="kpi-card">
+            <div class="kpi-title">INSS (4%)</div>
+            <div class="kpi-value mono">R$ {{ '%.2f'|format(inss_valor|default(0)) }}</div>
+            <div class="kpi-sub">Estimado</div>
           </div>
-
-          <div class="mini-kpi">
-            <div class="k-label">Documentos</div>
-            <div class="k-value">
-              {% if doc_cnh.ok and doc_placa.ok %}Em dia{% else %}Pendências{% endif %}
-            </div>
-            <div class="k-sub">CNH e placa</div>
+          <div class="kpi-card">
+            <div class="kpi-title">SEST/SENAT</div>
+            <div class="kpi-value mono">R$ {{ '%.2f'|format(sest_senat_valor|default(0)) }}</div>
+            <div class="kpi-sub">0,5%</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Complemento INSS</div>
+            <div class="kpi-value mono">R$ {{ '%.2f'|format(inss_complemento|default(0)) }}</div>
+            <div class="kpi-sub">Meta sugerida</div>
+          </div>
+          <div class="kpi-card span-2">
+            <div class="kpi-title">Total líquido</div>
+            <div class="kpi-value mono" style="color:var(--ok);font-size:1.2rem">R$ {{ '%.2f'|format(total_liquido|default(0)) }}</div>
+            <div class="kpi-sub">Após descontos e encargos</div>
           </div>
         </div>
       </div>
     </section>
 
     <section class="tab-pane-custom" id="tab-producoes">
-      <div class="glass-card section-card">
+      <div class="section-card">
         <div class="section-head">
-          <h3 class="section-title">Produções no período</h3>
-          <span class="chip">R$ {{ "%.2f"|format(total_bruto|default(0)) }}</span>
+          <h2 class="section-title">Produções no período</h2>
+          <span class="section-chip mono">R$ {{ '%.2f'|format(total_bruto|default(0)) }}</span>
         </div>
-
         <div class="list-stack">
           {% for lanc in producoes %}
-          <div class="list-card">
-            <div class="prod-row">
-              <div>
-                <div class="title-strong">{{ lanc.descricao }}</div>
-                <div class="muted">
-                  <i class="bi bi-shop"></i> {{ lanc.restaurante.nome }}
-                  &nbsp;·&nbsp; <i class="bi bi-calendar-event"></i> {{ lanc.data.strftime('%d/%m/%Y') }}
+          <div class="item-card">
+            <div class="item-row">
+              <div class="flex-grow-1 min-w-0">
+                <div class="item-title">{{ lanc.descricao }}</div>
+                <div class="item-meta mt-1">
+                  <i class="bi bi-shop me-1"></i>{{ lanc.restaurante.nome }}
+                  &nbsp;·&nbsp;<i class="bi bi-calendar-event me-1"></i>{{ lanc.data.strftime('%d/%m/%Y') }}
                   {% if lanc.hora_inicio or lanc.hora_fim %}
-                  &nbsp;·&nbsp; <i class="bi bi-clock"></i> {{ lanc.hora_inicio }}{% if lanc.hora_fim %}–{{ lanc.hora_fim }}{% endif %}
+                  &nbsp;·&nbsp;<i class="bi bi-clock me-1"></i>{{ lanc.hora_inicio }}{% if lanc.hora_fim %}–{{ lanc.hora_fim }}{% endif %}
                   {% endif %}
                 </div>
               </div>
-              <div>
-                <div class="money-main">R$ {{ "%.2f"|format(lanc.valor) }}</div>
-                <div class="money-sub">INSS: R$ {{ "%.2f"|format((lanc.valor or 0)*0.04) }}</div>
-                <div class="money-sub">SEST: R$ {{ "%.2f"|format((lanc.valor or 0)*0.005) }}</div>
+              <div class="text-end">
+                <div class="item-amount mono">R$ {{ '%.2f'|format(lanc.valor) }}</div>
+                <div class="item-small">INSS: R$ {{ '%.2f'|format((lanc.valor or 0)*0.04) }}</div>
+                <div class="item-small">SEST: R$ {{ '%.2f'|format((lanc.valor or 0)*0.005) }}</div>
               </div>
             </div>
-
-            <div class="rating-block">
-              {% set minha = lanc.minha_avaliacao %}
-              {% if minha is not none %}
-                <div class="small text-muted mb-1">Sua avaliação enviada</div>
-                <div class="rating-stars">
+            <div class="mt-3">
+              {% if lanc.minha_avaliacao is not none %}
+                <div class="item-small mb-1">Sua avaliação</div>
+                <div class="d-flex align-items-center gap-1">
                   {% for i in range(1,6) %}
-                    <i class="bi {{ 'bi-star-fill' if i<=minha else 'bi-star' }}"></i>
+                    <i class="bi {{ 'bi-star-fill text-warning' if i<=lanc.minha_avaliacao else 'bi-star text-secondary' }}"></i>
                   {% endfor %}
                 </div>
               {% else %}
-                <form method="post" action="{{ url_for('producoes_avaliar', lanc_id=lanc.id) }}" class="avaliar-form">
-                  <input type="hidden" name="tab" value="producoes">
+                <form method="post" action="{{ url_for('producoes_avaliar', lanc_id=lanc.id) }}" class="avaliar-form" aria-label="Avaliar restaurante">
+                  <input type="hidden" name="active_tab" value="producoes">
                   <input type="hidden" name="nota" value="">
                   <input type="hidden" name="av_geral" value="">
                   <input type="hidden" name="av_ambiente" value="">
@@ -746,117 +512,115 @@
                   <input type="hidden" name="av_educacao" value="">
                   <input type="hidden" name="av_eficiencia" value="">
                   <input type="hidden" name="av_pontualidade" value="">
-
-                  <div class="rating-grid">
-                    <div class="rating-col">
-                      <div class="small-title">Ambiente</div>
+                  <div class="row g-2">
+                    <div class="col-12 col-sm-4">
+                      <div class="item-small fw-semibold mb-1">Ambiente</div>
                       <div class="rating-stars selectable stars-group" data-field="av_ambiente">
                         {% for i in range(1,6) %}<button type="button" class="star-btn" data-value="{{ i }}"><i class="bi bi-star"></i></button>{% endfor %}
                       </div>
                     </div>
-                    <div class="rating-col">
-                      <div class="small-title">Tratamento</div>
+                    <div class="col-12 col-sm-4">
+                      <div class="item-small fw-semibold mb-1">Tratamento</div>
                       <div class="rating-stars selectable stars-group" data-field="av_tratamento">
                         {% for i in range(1,6) %}<button type="button" class="star-btn" data-value="{{ i }}"><i class="bi bi-star"></i></button>{% endfor %}
                       </div>
                     </div>
-                    <div class="rating-col">
-                      <div class="small-title">Suporte</div>
+                    <div class="col-12 col-sm-4">
+                      <div class="item-small fw-semibold mb-1">Suporte</div>
                       <div class="rating-stars selectable stars-group" data-field="av_suporte">
                         {% for i in range(1,6) %}<button type="button" class="star-btn" data-value="{{ i }}"><i class="bi bi-star"></i></button>{% endfor %}
                       </div>
                     </div>
                   </div>
-
                   <div class="mt-2">
-                    <textarea name="av_comentario" class="form-control" rows="2" placeholder="Comentário opcional"></textarea>
+                    <textarea name="av_comentario" class="form-control form-control-sm" rows="2" placeholder="Comentário opcional"></textarea>
                   </div>
-
-                  <div class="d-grid mt-2">
-                    <button type="submit" class="btn btn-royal" disabled>Enviar avaliação</button>
+                  <div class="d-flex align-items-center justify-content-between gap-2 mt-2">
+                    <small class="item-small">Você só pode avaliar uma vez.</small>
+                    <button type="submit" class="btn btn-xs btn-outline-primary" disabled>Enviar</button>
                   </div>
                 </form>
               {% endif %}
             </div>
           </div>
           {% else %}
-          <div class="list-card text-center muted">Nenhuma produção neste período.</div>
+          <div class="item-card text-center muted">Nenhuma produção neste período.</div>
           {% endfor %}
         </div>
       </div>
     </section>
 
     <section class="tab-pane-custom" id="tab-ajustes">
-      <div class="glass-card section-card">
+      <div class="section-card">
         <div class="section-head">
-          <h3 class="section-title">Créditos da cooperativa</h3>
-          <span class="chip">R$ {{ "%.2f"|format((receitas_coop|sum(attribute='valor'))|default(0)) }}</span>
+          <h2 class="section-title">Créditos da cooperativa</h2>
+          <span class="section-chip mono">R$ {{ '%.2f'|format((receitas_coop|sum(attribute='valor'))|default(0)) }}</span>
         </div>
-        <div class="list-stack mb-3">
+        <div class="list-stack">
           {% for rc in receitas_coop %}
-          <div class="list-card d-flex justify-content-between gap-2">
-            <div>
-              <div class="title-strong"><i class="bi bi-plus-circle"></i> {{ rc.descricao }}</div>
-              {% if rc.data %}<div class="muted"><i class="bi bi-calendar-event"></i> {{ rc.data.strftime('%d/%m/%Y') }}</div>{% endif %}
+          <div class="item-card">
+            <div class="item-row">
+              <div>
+                <div class="item-title"><i class="bi bi-plus-circle me-1"></i>{{ rc.descricao }}</div>
+                {% if rc.data %}<div class="item-meta mt-1">{{ rc.data.strftime('%d/%m/%Y') }}</div>{% endif %}
+              </div>
+              <div class="item-amount success mono">+ R$ {{ '%.2f'|format(rc.valor) }}</div>
             </div>
-            <div class="money-main text-success">+ R$ {{ "%.2f"|format(rc.valor) }}</div>
           </div>
           {% else %}
-          <div class="list-card text-center muted">Nenhum crédito lançado para você.</div>
+          <div class="item-card text-center muted">Nenhum crédito lançado para você.</div>
           {% endfor %}
         </div>
+      </div>
 
+      <div class="section-card">
         <div class="section-head">
-          <h3 class="section-title">Descontos da cooperativa</h3>
-          <span class="chip">R$ {{ "%.2f"|format((despesas_coop|sum(attribute='valor'))|default(0)) }}</span>
+          <h2 class="section-title">Descontos e despesas</h2>
+          <span class="section-chip mono">R$ {{ '%.2f'|format((despesas_coop|sum(attribute='valor'))|default(0)) }}</span>
         </div>
         <div class="list-stack">
           {% for d in despesas_coop %}
-          <div class="list-card d-flex justify-content-between gap-2">
-            <div>
-              <div class="title-strong"><i class="bi bi-dash-circle"></i> {{ d.descricao }}</div>
-              {% if d.data %}<div class="muted"><i class="bi bi-calendar-event"></i> {{ d.data.strftime('%d/%m/%Y') }}</div>{% endif %}
+          <div class="item-card">
+            <div class="item-row">
+              <div>
+                <div class="item-title"><i class="bi bi-dash-circle me-1"></i>{{ d.descricao }}</div>
+                {% if d.data %}<div class="item-meta mt-1">{{ d.data.strftime('%d/%m/%Y') }}</div>{% endif %}
+              </div>
+              <div class="item-amount danger mono">− R$ {{ '%.2f'|format(d.valor) }}</div>
             </div>
-            <div class="money-main text-danger">− R$ {{ "%.2f"|format(d.valor) }}</div>
           </div>
           {% else %}
-          <div class="list-card text-center muted">Nenhum desconto aplicado no período.</div>
+          <div class="item-card text-center muted">Nenhum desconto aplicado no período.</div>
           {% endfor %}
         </div>
       </div>
     </section>
 
     <section class="tab-pane-custom" id="tab-escalas">
-      <div class="glass-card section-card">
+      <div class="section-card">
         <div class="section-head">
-          <h3 class="section-title">Documentos</h3>
-          <span class="chip">
-            {% if doc_cnh.ok and doc_placa.ok %}
-              <i class="bi bi-check-circle-fill"></i> Em dia
-            {% else %}
-              <i class="bi bi-exclamation-triangle-fill"></i> Pendentes
-            {% endif %}
-          </span>
+          <h2 class="section-title">Documentos</h2>
+          <span class="section-chip"><i class="bi bi-shield-check"></i> Situação</span>
         </div>
 
-        <div class="list-stack mb-3">
-          <div class="list-card">
-            <div class="title-strong">CNH</div>
-            <div class="muted">Número: <b>{{ doc_cnh.numero or '—' }}</b></div>
-            <div class="muted">Validade: <b>{{ doc_cnh.vencimento.strftime('%d/%m/%Y') if doc_cnh.vencimento else '—' }}</b></div>
-          </div>
-          <div class="list-card">
-            <div class="title-strong">Placa</div>
-            <div class="muted">Número: <b>{{ doc_placa.numero or '—' }}</b></div>
-            <div class="muted">Validade: <b>{{ doc_placa.vencimento.strftime('%d/%m/%Y') if doc_placa.vencimento else '—' }}</b></div>
-          </div>
-        </div>
+        {% set cnh_ok = doc_cnh.ok %}
+        {% set placa_ok = doc_placa.ok %}
 
+        <div class="doc-block {{ 'doc-ok' if cnh_ok else 'doc-bad' }} mb-2">
+          <div class="item-title">CNH — {{ 'Em dia' if cnh_ok else 'Vencida ou pendente' }}</div>
+          <div class="item-meta mt-1">Nº: <b>{{ doc_cnh.numero or '—' }}</b> · Validade: <b>{{ doc_cnh.vencimento.strftime('%d/%m/%Y') if doc_cnh.vencimento else '—' }}</b></div>
+        </div>
+        <div class="doc-block {{ 'doc-ok' if placa_ok else 'doc-bad' }}">
+          <div class="item-title">Placa — {{ 'Em dia' if placa_ok else 'Vencida ou pendente' }}</div>
+          <div class="item-meta mt-1">Nº: <b>{{ doc_placa.numero or '—' }}</b> · Validade: <b>{{ doc_placa.vencimento.strftime('%d/%m/%Y') if doc_placa.vencimento else '—' }}</b></div>
+        </div>
+      </div>
+
+      <div class="section-card">
         <div class="section-head">
-          <h3 class="section-title">Minha escala</h3>
-          <span class="chip"><i class="bi bi-calendar-week"></i> Atual</span>
+          <h2 class="section-title">Minhas escalas</h2>
+          <span class="section-chip">Semana atual</span>
         </div>
-
         {% if minha_escala %}
           {% for e in minha_escala %}
             {% set stripe = (e.cor or e.status_color or '#dbe4ff') %}
@@ -864,139 +628,150 @@
             {% set dow = (e.dia_semana or e.dow or '')|upper %}
             <div class="esc-card" style="--stripe: {{ stripe }}">
               <div class="esc-bar"></div>
-              <div>
-                <div class="esc-title">
-                  {{ data_curta }}
-                  {% if dow %}<span class="chip ms-1">{{ dow }}</span>{% endif %}
+              <div class="esc-body">
+                <div class="esc-top">
+                  <div class="min-w-0 flex-grow-1">
+                    <div class="esc-title">{{ data_curta }} {% if dow %}<span class="esc-badge ms-1">{{ dow }}</span>{% endif %}</div>
+                    <div class="esc-meta">
+                      <div><i class="bi bi-sunrise-fill me-1"></i>{{ e.turno or '—' }}</div>
+                      <div><i class="bi bi-clock me-1"></i>{{ e.horario_fmt or e.horario or '—' }}</div>
+                      <div><i class="bi bi-briefcase me-1"></i>{{ e.contrato or '—' }}</div>
+                    </div>
+                  </div>
+                  <button class="btn btn-xs btn-outline-primary"
+                          data-bs-toggle="modal"
+                          data-bs-target="#trocaModal"
+                          data-escala-id="{{ e.id }}"
+                          data-escala-desc="{{ (data_curta or '') ~ ((' - ' ~ dow) if dow else '') ~ ' • ' ~ (e.turno or '') ~ ' • ' ~ (e.horario_fmt or e.horario or '') ~ ' • ' ~ (e.contrato or '') }}">
+                    Trocar
+                  </button>
                 </div>
-                <div class="esc-meta mt-1">
-                  <div><i class="bi bi-sunrise-fill"></i> {{ e.turno or '—' }}</div>
-                  <div><i class="bi bi-clock"></i> {{ e.horario_fmt or e.horario or '—' }}</div>
-                  <div><i class="bi bi-briefcase"></i> {{ e.contrato or '—' }}</div>
-                </div>
-              </div>
-              <div class="esc-side">
-                <button class="btn btn-outline-primary btn-xs"
-                        data-bs-toggle="modal"
-                        data-bs-target="#trocaModal"
-                        data-escala-id="{{ e.id }}"
-                        data-escala-desc="{{ (data_curta or '') ~ ((' - ' ~ dow) if dow else '') ~ ' • ' ~ (e.turno or '') ~ ' • ' ~ (e.horario_fmt or e.horario or '') ~ ' • ' ~ (e.contrato or '') }}">
-                  Trocar
-                </button>
               </div>
             </div>
           {% endfor %}
         {% else %}
-          <div class="list-card text-center muted">Nenhuma escala disponível.</div>
+          <div class="item-card text-center muted">Nenhuma escala disponível.</div>
         {% endif %}
       </div>
     </section>
 
     <section class="tab-pane-custom" id="tab-trocas">
-      <div class="glass-card section-card">
+      <div class="section-card">
         <div class="section-head">
-          <h3 class="section-title">Solicitações recebidas</h3>
-          <span class="chip">{{ trocas_recebidas_pendentes|length }} pendente(s)</span>
+          <h2 class="section-title">Solicitações recebidas</h2>
+          <span class="section-chip">{{ trocas_recebidas_pendentes|length }} pendente(s)</span>
         </div>
-        <div class="list-stack mb-3">
-          {% if trocas_recebidas_pendentes %}
+        {% if trocas_recebidas_pendentes %}
+          <div class="list-stack">
             {% for t in trocas_recebidas_pendentes %}
-            <div class="list-card">
-              <div class="title-strong">{{ t.solicitante.nome }}</div>
-              <div class="muted">{{ t.origem_desc }}</div>
-              {% if t.mensagem %}<div class="muted mt-1">{{ t.mensagem }}</div>{% endif %}
-              <div class="muted mt-1"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
-              <div class="d-grid gap-2 mt-2">
-                <button class="btn btn-success"
-                        data-bs-toggle="modal"
-                        data-bs-target="#aceitarTrocaModal"
-                        data-troca-id="{{ t.id }}"
-                        data-origem-desc="{{ t.origem_desc }}"
-                        data-origem-weekday="{{ t.origem_weekday }}"
-                        data-origem-turno="{{ t.origem_turno }}"
-                        data-origem-bucket="{{ t.origem_turno_bucket }}">
-                  Aceitar
-                </button>
-                <form method="POST" action="{{ url_for('recusar_troca', troca_id=t.id) }}">
-                  <input type="hidden" name="tab" value="trocas">
-                  <button class="btn btn-outline-danger w-100">Recusar</button>
-                </form>
+            <div class="item-card">
+              <div class="item-row">
+                <div class="flex-grow-1 min-w-0">
+                  <div class="item-title">{{ t.solicitante.nome }}</div>
+                  <div class="item-meta mt-1">{{ t.origem_desc }}</div>
+                  {% if t.mensagem %}<div class="item-small mt-1">{{ t.mensagem }}</div>{% endif %}
+                  <div class="item-small mt-1">{{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
+                </div>
+                <div class="text-end d-flex flex-column gap-2">
+                  <button class="btn btn-sm btn-success"
+                          data-bs-toggle="modal"
+                          data-bs-target="#aceitarTrocaModal"
+                          data-troca-id="{{ t.id }}"
+                          data-origem-desc="{{ t.origem_desc }}"
+                          data-origem-weekday="{{ t.origem_weekday }}"
+                          data-origem-turno="{{ t.origem_turno }}"
+                          data-origem-bucket="{{ t.origem_turno_bucket }}">
+                    Aceitar
+                  </button>
+                  <form method="POST" action="{{ url_for('recusar_troca', troca_id=t.id) }}">
+                    <input type="hidden" name="active_tab" value="trocas">
+                    <button class="btn btn-sm btn-outline-danger">Recusar</button>
+                  </form>
+                </div>
               </div>
             </div>
             {% endfor %}
-          {% else %}
-          <div class="list-card text-center muted">Nenhuma solicitação recebida.</div>
-          {% endif %}
-        </div>
+          </div>
+        {% else %}
+          <div class="item-card text-center muted">Nenhuma solicitação recebida.</div>
+        {% endif %}
+      </div>
 
+      <div class="section-card">
         <div class="section-head">
-          <h3 class="section-title">Minhas solicitações</h3>
-          <span class="chip">{{ trocas_enviadas|length }}</span>
+          <h2 class="section-title">Solicitações enviadas</h2>
+          <span class="section-chip">{{ trocas_enviadas|length }}</span>
         </div>
-        <div class="list-stack">
-          {% if trocas_enviadas %}
+        {% if trocas_enviadas %}
+          <div class="list-stack">
             {% for t in trocas_enviadas %}
-            <div class="list-card">
-              <div class="title-strong">Para: {{ t.destino.nome }}</div>
-              <div class="muted">{{ t.origem_desc }}</div>
-              {% if t.mensagem %}<div class="muted mt-1">{{ t.mensagem }}</div>{% endif %}
-              <div class="d-flex justify-content-between align-items-center mt-2">
-                <div class="muted"><i class="bi bi-clock"></i> {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
-                <div>
+            <div class="item-card">
+              <div class="item-row">
+                <div class="flex-grow-1 min-w-0">
+                  <div class="item-title">Para: {{ t.destino.nome }}</div>
+                  <div class="item-meta mt-1">{{ t.origem_desc }}</div>
+                  {% if t.mensagem %}<div class="item-small mt-1">{{ t.mensagem }}</div>{% endif %}
+                  <div class="item-small mt-1">{{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}</div>
+                </div>
+                <div class="text-end">
                   {% if t.status == 'pendente' %}
-                    <span class="chip" style="background:#fff7e7;color:#9a6700">Pendente</span>
+                    <span class="status-soft status-pendente">Pendente</span>
                   {% elif t.status == 'aprovada' %}
-                    <span class="chip" style="background:#ecfdf3;color:#166534">Aprovada</span>
+                    <span class="status-soft status-aprovada">Aprovada</span>
                   {% else %}
-                    <span class="chip" style="background:#fef2f2;color:#991b1b">Recusada</span>
+                    <span class="status-soft status-recusada">Recusada</span>
                   {% endif %}
                 </div>
               </div>
             </div>
             {% endfor %}
-          {% else %}
-          <div class="list-card text-center muted">Nenhuma solicitação enviada.</div>
-          {% endif %}
-        </div>
+          </div>
+        {% else %}
+          <div class="item-card text-center muted">Nenhuma solicitação enviada.</div>
+        {% endif %}
       </div>
     </section>
   </main>
+
+  <div class="text-center py-2 muted"><small>© {{ current_year|default('') }} Coopex</small></div>
 </div>
 
 <!-- MODAIS ORIGINAIS -->
 <div class="modal fade" id="trocaModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content p-2">
+    <div class="modal-content">
       <form id="trocaForm" method="POST" action="{{ url_for('solicitar_troca') }}">
-        <div class="modal-header border-0">
-          <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Solicitar troca</h5>
-          <button class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Solicitar troca de escala</h5>
+          <button class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
         </div>
         <div class="modal-body">
+          <input type="hidden" name="active_tab" value="trocas">
           <input type="hidden" name="from_escala_id" id="fromEscalaId">
           <input type="hidden" name="to_cooperado_id" id="toCooperadoId">
-          <input type="hidden" name="tab" value="trocas">
-
           <div class="mb-2">
-            <div class="small text-muted">Seu plantão</div>
+            <div class="item-small">Seu plantão</div>
             <div class="fw-semibold" id="fromEscalaDesc">—</div>
           </div>
           <hr>
           <div class="mb-2">
-            <label class="form-label">Escolha o cooperado</label>
-            <input type="text" class="form-control" id="coopSearch" placeholder="Buscar por nome...">
+            <label class="form-label mb-1">Escolha o cooperado</label>
+            <input type="text" class="form-control form-control-sm" id="coopSearch" placeholder="Buscar por nome...">
             <div class="border rounded mt-2" style="max-height:220px;overflow:auto">
               <ul class="list-group list-group-flush" id="coopList"></ul>
             </div>
           </div>
           <div class="mb-2">
-            <label class="form-label">Mensagem (opcional)</label>
-            <textarea name="mensagem" class="form-control" rows="2" placeholder="Digite sua mensagem"></textarea>
+            <label class="form-label mb-1">Mensagem (opcional)</label>
+            <textarea name="mensagem" class="form-control" rows="2" placeholder="Ex.: posso assumir seu turno e você assume o meu?"></textarea>
           </div>
         </div>
-        <div class="modal-footer border-0">
-          <button class="btn btn-soft" data-bs-dismiss="modal" type="button">Cancelar</button>
-          <button class="btn btn-royal" id="btnEnviarTroca" type="submit" disabled>Enviar</button>
+        <div class="modal-footer d-flex justify-content-between">
+          <small class="text-muted">O admin visualiza as solicitações.</small>
+          <div>
+            <button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancelar</button>
+            <button class="btn btn-royal" id="btnEnviarTroca" type="submit" disabled>Enviar</button>
+          </div>
         </div>
       </form>
     </div>
@@ -1005,27 +780,27 @@
 
 <div class="modal fade" id="aceitarTrocaModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content p-2">
+    <div class="modal-content">
       <form id="aceitarTrocaForm" method="POST">
-        <div class="modal-header border-0">
+        <div class="modal-header">
           <h5 class="modal-title"><i class="bi bi-check2-circle"></i> Aceitar troca</h5>
-          <button class="btn-close" data-bs-dismiss="modal"></button>
+          <button class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
         </div>
         <div class="modal-body">
+          <input type="hidden" name="active_tab" value="trocas">
           <input type="hidden" name="destino_escala_id" id="destinoEscalaId">
-          <input type="hidden" name="tab" value="trocas">
-          <div class="mb-2 small text-muted">Plantão do solicitante</div>
+          <div class="mb-2 item-small">Plantão do solicitante</div>
           <div class="fw-semibold" id="origemTrocaDesc">—</div>
           <hr>
           <div class="mb-2">
-            <div class="form-label">Escolha um plantão seu compatível</div>
+            <div class="form-label mb-1">Escolha um <b>plantão seu compatível</b></div>
             <div class="border rounded" style="max-height:260px;overflow:auto">
               <ul class="list-group list-group-flush" id="minhaEscalaCompatList"></ul>
             </div>
           </div>
         </div>
-        <div class="modal-footer border-0">
-          <button class="btn btn-soft" data-bs-dismiss="modal" type="button">Cancelar</button>
+        <div class="modal-footer">
+          <button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancelar</button>
           <button class="btn btn-royal" id="btnConfirmarAceite" type="submit" disabled>Confirmar</button>
         </div>
       </form>
@@ -1061,12 +836,12 @@
           <button class="calc-btn k-orange" data-act="equal">=</button>
         </div>
       </div>
-      <div class="glass-card section-card mt-2">
+      <div class="soft-card mt-2 p-2">
         <div class="d-flex justify-content-between">
-          <div class="fw-bold">Histórico</div>
-          <button class="btn btn-sm btn-outline-danger" id="calcTapeClear">Limpar</button>
+          <div class="title-muted">Histórico</div>
+          <button class="btn btn-sm btn-outline-danger" id="calcTapeClear"><i class="bi bi-trash"></i> Limpar</button>
         </div>
-        <div id="calcTape" class="mt-2"></div>
+        <div id="calcTape" class="calc-tape mt-2"></div>
       </div>
     </div>
   </div>
@@ -1074,46 +849,49 @@
 
 <div class="modal fade" id="cxbModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content p-2">
+    <div class="modal-content soft-card p-2">
       <div class="modal-header border-0">
-        <h5 class="modal-title"><i class="bi bi-cash-coin"></i> Custo x Benefício</h5>
-        <button class="btn-close" data-bs-dismiss="modal"></button>
+        <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal"><i class="bi bi-arrow-left"></i> Voltar</button>
+        <h5 class="modal-title ms-2"><i class="bi bi-cash-coin"></i> Custo x Benefício</h5>
+        <button class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
-      <div class="modal-body">
-        <div class="glass-card section-card">
-          <div class="form-grid">
-            <div><label class="form-label">Preço gasolina (R$/L)</label><input type="number" step="0.01" min="0" id="cxPreco" class="form-control"></div>
-            <div><label class="form-label">Consumo (km/L)</label><input type="number" step="0.1" min="0" id="cxKmPorLitro" class="form-control"></div>
-            <div><label class="form-label">Km rodados</label><input type="number" step="0.1" min="0" id="cxKmFeitos" class="form-control"></div>
-            <div><label class="form-label">Quanto ganhou (R$)</label><input type="number" step="0.01" min="0" id="cxGanho" class="form-control"></div>
-          </div>
-          <hr>
-          <div class="grid-2">
-            <div class="mini-kpi"><div class="k-label">Custo</div><div class="k-value" id="cxCusto">R$ 0,00</div></div>
-            <div class="mini-kpi"><div class="k-label">Custo por km</div><div class="k-value" id="cxCustoKm">R$ 0,00/km</div></div>
-            <div class="mini-kpi"><div class="k-label">Lucro</div><div class="k-value text-success" id="cxLucro">R$ 0,00</div></div>
-            <div class="mini-kpi"><div class="k-label">Lucro por km</div><div class="k-value text-success" id="cxLucroKm">R$ 0,00/km</div></div>
-          </div>
-          <div class="mt-2"><span class="chip" id="cxMargem">0%</span></div>
-          <div class="d-grid mt-3"><button class="btn btn-royal" id="cxSalvar">Salvar resultado</button></div>
-        </div>
-        <div class="glass-card section-card mt-2">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="fw-bold">Histórico</div>
-            <button class="btn btn-sm btn-outline-danger" id="cxLimpar">Limpar</button>
-          </div>
-          <div id="cxHistorico" class="mt-2"></div>
-          <hr>
-          <div class="grid-2">
-            <div class="mini-kpi"><div class="k-label">Total km</div><div class="k-value" id="cxTotKm">0</div></div>
-            <div class="mini-kpi"><div class="k-label">Total ganho</div><div class="k-value" id="cxTotGanho">R$ 0,00</div></div>
-            <div class="mini-kpi"><div class="k-label">Total custo</div><div class="k-value" id="cxTotCusto">R$ 0,00</div></div>
-            <div class="mini-kpi"><div class="k-label">Total lucro</div><div class="k-value text-success" id="cxTotLucro">R$ 0,00</div></div>
+      <div class="card p-3 mb-2">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">Calculadora</h6>
+          <div class="d-flex gap-1">
+            <button class="btn btn-sm btn-outline-secondary" id="cxExportCSV"><i class="bi bi-filetype-csv"></i> CSV</button>
+            <button class="btn btn-sm btn-outline-secondary" id="cxShareSum"><i class="bi bi-share"></i> Compartilhar</button>
           </div>
         </div>
+        <div class="row g-2">
+          <div class="col-6"><label class="form-label">Preço gasolina (R$/L)</label><input type="number" step="0.01" min="0" id="cxPreco" class="form-control" placeholder="5,99"></div>
+          <div class="col-6"><label class="form-label">Consumo (km/L)</label><input type="number" step="0.1" min="0" id="cxKmPorLitro" class="form-control" placeholder="35"></div>
+          <div class="col-6"><label class="form-label">Km rodados</label><input type="number" step="0.1" min="0" id="cxKmFeitos" class="form-control" placeholder="120"></div>
+          <div class="col-6"><label class="form-label">Quanto ganhou (R$)</label><input type="number" step="0.01" min="0" id="cxGanho" class="form-control" placeholder="180,00"></div>
+        </div>
+        <hr class="my-2">
+        <div class="row g-2">
+          <div class="col-6"><div class="small muted">Custo com combustível</div><div class="section-chip mono" id="cxCusto">R$ 0,00</div></div>
+          <div class="col-6"><div class="small muted">Custo por km</div><div class="section-chip mono" id="cxCustoKm">R$ 0,00/km</div></div>
+          <div class="col-6"><div class="small muted">Lucro</div><div class="section-chip mono" id="cxLucro">R$ 0,00</div></div>
+          <div class="col-6"><div class="small muted">Lucro por km</div><div class="section-chip mono" id="cxLucroKm">R$ 0,00/km</div></div>
+          <div class="col-12"><div class="small muted">Margem</div><div class="section-chip mono" id="cxMargem">0%</div></div>
+        </div>
+        <div class="d-grid mt-3"><button class="btn btn-royal" id="cxSalvar"><i class="bi bi-save"></i> Salvar resultado</button></div>
       </div>
-      <div class="modal-footer border-0">
-        <button class="btn btn-soft" data-bs-dismiss="modal">Fechar</button>
+      <div class="card p-3">
+        <div class="d-flex align-items-center justify-content-between">
+          <h6 class="mb-0"><i class="bi bi-clock-history"></i> Histórico</h6>
+          <button class="btn btn-sm btn-outline-danger" id="cxLimpar"><i class="bi bi-trash"></i> Limpar</button>
+        </div>
+        <div id="cxHistorico" class="mt-2"></div>
+        <hr class="my-2">
+        <div class="row g-2">
+          <div class="col-6"><div class="small muted">Total km</div><div class="section-chip mono" id="cxTotKm">0</div></div>
+          <div class="col-6"><div class="small muted">Total ganho</div><div class="section-chip mono" id="cxTotGanho">R$ 0,00</div></div>
+          <div class="col-6"><div class="small muted">Total custo</div><div class="section-chip mono" id="cxTotCusto">R$ 0,00</div></div>
+          <div class="col-6"><div class="small muted">Total lucro</div><div class="section-chip mono" id="cxTotLucro">R$ 0,00</div></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1121,10 +899,11 @@
 
 <div class="modal fade" id="notesModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
-    <div class="modal-content p-2">
+    <div class="modal-content soft-card p-2">
       <div class="modal-header border-0">
-        <h5 class="modal-title">Bloco de notas</h5>
-        <button class="btn-close" data-bs-dismiss="modal"></button>
+        <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal"><i class="bi bi-arrow-left"></i> Voltar</button>
+        <h5 class="modal-title ms-2">Bloco de Notas</h5>
+        <button class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
       <div class="notes-wrap">
         <div class="notes-list" id="notesList"></div>
@@ -1151,90 +930,114 @@
           <div class="notes-content" id="ntContent" contenteditable="true" spellcheck="true" style="flex:1;padding:.8rem"></div>
         </div>
       </div>
-      <div class="modal-footer border-0">
-        <button class="btn btn-soft" data-bs-dismiss="modal">Fechar</button>
-      </div>
     </div>
   </div>
 </div>
 
-<div class="offcanvas offcanvas-bottom" tabindex="-1" id="financasSheet" style="height:92vh">
+<div class="offcanvas offcanvas-bottom" tabindex="-1" id="financasSheet" aria-labelledby="financasSheetLabel" style="height:92vh">
   <div class="offcanvas-header">
-    <h5 class="offcanvas-title"><i class="bi bi-wallet2"></i> Finanças pessoais</h5>
-    <button class="btn-close" data-bs-dismiss="offcanvas"></button>
+    <button class="btn btn-link text-muted me-2" data-bs-dismiss="offcanvas"><i class="bi bi-arrow-left"></i> Voltar</button>
+    <h5 class="offcanvas-title" id="financasSheetLabel"><i class="bi bi-wallet2 me-1"></i> Finanças pessoais</h5>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary" id="finExport"><i class="bi bi-filetype-csv"></i> CSV</button>
+      <button class="btn btn-sm btn-outline-secondary" id="finDicasBtn"><i class="bi bi-lightbulb"></i> Dicas</button>
+      <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="offcanvas"><i class="bi bi-x-lg"></i></button>
+    </div>
   </div>
   <div class="offcanvas-body" style="background:#f7f9fc;overflow:auto">
-    <div class="glass-card section-card">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div>
-          <div class="small text-muted">Mês de referência</div>
-          <input type="month" id="finMes" class="form-control form-control-sm" style="width:160px">
-        </div>
-        <div class="text-end"><div class="small text-muted">Receitas</div><div class="fw-bold" id="finRecSum">R$ 0,00</div></div>
-        <div class="text-end"><div class="small text-muted">Despesas</div><div class="fw-bold" id="finDespSum">R$ 0,00</div></div>
-        <div class="text-end"><div class="small text-muted">Saldo</div><div class="fw-bold" id="finSaldo">R$ 0,00</div></div>
-      </div>
-      <hr>
-      <div class="form-grid">
-        <div><label class="form-label">Meta (valor)</label><input type="number" min="0" step="0.01" id="finMetaValor" class="form-control"></div>
-        <div><label class="form-label">Meta (% do ganho)</label><div class="input-group"><input type="number" min="0" step="1" id="finMetaPct" class="form-control"><span class="input-group-text">%</span></div></div>
-      </div>
-      <div class="mt-2 small text-muted">Alvo: <b id="finMetaAlvo">R$ 0,00</b> · Guardado: <b id="finGuardado">R$ 0,00</b></div>
-      <div class="progress mt-1" style="height:10px"><div id="finMetaProg" class="progress-bar" style="width:0%"></div></div>
-    </div>
-
-    <div class="glass-card section-card mt-2">
-      <h6 class="mb-2">Novo lançamento</h6>
-      <div class="form-grid">
-        <div><label class="form-label">Tipo</label><select id="finTipo" class="form-select"><option value="receita">Receita</option><option value="despesa" selected>Despesa</option><option value="poupanca">Guardar</option></select></div>
-        <div><label class="form-label">Data</label><input type="date" id="finData" class="form-control"></div>
-        <div><label class="form-label">Categoria</label><input type="text" id="finCat" class="form-control"></div>
-        <div><label class="form-label">Valor</label><input type="number" step="0.01" min="0" id="finValor" class="form-control"></div>
-        <div class="full"><label class="form-label">Descrição</label><input type="text" id="finDesc" class="form-control"></div>
-      </div>
-
-      <div class="form-check form-switch mt-2">
-        <input class="form-check-input" type="checkbox" id="finParcSw">
-        <label class="form-check-label" for="finParcSw">Parcelar</label>
-      </div>
-
-      <div id="finParcWrap" style="display:none" class="mt-2">
-        <div class="glass-card section-card p-2">
-          <div class="form-check"><input class="form-check-input" type="radio" name="finParcModo" id="finParcModoValor" value="valor" checked><label class="form-check-label" for="finParcModoValor">Valor da parcela</label></div>
-          <div class="form-check"><input class="form-check-input" type="radio" name="finParcModo" id="finParcModoTotal" value="total"><label class="form-check-label" for="finParcModoTotal">Valor total</label></div>
-          <div class="form-grid mt-2">
-            <div><label class="form-label">Nº parcelas</label><input type="number" id="finParcN" class="form-control" min="2" max="120" value="10"></div>
-            <div><label class="form-label">Início</label><input type="month" id="finParcIni" class="form-control"></div>
+    <div class="container">
+      <section class="soft-card p-3 mb-3">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div>
+            <div class="title-muted mb-1">Mês de referência</div>
+            <input type="month" id="finMes" class="form-control form-control-sm" style="width:160px">
           </div>
-          <div class="small text-muted mt-2" id="finParcPreview">—</div>
+          <div class="text-end"><div class="small muted">Receitas</div><div class="fw-bold mono" id="finRecSum">R$ 0,00</div></div>
+          <div class="text-end"><div class="small muted">Despesas</div><div class="fw-bold mono" id="finDespSum">R$ 0,00</div></div>
+          <div class="text-end"><div class="small muted">Saldo</div><div class="fw-bold mono" id="finSaldo">R$ 0,00</div></div>
         </div>
-      </div>
-
-      <div class="d-grid mt-3"><button class="btn btn-royal" id="finAdd">Salvar lançamento</button></div>
-    </div>
-
-    <div class="glass-card section-card mt-2">
-      <div class="d-flex justify-content-between align-items-center">
-        <h6 class="mb-2">Lançamentos do mês</h6>
-        <button class="btn btn-sm btn-outline-danger" id="finClearMes">Limpar mês</button>
-      </div>
-      <div id="finLista"></div>
-    </div>
-
-    <div class="glass-card section-card mt-2">
-      <h6 class="mb-2">Onde você gasta mais</h6>
-      <div id="finTopCats" class="small"></div>
+        <hr class="my-3">
+        <div class="row g-2 align-items-end">
+          <div class="col-6"><label class="form-label mb-1">Meta (valor)</label><input type="number" min="0" step="0.01" id="finMetaValor" class="form-control" placeholder="500,00"></div>
+          <div class="col-6"><label class="form-label mb-1">Meta (% do ganho)</label><div class="input-group"><input type="number" min="0" step="1" id="finMetaPct" class="form-control" placeholder="10"><span class="input-group-text">%</span></div></div>
+          <div class="col-12">
+            <div class="small text-muted">Alvo do mês: <b id="finMetaAlvo">R$ 0,00</b> · Guardado: <b id="finGuardado">R$ 0,00</b></div>
+            <div class="progress mt-1" style="height:10px"><div id="finMetaProg" class="progress-bar" style="width:0%"></div></div>
+          </div>
+        </div>
+      </section>
+      <section class="soft-card p-3 mb-3">
+        <h6 class="mb-2">Novo lançamento</h6>
+        <div class="row g-2">
+          <div class="col-6"><label class="form-label mb-1">Tipo</label><select id="finTipo" class="form-select"><option value="receita">Receita</option><option value="despesa" selected>Despesa</option><option value="poupanca">Guardar (poupança)</option></select></div>
+          <div class="col-6"><label class="form-label mb-1">Data</label><input type="date" id="finData" class="form-control"></div>
+          <div class="col-7"><label class="form-label mb-1">Categoria</label><input type="text" id="finCat" class="form-control" placeholder="Combustível, Alimentação..."></div>
+          <div class="col-5"><label class="form-label mb-1">Valor</label><input type="number" step="0.01" min="0" id="finValor" class="form-control" placeholder="0,00"></div>
+          <div class="col-12"><label class="form-label mb-1">Descrição (opcional)</label><input type="text" id="finDesc" class="form-control" placeholder="Observações"></div>
+          <div class="col-12"><div class="form-check form-switch mt-2"><input class="form-check-input" type="checkbox" id="finParcSw"><label class="form-check-label" for="finParcSw">Parcelar</label></div></div>
+          <div class="col-12" id="finParcWrap" style="display:none">
+            <div class="soft-card p-2">
+              <div class="row g-2">
+                <div class="col-12">
+                  <label class="form-label mb-1">Modo do parcelamento</label>
+                  <div class="d-grid gap-2">
+                    <div class="form-check"><input class="form-check-input" type="radio" name="finParcModo" id="finParcModoValor" value="valor" checked><label class="form-check-label" for="finParcModoValor">Informar <b>valor da parcela</b> e repetir por N meses</label></div>
+                    <div class="form-check"><input class="form-check-input" type="radio" name="finParcModo" id="finParcModoTotal" value="total"><label class="form-check-label" for="finParcModoTotal">Informar <b>valor total</b> e dividir em N parcelas iguais</label></div>
+                  </div>
+                </div>
+                <div class="col-4"><label class="form-label mb-1">Nº parcelas</label><input type="number" id="finParcN" class="form-control" min="2" max="120" value="10"></div>
+                <div class="col-8"><label class="form-label mb-1">Início</label><input type="month" id="finParcIni" class="form-control"></div>
+                <div class="col-12"><div class="small text-muted" id="finParcPreview">—</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 d-grid mt-2"><button class="btn btn-royal" id="finAdd"><i class="bi bi-plus-circle"></i> Salvar lançamento</button></div>
+        </div>
+      </section>
+      <section class="soft-card p-3 mb-3">
+        <div class="d-flex align-items-center justify-content-between">
+          <h6 class="mb-2">Lançamentos do mês</h6>
+          <button class="btn btn-sm btn-outline-danger" id="finClearMes"><i class="bi bi-trash"></i> Limpar mês</button>
+        </div>
+        <div id="finLista"></div>
+      </section>
+      <section class="soft-card p-3">
+        <h6 class="mb-2">Onde você gasta mais</h6>
+        <div id="finTopCats" class="small"></div>
+      </section>
     </div>
   </div>
 </div>
 
-<div class="position-fixed bottom-0 end-0 p-3 no-print" style="z-index:1080;">
+<div class="modal fade" id="finDicasModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-narrow">
+    <div class="modal-content soft-card p-2">
+      <div class="modal-header border-0">
+        <h6 class="m-0"><i class="bi bi-lightbulb me-1"></i> Dicas de economia</h6>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <ul class="m-0 ps-3">
+          <li>Cancele o que quase não usa.</li>
+          <li>Calibre pneus e economize combustível.</li>
+          <li>Separe automaticamente um valor por mês.</li>
+          <li>Use a regra das 24h antes de comprar.</li>
+          <li>Renegocie serviços e planos antigos.</li>
+        </ul>
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-royal" data-bs-dismiss="modal">Ok</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:1080;">
   <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false" data-unread-endpoint="/avisos/unread_count">
     <div class="toast-header">
       <i class="bi bi-megaphone-fill me-2"></i>
       <strong class="me-auto">Novos avisos</strong>
-      <small>agora</small>
-      <button class="btn-close ms-2 mb-1" data-bs-dismiss="toast"></button>
+      <button class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
     </div>
     <div class="toast-body">
       Você tem <span id="toastCount">{{ unread }}</span> aviso(s) não lido(s).
@@ -1248,80 +1051,60 @@
 </audio>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
 const COOPS_FINAL = {{ cooperados_json | default([]) | tojson }};
 const MY_ESCALA   = {{ minha_escala_json | default([]) | tojson }};
 </script>
-
 <script>
-document.addEventListener('DOMContentLoaded', function(){
-  const drawer = document.getElementById('menuLateral');
-  const backdrop = document.getElementById('drawerBackdrop');
-  const openBtn = document.getElementById('abrirMenu');
-  const closeBtn = document.getElementById('fecharMenu');
-
-  function openDrawer(){ drawer.classList.add('open'); backdrop.classList.add('open'); document.body.style.overflow='hidden'; }
-  function closeDrawer(){ drawer.classList.remove('open'); backdrop.classList.remove('open'); document.body.style.overflow=''; }
-
-  openBtn?.addEventListener('click', openDrawer);
-  closeBtn?.addEventListener('click', closeDrawer);
-  backdrop?.addEventListener('click', closeDrawer);
-
-  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeDrawer(); });
-
-  const tabs = Array.from(document.querySelectorAll('.tab-btn'));
-  const panes = Array.from(document.querySelectorAll('.tab-pane-custom'));
-  const storageKey = 'coopex_coop_active_tab';
-
-  function activateTab(name){
-    tabs.forEach(btn => btn.classList.toggle('is-active', btn.dataset.tab === name));
-    panes.forEach(p => p.classList.toggle('is-active', p.id === `tab-${name}`));
-    try{ localStorage.setItem(storageKey, name); }catch(_){}
-  }
-
-  tabs.forEach(btn => {
-    btn.addEventListener('click', () => activateTab(btn.dataset.tab));
-  });
-
-  const urlParams = new URLSearchParams(window.location.search);
-  const fromUrl = urlParams.get('tab');
-  let saved = null;
-  try{ saved = localStorage.getItem(storageKey); }catch(_){}
-  activateTab(fromUrl || saved || 'resumo');
-
-  const di = document.getElementById('dataInicioInput');
-  const df = document.getElementById('dataFimInput');
-  if (di && df && !di.value && !df.value){
-    const now = new Date();
-    const day = now.getDay();
-    const mondayOffset = day === 0 ? -6 : 1 - day;
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + mondayOffset);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    const iso = d => d.toISOString().slice(0,10);
-    di.value = iso(monday);
-    df.value = iso(sunday);
-  }
-});
+(function(){
+  const drawer=document.getElementById('menuLateral');
+  const backdrop=document.getElementById('fundoMenu');
+  const openBtn=document.getElementById('abrirMenu');
+  const closeBtn=document.getElementById('fecharMenu');
+  function openMenu(){ drawer?.classList.add('aberto'); backdrop?.classList.add('aberto'); }
+  function closeMenu(){ drawer?.classList.remove('aberto'); backdrop?.classList.remove('aberto'); }
+  openBtn?.addEventListener('click', openMenu);
+  closeBtn?.addEventListener('click', closeMenu);
+  backdrop?.addEventListener('click', closeMenu);
+})();
 </script>
-
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-  const toastEl = document.getElementById("toastAvisos");
-  const audio = document.getElementById("avisoSound");
+(function(){
+  const buttons=[...document.querySelectorAll('.tab-btn')];
+  const panes=[...document.querySelectorAll('.tab-pane-custom')];
+  const activeInput=document.getElementById('activeTabInput');
+  const params=new URLSearchParams(window.location.search);
+  const valid=['resumo','producoes','ajustes','escalas','trocas'];
+  let current=params.get('active_tab') || localStorage.getItem('coopex_active_tab') || (activeInput?.value || 'resumo');
+  if (!valid.includes(current)) current='resumo';
+
+  function showTab(name, updateHistory=true){
+    buttons.forEach(btn=>btn.classList.toggle('active', btn.dataset.tab===name));
+    panes.forEach(p=>p.classList.toggle('active', p.id===`tab-${name}`));
+    if (activeInput) activeInput.value=name;
+    localStorage.setItem('coopex_active_tab', name);
+    if (updateHistory){
+      const url=new URL(window.location.href);
+      url.searchParams.set('active_tab', name);
+      window.history.replaceState({}, '', url.toString());
+    }
+  }
+
+  buttons.forEach(btn=>btn.addEventListener('click', ()=>showTab(btn.dataset.tab)));
+  showTab(current, false);
+})();
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const toastEl = document.getElementById('toastAvisos');
+  const audio = document.getElementById('avisoSound');
   const unreadCount = parseInt({{ unread|tojson }});
   if (!toastEl || !audio) return;
-  audio.muted = false; audio.volume = 1.0;
   const toast = new bootstrap.Toast(toastEl, { autohide:false });
-
   function renderCount(c){ const el = document.getElementById('toastCount'); if (el) el.textContent = String(c); }
   function ensureToast(c){ renderCount(c); if (c>0) toast.show(); else toast.hide(); }
-
   ensureToast(unreadCount);
   if (unreadCount>0){ audio.currentTime=0; audio.play().catch(()=>{}); }
-
   const endpoint = toastEl.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
   let prev = unreadCount;
   async function checkUnread(){
@@ -1338,7 +1121,6 @@ document.addEventListener("DOMContentLoaded", function () {
   setInterval(checkUnread, 8000);
 });
 </script>
-
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const coopListEl = document.getElementById('coopList');
@@ -1350,7 +1132,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const trocaModalEl = document.getElementById('trocaModal');
 
   function renderCoops(filter=''){
-    if (!coopListEl) return;
     const q = (filter||'').trim().toLowerCase();
     coopListEl.innerHTML='';
     const base = Array.isArray(COOPS_FINAL)?COOPS_FINAL:[];
@@ -1358,59 +1139,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const filtered = base.filter(c=>!q || String(c.nome||'').toLowerCase().includes(q)).slice(0,200);
     if (!filtered.length){ coopListEl.innerHTML='<li class="list-group-item text-muted">Nenhum resultado.</li>'; return; }
     filtered.forEach(c=>{
-      const li=document.createElement('li');
-      li.className='list-group-item d-flex align-items-center gap-2';
-      li.style.cursor='pointer';
-      li.innerHTML = `
-        <img src="${c.foto_url || '{{ url_for("static", filename="img/default.png") }}'}" alt="" style="width:30px;height:30px;border-radius:50%;object-fit:cover;border:1px solid #0001">
-        <div class="flex-fill" style="min-width:0"><div class="fw-semibold" style="word-break:break-word">${c.nome||'—'}</div></div>
-        <button type="button" class="btn btn-sm btn-outline-primary">Selecionar</button>`;
-      li.querySelector('button').addEventListener('click', ()=>{
+      const li=document.createElement('li'); li.className='list-group-item d-flex align-items-center'; li.style.cursor='pointer';
+      const avatar=document.createElement('img'); avatar.src=c.foto_url || '{{ url_for("static", filename="img/default.png") }}';
+      avatar.alt=''; Object.assign(avatar.style,{width:'28px',height:'28px',objectFit:'cover',borderRadius:'50%',border:'1px solid #0001',marginRight:'.5rem'});
+      const name=document.createElement('div'); name.className='flex-fill'; name.innerHTML=`<div class="fw-semibold" style="word-break:break-word;overflow-wrap:anywhere">${c.nome||'—'}</div>`;
+      const choose=document.createElement('button'); choose.type='button'; choose.className='btn btn-sm btn-outline-primary'; choose.textContent='Selecionar';
+      choose.addEventListener('click', ()=>{
         const esc = fromEscalaDescEl.textContent||'';
         if (confirm(`Deseja solicitar a troca:\n\n${esc}\n\ncom "${c.nome}"?`)){
-          toCooperadoIdEl.value=c.id;
-          btnEnviarTroca.disabled=false;
-          [...coopListEl.querySelectorAll('.list-group-item')].forEach(x=>x.classList.remove('active'));
-          li.classList.add('active');
+          toCooperadoIdEl.value=c.id; btnEnviarTroca.disabled=false;
+          [...coopListEl.querySelectorAll('.list-group-item')].forEach(x=>x.classList.remove('active')); li.classList.add('active');
         }
       });
-      coopListEl.appendChild(li);
+      li.append(avatar,name,choose); coopListEl.appendChild(li);
     });
   }
 
   coopSearchEl?.addEventListener('input', ()=> renderCoops(coopSearchEl.value));
-
   trocaModalEl?.addEventListener('show.bs.modal', (ev)=>{
-    const btn=ev.relatedTarget;
-    const escalaId=btn?.getAttribute('data-escala-id')||'';
-    const escalaDesc=btn?.getAttribute('data-escala-desc')||'';
-    fromEscalaIdEl.value=escalaId;
-    fromEscalaDescEl.textContent=escalaDesc;
-    toCooperadoIdEl.value='';
-    btnEnviarTroca.disabled=true;
-    if (coopSearchEl) coopSearchEl.value='';
-    renderCoops('');
+    const btn=ev.relatedTarget; const escalaId=btn?.getAttribute('data-escala-id')||''; const escalaDesc=btn?.getAttribute('data-escala-desc')||'';
+    fromEscalaIdEl.value=escalaId; fromEscalaDescEl.textContent=escalaDesc; toCooperadoIdEl.value=''; btnEnviarTroca.disabled=true;
+    coopSearchEl.value=''; renderCoops('');
   });
 
   document.getElementById('trocaForm')?.addEventListener('submit', (e)=>{
-    if (!fromEscalaIdEl.value || !toCooperadoIdEl.value){
-      e.preventDefault();
-      alert('Selecione um cooperado.');
-    }
+    if (!fromEscalaIdEl.value || !toCooperadoIdEl.value){ e.preventDefault(); alert('Selecione um cooperado.'); }
   });
 });
 </script>
-
 <script>
 function stripDiacritics(str){ let s=String(str||''); if (typeof s.normalize==='function') s=s.normalize('NFD'); return s.replace(/[\u0300-\u036f]/g,''); }
 function turnoBucket(turno,horario){
   const t=stripDiacritics(String(turno||"").toLowerCase());
-  if (t.includes("noite")||t.includes("noturn")) return "noite";
-  if (t.includes("dia")||t.includes("diurn")||t.includes("manha")||t.includes("tarde")) return "dia";
-  const m=String(horario||"").match(/(\d{1,2}):(\d{2})/); if (m){ const h=parseInt(m[1],10); if (h>=17||h<=6) return "noite"; return "dia"; }
-  return "dia";
+  if (t.includes('noite')||t.includes('noturn')) return 'noite';
+  if (t.includes('dia')||t.includes('diurn')||t.includes('manha')||t.includes('tarde')) return 'dia';
+  const m=String(horario||'').match(/(\d{1,2}):(\d{2})/); if (m){ const h=parseInt(m[1],10); return (h>=17||h<=6)?'noite':'dia'; }
+  return 'dia';
 }
-
 document.addEventListener('DOMContentLoaded', ()=>{
   const aceitarModalEl=document.getElementById('aceitarTrocaModal');
   const origemTrocaDescEl=document.getElementById('origemTrocaDesc');
@@ -1418,47 +1183,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
   const destinoEscalaIdEl=document.getElementById('destinoEscalaId');
   const btnConfirmarAceite=document.getElementById('btnConfirmarAceite');
   const aceitarForm=document.getElementById('aceitarTrocaForm');
-
   aceitarModalEl?.addEventListener('show.bs.modal', (ev)=>{
     const btn=ev.relatedTarget;
     const trocaId=btn?.getAttribute('data-troca-id');
     const origemDesc=btn?.getAttribute('data-origem-desc')||'—';
     const origemWeekday=parseInt(btn?.getAttribute('data-origem-weekday'));
     const origemBucket=btn?.getAttribute('data-origem-bucket');
-
     origemTrocaDescEl.textContent=origemDesc;
     aceitarForm.action=`/trocas/${trocaId}/aceitar`;
-    destinoEscalaIdEl.value='';
-    btnConfirmarAceite.disabled=true;
-
+    destinoEscalaIdEl.value=''; btnConfirmarAceite.disabled=true;
     const base=Array.isArray(MY_ESCALA)?MY_ESCALA:[];
     const compativeis=base.filter(e=>{ const bucket=e.turno_bucket||turnoBucket(e.turno,e.horario); return e.weekday===origemWeekday && bucket===origemBucket; });
     minhaEscalaCompatListEl.innerHTML='';
     if (!compativeis.length){ minhaEscalaCompatListEl.innerHTML='<li class="list-group-item text-muted">Você não tem plantões compatíveis.</li>'; return; }
-
     compativeis.forEach(e=>{
       const li=document.createElement('li'); li.className='list-group-item d-flex align-items-center justify-content-between';
-      li.innerHTML=`<div class="me-2" style="word-break:break-word">${e.data} • ${e.turno||''} • ${e.horario||''} • ${e.contrato||''}</div>
-                    <button type="button" class="btn btn-sm btn-outline-primary">Selecionar</button>`;
-      li.querySelector('button').addEventListener('click', ()=>{
-        destinoEscalaIdEl.value=e.id;
-        btnConfirmarAceite.disabled=false;
-        [...minhaEscalaCompatListEl.querySelectorAll('.list-group-item')].forEach(x=>x.classList.remove('active'));
-        li.classList.add('active');
-      });
+      li.innerHTML=`<div class="me-2" style="word-break:break-word;overflow-wrap:anywhere"><div class="fw-semibold">${e.data} • ${e.turno||''} • ${e.horario||''} • ${e.contrato||''}</div></div><button type="button" class="btn btn-sm btn-outline-primary">Selecionar</button>`;
+      li.querySelector('button').addEventListener('click', ()=>{ destinoEscalaIdEl.value=e.id; btnConfirmarAceite.disabled=false; [...minhaEscalaCompatListEl.querySelectorAll('.list-group-item')].forEach(x=>x.classList.remove('active')); li.classList.add('active'); });
       minhaEscalaCompatListEl.appendChild(li);
     });
   });
-
-  aceitarForm?.addEventListener('submit', (e)=>{
-    if (!destinoEscalaIdEl.value){
-      e.preventDefault();
-      alert('Escolha um plantão compatível.');
-    }
-  });
+  aceitarForm?.addEventListener('submit', (e)=>{ if (!destinoEscalaIdEl.value){ e.preventDefault(); alert('Escolha um plantão compatível.'); } });
 });
 </script>
-
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.avaliar-form').forEach(form => {
@@ -1474,35 +1221,31 @@ document.addEventListener('DOMContentLoaded', () => {
       pont_legacy: form.querySelector('input[name="av_pontualidade"]'),
     };
     const submitBtn = form.querySelector('button[type="submit"]');
-
-    function renderGroup(group,value){ if (!group) return; group.querySelectorAll('.star-btn i').forEach((icon,idx)=>{ icon.className='bi '+(idx<value?'bi-star-fill':'bi-star'); }); }
+    function renderGroup(group,value){ if (!group) return; group.querySelectorAll('.star-btn i').forEach((icon,idx)=>{ icon.className='bi '+(idx<value?'bi-star-fill text-warning':'bi-star text-secondary'); }); }
     function getVal(input){ const n=Number(input && input.value || 0); return Number.isFinite(n)? Math.max(0,Math.min(5,n)) : 0; }
     function mirrorLegacy(){ if (hidden.amb_legacy) hidden.amb_legacy.value=hidden.amb?.value||''; if (hidden.trat_legacy) hidden.trat_legacy.value=hidden.trat?.value||''; if (hidden.sup_legacy) hidden.sup_legacy.value=hidden.sup?.value||''; if (hidden.pont_legacy) hidden.pont_legacy.value=''; }
     function updateDerived(){
       const a=getVal(hidden.amb), t=getVal(hidden.trat), s=getVal(hidden.sup);
-      const ready=a>0 && t>0 && s>0;
-      const media= ready? (a+t+s)/3 : 0, mediaRounded10=Math.round(media*10)/10;
+      const ready=a>0 && t>0 && s>0; const media= ready? (a+t+s)/3 : 0, mediaRounded10=Math.round(media*10)/10;
       if (ready){ hidden.geral.value=String(mediaRounded10); hidden.nota.value=String(mediaRounded10); } else { hidden.geral.value=''; hidden.nota.value=''; }
       mirrorLegacy(); if (submitBtn) submitBtn.disabled=!ready;
     }
-
     form.querySelectorAll('.rating-stars.selectable.stars-group').forEach(group=>{
       group.querySelectorAll('.star-btn').forEach(btn=>{
         const val=Number(btn.dataset.value||0);
         const commit=()=>{ group.dataset.value=String(val); const field=group.dataset.field; const hiddenInput=form.querySelector(`input[name="${field}"]`); if (hiddenInput) hiddenInput.value=String(val); renderGroup(group,val); updateDerived(); };
-        btn.addEventListener('click',commit);
+        btn.addEventListener('click',commit); btn.addEventListener('mouseenter',()=>renderGroup(group,val));
       });
+      group.addEventListener('mouseleave',()=>{ const cur=Number(group.dataset.value||0); renderGroup(group,cur); });
       const currentVal= Number(group.dataset.value||0) || Number((form.querySelector(`input[name="${group.dataset.field}"]`)||{}).value||0);
       if (currentVal>0) group.dataset.value=String(currentVal);
       renderGroup(group,currentVal);
     });
-
     updateDerived();
     form.addEventListener('submit', (e)=>{ const a=getVal(hidden.amb), t=getVal(hidden.trat), s=getVal(hidden.sup); if (!(a>0 && t>0 && s>0)){ e.preventDefault(); alert('Selecione notas para Ambiente, Tratamento e Suporte.'); } });
   });
 });
 </script>
-
 <script>
 (function(){
   const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
@@ -1511,139 +1254,36 @@ document.addEventListener('DOMContentLoaded', () => {
   const monthFmt = (d)=> d.toISOString().slice(0,7);
   const money = n => 'R$ ' + (Number(n)||0).toFixed(2).replace('.',',');
   const parseNum = v => { const n=parseFloat(String(v).replace(',', '.')); return Number.isFinite(n)?n:0; };
-
-  const mesEl = el('finMes');
-  const recSumEl = el('finRecSum'), despSumEl = el('finDespSum'), saldoEl = el('finSaldo');
+  const mesEl = el('finMes'), recSumEl = el('finRecSum'), despSumEl = el('finDespSum'), saldoEl = el('finSaldo');
   const metaValorEl = el('finMetaValor'), metaPctEl = el('finMetaPct'), metaAlvoEl = el('finMetaAlvo'), guardadoEl = el('finGuardado'), metaProgEl = el('finMetaProg');
   const tipoEl = el('finTipo'), dataEl = el('finData'), catEl = el('finCat'), valEl = el('finValor'), descEl = el('finDesc');
   const parcSw = el('finParcSw'), parcWrap = el('finParcWrap'), parcIniEl = el('finParcIni'), parcNEl = el('finParcN'), parcPrevEl = el('finParcPreview');
   const btnAdd = el('finAdd'), listaEl = el('finLista'), topCatsEl = el('finTopCats');
-  const btnClearMes = el('finClearMes');
-
-  let items = load();
-  let currentMonth = (()=>{ const today = new Date(); return monthFmt(today); })();
-
+  const btnClearMes = el('finClearMes'), btnExport = el('finExport'), btnDicas = el('finDicasBtn');
+  let items = load(); let currentMonth = monthFmt(new Date());
   function load(){ try{ const raw=localStorage.getItem(LS_KEY); const arr=raw?JSON.parse(raw):[]; return Array.isArray(arr)?arr:[]; }catch(_){ return []; } }
   function save(){ localStorage.setItem(LS_KEY, JSON.stringify(items)); }
-
   function nextMonth(ym, plus=1){ const [y,m]=ym.split('-').map(x=>parseInt(x,10)); const dt=new Date(y, m-1+plus, 1); return dt.toISOString().slice(0,7); }
   function endOfMonth(ym){ const [y,m]=ym.split('-').map(x=>parseInt(x,10)); return new Date(y, m, 0).getDate(); }
   function toDateStr(ym, day=1){ const [y,m]=ym.split('-').map(x=>parseInt(x,10)); const d=Math.min(day, endOfMonth(ym)); return new Date(y, m-1, d).toISOString().slice(0,10); }
   function uid(){ return Math.random().toString(36).slice(2)+Date.now().toString(36); }
-
-  if (mesEl) mesEl.value=currentMonth;
-  if (dataEl) dataEl.value=new Date().toISOString().slice(0,10);
-  if (parcIniEl) parcIniEl.value=currentMonth;
-
-  function renderParcPreview(){
-    const n=Math.max(2, parseInt(parcNEl.value||'10',10));
-    const modo=document.querySelector('input[name="finParcModo"]:checked')?.value || 'valor';
-    const baseVal=parseNum(valEl.value); const start=parcIniEl.value || currentMonth;
-    if (modo==='valor') parcPrevEl.textContent=`Serão ${n} parcelas de ${money(baseVal)} de ${start} até ${nextMonth(start, n-1)}.`;
-    else parcPrevEl.textContent=`Valor total ${money(baseVal)} dividido em ${n} parcelas iguais.`;
-  }
+  mesEl.value=currentMonth; dataEl.value=new Date().toISOString().slice(0,10); parcIniEl.value=currentMonth;
+  function renderParcPreview(){ const n=Math.max(2, parseInt(parcNEl.value||'10',10)); const modo=document.querySelector('input[name="finParcModo"]:checked')?.value || 'valor'; const baseVal=parseNum(valEl.value); const start=parcIniEl.value || currentMonth; if (modo==='valor') parcPrevEl.textContent=`Serão ${n} parcelas de ${money(baseVal)} de ${start} até ${nextMonth(start, n-1)}.`; else parcPrevEl.textContent=`Valor total ${money(baseVal)} dividido em ${n} parcelas iguais — primeira em ${start}, última em ${nextMonth(start, n-1)}.`; }
   parcSw?.addEventListener('change', ()=>{ parcWrap.style.display=parcSw.checked? '' : 'none'; renderParcPreview(); });
-  ['input','change'].forEach(ev=>{
-    parcNEl?.addEventListener(ev, renderParcPreview);
-    parcIniEl?.addEventListener(ev, renderParcPreview);
-    valEl?.addEventListener(ev, renderParcPreview);
-    document.querySelectorAll('input[name="finParcModo"]').forEach(r=> r.addEventListener(ev, renderParcPreview));
-  });
-
+  ['input','change'].forEach(ev=>{ parcNEl?.addEventListener(ev, renderParcPreview); parcIniEl?.addEventListener(ev, renderParcPreview); valEl?.addEventListener(ev, renderParcPreview); document.querySelectorAll('input[name="finParcModo"]').forEach(r=> r.addEventListener(ev, renderParcPreview)); });
   function addItem(obj){ items.push(obj); save(); refresh(); }
   function removeItem(id){ items=items.filter(x=>x.id!==id); save(); refresh(); }
-
-  btnAdd?.addEventListener('click', ()=>{
-    const tipo=String(tipoEl.value||'despesa');
-    const data=String(dataEl.value||new Date().toISOString().slice(0,10));
-    const cat=(catEl.value||'Geral').trim();
-    const val=parseNum(valEl.value);
-    const desc=(descEl.value||'').trim();
-    if (!val || val<=0){ alert('Informe um valor válido.'); return; }
-
-    if (!parcSw.checked){
-      addItem({id:uid(), tipo, data, cat, val, desc, origem:'manual'}); clearForm(); return;
-    }
-
-    const n=Math.max(2, parseInt(parcNEl.value||'10',10));
-    const modo=document.querySelector('input[name="finParcModo"]:checked')?.value || 'valor';
-    const startMonth=parcIniEl.value || currentMonth;
-    const day=parseInt(data.slice(-2),10) || 1;
-
-    if (modo==='valor'){
-      const parcela=val;
-      for (let i=0;i<n;i++){ const ym=nextMonth(startMonth,i);
-        addItem({id:uid(), tipo, data:toDateStr(ym,day), cat, val:parcela, desc:`${desc} (parc ${i+1}/${n})`, origem:'parc_valor'}); }
-    } else {
-      const total=val; const base=Math.floor((total/n)*100)/100; const resto=+(total - base*n).toFixed(2);
-      for (let i=0;i<n;i++){ const ym=nextMonth(startMonth,i); const parcVal=+(base + (i===n-1? resto:0)).toFixed(2);
-        addItem({id:uid(), tipo, data:toDateStr(ym,day), cat, val:parcVal, desc:`${desc} (parc ${i+1}/${n})`, origem:'parc_total'}); }
-    }
-    clearForm();
-  });
-
+  btnAdd?.addEventListener('click', ()=>{ const tipo=String(tipoEl.value||'despesa'); const data=String(dataEl.value||new Date().toISOString().slice(0,10)); const cat=(catEl.value||'Geral').trim(); const val=parseNum(valEl.value); const desc=(descEl.value||'').trim(); if (!val || val<=0){ alert('Informe um valor válido.'); return; } if (!parcSw.checked){ addItem({id:uid(), tipo, data, cat, val, desc, origem:'manual'}); clearForm(); return; } const n=Math.max(2, parseInt(parcNEl.value||'10',10)); const modo=document.querySelector('input[name="finParcModo"]:checked')?.value || 'valor'; const startMonth=parcIniEl.value || currentMonth; const day=parseInt(data.slice(-2),10) || 1; if (modo==='valor'){ const parcela=val; for (let i=0;i<n;i++){ const ym=nextMonth(startMonth,i); addItem({id:uid(), tipo, data:toDateStr(ym,day), cat, val:parcela, desc:`${desc} (parc ${i+1}/${n})`, origem:'parc_valor'}); } } else { const total=val; const base=Math.floor((total/n)*100)/100; const resto=+(total - base*n).toFixed(2); for (let i=0;i<n;i++){ const ym=nextMonth(startMonth,i); const parcVal=+(base + (i===n-1? resto:0)).toFixed(2); addItem({id:uid(), tipo, data:toDateStr(ym,day), cat, val:parcVal, desc:`${desc} (parc ${i+1}/${n})`, origem:'parc_total'}); } } clearForm(); });
   function clearForm(){ valEl.value=''; descEl.value=''; parcSw.checked=false; parcWrap.style.display='none'; renderParcPreview(); }
   mesEl?.addEventListener('change', ()=>{ currentMonth=mesEl.value || currentMonth; refresh(); });
-
-  btnClearMes?.addEventListener('click', ()=>{
-    if (!confirm('Remover todos os lançamentos deste mês?')) return;
-    const prefix=currentMonth+'-'; items=items.filter(x=> !String(x.data||'').startsWith(prefix)); save(); refresh();
-  });
-
-  function refresh(){
-    const prefix=currentMonth+'-';
-    const mesItems=items.filter(x=> String(x.data||'').startsWith(prefix)).sort((a,b)=> a.data.localeCompare(b.data));
-    const sum=(arr,pred)=> arr.filter(pred).reduce((s,x)=> s + Number(x.val||0), 0);
-    const rec=sum(mesItems,x=>x.tipo==='receita'); const desp=sum(mesItems,x=>x.tipo==='despesa'); const guardado=sum(mesItems,x=>x.tipo==='poupanca'); const saldo=rec - desp - guardado;
-    if(recSumEl) recSumEl.textContent=money(rec); if(despSumEl) despSumEl.textContent=money(desp); if(saldoEl) saldoEl.textContent=money(saldo);
-
-    const alvoByValor=parseNum(metaValorEl.value); const pct=Math.max(0, parseNum(metaPctEl.value)); const alvoByPct=rec*(pct/100); const alvo=Math.max(alvoByValor, alvoByPct);
-    if(metaAlvoEl) metaAlvoEl.textContent=money(alvo); if(guardadoEl) guardadoEl.textContent=money(guardado);
-    const prog=alvo>0 ? Math.min(100, Math.round((guardado/alvo)*100)) : 0;
-    if(metaProgEl){ metaProgEl.style.width=prog+'%'; metaProgEl.setAttribute('aria-valuenow', prog); }
-
-    renderList(mesItems);
-
-    const byCat={}; mesItems.filter(x=>x.tipo==='despesa').forEach(x=>{ const c=(x.cat||'Geral').trim()||'Geral'; byCat[c]=(byCat[c]||0)+Number(x.val||0); });
-    const totalDesp=Object.values(byCat).reduce((a,b)=>a+b,0);
-    const top=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,6);
-    if (!topCatsEl) return;
-    if (!top.length){ topCatsEl.innerHTML='<div class="text-muted">Sem despesas neste mês.</div>'; }
-    else {
-      topCatsEl.innerHTML=top.map(([c,v])=>{ const p=totalDesp>0? Math.round((v/totalDesp)*100):0;
-        return `<div class="mb-1"><div class="d-flex justify-content-between"><div>${c}</div><div>${money(v)} · ${p}%</div></div><div class="progress" style="height:8px"><div class="progress-bar" style="width:${p}%"></div></div></div>`;
-      }).join('');
-    }
-  }
-
-  function renderList(arr){
-    if (!listaEl) return;
-    if (!arr.length){ listaEl.innerHTML='<div class="text-muted">Sem lançamentos neste mês.</div>'; return; }
-    const groups={}; arr.forEach(x=>{ const d=x.data; (groups[d] ||= []).push(x); });
-    const days=Object.keys(groups).sort(); listaEl.innerHTML='';
-    days.forEach(d=>{
-      const items=groups[d];
-      const sumDia=items.reduce((s,x)=> s + (x.tipo==='receita'? x.val : x.tipo==='despesa'? -x.val : -x.val), 0);
-      const dayCard=document.createElement('div'); dayCard.className='border rounded p-2 mb-2';
-      dayCard.innerHTML=`<div class="d-flex justify-content-between align-items-center mb-1"><div class="fw-semibold">${d.split('-').reverse().join('/')}</div><div class="${sumDia>=0?'text-success':'text-danger'}">${money(sumDia)}</div></div><div></div>`;
-      const body=dayCard.children[1];
-      items.forEach(it=>{
-        const cls= it.tipo==='receita' ? 'text-success' : (it.tipo==='despesa' ? 'text-danger' : 'text-primary');
-        const sinal=it.tipo==='receita'? '+' : '−'; const chip= it.tipo==='poupanca' ? '<span class="badge text-bg-primary ms-2">Poupança</span>' : '';
-        const row=document.createElement('div'); row.className='d-flex align-items-center justify-content-between py-1 border-bottom gap-2';
-        row.innerHTML=`<div class="me-2" style="min-width:0"><div class="fw-semibold" style="word-break:break-word">${(it.cat||'Geral')} ${chip}</div><div class="small text-muted" style="word-break:break-word">${(it.desc||'')}</div></div>
-        <div class="text-end"><div class="${cls}">${sinal} ${money(it.val)}</div><button class="btn btn-sm btn-outline-danger mt-1"><i class="bi bi-trash"></i></button></div>`;
-        row.querySelector('button').addEventListener('click', ()=> removeItem(it.id));
-        body.appendChild(row);
-      });
-      listaEl.appendChild(dayCard);
-    });
-  }
-  [metaValorEl, metaPctEl].forEach(inp => inp?.addEventListener('input', refresh));
-  refresh();
+  btnClearMes?.addEventListener('click', ()=>{ if (!confirm('Remover todos os lançamentos deste mês?')) return; const prefix=currentMonth+'-'; items=items.filter(x=> !String(x.data||'').startsWith(prefix)); save(); refresh(); });
+  btnExport?.addEventListener('click', ()=>{ const header=['id','tipo','data','categoria','valor','descricao','origem']; const rows=items.map(x=>[x.id,x.tipo,x.data,(x.cat||''),(Number(x.val)||0).toFixed(2).replace('.',','),(x.desc||'').replace(/[\r\n]+/g,' '),x.origem||'']); const csv=[header.join(';'),...rows.map(r=>r.join(';'))].join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='financas_coopex.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); });
+  btnDicas?.addEventListener('click', ()=> new bootstrap.Modal(document.getElementById('finDicasModal')).show());
+  function refresh(){ const prefix=currentMonth+'-'; const mesItems=items.filter(x=> String(x.data||'').startsWith(prefix)).sort((a,b)=> a.data.localeCompare(b.data)); const sum=(arr,pred)=> arr.filter(pred).reduce((s,x)=> s + Number(x.val||0), 0); const rec=sum(mesItems,x=>x.tipo==='receita'); const desp=sum(mesItems,x=>x.tipo==='despesa'); const guardado=sum(mesItems,x=>x.tipo==='poupanca'); const saldo=rec - desp - guardado; recSumEl.textContent=money(rec); despSumEl.textContent=money(desp); saldoEl.textContent=money(saldo); const alvoByValor=parseNum(metaValorEl.value); const pct=Math.max(0, parseNum(metaPctEl.value)); const alvoByPct=rec*(pct/100); const alvo=Math.max(alvoByValor, alvoByPct); metaAlvoEl.textContent=money(alvo); guardadoEl.textContent=money(guardado); const prog=alvo>0 ? Math.min(100, Math.round((guardado/alvo)*100)) : 0; metaProgEl.style.width=prog+'%'; renderList(mesItems); const byCat={}; mesItems.filter(x=>x.tipo==='despesa').forEach(x=>{ const c=(x.cat||'Geral').trim()||'Geral'; byCat[c]=(byCat[c]||0)+Number(x.val||0); }); const totalDesp=Object.values(byCat).reduce((a,b)=>a+b,0); const top=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,6); if (!top.length){ topCatsEl.innerHTML='<div class="text-muted">Sem despesas neste mês.</div>'; } else { topCatsEl.innerHTML=top.map(([c,v])=>{ const p=totalDesp>0? Math.round((v/totalDesp)*100):0; return `<div class="mb-1"><div class="d-flex justify-content-between"><div>${c}</div><div class="mono">${money(v)} · ${p}%</div></div><div class="progress" style="height:8px"><div class="progress-bar" style="width:${p}%"></div></div></div>`; }).join(''); } }
+  function renderList(arr){ if (!arr.length){ listaEl.innerHTML='<div class="text-muted">Sem lançamentos neste mês.</div>'; return; } const groups={}; arr.forEach(x=>{ const d=x.data; (groups[d] ||= []).push(x); }); const days=Object.keys(groups).sort(); listaEl.innerHTML=''; days.forEach(d=>{ const items=groups[d]; const sumDia=items.reduce((s,x)=> s + (x.tipo==='receita'? x.val : -x.val), 0); const dayCard=document.createElement('div'); dayCard.className='border rounded p-2 mb-2'; dayCard.innerHTML=`<div class="d-flex justify-content-between align-items-center mb-1"><div class="fw-semibold">${d.split('-').reverse().join('/')}</div><div class="mono ${sumDia>=0?'text-success':'text-danger'}">${money(sumDia)}</div></div><div></div>`; const body=dayCard.children[1]; items.forEach(it=>{ const cls= it.tipo==='receita' ? 'text-success' : (it.tipo==='despesa' ? 'text-danger' : 'text-primary'); const sinal=it.tipo==='receita'? '+' : '−'; const row=document.createElement('div'); row.className='d-flex align-items-center justify-content-between py-1 border-bottom'; row.innerHTML=`<div class="me-2" style="min-width:0"><div class="fw-semibold" style="word-break:break-word;overflow-wrap:anywhere">${(it.cat||'Geral')}</div><div class="small text-muted">${(it.desc||'')}</div></div><div class="text-end"><div class="mono ${cls}">${sinal} ${money(it.val)}</div><button class="btn btn-sm btn-outline-danger mt-1"><i class="bi bi-trash"></i></button></div>`; row.querySelector('button').addEventListener('click', ()=> removeItem(it.id)); body.appendChild(row); }); listaEl.appendChild(dayCard); }); }
+  [metaValorEl, metaPctEl].forEach(inp => inp?.addEventListener('input', refresh)); refresh();
 })();
 </script>
-
 <script>
 (function(){
   const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
@@ -1653,83 +1293,35 @@ document.addEventListener('DOMContentLoaded', () => {
   const outCusto = el('cxCusto'), outCustoKm = el('cxCustoKm'), outLucro = el('cxLucro'), outLucroKm = el('cxLucroKm'), outMargem = el('cxMargem');
   const btnSalvar = el('cxSalvar'), btnLimpar = el('cxLimpar'), divHist = el('cxHistorico');
   const totKm = el('cxTotKm'), totGanho = el('cxTotGanho'), totCusto = el('cxTotCusto'), totLucro = el('cxTotLucro');
-
+  const btnCSV = el('cxExportCSV'), btnShare = el('cxShareSum');
   function parseNum(v){ const n=parseFloat(String(v).replace(',','.')); return Number.isFinite(n) ? n : 0; }
   function fmtMoney(n){ return 'R$ ' + (Number(n)||0).toFixed(2).replace('.',','); }
   function fmtKm(n){ return String(Number(n)||0); }
-
-  function calc(){
-    const p=parseNum(preco.value), c=parseNum(kpl.value), k=parseNum(km.value), g=parseNum(ganho.value);
-    const litros = c>0 ? (k / c) : 0, custo = p * litros, custoKm = k>0 ? (custo / k) : 0;
-    const lucro = g - custo, lucroKm = k>0 ? (lucro / k) : 0, margem = g>0 ? (lucro / g) * 100 : 0;
-    if(outCusto) outCusto.textContent=fmtMoney(custo); if(outCustoKm) outCustoKm.textContent=fmtMoney(custoKm)+'/km';
-    if(outLucro) outLucro.textContent=fmtMoney(lucro); if(outLucroKm) outLucroKm.textContent=fmtMoney(lucroKm)+'/km';
-    if(outMargem) outMargem.textContent=`${margem.toFixed(1).replace('.',',')}%`;
-    return {p,c,k,g,litros,custo,custoKm,lucro,lucroKm,margem};
-  }
+  function calc(){ const p=parseNum(preco.value), c=parseNum(kpl.value), k=parseNum(km.value), g=parseNum(ganho.value); const litros = c>0 ? (k / c) : 0, custo = p * litros, custoKm = k>0 ? (custo / k) : 0; const lucro = g - custo, lucroKm = k>0 ? (lucro / k) : 0, margem = g>0 ? (lucro / g) * 100 : 0; outCusto.textContent=fmtMoney(custo); outCustoKm.textContent=fmtMoney(custoKm)+'/km'; outLucro.textContent=fmtMoney(lucro); outLucroKm.textContent=fmtMoney(lucroKm)+'/km'; outMargem.textContent=`${margem.toFixed(1).replace('.',',')}%`; return {p,c,k,g,litros,custo,custoKm,lucro,lucroKm,margem}; }
   [preco,kpl,km,ganho].forEach(i=> i?.addEventListener('input', calc));
-
   function loadHist(){ try{ const raw=localStorage.getItem(LS_KEY); const arr=raw ? JSON.parse(raw) : []; return Array.isArray(arr)?arr:[]; }catch(_){ return []; } }
   function saveHist(arr){ localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
-
-  function setTotals(arr){
-    const sum=(a,f)=>a.reduce((s,x)=>s+Number(x[f]||0),0);
-    if(totKm) totKm.textContent=fmtKm(sum(arr,'k'));
-    if(totGanho) totGanho.textContent=fmtMoney(sum(arr,'g'));
-    if(totCusto) totCusto.textContent=fmtMoney(sum(arr,'custo'));
-    if(totLucro) totLucro.textContent=fmtMoney(sum(arr,'lucro'));
-  }
-
-  function renderHist(){
-    const arr=loadHist(); if (!divHist) return;
-    if (!arr.length){ divHist.innerHTML='<div class="text-muted">Sem registros salvos.</div>'; setTotals(arr); return; }
-    divHist.innerHTML='';
-    arr.slice().reverse().forEach((it,idxRev)=>{
-      const idx=arr.length-1-idxRev;
-      const card=document.createElement('div'); card.className='border rounded p-2 mb-2'; card.setAttribute('data-idx',idx);
-      card.innerHTML=`<div class="d-flex justify-content-between align-items-center gap-2">
-        <div><div class="fw-semibold">${new Date(it.ts).toLocaleString()}</div>
-        <div class="small text-muted">Gas: ${fmtMoney(it.p)} · Consumo: ${it.c} km/L · Km: ${it.k} · Ganhou: ${fmtMoney(it.g)}</div></div>
-        <div class="text-end">
-          <div><b>${fmtMoney(it.lucro)}</b></div>
-          <div class="small text-muted">Custo: ${fmtMoney(it.custo)}</div>
-          <div class="mt-1">
-            <button class="btn btn-sm btn-outline-secondary me-1" data-act="fill"><i class="bi bi-box-arrow-in-down-left"></i></button>
-            <button class="btn btn-sm btn-outline-danger" data-act="del"><i class="bi bi-trash"></i></button>
-          </div>
-        </div></div>`;
-      card.addEventListener('click',(e)=>{
-        const act=e.target.closest('button')?.getAttribute('data-act');
-        if (act==='fill'){ preco.value=it.p;kpl.value=it.c;km.value=it.k;ganho.value=it.g; calc(); }
-        else if (act==='del'){ const arr2=loadHist(); arr2.splice(idx,1); saveHist(arr2); renderHist(); }
-      });
-      divHist.appendChild(card);
-    });
-    setTotals(arr);
-  }
-
+  function setTotals(arr){ const sum=(a,f)=>a.reduce((s,x)=>s+Number(x[f]||0),0); totKm.textContent=fmtKm(sum(arr,'k')); totGanho.textContent=fmtMoney(sum(arr,'g')); totCusto.textContent=fmtMoney(sum(arr,'custo')); totLucro.textContent=fmtMoney(sum(arr,'lucro')); }
+  function renderHist(){ const arr=loadHist(); if (!arr.length){ divHist.innerHTML='<div class="text-muted">Sem registros salvos.</div>'; setTotals(arr); return; } divHist.innerHTML=''; arr.slice().reverse().forEach((it,idxRev)=>{ const idx=arr.length-1-idxRev; const card=document.createElement('div'); card.className='border rounded p-2 mb-2'; card.innerHTML=`<div class="d-flex justify-content-between align-items-center"><div><div class="fw-semibold">${new Date(it.ts).toLocaleString()}</div><div class="small text-muted">Gas: ${fmtMoney(it.p)} · Consumo: ${it.c} km/L · Km: ${it.k} · Ganhou: ${fmtMoney(it.g)}</div></div><div class="text-end"><div><span class="badge text-bg-light">Lucro</span> <b class="mono">${fmtMoney(it.lucro)}</b></div><div class="small text-muted">Custo: ${fmtMoney(it.custo)} · Margem: ${it.margem.toFixed(1).replace('.',',')}%</div><div class="mt-1"><button class="btn btn-sm btn-outline-secondary me-1" data-act="fill"><i class="bi bi-box-arrow-in-down-left"></i></button><button class="btn btn-sm btn-outline-danger" data-act="del"><i class="bi bi-trash"></i></button></div></div></div>`; card.addEventListener('click',(e)=>{ const act=e.target.closest('button')?.getAttribute('data-act'); if (act==='fill'){ preco.value=it.p;kpl.value=it.c;km.value=it.k;ganho.value=it.g; calc(); } else if (act==='del'){ const arr2=loadHist(); arr2.splice(idx,1); saveHist(arr2); renderHist(); } }); divHist.appendChild(card); }); setTotals(arr); }
   btnSalvar?.addEventListener('click', ()=>{ const r=calc(); const item={ ts:Date.now(), p:r.p, c:r.c, k:r.k, g:r.g, litros:r.litros, custo:r.custo, custoKm:r.custoKm, lucro:r.lucro, lucroKm:r.lucroKm, margem:r.margem }; const arr=loadHist(); arr.push(item); saveHist(arr); renderHist(); });
   btnLimpar?.addEventListener('click', ()=>{ if (confirm('Limpar todo o histórico?')){ saveHist([]); renderHist(); } });
-
+  btnCSV?.addEventListener('click', ()=>{ const arr=loadHist(); const header=['data','preco','consumo_km_l','km','ganho','litros','custo','custo_km','lucro','lucro_km','margem_%']; const rows=arr.map(x=>[new Date(x.ts).toISOString(), x.p, x.c, x.k, x.g, x.litros, x.custo, x.custoKm, x.lucro, x.lucroKm, x.margem]); const csv=[header.join(','), ...rows.map(r=>r.join(','))].join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='custo_beneficio.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); });
+  btnShare?.addEventListener('click', ()=>{ const arr=loadHist(); if (!navigator.share){ alert('Compartilhamento nativo não suportado.'); return; } const total=arr.reduce((acc,x)=>({km:acc.km+(x.k||0), ganho:acc.ganho+(x.g||0), lucro:acc.lucro+(x.lucro||0)}), {km:0,ganho:0,lucro:0}); navigator.share({ title:'Resumo CxB', text:`Km: ${total.km} | Ganhou: R$ ${total.ganho.toFixed(2)} | Lucro: R$ ${total.lucro.toFixed(2)}` }).catch(()=>{}); });
   calc(); renderHist();
 })();
 </script>
-
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  const disp=document.getElementById('calcDisplay');
-  const statusEl=document.getElementById('calcStatus');
-  const tapeEl=document.getElementById('calcTape');
-  const tapeClear=document.getElementById('calcTapeClear');
-  const keys=document.querySelectorAll('#calcModal .calc-btn');
+  const disp=document.getElementById('calcDisplay'); const statusEl=document.getElementById('calcStatus'); const tapeEl=document.getElementById('calcTape'); const tapeClear=document.getElementById('calcTapeClear'); const keys=document.querySelectorAll('#calcModal .calc-btn');
   let a=null,b=null,op=null,entering='a',justEvaluated=false;
-  const sym=o=>o==='divide'?'÷':o==='multiply'?'×':o==='minus'?'−':'+'; const setDisplay=t=> disp.textContent=(t ?? '0');
+  const sym=o=>o==='divide'?'÷':o==='multiply'?'×':o==='minus'?'−':'+';
+  const setDisplay=t=> disp.textContent=(t ?? '0');
   function appendDigit(d){ const target=entering==='a'?'a':'b'; let cur=((target==='a'?a:b) ?? '').toString(); if (d==='.' && cur.includes('.')) return; if (justEvaluated && entering==='a'){ a=null; cur=''; justEvaluated=false; } cur=(cur==='0' && d!=='.')? d : cur+d; if (target==='a') a=cur; else b=cur; setDisplay(cur); }
   function setOp(next){ if (a==null) a='0'; if (op && b!=null) evalNow(false); op=next; entering='b'; justEvaluated=false; statusEl.textContent=`${a} ${sym(op)}`; }
   function percent(){ if (entering==='b' && b!=null){ b=String(parseFloat(b)/100); setDisplay(b); } else if (a!=null){ a=String(parseFloat(a)/100); setDisplay(a); } }
   function backspace(){ const target=entering==='b'?'b':'a'; if (justEvaluated && entering==='a'){ a=null; setDisplay('0'); justEvaluated=false; return; } let cur=(target==='b'?b:a); if (cur==null) return; cur=cur.toString().slice(0,-1); if (!cur || cur==='-') cur='0'; if (target==='b') b=cur; else a=cur; setDisplay(cur); }
   function clearAll(){ a=b=op=null; entering='a'; justEvaluated=false; setDisplay('0'); statusEl.textContent='\u00A0'; }
-  function addTape(text){ const row=document.createElement('div'); row.className='item d-flex justify-content-between align-items-center border-bottom py-1'; row.innerHTML=`<span class="expr">${text}</span><button class="btn btn-sm btn-link text-danger">&times;</button>`; row.querySelector('button').addEventListener('click', ()=> row.remove()); tapeEl.prepend(row); }
+  function addTape(text){ const row=document.createElement('div'); row.className='item d-flex justify-content-between align-items-center border-bottom py-1'; row.innerHTML=`<span class="expr">${text}</span><button class="btn btn-sm btn-link text-danger" title="Remover">&times;</button>`; row.querySelector('button').addEventListener('click', ()=> row.remove()); tapeEl.prepend(row); }
   function evalNow(addToTape=true){ if (a==null) return; const ax=parseFloat(a); const bx=parseFloat(b ?? a); if (!op){ setDisplay(String(ax)); return; } let res=0; if (op==='plus') res=ax+bx; else if (op==='minus') res=ax-bx; else if (op==='multiply') res=ax*bx; else if (op==='divide') res = bx===0 ? NaN : ax/bx; const expr=`${ax} ${sym(op)} ${bx} = ${res}`; setDisplay(isNaN(res)?'Erro':String(res)); statusEl.textContent=expr; if (addToTape) addTape(expr); a=String(res); b=null; entering='a'; op=null; justEvaluated=true; }
   keys.forEach(btn=>{ btn.addEventListener('click', ()=>{ const num=btn.getAttribute('data-num'), dot=btn.getAttribute('data-dot'), act=btn.getAttribute('data-act'), opBtn=btn.getAttribute('data-op'); if (num) return appendDigit(num); if (dot) return appendDigit('.'); if (opBtn) return setOp(opBtn); if (act==='ac') return clearAll(); if (act==='percent') return percent(); if (act==='back') return backspace(); if (act==='equal') return evalNow(true); }); });
   tapeClear?.addEventListener('click', ()=> tapeEl.innerHTML='');
