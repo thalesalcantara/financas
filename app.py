@@ -1568,32 +1568,6 @@ def _build_escala_alertas_1h(escalas_all: list[Escala], cooperados_map: dict[int
     out.sort(key=lambda item: (item.get("inicio_iso", ""), (item.get("contrato", "") or "").lower(), item.get("id", 0)))
     return out
 
-
-def _serialize_escala_editor_rows(escalas_all: list[Escala], cooperados_map: dict[int, Cooperado] | None = None) -> list[dict]:
-    cooperados_map = cooperados_map or {}
-    rows: list[dict] = []
-
-    for e in sorted(escalas_all, key=_escala_sort_key):
-        coop_obj = cooperados_map.get(e.cooperado_id) if getattr(e, "cooperado_id", None) else None
-        nome_atual = (coop_obj.nome if coop_obj else (getattr(e, "cooperado_nome", None) or "").strip())
-        rows.append({
-            "id": int(e.id),
-            "data": e.data or "",
-            "weekday_num": _escala_weekday_num(e.data),
-            "weekday_label": _escala_weekday_label(e.data),
-            "turno": e.turno or "",
-            "horario": e.horario or "",
-            "contrato": e.contrato or "",
-            "cooperado_id": e.cooperado_id,
-            "cooperado_nome": nome_atual or "",
-            "cooperado_nome_livre": ((getattr(e, "cooperado_nome", None) or "").strip() if not coop_obj else ""),
-            "restaurante_id": e.restaurante_id,
-            "cor": getattr(e, "cor", None),
-            "save_url": url_for("admin_escala_salvar", escala_id=e.id),
-        })
-
-    return rows
-
 def _match_cooperado_by_name(nome_planilha: str, cooperados: list[Cooperado]) -> Cooperado | None:
     def norm_join(s: str) -> str:
         return " ".join(_normalize_name(s))
@@ -3160,8 +3134,28 @@ def admin_dashboard():
     contratos_set.update({((r.nome or "").strip()) for r in restaurantes if (r.nome or "").strip()})
     contratos_escala_opcoes = sorted(contratos_set, key=lambda s: s.lower())
 
-    # Grade semanal agora é carregada sob demanda via API, para deixar a aba Escalas mais leve.
     escala_editor_rows = []
+    for e in sorted(escalas_all, key=_escala_sort_key):
+        coop_obj = None
+        if e.cooperado_id:
+            coop_obj = cooperados_map.get(e.cooperado_id)
+
+        nome_atual = (coop_obj.nome if coop_obj else (e.cooperado_nome or "").strip())
+        escala_editor_rows.append({
+            "id": e.id,
+            "data": e.data or "",
+            "weekday_num": _escala_weekday_num(e.data),
+            "weekday_label": _escala_weekday_label(e.data),
+            "turno": e.turno or "",
+            "horario": e.horario or "",
+            "contrato": e.contrato or "",
+            "cooperado_id": e.cooperado_id,
+            "cooperado_nome": nome_atual or "",
+            "cooperado_nome_livre": (e.cooperado_nome or "") if not coop_obj else "",
+            "restaurante_id": e.restaurante_id,
+            "cor": getattr(e, "cor", None),
+        })
+
     escala_alertas_1h = _build_escala_alertas_1h(escalas_all, cooperados_map)
 
     # =========================
@@ -3589,7 +3583,6 @@ def admin_dashboard():
         filtro_periodo_aplicado=filtro_periodo_aplicado,
         escala_editor_rows=escala_editor_rows,
         contratos_escala_opcoes=contratos_escala_opcoes,
-        escala_alertas_1h=escala_alertas_1h,
     )
     
 # =========================
@@ -5886,6 +5879,19 @@ def admin_escala_salvar(escala_id):
     cooperado_id_raw = (request.form.get("cooperado_id") or "").strip()
     cooperado_nome_livre = (request.form.get("cooperado_nome_livre") or "").strip()
     redirect_day = (request.form.get("redirect_day") or "semana").strip().lower()
+    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest" or (request.form.get("ajax") == "1")
+
+    def _reply_ok(message):
+        if is_ajax:
+            return jsonify({"ok": True, "message": message})
+        flash(message, "success")
+        return redirect(url_for("admin_dashboard", tab="escalas", escala_dia=redirect_day))
+
+    def _reply_error(message, code=400):
+        if is_ajax:
+            return jsonify({"ok": False, "message": message}), code
+        flash(message, "danger")
+        return redirect(url_for("admin_dashboard", tab="escalas", escala_dia=redirect_day))
 
     if contrato_txt:
         e.contrato = contrato_txt
@@ -5895,8 +5901,7 @@ def admin_escala_salvar(escala_id):
         try:
             coop_id = int(cooperado_id_raw)
         except Exception:
-            flash("Cooperado inválido.", "danger")
-            return redirect(url_for("admin_dashboard", tab="escalas", escala_dia=redirect_day))
+            return _reply_error("Cooperado inválido.")
 
         coop = (
             Cooperado.query
@@ -5905,8 +5910,7 @@ def admin_escala_salvar(escala_id):
             .first()
         )
         if not coop:
-            flash("Cooperado inválido ou inativo.", "danger")
-            return redirect(url_for("admin_dashboard", tab="escalas", escala_dia=redirect_day))
+            return _reply_error("Cooperado inválido ou inativo.")
 
         e.cooperado_id = coop.id
         e.cooperado_nome = None
@@ -5915,45 +5919,7 @@ def admin_escala_salvar(escala_id):
         e.cooperado_nome = cooperado_nome_livre or None
 
     db.session.commit()
-    flash("Linha da escala atualizada com sucesso.", "success")
-    return redirect(url_for("admin_dashboard", tab="escalas", escala_dia=redirect_day))
-
-
-@app.get("/admin/api/escalas/editor_rows")
-@admin_perm_required("escalas", "ver")
-def admin_api_escala_editor_rows():
-    admin_logado = _usuario_logado()
-    if not admin_logado or (admin_logado.tipo or "").strip().lower() != "admin":
-        return jsonify({"ok": False, "message": "Não autorizado."}), 403
-
-    escalas_all = (
-        db.session.query(Escala)
-        .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
-        .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
-        .filter(
-            or_(
-                Escala.cooperado_id.is_(None),
-                Usuario.ativo.is_(True)
-            )
-        )
-        .order_by(Escala.id.asc())
-        .all()
-    )
-
-    cooperados = (
-        Cooperado.query
-        .join(Usuario, Cooperado.usuario_id == Usuario.id)
-        .filter(Usuario.ativo.is_(True))
-        .order_by(Cooperado.nome)
-        .all()
-    )
-    cooperados_map = {c.id: c for c in cooperados}
-    rows = _serialize_escala_editor_rows(escalas_all, cooperados_map)
-    return jsonify({
-        "ok": True,
-        "total": len(rows),
-        "rows": rows,
-    })
+    return _reply_ok("Linha da escala atualizada com sucesso.")
 
 
 @app.get("/admin/api/escalas/alertas_1h")
