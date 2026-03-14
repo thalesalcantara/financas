@@ -6737,6 +6737,105 @@ def solicitar_troca():
         flash("Cooperado de destino inválido.", "danger")
         return redirect(url_for("portal_cooperado"))
 
+    def _escala_match_key(e: Escala | None):
+        if not e:
+            return None
+        return (
+            _weekday_from_data_str(getattr(e, "data", None)),
+            _turno_bucket(getattr(e, "turno", None), getattr(e, "horario", None)),
+            _norm(getattr(e, "contrato", "") or ""),
+        )
+
+    def _escalas_compativeis_para(cooperado_id: int, referencia: Escala):
+        wd_ref = _weekday_from_data_str(getattr(referencia, "data", None))
+        bucket_ref = _turno_bucket(getattr(referencia, "turno", None), getattr(referencia, "horario", None))
+        if wd_ref is None:
+            return []
+        return [
+            e for e in Escala.query.filter_by(cooperado_id=cooperado_id).order_by(Escala.id.asc()).all()
+            if _weekday_from_data_str(getattr(e, "data", None)) == wd_ref
+            and _turno_bucket(getattr(e, "turno", None), getattr(e, "horario", None)) == bucket_ref
+        ]
+
+    origem_key = _escala_match_key(origem)
+    minhas_compativeis_ids = {e.id for e in _escalas_compativeis_para(me.id, origem)}
+    destino_compativeis_ids = {e.id for e in _escalas_compativeis_para(destino.id, origem)}
+
+    pendentes_mesma_dupla = (
+        TrocaSolicitacao.query
+        .filter(TrocaSolicitacao.status == "pendente")
+        .filter(
+            or_(
+                and_(
+                    TrocaSolicitacao.solicitante_id == me.id,
+                    TrocaSolicitacao.destino_id == destino.id,
+                ),
+                and_(
+                    TrocaSolicitacao.solicitante_id == destino.id,
+                    TrocaSolicitacao.destino_id == me.id,
+                ),
+            )
+        )
+        .order_by(TrocaSolicitacao.id.desc())
+        .all()
+    )
+
+    for pend in pendentes_mesma_dupla:
+        origem_pend = Escala.query.get(pend.origem_escala_id)
+        if not origem_pend:
+            continue
+
+        origem_pend_key = _escala_match_key(origem_pend)
+
+        # Mesmo solicitante, mesmo destinatário e mesma escala de origem.
+        if (
+            pend.solicitante_id == me.id
+            and pend.destino_id == destino.id
+            and pend.origem_escala_id == origem.id
+        ):
+            flash(
+                "Já existe uma solicitação pendente para essa mesma escala. Vá na aba Trocas para acompanhar.",
+                "warning",
+            )
+            return redirect(url_for("portal_cooperado"))
+
+        # Solicitação espelhada: o outro cooperado já pediu a mesma troca.
+        if (
+            pend.solicitante_id == destino.id
+            and pend.destino_id == me.id
+            and origem_key is not None
+            and origem_pend_key is not None
+            and origem.id in minhas_compativeis_ids
+            and origem_pend.id in destino_compativeis_ids
+        ):
+            flash(
+                "Esse cooperado já enviou a solicitação dessa mesma troca. Vá na aba Trocas e aceite a solicitação pendente.",
+                "warning",
+            )
+            return redirect(url_for("portal_cooperado"))
+
+        # Também bloqueia quando já existe pendente com os mesmos contratos/dia/turno,
+        # mesmo que a escala de origem exata seja outra linha equivalente.
+        if (
+            pend.solicitante_id == destino.id
+            and pend.destino_id == me.id
+            and origem_key is not None
+            and origem_pend_key is not None
+            and origem_key[0] == origem_pend_key[0]
+            and origem_key[1] == origem_pend_key[1]
+            and origem.id in minhas_compativeis_ids
+        ):
+            contratos_destino_pend = {
+                _norm(getattr(e, "contrato", "") or "")
+                for e in _escalas_compativeis_para(me.id, origem_pend)
+            }
+            if origem_key[2] in contratos_destino_pend:
+                flash(
+                    "Esse cooperado já enviou a solicitação dessa mesma troca. Vá na aba Trocas e aceite a solicitação pendente.",
+                    "warning",
+                )
+                return redirect(url_for("portal_cooperado"))
+
     t = TrocaSolicitacao(
         solicitante_id=me.id,
         destino_id=destino.id,
