@@ -6747,9 +6747,9 @@ def solicitar_troca():
         return _portal_cooperado_redirect_tab("trocas")
 
     def _safe_str(v):
-        return str(v or "").strip()
+        return (str(v or "").strip())
 
-    def _norm_horario(v: str) -> str:
+    def _norm_horario(v):
         txt = _safe_str(v)
         m = re.findall(r"(\d{1,2}):(\d{2})", txt)
         if m:
@@ -6759,7 +6759,6 @@ def solicitar_troca():
     def _escala_signature(e: Escala | None):
         if not e:
             return None
-
         return {
             "weekday": _weekday_from_data_str(getattr(e, "data", None)),
             "bucket": _turno_bucket(getattr(e, "turno", None), getattr(e, "horario", None)),
@@ -6768,7 +6767,29 @@ def solicitar_troca():
         }
 
     nova_sig = _escala_signature(origem)
+    contrato_origem = _norm(getattr(origem, "contrato", "") or "")
 
+    # procura escalas do destino compatíveis com a origem (mesmo dia/turno/horário)
+    escalas_destino_compativeis = []
+    for e_dest in Escala.query.filter_by(cooperado_id=destino.id).order_by(Escala.id.asc()).all():
+        sig_dest = _escala_signature(e_dest)
+        if not sig_dest or not nova_sig:
+            continue
+
+        if (
+            sig_dest["weekday"] == nova_sig["weekday"]
+            and sig_dest["bucket"] == nova_sig["bucket"]
+            and sig_dest["horario"] == nova_sig["horario"]
+        ):
+            escalas_destino_compativeis.append(e_dest)
+
+    contratos_destino = {
+        _norm(getattr(e, "contrato", "") or "")
+        for e in escalas_destino_compativeis
+        if (getattr(e, "contrato", "") or "").strip()
+    }
+
+    # pendentes entre as mesmas 2 pessoas, em qualquer direção
     pendentes_mesma_dupla = (
         TrocaSolicitacao.query
         .filter(TrocaSolicitacao.status == "pendente")
@@ -6794,7 +6815,23 @@ def solicitar_troca():
             continue
 
         exist_sig = _escala_signature(esc_exist)
+        if not exist_sig:
+            continue
 
+        mesmo_slot = (
+            nova_sig
+            and exist_sig
+            and nova_sig["weekday"] == exist_sig["weekday"]
+            and nova_sig["bucket"] == exist_sig["bucket"]
+            and nova_sig["horario"] == exist_sig["horario"]
+        )
+
+        if not mesmo_slot:
+            continue
+
+        contrato_exist = _norm(getattr(esc_exist, "contrato", "") or "")
+
+        # mesma linha exata
         if int(t_exist.origem_escala_id or 0) == int(origem.id):
             if t_exist.solicitante_id == destino.id:
                 flash(
@@ -6808,22 +6845,30 @@ def solicitar_troca():
                 )
             return _portal_cooperado_redirect_tab("trocas")
 
-        if (
-            nova_sig
-            and exist_sig
-            and nova_sig["weekday"] == exist_sig["weekday"]
-            and nova_sig["bucket"] == exist_sig["bucket"]
-            and nova_sig["horario"] == exist_sig["horario"]
-            and nova_sig["contrato"] == exist_sig["contrato"]
-        ):
+        # mesma troca espelhada: A↔B e depois B↔A
+        if contrato_exist in contratos_destino and contrato_origem == contrato_exist:
+            # nesse caso o próprio contrato é igual; segue bloqueio de equivalência simples
             if t_exist.solicitante_id == destino.id:
                 flash(
-                    "Esse cooperado já enviou a solicitação de troca. Vá na aba Trocas e aceite.",
+                    "Esse cooperado já enviou a solicitação dessa mesma troca. Vá na aba Trocas e aceite.",
                     "info"
                 )
             else:
                 flash(
                     "Já existe uma solicitação pendente equivalente entre vocês para esse mesmo horário e contrato.",
+                    "warning"
+                )
+            return _portal_cooperado_redirect_tab("trocas")
+
+        if contrato_exist in contratos_destino:
+            if t_exist.solicitante_id == destino.id:
+                flash(
+                    "Esse cooperado já enviou a solicitação dessa mesma troca. Vá na aba Trocas e aceite.",
+                    "info"
+                )
+            else:
+                flash(
+                    "Já existe uma solicitação pendente equivalente entre vocês para esse mesmo horário e contratos.",
                     "warning"
                 )
             return _portal_cooperado_redirect_tab("trocas")
@@ -6840,8 +6885,6 @@ def solicitar_troca():
 
     flash("Solicitação de troca enviada com sucesso.", "success")
     return _portal_cooperado_redirect_tab("trocas")
-
-
 
 @app.post("/trocas/<int:troca_id>/aceitar")
 @role_required("cooperado")
