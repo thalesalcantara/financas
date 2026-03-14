@@ -2066,6 +2066,7 @@
                      href="{{ url_for('admin_delete_lancamento', id=l.id) }}">
                     <i class="bi bi-trash"></i>
                   </a>{% endif %}
+                  {% endif %}
                 </td>
               </tr>
             {% else %}
@@ -2338,6 +2339,7 @@
                   {% if can_receitas_excluir %}<a class="btn btn-danger btn-sm btn-del" href="{{ url_for('delete_receita', id=r.id) }}">
                     <i class="bi bi-trash"></i>
                   </a>{% endif %}
+                  {% endif %}
                 </td>
               </tr>
             {% else %}
@@ -2466,6 +2468,7 @@
                   {% if can_despesas_excluir %}<a class="btn btn-danger btn-sm btn-del" href="{{ url_for('delete_despesa', id=d.id) }}">
                     <i class="bi bi-trash"></i>
                   </a>{% endif %}
+                  {% endif %}
                 </td>
               </tr>
             {% else %}
@@ -2604,6 +2607,7 @@
                   {% if can_coop_receitas_excluir %}<a class="btn btn-danger btn-sm btn-del" href="{{ url_for('delete_receita_coop', id=rc.id) }}">
                     <i class="bi bi-trash"></i>
                   </a>{% endif %}
+                  {% endif %}
                 </td>
               </tr>
             {% else %}
@@ -3410,6 +3414,7 @@
                         <i class="bi bi-trash"></i>
                       </button>
                     </form>{% endif %}
+                    {% endif %}
                   </div>
                 </td>
               </tr>
@@ -3767,6 +3772,8 @@
     <i class="bi bi-trash"></i>
   </button>
 </form>{% endif %}
+                    {% endif %}
+                    {% endif %}
                   </div>
                 </td>
               </tr>
