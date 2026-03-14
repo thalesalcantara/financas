@@ -4033,24 +4033,10 @@
       </div>
 
       <div id="escalaEditorMount"
+           data-rows='{{ escala_editor_rows|tojson|safe }}'
+           data-save-base="/admin/escalas/__ID__/salvar"
            data-csrf="{{ csrf_token() if csrf_token is defined else '' }}"
-           data-can-edit="{{ '1' if can_escalas_editar else '0' }}"
-           data-save-base="{{ url_for('admin_escala_salvar', escala_id=0)[:-1] }}"
-           data-rows='[
-             {% for row in escala_editor_rows or [] %}
-             {
-               "id": {{ row.id|int }},
-               "weekday_num": {{ (row.weekday_num or 0)|int }},
-               "weekday_label": {{ (row.weekday_label or 'Sem dia')|tojson }},
-               "data": {{ (row.data or '')|tojson }},
-               "turno": {{ (row.turno or '')|tojson }},
-               "horario": {{ (row.horario or '')|tojson }},
-               "contrato": {{ (row.contrato or '')|tojson }},
-               "cooperado_id": {{ (row.cooperado_id if row.cooperado_id is not none else 'null') }},
-               "cooperado_nome_livre": {{ ((row.cooperado_nome_livre if row.cooperado_nome_livre is defined else row.cooperado_nome) or '')|tojson }}
-             }{% if not loop.last %},{% endif %}
-             {% endfor %}
-           ]'>
+           data-can-edit="{{ '1' if can_escalas_editar else '0' }}">
         <div class="alert alert-light border mb-0">Clique em <strong>Abrir escala semanal</strong> para carregar a grade.</div>
       </div>
     </div>
@@ -5932,7 +5918,6 @@ document.addEventListener('DOMContentLoaded', function(){
   const dayTabs = document.getElementById('escalaDayTabs');
   const canEdit = mount?.dataset?.canEdit === '1';
   const csrfToken = mount?.dataset?.csrf || '';
-  const editorEndpoint = mount?.dataset?.endpoint || '';
   const saveBase = mount?.dataset?.saveBase || '';
 
   let rows = [];
@@ -5962,12 +5947,22 @@ document.addEventListener('DOMContentLoaded', function(){
   document.addEventListener('click', unlockAudio, { once:true });
   document.addEventListener('keydown', unlockAudio, { once:true });
 
+  function parsePreloadedRows(){
+    try {
+      const raw = mount?.dataset?.rows || '[]';
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch(_) {
+      return [];
+    }
+  }
+
   function dayMatches(row){
     return currentDay === 'semana' || String(row.weekday_num || '') === String(currentDay);
   }
 
   function getCoopDisplay(row){
-    return (row.cooperado_nome || row.cooperado_nome_livre || '').trim();
+    return String(row.cooperado_nome || row.cooperado_nome_livre || '').trim();
   }
 
   function rowMatches(row){
@@ -6009,11 +6004,11 @@ document.addEventListener('DOMContentLoaded', function(){
   function renderRows(){
     if (!mount) return;
     const filtered = rows.filter(rowMatches);
-    countRows.textContent = `${filtered.length} linha(s)`;
-    statusRows.textContent = rowsLoaded ? 'Grade carregada' : 'Carregando…';
+    if (countRows) countRows.textContent = `${filtered.length} linha(s)`;
+    if (statusRows) statusRows.textContent = rowsLoaded ? 'Grade carregada' : 'Aguardando abertura';
 
     if (!rowsLoaded) {
-      mount.innerHTML = '<div class="alert alert-light border mb-0">Carregando escala semanal…</div>';
+      mount.innerHTML = '<div class="alert alert-light border mb-0">Clique em <strong>Abrir escala semanal</strong> para carregar a grade.</div>';
       return;
     }
 
@@ -6027,14 +6022,14 @@ document.addEventListener('DOMContentLoaded', function(){
       const disabled = canEdit ? '' : 'disabled';
       const nomeLivreDisabled = row.cooperado_id ? 'disabled' : '';
       return `
-        <tr class="${isLivre ? 'escala-row-vazia' : ''} js-escala-row" data-escala-id="${escapeHtml(row.id)}">
+        <tr class="js-escala-row ${isLivre ? 'escala-row-vazia' : ''}" data-row-id="${row.id}">
           <td><span class="badge rounded-pill text-bg-light border">${escapeHtml(row.weekday_label || 'Sem dia')}</span></td>
           <td>${escapeHtml(row.data || '—')}</td>
           <td>${escapeHtml(row.turno || '—')}</td>
           <td>${escapeHtml(row.horario || '—')}</td>
-          <td><select name="contrato" class="form-select form-select-sm js-contrato-select" ${disabled}>${contractOptions(row.contrato || '')}</select></td>
-          <td><select name="cooperado_id" class="form-select form-select-sm js-cooperado-select" ${disabled}>${cooperadoOptions(row.cooperado_id || '')}</select></td>
-          <td><input type="text" name="cooperado_nome_livre" class="form-control form-control-sm js-nome-livre" value="${escapeHtml(row.cooperado_nome_livre || '')}" placeholder="Opcional" ${disabled} ${nomeLivreDisabled}></td>
+          <td><select class="form-select form-select-sm js-contrato" ${disabled}>${contractOptions(row.contrato || '')}</select></td>
+          <td><select class="form-select form-select-sm js-cooperado-select" ${disabled}>${cooperadoOptions(row.cooperado_id || '')}</select></td>
+          <td><input type="text" class="form-control form-control-sm js-nome-livre" value="${escapeHtml(row.cooperado_nome_livre || '')}" placeholder="Opcional" ${disabled} ${nomeLivreDisabled}></td>
           <td class="text-center">${canEdit ? '<button type="button" class="btn btn-success btn-sm js-salvar-linha">Salvar</button>' : '<span class="badge text-bg-light border">Visualizar</span>'}</td>
           <td class="text-center">${canEdit ? '<button type="button" class="btn btn-outline-danger btn-sm js-retirar-coop">Retirar</button>' : '<span class="text-muted">—</span>'}</td>
         </tr>`;
@@ -6045,15 +6040,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <table class="table table-sm align-middle mb-0 escala-compact-table">
           <thead>
             <tr>
-              <th>Dia</th>
-              <th>Data</th>
-              <th>Turno</th>
-              <th>Horário</th>
-              <th>Contrato</th>
-              <th>Cooperado</th>
-              <th>Nome livre</th>
-              <th class="text-center">Salvar</th>
-              <th class="text-center">Sair da escala</th>
+              <th>Dia</th><th>Data</th><th>Turno</th><th>Horário</th><th>Contrato</th><th>Cooperado</th><th>Nome livre</th><th class="text-center">Salvar</th><th class="text-center">Sair da escala</th>
             </tr>
           </thead>
           <tbody>${tbody}</tbody>
@@ -6063,26 +6050,70 @@ document.addEventListener('DOMContentLoaded', function(){
 
   async function loadRows(){
     if (rowsLoaded) return;
-    statusRows.textContent = 'Carregando grade…';
+    rows = parsePreloadedRows();
+    rowsLoaded = true;
+    if (statusRows) statusRows.textContent = 'Grade carregada';
     renderRows();
+  }
+
+  function buildSaveUrl(rowId){
+    return saveBase.replace('__ID__', String(rowId || ''));
+  }
+
+  async function salvarLinha(tr){
+    if (!tr || !canEdit) return;
+    const rowId = tr.dataset.rowId;
+    const contratoEl = tr.querySelector('.js-contrato');
+    const coopEl = tr.querySelector('.js-cooperado-select');
+    const nomeLivreEl = tr.querySelector('.js-nome-livre');
+    const btnSalvar = tr.querySelector('.js-salvar-linha');
+    const btnRetirar = tr.querySelector('.js-retirar-coop');
+    const originalSalvar = btnSalvar ? btnSalvar.innerHTML : '';
+    if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerHTML = 'Salvando...'; }
+    if (btnRetirar) btnRetirar.disabled = true;
+
+    const fd = new FormData();
+    fd.append('contrato', contratoEl?.value || '');
+    fd.append('cooperado_id', coopEl?.value || '');
+    fd.append('cooperado_nome_livre', nomeLivreEl?.value || '');
+    fd.append('redirect_day', currentDay);
+    fd.append('ajax', '1');
+    if (csrfToken) fd.append('csrf_token', csrfToken);
+
     try {
-      const preloadedRowsRaw = mount?.dataset?.rows || '[]';
-      rows = JSON.parse(preloadedRowsRaw);
-      rowsLoaded = true;
-      statusRows.textContent = 'Grade carregada';
+      const resp = await fetch(buildSaveUrl(rowId), {
+        method: 'POST',
+        body: fd,
+        headers: { 'X-Requested-With':'XMLHttpRequest' }
+      });
+      const contentType = resp.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('Resposta inválida do servidor. Verifique login e permissão de editar em Escalas.');
+      }
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.message || 'Erro ao salvar');
+
+      const row = rows.find(r => String(r.id) === String(rowId));
+      if (row) {
+        row.contrato = contratoEl?.value || '';
+        row.cooperado_id = coopEl?.value ? Number(coopEl.value) : null;
+        row.cooperado_nome_livre = nomeLivreEl?.value || '';
+        const coop = cooperadosFull.find(c => String(c.id) === String(coopEl?.value || ''));
+        row.cooperado_nome = coop ? coop.nome : (nomeLivreEl?.value || '');
+      }
       renderRows();
     } catch (err) {
-      statusRows.textContent = 'Erro ao carregar';
-      mount.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(err.message || 'Erro ao carregar a grade semanal.')}</div>`;
+      alert(err.message || 'Não foi possível salvar a linha da escala.');
+    } finally {
+      if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerHTML = originalSalvar || 'Salvar'; }
+      if (btnRetirar) btnRetirar.disabled = false;
     }
   }
 
   toggleBtn?.addEventListener('click', async function(){
     const opening = panel.hidden;
     panel.hidden = !panel.hidden;
-    this.innerHTML = opening
-      ? '<i class="bi bi-chevron-up me-1"></i> Fechar escala semanal'
-      : '<i class="bi bi-calendar-week me-1"></i> Abrir escala semanal';
+    this.innerHTML = opening ? '<i class="bi bi-chevron-up me-1"></i> Fechar escala semanal' : '<i class="bi bi-calendar-week me-1"></i> Abrir escala semanal';
     if (opening) await loadRows();
   });
 
@@ -6099,53 +6130,9 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   });
 
-  [filtroNome, filtroContrato, filtroLivres].forEach(el => el?.addEventListener('input', renderRows));
+  [filtroNome, filtroContrato].forEach(el => el?.addEventListener('input', renderRows));
   filtroLivres?.addEventListener('change', renderRows);
 
-
-  function rowPayload(tr){
-    return {
-      contrato: tr.querySelector('[name="contrato"]')?.value || '',
-      cooperado_id: tr.querySelector('[name="cooperado_id"]')?.value || '',
-      cooperado_nome_livre: tr.querySelector('[name="cooperado_nome_livre"]')?.value || '',
-      redirect_day: currentDay || 'semana',
-    };
-  }
-
-  async function salvarLinha(tr){
-    const id = tr?.dataset?.escalaId || '';
-    if (!id || !saveBase) return;
-    const fd = new FormData();
-    const payload = rowPayload(tr);
-    Object.entries(payload).forEach(([k,v]) => fd.append(k, v));
-    if (csrfToken) fd.append('csrf_token', csrfToken);
-
-    const btnSalvar = tr.querySelector('.js-salvar-linha');
-    const btnRetirar = tr.querySelector('.js-retirar-coop');
-    const before = btnSalvar ? btnSalvar.innerHTML : '';
-    if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerHTML = 'Salvando...'; }
-    if (btnRetirar) btnRetirar.disabled = true;
-
-    try {
-      const resp = await fetch(`${saveBase}${id}/salvar`, {
-        method: 'POST',
-        headers: { 'X-Requested-With':'XMLHttpRequest' },
-        body: fd
-      });
-      const data = await resp.json();
-      if (!resp.ok || !data.ok) throw new Error(data.message || 'Erro ao salvar');
-      const select = tr.querySelector('.js-cooperado-select');
-      const nomeLivre = tr.querySelector('.js-nome-livre');
-      const isLivre = !(select?.value) && !(String(nomeLivre?.value || '').trim());
-      tr.classList.toggle('escala-row-vazia', !!isLivre);
-      statusRows.textContent = 'Última atualização salva';
-    } catch (err) {
-      alert(err.message || 'Não foi possível salvar a linha.');
-    } finally {
-      if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerHTML = before || 'Salvar'; }
-      if (btnRetirar) btnRetirar.disabled = false;
-    }
-  }
   mount?.addEventListener('change', function(e){
     const tr = e.target.closest('.js-escala-row');
     if (!tr) return;
@@ -6160,27 +6147,28 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 
   mount?.addEventListener('click', function(e){
-    const btnSalvar = e.target.closest('.js-salvar-linha');
-    if (btnSalvar) {
-      const tr = btnSalvar.closest('.js-escala-row');
-      if (tr) salvarLinha(tr);
+    const salvarBtn = e.target.closest('.js-salvar-linha');
+    if (salvarBtn) {
+      e.preventDefault();
+      const tr = salvarBtn.closest('.js-escala-row');
+      salvarLinha(tr);
       return;
     }
-
-    const btn = e.target.closest('.js-retirar-coop');
-    if (!btn) return;
-    const tr = btn.closest('.js-escala-row');
-    if (!tr) return;
-    const select = tr.querySelector('.js-cooperado-select');
-    const nomeLivre = tr.querySelector('.js-nome-livre');
-    if (select) select.value = '';
-    if (nomeLivre) {
-      nomeLivre.disabled = !canEdit ? true : false;
-      nomeLivre.value = '';
+    const retirarBtn = e.target.closest('.js-retirar-coop');
+    if (retirarBtn) {
+      e.preventDefault();
+      const tr = retirarBtn.closest('.js-escala-row');
+      if (!tr) return;
+      const select = tr.querySelector('.js-cooperado-select');
+      const nomeLivre = tr.querySelector('.js-nome-livre');
+      if (select) select.value = '';
+      if (nomeLivre) {
+        nomeLivre.value = '';
+        nomeLivre.disabled = !canEdit ? true : false;
+      }
+      salvarLinha(tr);
     }
-    salvarLinha(tr);
   });
-
   function renderAlertas(alertas){
     if (!wrapAlertas) return;
     const total = Array.isArray(alertas) ? alertas.length : 0;
