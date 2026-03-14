@@ -3928,6 +3928,170 @@
     </div>
   </div>
 
+  <!-- Distribuição semanal editável -->
+  <div class="card p-3 mb-3 border-0 shadow-sm escala-week-card">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+      <div>
+        <h6 class="mb-1 section-title">Escala semanal individual</h6>
+        <small class="section-subtitle">
+          Visualize por semana ou por dia. Alterações feitas aqui atualizam a escala do cooperado e o painel do estabelecimento.
+        </small>
+      </div>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span class="badge-soft">Linhas: {{ escala_editor_rows|length if escala_editor_rows is defined else 0 }}</span>
+        <span class="badge-soft">Contratos: {{ contratos_escala_opcoes|length if contratos_escala_opcoes is defined else 0 }}</span>
+      </div>
+    </div>
+
+    <div class="escala-day-tabs mb-3" id="escalaDayTabs">
+      <button type="button" class="btn btn-sm btn-royal active" data-day-filter="semana">Semana</button>
+      <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="1">Segunda</button>
+      <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="2">Terça</button>
+      <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="3">Quarta</button>
+      <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="4">Quinta</button>
+      <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="5">Sexta</button>
+      <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="6">Sábado</button>
+      <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="7">Domingo</button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0 table-escalas table-escala-editor" id="tabela-escala-editor">
+        <thead>
+          <tr>
+            <th style="width: 110px;">Dia</th>
+            <th style="width: 110px;">Data</th>
+            <th style="width: 120px;">Turno</th>
+            <th style="width: 140px;">Horário</th>
+            <th>Contrato</th>
+            <th>Cooperado</th>
+            <th style="width: 170px;">Nome livre</th>
+            <th class="text-center" style="width: 110px;">Salvar</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in escala_editor_rows or [] %}
+            <tr class="escala-editor-row {% if not row.cooperado_id and not row.cooperado_nome_livre %}escala-row-vazia{% endif %}"
+                data-weekday="{{ row.weekday_num or 0 }}">
+              <td>
+                <span class="badge rounded-pill text-bg-light border">{{ row.weekday_label or 'Sem dia' }}</span>
+              </td>
+              <td>{{ row.data or '—' }}</td>
+              <td>{{ row.turno or '—' }}</td>
+              <td>{{ row.horario or '—' }}</td>
+              <td>
+                <form method="POST"
+                      action="{{ url_for('admin_escala_salvar', escala_id=row.id) }}"
+                      class="row g-2 align-items-center js-escala-form">
+                  {% if csrf_token is defined %}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  {% endif %}
+                  <input type="hidden" name="redirect_day" class="js-redirect-day" value="{{ request.args.get('escala_dia', 'semana') }}">
+                  <div class="escala-inline-field">
+                    <select name="contrato" class="form-select form-select-sm js-contrato-select" {% if not can_escalas_editar %}disabled{% endif %}>
+                      {% for contrato_nome in contratos_escala_opcoes or [] %}
+                        <option value="{{ contrato_nome }}" {{ 'selected' if contrato_nome == row.contrato else '' }}>{{ contrato_nome }}</option>
+                      {% endfor %}
+                      {% if row.contrato and row.contrato not in (contratos_escala_opcoes or []) %}
+                        <option value="{{ row.contrato }}" selected>{{ row.contrato }}</option>
+                      {% endif %}
+                    </select>
+                  </div>
+              </td>
+              <td>
+                  <div class="escala-inline-field">
+                    <select name="cooperado_id" class="form-select form-select-sm js-cooperado-select" {% if not can_escalas_editar %}disabled{% endif %}>
+                      <option value="">Sem cooperado</option>
+                      {% for c in cooperados or [] %}
+                        <option value="{{ c.id }}" {{ 'selected' if row.cooperado_id == c.id else '' }}>{{ c.nome }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+              </td>
+              <td>
+                  <input type="text"
+                         name="cooperado_nome_livre"
+                         class="form-control form-control-sm js-nome-livre"
+                         value="{{ row.cooperado_nome_livre or '' }}"
+                         placeholder="Somente quando ficar sem cooperado"
+                         {% if row.cooperado_id %}disabled{% endif %}
+                         {% if not can_escalas_editar %}disabled{% endif %}>
+              </td>
+              <td class="text-center">
+                  {% if can_escalas_editar %}
+                    <button type="submit" class="btn btn-success btn-sm w-100">Salvar</button>
+                  {% else %}
+                    <span class="badge text-bg-light border">Visualizar</span>
+                  {% endif %}
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="8" class="text-center text-muted py-3">Nenhuma linha de escala encontrada.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card p-3 mb-3 border-0 shadow-sm escala-alerta-card" id="escalaAlertasCard">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-2">
+      <div>
+        <h6 class="mb-1 section-title">Alertas automáticos de contratos sem cooperado</h6>
+        <small class="section-subtitle">
+          O painel verifica contratos descobertos com início em até 1 hora e avisa automaticamente enquanto esta aba estiver aberta.
+        </small>
+      </div>
+      <div class="d-flex gap-2 align-items-center">
+        <span class="badge-soft" id="escalaAlertasCount">{{ escala_alertas_1h|length if escala_alertas_1h is defined else 0 }} alerta(s)</span>
+        <span class="badge-soft" id="escalaAlertasClock">Atualizando…</span>
+      </div>
+    </div>
+
+    <audio id="audioAlertaEscala" preload="auto">
+      <source src="{{ url_for('static', filename='escala.mp3') }}" type="audio/mpeg">
+    </audio>
+
+    <div id="escalaAlertasWrap"
+         data-initial='{{ escala_alertas_1h|default([])|tojson|safe }}'
+         data-endpoint='{{ url_for("admin_api_escala_alertas_1h") }}'>
+      {% if escala_alertas_1h %}
+        <div class="alert alert-warning border-0 shadow-sm mb-3">
+          <strong>Atenção:</strong> existem {{ escala_alertas_1h|length }} contrato(s) sem cooperado começando em até 1 hora.
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Dia</th>
+                <th>Data</th>
+                <th>Turno</th>
+                <th>Horário</th>
+                <th>Contrato</th>
+                <th>Faltam</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in escala_alertas_1h %}
+                <tr class="escala-alerta-row">
+                  <td>{{ a.weekday_label }}</td>
+                  <td>{{ a.data }}</td>
+                  <td>{{ a.turno or '—' }}</td>
+                  <td>{{ a.horario or '—' }}</td>
+                  <td><strong>{{ a.contrato }}</strong></td>
+                  <td>{{ a.minutos_restantes }} min</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="alert alert-success border-0 mb-0">Nenhum contrato sem cooperado começando dentro da próxima 1 hora.</div>
+      {% endif %}
+    </div>
+  </div>
+
   <!-- Cooperados & Escalas -->
   <div class="card p-3 mb-3">
     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -4975,6 +5139,14 @@
 
   .search-input::placeholder { font-size: 0.78rem; }
 
+
+  .escala-week-card { background: linear-gradient(135deg, #ffffff 0%, #f7f9ff 100%); }
+  .escala-day-tabs { display:flex; flex-wrap:wrap; gap:.45rem; }
+  .table-escala-editor th, .table-escala-editor td { vertical-align: middle; }
+  .escala-inline-field { min-width: 180px; }
+  .escala-row-vazia td { background: #fff8e6; }
+  .escala-editor-row.is-hidden-day { display:none; }
+
   .escalas-wrapper { max-height: 420px; overflow-y: auto; }
 
   .table-escalas { border-collapse: separate; border-spacing: 0; }
@@ -5002,6 +5174,12 @@
   .badge-doc-na { background: #f2f3f7; color: #6c757d; border-color: #dde1ee; }
 
   .troca-pendentes-wrapper, .troca-historico-wrapper { max-height: 380px; overflow-y: auto; }
+  .escala-row-vazia { background: rgba(255, 193, 7, .10); }
+  .escala-alerta-card { border-left: 4px solid #f59e0b !important; }
+  .escala-alerta-row { background: rgba(245, 158, 11, .08); }
+  .escala-alerta-toast { position: fixed; right: 18px; bottom: 18px; z-index: 2055; min-width: 320px; max-width: 420px; background: #fff7ed; border: 1px solid rgba(245, 158, 11, .28); border-radius: 16px; box-shadow: 0 18px 38px rgba(15, 23, 42, .14); padding: 14px 16px; }
+  .escala-alerta-toast strong { color: #9a3412; }
+
 
   .table-troca { border-collapse: separate; border-spacing: 0; }
   .table-troca thead th {
