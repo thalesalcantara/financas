@@ -6746,18 +6746,30 @@ def solicitar_troca():
         flash("Cooperado de destino inválido.", "danger")
         return _portal_cooperado_redirect_tab("trocas")
 
-    def _escala_match_key(e: Escala | None):
+    def _safe_str(v):
+        return str(v or "").strip()
+
+    def _norm_horario(v: str) -> str:
+        txt = _safe_str(v)
+        m = re.findall(r"(\d{1,2}):(\d{2})", txt)
+        if m:
+            return " | ".join(f"{int(h):02d}:{int(mm):02d}" for h, mm in m)
+        return _norm(txt)
+
+    def _escala_signature(e: Escala | None):
         if not e:
             return None
-        return (
-            _weekday_from_data_str(getattr(e, "data", None)),
-            _turno_bucket(getattr(e, "turno", None), getattr(e, "horario", None)),
-            _norm(getattr(e, "contrato", "") or ""),
-        )
 
-    origem_key = _escala_match_key(origem)
+        return {
+            "weekday": _weekday_from_data_str(getattr(e, "data", None)),
+            "bucket": _turno_bucket(getattr(e, "turno", None), getattr(e, "horario", None)),
+            "horario": _norm_horario(getattr(e, "horario", None)),
+            "contrato": _norm(getattr(e, "contrato", "") or ""),
+        }
 
-    candidatas = (
+    nova_sig = _escala_signature(origem)
+
+    pendentes_mesma_dupla = (
         TrocaSolicitacao.query
         .filter(TrocaSolicitacao.status == "pendente")
         .filter(
@@ -6776,35 +6788,42 @@ def solicitar_troca():
         .all()
     )
 
-    for t_exist in candidatas:
+    for t_exist in pendentes_mesma_dupla:
         esc_exist = Escala.query.get(t_exist.origem_escala_id)
         if not esc_exist:
             continue
 
-        esc_exist_key = _escala_match_key(esc_exist)
+        exist_sig = _escala_signature(esc_exist)
 
         if int(t_exist.origem_escala_id or 0) == int(origem.id):
-            if t_exist.solicitante_id == destino.id and t_exist.destino_id == me.id:
+            if t_exist.solicitante_id == destino.id:
                 flash(
-                    "Esse cooperado já enviou a solicitação desta mesma escala para você. Vá na aba Trocas e aceite.",
+                    "Esse cooperado já enviou a solicitação dessa troca. Vá na aba Trocas e aceite.",
                     "info"
                 )
             else:
                 flash(
-                    "Já existe uma solicitação pendente para essa mesma escala com esse cooperado. Vá na aba Trocas.",
+                    "Já existe uma solicitação pendente para essa mesma escala com esse cooperado.",
                     "warning"
                 )
             return _portal_cooperado_redirect_tab("trocas")
 
-        if origem_key and esc_exist_key and origem_key == esc_exist_key:
-            if t_exist.solicitante_id == destino.id and t_exist.destino_id == me.id:
+        if (
+            nova_sig
+            and exist_sig
+            and nova_sig["weekday"] == exist_sig["weekday"]
+            and nova_sig["bucket"] == exist_sig["bucket"]
+            and nova_sig["horario"] == exist_sig["horario"]
+            and nova_sig["contrato"] == exist_sig["contrato"]
+        ):
+            if t_exist.solicitante_id == destino.id:
                 flash(
-                    "Esse cooperado já enviou uma solicitação equivalente para você. Vá na aba Trocas e aceite.",
+                    "Esse cooperado já enviou a solicitação de troca. Vá na aba Trocas e aceite.",
                     "info"
                 )
             else:
                 flash(
-                    "Já existe uma solicitação pendente equivalente entre vocês. Vá na aba Trocas.",
+                    "Já existe uma solicitação pendente equivalente entre vocês para esse mesmo horário e contrato.",
                     "warning"
                 )
             return _portal_cooperado_redirect_tab("trocas")
@@ -6818,6 +6837,7 @@ def solicitar_troca():
     )
     db.session.add(t)
     db.session.commit()
+
     flash("Solicitação de troca enviada com sucesso.", "success")
     return _portal_cooperado_redirect_tab("trocas")
 
