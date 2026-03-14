@@ -1507,6 +1507,67 @@ def _escala_sort_key(e: Escala):
         int(getattr(e, "id", 0) or 0),
     )
 
+
+def _brasil_now() -> datetime:
+    """Agora em horário de Brasília sem depender do timezone do servidor."""
+    return datetime.utcnow() - timedelta(hours=3)
+
+
+def _escala_inicio_datetime(e: Escala) -> datetime | None:
+    dt = _parse_data_escala_str(getattr(e, "data", None))
+    if not dt:
+        return None
+
+    horario_txt = str(getattr(e, "horario", "") or "")
+    m = re.search(r"(\d{1,2}):(\d{2})", horario_txt)
+    if not m:
+        return None
+
+    hh = int(m.group(1))
+    mm = int(m.group(2))
+    if hh > 23 or mm > 59:
+        return None
+
+    return datetime.combine(dt, dtime(hour=hh, minute=mm))
+
+
+def _build_escala_alertas_1h(escalas_all: list[Escala], cooperados_map: dict[int, Cooperado] | None = None) -> list[dict]:
+    agora = _brasil_now()
+    limite = agora + timedelta(hours=1)
+    out = []
+    cooperados_map = cooperados_map or {}
+
+    for e in escalas_all:
+        sem_cooperado = not getattr(e, "cooperado_id", None) and not (getattr(e, "cooperado_nome", None) or "").strip()
+        if not sem_cooperado:
+            continue
+
+        inicio = _escala_inicio_datetime(e)
+        if not inicio:
+            continue
+
+        if not (agora <= inicio <= limite):
+            continue
+
+        minutos = int((inicio - agora).total_seconds() // 60)
+        contrato = (getattr(e, "contrato", None) or "Sem contrato").strip() or "Sem contrato"
+        coop = cooperados_map.get(getattr(e, "cooperado_id", 0) or 0)
+        out.append({
+            "id": int(getattr(e, "id", 0) or 0),
+            "data": getattr(e, "data", "") or "",
+            "turno": getattr(e, "turno", "") or "",
+            "horario": getattr(e, "horario", "") or "",
+            "contrato": contrato,
+            "cooperado_nome": (coop.nome if coop else (getattr(e, "cooperado_nome", None) or "").strip()),
+            "minutos_restantes": max(0, minutos),
+            "inicio_iso": inicio.strftime("%Y-%m-%dT%H:%M:%S"),
+            "weekday_label": _escala_weekday_label(getattr(e, "data", None)),
+            "mensagem": f"Cobrir contrato {contrato} às {(getattr(e, 'horario', '') or '').strip() or '—'}",
+        })
+
+    out.sort(key=lambda item: (item.get("inicio_iso", ""), (item.get("contrato", "") or "").lower(), item.get("id", 0)))
+    return out
+
 def _match_cooperado_by_name(nome_planilha: str, cooperados: list[Cooperado]) -> Cooperado | None:
     def norm_join(s: str) -> str:
         return " ".join(_normalize_name(s))
@@ -3005,6 +3066,7 @@ def admin_dashboard():
     )
 
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
+    cooperados_map = {c.id: c for c in cooperados}
 
     # =========================
     # Documentos / status
@@ -3076,7 +3138,7 @@ def admin_dashboard():
     for e in sorted(escalas_all, key=_escala_sort_key):
         coop_obj = None
         if e.cooperado_id:
-            coop_obj = next((c for c in cooperados if c.id == e.cooperado_id), None)
+            coop_obj = cooperados_map.get(e.cooperado_id)
 
         nome_atual = (coop_obj.nome if coop_obj else (e.cooperado_nome or "").strip())
         escala_editor_rows.append({
@@ -3093,6 +3155,8 @@ def admin_dashboard():
             "restaurante_id": e.restaurante_id,
             "cor": getattr(e, "cor", None),
         })
+
+    escala_alertas_1h = _build_escala_alertas_1h(escalas_all, cooperados_map)
 
     # =========================
     # Gráficos
@@ -5846,6 +5910,44 @@ def admin_escala_salvar(escala_id):
     db.session.commit()
     flash("Linha da escala atualizada com sucesso.", "success")
     return redirect(url_for("admin_dashboard", tab="escalas", escala_dia=redirect_day))
+
+
+@app.get("/admin/api/escalas/alertas_1h")
+@admin_perm_required("escalas", "ver")
+def admin_api_escala_alertas_1h():
+    admin_logado = _usuario_logado()
+    if not admin_logado or (admin_logado.tipo or "").strip().lower() != "admin":
+        return jsonify({"ok": False, "message": "Não autorizado."}), 403
+
+    escalas_all = (
+        db.session.query(Escala)
+        .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
+        .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(
+            or_(
+                Escala.cooperado_id.is_(None),
+                Usuario.ativo.is_(True)
+            )
+        )
+        .order_by(Escala.id.asc())
+        .all()
+    )
+
+    cooperados = (
+        Cooperado.query
+        .join(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(Usuario.ativo.is_(True))
+        .order_by(Cooperado.nome)
+        .all()
+    )
+    cooperados_map = {c.id: c for c in cooperados}
+    alertas = _build_escala_alertas_1h(escalas_all, cooperados_map)
+    return jsonify({
+        "ok": True,
+        "now": _brasil_now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "total": len(alertas),
+        "alertas": alertas,
+    })
 
 
 # =========================
