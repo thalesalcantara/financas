@@ -1465,6 +1465,48 @@ def _match_restaurante_id(contrato_txt: str) -> int | None:
     return None
 
 
+
+def _escala_weekday_num(data_txt: str | None) -> int:
+    """Retorna 1=segunda ... 7=domingo a partir do texto da data da escala."""
+    try:
+        wd = _weekday_from_data_str(data_txt)
+        if wd in (1, 2, 3, 4, 5, 6, 7):
+            return int(wd)
+    except Exception:
+        pass
+
+    try:
+        dt = _parse_data_escala_str(data_txt)
+        if dt:
+            return int(dt.weekday()) + 1
+    except Exception:
+        pass
+
+    return 0
+
+
+def _escala_weekday_label(data_txt: str | None) -> str:
+    mapa = {1: "Segunda", 2: "Terça", 3: "Quarta", 4: "Quinta", 5: "Sexta", 6: "Sábado", 7: "Domingo"}
+    return mapa.get(_escala_weekday_num(data_txt), "Sem dia")
+
+
+def _escala_sort_key(e: Escala):
+    dt = _parse_data_escala_str(getattr(e, "data", None))
+    data_ord = dt.toordinal() if dt else 0
+
+    horario_txt = str(getattr(e, "horario", "") or "")
+    m = re.search(r"(\d{1,2}):(\d{2})", horario_txt)
+    mins = (int(m.group(1)) * 60 + int(m.group(2))) if m else 9999
+
+    return (
+        _escala_weekday_num(getattr(e, "data", None)),
+        (getattr(e, "contrato", "") or "").strip().lower(),
+        data_ord,
+        mins,
+        (getattr(e, "turno", "") or "").strip().lower(),
+        int(getattr(e, "id", 0) or 0),
+    )
+
 def _match_cooperado_by_name(nome_planilha: str, cooperados: list[Cooperado]) -> Cooperado | None:
     def norm_join(s: str) -> str:
         return " ".join(_normalize_name(s))
@@ -3026,6 +3068,32 @@ def admin_dashboard():
     qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
     qtd_sem_cadastro = int(cont_rows.get(None, 0))
 
+    contratos_set = {((e.contrato or "").strip()) for e in escalas_all if (e.contrato or "").strip()}
+    contratos_set.update({((r.nome or "").strip()) for r in restaurantes if (r.nome or "").strip()})
+    contratos_escala_opcoes = sorted(contratos_set, key=lambda s: s.lower())
+
+    escala_editor_rows = []
+    for e in sorted(escalas_all, key=_escala_sort_key):
+        coop_obj = None
+        if e.cooperado_id:
+            coop_obj = next((c for c in cooperados if c.id == e.cooperado_id), None)
+
+        nome_atual = (coop_obj.nome if coop_obj else (e.cooperado_nome or "").strip())
+        escala_editor_rows.append({
+            "id": e.id,
+            "data": e.data or "",
+            "weekday_num": _escala_weekday_num(e.data),
+            "weekday_label": _escala_weekday_label(e.data),
+            "turno": e.turno or "",
+            "horario": e.horario or "",
+            "contrato": e.contrato or "",
+            "cooperado_id": e.cooperado_id,
+            "cooperado_nome": nome_atual or "",
+            "cooperado_nome_livre": (e.cooperado_nome or "") if not coop_obj else "",
+            "restaurante_id": e.restaurante_id,
+            "cor": getattr(e, "cor", None),
+        })
+
     # =========================
     # Gráficos
     # =========================
@@ -3449,6 +3517,8 @@ def admin_dashboard():
         admins_secundarios=admins_secundarios,
         admins_permissoes=admins_permissoes,
         filtro_periodo_aplicado=filtro_periodo_aplicado,
+        escala_editor_rows=escala_editor_rows,
+        contratos_escala_opcoes=contratos_escala_opcoes,
     )
     
 # =========================
@@ -5731,6 +5801,51 @@ def upload_escala():
         flash(f"Erro ao importar a escala: {e}", "danger")
 
     return redirect(url_for("admin_dashboard", tab="escalas"))
+
+
+# =========================
+# Edição rápida da escala semanal
+# =========================
+@app.post("/admin/escalas/<int:escala_id>/salvar")
+@admin_perm_required("escalas", "editar")
+def admin_escala_salvar(escala_id):
+    e = Escala.query.get_or_404(escala_id)
+
+    contrato_txt = (request.form.get("contrato") or "").strip()
+    cooperado_id_raw = (request.form.get("cooperado_id") or "").strip()
+    cooperado_nome_livre = (request.form.get("cooperado_nome_livre") or "").strip()
+    redirect_day = (request.form.get("redirect_day") or "semana").strip().lower()
+
+    if contrato_txt:
+        e.contrato = contrato_txt
+        e.restaurante_id = _match_restaurante_id(contrato_txt)
+
+    if cooperado_id_raw:
+        try:
+            coop_id = int(cooperado_id_raw)
+        except Exception:
+            flash("Cooperado inválido.", "danger")
+            return redirect(url_for("admin_dashboard", tab="escalas", escala_dia=redirect_day))
+
+        coop = (
+            Cooperado.query
+            .join(Usuario, Cooperado.usuario_id == Usuario.id)
+            .filter(Cooperado.id == coop_id, Usuario.ativo.is_(True))
+            .first()
+        )
+        if not coop:
+            flash("Cooperado inválido ou inativo.", "danger")
+            return redirect(url_for("admin_dashboard", tab="escalas", escala_dia=redirect_day))
+
+        e.cooperado_id = coop.id
+        e.cooperado_nome = None
+    else:
+        e.cooperado_id = None
+        e.cooperado_nome = cooperado_nome_livre or None
+
+    db.session.commit()
+    flash("Linha da escala atualizada com sucesso.", "success")
+    return redirect(url_for("admin_dashboard", tab="escalas", escala_dia=redirect_day))
 
 
 # =========================
