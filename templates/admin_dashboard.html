@@ -6065,7 +6065,8 @@ document.addEventListener('DOMContentLoaded', function(){
     statusRows.textContent = 'Carregando grade…';
     renderRows();
     try {
-      rows = JSON.parse(preloadedRowsRaw || '[]');
+      const preloadedRowsRaw = mount?.dataset?.rows || '[]';
+      rows = JSON.parse(preloadedRowsRaw);
       rowsLoaded = true;
       statusRows.textContent = 'Grade carregada';
       renderRows();
