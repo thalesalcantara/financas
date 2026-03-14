@@ -6918,8 +6918,7 @@ def aceitar_troca(troca_id):
     t.status = "aprovada"
     t.aplicada_em = datetime.utcnow()
 
-    prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "
-")
+    prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
     t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps(afetacao_json, ensure_ascii=False)
 
     db.session.commit()
