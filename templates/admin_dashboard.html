@@ -3847,15 +3847,13 @@
 
      <!-- ESCALAS -->
 <section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
-  <!-- Cabeçalho Escalas -->
   <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 align-items-lg-center mb-3">
     <div>
       <h5 class="mb-0 section-title">Gestão de Escalas</h5>
       <small class="section-subtitle">
-        Upload da planilha, consulta rápida por cooperado e histórico de trocas em um só lugar.
+        Upload da planilha, alertas no topo e escala semanal carregada somente quando você abrir.
       </small>
     </div>
-
     <div class="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center">
       <div class="alert alert-info py-1 px-2 mb-0 small shadow-sm border-0">
         <b>Prazo-limite geral:</b> 31/12/<span id="prazoAno">—</span>
@@ -3865,185 +3863,15 @@
     </div>
   </div>
 
-  <!-- Upload + Busca -->
-  <div class="card p-3 mb-3 escala-upload-card">
-    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
-      <div class="flex-grow-1">
-        <h6 class="mb-1 section-title">Upload da Escala (.xlsx)</h6>
-        <small class="section-subtitle">
-          Envie a planilha oficial de escalas. A associação do cooperado é feita por login (quando existir) ou por nome,
-          ignorando acentos.
-        </small>
-
-        <form method="POST"
-              action="{{ url_for('upload_escala') }}"
-              enctype="multipart/form-data"
-              class="row g-2 align-items-end mt-2">
-
-          {% if csrf_token is defined %}
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          {% endif %}
-
-          <div class="col-md-6">
-            <label for="arquivo_escala" class="form-label extra-small text-muted-2 mb-1">
-              Planilha de escala (.xlsx)
-            </label>
-            <input type="file"
-                   class="form-control form-control-sm"
-                   id="arquivo_escala"
-                   name="file"
-                   accept=".xlsx"
-                   required>
-          </div>
-
-          <div class="col-md-3">
-            <button type="submit" class="btn btn-royal btn-sm w-100 mt-1">
-              <i class="bi bi-upload me-1"></i> Enviar Planilha
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <!-- Busca por cooperado / placa / CNH -->
-      <div class="escala-search-box">
-        <span class="section-subtitle d-block mb-1">Pesquisar cooperado</span>
-        <div class="input-group input-group-sm">
-          <span class="input-group-text bg-light border-0 pe-1">
-            <i class="bi bi-search text-muted-2"></i>
-          </span>
-          <input type="text"
-                 id="filtroCooperado"
-                 class="form-control border-0 shadow-none search-input"
-                 placeholder="Digite nome, placa ou CNH...">
-        </div>
-        <div class="d-flex gap-2 mt-2 justify-content-end">
-          <span class="badge-soft">
-            Cooperados: {{ cooperados|length if cooperados else 0 }}
-          </span>
-          <span class="badge-soft">
-            Com escala: {{ escalas_por_coop|length if escalas_por_coop is defined else 0 }}
-          </span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Distribuição semanal editável -->
-  <div class="card p-3 mb-3 border-0 shadow-sm escala-week-card">
-    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
-      <div>
-        <h6 class="mb-1 section-title">Escala semanal individual</h6>
-        <small class="section-subtitle">
-          Visualize por semana ou por dia. Alterações feitas aqui atualizam a escala do cooperado e o painel do estabelecimento.
-        </small>
-      </div>
-      <div class="d-flex flex-wrap gap-2 align-items-center">
-        <span class="badge-soft">Linhas: {{ escala_editor_rows|length if escala_editor_rows is defined else 0 }}</span>
-        <span class="badge-soft">Contratos: {{ contratos_escala_opcoes|length if contratos_escala_opcoes is defined else 0 }}</span>
-      </div>
-    </div>
-
-    <div class="escala-day-tabs mb-3" id="escalaDayTabs">
-      <button type="button" class="btn btn-sm btn-royal active" data-day-filter="semana">Semana</button>
-      <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="1">Segunda</button>
-      <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="2">Terça</button>
-      <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="3">Quarta</button>
-      <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="4">Quinta</button>
-      <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="5">Sexta</button>
-      <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="6">Sábado</button>
-      <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="7">Domingo</button>
-    </div>
-
-    <div class="table-responsive">
-      <table class="table table-sm align-middle mb-0 table-escalas table-escala-editor" id="tabela-escala-editor">
-        <thead>
-          <tr>
-            <th style="width: 110px;">Dia</th>
-            <th style="width: 110px;">Data</th>
-            <th style="width: 120px;">Turno</th>
-            <th style="width: 140px;">Horário</th>
-            <th>Contrato</th>
-            <th>Cooperado</th>
-            <th style="width: 170px;">Nome livre</th>
-            <th class="text-center" style="width: 110px;">Salvar</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in escala_editor_rows or [] %}
-            <tr class="escala-editor-row {% if not row.cooperado_id and not row.cooperado_nome_livre %}escala-row-vazia{% endif %}"
-                data-weekday="{{ row.weekday_num or 0 }}">
-              <td>
-                <span class="badge rounded-pill text-bg-light border">{{ row.weekday_label or 'Sem dia' }}</span>
-              </td>
-              <td>{{ row.data or '—' }}</td>
-              <td>{{ row.turno or '—' }}</td>
-              <td>{{ row.horario or '—' }}</td>
-              <td>
-                <form method="POST"
-                      action="{{ url_for('admin_escala_salvar', escala_id=row.id) }}"
-                      class="row g-2 align-items-center js-escala-form">
-                  {% if csrf_token is defined %}
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  {% endif %}
-                  <input type="hidden" name="redirect_day" class="js-redirect-day" value="{{ request.args.get('escala_dia', 'semana') }}">
-                  <div class="escala-inline-field">
-                    <select name="contrato" class="form-select form-select-sm js-contrato-select" {% if not can_escalas_editar %}disabled{% endif %}>
-                      {% for contrato_nome in contratos_escala_opcoes or [] %}
-                        <option value="{{ contrato_nome }}" {{ 'selected' if contrato_nome == row.contrato else '' }}>{{ contrato_nome }}</option>
-                      {% endfor %}
-                      {% if row.contrato and row.contrato not in (contratos_escala_opcoes or []) %}
-                        <option value="{{ row.contrato }}" selected>{{ row.contrato }}</option>
-                      {% endif %}
-                    </select>
-                  </div>
-              </td>
-              <td>
-                  <div class="escala-inline-field">
-                    <select name="cooperado_id" class="form-select form-select-sm js-cooperado-select" {% if not can_escalas_editar %}disabled{% endif %}>
-                      <option value="">Sem cooperado</option>
-                      {% for c in cooperados or [] %}
-                        <option value="{{ c.id }}" {{ 'selected' if row.cooperado_id == c.id else '' }}>{{ c.nome }}</option>
-                      {% endfor %}
-                    </select>
-                  </div>
-              </td>
-              <td>
-                  <input type="text"
-                         name="cooperado_nome_livre"
-                         class="form-control form-control-sm js-nome-livre"
-                         value="{{ row.cooperado_nome_livre or '' }}"
-                         placeholder="Somente quando ficar sem cooperado"
-                         {% if row.cooperado_id %}disabled{% endif %}
-                         {% if not can_escalas_editar %}disabled{% endif %}>
-              </td>
-              <td class="text-center">
-                  {% if can_escalas_editar %}
-                    <button type="submit" class="btn btn-success btn-sm w-100">Salvar</button>
-                  {% else %}
-                    <span class="badge text-bg-light border">Visualizar</span>
-                  {% endif %}
-                </form>
-              </td>
-            </tr>
-          {% else %}
-            <tr>
-              <td colspan="8" class="text-center text-muted py-3">Nenhuma linha de escala encontrada.</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="card p-3 mb-3 border-0 shadow-sm escala-alerta-card" id="escalaAlertasCard">
+  <div class="card p-3 mb-3 border-0 shadow-sm escala-alerta-card escala-alerta-top" id="escalaAlertasCard">
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-2">
       <div>
-        <h6 class="mb-1 section-title">Alertas automáticos de contratos sem cooperado</h6>
+        <h6 class="mb-1 section-title">Aviso de contratos sem cooperado</h6>
         <small class="section-subtitle">
-          O painel verifica contratos descobertos com início em até 1 hora e avisa automaticamente enquanto esta aba estiver aberta.
+          O aviso fica no topo para aparecer logo. O som usa <strong>static/escala.mp3</strong> e toca quando surgir alerta novo com a aba aberta.
         </small>
       </div>
-      <div class="d-flex gap-2 align-items-center">
+      <div class="d-flex gap-2 align-items-center flex-wrap">
         <span class="badge-soft" id="escalaAlertasCount">{{ escala_alertas_1h|length if escala_alertas_1h is defined else 0 }} alerta(s)</span>
         <span class="badge-soft" id="escalaAlertasClock">Atualizando…</span>
       </div>
@@ -4057,10 +3885,10 @@
          data-initial='{{ escala_alertas_1h|default([])|tojson|safe }}'
          data-endpoint='{{ url_for("admin_api_escala_alertas_1h") }}'>
       {% if escala_alertas_1h %}
-        <div class="alert alert-warning border-0 shadow-sm mb-3">
+        <div class="alert alert-warning border-0 shadow-sm mb-2">
           <strong>Atenção:</strong> existem {{ escala_alertas_1h|length }} contrato(s) sem cooperado começando em até 1 hora.
         </div>
-        <div class="table-responsive">
+        <div class="table-responsive escala-alerta-table-wrap">
           <table class="table table-sm align-middle mb-0">
             <thead>
               <tr>
@@ -4092,6 +3920,126 @@
     </div>
   </div>
 
+  <div class="card p-3 mb-3 escala-upload-card">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+      <div class="flex-grow-1">
+        <h6 class="mb-1 section-title">Upload da Escala (.xlsx)</h6>
+        <small class="section-subtitle">
+          Envie a planilha oficial. A grade semanal abaixo não vem aberta por padrão para não deixar a página tão grande.
+        </small>
+
+        <form method="POST"
+              action="{{ url_for('upload_escala') }}"
+              enctype="multipart/form-data"
+              class="row g-2 align-items-end mt-2">
+
+          {% if csrf_token is defined %}
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% endif %}
+
+          <div class="col-md-6">
+            <label for="arquivo_escala" class="form-label extra-small text-muted-2 mb-1">
+              Planilha de escala (.xlsx)
+            </label>
+            <input type="file"
+                   class="form-control form-control-sm"
+                   id="arquivo_escala"
+                   name="file"
+                   accept=".xlsx"
+                   required
+                   {% if not can_escalas_criar %}disabled{% endif %}>
+          </div>
+
+          <div class="col-md-3">
+            <button type="submit" class="btn btn-royal btn-sm w-100 mt-1" {% if not can_escalas_criar %}disabled{% endif %}>
+              <i class="bi bi-upload me-1"></i> Enviar Planilha
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="escala-search-box">
+        <span class="section-subtitle d-block mb-1">Pesquisar cooperado</span>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-light border-0 pe-1">
+            <i class="bi bi-search text-muted-2"></i>
+          </span>
+          <input type="text"
+                 id="filtroCooperado"
+                 class="form-control border-0 shadow-none search-input"
+                 placeholder="Digite nome, placa ou CNH...">
+        </div>
+        <div class="d-flex gap-2 mt-2 justify-content-end">
+          <span class="badge-soft">Cooperados: {{ cooperados|length if cooperados else 0 }}</span>
+          <span class="badge-soft">Com escala: {{ escalas_por_coop|length if escalas_por_coop is defined else 0 }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-3 mb-3 border-0 shadow-sm escala-week-card">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2">
+      <div>
+        <h6 class="mb-1 section-title">Escala semanal individual</h6>
+        <small class="section-subtitle">
+          Clique para abrir somente quando precisar. Você pode filtrar por nome, contrato, livres e por dia específico.
+        </small>
+      </div>
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+        <span class="badge-soft">Contratos: {{ contratos_escala_opcoes|length if contratos_escala_opcoes is defined else 0 }}</span>
+        <button type="button" class="btn btn-royal btn-sm" id="btnToggleEscalaSemanal">
+          <i class="bi bi-calendar-week me-1"></i> Abrir escala semanal
+        </button>
+      </div>
+    </div>
+
+    <div id="escalaWeeklyPanel" class="mt-3" hidden>
+      <div class="row g-2 mb-3">
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label mb-1">Localizar cooperado</label>
+          <input type="text" id="escalaFiltroNome" class="form-control form-control-sm" placeholder="Digite o nome do cooperado">
+        </div>
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label mb-1">Filtrar por contrato</label>
+          <select id="escalaFiltroContrato" class="form-select form-select-sm">
+            <option value="">Todos os contratos</option>
+            {% for contrato_nome in contratos_escala_opcoes or [] %}
+              <option value="{{ contrato_nome }}">{{ contrato_nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label mb-1">Vagas</label>
+          <div class="form-check form-switch pt-2">
+            <input class="form-check-input" type="checkbox" id="escalaFiltroLivres">
+            <label class="form-check-label" for="escalaFiltroLivres">Somente livres</label>
+          </div>
+        </div>
+        <div class="col-lg-4 col-md-6 d-flex align-items-end justify-content-md-end gap-2 flex-wrap">
+          <span class="badge-soft" id="escalaWeeklyCount">0 linha(s)</span>
+          <span class="badge-soft" id="escalaWeeklyStatus">Aguardando abertura</span>
+        </div>
+      </div>
+
+      <div class="escala-day-tabs mb-3" id="escalaDayTabs">
+        <button type="button" class="btn btn-sm btn-royal active" data-day-filter="semana">Semana</button>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="1">Segunda</button>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="2">Terça</button>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="3">Quarta</button>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="4">Quinta</button>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="5">Sexta</button>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="6">Sábado</button>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="7">Domingo</button>
+      </div>
+
+      <div id="escalaEditorMount"
+           data-endpoint="{{ url_for('admin_api_escala_editor_rows') }}"
+           data-csrf="{{ csrf_token() if csrf_token is defined else '' }}"
+           data-can-edit="{{ '1' if can_escalas_editar else '0' }}">
+        <div class="alert alert-light border mb-0">Clique em <strong>Abrir escala semanal</strong> para carregar a grade.</div>
+      </div>
+    </div>
+  </div>
   <!-- Cooperados & Escalas -->
   <div class="card p-3 mb-3">
     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -5175,6 +5123,12 @@
 
   .troca-pendentes-wrapper, .troca-historico-wrapper { max-height: 380px; overflow-y: auto; }
   .escala-row-vazia { background: rgba(255, 193, 7, .10); }
+  .escala-alerta-top{ position:sticky; top:10px; z-index:5; }
+  .escala-alerta-table-wrap{ max-height:260px; overflow:auto; }
+  .escala-week-table-wrap{ max-height:560px; overflow:auto; border:1px solid var(--border); border-radius:18px; }
+  .escala-compact-table th,.escala-compact-table td{ white-space:nowrap; }
+  .escala-filter-summary{ color:var(--muted); font-size:.78rem; }
+  .escala-week-empty{ padding:18px; text-align:center; color:var(--muted); }
   .escala-alerta-card { border-left: 4px solid #f59e0b !important; }
   .escala-alerta-row { background: rgba(245, 158, 11, .08); }
   .escala-alerta-toast { position: fixed; right: 18px; bottom: 18px; z-index: 2055; min-width: 320px; max-width: 420px; background: #fff7ed; border: 1px solid rgba(245, 158, 11, .28); border-radius: 16px; box-shadow: 0 18px 38px rgba(15, 23, 42, .14); padding: 14px 16px; }
@@ -5933,6 +5887,302 @@ document.addEventListener('DOMContentLoaded', function(){
       submitBtns.forEach(btn => btn.style.display = 'none');
     }
   });
+});
+</script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const contratos = {{ contratos_escala_opcoes|default([])|tojson|safe }};
+  const cooperados = {{ cooperados|default([])|map(attribute='nome')|list|tojson|safe }};
+  const cooperadosObjs = {{ cooperados|default([])|map(attribute='id')|list|tojson|safe }};
+  const cooperadosFull = [
+    {% for c in cooperados or [] %}
+      {id: {{ c.id }}, nome: {{ c.nome|tojson }} }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  const wrapAlertas = document.getElementById('escalaAlertasWrap');
+  const countAlertas = document.getElementById('escalaAlertasCount');
+  const clockAlertas = document.getElementById('escalaAlertasClock');
+  const audioAlerta = document.getElementById('audioAlertaEscala');
+  const toggleBtn = document.getElementById('btnToggleEscalaSemanal');
+  const panel = document.getElementById('escalaWeeklyPanel');
+  const mount = document.getElementById('escalaEditorMount');
+  const filtroNome = document.getElementById('escalaFiltroNome');
+  const filtroContrato = document.getElementById('escalaFiltroContrato');
+  const filtroLivres = document.getElementById('escalaFiltroLivres');
+  const countRows = document.getElementById('escalaWeeklyCount');
+  const statusRows = document.getElementById('escalaWeeklyStatus');
+  const dayTabs = document.getElementById('escalaDayTabs');
+  const canEdit = mount?.dataset?.canEdit === '1';
+  const csrfToken = mount?.dataset?.csrf || '';
+  const editorEndpoint = mount?.dataset?.endpoint || '';
+
+  let rows = [];
+  let rowsLoaded = false;
+  let currentDay = 'semana';
+  let audioUnlocked = false;
+  let knownAlertIds = new Set();
+
+  function escapeHtml(v){
+    return String(v ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+  }
+
+  function unlockAudio(){
+    if (!audioAlerta || audioUnlocked) return;
+    audioUnlocked = true;
+    try {
+      audioAlerta.volume = 1;
+      const p = audioAlerta.play();
+      if (p && typeof p.then === 'function') {
+        p.then(() => { audioAlerta.pause(); audioAlerta.currentTime = 0; }).catch(() => {});
+      } else {
+        audioAlerta.pause();
+        audioAlerta.currentTime = 0;
+      }
+    } catch(_) {}
+  }
+  document.addEventListener('click', unlockAudio, { once:true });
+  document.addEventListener('keydown', unlockAudio, { once:true });
+
+  function dayMatches(row){
+    return currentDay === 'semana' || String(row.weekday_num || '') === String(currentDay);
+  }
+
+  function getCoopDisplay(row){
+    return (row.cooperado_nome || row.cooperado_nome_livre || '').trim();
+  }
+
+  function rowMatches(row){
+    const nome = (filtroNome?.value || '').trim().toLowerCase();
+    const contrato = (filtroContrato?.value || '').trim().toLowerCase();
+    const livres = !!filtroLivres?.checked;
+    const coop = getCoopDisplay(row).toLowerCase();
+    const rowContrato = String(row.contrato || '').toLowerCase();
+    const isLivre = !row.cooperado_id && !String(row.cooperado_nome_livre || '').trim();
+
+    if (!dayMatches(row)) return false;
+    if (nome && !coop.includes(nome)) return false;
+    if (contrato && rowContrato !== contrato) return false;
+    if (livres && !isLivre) return false;
+    return true;
+  }
+
+  function contractOptions(selected){
+    const opts = [];
+    const seen = new Set();
+    [...contratos, selected].forEach(item => {
+      const val = String(item || '').trim();
+      if (!val || seen.has(val.toLowerCase())) return;
+      seen.add(val.toLowerCase());
+      opts.push(`<option value="${escapeHtml(val)}" ${val===selected?'selected':''}>${escapeHtml(val)}</option>`);
+    });
+    return opts.join('');
+  }
+
+  function cooperadoOptions(selectedId){
+    let html = '<option value="">Sem cooperado</option>';
+    cooperadosFull.forEach(c => {
+      const selected = String(c.id) === String(selectedId) ? 'selected' : '';
+      html += `<option value="${c.id}" ${selected}>${escapeHtml(c.nome)}</option>`;
+    });
+    return html;
+  }
+
+  function renderRows(){
+    if (!mount) return;
+    const filtered = rows.filter(rowMatches);
+    countRows.textContent = `${filtered.length} linha(s)`;
+    statusRows.textContent = rowsLoaded ? 'Grade carregada' : 'Carregando…';
+
+    if (!rowsLoaded) {
+      mount.innerHTML = '<div class="alert alert-light border mb-0">Carregando escala semanal…</div>';
+      return;
+    }
+
+    if (!filtered.length) {
+      mount.innerHTML = '<div class="card border-0 shadow-sm"><div class="escala-week-empty">Nenhuma linha encontrada para esse filtro.</div></div>';
+      return;
+    }
+
+    const tbody = filtered.map(row => {
+      const isLivre = !row.cooperado_id && !String(row.cooperado_nome_livre || '').trim();
+      const disabled = canEdit ? '' : 'disabled';
+      const nomeLivreDisabled = row.cooperado_id ? 'disabled' : '';
+      const csrf = csrfToken ? `<input type="hidden" name="csrf_token" value="${escapeHtml(csrfToken)}">` : '';
+      return `
+        <tr class="${isLivre ? 'escala-row-vazia' : ''}">
+          <td><span class="badge rounded-pill text-bg-light border">${escapeHtml(row.weekday_label || 'Sem dia')}</span></td>
+          <td>${escapeHtml(row.data || '—')}</td>
+          <td>${escapeHtml(row.turno || '—')}</td>
+          <td>${escapeHtml(row.horario || '—')}</td>
+          <td>
+            <form method="POST" action="${escapeHtml(row.save_url)}" class="d-flex align-items-center gap-2 js-escala-row-form flex-nowrap">
+              ${csrf}
+              <input type="hidden" name="redirect_day" value="${escapeHtml(currentDay)}">
+              <select name="contrato" class="form-select form-select-sm" ${disabled}>${contractOptions(row.contrato || '')}</select>
+          </td>
+          <td>
+              <select name="cooperado_id" class="form-select form-select-sm js-cooperado-select" ${disabled}>${cooperadoOptions(row.cooperado_id || '')}</select>
+          </td>
+          <td>
+              <input type="text" name="cooperado_nome_livre" class="form-control form-control-sm js-nome-livre" value="${escapeHtml(row.cooperado_nome_livre || '')}" placeholder="Opcional" ${disabled} ${nomeLivreDisabled}>
+          </td>
+          <td class="text-center">
+              ${canEdit ? '<button type="submit" class="btn btn-success btn-sm">Salvar</button>' : '<span class="badge text-bg-light border">Visualizar</span>'}
+          </td>
+          <td class="text-center">
+              ${canEdit ? '<button type="button" class="btn btn-outline-danger btn-sm js-retirar-coop">Retirar</button>' : '<span class="text-muted">—</span>'}
+            </form>
+          </td>
+        </tr>`;
+    }).join('');
+
+    mount.innerHTML = `
+      <div class="escala-week-table-wrap">
+        <table class="table table-sm align-middle mb-0 escala-compact-table">
+          <thead>
+            <tr>
+              <th>Dia</th>
+              <th>Data</th>
+              <th>Turno</th>
+              <th>Horário</th>
+              <th>Contrato</th>
+              <th>Cooperado</th>
+              <th>Nome livre</th>
+              <th class="text-center">Salvar</th>
+              <th class="text-center">Sair da escala</th>
+            </tr>
+          </thead>
+          <tbody>${tbody}</tbody>
+        </table>
+      </div>`;
+  }
+
+  async function loadRows(){
+    if (rowsLoaded || !editorEndpoint) return;
+    statusRows.textContent = 'Carregando grade…';
+    renderRows();
+    try {
+      const resp = await fetch(editorEndpoint, { headers: { 'X-Requested-With':'XMLHttpRequest' } });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.message || 'Erro ao carregar a grade');
+      rows = Array.isArray(data.rows) ? data.rows : [];
+      rowsLoaded = true;
+      statusRows.textContent = 'Grade carregada';
+      renderRows();
+    } catch (err) {
+      statusRows.textContent = 'Erro ao carregar';
+      mount.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(err.message || 'Erro ao carregar a grade semanal.')}</div>`;
+    }
+  }
+
+  toggleBtn?.addEventListener('click', async function(){
+    const opening = panel.hidden;
+    panel.hidden = !panel.hidden;
+    this.innerHTML = opening
+      ? '<i class="bi bi-chevron-up me-1"></i> Fechar escala semanal'
+      : '<i class="bi bi-calendar-week me-1"></i> Abrir escala semanal';
+    if (opening) await loadRows();
+  });
+
+  dayTabs?.querySelectorAll('[data-day-filter]').forEach(btn => {
+    btn.addEventListener('click', function(){
+      currentDay = this.getAttribute('data-day-filter') || 'semana';
+      dayTabs.querySelectorAll('[data-day-filter]').forEach(x => {
+        x.classList.remove('btn-royal','active');
+        x.classList.add('btn-outline-primary');
+      });
+      this.classList.remove('btn-outline-primary');
+      this.classList.add('btn-royal','active');
+      renderRows();
+    });
+  });
+
+  [filtroNome, filtroContrato, filtroLivres].forEach(el => el?.addEventListener('input', renderRows));
+  filtroLivres?.addEventListener('change', renderRows);
+
+  mount?.addEventListener('change', function(e){
+    const form = e.target.closest('.js-escala-row-form');
+    if (!form) return;
+    if (e.target.classList.contains('js-cooperado-select')) {
+      const nomeLivre = form.querySelector('.js-nome-livre');
+      if (nomeLivre) {
+        const semCoop = !e.target.value;
+        nomeLivre.disabled = !semCoop || !canEdit;
+        if (!semCoop) nomeLivre.value = '';
+      }
+    }
+  });
+
+  mount?.addEventListener('click', function(e){
+    const btn = e.target.closest('.js-retirar-coop');
+    if (!btn) return;
+    const form = btn.closest('.js-escala-row-form');
+    if (!form) return;
+    const select = form.querySelector('.js-cooperado-select');
+    const nomeLivre = form.querySelector('.js-nome-livre');
+    if (select) select.value = '';
+    if (nomeLivre) {
+      nomeLivre.disabled = !canEdit ? true : false;
+      nomeLivre.value = '';
+    }
+    form.submit();
+  });
+
+  function renderAlertas(alertas){
+    if (!wrapAlertas) return;
+    const total = Array.isArray(alertas) ? alertas.length : 0;
+    countAlertas.textContent = `${total} alerta(s)`;
+    const now = new Date();
+    clockAlertas.textContent = `Atualizado ${now.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}`;
+
+    if (!total) {
+      wrapAlertas.innerHTML = '<div class="alert alert-success border-0 mb-0">Nenhum contrato sem cooperado começando dentro da próxima 1 hora.</div>';
+      return;
+    }
+
+    wrapAlertas.innerHTML = `
+      <div class="alert alert-warning border-0 shadow-sm mb-2"><strong>Atenção:</strong> existem ${total} contrato(s) sem cooperado começando em até 1 hora.</div>
+      <div class="table-responsive escala-alerta-table-wrap">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Dia</th><th>Data</th><th>Turno</th><th>Horário</th><th>Contrato</th><th>Faltam</th></tr></thead>
+          <tbody>
+            ${alertas.map(a => `<tr class="escala-alerta-row"><td>${escapeHtml(a.weekday_label || '')}</td><td>${escapeHtml(a.data || '')}</td><td>${escapeHtml(a.turno || '—')}</td><td>${escapeHtml(a.horario || '—')}</td><td><strong>${escapeHtml(a.contrato || '')}</strong></td><td>${escapeHtml(a.minutos_restantes || 0)} min</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  async function pollAlertas(){
+    if (!wrapAlertas) return;
+    const endpoint = wrapAlertas.dataset.endpoint;
+    if (!endpoint) return;
+    try {
+      const resp = await fetch(endpoint, { headers: { 'X-Requested-With':'XMLHttpRequest' } });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.message || 'Erro ao consultar alertas');
+      const alertas = Array.isArray(data.alertas) ? data.alertas : [];
+      const newIds = alertas.map(a => String(a.id));
+      const hasNew = newIds.some(id => !knownAlertIds.has(id));
+      knownAlertIds = new Set(newIds);
+      renderAlertas(alertas);
+      if (hasNew && audioUnlocked && audioAlerta) {
+        try { audioAlerta.currentTime = 0; audioAlerta.play().catch(() => {}); } catch(_) {}
+      }
+    } catch (err) {
+      clockAlertas.textContent = 'Falha ao atualizar';
+    }
+  }
+
+  try {
+    const initial = JSON.parse(wrapAlertas?.dataset?.initial || '[]');
+    knownAlertIds = new Set((initial || []).map(a => String(a.id)));
+    renderAlertas(initial || []);
+  } catch(_) {}
+  pollAlertas();
+  setInterval(pollAlertas, 60000);
 });
 </script>
 
