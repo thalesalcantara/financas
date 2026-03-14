@@ -5933,6 +5933,7 @@ document.addEventListener('DOMContentLoaded', function(){
   const canEdit = mount?.dataset?.canEdit === '1';
   const csrfToken = mount?.dataset?.csrf || '';
   const editorEndpoint = mount?.dataset?.endpoint || '';
+  const saveBase = mount?.dataset?.saveBase || '';
 
   let rows = [];
   let rowsLoaded = false;
@@ -6146,10 +6147,10 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   }
   mount?.addEventListener('change', function(e){
-    const form = e.target.closest('.js-escala-row-form');
-    if (!form) return;
+    const tr = e.target.closest('.js-escala-row');
+    if (!tr) return;
     if (e.target.classList.contains('js-cooperado-select')) {
-      const nomeLivre = form.querySelector('.js-nome-livre');
+      const nomeLivre = tr.querySelector('.js-nome-livre');
       if (nomeLivre) {
         const semCoop = !e.target.value;
         nomeLivre.disabled = !semCoop || !canEdit;
@@ -6168,17 +6169,16 @@ document.addEventListener('DOMContentLoaded', function(){
 
     const btn = e.target.closest('.js-retirar-coop');
     if (!btn) return;
-    const form = btn.closest('.js-escala-row-form');
-    if (!form) return;
-    const select = form.querySelector('.js-cooperado-select');
-    const nomeLivre = form.querySelector('.js-nome-livre');
+    const tr = btn.closest('.js-escala-row');
+    if (!tr) return;
+    const select = tr.querySelector('.js-cooperado-select');
+    const nomeLivre = tr.querySelector('.js-nome-livre');
     if (select) select.value = '';
     if (nomeLivre) {
       nomeLivre.disabled = !canEdit ? true : false;
       nomeLivre.value = '';
     }
-    const tr = btn.closest('.js-escala-row');
-    if (tr) salvarLinha(tr);
+    salvarLinha(tr);
   });
 
   function renderAlertas(alertas){
