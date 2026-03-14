@@ -6873,37 +6873,7 @@ def solicitar_troca():
                 )
             return _portal_cooperado_redirect_tab("trocas")
 
-    
-
-    # BLOQUEIO TROCA RECIPROCA DUPLICADA (MESMO DIA + MESMO TURNO)
-    origem_weekday = _weekday_from_data_str(getattr(origem, "data", None))
-    origem_bucket = _turno_bucket(getattr(origem, "turno", None), getattr(origem, "horario", None))
-
-    pendentes = (TrocaSolicitacao.query
-        .filter(TrocaSolicitacao.status=="pendente")
-        .all())
-
-    for tcheck in pendentes:
-        esc_exist = Escala.query.get(tcheck.origem_escala_id)
-        if not esc_exist:
-            continue
-
-        wd_exist = _weekday_from_data_str(getattr(esc_exist,"data",None))
-        bucket_exist = _turno_bucket(getattr(esc_exist,"turno",None), getattr(esc_exist,"horario",None))
-
-        # A->B já existe
-        if (tcheck.solicitante_id==me.id and tcheck.destino_id==destino.id
-            and wd_exist==origem_weekday and bucket_exist==origem_bucket):
-            flash("Já existe uma solicitação dessa troca pendente.","warning")
-            return _portal_cooperado_redirect_tab("trocas")
-
-        # B->A (recíproca)
-        if (tcheck.solicitante_id==destino.id and tcheck.destino_id==me.id
-            and wd_exist==origem_weekday and bucket_exist==origem_bucket):
-            flash("Esse cooperado já enviou essa troca. Vá na aba Trocas para aceitar.","info")
-            return _portal_cooperado_redirect_tab("trocas")
-
-t = TrocaSolicitacao(
+    t = TrocaSolicitacao(
         solicitante_id=me.id,
         destino_id=destino.id,
         origem_escala_id=origem.id,
