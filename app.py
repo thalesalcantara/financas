@@ -6823,7 +6823,7 @@ def solicitar_troca():
             and exist_sig
             and nova_sig["weekday"] == exist_sig["weekday"]
             and nova_sig["bucket"] == exist_sig["bucket"]
-        )
+            and nova_sig["horario"] == exist_sig["horario"]
         )
 
         if not mesmo_slot:
