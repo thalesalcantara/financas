@@ -360,6 +360,30 @@
 {% set _flt       = _flt if _flt is defined else namespace(restaurante_id=None, cooperado_id=None, data_inicio='', data_fim='') %}
 {% set _tab       = (tab if tab is defined else request.args.get('tab','resumo')) %}
 
+
+{# -----------------------------------------
+   Permissões do admin logado
+   ----------------------------------------- #}
+{% set _perms = admin_perms if admin_perms is defined and admin_perms else {} %}
+{% set can_view_resumo         = admin_is_master %}
+{% set can_view_lancamentos    = admin_is_master or _perms.get('lancamentos', {}).get('ver') %}
+{% set can_view_receitas       = admin_is_master or _perms.get('receitas', {}).get('ver') %}
+{% set can_view_despesas       = admin_is_master or _perms.get('despesas', {}).get('ver') %}
+{% set can_view_coop_receitas  = admin_is_master or _perms.get('coop_receitas', {}).get('ver') %}
+{% set can_view_coop_despesas  = admin_is_master or _perms.get('coop_despesas', {}).get('ver') %}
+{% set can_view_beneficios     = admin_is_master or _perms.get('beneficios', {}).get('ver') %}
+{% set can_view_cooperados     = admin_is_master or _perms.get('cooperados', {}).get('ver') %}
+{% set can_view_restaurantes   = admin_is_master or _perms.get('restaurantes', {}).get('ver') %}
+{% set can_view_escalas        = admin_is_master or _perms.get('escalas', {}).get('ver') %}
+{% set can_view_avisos         = admin_is_master or _perms.get('avisos', {}).get('ver') %}
+{% set can_view_documentos     = admin_is_master or _perms.get('documentos', {}).get('ver') %}
+{% set can_view_tabelas        = admin_is_master or _perms.get('tabelas', {}).get('ver') %}
+{% set can_view_avaliacoes     = admin_is_master or _perms.get('avaliacoes', {}).get('ver') %}
+{% set can_view_config         = admin_is_master %}
+{% set show_financeiro_menu = can_view_lancamentos or can_view_receitas or can_view_despesas or can_view_coop_receitas or can_view_coop_despesas or can_view_beneficios %}
+{% set show_cadastros_menu  = can_view_cooperados or can_view_restaurantes or can_view_documentos or can_view_tabelas %}
+{% set show_operacao_menu   = can_view_escalas or can_view_avisos %}
+
 <div class="layout">
 
   <!-- SIDEBAR -------------------------------------------------------------->
@@ -375,6 +399,7 @@
       <div class="nav-section-label">Visão Geral</div>
 
       <!-- Resumo (TAB, igual antes) -->
+{% if can_view_resumo %}
       <a class="nav-link-main {{ 'active' if _tab=='resumo' else '' }}"
          data-bs-toggle="tab"
          data-bs-target="#resumo"
@@ -387,8 +412,10 @@
           <span class="nav-link-label">Resumo</span>
         </div>
       </a>
+{% endif %}
 
       <!-- Avaliações (ROTA /admin/avaliacoes) -->
+{% if can_view_avaliacoes %}
     <a class="nav-link-main {% if request.endpoint == 'admin_avaliacoes' %}active{% endif %}"
        href="{{ url_for('admin_avaliacoes') }}">
       <div class="nav-link-left">
@@ -396,9 +423,11 @@
         <span class="nav-link-label">Avaliações</span>
       </div>
     </a>
+{% endif %}
 
       <hr class="sidebar-divider">
 
+{% if show_financeiro_menu %}
       <!-- FINANCEIRO (TABS, não rotas) ------------------------------------->
       <button class="nav-link-group-toggle"
               type="button"
@@ -414,6 +443,7 @@
 
       <div id="menuFinanceiro" class="collapse show nav-sublinks">
         <!-- Lançamentos (tab) -->
+{% if can_view_lancamentos %}
         <a class="nav-sublink {{ 'active' if _tab=='lancamentos' else '' }}"
            data-bs-toggle="tab"
            data-bs-target="#lancamentos"
@@ -424,8 +454,10 @@
           <i class="bi bi-journal-text"></i>
           <span class="nav-link-label">Lançamentos</span>
         </a>
+{% endif %}
 
         <!-- Receitas Coop (tab) -->
+{% if can_view_receitas %}
         <a class="nav-sublink {{ 'active' if _tab=='receitas' else '' }}"
            data-bs-toggle="tab"
            data-bs-target="#receitas"
@@ -436,8 +468,10 @@
           <i class="bi bi-credit-card"></i>
           <span class="nav-link-label">Receitas Coop</span>
         </a>
+{% endif %}
 
         <!-- Despesas Coop (tab) -->
+{% if can_view_despesas %}
         <a class="nav-sublink {{ 'active' if _tab=='despesas' else '' }}"
            data-bs-toggle="tab"
            data-bs-target="#despesas"
@@ -448,8 +482,10 @@
           <i class="bi bi-cart-dash"></i>
           <span class="nav-link-label">Despesas Coop</span>
         </a>
+{% endif %}
 
         <!-- Receitas Cooperados (tab) -->
+{% if can_view_coop_receitas %}
         <a class="nav-sublink {{ 'active' if _tab=='coop_receitas' else '' }}"
            data-bs-toggle="tab"
            data-bs-target="#coop_receitas"
@@ -460,8 +496,10 @@
           <i class="bi bi-wallet2"></i>
           <span class="nav-link-label">Receitas Cooperados</span>
         </a>
+{% endif %}
 
         <!-- Despesas Cooperados (tab) -->
+{% if can_view_coop_despesas %}
         <a class="nav-sublink {{ 'active' if _tab=='coop_despesas' else '' }}"
            data-bs-toggle="tab"
            data-bs-target="#coop_despesas"
@@ -472,8 +510,10 @@
           <i class="bi bi-bag-dash"></i>
           <span class="nav-link-label">Despesas Cooperados</span>
         </a>
+{% endif %}
 
         <!-- Benefícios (tab) -->
+{% if can_view_beneficios %}
         <a class="nav-sublink {{ 'active' if _tab=='beneficios' else '' }}"
            data-bs-toggle="tab"
            data-bs-target="#beneficios"
@@ -484,8 +524,11 @@
           <i class="bi bi-heart-pulse"></i>
           <span class="nav-link-label">Benefícios</span>
         </a>
+{% endif %}
       </div>
 
+{% endif %}
+{% if show_cadastros_menu %}
       <!-- CADASTROS (tabs + rotas) ------------------------------------------>
       <button class="nav-link-group-toggle"
               type="button"
@@ -501,6 +544,7 @@
 
       <div id="menuCadastros" class="collapse show nav-sublinks">
         <!-- Cooperados (tab) -->
+{% if can_view_cooperados %}
         <a class="nav-sublink {{ 'active' if _tab=='cooperados' else '' }}"
            data-bs-toggle="tab"
            data-bs-target="#cooperados"
@@ -511,8 +555,10 @@
           <i class="bi bi-person-badge"></i>
           <span class="nav-link-label">Cooperados</span>
         </a>
+{% endif %}
 
         <!-- Estabelecimentos (tab) -->
+{% if can_view_restaurantes %}
         <a class="nav-sublink {{ 'active' if _tab=='restaurantes' else '' }}"
            data-bs-toggle="tab"
            data-bs-target="#restaurantes"
@@ -523,22 +569,29 @@
           <i class="bi bi-shop-window"></i>
           <span class="nav-link-label">Estabelecimentos</span>
         </a>
+{% endif %}
 
         <!-- Documentos (rota) -->
+{% if can_view_documentos %}
         <a class="nav-sublink {% if request.endpoint == 'admin_documentos' %}active{% endif %}"
            href="{{ url_for('admin_documentos') }}">
           <i class="bi bi-folder2"></i>
           <span class="nav-link-label">Documentos</span>
         </a>
+{% endif %}
 
         <!-- Tabelas (rota) -->
+{% if can_view_tabelas %}
         <a class="nav-sublink {% if request.endpoint == 'admin_tabelas' %}active{% endif %}"
            href="{{ url_for('admin_tabelas') }}">
           <i class="bi bi-table"></i>
           <span class="nav-link-label">Tabelas</span>
         </a>
+{% endif %}
       </div>
 
+{% endif %}
+{% if show_operacao_menu %}
       <!-- OPERAÇÃO ---------------------------------------------------------->
       <button class="nav-link-group-toggle"
               type="button"
@@ -554,6 +607,7 @@
 
       <div id="menuOperacao" class="collapse show nav-sublinks">
         <!-- Escalas (tab) -->
+{% if can_view_escalas %}
         <a class="nav-sublink {{ 'active' if _tab=='escalas' else '' }}"
            data-bs-toggle="tab"
            data-bs-target="#escalas"
@@ -564,19 +618,24 @@
           <i class="bi bi-calendar-week"></i>
           <span class="nav-link-label">Escalas</span>
         </a>
+{% endif %}
 
         <!-- Avisos (rota, como já era) -->
+{% if can_view_avisos %}
         <a class="nav-sublink {% if request.endpoint == 'admin_avisos' %}active{% endif %}"
            href="{{ url_for('admin_avisos') }}">
           <i class="bi bi-megaphone"></i>
           <span class="nav-link-label">Avisos</span>
         </a>
+{% endif %}
       </div>
 
+{% endif %}
       <hr class="sidebar-divider">
 
       <!-- Config (TAB) e Sair (rota) ---------------------------------------->
       <div class="sidebar-footer">
+{% if can_view_config %}
         <a class="nav-link-main {{ 'active' if _tab=='config' else '' }}"
            data-bs-toggle="tab"
            data-bs-target="#config"
@@ -589,6 +648,7 @@
             <span class="nav-link-label">Configurações</span>
           </div>
         </a>
+{% endif %}
 
         <a class="nav-link-main"
            href="{{ url_for('logout') }}">
@@ -606,7 +666,8 @@
 <main class="main">
   <div class="tab-content">
 
-    <!-- === RESUMO (Dashboard Financeiro Completo) === -->
+    {% if can_view_resumo %}
+<!-- === RESUMO (Dashboard Financeiro Completo) === -->
     <section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
       <div class="resumo-shell">
 
@@ -1730,6 +1791,7 @@
     </script>
 </section>
 
+{% endif %}
 <!-- LANÇAMENTOS (versão moderna/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='lancamentos' else '' }}" id="lancamentos" role="tabpanel">
   {# ====== TOTAIS DO FILTRO (já vem filtrado do backend) ====== #}
@@ -3184,6 +3246,7 @@
 })();
 </script>
       
+{% if can_view_cooperados %}
 <!-- COOPERADOS (versão profissional / drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
   {% set qtd_coops = cooperados|length %}
@@ -3588,6 +3651,7 @@
   </div>
 </section>
 
+{% endif %}
       <!-- RESTAURANTES (versão profissional / drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='restaurantes' else '' }}" id="restaurantes" role="tabpanel">
   {% set qtd_rest = restaurantes|length %}
