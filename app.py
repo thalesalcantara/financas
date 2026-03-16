@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 # ============ Stdlib ============
@@ -2450,6 +2449,48 @@ _PRIORD = case(
 )
 
 
+def _parse_datetime_local(value: str | None):
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    raw = raw.replace("Z", "")
+    for candidate in (raw, raw.replace("T", " ")):
+        try:
+            return datetime.fromisoformat(candidate)
+        except Exception:
+            pass
+    try:
+        d = _parse_date(raw)
+        if d:
+            return datetime.combine(d, dtime.min)
+    except Exception:
+        pass
+    return None
+
+
+def _aviso_destinatarios(aviso: Aviso, cooperados_all=None, restaurantes_all=None):
+    cooperados_all = cooperados_all if cooperados_all is not None else Cooperado.query.order_by(Cooperado.nome.asc()).all()
+    restaurantes_all = restaurantes_all if restaurantes_all is not None else Restaurante.query.order_by(Restaurante.nome.asc()).all()
+
+    if aviso.tipo == "cooperado":
+        if aviso.destino_cooperado_id:
+            coops = [c for c in cooperados_all if c.id == aviso.destino_cooperado_id]
+        else:
+            coops = list(cooperados_all)
+        rests = []
+    elif aviso.tipo == "restaurante":
+        alvo_ids = {r.id for r in (list(getattr(aviso, "restaurantes", []) or []))}
+        rests = [r for r in restaurantes_all if (not alvo_ids or r.id in alvo_ids)]
+        coops = []
+    elif aviso.tipo == "global":
+        coops = list(cooperados_all)
+        rests = list(restaurantes_all)
+    else:
+        coops = []
+        rests = []
+    return coops, rests
+
+
 def get_avisos_for_cooperado(coop: Cooperado):
     q = (
         _avisos_base_query()
@@ -4625,12 +4666,22 @@ def admin_avisos():
 
         titulo = (f.get("titulo") or "").strip()
         msg = _pick_msg(f)
-        prioridade = (f.get("prioridade") or "normal").strip()
+        prioridade = ((f.get("prioridade") or "normal").strip() or "normal")
         ativo = bool(f.get("ativo"))
         exigir_confirmacao = bool(f.get("exigir_confirmacao")) if hasattr(Aviso, "exigir_confirmacao") else False
 
-        inicio_em = (lambda d=_parse_date(f.get("inicio_em")): datetime.combine(d, time()) if d else None)()
-        fim_em = (lambda d=_parse_date(f.get("fim_em")): datetime.combine(d, time()) if d else None)()
+        inicio_em = _parse_datetime_local(f.get("inicio_em") or f.get("agendar_inicio"))
+        fim_em = _parse_datetime_local(f.get("fim_em") or f.get("agendar_fim"))
+
+        if not titulo:
+            flash("Informe o título do aviso.", "warning")
+            return redirect(url_for("admin_avisos"))
+        if not msg:
+            flash("Informe a mensagem do aviso.", "warning")
+            return redirect(url_for("admin_avisos"))
+        if inicio_em and fim_em and fim_em < inicio_em:
+            flash("A data final do agendamento não pode ser menor que a inicial.", "warning")
+            return redirect(url_for("admin_avisos"))
 
         def _mk_aviso(tipo: str):
             a = Aviso(
@@ -4656,14 +4707,15 @@ def admin_avisos():
                     flash("Selecione ao menos um cooperado.", "warning")
                     return redirect(url_for("admin_avisos"))
                 try:
-                    coop_id = int(sel_coops[0])
+                    coop_ids = [int(x) for x in sel_coops]
                 except Exception:
                     flash("Seleção de cooperado inválida.", "warning")
                     return redirect(url_for("admin_avisos"))
 
-                a = _mk_aviso("cooperado")
-                a.destino_cooperado_id = coop_id
-                avisos_para_criar.append(a)
+                for coop_id in coop_ids:
+                    a = _mk_aviso("cooperado")
+                    a.destino_cooperado_id = coop_id
+                    avisos_para_criar.append(a)
             else:
                 a = _mk_aviso("cooperado")
                 a.destino_cooperado_id = None
@@ -4694,18 +4746,19 @@ def admin_avisos():
                     flash("Selecione ao menos um cooperado para o aviso dos cooperados.", "warning")
                     return redirect(url_for("admin_avisos"))
                 try:
-                    coop_id = int(sel_coops[0])
+                    coop_ids = [int(x) for x in sel_coops]
                 except Exception:
                     flash("Seleção de cooperado inválida.", "warning")
                     return redirect(url_for("admin_avisos"))
 
-                a_coop = _mk_aviso("cooperado")
-                a_coop.destino_cooperado_id = coop_id
+                for coop_id in coop_ids:
+                    a_coop = _mk_aviso("cooperado")
+                    a_coop.destino_cooperado_id = coop_id
+                    avisos_para_criar.append(a_coop)
             else:
                 a_coop = _mk_aviso("cooperado")
                 a_coop.destino_cooperado_id = None
-
-            avisos_para_criar.append(a_coop)
+                avisos_para_criar.append(a_coop)
 
             if rest_alc == "selecionados":
                 if not sel_rests:
@@ -4732,15 +4785,62 @@ def admin_avisos():
             db.session.add(a)
 
         db.session.commit()
-        flash("Aviso(s) publicado(s).", "success")
+        flash("Aviso(s) salvo(s) com sucesso.", "success")
         return redirect(url_for("admin_avisos"))
 
-    avisos = Aviso.query.order_by(Aviso.fixado.desc(), Aviso.criado_em.desc()).all()
+    avisos = Aviso.query.options(selectinload(Aviso.restaurantes)).order_by(Aviso.fixado.desc(), Aviso.criado_em.desc()).all()
+
+    leituras = AvisoLeitura.query.order_by(AvisoLeitura.lido_em.desc()).all()
+    leituras_por_aviso = defaultdict(list)
+    for leitura in leituras:
+        leituras_por_aviso[leitura.aviso_id].append(leitura)
+
+    now_dt = datetime.utcnow()
+
+    for a in avisos:
+        destinatarios_coop, destinatarios_rest = _aviso_destinatarios(a, cooperados_all=cooperados, restaurantes_all=restaurantes)
+        registros = leituras_por_aviso.get(a.id, [])
+
+        lidos_coop = {r.cooperado_id: r for r in registros if r.cooperado_id}
+        lidos_rest = {r.restaurante_id: r for r in registros if r.restaurante_id}
+
+        a.destino_resumo = (
+            "Todos" if a.tipo == "global" else
+            "Cooperados" if a.tipo == "cooperado" and not a.destino_cooperado_id else
+            "Restaurantes" if a.tipo == "restaurante" and not getattr(a, "restaurantes", None) else
+            a.tipo.capitalize()
+        )
+        a.agendado = bool(a.inicio_em and a.inicio_em > now_dt)
+        a.expirado = bool(a.fim_em and a.fim_em < now_dt)
+
+        a.leituras_cooperados = [
+            {
+                "id": c.id,
+                "nome": c.nome,
+                "lido": c.id in lidos_coop,
+                "lido_em": lidos_coop.get(c.id).lido_em if c.id in lidos_coop else None,
+            }
+            for c in destinatarios_coop
+        ]
+        a.leituras_restaurantes = [
+            {
+                "id": r.id,
+                "nome": r.nome,
+                "lido": r.id in lidos_rest,
+                "lido_em": lidos_rest.get(r.id).lido_em if r.id in lidos_rest else None,
+            }
+            for r in destinatarios_rest
+        ]
+        a.total_destinatarios = len(a.leituras_cooperados) + len(a.leituras_restaurantes)
+        a.total_lidos = sum(1 for x in a.leituras_cooperados if x["lido"]) + sum(1 for x in a.leituras_restaurantes if x["lido"])
+        a.total_pendentes = max(a.total_destinatarios - a.total_lidos, 0)
+
     return render_template(
         "admin_avisos.html",
         avisos=avisos,
         cooperados=cooperados,
         restaurantes=restaurantes,
+        agora=now_dt,
     )
 
 
