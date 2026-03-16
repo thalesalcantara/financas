@@ -2935,6 +2935,66 @@ def admin_dashboard():
     if cooperado_id is None:
         cooperado_id = resumo_cooperado_id
 
+    resumo_lancamentos = []
+    resumo_receitas = []
+    resumo_despesas = []
+    resumo_receitas_coop = []
+    resumo_despesas_coop = []
+    resumo_total_producoes = 0.0
+    resumo_total_receitas = 0.0
+    resumo_total_despesas = 0.0
+    resumo_total_receitas_coop = 0.0
+    resumo_total_despesas_coop = 0.0
+    resumo_total_adiantamentos_coop = 0.0
+
+    if active_tab == "resumo":
+        rq_res = ReceitaCooperativa.query
+        dq_res = DespesaCooperativa.query
+        rq2_res = ReceitaCooperado.query
+        dq2_res = DespesaCooperado.query
+        lq_res = Lancamento.query
+
+        if resumo_restaurante_id:
+            lq_res = lq_res.filter(Lancamento.restaurante_id == resumo_restaurante_id)
+        if resumo_cooperado_id:
+            lq_res = lq_res.filter(Lancamento.cooperado_id == resumo_cooperado_id)
+            rq2_res = rq2_res.filter(ReceitaCooperado.cooperado_id == resumo_cooperado_id)
+            dq2_res = dq2_res.filter(DespesaCooperado.cooperado_id == resumo_cooperado_id)
+
+        if data_inicio:
+            lq_res = lq_res.filter(Lancamento.data >= data_inicio)
+            rq_res = rq_res.filter(ReceitaCooperativa.data >= data_inicio)
+            dq_res = dq_res.filter(DespesaCooperativa.data >= data_inicio)
+            rq2_res = rq2_res.filter(ReceitaCooperado.data >= data_inicio)
+        if data_fim:
+            lq_res = lq_res.filter(Lancamento.data <= data_fim)
+            rq_res = rq_res.filter(ReceitaCooperativa.data <= data_fim)
+            dq_res = dq_res.filter(DespesaCooperativa.data <= data_fim)
+            rq2_res = rq2_res.filter(ReceitaCooperado.data <= data_fim)
+
+        if data_inicio and data_fim:
+            dq2_res = dq2_res.filter(
+                DespesaCooperado.data_inicio <= data_fim,
+                DespesaCooperado.data_fim >= data_inicio,
+            )
+        elif data_inicio:
+            dq2_res = dq2_res.filter(DespesaCooperado.data_fim >= data_inicio)
+        elif data_fim:
+            dq2_res = dq2_res.filter(DespesaCooperado.data_inicio <= data_fim)
+
+        resumo_lancamentos = lq_res.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
+        resumo_receitas = rq_res.order_by(ReceitaCooperativa.data.desc().nullslast(), ReceitaCooperativa.id.desc()).all()
+        resumo_despesas = dq_res.order_by(DespesaCooperativa.data.desc(), DespesaCooperativa.id.desc()).all()
+        resumo_receitas_coop = rq2_res.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
+        resumo_despesas_coop = dq2_res.order_by(DespesaCooperado.data_fim.desc().nullslast(), DespesaCooperado.id.desc()).all()
+
+        resumo_total_producoes = sum((l.valor or 0.0) for l in resumo_lancamentos)
+        resumo_total_receitas = sum((getattr(r, "valor", None) or getattr(r, "valor_total", 0.0) or 0.0) for r in resumo_receitas)
+        resumo_total_despesas = sum((d.valor or 0.0) for d in resumo_despesas)
+        resumo_total_receitas_coop = sum((r.valor or 0.0) for r in resumo_receitas_coop)
+        resumo_total_despesas_coop = sum((d.valor or 0.0) for d in resumo_despesas_coop if not getattr(d, "eh_adiantamento", False))
+        resumo_total_adiantamentos_coop = sum((d.valor or 0.0) for d in resumo_despesas_coop if getattr(d, "eh_adiantamento", False))
+
     considerar_periodo = bool(args.get("considerar_periodo"))
     dows = set(args.getlist("dow"))
 
@@ -3554,8 +3614,12 @@ def admin_dashboard():
             return None
         return f"{dt.year:04d}-{dt.month:02d}"
 
+    resumo_receitas_base = resumo_receitas if active_tab == "resumo" else receitas
+    resumo_despesas_base = resumo_despesas if active_tab == "resumo" else despesas
+    resumo_lancamentos_base = resumo_lancamentos if active_tab == "resumo" else lancamentos
+
     coop_month_map = {}
-    for r in receitas:
+    for r in resumo_receitas_base:
         dt = getattr(r, "data", None) or getattr(r, "data_lancamento", None)
         k = _month_key(dt)
         if not k:
@@ -3563,7 +3627,7 @@ def admin_dashboard():
         coop_month_map.setdefault(k, {"receitas": 0.0, "despesas": 0.0})
         coop_month_map[k]["receitas"] += float(getattr(r, "valor", None) or getattr(r, "valor_total", 0.0) or 0.0)
 
-    for d in despesas:
+    for d in resumo_despesas_base:
         dt = getattr(d, "data", None) or getattr(d, "data_lancamento", None)
         k = _month_key(dt)
         if not k:
@@ -3580,7 +3644,7 @@ def admin_dashboard():
         }
 
     coopers_month_map = {}
-    for l in lancamentos:
+    for l in resumo_lancamentos_base:
         dt = getattr(l, "data", None)
         k = _month_key(dt)
         if not k:
@@ -3601,7 +3665,7 @@ def admin_dashboard():
         }
 
     estabs_map = {}
-    for l in lancamentos:
+    for l in resumo_lancamentos_base:
         rest = getattr(l, "restaurante", None)
         nome_rest = getattr(rest, "nome", None) or "—"
         estabs_map[nome_rest] = estabs_map.get(nome_rest, 0.0) + float(getattr(l, "valor", 0.0) or 0.0)
@@ -3631,6 +3695,17 @@ def admin_dashboard():
         despesas=despesas,
         receitas_coop=receitas_coop,
         despesas_coop=despesas_coop,
+        resumo_lancamentos=resumo_lancamentos,
+        resumo_receitas=resumo_receitas,
+        resumo_despesas=resumo_despesas,
+        resumo_receitas_coop=resumo_receitas_coop,
+        resumo_despesas_coop=resumo_despesas_coop,
+        resumo_total_producoes=resumo_total_producoes,
+        resumo_total_receitas=resumo_total_receitas,
+        resumo_total_despesas=resumo_total_despesas,
+        resumo_total_receitas_coop=resumo_total_receitas_coop,
+        resumo_total_despesas_coop=resumo_total_despesas_coop,
+        resumo_total_adiantamentos_coop=resumo_total_adiantamentos_coop,
         cooperados=cooperados,
         restaurantes=restaurantes,
         beneficios_view=beneficios_view,
