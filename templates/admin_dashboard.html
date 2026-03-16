@@ -859,7 +859,7 @@
                 </select>
               </div>
 
-              <div class="col-12 d-flex flex-wrap gap-2 mt-2">
+              <div class="col-12 d-flex flex-wrap gap-2 mt-2 align-items-end resumo-filter-actions">
                 <button class="btn btn-royal btn-sm">
                   <i class="bi bi-funnel"></i> Filtrar
                 </button>
@@ -871,6 +871,27 @@
                 <button id="btnExportXLSX" type="button" class="btn btn-outline-success btn-sm">
                   <i class="bi bi-file-earmark-excel"></i> Exportar XLSX (com filtros)
                 </button>
+                <div class="d-flex flex-wrap gap-2 align-items-end ms-lg-auto">
+                  <div>
+                    <label class="form-label mb-1">Filtro mensal</label>
+                    <input type="month" class="form-control form-control-sm" id="quickMonthResumo">
+                  </div>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnQuickMonthResumo">
+                    <i class="bi bi-calendar3"></i> Aplicar mês
+                  </button>
+                  <div>
+                    <label class="form-label mb-1">Filtro anual</label>
+                    <select class="form-select form-select-sm" id="quickYearResumo">
+                      <option value="">Ano</option>
+                      {% for ano in range(2025, 2101) %}
+                        <option value="{{ ano }}">{{ ano }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnQuickYearResumo">
+                    <i class="bi bi-calendar-range"></i> Aplicar ano
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1009,6 +1030,48 @@
               </div>
             </div>
           </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-entregas-periodo"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Quantidade de Entregas</div>
+                  <div id="kpiQtdEntregasPeriodo" class="fw-bold fs-5">0</div>
+                  <div class="small text-muted">No período filtrado</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-bicycle"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-ticket-periodo"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Ticket Médio</div>
+                  <div id="kpiTicketMedioPeriodo" class="fw-bold fs-5">R$ 0,00</div>
+                  <div class="small text-muted">Média por entrega</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-receipt"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-benef-rateados"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Benefícios Rateados</div>
+                  <div id="kpiBeneficiosRateados" class="fw-bold fs-5">R$ 0,00</div>
+                  <div class="small text-muted">Total lançado no período</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-heart-pulse"></i></div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Resumo por Cooperado -->
@@ -1087,6 +1150,20 @@
                 <span>Top Estabelecimentos (Produções no período)</span>
               </h6>
               <canvas id="chartEstabs"></canvas>
+              <div class="table-responsive mt-3">
+                <table class="table table-sm table-bordered table-hover align-middle" id="tblTopEstabsResumo">
+                  <thead class="table-light">
+                    <tr>
+                      <th style="width:72px">#</th>
+                      <th>Estabelecimento</th>
+                      <th class="text-end">Produção real</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td colspan="3" class="text-center text-muted">Carregando…</td></tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -1144,6 +1221,9 @@
         #resumo .kpi-desp-coop2{ border-color: rgba(248,113,113,0.65); }
         #resumo .kpi-res-coop{ border-color: rgba(14,116,144,0.6); }
         #resumo .kpi-total-rec{ border-color: rgba(99,102,241,0.7); }
+        #resumo .kpi-entregas-periodo{ border-color: rgba(245,158,11,0.65); }
+        #resumo .kpi-ticket-periodo{ border-color: rgba(168,85,247,0.65); }
+        #resumo .kpi-benef-rateados{ border-color: rgba(236,72,153,0.65); }
 
         #resumo .resumo-kpi-row .card.kpi-card .text-muted.small {
           font-size: 0.76rem;
@@ -1292,6 +1372,19 @@
         {% endfor %}
       ];
 
+      const BENEFICIOS_VIEW = [
+        {% for b in beneficios_view %}
+          {
+            id: {{ b.id }},
+            data_inicial: "{{ ymd(b.data_inicial) }}",
+            data_final: "{{ ymd(b.data_final) }}",
+            data_lancamento: "{{ ymd(b.data_lancamento) }}",
+            tipo: "{{ (b.tipo or '')|e }}",
+            valor_total: {{ (b.valor_total or 0)|float }}
+          }{{ "," if not loop.last }}
+        {% endfor %}
+      ];
+
       const COOPS = [
         {% for c in cooperados %}
           { id: {{ c.id }}, nome: "{{ c.nome|e }}" }{{ "," if not loop.last }}
@@ -1358,8 +1451,10 @@
 
       const filteredRECc = REC_COOP_CORP.filter(r => inRange(r.data));
       const filteredDESc = DESP_COOP_CORP.filter(d => inRange(d.data));
+      const filteredBEN  = BENEFICIOS_VIEW.filter(b => inRange(b.data_lancamento || b.data_final || b.data_inicial));
 
       // ---- KPIs (front) ----
+      const qtdEntregasPeriodo   = filteredPROD.length;
       const kpiProd         = sumBy(filteredPROD, x => x.valor);
       const kpiINSS4        = kpiProd * 0.04;
       const kpiSEST05       = kpiProd * 0.005;
@@ -1375,6 +1470,8 @@
 
       const kpiResultadoCoop      = kpiRecCoopCorp - kpiDespCoopCorp;
       const kpiTotalReceitasGeral = kpiRecCoopCorp + kpiRecCooperadosFull;
+      const kpiTicketMedioPeriodo = qtdEntregasPeriodo ? (kpiProd / qtdEntregasPeriodo) : 0;
+      const kpiBeneficiosRateados = sumBy(filteredBEN, x => x.valor_total);
 
       // aplica KPIs na tela
       document.getElementById('kpiTotalProds').textContent         = fmtBR(kpiProd);
@@ -1385,6 +1482,12 @@
       document.getElementById('kpiRecCooperadosFull').textContent  = fmtBR(kpiRecCooperadosFull);
       document.getElementById('kpiDespCooperados').textContent     = fmtBR(kpiDespCooperados);
       document.getElementById('kpiTotalReceitasGeral').textContent = fmtBR(kpiTotalReceitasGeral);
+      const qtdEl = document.getElementById('kpiQtdEntregasPeriodo');
+      if (qtdEl) qtdEl.textContent = Number(qtdEntregasPeriodo || 0).toLocaleString('pt-BR');
+      const ticketEl = document.getElementById('kpiTicketMedioPeriodo');
+      if (ticketEl) ticketEl.textContent = fmtBR(kpiTicketMedioPeriodo);
+      const benEl = document.getElementById('kpiBeneficiosRateados');
+      if (benEl) benEl.textContent = fmtBR(kpiBeneficiosRateados);
 
       const resEl = document.getElementById('kpiResultadoCoop');
       if (resEl) {
@@ -1628,18 +1731,36 @@
           });
         })();
 
-        // Estabelecimentos — barra horizontal
+        // Estabelecimentos — barra horizontal + tabela real
         (function () {
           const byR = {};
           filteredPROD.forEach(p => {
-            if (p.restaurante_id == null) return;
-            const k = p.restaurante_nome || '—';
-            byR[k] = (byR[k] || 0) + p.valor;
+            if (p.restaurante_id == null && !p.restaurante_nome) return;
+            const nome = (p.restaurante_nome || '—').trim() || '—';
+            byR[nome] = (byR[nome] || 0) + (+p.valor || 0);
           });
 
-          const entries = Object.entries(byR).sort((a, b) => b[1] - a[1]).slice(0, 20);
-          const labels = entries.map(e => e[0]);
-          const vals   = entries.map(e => e[1]);
+          const entries = Object.entries(byR)
+            .map(([nome, valor]) => ({ nome, valor: +(valor || 0) }))
+            .sort((a, b) => b.valor - a.valor)
+            .slice(0, 20);
+
+          const labels = entries.map(e => e.nome);
+          const vals   = entries.map(e => Number(e.valor.toFixed(2)));
+
+          const tbody = document.querySelector('#tblTopEstabsResumo tbody');
+          if (tbody) {
+            tbody.innerHTML = entries.length ? '' : '<tr><td colspan="3" class="text-center text-muted">Sem dados no período.</td></tr>';
+            entries.forEach((item, idx) => {
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                <td>${idx + 1}</td>
+                <td class="text-break">${item.nome}</td>
+                <td class="text-end fw-semibold">${fmtBR(item.valor)}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+          }
 
           const ctx = document.getElementById('chartEstabs');
           if (!ctx) return;
@@ -1654,6 +1775,44 @@
           });
         })();
       });
+
+      // ---- Atalhos de filtro mensal / anual ----
+      (function(){
+        const form = document.querySelector('#resumo form[method="GET"]');
+        if (!form) return;
+        const diInput = form.querySelector('input[name="data_inicio"]');
+        const dfInput = form.querySelector('input[name="data_fim"]');
+        const monthInput = document.getElementById('quickMonthResumo');
+        const yearSelect = document.getElementById('quickYearResumo');
+        const btnMonth = document.getElementById('btnQuickMonthResumo');
+        const btnYear = document.getElementById('btnQuickYearResumo');
+
+        if (monthInput && FILTER.ri && FILTER.rf && FILTER.ri.slice(0,7) === FILTER.rf.slice(0,7)) {
+          monthInput.value = FILTER.ri.slice(0,7);
+        }
+        if (yearSelect && FILTER.ri && FILTER.rf && FILTER.ri.slice(0,4) === FILTER.rf.slice(0,4)) {
+          yearSelect.value = FILTER.ri.slice(0,4);
+        }
+
+        btnMonth?.addEventListener('click', () => {
+          const ym = monthInput?.value || '';
+          if (!ym || !diInput || !dfInput) return;
+          const [y, m] = ym.split('-').map(Number);
+          if (!y || !m) return;
+          const lastDay = new Date(y, m, 0).getDate();
+          diInput.value = `${y}-${String(m).padStart(2,'0')}-01`;
+          dfInput.value = `${y}-${String(m).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+          form.submit();
+        });
+
+        btnYear?.addEventListener('click', () => {
+          const y = Number(yearSelect?.value || 0);
+          if (!y || !diInput || !dfInput) return;
+          diInput.value = `${y}-01-01`;
+          dfInput.value = `${y}-12-31`;
+          form.submit();
+        });
+      })();
 
       // ---- Exportação XLSX ----
       const ensureXLSX = () => new Promise(res => {
