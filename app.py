@@ -5540,72 +5540,130 @@ def excluir_beneficio_bulk():
 @admin_perm_required("beneficios", "criar")
 def ratear_beneficios():
     """
-    Cria um BeneficioRegistro a partir do form de 'Ratear benefícios'.
-    Espera:
-      - data_inicial, data_final, (opcional) data_lancamento
-      - tipo (hospitalar|farmaceutico|alimentar ou hosp|farm|alim)
-      - valor_total
-      - recebedores_ids[]  ou recebedores_ids  ("1;2;3")
-      - recebedores_nomes[] ou recebedores_nomes ("Ana;Bia;…")
+    Aceita tanto o formato simples legado quanto o formulário atual da aba Benefícios
+    (hospitalar / farmacêutico / alimentar), criando os registros recebidos e lançando
+    as despesas para os pagantes do rateio.
     """
     f = request.form
+
+    def _to_float_br(v):
+        s = str(v or "").strip()
+        if not s:
+            return 0.0
+        s = s.replace("R$", "").replace(" ", "")
+        if "," in s and "." in s:
+            s = s.replace(".", "").replace(",", ".")
+        else:
+            s = s.replace(",", ".")
+        try:
+            return float(s)
+        except Exception:
+            return 0.0
+
+    def _redirect_back():
+        return redirect(url_for(
+            "admin_dashboard",
+            tab="beneficios",
+            data_inicio=(f.get("data_inicio") or ""),
+            data_fim=(f.get("data_fim") or ""),
+            restaurante_id=(f.get("restaurante_id") or ""),
+            cooperado_id=(f.get("cooperado_id") or ""),
+        ))
 
     di = _parse_date(f.get("data_inicial"))
     df = _parse_date(f.get("data_final"))
     if di and df and df < di:
         di, df = df, di
 
-    dl = _parse_date(f.get("data_lancamento"))
+    if not di or not df:
+        flash("Preencha a data inicial e a data final.", "warning")
+        return _redirect_back()
 
+    dl = _parse_date(f.get("data_lancamento")) or date.today()
+
+    def _coops_by_ids(ids):
+        ids = [int(x) for x in ids if str(x).isdigit()]
+        if not ids:
+            return []
+        return Cooperado.query.filter(Cooperado.id.in_(ids)).order_by(Cooperado.nome.asc()).all()
+
+    def _add_beneficio(tipo: str, valor_total: float, recebedores_ids: list[int], isentos_ids: list[int]):
+        recebedores = _coops_by_ids(recebedores_ids)
+        if valor_total <= 0 or not recebedores:
+            return False
+
+        rec_ids = [c.id for c in recebedores]
+        rec_nomes = [c.nome for c in recebedores]
+
+        b = BeneficioRegistro(
+            data_inicial=di,
+            data_final=df,
+            data_lancamento=dl,
+            tipo=tipo,
+            valor_total=round(valor_total, 2),
+            recebedores_ids=";".join(str(i) for i in rec_ids),
+            recebedores_nomes=";".join(rec_nomes),
+        )
+        db.session.add(b)
+        db.session.flush()
+
+        bloqueados = set(rec_ids) | {int(x) for x in isentos_ids if str(x).isdigit()}
+        pagantes = [c for c in Cooperado.query.order_by(Cooperado.nome.asc()).all() if c.id not in bloqueados]
+        valor_por_pagante = round(valor_total / len(pagantes), 2) if pagantes else 0.0
+
+        if valor_por_pagante > 0:
+            for coop in pagantes:
+                db.session.add(DespesaCooperado(
+                    cooperado_id=coop.id,
+                    descricao=f"Rateio benefício {tipo}",
+                    valor=valor_por_pagante,
+                    data=dl,
+                    data_inicio=di,
+                    data_fim=df,
+                    beneficio_id=b.id,
+                    eh_adiantamento=False,
+                ))
+        return True
+
+    # compatibilidade com fluxo simples legado
     tipo_in = (f.get("tipo") or "").strip().lower()
-    tipo = TIPO_MAP.get(tipo_in, tipo_in or "alimentar")  # default seguro
-
-    # valor
-    valor_total = None
-    raw_val = f.get("valor_total")
-    if raw_val not in (None, ""):
-        try:
-            valor_total = float(str(raw_val).replace(",", "."))
-        except ValueError:
-            flash("Valor total inválido.", "warning")
-            return redirect(url_for("admin_dashboard", tab="beneficios"))
-
-    # recebedores
-    ids_list   = _split_field(f, "recebedores_ids[]",   "recebedores_ids")
+    ids_list = _split_field(f, "recebedores_ids[]", "recebedores_ids")
     nomes_list = _split_field(f, "recebedores_nomes[]", "recebedores_nomes")
+    if tipo_in or ids_list or nomes_list or f.get("valor_total"):
+        ids_sane = [int(x) for x in ids_list if str(x).isdigit()]
+        if not ids_sane:
+            flash("Selecione pelo menos um recebedor.", "warning")
+            return _redirect_back()
+        tipo = TIPO_MAP.get(tipo_in, tipo_in or "alimentar")
+        valor_total = _to_float_br(f.get("valor_total"))
+        _add_beneficio(tipo, valor_total, ids_sane, [])
+        db.session.commit()
+        flash("Benefício registrado com sucesso.", "success")
+        return _redirect_back()
 
-    # se vier só ID, tenta nomes
-    if ids_list and not nomes_list:
-        ids_int = [int(x) for x in ids_list if str(x).isdigit()]
-        if ids_int:
-            coops = Cooperado.query.filter(Cooperado.id.in_(ids_int)).all()
-            m = {str(c.id): c.nome for c in coops}
-            nomes_list = [m.get(str(i), "") for i in ids_int]
+    tipos_cfg = [
+        ("hosp", "hospitalar"),
+        ("farm", "farmaceutico"),
+        ("alim", "alimentar"),
+    ]
+    criou = 0
+    for prefixo, tipo in tipos_cfg:
+        recebedores_ids = [int(x) for x in f.getlist(f"{prefixo}_beneficiarios[]") if str(x).isdigit()]
+        isentos_ids = [int(x) for x in f.getlist(f"{prefixo}_isencoes[]") if str(x).isdigit()]
+        valor_total = _to_float_br(f.get(f"{prefixo}_valor"))
+        if valor_total <= 0:
+            valor_unit = _to_float_br(f.get(f"{prefixo}_valor_unit"))
+            valor_total = round(valor_unit * len(recebedores_ids), 2)
+        if _add_beneficio(tipo, valor_total, recebedores_ids, isentos_ids):
+            criou += 1
 
-    ids_sane   = [str(int(x)) for x in ids_list if str(x).isdigit()]
-    nomes_sane = [n for n in nomes_list if n is not None]
+    if not criou:
+        flash("Informe ao menos um benefício com valor e recebedores.", "warning")
+        return _redirect_back()
 
-    n = min(len(ids_sane), len(nomes_sane)) if ids_sane and nomes_sane else max(len(ids_sane), len(nomes_sane))
-    ids_sane   = ids_sane[:n]
-    nomes_sane = (nomes_sane[:n] if nomes_sane else [""] * n)
-
-    if not di or not df or not ids_sane:
-        flash("Preencha período e pelo menos um recebedor.", "warning")
-        return redirect(url_for("admin_dashboard", tab="beneficios"))
-
-    b = BeneficioRegistro(
-        data_inicial=di,
-        data_final=df,
-        data_lancamento=dl,
-        tipo=tipo,
-        valor_total=valor_total or 0.0,
-        recebedores_ids=";".join(ids_sane),
-        recebedores_nomes=";".join(nomes_sane),
-    )
-    db.session.add(b)
     db.session.commit()
-    flash("Benefício registrado/Rateado.", "success")
-    return redirect(url_for("admin_dashboard", tab="beneficios"))
+    flash("Benefícios registrados com sucesso.", "success")
+    return _redirect_back()
 
 # =========================
 # Escalas — Upload (substituição TOTAL sempre)
