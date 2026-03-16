@@ -997,10 +997,10 @@
 
       <nav class="navmenu" id="sideNav">
         <a data-target="lancar" class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos','tabelas']) else '' }}" href="{{ url_for('portal_restaurante', view='lancar') }}">
-          <i class="bi bi-person-lines-fill"></i><span>Cooperados</span>
+          <i class="bi bi-person-lines-fill"></i><span>Lançar Produção</span>
         </a>
         <a data-target="lancamentos" class="{{ 'active' if view=='lancamentos' else '' }}" href="{{ url_for('portal_restaurante', view='lancamentos') }}">
-          <i class="bi bi-receipt"></i><span>Lançamentos</span>
+          <i class="bi bi-receipt"></i><span>Histórico de Produção</span>
         </a>
         <a data-target="escalas" class="{{ 'active' if view=='escalas' else '' }}" href="{{ url_for('portal_restaurante', view='escalas') }}">
           <i class="bi bi-calendar-week"></i><span>Escala</span>
@@ -1430,7 +1430,7 @@
       </section>
 
       <section data-view="lancamentos">
-        <div class="section-title"><i class="bi bi-receipt"></i> Lançamentos</div>
+        <div class="section-title"><i class="bi bi-receipt"></i>Histórico de Produção</div>
         <div class="row g-3">
           <div class="col-lg-3">
             <div class="card card-body sticky-tools">
