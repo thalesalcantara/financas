@@ -670,10 +670,10 @@
         {%- endmacro %}
 
         {# ---------- Filtros atuais (querystring) ---------- #}
-        {% set ri  = request.args.get('resumo_inicio','') %}
-        {% set rf  = request.args.get('resumo_fim','') %}
-        {% set rs  = request.args.get('resumo_restaurante_id','') %}
-        {% set cs  = request.args.get('resumo_cooperado_id','') %}
+        {% set ri  = resumo_inicio_val|default(request.args.get('resumo_inicio','')) %}
+        {% set rf  = resumo_fim_val|default(request.args.get('resumo_fim','')) %}
+        {% set rs  = resumo_restaurante_id_val|default(request.args.get('resumo_restaurante_id','')) %}
+        {% set cs  = resumo_cooperado_id_val|default(request.args.get('resumo_cooperado_id','')) %}
         {% set rid = rs|int if rs else None %}
         {% set cid = cs|int if cs else None %}
 
@@ -2277,10 +2277,10 @@
 
       <form method="POST" action="{{ url_for('add_receita') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_receitas_criar">
 
-      <input type="hidden" name="resumo_inicio" value="{{ request.args.get('resumo_inicio','') }}">
-      <input type="hidden" name="resumo_fim" value="{{ request.args.get('resumo_fim','') }}">
-      <input type="hidden" name="resumo_restaurante_id" value="{{ request.args.get('resumo_restaurante_id','') }}">
-      <input type="hidden" name="resumo_cooperado_id" value="{{ request.args.get('resumo_cooperado_id','') }}">
+      <input type="hidden" name="resumo_inicio" value="{{ resumo_inicio_val|default(request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="resumo_fim" value="{{ resumo_fim_val|default(request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="resumo_restaurante_id" value="{{ resumo_restaurante_id_val|default(request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="resumo_cooperado_id" value="{{ resumo_cooperado_id_val|default(request.args.get('resumo_cooperado_id','')) }}">
         <div class="col-md-5">
           <label class="form-label">Descrição</label>
           <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
@@ -2407,10 +2407,10 @@
 
       <form method="POST" action="{{ url_for('add_despesa') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_despesas_criar">
 
-      <input type="hidden" name="resumo_inicio" value="{{ request.args.get('resumo_inicio','') }}">
-      <input type="hidden" name="resumo_fim" value="{{ request.args.get('resumo_fim','') }}">
-      <input type="hidden" name="resumo_restaurante_id" value="{{ request.args.get('resumo_restaurante_id','') }}">
-      <input type="hidden" name="resumo_cooperado_id" value="{{ request.args.get('resumo_cooperado_id','') }}">
+      <input type="hidden" name="resumo_inicio" value="{{ resumo_inicio_val|default(request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="resumo_fim" value="{{ resumo_fim_val|default(request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="resumo_restaurante_id" value="{{ resumo_restaurante_id_val|default(request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="resumo_cooperado_id" value="{{ resumo_cooperado_id_val|default(request.args.get('resumo_cooperado_id','')) }}">
         <div class="col-md-5">
           <label class="form-label">Descrição</label>
           <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
@@ -2536,10 +2536,10 @@
 
       <form method="POST" action="{{ url_for('add_receita_coop') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_coop_receitas_criar">
 
-      <input type="hidden" name="resumo_inicio" value="{{ request.args.get('resumo_inicio','') }}">
-      <input type="hidden" name="resumo_fim" value="{{ request.args.get('resumo_fim','') }}">
-      <input type="hidden" name="resumo_restaurante_id" value="{{ request.args.get('resumo_restaurante_id','') }}">
-      <input type="hidden" name="resumo_cooperado_id" value="{{ request.args.get('resumo_cooperado_id','') }}">
+      <input type="hidden" name="resumo_inicio" value="{{ resumo_inicio_val|default(request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="resumo_fim" value="{{ resumo_fim_val|default(request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="resumo_restaurante_id" value="{{ resumo_restaurante_id_val|default(request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="resumo_cooperado_id" value="{{ resumo_cooperado_id_val|default(request.args.get('resumo_cooperado_id','')) }}">
         <div class="col-md-3">
           <label class="form-label">Cooperado</label>
           <select class="form-select form-select-sm" name="cooperado_id" required>
@@ -2706,10 +2706,10 @@
 
       <form method="POST" action="{{ url_for('add_despesa_coop') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_coop_despesas_criar">
 
-      <input type="hidden" name="resumo_inicio" value="{{ request.args.get('resumo_inicio','') }}">
-      <input type="hidden" name="resumo_fim" value="{{ request.args.get('resumo_fim','') }}">
-      <input type="hidden" name="resumo_restaurante_id" value="{{ request.args.get('resumo_restaurante_id','') }}">
-      <input type="hidden" name="resumo_cooperado_id" value="{{ request.args.get('resumo_cooperado_id','') }}">
+      <input type="hidden" name="resumo_inicio" value="{{ resumo_inicio_val|default(request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="resumo_fim" value="{{ resumo_fim_val|default(request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="resumo_restaurante_id" value="{{ resumo_restaurante_id_val|default(request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="resumo_cooperado_id" value="{{ resumo_cooperado_id_val|default(request.args.get('resumo_cooperado_id','')) }}">
         <div class="col-md-4">
           <label class="form-label">Cooperados</label>
           <select class="form-select form-select-sm" name="cooperado_ids[]" multiple size="5">
@@ -2790,10 +2790,10 @@
                   <!-- EXCLUIR via POST (evita 405) -->
                   {% if can_coop_despesas_excluir %}<form method="POST" action="{{ url_for('delete_despesa_coop', id=dc.id) }}" class="d-inline">
 
-                  <input type="hidden" name="resumo_inicio" value="{{ request.args.get('resumo_inicio','') }}">
-                  <input type="hidden" name="resumo_fim" value="{{ request.args.get('resumo_fim','') }}">
-                  <input type="hidden" name="resumo_restaurante_id" value="{{ request.args.get('resumo_restaurante_id','') }}">
-                  <input type="hidden" name="resumo_cooperado_id" value="{{ request.args.get('resumo_cooperado_id','') }}">
+                  <input type="hidden" name="resumo_inicio" value="{{ resumo_inicio_val|default(request.args.get('resumo_inicio','')) }}">
+                  <input type="hidden" name="resumo_fim" value="{{ resumo_fim_val|default(request.args.get('resumo_fim','')) }}">
+                  <input type="hidden" name="resumo_restaurante_id" value="{{ resumo_restaurante_id_val|default(request.args.get('resumo_restaurante_id','')) }}">
+                  <input type="hidden" name="resumo_cooperado_id" value="{{ resumo_cooperado_id_val|default(request.args.get('resumo_cooperado_id','')) }}">
                     {# Se você usa Flask-WTF/CSRF, descomente a linha abaixo #}
                     {# {{ csrf_token() }} #}
                     <button type="submit" class="btn btn-danger btn-sm btn-del" onclick="return confirm('Excluir esta despesa?');">
@@ -2898,7 +2898,7 @@
         </div>
         <div class="col-md-3">
           <label class="form-label">Valor por beneficiado (R$)</label>
-          <input type="number" step="0.01" class="form-control form-control-sm" name="hosp_valor_unit" id="hosp_valor_unit" placeholder="0,00">
+          <input type="text" inputmode="decimal" class="form-control form-control-sm" name="hosp_valor_unit" id="hosp_valor_unit" placeholder="0,00" autocomplete="off">
           <input type="hidden" name="hosp_valor" id="hosp_valor_total">
         </div>
         <div class="col-md-5">
@@ -2928,7 +2928,7 @@
         </div>
         <div class="col-md-3">
           <label class="form-label">Valor por beneficiado (R$)</label>
-          <input type="number" step="0.01" class="form-control form-control-sm" name="farm_valor_unit" id="farm_valor_unit" placeholder="0,00">
+          <input type="text" inputmode="decimal" class="form-control form-control-sm" name="farm_valor_unit" id="farm_valor_unit" placeholder="0,00" autocomplete="off">
           <input type="hidden" name="farm_valor" id="farm_valor_total">
         </div>
         <div class="col-md-5">
@@ -2956,7 +2956,7 @@
         </div>
         <div class="col-md-3">
           <label class="form-label">Valor por beneficiado (R$)</label>
-          <input type="number" step="0.01" class="form-control form-control-sm" name="alim_valor_unit" id="alim_valor_unit" placeholder="0,00">
+          <input type="text" inputmode="decimal" class="form-control form-control-sm" name="alim_valor_unit" id="alim_valor_unit" placeholder="0,00" autocomplete="off">
           <input type="hidden" name="alim_valor" id="alim_valor_total">
         </div>
         <div class="col-md-5">
@@ -3156,8 +3156,23 @@
       `Total a ratear: ${money(total)} · Cobrança por pagante: ${money(porPag)}`;
   }
 
+  function maskMoneyInput(inp){
+    if (!inp) return;
+    inp.addEventListener('blur', ()=>{
+      const n = valNum(inp);
+      inp.value = n ? n.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}) : '';
+      const prefix = inp.id.replace('_valor_unit','');
+      calcPreview(prefix);
+    });
+    inp.addEventListener('focus', ()=>{
+      inp.value = String(inp.value || '').replace(/\./g,'').replace(',', '.');
+    });
+  }
+
   ['hosp','farm','alim'].forEach(p=>{
-    q(`#${p}_valor_unit`)?.addEventListener('input', ()=>calcPreview(p));
+    const inp = q(`#${p}_valor_unit`);
+    maskMoneyInput(inp);
+    inp?.addEventListener('input', ()=>calcPreview(p));
     q(`#${p}_beneficiarios`)?.addEventListener('change', ()=>calcPreview(p));
     q(`#${p}_isencoes`)?.addEventListener('change', ()=>calcPreview(p));
     calcPreview(p); // estado inicial
@@ -5766,8 +5781,22 @@
       );
     }
 
+    function maskMoneyInput(inp, prefix) {
+      if (!inp) return;
+      inp.addEventListener('blur', () => {
+        const n = valNum(inp);
+        inp.value = n ? n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        calcPreview(prefix);
+      });
+      inp.addEventListener('focus', () => {
+        inp.value = String(inp.value || '').replace(/\./g, '').replace(',', '.');
+      });
+    }
+
     ['hosp', 'farm', 'alim'].forEach(p => {
-      sec.querySelector(`#${p}_valor_unit`)?.addEventListener('input', () => calcPreview(p));
+      const inp = sec.querySelector(`#${p}_valor_unit`);
+      maskMoneyInput(inp, p);
+      inp?.addEventListener('input', () => calcPreview(p));
       sec.querySelector(`#${p}_beneficiarios`)?.addEventListener('change', () => calcPreview(p));
       sec.querySelector(`#${p}_isencoes`)?.addEventListener('change', () => calcPreview(p));
       calcPreview(p);
