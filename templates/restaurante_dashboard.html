@@ -412,6 +412,210 @@
       box-shadow:0 8px 24px rgba(15,23,42,0.06);
     }
 
+    .escala-topbar{
+      display:flex;
+      justify-content:space-between;
+      gap:14px;
+      align-items:flex-start;
+      margin-bottom:14px;
+      padding:14px 16px;
+      border:1px solid var(--border);
+      border-radius:18px;
+      background:linear-gradient(135deg, rgba(33,65,217,.08), rgba(54,84,230,.03));
+    }
+
+    .escala-title-main{
+      font-size:1rem;
+      font-weight:800;
+      color:var(--royal);
+      margin-bottom:2px;
+    }
+
+    .escala-subtitle{
+      color:var(--muted);
+      font-size:.88rem;
+    }
+
+    .escala-legend, .escala-day-stats{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      align-items:center;
+    }
+
+    .legend-pill, .escala-stat{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      border-radius:999px;
+      padding:.35rem .75rem;
+      font-size:.8rem;
+      font-weight:700;
+      border:1px solid var(--border);
+      background:#fff;
+    }
+
+    .legend-dia, .stat-dia{ background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+    .legend-noite, .stat-noite{ background:#f5f3ff; color:#6d28d9; border-color:#ddd6fe; }
+    .legend-indef, .stat-indef{ background:#fff7ed; color:#c2410c; border-color:#fed7aa; display:none !important; }
+
+    .escala-switch{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+
+    .escala-switch-btn{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:.48rem .9rem;
+      border:1px solid var(--border);
+      border-radius:999px;
+      background:#fff;
+      color:var(--text);
+      font-size:.88rem;
+      font-weight:700;
+      transition:.18s ease;
+    }
+
+    .escala-switch-btn:hover{
+      border-color:var(--royal);
+      color:var(--royal);
+      transform:translateY(-1px);
+    }
+
+    .escala-switch-btn.active{
+      background:var(--royal);
+      color:#fff;
+      border-color:var(--royal);
+      box-shadow:0 10px 22px rgba(33,65,217,.18);
+    }
+
+    .escala-day-card, .escala-day-focus{
+      border:1px solid var(--border);
+      border-radius:20px;
+      background:var(--card);
+      padding:16px;
+      box-shadow:0 10px 26px rgba(15,23,42,.05);
+    }
+
+    .escala-day-head{
+      display:flex;
+      justify-content:space-between;
+      gap:14px;
+      align-items:flex-start;
+      margin-bottom:12px;
+    }
+
+    .escala-day-badge{
+      display:inline-flex;
+      align-items:center;
+      padding:.28rem .72rem;
+      border-radius:999px;
+      background:var(--royal);
+      color:#fff;
+      font-size:.77rem;
+      font-weight:800;
+      letter-spacing:.03em;
+      margin-bottom:6px;
+    }
+
+    .escala-day-date{
+      font-size:1.1rem;
+      font-weight:800;
+      color:var(--text);
+    }
+
+    .escala-turno-box{
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:12px;
+      background:#fbfcff;
+      height:100%;
+    }
+
+    .turno-dia{ background:linear-gradient(180deg, rgba(239,246,255,.95), rgba(255,255,255,.98)); }
+    .turno-noite{ background:linear-gradient(180deg, rgba(245,243,255,.95), rgba(255,255,255,.98)); }
+    .turno-indef{ background:linear-gradient(180deg, rgba(255,247,237,.95), rgba(255,255,255,.98)); display:none !important; }
+
+    .escala-turno-title{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-size:.9rem;
+      font-weight:800;
+      color:var(--royal);
+      margin-bottom:10px;
+    }
+
+    .escala-contract{
+      font-size:.74rem;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      font-weight:800;
+      color:var(--muted);
+      margin:12px 0 6px;
+      padding-top:6px;
+      border-top:1px dashed var(--border);
+    }
+
+    .escala-contract:first-of-type{
+      margin-top:0;
+      padding-top:0;
+      border-top:none;
+    }
+
+    .escala-item{
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:9px 10px;
+      margin-bottom:8px;
+    }
+
+    .escala-item-name{
+      font-weight:700;
+      font-size:.88rem;
+      line-height:1.25;
+    }
+
+    .escala-item-meta{
+      margin-top:2px;
+      color:var(--muted);
+      font-size:.8rem;
+    }
+
+
+
+    .escala-turno-box-wide{
+      min-height: 100%;
+    }
+
+    .escala-item{
+      min-height:72px;
+    }
+
+    .escala-item-name{
+      white-space:normal;
+      word-break:break-word;
+    }
+
+    .escala-item-meta{
+      white-space:normal;
+      word-break:break-word;
+    }
+
+    .escala-empty{
+      border:1px dashed var(--border);
+      border-radius:12px;
+      padding:14px;
+      text-align:center;
+      color:var(--muted);
+      font-size:.88rem;
+      background:rgba(255,255,255,.7);
+    }
+
     .hero-panel{
       background:
         radial-gradient(circle at right top, rgba(54,84,230,.18), transparent 28%),
@@ -766,6 +970,23 @@
         padding:10px;
       }
     }
+    @media (max-width: 991.98px){
+      .escala-topbar, .escala-day-head{
+        flex-direction:column;
+      }
+    }
+
+    @media (max-width: 575.98px){
+      .escala-switch-btn{
+        font-size:.82rem;
+        padding:.42rem .75rem;
+      }
+
+      .escala-day-date{
+        font-size:1rem;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -854,174 +1075,59 @@
       <section data-view="escalas">
         <div class="section-title"><i class="bi bi-calendar-week"></i> Escala semanal</div>
         <div class="card card-body">
+          <div class="escala-topbar">
+            <div>
+              <div class="escala-title-main">Visualização da escala</div>
+              <div class="escala-subtitle">Mais clara para ler: veja a semana inteira ou abra um dia específico com um clique.</div>
+            </div>
+            <div class="escala-legend">
+              <span class="legend-pill legend-dia"><i class="bi bi-sun"></i> Dia</span>
+              <span class="legend-pill legend-noite"><i class="bi bi-moon-stars"></i> Noite</span>
+                          </div>
+          </div>
+
           <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
             <input type="hidden" name="view" value="escalas">
-            <div class="col-md-3">
-              <label class="form-label">Ver</label>
+            <div class="col-lg-3 col-md-4">
+              <label class="form-label">Visualização</label>
               <select name="modo" class="form-select">
                 <option value="semana" {{ 'selected' if (_modo=='semana') }}>Semana completa</option>
                 <option value="dia" {{ 'selected' if (_modo=='dia') }}>Somente 1 dia</option>
               </select>
             </div>
-            <div class="col-md-3">
-              <label class="form-label">Referência</label>
+            <div class="col-lg-3 col-md-4">
+              <label class="form-label">Data de referência</label>
               <input type="date" name="ref" class="form-control" value="{{ _ref_data and _ref_data.strftime('%Y-%m-%d') }}">
             </div>
-            <div class="col-md-6 text-end">
+            <div class="col-lg-6 col-md-4 text-md-end">
               <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
               <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='escalas') }}">
-                <i class="bi bi-arrow-counterclockwise"></i> Hoje
+                <i class="bi bi-arrow-counterclockwise"></i> Semana atual
               </a>
             </div>
           </form>
 
-          {% if _modo == 'semana' %}
-          <hr class="my-3">
-          <div class="row g-3">
+          <div class="escala-switch mt-3">
+            <a class="escala-switch-btn {{ 'active' if _modo == 'semana' else '' }}"
+               href="{{ url_for('portal_restaurante', view='escalas', modo='semana', ref=_ref_data and _ref_data.strftime('%Y-%m-%d')) }}">
+              <i class="bi bi-calendar-week"></i> Escala completa
+            </a>
             {% for dia in _dias_list %}
-            <div class="col-md-6 col-lg-4">
-              <div class="card-soft h-100 d-flex flex-column">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <span class="badge text-bg-primary fw-semibold">
-                    {{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][dia.weekday()] }} — {{ dia.strftime('%d/%m/%Y') }}
-                  </span>
-                  <i class="bi bi-people"></i>
-                </div>
-
-                {% set lista = _agenda.get(dia, []) %}
-                {% if lista %}
-                  {% set ns = namespace(dia_total=0, noite_total=0, indef_total=0) %}
-                  {% for item in lista %}
-                    {% set t = (item.turno or '')|lower %}
-                    {% if 'noite' not in t and ( 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t ) %}
-                      {% set ns.dia_total = ns.dia_total + 1 %}
-                    {% elif 'noite' in t %}
-                      {% set ns.noite_total = ns.noite_total + 1 %}
-                    {% else %}
-                      {% set ns.indef_total = ns.indef_total + 1 %}
-                    {% endif %}
-                  {% endfor %}
-
-                  <div class="small text-muted mb-1">
-                    <span class="me-3">Dia: <strong>{{ ns.dia_total }}</strong></span>
-                    <span class="me-3">Noite: <strong>{{ ns.noite_total }}</strong></span>
-                    <span>Indef.: <strong>{{ ns.indef_total }}</strong></span>
-                  </div>
-
-                  <div style="max-height:360px; overflow:auto; border-top:1px dashed var(--border); padding-top:0.5rem;">
-                    <div class="row g-2">
-                      <div class="col-6 border-end">
-                        <div class="small text-uppercase text-muted mb-1">Dia ({{ ns.dia_total }})</div>
-                        {% set tem_dia = false %}
-                        {% for grupo in (lista | groupby('contrato')) %}
-                          {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                          {% set gns = namespace(tem_no_contrato=false) %}
-                          {% for item in grupo.list %}
-                            {% set t = (item.turno or '')|lower %}
-                            {% if 'noite' not in t and ( 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t ) %}
-                              {% if not gns.tem_no_contrato %}
-                                <div class="fw-semibold mt-2">{{ contrato_nome }}</div>
-                                {% set gns.tem_no_contrato = true %}
-                                {% set tem_dia = true %}
-                              {% endif %}
-                              <div class="py-1 border-bottom small">
-                                <div class="fw-semibold">
-                                  {{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}
-                                </div>
-                                <div class="text-muted">
-                                  {{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}
-                                </div>
-                              </div>
-                            {% endif %}
-                          {% endfor %}
-                        {% endfor %}
-                        {% if not tem_dia %}
-                          <div class="text-muted small mt-2">Sem escala de dia.</div>
-                        {% endif %}
-                      </div>
-
-                      <div class="col-6">
-                        <div class="small text-uppercase text-muted mb-1">Noite ({{ ns.noite_total }})</div>
-                        {% set tem_noite = false %}
-                        {% for grupo in (lista | groupby('contrato')) %}
-                          {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                          {% set gns = namespace(tem_no_contrato=false) %}
-                          {% for item in grupo.list %}
-                            {% set t = (item.turno or '')|lower %}
-                            {% if 'noite' in t %}
-                              {% if not gns.tem_no_contrato %}
-                                <div class="fw-semibold mt-2">{{ contrato_nome }}</div>
-                                {% set gns.tem_no_contrato = true %}
-                                {% set tem_noite = true %}
-                              {% endif %}
-                              <div class="py-1 border-bottom small">
-                                <div class="fw-semibold">
-                                  {{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}
-                                </div>
-                                <div class="text-muted">
-                                  {{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}
-                                </div>
-                              </div>
-                            {% endif %}
-                          {% endfor %}
-                        {% endfor %}
-                        {% if not tem_noite %}
-                          <div class="text-muted small mt-2">Sem escala de noite.</div>
-                        {% endif %}
-                      </div>
-                    </div>
-
-                    {% if ns.indef_total > 0 %}
-                    <div class="mt-3 pt-2 border-top">
-                      <div class="small text-uppercase text-muted mb-1">Indefinido ({{ ns.indef_total }})</div>
-                      {% for grupo in (lista | groupby('contrato')) %}
-                        {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                        {% set gns = namespace(tem_no_contrato=false) %}
-                        {% for item in grupo.list %}
-                          {% set t = (item.turno or '')|lower %}
-                          {% if not ('noite' in t or 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
-                            {% if not gns.tem_no_contrato %}
-                              <div class="fw-semibold mt-2">{{ contrato_nome }}</div>
-                              {% set gns.tem_no_contrato = true %}
-                            {% endif %}
-                            <div class="py-1 border-bottom small">
-                              <div class="fw-semibold">
-                                {{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}
-                              </div>
-                              <div class="text-muted">
-                                {{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}
-                              </div>
-                            </div>
-                          {% endif %}
-                        {% endfor %}
-                      {% endfor %}
-                    </div>
-                    {% endif %}
-                  </div>
-                {% else %}
-                  <div class="text-muted small py-2">Sem escala registrada.</div>
-                {% endif %}
-              </div>
-            </div>
+            <a class="escala-switch-btn {{ 'active' if _modo == 'dia' and _ref_data == dia else '' }}"
+               href="{{ url_for('portal_restaurante', view='escalas', modo='dia', ref=dia.strftime('%Y-%m-%d')) }}">
+              {{ ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'][dia.weekday()] }}
+            </a>
             {% endfor %}
           </div>
 
-          {% else %}
-          <hr class="my-3">
-          <div class="card-soft">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <span class="badge text-bg-primary fw-semibold">
-                {{ _ref_data and ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][_ref_data.weekday()] }} — {{ _ref_data and _ref_data.strftime('%d/%m/%Y') }}
-              </span>
-              <i class="bi bi-calendar-day"></i>
-            </div>
-
-            {% set lista = _agenda.get(_ref_data, []) if _ref_data else [] %}
-            {% if lista %}
+          {% if _modo == 'semana' %}
+          <div class="escala-week-list mt-3">
+            {% for dia in _dias_list %}
+              {% set lista = _agenda.get(dia, []) %}
               {% set ns = namespace(dia_total=0, noite_total=0, indef_total=0) %}
               {% for item in lista %}
                 {% set t = (item.turno or '')|lower %}
-                {% if 'noite' not in t and ( 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t ) %}
+                {% if 'noite' not in t and ('dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
                   {% set ns.dia_total = ns.dia_total + 1 %}
                 {% elif 'noite' in t %}
                   {% set ns.noite_total = ns.noite_total + 1 %}
@@ -1030,129 +1136,213 @@
                 {% endif %}
               {% endfor %}
 
-              <div class="small text-muted mb-2">
-                <span class="me-3">Dia: <strong>{{ ns.dia_total }}</strong></span>
-                <span class="me-3">Noite: <strong>{{ ns.noite_total }}</strong></span>
-                <span>Indef.: <strong>{{ ns.indef_total }}</strong></span>
+            <div class="escala-day-card mb-3">
+              <div class="escala-day-head">
+                <div>
+                  <div class="escala-day-badge">{{ ['SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SÁBADO','DOMINGO'][dia.weekday()] }}</div>
+                  <div class="escala-day-date">{{ dia.strftime('%d/%m/%Y') }}</div>
+                </div>
+                <div class="escala-day-stats">
+                  <span class="escala-stat stat-dia"><strong>{{ ns.dia_total }}</strong> Dia</span>
+                  <span class="escala-stat stat-noite"><strong>{{ ns.noite_total }}</strong> Noite</span>
+                                    <a class="btn btn-outline-royal btn-sm" href="{{ url_for('portal_restaurante', view='escalas', modo='dia', ref=dia.strftime('%Y-%m-%d')) }}">
+                    <i class="bi bi-eye"></i> Ver só este dia
+                  </a>
+                </div>
               </div>
 
+              {% if lista %}
               <div class="row g-3">
-                <div class="col-md-6">
-                  <div class="table-responsive">
-                    <table class="table table-bordered table-hover align-middle table-compact mb-0">
-                      <thead class="table-primary">
-                        <tr>
-                          <th colspan="4" class="text-center text-uppercase">Turno de DIA ({{ ns.dia_total }})</th>
-                        </tr>
-                        <tr>
-                          <th>Contrato</th>
-                          <th>Cooperado</th>
-                          <th>Turno</th>
-                          <th>Horário</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {% set tem_dia = false %}
-                        {% for grupo in (lista | groupby('contrato')) %}
-                          {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                          {% for item in grupo.list %}
-                            {% set t = (item.turno or '')|lower %}
-                            {% if 'noite' not in t and ( 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t ) %}
-                              {% set tem_dia = true %}
-                              <tr>
-                                <td>{{ contrato_nome }}</td>
-                                <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
-                                <td>{{ item.turno or '—' }}</td>
-                                <td>{{ item.horario or '—' }}</td>
-                              </tr>
-                            {% endif %}
-                          {% endfor %}
-                        {% endfor %}
-                        {% if not tem_dia %}
-                          <tr><td colspan="4" class="text-center text-muted">Sem escala de dia.</td></tr>
+                <div class="col-lg-6">
+                  <div class="escala-turno-box turno-dia escala-turno-box-wide">
+                    <div class="escala-turno-title"><i class="bi bi-sun"></i> Turno de dia</div>
+                    {% set tem_dia = false %}
+                    {% for grupo in (lista | groupby('contrato')) %}
+                      {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                      {% set gns = namespace(tem=false) %}
+                      {% for item in grupo.list %}
+                        {% set t = (item.turno or '')|lower %}
+                        {% if 'noite' not in t and ('dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
+                          {% if not gns.tem %}
+                            <div class="escala-contract">{{ contrato_nome }}</div>
+                            {% set gns.tem = true %}
+                            {% set tem_dia = true %}
+                          {% endif %}
+                          <div class="escala-item">
+                            <div class="escala-item-name">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
+                            <div class="escala-item-meta">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
+                          </div>
                         {% endif %}
-                      </tbody>
-                    </table>
+                      {% endfor %}
+                    {% endfor %}
+                    {% if not tem_dia %}<div class="escala-empty">Sem escala de dia.</div>{% endif %}
                   </div>
                 </div>
 
-                <div class="col-md-6">
-                  <div class="table-responsive">
-                    <table class="table table-bordered table-hover align-middle table-compact mb-0">
-                      <thead class="table-primary">
-                        <tr>
-                          <th colspan="4" class="text-center text-uppercase">Turno de NOITE ({{ ns.noite_total }})</th>
-                        </tr>
-                        <tr>
-                          <th>Contrato</th>
-                          <th>Cooperado</th>
-                          <th>Turno</th>
-                          <th>Horário</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {% set tem_noite = false %}
-                        {% for grupo in (lista | groupby('contrato')) %}
-                          {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                          {% for item in grupo.list %}
-                            {% set t = (item.turno or '')|lower %}
-                            {% if 'noite' in t %}
-                              {% set tem_noite = true %}
-                              <tr>
-                                <td>{{ contrato_nome }}</td>
-                                <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
-                                <td>{{ item.turno or '—' }}</td>
-                                <td>{{ item.horario or '—' }}</td>
-                              </tr>
-                            {% endif %}
-                          {% endfor %}
-                        {% endfor %}
-                        {% if not tem_noite %}
-                          <tr><td colspan="4" class="text-center text-muted">Sem escala de noite.</td></tr>
+                <div class="col-lg-6">
+                  <div class="escala-turno-box turno-noite escala-turno-box-wide">
+                    <div class="escala-turno-title"><i class="bi bi-moon-stars"></i> Turno de noite</div>
+                    {% set tem_noite = false %}
+                    {% for grupo in (lista | groupby('contrato')) %}
+                      {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                      {% set gns = namespace(tem=false) %}
+                      {% for item in grupo.list %}
+                        {% set t = (item.turno or '')|lower %}
+                        {% if 'noite' in t %}
+                          {% if not gns.tem %}
+                            <div class="escala-contract">{{ contrato_nome }}</div>
+                            {% set gns.tem = true %}
+                            {% set tem_noite = true %}
+                          {% endif %}
+                          <div class="escala-item">
+                            <div class="escala-item-name">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
+                            <div class="escala-item-meta">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
+                          </div>
                         {% endif %}
-                      </tbody>
-                    </table>
+                      {% endfor %}
+                    {% endfor %}
+                    {% if not tem_noite %}<div class="escala-empty">Sem escala de noite.</div>{% endif %}
                   </div>
                 </div>
-              </div>
 
-              {% if ns.indef_total > 0 %}
-              <div class="mt-3">
-                <div class="table-responsive">
-                  <table class="table table-bordered table-hover align-middle table-compact mb-0">
-                    <thead class="table-light">
-                      <tr>
-                        <th colspan="4" class="text-center text-uppercase">Turno INDEFINIDO ({{ ns.indef_total }})</th>
-                      </tr>
-                      <tr>
-                        <th>Contrato</th>
-                        <th>Cooperado</th>
-                        <th>Turno</th>
-                        <th>Horário</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                <div class="col-12 d-none">
+                  <div class="escala-turno-box turno-indef">
+                    <div class="escala-turno-title"><i class="bi bi-question-circle"></i> Apoio</div>
+                    {% if ns.indef_total > 0 %}
+                      {% set tem_indef = false %}
                       {% for grupo in (lista | groupby('contrato')) %}
                         {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                        {% set gns = namespace(tem=false) %}
                         {% for item in grupo.list %}
                           {% set t = (item.turno or '')|lower %}
                           {% if not ('noite' in t or 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
-                            <tr>
-                              <td>{{ contrato_nome }}</td>
-                              <td>{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</td>
-                              <td>{{ item.turno or '—' }}</td>
-                              <td>{{ item.horario or '—' }}</td>
-                            </tr>
+                            {% if not gns.tem %}
+                              <div class="escala-contract">{{ contrato_nome }}</div>
+                              {% set gns.tem = true %}
+                              {% set tem_indef = true %}
+                            {% endif %}
+                            <div class="escala-item">
+                              <div class="escala-item-name">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
+                              <div class="escala-item-meta">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
+                            </div>
                           {% endif %}
                         {% endfor %}
                       {% endfor %}
-                    </tbody>
-                  </table>
+                      {% if not tem_indef %}<div class="escala-empty"></div>{% endif %}
+                    {% else %}
+                      <div class="escala-empty"></div>
+                    {% endif %}
+                  </div>
                 </div>
               </div>
+              {% else %}
+                <div class="escala-empty mt-3">Sem escala registrada neste dia.</div>
               {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+
+          {% else %}
+            {% set lista = _agenda.get(_ref_data, []) if _ref_data else [] %}
+            {% set ns = namespace(dia_total=0, noite_total=0, indef_total=0) %}
+            {% for item in lista %}
+              {% set t = (item.turno or '')|lower %}
+              {% if 'noite' not in t and ('dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
+                {% set ns.dia_total = ns.dia_total + 1 %}
+              {% elif 'noite' in t %}
+                {% set ns.noite_total = ns.noite_total + 1 %}
+              {% else %}
+                {% set ns.indef_total = ns.indef_total + 1 %}
+              {% endif %}
+            {% endfor %}
+
+          <div class="escala-day-focus mt-3">
+            <div class="escala-day-head mb-3">
+              <div>
+                <div class="escala-day-badge">{{ _ref_data and ['SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SÁBADO','DOMINGO'][_ref_data.weekday()] }}</div>
+                <div class="escala-day-date">{{ _ref_data and _ref_data.strftime('%d/%m/%Y') }}</div>
+              </div>
+              <div class="escala-day-stats">
+                <span class="escala-stat stat-dia"><strong>{{ ns.dia_total }}</strong> Dia</span>
+                <span class="escala-stat stat-noite"><strong>{{ ns.noite_total }}</strong> Noite</span>
+                                <a class="btn btn-outline-royal btn-sm" href="{{ url_for('portal_restaurante', view='escalas', modo='semana', ref=_ref_data and _ref_data.strftime('%Y-%m-%d')) }}">
+                  <i class="bi bi-calendar-week"></i> Voltar para semana completa
+                </a>
+              </div>
+            </div>
+
+            {% if lista %}
+            <div class="row g-3">
+              <div class="col-xl-4 col-md-6">
+                <div class="escala-turno-box turno-dia h-100">
+                  <div class="escala-turno-title"><i class="bi bi-sun"></i> Turno de dia</div>
+                  {% set tem_dia = false %}
+                  {% for grupo in (lista | groupby('contrato')) %}
+                    {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                    {% set gns = namespace(tem=false) %}
+                    {% for item in grupo.list %}
+                      {% set t = (item.turno or '')|lower %}
+                      {% if 'noite' not in t and ('dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
+                        {% if not gns.tem %}<div class="escala-contract">{{ contrato_nome }}</div>{% set gns.tem = true %}{% set tem_dia = true %}{% endif %}
+                        <div class="escala-item">
+                          <div class="escala-item-name">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
+                          <div class="escala-item-meta">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
+                        </div>
+                      {% endif %}
+                    {% endfor %}
+                  {% endfor %}
+                  {% if not tem_dia %}<div class="escala-empty">Sem escala de dia.</div>{% endif %}
+                </div>
+              </div>
+              <div class="col-xl-4 col-md-6">
+                <div class="escala-turno-box turno-noite h-100">
+                  <div class="escala-turno-title"><i class="bi bi-moon-stars"></i> Turno de noite</div>
+                  {% set tem_noite = false %}
+                  {% for grupo in (lista | groupby('contrato')) %}
+                    {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                    {% set gns = namespace(tem=false) %}
+                    {% for item in grupo.list %}
+                      {% set t = (item.turno or '')|lower %}
+                      {% if 'noite' in t %}
+                        {% if not gns.tem %}<div class="escala-contract">{{ contrato_nome }}</div>{% set gns.tem = true %}{% set tem_noite = true %}{% endif %}
+                        <div class="escala-item">
+                          <div class="escala-item-name">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
+                          <div class="escala-item-meta">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
+                        </div>
+                      {% endif %}
+                    {% endfor %}
+                  {% endfor %}
+                  {% if not tem_noite %}<div class="escala-empty">Sem escala de noite.</div>{% endif %}
+                </div>
+              </div>
+              <div class="col-xl-4 col-md-12">
+                <div class="escala-turno-box turno-indef h-100">
+                  <div class="escala-turno-title"><i class="bi bi-question-circle"></i> Apoio</div>
+                  {% if ns.indef_total > 0 %}
+                    {% set tem_indef = false %}
+                    {% for grupo in (lista | groupby('contrato')) %}
+                      {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
+                      {% set gns = namespace(tem=false) %}
+                      {% for item in grupo.list %}
+                        {% set t = (item.turno or '')|lower %}
+                        {% if not ('noite' in t or 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
+                          {% if not gns.tem %}<div class="escala-contract">{{ contrato_nome }}</div>{% set gns.tem = true %}{% set tem_indef = true %}{% endif %}
+                          <div class="escala-item">
+                            <div class="escala-item-name">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
+                            <div class="escala-item-meta">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
+                          </div>
+                        {% endif %}
+                      {% endfor %}
+                    {% endfor %}
+                    {% if not tem_indef %}<div class="escala-empty"></div>{% endif %}
+                  {% else %}
+                    <div class="escala-empty"></div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
             {% else %}
-              <div class="text-center text-muted py-3">Sem escala registrada.</div>
+              <div class="escala-empty mt-3">Sem escala registrada para esta data.</div>
             {% endif %}
           </div>
           {% endif %}
