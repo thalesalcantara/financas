@@ -641,6 +641,16 @@
                   </label>
                 </div>
               </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Início do aviso</label>
+                <input id="novoInicioEm" name="inicio_em" type="datetime-local" class="form-control">
+                <div class="form-help">Deixe em branco para publicar imediatamente.</div>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Fim do aviso</label>
+                <input id="novoFimEm" name="fim_em" type="datetime-local" class="form-control">
+                <div class="form-help">Opcional. Após este momento o aviso deixa de aparecer.</div>
+              </div>
             </div>
 
             <hr class="my-3">
@@ -889,8 +899,10 @@
       {% set qtd_ativos = ativos_list|length %}
       {% set qtd_inativos = total - qtd_ativos %}
 
+      {% set total_lidos = avisos|sum(attribute='total_lidos') %}
+      {% set total_pendentes = avisos|sum(attribute='total_pendentes') %}
       <div class="row g-3 align-items-stretch mt-1">
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-3">
           <div class="card p-3 h-100">
             <div class="d-flex justify-content-between align-items-center">
               <div>
@@ -901,16 +913,22 @@
             </div>
           </div>
         </div>
-        <div class="col-6 col-md-4">
+        <div class="col-6 col-md-3">
           <div class="card p-3 h-100">
             <div class="fw-bold small text-success">Ativos</div>
             <div class="display-6 text-success">{{ qtd_ativos }}</div>
           </div>
         </div>
-        <div class="col-6 col-md-4">
+        <div class="col-6 col-md-3">
           <div class="card p-3 h-100">
-            <div class="fw-bold small text-secondary">Inativos</div>
-            <div class="display-6 text-secondary">{{ qtd_inativos }}</div>
+            <div class="fw-bold small text-primary">Leituras registradas</div>
+            <div class="display-6 text-primary">{{ total_lidos }}</div>
+          </div>
+        </div>
+        <div class="col-12 col-md-3">
+          <div class="card p-3 h-100">
+            <div class="fw-bold small text-warning">Leituras pendentes</div>
+            <div class="display-6 text-warning">{{ total_pendentes }}</div>
           </div>
         </div>
       </div>
@@ -933,6 +951,13 @@
                 {% if a.atualizado_em %}
                   · <i class="bi bi-pencil-square"></i> Atualizado {{ a.atualizado_em.strftime('%d/%m/%Y %H:%M') }}
                 {% endif %}
+                · <i class="bi bi-bullseye"></i> {{ a.destino_resumo }}
+                {% if a.inicio_em %}
+                  · <i class="bi bi-clock"></i> Início {{ a.inicio_em.strftime('%d/%m/%Y %H:%M') }}
+                {% endif %}
+                {% if a.fim_em %}
+                  · Expira {{ a.fim_em.strftime('%d/%m/%Y %H:%M') }}
+                {% endif %}
               </div>
               <div class="mt-2 text-muted" style="white-space:pre-line">
                 {{ conteudo[:280] }}{% if conteudo|length > 280 %}…{% endif %}
@@ -941,6 +966,12 @@
                 <span class="badge {{ 'bg-success-subtle text-success' if a.ativo else 'bg-secondary-subtle text-secondary' }}">
                   {{ 'Ativo' if a.ativo else 'Inativo' }}
                 </span>
+                {% if a.agendado %}
+                  <span class="badge bg-warning-subtle text-warning">Agendado</span>
+                {% endif %}
+                {% if a.expirado %}
+                  <span class="badge bg-danger-subtle text-danger">Encerrado</span>
+                {% endif %}
                 {% if a.prioridade %}
                   <span class="badge-soft">Prioridade: {{ a.prioridade|capitalize }}</span>
                 {% else %}
@@ -949,6 +980,7 @@
                 {% if a.exigir_confirmacao %}
                   <span class="badge-soft"><i class="bi bi-check2-square"></i> Confirmação</span>
                 {% endif %}
+                <span class="badge-soft"><i class="bi bi-eye"></i> {{ a.total_lidos }}/{{ a.total_destinatarios }} leitura(s)</span>
               </div>
             </div>
 
@@ -965,6 +997,9 @@
 
               <button class="btn btn-sm btn-royal mt-1" data-bs-toggle="modal" data-bs-target="#previewModal{{ a.id }}">
                 <i class="bi bi-search"></i> Visualizar
+              </button>
+              <button class="btn btn-sm btn-outline-primary mt-1" data-bs-toggle="modal" data-bs-target="#leiturasModal{{ a.id }}">
+                <i class="bi bi-people"></i> Quem leu
               </button>
 
               <form method="POST"
@@ -992,6 +1027,12 @@
                   {% if a.prioridade %} · Prioridade: {{ a.prioridade|capitalize }}{% endif %}
                   {% if a.exigir_confirmacao %} · <i class="bi bi-check2-square"></i> Exige confirmação{% endif %}
                 </div>
+                <div class="small mb-2">
+                  <span class="text-muted">Destino:</span> {{ a.destino_resumo }}
+                  {% if a.inicio_em %}<br><span class="text-muted">Início:</span> {{ a.inicio_em.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+                  {% if a.fim_em %}<br><span class="text-muted">Fim:</span> {{ a.fim_em.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+                  <br><span class="text-muted">Leituras:</span> {{ a.total_lidos }}/{{ a.total_destinatarios }}
+                </div>
                 <div style="white-space:pre-line">{{ conteudo }}</div>
               </div>
               <div class="modal-footer border-0">
@@ -1000,6 +1041,90 @@
             </div>
           </div>
         </div>
+        
+        <div class="modal fade" id="leiturasModal{{ a.id }}" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+              <div class="modal-header border-0">
+                <div>
+                  <h5 class="modal-title mb-1"><i class="bi bi-people-fill"></i> Leituras do aviso</h5>
+                  <div class="small text-muted">{{ titulo }} · {{ a.total_lidos }}/{{ a.total_destinatarios }} leitura(s)</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+              </div>
+              <div class="modal-body pt-0">
+                <div class="row g-3">
+                  <div class="col-12 col-lg-6">
+                    <div class="card p-3 h-100">
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="section-title"><i class="bi bi-people"></i> Cooperados</div>
+                        <span class="chip">{{ a.leituras_cooperados|selectattr('lido')|list|length }}/{{ a.leituras_cooperados|length }}</span>
+                      </div>
+                      <div class="listbox">
+                        {% if a.leituras_cooperados %}
+                          {% for item in a.leituras_cooperados %}
+                          <div class="item" style="cursor:default">
+                            <div class="flex-fill">
+                              <div class="fw-semibold">{{ item.nome }}</div>
+                              <div class="small text-muted">
+                                {% if item.lido and item.lido_em %}
+                                  Leu em {{ item.lido_em.strftime('%d/%m/%Y %H:%M') }}
+                                {% else %}
+                                  Ainda não leu
+                                {% endif %}
+                              </div>
+                            </div>
+                            <span class="badge {{ 'bg-success-subtle text-success' if item.lido else 'bg-warning-subtle text-warning' }}">
+                              {{ 'Lido' if item.lido else 'Pendente' }}
+                            </span>
+                          </div>
+                          {% endfor %}
+                        {% else %}
+                          <div class="text-muted p-2">Este aviso não foi enviado para cooperados.</div>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-12 col-lg-6">
+                    <div class="card p-3 h-100">
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="section-title"><i class="bi bi-shop"></i> Estabelecimentos</div>
+                        <span class="chip">{{ a.leituras_restaurantes|selectattr('lido')|list|length }}/{{ a.leituras_restaurantes|length }}</span>
+                      </div>
+                      <div class="listbox">
+                        {% if a.leituras_restaurantes %}
+                          {% for item in a.leituras_restaurantes %}
+                          <div class="item" style="cursor:default">
+                            <div class="flex-fill">
+                              <div class="fw-semibold">{{ item.nome }}</div>
+                              <div class="small text-muted">
+                                {% if item.lido and item.lido_em %}
+                                  Leu em {{ item.lido_em.strftime('%d/%m/%Y %H:%M') }}
+                                {% else %}
+                                  Ainda não leu
+                                {% endif %}
+                              </div>
+                            </div>
+                            <span class="badge {{ 'bg-success-subtle text-success' if item.lido else 'bg-warning-subtle text-warning' }}">
+                              {{ 'Lido' if item.lido else 'Pendente' }}
+                            </span>
+                          </div>
+                          {% endfor %}
+                        {% else %}
+                          <div class="text-muted p-2">Este aviso não foi enviado para estabelecimentos.</div>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer border-0">
+                <button class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {% else %}
         <div class="card p-4 text-center empty">
           <i class="bi bi-info-circle"></i> Nenhum aviso cadastrado.
@@ -1198,6 +1323,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const novoPrioridade = document.getElementById('novoPrioridade');
   const novoAtivo = document.getElementById('novoAtivo');
   const novoConfirmacao = document.getElementById('novoConfirmacao');
+  const novoInicioEm = document.getElementById('novoInicioEm');
+  const novoFimEm = document.getElementById('novoFimEm');
 
   const prevNovoTitulo = document.getElementById('prevNovoTitulo');
   const prevNovoMensagem = document.getElementById('prevNovoMensagem');
@@ -1257,6 +1384,22 @@ document.addEventListener('DOMContentLoaded', () => {
     b2.style.marginLeft = '8px';
     frag.appendChild(b2);
 
+    if (novoInicioEm?.value){
+      const b4 = document.createElement('span');
+      b4.className = 'badge-soft';
+      b4.style.marginLeft = '8px';
+      b4.innerHTML = '<i class="bi bi-clock"></i> Início agendado';
+      frag.appendChild(b4);
+    }
+
+    if (novoFimEm?.value){
+      const b5 = document.createElement('span');
+      b5.className = 'badge-soft';
+      b5.style.marginLeft = '8px';
+      b5.innerHTML = '<i class="bi bi-calendar-x"></i> Com expiração';
+      frag.appendChild(b5);
+    }
+
     if (novoConfirmacao?.checked){
       const b3 = document.createElement('span');
       b3.className = 'badge-soft';
@@ -1268,16 +1411,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const agora = new Date();
     const pad = n => String(n).padStart(2,'0');
-    prevNovoMeta.textContent =
-      `${pad(agora.getDate())}/${pad(agora.getMonth()+1)}/${agora.getFullYear()} ` +
-      `${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
+    let metaTxt = `${pad(agora.getDate())}/${pad(agora.getMonth()+1)}/${agora.getFullYear()} ${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
+    if (novoInicioEm?.value) metaTxt += ` · Início ${novoInicioEm.value.replace('T',' ')}`;
+    if (novoFimEm?.value) metaTxt += ` · Fim ${novoFimEm.value.replace('T',' ')}`;
+    prevNovoMeta.textContent = metaTxt;
 
     prevDestinoTexto.textContent = resumoDestinoTexto();
   }
 
   document.getElementById('btnPreviewNovo')?.addEventListener('click', atualizarPreviewNovo);
   [
-    novoTitulo, novoMensagem, novoPrioridade, novoAtivo, novoConfirmacao,
+    novoTitulo, novoMensagem, novoPrioridade, novoAtivo, novoConfirmacao, novoInicioEm, novoFimEm,
     destCoops, destRests, destAmbos
   ].forEach(el => {
     el?.addEventListener('input', atualizarPreviewNovo);
