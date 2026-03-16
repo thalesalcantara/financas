@@ -670,10 +670,10 @@
         {%- endmacro %}
 
         {# ---------- Filtros atuais (querystring) ---------- #}
-        {% set ri  = request.args.get('resumo_inicio', ymd(resumo_inicio) if resumo_inicio else '') %}
-        {% set rf  = request.args.get('resumo_fim', ymd(resumo_fim) if resumo_fim else '') %}
-        {% set rs  = request.args.get('resumo_restaurante_id', resumo_restaurante_id|string if resumo_restaurante_id else '') %}
-        {% set cs  = request.args.get('resumo_cooperado_id', resumo_cooperado_id|string if resumo_cooperado_id else '') %}
+        {% set ri  = request.args.get('resumo_inicio','') %}
+        {% set rf  = request.args.get('resumo_fim','') %}
+        {% set rs  = request.args.get('resumo_restaurante_id','') %}
+        {% set cs  = request.args.get('resumo_cooperado_id','') %}
         {% set rid = rs|int if rs else None %}
         {% set cid = cs|int if cs else None %}
 
@@ -682,28 +682,26 @@
         {% set _coop_sel = (cooperados|selectattr('id','equalto',cid)|list|first) if cid else None %}
 
         {# ---------- Bases com fallback (NÃO sobrescrever 'receitas'/'despesas' originais) ---------- #}
-        {% set _producoes = (producoes_resumo | default(producoes | default([])) | list) %}
+        {% set _producoes = (producoes | default([]) | list) %}
         {% if _producoes|length == 0 %}
           {% set _producoes = (lancamentos | default([]) | list) %}
         {% endif %}
 
         {# Cooperados (por pessoa) #}
-        {% set receitas_coop = (receitas_cooperado_resumo | default(receitas_coop | default([])) | list) %}
-        {% set despesas_coop = (despesas_cooperado_resumo | default(despesas_coop | default([])) | list) %}
+        {% set receitas_coop = (receitas_coop | default([]) | list) %}
+        {% set despesas_coop = (despesas_coop | default([]) | list) %}
 
         {# Cooperativa (geral) — mesma fonte da aba de RECEITAS/ DESPESAS da coop #}
         {% set _rec_coop_corp =
-             (receitas_cooperativa_resumo if receitas_cooperativa_resumo is defined else
-              (receitas if receitas is defined else
-               (receitas_cooperativa if receitas_cooperativa is defined else
-                (receitas_corp if receitas_corp is defined else
-                 [])))) %}
+             (receitas if receitas is defined else
+              (receitas_cooperativa if receitas_cooperativa is defined else
+               (receitas_corp if receitas_corp is defined else
+                []))) %}
         {% set _desp_coop_corp =
-             (despesas_cooperativa_resumo if despesas_cooperativa_resumo is defined else
-              (despesas if despesas is defined else
-               (despesas_cooperativa if despesas_cooperativa is defined else
-                (despesas_corp if despesas_corp is defined else
-                 [])))) %}
+             (despesas if despesas is defined else
+              (despesas_cooperativa if despesas_cooperativa is defined else
+               (despesas_corp if despesas_corp is defined else
+                []))) %}
 
         {% if not fast_mode %}
 {# ---------- Totais (lado servidor, para primeiro paint) ---------- #}
@@ -759,10 +757,9 @@
         {# Despesas Cooperados (SEM coluna de adiantamento: tudo soma em DESPESAS) #}
         {% set ns_desp_coop = namespace(total=0) %}
         {% for d in despesas_coop %}
-          {% set dt_ini = ymd(d.data_inicio or d.data) %}
-          {% set dt_fim = ymd(d.data_fim or d.data) %}
-          {% set okd = (not ri or dt_fim >= ri) and (not rf or dt_ini <= rf) %}
-          {% set okc = (not cid or (d.cooperado and d.cooperado.id==cid) or ((d.cooperado_nome if d.cooperado_nome is defined else '')|trim|upper == ((_coop_sel.nome if _coop_sel else '')|trim|upper))) %}
+          {% set dt  = ymd(d.data) %}
+          {% set okd = (not ri or dt >= ri) and (not rf or dt <= rf) %}
+          {% set okc = (not cid or (d.cooperado and d.cooperado.id==cid)) %}
           {% if okd and okc %}
             {% set ns_desp_coop.total = ns_desp_coop.total + (d.valor or 0) %}
           {% endif %}
@@ -1262,9 +1259,7 @@
           {% set _is_ad_js = (d.adiantamento in [True, 1, '1', 'true', 'True', 'on']) %}
           {
             id: {{ d.id }},
-            data: "{{ ymd(d.data or d.data_fim or d.data_inicio) }}",
-            data_inicio: "{{ ymd(d.data_inicio or d.data) }}",
-            data_fim: "{{ ymd(d.data_fim or d.data) }}",
+            data: "{{ ymd(d.data) }}",
             valor: {{ (d.valor or 0)|float }},
             cooperado_id: {{ d.cooperado.id if d.cooperado else 'null' }},
             cooperado_nome: "{{ (d.cooperado.nome if d.cooperado else (d.cooperado_nome if d.cooperado_nome is defined else ''))|e }}",
@@ -1327,19 +1322,6 @@
         return true;
       };
 
-      const overlapsRange = (ini, fim, fallback = null) => {
-        const di = parseISO(FILTER.ri);
-        const df = parseISO(FILTER.rf);
-        const xIni = parseISO(ini || fallback);
-        const xFim = parseISO(fim || fallback || ini);
-        if (!xIni && !xFim) return true;
-        const start = xIni || xFim;
-        const end = xFim || xIni;
-        if (di && end < di) return false;
-        if (df && start > df) return false;
-        return true;
-      };
-
       const byMonthKey = d => {
         if (!d) return '';
         const dt = parseISO(d);
@@ -1362,7 +1344,7 @@
       );
 
       const filteredDESp = DESP_COOP.filter(d => {
-        if (!overlapsRange(d.data_inicio, d.data_fim, d.data)) return false;
+        if (!inRange(d.data)) return false;
         if (FILTER.cid == null) return true;
 
         if (d.cooperado_id === FILTER.cid) return true;
@@ -1523,39 +1505,8 @@
           maximumFractionDigits: 2
         });
 
-        const CHART_PAYLOAD = {
-          coop: {{ (resumo_chart_coop or {'labels': [], 'receitas': [], 'despesas': []})|tojson }},
-          cooperados: {{ (resumo_chart_cooperados or {'labels': [], 'producoes': [], 'inss': [], 'sest': []})|tojson }},
-          estabs: {{ (resumo_chart_estabs or {'labels': [], 'valores': []})|tojson }}
-        };
-
-        const addEmptyState = (canvasId, message) => {
-          const canvas = document.getElementById(canvasId);
-          if (!canvas) return;
-          const parent = canvas.parentElement;
-          if (!parent) return;
-          canvas.style.display = 'none';
-          let empty = parent.querySelector('.chart-empty-state');
-          if (!empty) {
-            empty = document.createElement('div');
-            empty.className = 'chart-empty-state text-center text-muted small py-4';
-            parent.appendChild(empty);
-          }
-          empty.textContent = message;
-        };
-
-        const reviveCanvas = (canvasId) => {
-          const canvas = document.getElementById(canvasId);
-          if (!canvas) return null;
-          canvas.style.display = '';
-          const empty = canvas.parentElement ? canvas.parentElement.querySelector('.chart-empty-state') : null;
-          if (empty) empty.remove();
-          return canvas;
-        };
-
         const baseChartOptions = {
           responsive: true,
-          maintainAspectRatio: false,
           plugins: {
             legend: {
               position: 'bottom',
@@ -1585,16 +1536,21 @@
 
         // Cooperativa: Receitas vs Despesas por mês
         (function () {
-          const labels = Array.isArray(CHART_PAYLOAD.coop.labels) ? CHART_PAYLOAD.coop.labels : [];
-          const rec = Array.isArray(CHART_PAYLOAD.coop.receitas) ? CHART_PAYLOAD.coop.receitas : [];
-          const des = Array.isArray(CHART_PAYLOAD.coop.despesas) ? CHART_PAYLOAD.coop.despesas : [];
+          const byM = {};
+          filteredRECc.forEach(r => {
+            const k = byMonthKey(r.data) || '—';
+            (byM[k] ??= { r: 0, d: 0 }).r += r.valor;
+          });
+          filteredDESc.forEach(d => {
+            const k = byMonthKey(d.data) || '—';
+            (byM[k] ??= { r: 0, d: 0 }).d += d.valor;
+          });
 
-          if (!labels.length || (!rec.some(v => Number(v || 0) !== 0) && !des.some(v => Number(v || 0) !== 0))) {
-            addEmptyState('chartCoop', 'Sem receitas ou despesas da cooperativa no período filtrado.');
-            return;
-          }
+          const labels = Object.keys(byM).sort();
+          const rec    = labels.map(k => byM[k].r);
+          const des    = labels.map(k => byM[k].d);
 
-          const ctx = reviveCanvas('chartCoop');
+          const ctx = document.getElementById('chartCoop');
           if (!ctx) return;
 
           new Chart(ctx, {
@@ -1612,17 +1568,20 @@
 
         // Cooperados: Produções + INSS 4% + SEST 0,5% por mês
         (function () {
-          const labels = Array.isArray(CHART_PAYLOAD.cooperados.labels) ? CHART_PAYLOAD.cooperados.labels : [];
-          const prod = Array.isArray(CHART_PAYLOAD.cooperados.producoes) ? CHART_PAYLOAD.cooperados.producoes : [];
-          const inss = Array.isArray(CHART_PAYLOAD.cooperados.inss) ? CHART_PAYLOAD.cooperados.inss : [];
-          const sest = Array.isArray(CHART_PAYLOAD.cooperados.sest) ? CHART_PAYLOAD.cooperados.sest : [];
+          const byM = {};
+          filteredPROD.forEach(p => {
+            const k = byMonthKey(p.data) || '—';
+            (byM[k] ??= { prod: 0, inss4: 0, sest05: 0 }).prod += p.valor;
+            byM[k].inss4  += p.valor * 0.04;
+            byM[k].sest05 += p.valor * 0.005;
+          });
 
-          if (!labels.length || (!prod.some(v => Number(v || 0) !== 0) && !inss.some(v => Number(v || 0) !== 0) && !sest.some(v => Number(v || 0) !== 0))) {
-            addEmptyState('chartCooperados', 'Sem produções de cooperados no período filtrado.');
-            return;
-          }
+          const labels = Object.keys(byM).sort();
+          const prod   = labels.map(k => byM[k].prod);
+          const inss4  = labels.map(k => byM[k].inss4);
+          const sest05 = labels.map(k => byM[k].sest05);
 
-          const ctx = reviveCanvas('chartCooperados');
+          const ctx = document.getElementById('chartCooperados');
           if (!ctx) return;
 
           new Chart(ctx, {
@@ -1643,7 +1602,7 @@
                 },
                 {
                   label: 'INSS (4,0%)',
-                  data: inss,
+                  data: inss4,
                   borderColor: 'rgba(56, 189, 248, 1)',
                   backgroundColor: 'rgba(56, 189, 248, 0.12)',
                   borderWidth: 2,
@@ -1654,7 +1613,7 @@
                 },
                 {
                   label: 'SEST/SENAT (0,5%)',
-                  data: sest,
+                  data: sest05,
                   borderColor: 'rgba(2, 132, 199, 1)',
                   backgroundColor: 'rgba(2, 132, 199, 0.10)',
                   borderWidth: 2,
@@ -1671,15 +1630,18 @@
 
         // Estabelecimentos — barra horizontal
         (function () {
-          const labels = Array.isArray(CHART_PAYLOAD.estabs.labels) ? CHART_PAYLOAD.estabs.labels : [];
-          const vals = Array.isArray(CHART_PAYLOAD.estabs.valores) ? CHART_PAYLOAD.estabs.valores : [];
+          const byR = {};
+          filteredPROD.forEach(p => {
+            if (p.restaurante_id == null) return;
+            const k = p.restaurante_nome || '—';
+            byR[k] = (byR[k] || 0) + p.valor;
+          });
 
-          if (!labels.length || !vals.some(v => Number(v || 0) !== 0)) {
-            addEmptyState('chartEstabs', 'Sem produções por estabelecimento no período filtrado.');
-            return;
-          }
+          const entries = Object.entries(byR).sort((a, b) => b[1] - a[1]).slice(0, 20);
+          const labels = entries.map(e => e[0]);
+          const vals   = entries.map(e => e[1]);
 
-          const ctx = reviveCanvas('chartEstabs');
+          const ctx = document.getElementById('chartEstabs');
           if (!ctx) return;
 
           new Chart(ctx, {
@@ -1688,26 +1650,9 @@
               labels,
               datasets: [{ label: 'Produções por Estabelecimento', data: vals, backgroundColor: 'rgba(16, 185, 129, 0.8)', borderRadius: 6 }]
             },
-            options: {
-              ...baseChartOptions,
-              indexAxis: 'y',
-              plugins: { ...baseChartOptions.plugins, legend: { display: false } },
-              scales: {
-                x: {
-                  beginAtZero: true,
-                  grid: { color: 'rgba(148,163,184,0.25)' },
-                  ticks: { callback: (v) => moneyTick(v) }
-                },
-                y: {
-                  grid: { display: false },
-                  ticks: { callback: (v, i) => labels[i] || v }
-                }
-              }
-            }
+            options: { ...baseChartOptions, plugins: { ...baseChartOptions.plugins, legend: { display: false } }, indexAxis: 'y' }
           });
         })();
-      }).catch((err) => {
-        console.error('Falha ao montar gráficos do resumo:', err);
       });
 
       // ---- Exportação XLSX ----
@@ -2930,7 +2875,7 @@
   <div class="card border-0 shadow-sm rounded-3 mb-3">
     <div class="card-body">
 
-      <form id="form-beneficios" method="POST" action="{{ url_for('ratear_beneficios') }}" class="row g-3" data-perm-form="can_beneficios_criar">
+      <form id="form-beneficios" method="POST" action="{{ url_for('ratear_beneficios') }}" class="row g-3" data-perm-form="can_beneficios_criar_or_editar">
         <div class="col-12 col-md-3">
           <label class="form-label">Data inicial</label>
           <input type="date" class="form-control form-control-sm" name="data_inicial" required value="{{ request.args.get('data_inicio','') }}">
@@ -2953,7 +2898,7 @@
         </div>
         <div class="col-md-3">
           <label class="form-label">Valor por beneficiado (R$)</label>
-          <input type="text" inputmode="decimal" class="form-control form-control-sm" name="hosp_valor_unit" id="hosp_valor_unit" placeholder="0,00">
+          <input type="number" step="0.01" class="form-control form-control-sm" name="hosp_valor_unit" id="hosp_valor_unit" placeholder="0,00">
           <input type="hidden" name="hosp_valor" id="hosp_valor_total">
         </div>
         <div class="col-md-5">
@@ -2983,7 +2928,7 @@
         </div>
         <div class="col-md-3">
           <label class="form-label">Valor por beneficiado (R$)</label>
-          <input type="text" inputmode="decimal" class="form-control form-control-sm" name="farm_valor_unit" id="farm_valor_unit" placeholder="0,00">
+          <input type="number" step="0.01" class="form-control form-control-sm" name="farm_valor_unit" id="farm_valor_unit" placeholder="0,00">
           <input type="hidden" name="farm_valor" id="farm_valor_total">
         </div>
         <div class="col-md-5">
@@ -3011,7 +2956,7 @@
         </div>
         <div class="col-md-3">
           <label class="form-label">Valor por beneficiado (R$)</label>
-          <input type="text" inputmode="decimal" class="form-control form-control-sm" name="alim_valor_unit" id="alim_valor_unit" placeholder="0,00">
+          <input type="number" step="0.01" class="form-control form-control-sm" name="alim_valor_unit" id="alim_valor_unit" placeholder="0,00">
           <input type="hidden" name="alim_valor" id="alim_valor_total">
         </div>
         <div class="col-md-5">
@@ -3213,18 +3158,8 @@
 
   ['hosp','farm','alim'].forEach(p=>{
     q(`#${p}_valor_unit`)?.addEventListener('input', ()=>calcPreview(p));
-    q(`#${p}_beneficiarios`)?.addEventListener('change', ()=>{
-      const bens = new Set(selectedVals(q(`#${p}_beneficiarios`)));
-      const isSel = q(`#${p}_isencoes`);
-      if (isSel) [...isSel.options].forEach(o => { if (bens.has(o.value)) o.selected = false; });
-      calcPreview(p);
-    });
-    q(`#${p}_isencoes`)?.addEventListener('change', ()=>{
-      const isens = new Set(selectedVals(q(`#${p}_isencoes`)));
-      const beSel = q(`#${p}_beneficiarios`);
-      if (beSel) [...beSel.options].forEach(o => { if (isens.has(o.value)) o.selected = false; });
-      calcPreview(p);
-    });
+    q(`#${p}_beneficiarios`)?.addEventListener('change', ()=>calcPreview(p));
+    q(`#${p}_isencoes`)?.addEventListener('change', ()=>calcPreview(p));
     calcPreview(p); // estado inicial
   });
 
@@ -5783,6 +5718,148 @@
   }
 </script>
 
+<!-- ==== BENEFÍCIOS: prévia + cálculo do TOTAL antes de enviar ==== -->
+<script>
+  (function () {
+    const sec = document.getElementById('beneficios');
+    if (!sec) return; // só roda nesta aba
+
+    const TOTAL_COOPS = {{ cooperados|length or 0 }};
+
+    // ===== Utils =====
+    function valNum(inp) {
+      const n = parseFloat(String(inp?.value ?? '').replace(',', '.'));
+      return isFinite(n) ? n : 0;
+    }
+    function idsFromSelect(sel) {
+      return Array.from(sel?.selectedOptions || []).map(o => String(o.value));
+    }
+    function money(v) {
+      return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function setBadge(el, txt) { if (el) el.textContent = txt; }
+
+    // ===== Prévia por tipo (hosp/farm/alim) =====
+    function calcPreview(prefix) {
+      const unit = sec.querySelector(`#${prefix}_valor_unit`);
+      const bensSel = sec.querySelector(`#${prefix}_beneficiarios`);
+      const isenSel = sec.querySelector(`#${prefix}_isencoes`);
+      const badge = sec.querySelector(`#${prefix}_badge`);
+      if (!unit || !bensSel || !isenSel || !badge) return;
+
+      const vUnit = Math.max(0, valNum(unit));
+      const bens = idsFromSelect(bensSel);
+      const isen = idsFromSelect(isenSel);
+
+      // regra do seu texto: union(bens + isen) = "quem não paga"
+      const uniqueNaoPagam = new Set([...bens, ...isen]);
+      const numBens = bens.length;
+      const numIsen = isen.length;
+      const pagantes = Math.max(0, TOTAL_COOPS - uniqueNaoPagam.size);
+
+      const total = vUnit * numBens;
+      const porPag = pagantes > 0 ? (total / pagantes) : 0;
+
+      setBadge(
+        badge,
+        `Recebem: ${numBens} · Isentos: ${numIsen} · Pagantes: ${pagantes} · Total a ratear: ${money(total)} · Cobrança por pagante: ${money(porPag)}`
+      );
+    }
+
+    ['hosp', 'farm', 'alim'].forEach(p => {
+      sec.querySelector(`#${p}_valor_unit`)?.addEventListener('input', () => calcPreview(p));
+      sec.querySelector(`#${p}_beneficiarios`)?.addEventListener('change', () => calcPreview(p));
+      sec.querySelector(`#${p}_isencoes`)?.addEventListener('change', () => calcPreview(p));
+      calcPreview(p);
+    });
+
+    // ===== Cálculo dos totais no submit + garantir IDs dos hidden =====
+    const form = sec.querySelector('#form-beneficios');
+    if (form) {
+      // garante IDs dos hidden esperados (se existir só name="")
+      (function ensureHiddenIds() {
+        const map = { hosp: 'hosp_valor_total', farm: 'farm_valor_total', alim: 'alim_valor_total' };
+        Object.entries(map).forEach(([p, id]) => {
+          if (!sec.querySelector(`#${id}`)) {
+            const i = sec.querySelector(`input[name="${p}_valor"]`);
+            if (i) i.id = id;
+          }
+        });
+      })();
+
+      function setTotal(prefix) {
+        const unit = sec.querySelector(`#${prefix}_valor_unit`);
+        const bensSel = sec.querySelector(`#${prefix}_beneficiarios`);
+        const hidden = sec.querySelector(`#${prefix}_valor_total`) || sec.querySelector(`input[name="${prefix}_valor"]`);
+
+        const count = (bensSel?.selectedOptions?.length) ? bensSel.selectedOptions.length : 0;
+        const total = Math.max(0, valNum(unit) * count);
+
+        if (hidden) hidden.value = total.toFixed(2);
+      }
+
+      form.addEventListener('submit', function () {
+        ['hosp', 'farm', 'alim'].forEach(setTotal);
+      });
+    }
+
+    // ===== Seleção em massa + modal de exclusão (tabela) =====
+    try {
+      const tbl = sec.querySelector('#tabela-beneficios');
+      const checkAll = sec.querySelector('#check_all');
+      const bulkBtn = sec.querySelector('#btn-bulk-delete');
+      const modal = document.getElementById('modalExcluirBeneficio'); // modal pode ficar fora da aba
+
+      const allChecks = () => (tbl ? tbl.querySelectorAll('tbody .chk-beneficio') : []);
+      const checkedCount = () => (tbl ? tbl.querySelectorAll('tbody .chk-beneficio:checked').length : 0);
+
+      function toggleBulkBtn() { if (bulkBtn) bulkBtn.disabled = checkedCount() === 0; }
+      function updateHeaderState() {
+        if (!checkAll) return;
+        const items = allChecks();
+        const total = items.length;
+        const checked = checkedCount();
+
+        if (checked === 0) { checkAll.checked = false; checkAll.indeterminate = false; }
+        else if (checked === total) { checkAll.checked = true; checkAll.indeterminate = false; }
+        else { checkAll.checked = false; checkAll.indeterminate = true; }
+      }
+
+      checkAll?.addEventListener('change', () => {
+        allChecks().forEach(ch => { ch.checked = checkAll.checked; });
+        toggleBulkBtn();
+        updateHeaderState();
+      });
+
+      tbl?.addEventListener('change', (e) => {
+        if (e.target && e.target.classList?.contains('chk-beneficio')) {
+          toggleBulkBtn();
+          updateHeaderState();
+        }
+      });
+
+      toggleBulkBtn();
+      updateHeaderState();
+
+      // Modal individual (exclusão)
+      if (modal) {
+        modal.addEventListener('show.bs.modal', function (ev) {
+          const btn = ev.relatedTarget;
+          const id = btn ? btn.getAttribute('data-beneficio-id') : '';
+          const label = btn ? (btn.getAttribute('data-beneficio-label') || '—') : '—';
+
+          const labelNode = modal.querySelector('#beneficio_label_preview');
+          if (labelNode) labelNode.textContent = label;
+
+          const hidden = modal.querySelector('#beneficio_id_hidden');
+          if (hidden) hidden.value = id || '';
+        });
+      }
+    } catch (err) {
+      console.error('[beneficios-js]', err);
+    }
+  })();
+</script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function(){
