@@ -2911,27 +2911,19 @@ def admin_dashboard():
                     return d
         return None
 
-    resumo_inicio_raw = (args.get("resumo_inicio") or "").strip()
-    resumo_fim_raw = (args.get("resumo_fim") or "").strip()
-    resumo_restaurante_id = args.get("resumo_restaurante_id", type=int)
-    resumo_cooperado_id = args.get("resumo_cooperado_id", type=int)
+    resumo_inicio_raw = (args.get("data_inicio") or args.get("resumo_inicio") or "").strip()
+    resumo_fim_raw = (args.get("data_fim") or args.get("resumo_fim") or "").strip()
+    resumo_restaurante_id = args.get("restaurante_id", type=int) or args.get("resumo_restaurante_id", type=int)
+    resumo_cooperado_id = args.get("cooperado_id", type=int) or args.get("resumo_cooperado_id", type=int)
 
-    if active_tab == "resumo":
-        data_inicio = _pick_date("resumo_inicio")
-        data_fim = _pick_date("resumo_fim")
-        restaurante_id = resumo_restaurante_id
-        cooperado_id = resumo_cooperado_id
-        considerar_periodo = False
-        dows = set()
-    else:
-        data_inicio = _pick_date("data_inicio")
-        data_fim = _pick_date("data_fim")
-        restaurante_id = args.get("restaurante_id", type=int)
-        cooperado_id = args.get("cooperado_id", type=int)
-        considerar_periodo = bool(args.get("considerar_periodo"))
-        dows = set(args.getlist("dow"))
+    data_inicio = _pick_date("data_inicio", "resumo_inicio")
+    data_fim = _pick_date("data_fim", "resumo_fim")
+    restaurante_id = resumo_restaurante_id
+    cooperado_id = resumo_cooperado_id
+    considerar_periodo = bool(args.get("considerar_periodo"))
+    dows = set(args.getlist("dow"))
 
-    filtro_periodo_aplicado = bool(data_inicio or data_fim)
+    filtro_periodo_aplicado = bool(data_inicio or data_fim or restaurante_id or cooperado_id)
 
     if data_inicio and not data_fim:
         data_fim = data_inicio
