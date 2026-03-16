@@ -658,6 +658,12 @@ aviso_restaurantes = db.Table(
     db.Column("restaurante_id", db.Integer, db.ForeignKey("restaurantes.id"), primary_key=True),
 )
 
+aviso_cooperados = db.Table(
+    "aviso_cooperados",
+    db.Column("aviso_id", db.Integer, db.ForeignKey("avisos.id"), primary_key=True),
+    db.Column("cooperado_id", db.Integer, db.ForeignKey("cooperados.id"), primary_key=True),
+)
+
 class Aviso(db.Model):
     __tablename__ = "avisos"
     id = db.Column(db.Integer, primary_key=True)
@@ -666,11 +672,12 @@ class Aviso(db.Model):
     # escopo: global | restaurante | cooperado
     tipo = db.Column(db.String(20), nullable=False, default="global")
 
-    # destino individual (opcional)
+    # destino individual (opcional / legado)
     destino_cooperado_id = db.Column(db.Integer, db.ForeignKey("cooperados.id"))
     destino_cooperado = db.relationship("Cooperado", foreign_keys=[destino_cooperado_id])
 
-    # destino por restaurante (opcional, N:N)
+    # destinos por lista (N:N)
+    cooperados = db.relationship("Cooperado", secondary=aviso_cooperados, backref="avisos_recebidos")
     restaurantes = db.relationship("Restaurante", secondary=aviso_restaurantes, backref="avisos")
 
     prioridade = db.Column(db.String(10), default="normal")  # normal | alta
@@ -2435,7 +2442,7 @@ def _avisos_base_query():
     now = func.now()
     return (
         Aviso.query
-        .options(selectinload(Aviso.restaurantes))  # evita N+1 no template
+        .options(selectinload(Aviso.restaurantes), selectinload(Aviso.cooperados))  # evita N+1 no template
         .filter(Aviso.ativo.is_(True))
         .filter(or_(Aviso.inicio_em.is_(None), Aviso.inicio_em <= now))
         .filter(or_(Aviso.fim_em.is_(None),    Aviso.fim_em    >= now))
@@ -2473,7 +2480,10 @@ def _aviso_destinatarios(aviso: Aviso, cooperados_all=None, restaurantes_all=Non
     restaurantes_all = restaurantes_all if restaurantes_all is not None else Restaurante.query.order_by(Restaurante.nome.asc()).all()
 
     if aviso.tipo == "cooperado":
-        if aviso.destino_cooperado_id:
+        alvo_ids = {c.id for c in (list(getattr(aviso, "cooperados", []) or []))}
+        if alvo_ids:
+            coops = [c for c in cooperados_all if c.id in alvo_ids]
+        elif aviso.destino_cooperado_id:
             coops = [c for c in cooperados_all if c.id == aviso.destino_cooperado_id]
         else:
             coops = list(cooperados_all)
@@ -2500,8 +2510,12 @@ def get_avisos_for_cooperado(coop: Cooperado):
                 and_(
                     Aviso.tipo == "cooperado",
                     or_(
+                        Aviso.cooperados.any(Cooperado.id == coop.id),
                         Aviso.destino_cooperado_id == coop.id,
-                        Aviso.destino_cooperado_id.is_(None)  # broadcast cooperados
+                        and_(
+                            Aviso.destino_cooperado_id.is_(None),
+                            ~Aviso.cooperados.any(),
+                        ),
                     ),
                 ),
             )
@@ -4707,18 +4721,19 @@ def admin_avisos():
                     flash("Selecione ao menos um cooperado.", "warning")
                     return redirect(url_for("admin_avisos"))
                 try:
-                    coop_ids = [int(x) for x in sel_coops]
+                    coop_ids = sorted({int(x) for x in sel_coops})
                 except Exception:
                     flash("Seleção de cooperado inválida.", "warning")
                     return redirect(url_for("admin_avisos"))
 
-                for coop_id in coop_ids:
-                    a = _mk_aviso("cooperado")
-                    a.destino_cooperado_id = coop_id
-                    avisos_para_criar.append(a)
+                a = _mk_aviso("cooperado")
+                a.destino_cooperado_id = None
+                a.cooperados = Cooperado.query.filter(Cooperado.id.in_(coop_ids)).all()
+                avisos_para_criar.append(a)
             else:
                 a = _mk_aviso("cooperado")
                 a.destino_cooperado_id = None
+                a.cooperados = []
                 avisos_para_criar.append(a)
 
         elif destino_tipo == "restaurantes":
@@ -4746,18 +4761,19 @@ def admin_avisos():
                     flash("Selecione ao menos um cooperado para o aviso dos cooperados.", "warning")
                     return redirect(url_for("admin_avisos"))
                 try:
-                    coop_ids = [int(x) for x in sel_coops]
+                    coop_ids = sorted({int(x) for x in sel_coops})
                 except Exception:
                     flash("Seleção de cooperado inválida.", "warning")
                     return redirect(url_for("admin_avisos"))
 
-                for coop_id in coop_ids:
-                    a_coop = _mk_aviso("cooperado")
-                    a_coop.destino_cooperado_id = coop_id
-                    avisos_para_criar.append(a_coop)
+                a_coop = _mk_aviso("cooperado")
+                a_coop.destino_cooperado_id = None
+                a_coop.cooperados = Cooperado.query.filter(Cooperado.id.in_(coop_ids)).all()
+                avisos_para_criar.append(a_coop)
             else:
                 a_coop = _mk_aviso("cooperado")
                 a_coop.destino_cooperado_id = None
+                a_coop.cooperados = []
                 avisos_para_criar.append(a_coop)
 
             if rest_alc == "selecionados":
@@ -4788,7 +4804,7 @@ def admin_avisos():
         flash("Aviso(s) salvo(s) com sucesso.", "success")
         return redirect(url_for("admin_avisos"))
 
-    avisos = Aviso.query.options(selectinload(Aviso.restaurantes)).order_by(Aviso.fixado.desc(), Aviso.criado_em.desc()).all()
+    avisos = Aviso.query.options(selectinload(Aviso.restaurantes), selectinload(Aviso.cooperados)).order_by(Aviso.fixado.desc(), Aviso.criado_em.desc()).all()
 
     leituras = AvisoLeitura.query.order_by(AvisoLeitura.lido_em.desc()).all()
     leituras_por_aviso = defaultdict(list)
@@ -4804,12 +4820,22 @@ def admin_avisos():
         lidos_coop = {r.cooperado_id: r for r in registros if r.cooperado_id}
         lidos_rest = {r.restaurante_id: r for r in registros if r.restaurante_id}
 
-        a.destino_resumo = (
-            "Todos" if a.tipo == "global" else
-            "Cooperados" if a.tipo == "cooperado" and not a.destino_cooperado_id else
-            "Restaurantes" if a.tipo == "restaurante" and not getattr(a, "restaurantes", None) else
-            a.tipo.capitalize()
-        )
+        if a.tipo == "global":
+            a.destino_resumo = "Todos"
+        elif a.tipo == "cooperado":
+            if getattr(a, "cooperados", None):
+                a.destino_resumo = "Cooperados selecionados"
+            elif a.destino_cooperado_id:
+                a.destino_resumo = "Cooperado específico"
+            else:
+                a.destino_resumo = "Todos os cooperados"
+        elif a.tipo == "restaurante":
+            if getattr(a, "restaurantes", None):
+                a.destino_resumo = "Restaurantes selecionados"
+            else:
+                a.destino_resumo = "Todos os restaurantes"
+        else:
+            a.destino_resumo = a.tipo.capitalize()
         a.agendado = bool(a.inicio_em and a.inicio_em > now_dt)
         a.expirado = bool(a.fim_em and a.fim_em < now_dt)
 
