@@ -1390,7 +1390,7 @@ def admin_perm_required(aba: str, acao: str = "ver"):
                 flash("Você não tem permissão para essa ação.", "danger")
 
                 if getattr(u, "is_master", False):
-                    return _redirect_admin_dashboard("lancamentos")
+                    return redirect(url_for("admin_dashboard", tab="lancamentos"))
 
                 abas_liberadas = [
                     nome_aba
@@ -2901,7 +2901,6 @@ def admin_dashboard():
             flash("Você não tem permissão para acessar essa aba.", "warning")
             return redirect(url_for("admin_dashboard", tab=abas_liberadas[0]))
 
-
     def _pick_date(*keys):
         for k in keys:
             v = args.get(k)
@@ -2911,19 +2910,10 @@ def admin_dashboard():
                     return d
         return None
 
-    resumo_inicio_raw = (args.get("data_inicio") or args.get("resumo_inicio") or "").strip()
-    resumo_fim_raw = (args.get("data_fim") or args.get("resumo_fim") or "").strip()
-    resumo_restaurante_id = args.get("restaurante_id", type=int) or args.get("resumo_restaurante_id", type=int)
-    resumo_cooperado_id = args.get("cooperado_id", type=int) or args.get("resumo_cooperado_id", type=int)
+    data_inicio = _pick_date("resumo_inicio", "data_inicio")
+    data_fim = _pick_date("resumo_fim", "data_fim")
 
-    data_inicio = _pick_date("data_inicio", "resumo_inicio")
-    data_fim = _pick_date("data_fim", "resumo_fim")
-    restaurante_id = resumo_restaurante_id
-    cooperado_id = resumo_cooperado_id
-    considerar_periodo = bool(args.get("considerar_periodo"))
-    dows = set(args.getlist("dow"))
-
-    filtro_periodo_aplicado = bool(data_inicio or data_fim or restaurante_id or cooperado_id)
+    filtro_periodo_aplicado = bool(data_inicio or data_fim)
 
     if data_inicio and not data_fim:
         data_fim = data_inicio
@@ -2934,10 +2924,10 @@ def admin_dashboard():
         data_inicio = hoje_ref - timedelta(days=hoje_ref.weekday())
         data_fim = data_inicio + timedelta(days=6)
 
-    resumo_inicio_val = resumo_inicio_raw or (data_inicio.strftime("%Y-%m-%d") if data_inicio else "")
-    resumo_fim_val = resumo_fim_raw or (data_fim.strftime("%Y-%m-%d") if data_fim else "")
-    resumo_restaurante_id_val = resumo_restaurante_id or None
-    resumo_cooperado_id_val = resumo_cooperado_id or None
+    restaurante_id = args.get("restaurante_id", type=int)
+    cooperado_id = args.get("cooperado_id", type=int)
+    considerar_periodo = bool(args.get("considerar_periodo"))
+    dows = set(args.getlist("dow"))
 
     # =========================
     # Lançamentos
@@ -2990,7 +2980,7 @@ def admin_dashboard():
     total_receitas = 0.0
     total_despesas = 0.0
 
-    if active_tab in {"receitas", "despesas", "resumo", "config"}:
+    if True:
         rq = ReceitaCooperativa.query
         dq = DespesaCooperativa.query
 
@@ -3026,7 +3016,7 @@ def admin_dashboard():
     total_despesas_coop = 0.0
     total_adiantamentos_coop = 0.0
 
-    if active_tab in {"coop_receitas", "coop_despesas", "beneficios", "resumo", "config"}:
+    if True:
         rq2 = ReceitaCooperado.query
         dq2 = DespesaCooperado.query
 
@@ -3325,7 +3315,7 @@ def admin_dashboard():
     historico_beneficios = []
     beneficios_view = []
 
-    if active_tab == "beneficios":
+    if True:
         if b_ini and not b_fim:
             b_fim = b_ini
         elif b_fim and not b_ini:
@@ -3593,10 +3583,6 @@ def admin_dashboard():
         filtro_periodo_aplicado=filtro_periodo_aplicado,
         escala_editor_rows=escala_editor_rows,
         contratos_escala_opcoes=contratos_escala_opcoes,
-        resumo_inicio_val=resumo_inicio_val,
-        resumo_fim_val=resumo_fim_val,
-        resumo_restaurante_id_val=resumo_restaurante_id_val,
-        resumo_cooperado_id_val=resumo_cooperado_id_val,
     )
     
 # =========================
@@ -3636,58 +3622,6 @@ def _fmt_time(t) -> str:
         except Exception:
             pass
     return str(t)
-
-from urllib.parse import urlsplit, parse_qs
-
-def _redirect_admin_dashboard(tab: str, extra: dict | None = None):
-    """Redireciona preservando aba e filtros atuais, com fallback no HTTP_REFERER."""
-    keep_multi = {"dow", "ids[]"}
-    keep_keys = [
-        "tab", "data_inicio", "data_fim", "restaurante_id", "cooperado_id",
-        "resumo_inicio", "resumo_fim", "resumo_restaurante_id", "resumo_cooperado_id",
-        "b_ini", "b_fim", "coop_benef_id", "considerar_periodo"
-    ]
-
-    merged: dict[str, object] = {"tab": tab}
-
-    def absorb(src):
-        if not src:
-            return
-        getter = getattr(src, "get", None)
-        getlist = getattr(src, "getlist", None)
-        for k in keep_keys:
-            v = getter(k) if getter else None
-            if v not in (None, ""):
-                merged[k] = v
-        if getlist:
-            vals = [x for x in getlist("dow") if x not in (None, "")]
-            if vals:
-                merged["dow"] = vals
-
-    absorb(request.args)
-    absorb(request.form)
-
-    ref = request.referrer or ""
-    if ref:
-        try:
-            qs = parse_qs(urlsplit(ref).query, keep_blank_values=False)
-            for k in keep_keys:
-                if k not in merged and qs.get(k):
-                    merged[k] = qs[k][-1]
-            if "dow" not in merged and qs.get("dow"):
-                merged["dow"] = [x for x in qs.get("dow", []) if x not in (None, "")]
-        except Exception:
-            pass
-
-    merged["tab"] = tab
-    if extra:
-        for k, v in extra.items():
-            if v not in (None, "", [], ()): merged[k] = v
-
-    from urllib.parse import urlencode
-    qs = urlencode(merged, doseq=True)
-    base = url_for("admin_dashboard")
-    return redirect(f"{base}?{qs}" if qs else base)
 
 @app.route("/exportar_lancamentos")
 @admin_required
@@ -4120,7 +4054,7 @@ def admin_add_lancamento():
     db.session.add(l)
     db.session.commit()
     flash("Lançamento inserido.", "success")
-    return _redirect_admin_dashboard("lancamentos")
+    return redirect(url_for("admin_dashboard", tab="lancamentos"))
 
 
 @app.route("/admin/lancamentos/<int:id>/edit", methods=["POST"])
@@ -4140,7 +4074,7 @@ def admin_edit_lancamento(id):
 
     db.session.commit()
     flash("Lançamento atualizado.", "success")
-    return _redirect_admin_dashboard("lancamentos")
+    return redirect(url_for("admin_dashboard", tab="lancamentos"))
 
 
 @app.route("/admin/lancamentos/<int:id>/delete", methods=["GET", "POST"])
@@ -4158,7 +4092,7 @@ def admin_delete_lancamento(id):
     db.session.delete(l)
     db.session.commit()
     flash("Lançamento excluído.", "success")
-    return _redirect_admin_dashboard("lancamentos")
+    return redirect(url_for("admin_dashboard", tab="lancamentos"))
 
 
 # =========================
@@ -4577,7 +4511,7 @@ def add_receita():
     db.session.add(r)
     db.session.commit()
     flash("Receita adicionada.", "success")
-    return _redirect_admin_dashboard("receitas")
+    return redirect(url_for("admin_dashboard", tab="receitas"))
 
 
 @app.route("/receitas/<int:id>/edit", methods=["POST"])
@@ -4592,7 +4526,7 @@ def edit_receita(id):
 
     db.session.commit()
     flash("Receita atualizada.", "success")
-    return _redirect_admin_dashboard("receitas")
+    return redirect(url_for("admin_dashboard", tab="receitas"))
 
 
 @app.route("/receitas/<int:id>/delete", methods=["GET", "POST"])
@@ -4602,7 +4536,7 @@ def delete_receita(id):
     db.session.delete(r)
     db.session.commit()
     flash("Receita excluída.", "success")
-    return _redirect_admin_dashboard("receitas")
+    return redirect(url_for("admin_dashboard", tab="receitas"))
 
 
 @app.route("/despesas/add", methods=["POST"])
@@ -4619,7 +4553,7 @@ def add_despesa():
     db.session.add(d)
     db.session.commit()
     flash("Despesa adicionada.", "success")
-    return _redirect_admin_dashboard("despesas")
+    return redirect(url_for("admin_dashboard", tab="despesas"))
 
 
 @app.route("/despesas/<int:id>/edit", methods=["POST"])
@@ -4634,7 +4568,7 @@ def edit_despesa(id):
 
     db.session.commit()
     flash("Despesa atualizada.", "success")
-    return _redirect_admin_dashboard("despesas")
+    return redirect(url_for("admin_dashboard", tab="despesas"))
 
 
 @app.route("/despesas/<int:id>/delete", methods=["GET", "POST"])
@@ -4644,7 +4578,7 @@ def delete_despesa(id):
     db.session.delete(d)
     db.session.commit()
     flash("Despesa excluída.", "success")
-    return _redirect_admin_dashboard("despesas")
+    return redirect(url_for("admin_dashboard", tab="despesas"))
 
 
 # =========================
@@ -5379,7 +5313,7 @@ def add_receita_coop():
     db.session.add(rc)
     db.session.commit()
     flash("Receita do cooperado adicionada.", "success")
-    return _redirect_admin_dashboard("coop_receitas")
+    return redirect(url_for("admin_dashboard", tab="coop_receitas"))
 
 
 @app.route("/coop/receitas/<int:id>/edit", methods=["POST"])
@@ -5395,7 +5329,7 @@ def edit_receita_coop(id):
 
     db.session.commit()
     flash("Receita do cooperado atualizada.", "success")
-    return _redirect_admin_dashboard("coop_receitas")
+    return redirect(url_for("admin_dashboard", tab="coop_receitas"))
 
 
 @app.route("/coop/receitas/<int:id>/delete", methods=["GET", "POST"])
@@ -5405,7 +5339,7 @@ def delete_receita_coop(id):
     db.session.delete(rc)
     db.session.commit()
     flash("Receita do cooperado excluída.", "success")
-    return _redirect_admin_dashboard("coop_receitas")
+    return redirect(url_for("admin_dashboard", tab="coop_receitas"))
 
 
 @app.route("/coop/despesas/add", methods=["POST"])
@@ -5421,7 +5355,7 @@ def add_despesa_coop():
 
     if not ids:
         flash("Selecione pelo menos um cooperado.", "warning")
-        return _redirect_admin_dashboard("coop_despesas")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
     if not d:
         d = date.today()
@@ -5442,7 +5376,7 @@ def add_despesa_coop():
 
     db.session.commit()
     flash("Despesa(s) lançada(s).", "success")
-    return _redirect_admin_dashboard("coop_despesas")
+    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
 
 @app.route("/coop/despesas/<int:id>/edit", methods=["POST"])
@@ -5458,7 +5392,7 @@ def edit_despesa_coop(id):
 
     db.session.commit()
     flash("Despesa do cooperado atualizada.", "success")
-    return _redirect_admin_dashboard("coop_despesas")
+    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
 
 @app.route("/coop/despesas/<int:id>/delete", methods=["GET", "POST"])
@@ -5468,7 +5402,7 @@ def delete_despesa_coop(id):
     db.session.delete(dc)
     db.session.commit()
     flash("Despesa do cooperado excluída.", "success")
-    return _redirect_admin_dashboard("coop_despesas")
+    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
 # =========================
 # Benefícios — Editar / Excluir (Admin)
@@ -5539,7 +5473,7 @@ def edit_beneficio(id):
             b.valor_total = float(str(val_raw).replace(",", "."))
         except ValueError:
             flash("Valor total inválido.", "warning")
-            return _redirect_admin_dashboard("beneficios")
+            return redirect(url_for("admin_dashboard", tab="beneficios"))
 
     # --- Recebedores ---
     ids_list   = _split_field(f, "recebedores_ids[]",   "recebedores_ids")
@@ -5567,7 +5501,7 @@ def edit_beneficio(id):
 
     db.session.commit()
     flash("Benefício atualizado.", "success")
-    return _redirect_admin_dashboard("beneficios")
+    return redirect(url_for("admin_dashboard", tab="beneficios"))
 
 
 # 1) Excluir 1 (via modal, com hidden)
@@ -5577,12 +5511,12 @@ def excluir_beneficio_one():
     bid = request.form.get("beneficio_id", type=int)
     if not bid:
         flash("ID inválido.", "warning")
-        return _redirect_admin_dashboard("beneficios")
+        return redirect(url_for("admin_dashboard", tab="beneficios"))
     b = BeneficioRegistro.query.get_or_404(bid)
     db.session.delete(b)
     db.session.commit()
     flash("Registro de benefício excluído.", "info")
-    return _redirect_admin_dashboard("beneficios")
+    return redirect(url_for("admin_dashboard", tab="beneficios"))
 
 # 2) Excluir vários (bulk)
 @app.post("/beneficios/delete-bulk", endpoint="excluir_beneficio_bulk")
@@ -5591,13 +5525,13 @@ def excluir_beneficio_bulk():
     ids = {int(x) for x in request.form.getlist("ids[]") if str(x).isdigit()}
     if not ids:
         flash("Selecione ao menos um benefício.", "warning")
-        return _redirect_admin_dashboard("beneficios")
+        return redirect(url_for("admin_dashboard", tab="beneficios"))
     qs = BeneficioRegistro.query.filter(BeneficioRegistro.id.in_(ids)).all()
     for b in qs:
         db.session.delete(b)
     db.session.commit()
     flash(f"{len(qs)} registro(s) excluído(s).", "info")
-    return _redirect_admin_dashboard("beneficios")
+    return redirect(url_for("admin_dashboard", tab="beneficios"))
 
 # =========================
 # Benefícios — Criar/Ratear (Admin)
@@ -5605,106 +5539,36 @@ def excluir_beneficio_bulk():
 @app.post("/beneficios/ratear", endpoint="ratear_beneficios")
 @admin_perm_required("beneficios", "criar")
 def ratear_beneficios():
+    """
+    Cria um BeneficioRegistro a partir do form de 'Ratear benefícios'.
+    Espera:
+      - data_inicial, data_final, (opcional) data_lancamento
+      - tipo (hospitalar|farmaceutico|alimentar ou hosp|farm|alim)
+      - valor_total
+      - recebedores_ids[]  ou recebedores_ids  ("1;2;3")
+      - recebedores_nomes[] ou recebedores_nomes ("Ana;Bia;…")
+    """
     f = request.form
 
     di = _parse_date(f.get("data_inicial"))
     df = _parse_date(f.get("data_final"))
     if di and df and df < di:
         di, df = df, di
-    if not di or not df:
-        flash("Preencha a data inicial e final do benefício.", "warning")
-        return _redirect_admin_dashboard("beneficios")
 
-    def _parse_money(v):
-        s = str(v or "").strip()
-        if not s:
-            return 0.0
-        s = s.replace("R$", "").replace(" ", "")
-        if "," in s and "." in s:
-            s = s.replace(".", "").replace(",", ".")
-        else:
-            s = s.replace(",", ".")
+    dl = _parse_date(f.get("data_lancamento"))
+
+    tipo_in = (f.get("tipo") or "").strip().lower()
+    tipo = TIPO_MAP.get(tipo_in, tipo_in or "alimentar")  # default seguro
+
+    # valor
+    valor_total = None
+    raw_val = f.get("valor_total")
+    if raw_val not in (None, ""):
         try:
-            return max(0.0, float(s))
-        except Exception:
-            return 0.0
-
-    all_coops = (
-        Cooperado.query
-        .join(Usuario, Cooperado.usuario_id == Usuario.id)
-        .filter(Usuario.ativo.is_(True))
-        .order_by(Cooperado.nome.asc())
-        .all()
-    )
-    all_ids = {int(c.id) for c in all_coops}
-
-    tipos = [
-        ("hosp", "hospitalar"),
-        ("farm", "farmaceutico"),
-        ("alim", "alimentar"),
-    ]
-
-    criados = 0
-    despesas_criadas = 0
-
-    for prefix, tipo in tipos:
-        beneficiarios = [int(x) for x in f.getlist(f"{prefix}_beneficiarios[]") if str(x).isdigit()]
-        isentos = [int(x) for x in f.getlist(f"{prefix}_isencoes[]") if str(x).isdigit()]
-        valor_unit = _parse_money(f.get(f"{prefix}_valor_unit"))
-        valor_total = _parse_money(f.get(f"{prefix}_valor"))
-
-        if beneficiarios and valor_unit > 0 and valor_total <= 0:
-            valor_total = round(valor_unit * len(beneficiarios), 2)
-
-        if not beneficiarios or valor_total <= 0:
-            continue
-
-        beneficiarios = list(dict.fromkeys([x for x in beneficiarios if x in all_ids]))
-        isentos = set(x for x in isentos if x in all_ids)
-        if not beneficiarios:
-            continue
-
-        coops_benef = Cooperado.query.filter(Cooperado.id.in_(beneficiarios)).all()
-        nome_por_id = {int(c.id): c.nome for c in coops_benef}
-        recebedores_nomes = [nome_por_id.get(cid, "") for cid in beneficiarios]
-
-        b = BeneficioRegistro(
-            data_inicial=di,
-            data_final=df,
-            data_lancamento=date.today(),
-            tipo=tipo,
-            valor_total=round(valor_total, 2),
-            recebedores_ids=";".join(str(x) for x in beneficiarios),
-            recebedores_nomes=";".join(recebedores_nomes),
-        )
-        db.session.add(b)
-        db.session.flush()
-        criados += 1
-
-        nao_pagam = set(beneficiarios) | set(isentos)
-        pagantes = [cid for cid in all_ids if cid not in nao_pagam]
-        valor_por_pagante = round(valor_total / len(pagantes), 2) if pagantes else 0.0
-
-        for cid in pagantes:
-            db.session.add(DespesaCooperado(
-                cooperado_id=cid,
-                descricao=f"Rateio benefício {tipo} ({di.strftime('%d/%m/%Y')} a {df.strftime('%d/%m/%Y')})",
-                valor=valor_por_pagante,
-                data=df,
-                data_inicio=di,
-                data_fim=df,
-                beneficio_id=b.id,
-                eh_adiantamento=False,
-            ))
-            despesas_criadas += 1
-
-    if not criados:
-        flash("Informe ao menos um valor e selecione pelo menos um recebedor em algum benefício.", "warning")
-        return _redirect_admin_dashboard("beneficios")
-
-    db.session.commit()
-    flash(f"Benefícios lançados com sucesso. Registros: {criados}. Despesas geradas: {despesas_criadas}.", "success")
-    return _redirect_admin_dashboard("beneficios")
+            valor_total = float(str(raw_val).replace(",", "."))
+        except ValueError:
+            flash("Valor total inválido.", "warning")
+            return redirect(url_for("admin_dashboard", tab="beneficios"))
 
     # recebedores
     ids_list   = _split_field(f, "recebedores_ids[]",   "recebedores_ids")
@@ -5727,7 +5591,7 @@ def ratear_beneficios():
 
     if not di or not df or not ids_sane:
         flash("Preencha período e pelo menos um recebedor.", "warning")
-        return _redirect_admin_dashboard("beneficios")
+        return redirect(url_for("admin_dashboard", tab="beneficios"))
 
     b = BeneficioRegistro(
         data_inicial=di,
@@ -5741,7 +5605,7 @@ def ratear_beneficios():
     db.session.add(b)
     db.session.commit()
     flash("Benefício registrado/Rateado.", "success")
-    return _redirect_admin_dashboard("beneficios")
+    return redirect(url_for("admin_dashboard", tab="beneficios"))
 
 # =========================
 # Escalas — Upload (substituição TOTAL sempre)
