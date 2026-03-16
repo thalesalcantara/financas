@@ -682,26 +682,31 @@
         {% set _coop_sel = (cooperados|selectattr('id','equalto',cid)|list|first) if cid else None %}
 
         {# ---------- Bases com fallback (NÃO sobrescrever 'receitas'/'despesas' originais) ---------- #}
-        {% set _producoes = (producoes | default([]) | list) %}
+        {% set _producoes = (resumo_lancamentos | default([]) | list) %}
+        {% if _producoes|length == 0 %}
+          {% set _producoes = (producoes | default([]) | list) %}
+        {% endif %}
         {% if _producoes|length == 0 %}
           {% set _producoes = (lancamentos | default([]) | list) %}
         {% endif %}
 
         {# Cooperados (por pessoa) #}
-        {% set receitas_coop = (receitas_coop | default([]) | list) %}
-        {% set despesas_coop = (despesas_coop | default([]) | list) %}
+        {% set receitas_coop = (resumo_receitas_coop | default(receitas_coop, true) | default([]) | list) %}
+        {% set despesas_coop = (resumo_despesas_coop | default(despesas_coop, true) | default([]) | list) %}
 
-        {# Cooperativa (geral) — mesma fonte da aba de RECEITAS/ DESPESAS da coop #}
+        {# Cooperativa (geral) — resumo usa base própria, sem depender das outras abas #}
         {% set _rec_coop_corp =
-             (receitas if receitas is defined else
-              (receitas_cooperativa if receitas_cooperativa is defined else
-               (receitas_corp if receitas_corp is defined else
-                []))) %}
+             (resumo_receitas if resumo_receitas is defined and resumo_receitas is not none else
+              (receitas if receitas is defined else
+               (receitas_cooperativa if receitas_cooperativa is defined else
+                (receitas_corp if receitas_corp is defined else
+                 [])))) %}
         {% set _desp_coop_corp =
-             (despesas if despesas is defined else
-              (despesas_cooperativa if despesas_cooperativa is defined else
-               (despesas_corp if despesas_corp is defined else
-                []))) %}
+             (resumo_despesas if resumo_despesas is defined and resumo_despesas is not none else
+              (despesas if despesas is defined else
+               (despesas_cooperativa if despesas_cooperativa is defined else
+                (despesas_corp if despesas_corp is defined else
+                 [])))) %}
 
         {% if not fast_mode %}
 {# ---------- Totais (lado servidor, para primeiro paint) ---------- #}
@@ -777,16 +782,16 @@
         
 {% else %}
         {# Totais já calculados no backend (fast_mode) #}
-        {% set total_producoes_f = total_producoes|default(0) %}
+        {% set total_producoes_f = resumo_total_producoes|default(total_producoes, true)|default(0) %}
         {% set total_inss_4_f    = total_inss|default(0) %}
         {% set total_sest_05_f   = total_sest|default(0) %}
         {% set total_encargos_f  = total_encargos|default(0) %}
 
-        {% set total_receitas_corp_f = total_receitas|default(0) %}
-        {% set total_despesas_corp_f = total_despesas|default(0) %}
+        {% set total_receitas_corp_f = resumo_total_receitas|default(total_receitas, true)|default(0) %}
+        {% set total_despesas_corp_f = resumo_total_despesas|default(total_despesas, true)|default(0) %}
 
-        {% set total_receitas_coop_f = total_receitas_coop|default(0) %}
-        {% set total_despesas_coop_f = total_despesas_coop|default(0) %}
+        {% set total_receitas_coop_f = resumo_total_receitas_coop|default(total_receitas_coop, true)|default(0) %}
+        {% set total_despesas_coop_f = resumo_total_despesas_coop|default(total_despesas_coop, true)|default(0) %}
 
         {# Ajuste: Receitas dos cooperados = Produções + Receitas individuais #}
         {% set total_receitas_coop_full_f = (total_producoes_f|default(0)) + (total_receitas_coop_f|default(0)) %}
