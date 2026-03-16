@@ -2910,163 +2910,24 @@ def admin_dashboard():
                     return d
         return None
 
-    raw_resumo_inicio = (args.get("resumo_inicio") or "").strip()
-    raw_resumo_fim = (args.get("resumo_fim") or "").strip()
-    raw_data_inicio = (args.get("data_inicio") or "").strip()
-    raw_data_fim = (args.get("data_fim") or "").strip()
+    data_inicio = _pick_date("resumo_inicio", "data_inicio")
+    data_fim = _pick_date("resumo_fim", "data_fim")
 
-    resumo_inicio = _pick_date("resumo_inicio")
-    resumo_fim = _pick_date("resumo_fim")
-    data_inicio = _pick_date("data_inicio")
-    data_fim = _pick_date("data_fim")
+    filtro_periodo_aplicado = bool(data_inicio or data_fim)
 
-    raw_resumo_restaurante_id = (args.get("resumo_restaurante_id") or "").strip()
-    raw_resumo_cooperado_id = (args.get("resumo_cooperado_id") or "").strip()
-    raw_restaurante_id = (args.get("restaurante_id") or "").strip()
-    raw_cooperado_id = (args.get("cooperado_id") or "").strip()
-
-    resumo_restaurante_id = args.get("resumo_restaurante_id", type=int)
-    resumo_cooperado_id = args.get("resumo_cooperado_id", type=int)
+    if data_inicio and not data_fim:
+        data_fim = data_inicio
+    elif data_fim and not data_inicio:
+        data_inicio = data_fim
+    elif not data_inicio and not data_fim:
+        hoje_ref = date.today()
+        data_inicio = hoje_ref - timedelta(days=hoje_ref.weekday())
+        data_fim = data_inicio + timedelta(days=6)
 
     restaurante_id = args.get("restaurante_id", type=int)
     cooperado_id = args.get("cooperado_id", type=int)
-
-    hoje_ref = date.today()
-    semana_inicio_padrao = hoje_ref - timedelta(days=hoje_ref.weekday())
-    semana_fim_padrao = semana_inicio_padrao + timedelta(days=6)
-
-    resumo_tem_filtro_explicito = bool(
-        raw_resumo_inicio or raw_resumo_fim or raw_resumo_restaurante_id or raw_resumo_cooperado_id
-    )
-    filtros_gerais_explicitos = bool(
-        raw_data_inicio or raw_data_fim or raw_restaurante_id or raw_cooperado_id
-    )
-
-    if active_tab == "resumo":
-        restaurante_id = resumo_restaurante_id
-        cooperado_id = resumo_cooperado_id
-        filtro_periodo_aplicado = resumo_tem_filtro_explicito
-
-        if resumo_tem_filtro_explicito:
-            data_inicio = resumo_inicio
-            data_fim = resumo_fim
-
-            if data_inicio and not data_fim:
-                data_fim = data_inicio
-            elif data_fim and not data_inicio:
-                data_inicio = data_fim
-        else:
-            data_inicio = semana_inicio_padrao
-            data_fim = semana_fim_padrao
-
-        resumo_inicio = data_inicio
-        resumo_fim = data_fim
-    else:
-        filtro_periodo_aplicado = filtros_gerais_explicitos
-
-        if data_inicio and not data_fim:
-            data_fim = data_inicio
-        elif data_fim and not data_inicio:
-            data_inicio = data_fim
-        elif not data_inicio and not data_fim:
-            data_inicio = semana_inicio_padrao
-            data_fim = semana_fim_padrao
-
-        resumo_inicio = resumo_inicio or semana_inicio_padrao
-        resumo_fim = resumo_fim or semana_fim_padrao
-
-    if data_inicio and data_fim and data_inicio > data_fim:
-        data_inicio, data_fim = data_fim, data_inicio
-
-    if active_tab == "resumo":
-        resumo_inicio = data_inicio
-        resumo_fim = data_fim
-
     considerar_periodo = bool(args.get("considerar_periodo"))
     dows = set(args.getlist("dow"))
-
-    # =========================
-    # Bases dedicadas da aba Resumo
-    # =========================
-    resumo_producoes = []
-    resumo_receitas_corp = []
-    resumo_despesas_corp = []
-    resumo_receitas_coop_base = []
-    resumo_despesas_coop_base = []
-
-    if active_tab == "resumo":
-        resumo_q_prod = Lancamento.query
-        if resumo_restaurante_id:
-            resumo_q_prod = resumo_q_prod.filter(Lancamento.restaurante_id == resumo_restaurante_id)
-        if resumo_cooperado_id:
-            resumo_q_prod = resumo_q_prod.filter(Lancamento.cooperado_id == resumo_cooperado_id)
-        if data_inicio:
-            resumo_q_prod = resumo_q_prod.filter(Lancamento.data >= data_inicio)
-        if data_fim:
-            resumo_q_prod = resumo_q_prod.filter(Lancamento.data <= data_fim)
-
-        resumo_producoes = resumo_q_prod.order_by(
-            Lancamento.data.desc(),
-            Lancamento.id.desc()
-        ).all()
-
-        if considerar_periodo and resumo_restaurante_id:
-            rest_resumo = Restaurante.query.get(resumo_restaurante_id)
-            if rest_resumo:
-                mapa = {
-                    "seg-dom": {"1", "2", "3", "4", "5", "6", "7"},
-                    "sab-sex": {"6", "7", "1", "2", "3", "4", "5"},
-                    "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
-                }
-                permitidos_resumo = mapa.get(rest_resumo.periodo, {"1", "2", "3", "4", "5", "6", "7"})
-                resumo_producoes = [l for l in resumo_producoes if l.data and _dow(l.data) in permitidos_resumo]
-
-        resumo_q_rec_corp = ReceitaCooperativa.query
-        resumo_q_desp_corp = DespesaCooperativa.query
-        if data_inicio:
-            resumo_q_rec_corp = resumo_q_rec_corp.filter(ReceitaCooperativa.data >= data_inicio)
-            resumo_q_desp_corp = resumo_q_desp_corp.filter(DespesaCooperativa.data >= data_inicio)
-        if data_fim:
-            resumo_q_rec_corp = resumo_q_rec_corp.filter(ReceitaCooperativa.data <= data_fim)
-            resumo_q_desp_corp = resumo_q_desp_corp.filter(DespesaCooperativa.data <= data_fim)
-
-        resumo_receitas_corp = resumo_q_rec_corp.order_by(
-            ReceitaCooperativa.data.desc().nullslast(),
-            ReceitaCooperativa.id.desc()
-        ).all()
-        resumo_despesas_corp = resumo_q_desp_corp.order_by(
-            DespesaCooperativa.data.desc(),
-            DespesaCooperativa.id.desc()
-        ).all()
-
-        resumo_q_rec_coop = ReceitaCooperado.query
-        resumo_q_desp_coop = DespesaCooperado.query
-        if resumo_cooperado_id:
-            resumo_q_rec_coop = resumo_q_rec_coop.filter(ReceitaCooperado.cooperado_id == resumo_cooperado_id)
-            resumo_q_desp_coop = resumo_q_desp_coop.filter(DespesaCooperado.cooperado_id == resumo_cooperado_id)
-        if data_inicio:
-            resumo_q_rec_coop = resumo_q_rec_coop.filter(ReceitaCooperado.data >= data_inicio)
-        if data_fim:
-            resumo_q_rec_coop = resumo_q_rec_coop.filter(ReceitaCooperado.data <= data_fim)
-
-        if data_inicio and data_fim:
-            resumo_q_desp_coop = resumo_q_desp_coop.filter(
-                DespesaCooperado.data_inicio <= data_fim,
-                DespesaCooperado.data_fim >= data_inicio,
-            )
-        elif data_inicio:
-            resumo_q_desp_coop = resumo_q_desp_coop.filter(DespesaCooperado.data_fim >= data_inicio)
-        elif data_fim:
-            resumo_q_desp_coop = resumo_q_desp_coop.filter(DespesaCooperado.data_inicio <= data_fim)
-
-        resumo_receitas_coop_base = resumo_q_rec_coop.order_by(
-            ReceitaCooperado.data.desc(),
-            ReceitaCooperado.id.desc()
-        ).all()
-        resumo_despesas_coop_base = resumo_q_desp_coop.order_by(
-            DespesaCooperado.data_fim.desc().nullslast(),
-            DespesaCooperado.id.desc()
-        ).all()
 
     # =========================
     # Lançamentos
@@ -3672,77 +3533,6 @@ def admin_dashboard():
     current_date = date.today()
     data_limite = date(current_date.year, 12, 31)
 
-    # =========================
-    # Payloads do Resumo (gráficos)
-    # =========================
-    resumo_chart_coop = {"labels": [], "receitas": [], "despesas": []}
-    resumo_chart_cooperados = {"labels": [], "producoes": [], "inss": [], "sest": []}
-    resumo_chart_estabs = {"labels": [], "valores": []}
-
-    def _month_key(dt):
-        if not dt:
-            return None
-        return f"{dt.year:04d}-{dt.month:02d}"
-
-    coop_month_map = {}
-    for r in resumo_receitas_corp:
-        dt = getattr(r, "data", None) or getattr(r, "data_lancamento", None)
-        k = _month_key(dt)
-        if not k:
-            continue
-        coop_month_map.setdefault(k, {"receitas": 0.0, "despesas": 0.0})
-        coop_month_map[k]["receitas"] += float(getattr(r, "valor", None) or getattr(r, "valor_total", 0.0) or 0.0)
-
-    for d in resumo_despesas_corp:
-        dt = getattr(d, "data", None) or getattr(d, "data_lancamento", None)
-        k = _month_key(dt)
-        if not k:
-            continue
-        coop_month_map.setdefault(k, {"receitas": 0.0, "despesas": 0.0})
-        coop_month_map[k]["despesas"] += float(getattr(d, "valor", None) or getattr(d, "valor_total", 0.0) or 0.0)
-
-    if coop_month_map:
-        labels = sorted(coop_month_map.keys())
-        resumo_chart_coop = {
-            "labels": labels,
-            "receitas": [round(coop_month_map[k]["receitas"], 2) for k in labels],
-            "despesas": [round(coop_month_map[k]["despesas"], 2) for k in labels],
-        }
-
-    coopers_month_map = {}
-    for l in resumo_producoes:
-        dt = getattr(l, "data", None)
-        k = _month_key(dt)
-        if not k:
-            continue
-        coopers_month_map.setdefault(k, {"producoes": 0.0, "inss": 0.0, "sest": 0.0})
-        valor_l = float(getattr(l, "valor", 0.0) or 0.0)
-        coopers_month_map[k]["producoes"] += valor_l
-        coopers_month_map[k]["inss"] += valor_l * INSS_ALIQ
-        coopers_month_map[k]["sest"] += valor_l * SEST_ALIQ
-
-    if coopers_month_map:
-        labels = sorted(coopers_month_map.keys())
-        resumo_chart_cooperados = {
-            "labels": labels,
-            "producoes": [round(coopers_month_map[k]["producoes"], 2) for k in labels],
-            "inss": [round(coopers_month_map[k]["inss"], 2) for k in labels],
-            "sest": [round(coopers_month_map[k]["sest"], 2) for k in labels],
-        }
-
-    estabs_map = {}
-    for l in resumo_producoes:
-        rest = getattr(l, "restaurante", None)
-        nome_rest = getattr(rest, "nome", None) or "—"
-        estabs_map[nome_rest] = estabs_map.get(nome_rest, 0.0) + float(getattr(l, "valor", 0.0) or 0.0)
-
-    if estabs_map:
-        top_estabs = sorted(estabs_map.items(), key=lambda item: item[1], reverse=True)[:20]
-        resumo_chart_estabs = {
-            "labels": [nome for nome, _ in top_estabs],
-            "valores": [round(valor, 2) for _, valor in top_estabs],
-        }
-
     return render_template(
         "admin_dashboard.html",
         tab=active_tab,
@@ -3761,11 +3551,6 @@ def admin_dashboard():
         despesas=despesas,
         receitas_coop=receitas_coop,
         despesas_coop=despesas_coop,
-        producoes_resumo=resumo_producoes,
-        receitas_cooperativa_resumo=resumo_receitas_corp,
-        despesas_cooperativa_resumo=resumo_despesas_corp,
-        receitas_cooperado_resumo=resumo_receitas_coop_base,
-        despesas_cooperado_resumo=resumo_despesas_coop_base,
         cooperados=cooperados,
         restaurantes=restaurantes,
         beneficios_view=beneficios_view,
@@ -3798,13 +3583,6 @@ def admin_dashboard():
         filtro_periodo_aplicado=filtro_periodo_aplicado,
         escala_editor_rows=escala_editor_rows,
         contratos_escala_opcoes=contratos_escala_opcoes,
-        resumo_inicio=resumo_inicio,
-        resumo_fim=resumo_fim,
-        resumo_restaurante_id=resumo_restaurante_id,
-        resumo_cooperado_id=resumo_cooperado_id,
-        resumo_chart_coop=resumo_chart_coop,
-        resumo_chart_cooperados=resumo_chart_cooperados,
-        resumo_chart_estabs=resumo_chart_estabs,
     )
     
 # =========================
@@ -5762,171 +5540,35 @@ def excluir_beneficio_bulk():
 @admin_perm_required("beneficios", "criar")
 def ratear_beneficios():
     """
-    Compatível com os 2 formatos de formulário:
-      1) legado: tipo, valor_total, recebedores_ids[]/recebedores_nomes[]
-      2) painel atual: hosp_/farm_/alim_ com beneficiários e isenções
-
-    Além de registrar o benefício, lança as despesas do rateio para quem paga.
+    Cria um BeneficioRegistro a partir do form de 'Ratear benefícios'.
+    Espera:
+      - data_inicial, data_final, (opcional) data_lancamento
+      - tipo (hospitalar|farmaceutico|alimentar ou hosp|farm|alim)
+      - valor_total
+      - recebedores_ids[]  ou recebedores_ids  ("1;2;3")
+      - recebedores_nomes[] ou recebedores_nomes ("Ana;Bia;…")
     """
     f = request.form
 
     di = _parse_date(f.get("data_inicial"))
     df = _parse_date(f.get("data_final"))
-    di, df = _ensure_periodo_ok(di, df)
-    dl = _parse_date(f.get("data_lancamento")) or di
+    if di and df and df < di:
+        di, df = df, di
 
-    if not di or not df:
-        flash("Preencha a data inicial e final do benefício.", "warning")
-        return redirect(url_for("admin_dashboard", tab="beneficios"))
+    dl = _parse_date(f.get("data_lancamento"))
 
-    cooperados_ativos = (
-        Cooperado.query
-        .join(Usuario, Cooperado.usuario_id == Usuario.id)
-        .filter(Usuario.ativo.is_(True))
-        .order_by(Cooperado.nome.asc())
-        .all()
-    )
-    coop_ids_ativos = [c.id for c in cooperados_ativos]
-    coop_nome_por_id = {c.id: c.nome for c in cooperados_ativos}
+    tipo_in = (f.get("tipo") or "").strip().lower()
+    tipo = TIPO_MAP.get(tipo_in, tipo_in or "alimentar")  # default seguro
 
-    def _parse_money(value):
-        if value in (None, ""):
-            return None
+    # valor
+    valor_total = None
+    raw_val = f.get("valor_total")
+    if raw_val not in (None, ""):
         try:
-            return float(str(value).replace(".", "").replace(",", ".")) if isinstance(value, str) and value.count(',') == 1 and value.count('.') > 1 else float(str(value).replace(',', '.'))
-        except Exception:
-            return None
-
-    def _ids_validos(values):
-        out = []
-        vistos = set()
-        for x in values or []:
-            sx = str(x).strip()
-            if not sx.isdigit():
-                continue
-            ix = int(sx)
-            if ix in coop_nome_por_id and ix not in vistos:
-                vistos.add(ix)
-                out.append(ix)
-        return out
-
-    def _rateio_em_centavos(total, qtd):
-        total_cent = int(round((total or 0.0) * 100))
-        if qtd <= 0 or total_cent <= 0:
-            return []
-        base = total_cent // qtd
-        resto = total_cent % qtd
-        valores = [base] * qtd
-        for i in range(resto):
-            valores[i] += 1
-        return [v / 100.0 for v in valores]
-
-    def _criar_registro_e_despesas(tipo_key, valor_total, recebedores_ids, isentos_ids=None):
-        recebedores_ids = _ids_validos(recebedores_ids)
-        isentos_ids = set(_ids_validos(isentos_ids or []))
-        valor_total = float(valor_total or 0.0)
-
-        if not recebedores_ids or valor_total <= 0:
-            return None, 0
-
-        recebedores_nomes = [coop_nome_por_id[i] for i in recebedores_ids if i in coop_nome_por_id]
-        tipo_norm = TIPO_MAP.get((tipo_key or '').strip().lower(), (tipo_key or 'alimentar').strip().lower() or 'alimentar')
-
-        beneficio = BeneficioRegistro(
-            data_inicial=di,
-            data_final=df,
-            data_lancamento=dl,
-            tipo=tipo_norm,
-            valor_total=round(valor_total, 2),
-            recebedores_ids=';'.join(str(i) for i in recebedores_ids),
-            recebedores_nomes=';'.join(recebedores_nomes),
-        )
-        db.session.add(beneficio)
-        db.session.flush()
-
-        pagantes_ids = [cid for cid in coop_ids_ativos if cid not in set(recebedores_ids) and cid not in isentos_ids]
-        rateios = _rateio_em_centavos(valor_total, len(pagantes_ids))
-
-        desc_base = f"Benefício {tipo_norm} ({di.strftime('%d/%m/%Y')} a {df.strftime('%d/%m/%Y')})"
-        if recebedores_nomes:
-            resumo = ', '.join(recebedores_nomes[:3])
-            if len(recebedores_nomes) > 3:
-                resumo += f" +{len(recebedores_nomes) - 3}"
-            desc_base = f"{desc_base} - Recebem: {resumo}"
-        desc_base = desc_base[:200]
-
-        for coop_id, valor_parcela in zip(pagantes_ids, rateios):
-            db.session.add(DespesaCooperado(
-                cooperado_id=coop_id,
-                descricao=desc_base,
-                valor=valor_parcela,
-                data=dl,
-                data_inicio=di,
-                data_fim=df,
-                beneficio_id=beneficio.id,
-                eh_adiantamento=False,
-            ))
-
-        return beneficio, len(rateios)
-
-    registros_criados = 0
-    despesas_criadas = 0
-
-    prefixes = [
-        ("hosp", "hospitalar"),
-        ("farm", "farmaceutico"),
-        ("alim", "alimentar"),
-    ]
-
-    usou_formulario_multi = any(
-        key in f for key in (
-            "hosp_beneficiarios[]", "farm_beneficiarios[]", "alim_beneficiarios[]",
-            "hosp_valor", "farm_valor", "alim_valor",
-            "hosp_valor_unit", "farm_valor_unit", "alim_valor_unit",
-        )
-    )
-
-    if usou_formulario_multi:
-        for prefix, tipo_padrao in prefixes:
-            beneficiarios = _ids_validos(f.getlist(f"{prefix}_beneficiarios[]"))
-            isencoes = _ids_validos(f.getlist(f"{prefix}_isencoes[]"))
-            valor_total = _parse_money(f.get(f"{prefix}_valor"))
-
-            if valor_total is None:
-                valor_unit = _parse_money(f.get(f"{prefix}_valor_unit")) or 0.0
-                valor_total = round(valor_unit * len(beneficiarios), 2)
-
-            beneficio, qtd_desp = _criar_registro_e_despesas(tipo_padrao, valor_total, beneficiarios, isencoes)
-            if beneficio:
-                registros_criados += 1
-                despesas_criadas += qtd_desp
-    else:
-        tipo_in = (f.get("tipo") or "").strip().lower()
-        tipo = TIPO_MAP.get(tipo_in, tipo_in or "alimentar")
-        valor_total = _parse_money(f.get("valor_total"))
-        ids_list = _split_field(f, "recebedores_ids[]", "recebedores_ids")
-        nomes_list = _split_field(f, "recebedores_nomes[]", "recebedores_nomes")
-
-        ids_validos = _ids_validos(ids_list)
-        if ids_validos and not nomes_list:
-            nomes_list = [coop_nome_por_id.get(i, "") for i in ids_validos]
-
-        beneficio, qtd_desp = _criar_registro_e_despesas(tipo, valor_total, ids_validos, [])
-        if beneficio:
-            if nomes_list:
-                beneficio.recebedores_nomes = ';'.join([str(n).strip() for n in nomes_list if str(n).strip()])
-            registros_criados += 1
-            despesas_criadas += qtd_desp
-
-    if registros_criados == 0:
-        db.session.rollback()
-        flash("Nenhum benefício válido foi informado para lançamento.", "warning")
-        return redirect(url_for("admin_dashboard", tab="beneficios"))
-
-    db.session.commit()
-    flash(f"Benefício(s) registrado(s): {registros_criados}. Despesas lançadas: {despesas_criadas}.", "success")
-    return redirect(url_for("admin_dashboard", tab="beneficios"))
-
+            valor_total = float(str(raw_val).replace(",", "."))
+        except ValueError:
+            flash("Valor total inválido.", "warning")
+            return redirect(url_for("admin_dashboard", tab="beneficios"))
 
     # recebedores
     ids_list   = _split_field(f, "recebedores_ids[]",   "recebedores_ids")
