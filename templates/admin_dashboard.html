@@ -2953,7 +2953,7 @@
         </div>
         <div class="col-md-3">
           <label class="form-label">Valor por beneficiado (R$)</label>
-          <input type="text" inputmode="decimal" class="form-control form-control-sm" name="hosp_valor_unit" id="hosp_valor_unit" placeholder="0,00">
+          <input type="text" inputmode="decimal" class="form-control form-control-sm" name="hosp_valor_unit" id="hosp_valor_unit" placeholder="0,00" autocomplete="off">
           <input type="hidden" name="hosp_valor" id="hosp_valor_total">
         </div>
         <div class="col-md-5">
@@ -2983,7 +2983,7 @@
         </div>
         <div class="col-md-3">
           <label class="form-label">Valor por beneficiado (R$)</label>
-          <input type="text" inputmode="decimal" class="form-control form-control-sm" name="farm_valor_unit" id="farm_valor_unit" placeholder="0,00">
+          <input type="text" inputmode="decimal" class="form-control form-control-sm" name="farm_valor_unit" id="farm_valor_unit" placeholder="0,00" autocomplete="off">
           <input type="hidden" name="farm_valor" id="farm_valor_total">
         </div>
         <div class="col-md-5">
@@ -3011,7 +3011,7 @@
         </div>
         <div class="col-md-3">
           <label class="form-label">Valor por beneficiado (R$)</label>
-          <input type="text" inputmode="decimal" class="form-control form-control-sm" name="alim_valor_unit" id="alim_valor_unit" placeholder="0,00">
+          <input type="text" inputmode="decimal" class="form-control form-control-sm" name="alim_valor_unit" id="alim_valor_unit" placeholder="0,00" autocomplete="off">
           <input type="hidden" name="alim_valor" id="alim_valor_total">
         </div>
         <div class="col-md-5">
@@ -3219,9 +3219,6 @@
 
   ['hosp','farm','alim'].forEach(p=>{
     const unitInput = q(`#${p}_valor_unit`);
-    unitInput?.addEventListener('focus', ()=>{
-      unitInput.select?.();
-    });
     unitInput?.addEventListener('blur', ()=>{
       const n = valNum(unitInput);
       if ((unitInput.value || '').trim() !== '') unitInput.value = n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -3246,6 +3243,14 @@
   // ===== Garantir IDs dos hidden + calcular total no submit =====
   const form = q('#form-beneficios');
   if (form){
+    const canEditBeneficios = {{ 'true' if (can_beneficios_criar or can_beneficios_editar or admin_is_master) else 'false' }};
+    if (canEditBeneficios) {
+      form.querySelectorAll('input, select, textarea, button').forEach(el => {
+        if (!el.hasAttribute('data-force-disabled')) el.disabled = false;
+        el.removeAttribute('readonly');
+      });
+    }
+
     (function ensureHiddenIds(){
       const map = { hosp:'hosp_valor_total', farm:'farm_valor_total', alim:'alim_valor_total' };
       Object.entries(map).forEach(([p, id])=>{
