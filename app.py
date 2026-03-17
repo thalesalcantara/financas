@@ -6037,89 +6037,166 @@ def ratear_beneficios():
 # =========================
 # Escalas/Trocas — Exportações e histórico
 # =========================
-def _xlsx_finish_and_send(wb, filename):
+def _xlsx_finish_and_send(wb, filename, *, fast=False):
     import io
     from openpyxl.styles import Font, PatternFill, Alignment
-    for ws in wb.worksheets:
-        for cell in ws[1]:
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal='center', vertical='center')
-            cell.fill = PatternFill(fill_type='solid', fgColor='DCE6F1')
-        for col in ws.columns:
-            max_len = 0
-            col_letter = col[0].column_letter
-            for cell in col:
-                try:
-                    max_len = max(max_len, len(str(cell.value or '')))
-                except Exception:
-                    pass
-            ws.column_dimensions[col_letter].width = min(max(max_len + 2, 10), 40)
-    bio = io.BytesIO(); wb.save(bio); bio.seek(0)
+
+    if not fast:
+        for ws in wb.worksheets:
+            try:
+                header = next(ws.iter_rows(min_row=1, max_row=1))
+            except Exception:
+                header = []
+            for cell in header:
+                cell.font = Font(bold=True)
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                cell.fill = PatternFill(fill_type='solid', fgColor='DCE6F1')
+
+            max_scan_rows = 400
+            try:
+                max_col = ws.max_column or 0
+                max_row = ws.max_row or 0
+            except Exception:
+                max_col = 0
+                max_row = 0
+            if max_col:
+                widths = [10] * max_col
+                scan_to = min(max_row, max_scan_rows)
+                for row in ws.iter_rows(min_row=1, max_row=scan_to):
+                    for idx, cell in enumerate(row):
+                        try:
+                            widths[idx] = min(max(widths[idx], len(str(cell.value or '')) + 2), 36)
+                        except Exception:
+                            pass
+                from openpyxl.utils import get_column_letter
+                for idx, width in enumerate(widths, start=1):
+                    ws.column_dimensions[get_column_letter(idx)].width = width
+
+    bio = io.BytesIO()
+    wb.save(bio)
+    bio.seek(0)
     return send_file(bio, as_attachment=True, download_name=filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
 @app.get("/admin/escalas/exportar_atual")
 @admin_perm_required("escalas", "ver")
 def admin_exportar_escalas_atual():
-    import io
     from openpyxl import Workbook
 
-    rows = []
-    escalas_all = Escala.query.order_by(Escala.id.asc()).all()
     hist_ini = _parse_ymd_date(request.args.get("escala_hist_inicio")) or (date.today() - timedelta(days=30))
     hist_fim = _parse_ymd_date(request.args.get("escala_hist_fim")) or date.today()
-    hist_rows = _history_rows_between(EscalaHistorico.query.filter(EscalaHistorico.saiu_nome.isnot(None)), EscalaHistorico.snapshot_em, hist_ini, hist_fim).all()
+
     latest = {}
-    for h in hist_rows:
+    hist_q = _history_rows_between(
+        db.session.query(
+            EscalaHistorico.data,
+            EscalaHistorico.turno,
+            EscalaHistorico.horario,
+            EscalaHistorico.contrato,
+            EscalaHistorico.cooperado_nome,
+            EscalaHistorico.saiu_nome,
+            EscalaHistorico.entrou_nome,
+            EscalaHistorico.snapshot_em,
+            EscalaHistorico.id,
+        ).filter(EscalaHistorico.saiu_nome.isnot(None)),
+        EscalaHistorico.snapshot_em,
+        hist_ini,
+        hist_fim,
+    ).order_by(EscalaHistorico.snapshot_em.desc(), EscalaHistorico.id.desc())
+    for h in hist_q.all():
         k = ((h.data or '').strip(), (h.turno or '').strip(), (h.horario or '').strip(), (h.contrato or '').strip(), (h.cooperado_nome or '').strip())
-        latest[k] = h
+        if k not in latest:
+            latest[k] = h
+
+    wb = Workbook(write_only=True)
+    ws = wb.create_sheet(title='Escala atual')
+    ws.append(['Data', 'Turno', 'Horário', 'Nº', 'Contrato', 'Cooperado atual', 'Quem foi retirado', 'Quem entrou'])
+
+    escalas_all = db.session.query(
+        Escala.data,
+        Escala.turno,
+        Escala.horario,
+        Escala.contrato,
+        Escala.cooperado_nome,
+        Escala.cooperado_id,
+    ).order_by(Escala.data.asc(), Escala.turno.asc(), Escala.contrato.asc(), Escala.horario.asc(), Escala.id.asc()).all()
+
+    coop_ids = sorted({int(e.cooperado_id) for e in escalas_all if getattr(e, 'cooperado_id', None)})
+    cooperados_map = {}
+    if coop_ids:
+        cooperados_map = {c.id: c.nome for c in Cooperado.query.filter(Cooperado.id.in_(coop_ids)).all()}
 
     slot_counts = defaultdict(int)
-
-    for e in sorted(escalas_all, key=_escala_sort_key):
-        nome = _safe_coop_nome_by_id(e.cooperado_id) or (e.cooperado_nome or '')
-        h = latest.get(((e.data or '').strip(), (e.turno or '').strip(), (e.horario or '').strip(), (e.contrato or '').strip(), nome.strip()))
+    for e in escalas_all:
+        nome = cooperados_map.get(getattr(e, 'cooperado_id', None)) or (e.cooperado_nome or '')
         group_key = ((e.data or '').strip(), (e.turno or '').strip(), (e.contrato or '').strip())
         slot_counts[group_key] += 1
-        rows.append([e.data or '', e.turno or '', e.horario or '', slot_counts[group_key], e.contrato or '', nome, (h.saiu_nome if h else ''), (h.entrou_nome if h else '')])
+        h = latest.get(((e.data or '').strip(), (e.turno or '').strip(), (e.horario or '').strip(), (e.contrato or '').strip(), nome.strip()))
+        ws.append([e.data or '', e.turno or '', e.horario or '', slot_counts[group_key], e.contrato or '', nome, (h.saiu_nome if h else ''), (h.entrou_nome if h else '')])
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = 'Escala atual'
-    ws.append(['Data', 'Turno', 'Horário', 'Nº', 'Contrato', 'Cooperado atual', 'Quem foi retirado', 'Quem entrou'])
-    for r in rows:
-        ws.append(r)
-    return _xlsx_finish_and_send(wb, 'escala_atual_com_alteracoes.xlsx')
+    return _xlsx_finish_and_send(wb, 'escala_atual_com_alteracoes.xlsx', fast=True)
 
 
 @app.get("/admin/escalas/exportar_historico")
 @admin_perm_required("escalas", "ver")
 def admin_exportar_escalas_historico():
-    import io
     from openpyxl import Workbook
     ini = _parse_ymd_date(request.args.get("escala_hist_inicio")) or (date.today() - timedelta(days=30))
     fim = _parse_ymd_date(request.args.get("escala_hist_fim")) or date.today()
-    hist = _history_rows_between(EscalaHistorico.query, EscalaHistorico.snapshot_em, ini, fim).order_by(EscalaHistorico.snapshot_em.desc(), EscalaHistorico.id.desc()).all()
-    wb = Workbook(); ws = wb.active; ws.title = 'Histórico escalas'
+    hist = _history_rows_between(
+        db.session.query(
+            EscalaHistorico.snapshot_em,
+            EscalaHistorico.origem,
+            EscalaHistorico.acao,
+            EscalaHistorico.data,
+            EscalaHistorico.turno,
+            EscalaHistorico.horario,
+            EscalaHistorico.contrato,
+            EscalaHistorico.cooperado_nome,
+            EscalaHistorico.saiu_nome,
+            EscalaHistorico.entrou_nome,
+        ),
+        EscalaHistorico.snapshot_em,
+        ini,
+        fim,
+    ).order_by(EscalaHistorico.snapshot_em.desc(), EscalaHistorico.id.desc())
+    wb = Workbook(write_only=True)
+    ws = wb.create_sheet(title='Histórico escalas')
     ws.append(['Registrado em', 'Origem', 'Ação', 'Data', 'Turno', 'Horário', 'Contrato', 'Cooperado atual', 'Quem saiu', 'Quem entrou'])
-    for h in hist:
+    for h in hist.all():
         ws.append([h.snapshot_em.strftime('%d/%m/%Y %H:%M') if h.snapshot_em else '', h.origem or '', h.acao or '', h.data or '', h.turno or '', h.horario or '', h.contrato or '', h.cooperado_nome or '', h.saiu_nome or '', h.entrou_nome or ''])
-    return _xlsx_finish_and_send(wb, 'historico_escalas.xlsx')
+    return _xlsx_finish_and_send(wb, 'historico_escalas.xlsx', fast=True)
 
 
 @app.get("/admin/trocas/exportar_historico")
 @admin_perm_required("escalas", "ver")
 def admin_exportar_trocas_historico():
-    import io
     from openpyxl import Workbook
     ini = _parse_ymd_date(request.args.get("trocas_hist_inicio")) or (date.today() - timedelta(days=30))
     fim = _parse_ymd_date(request.args.get("trocas_hist_fim")) or date.today()
-    hist = _history_rows_between(TrocaHistorico.query, TrocaHistorico.aplicada_em, ini, fim).order_by(TrocaHistorico.aplicada_em.desc(), TrocaHistorico.id.desc()).all()
-    wb = Workbook(); ws = wb.active; ws.title = 'Histórico trocas'
+    hist = _history_rows_between(
+        db.session.query(
+            TrocaHistorico.aplicada_em,
+            TrocaHistorico.tipo,
+            TrocaHistorico.solicitante_nome,
+            TrocaHistorico.destino_nome,
+            TrocaHistorico.data,
+            TrocaHistorico.turno,
+            TrocaHistorico.horario,
+            TrocaHistorico.contrato,
+            TrocaHistorico.saiu_nome,
+            TrocaHistorico.entrou_nome,
+        ),
+        TrocaHistorico.aplicada_em,
+        ini,
+        fim,
+    ).order_by(TrocaHistorico.aplicada_em.desc(), TrocaHistorico.id.desc())
+    wb = Workbook(write_only=True)
+    ws = wb.create_sheet(title='Histórico trocas')
     ws.append(['Aplicada em', 'Tipo', 'Solicitante', 'Destino', 'Data', 'Turno', 'Horário', 'Contrato', 'Saiu', 'Entrou'])
-    for h in hist:
+    for h in hist.all():
         ws.append([h.aplicada_em.strftime('%d/%m/%Y %H:%M') if h.aplicada_em else '', h.tipo or '', h.solicitante_nome or '', h.destino_nome or '', h.data or '', h.turno or '', h.horario or '', h.contrato or '', h.saiu_nome or '', h.entrou_nome or ''])
-    return _xlsx_finish_and_send(wb, 'historico_trocas.xlsx')
+    return _xlsx_finish_and_send(wb, 'historico_trocas.xlsx', fast=True)
 
 
 # =========================
