@@ -5758,6 +5758,12 @@ def delete_despesa_coop_bulk():
         flash("Selecione pelo menos uma despesa para excluir.", "warning")
         return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
+
+@app.route("/coop/despesas/bulk-delete", methods=["POST"], endpoint="bulk_delete_despesa_coop")
+@admin_perm_required("coop_despesas", "excluir")
+def bulk_delete_despesa_coop():
+    return delete_despesa_coop_bulk()
+
     DespesaCooperado.query.filter(DespesaCooperado.id.in_(ids_int)).delete(synchronize_session=False)
     db.session.commit()
     flash(f"{len(ids_int)} despesa(s) excluída(s).", "success")
