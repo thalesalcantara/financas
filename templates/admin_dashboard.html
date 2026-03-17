@@ -4237,39 +4237,7 @@
       </div>
     </div>
   </div>
-  <div class="card p-3 mb-3 border-0 shadow-sm">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <div>
-        <h6 class="mb-0 section-title">Contagem por contrato e turno</h6>
-        <small class="section-subtitle">Mostra quantos cooperados estão em cada contrato por turno.</small>
-      </div>
-      <span class="badge-soft">{{ contagem_contrato_turno|length if contagem_contrato_turno else 0 }} linha(s)</span>
-    </div>
-    <div class="table-responsive">
-      <table class="table table-sm align-middle mb-0">
-        <thead>
-          <tr>
-            <th>Data</th>
-            <th>Turno</th>
-            <th>Contrato</th>
-            <th class="text-center">Qtd cooperados</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in contagem_contrato_turno or [] %}
-          <tr>
-            <td>{{ item.data }}</td>
-            <td>{{ item.turno or '—' }}</td>
-            <td>{{ item.contrato or '—' }}</td>
-            <td class="text-center">{{ item.qtd_cooperados }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="4" class="text-center text-muted">Sem dados.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+
 
   <div class="card p-3 mb-3 border-0 shadow-sm">
     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -6308,6 +6276,14 @@ document.addEventListener('DOMContentLoaded', function(){
       return;
     }
 
+    const slotMap = new Map();
+    filtered.forEach(row => {
+      const key = `${row.data || ''}||${row.turno || ''}||${row.contrato || ''}`.toLowerCase();
+      const next = (slotMap.get(key) || 0) + 1;
+      slotMap.set(key, next);
+      row.__slot_index = next;
+    });
+
     const tbody = filtered.map(row => {
       const isLivre = !row.cooperado_id && !String(row.cooperado_nome_livre || '').trim();
       const disabled = canEdit ? '' : 'disabled';
@@ -6318,6 +6294,7 @@ document.addEventListener('DOMContentLoaded', function(){
           <td>${escapeHtml(row.data || '—')}</td>
           <td>${escapeHtml(row.turno || '—')}</td>
           <td>${escapeHtml(row.horario || '—')}</td>
+          <td>${escapeHtml(row.__slot_index || '—')}</td>
           <td><select class="form-select form-select-sm js-contrato" ${disabled}>${contractOptions(row.contrato || '')}</select></td>
           <td><select class="form-select form-select-sm js-cooperado-select" ${disabled}>${cooperadoOptions(row.cooperado_id || '')}</select></td>
           <td><input type="text" class="form-control form-control-sm js-nome-livre" value="${escapeHtml(row.cooperado_nome_livre || '')}" placeholder="Opcional" ${disabled} ${nomeLivreDisabled}></td>
@@ -6331,7 +6308,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <table class="table table-sm align-middle mb-0 escala-compact-table">
           <thead>
             <tr>
-              <th>Dia</th><th>Data</th><th>Turno</th><th>Horário</th><th>Contrato</th><th>Cooperado</th><th>Nome livre</th><th class="text-center">Salvar</th><th class="text-center">Sair da escala</th>
+              <th>Dia</th><th>Data</th><th>Turno</th><th>Horário</th><th class="text-center">Nº</th><th>Contrato</th><th>Cooperado</th><th>Nome livre</th><th class="text-center">Salvar</th><th class="text-center">Sair da escala</th>
             </tr>
           </thead>
           <tbody>${tbody}</tbody>
