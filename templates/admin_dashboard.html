@@ -400,7 +400,6 @@
 {% set can_documentos_ver = admin_is_master or _perms.get('documentos', {}).get('ver', False) %}
 {% set can_tabelas_ver = admin_is_master or _perms.get('tabelas', {}).get('ver', False) %}
 {% set can_avaliacoes_ver = admin_is_master or _perms.get('avaliacoes', {}).get('ver', False) %}
-{% set can_rh_ver = admin_is_master or _perms.get('rh', {}).get('ver', False) %}
 {% set can_config_ver = admin_is_master or _perms.get('config', {}).get('ver', False) %}
 {% set can_config_criar = admin_is_master or _perms.get('config', {}).get('criar', False) %}
 {% set can_config_editar = admin_is_master or _perms.get('config', {}).get('editar', False) %}
@@ -534,15 +533,6 @@
           <span class="nav-link-label">Benefícios</span>
         </a>{% endif %}
       </div>
-
-
-      {% if can_rh_ver %}<a class="nav-link-main {% if request.endpoint and request.endpoint.startswith('admin_rh_') %}active{% endif %}"
-         href="{{ url_for('admin_rh_dashboard') }}">
-        <div class="nav-link-left">
-          <span class="nav-link-icon"><i class="bi bi-people-fill"></i></span>
-          <span class="nav-link-label">RH</span>
-        </div>
-      </a>{% endif %}
 
       <!-- CADASTROS (tabs + rotas) ------------------------------------------>
       <button class="nav-link-group-toggle"
