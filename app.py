@@ -622,44 +622,6 @@ class TrocaSolicitacao(db.Model):
     aplicada_em = db.Column(db.DateTime)
 
 
-class EscalaHistorico(db.Model):
-    __tablename__ = "escalas_historico"
-    id = db.Column(db.Integer, primary_key=True)
-    grupo_ref = db.Column(db.String(40), index=True)
-    origem = db.Column(db.String(30), index=True)  # upload, edicao_manual, troca_aprovada, passagem_aprovada
-    acao = db.Column(db.String(30), index=True)    # snapshot, substituicao, troca, passagem
-    escala_ref_id = db.Column(db.Integer, index=True)
-    troca_ref_id = db.Column(db.Integer, index=True)
-    admin_usuario_id = db.Column(db.Integer, nullable=True)
-    data = db.Column(db.String(40), index=True)
-    turno = db.Column(db.String(50), index=True)
-    horario = db.Column(db.String(50))
-    contrato = db.Column(db.String(80), index=True)
-    cooperado_id = db.Column(db.Integer, nullable=True, index=True)
-    cooperado_nome = db.Column(db.String(120))
-    saiu_nome = db.Column(db.String(120))
-    entrou_nome = db.Column(db.String(120))
-    snapshot_em = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-
-
-class TrocaHistorico(db.Model):
-    __tablename__ = "trocas_historico"
-    id = db.Column(db.Integer, primary_key=True)
-    troca_ref_id = db.Column(db.Integer, index=True)
-    tipo = db.Column(db.String(20), index=True)  # troca ou passagem
-    solicitante_id = db.Column(db.Integer, nullable=True, index=True)
-    solicitante_nome = db.Column(db.String(120))
-    destino_id = db.Column(db.Integer, nullable=True, index=True)
-    destino_nome = db.Column(db.String(120))
-    data = db.Column(db.String(40), index=True)
-    turno = db.Column(db.String(50), index=True)
-    horario = db.Column(db.String(50))
-    contrato = db.Column(db.String(80), index=True)
-    saiu_nome = db.Column(db.String(120))
-    entrou_nome = db.Column(db.String(120))
-    aplicada_em = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-
-
 class Config(db.Model):
     __tablename__ = "config"
     id = db.Column(db.Integer, primary_key=True)
@@ -1398,41 +1360,44 @@ def admin_perm_required(aba: str, acao: str = "ver"):
     def deco(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            wants_json = (
+            is_ajax = (
                 request.headers.get("X-Requested-With") == "XMLHttpRequest"
-                or request.headers.get("Accept", "").lower().find("application/json") >= 0
                 or (request.form.get("ajax") == "1")
                 or (request.args.get("ajax") == "1")
+                or "application/json" in (request.headers.get("Accept") or "")
             )
 
-            def _deny_json(message: str, status: int):
-                return jsonify({"ok": False, "message": message}), status
+            def _json_or_redirect(message: str, code: int, *, login_required: bool = False, fallback_tab: str = "lancamentos"):
+                if is_ajax:
+                    payload = {"ok": False, "message": message}
+                    if login_required:
+                        payload["login_required"] = True
+                        payload["redirect"] = url_for("login")
+                    else:
+                        payload["redirect"] = url_for("admin_dashboard", tab=fallback_tab)
+                    return jsonify(payload), code
+                if code >= 400:
+                    flash(message, "danger" if code != 401 else "warning")
+                if login_required:
+                    return redirect(url_for("login"))
+                return redirect(url_for("admin_dashboard", tab=fallback_tab))
 
             uid = session.get("user_id")
             tipo = (session.get("user_tipo") or "").strip().lower()
 
             if not uid:
                 session.clear()
-                if wants_json:
-                    return _deny_json("Sessão expirada. Faça login novamente.", 401)
-                return redirect(url_for("login"))
+                return _json_or_redirect("Sessão expirada. Faça login novamente.", 401, login_required=True)
 
             u = Usuario.query.get(uid)
             if not u:
                 session.clear()
-                if wants_json:
-                    return _deny_json("Sessão inválida. Faça login novamente.", 401)
-                flash("Sessão inválida. Faça login novamente.", "danger")
-                return redirect(url_for("login"))
+                return _json_or_redirect("Sessão inválida. Faça login novamente.", 401, login_required=True)
 
             tipo_db = (u.tipo or "").strip().lower()
-
             if tipo_db != "admin":
                 session.clear()
-                if wants_json:
-                    return _deny_json("Acesso restrito ao administrador.", 403)
-                flash("Acesso restrito ao administrador.", "danger")
-                return redirect(url_for("login"))
+                return _json_or_redirect("Acesso restrito ao administrador.", 403, login_required=True)
 
             if getattr(u, "ativo", None) is None:
                 u.ativo = True
@@ -1440,35 +1405,25 @@ def admin_perm_required(aba: str, acao: str = "ver"):
 
             if u.ativo is False:
                 session.clear()
-                if wants_json:
-                    return _deny_json("Conta desativada. Fale com o administrador master.", 403)
-                flash("Conta desativada. Fale com o administrador master.", "danger")
-                return redirect(url_for("login"))
+                return _json_or_redirect("Conta desativada. Fale com o administrador master.", 403, login_required=True)
 
             if tipo != "admin":
                 session["user_tipo"] = "admin"
 
             if not admin_has_perm(aba, acao):
-                if wants_json:
-                    return _deny_json("Você não tem permissão para editar Escalas.", 403)
-
-                flash("Você não tem permissão para essa ação.", "danger")
-
-                if getattr(u, "is_master", False):
-                    return redirect(url_for("admin_dashboard", tab="lancamentos"))
-
-                abas_liberadas = [
-                    nome_aba
-                    for nome_aba in ADMIN_ABAS.keys()
-                    if admin_has_perm(nome_aba, "ver")
-                ]
-
-                if abas_liberadas:
-                    return redirect(url_for("admin_dashboard", tab=abas_liberadas[0]))
-
-                session.clear()
-                flash("Seu usuário admin está sem permissões liberadas.", "warning")
-                return redirect(url_for("login"))
+                fallback_tab = "lancamentos"
+                if not getattr(u, "is_master", False):
+                    abas_liberadas = [
+                        nome_aba
+                        for nome_aba in ADMIN_ABAS.keys()
+                        if admin_has_perm(nome_aba, "ver")
+                    ]
+                    if abas_liberadas:
+                        fallback_tab = abas_liberadas[0]
+                    else:
+                        session.clear()
+                        return _json_or_redirect("Seu usuário admin está sem permissões liberadas.", 403, login_required=True)
+                return _json_or_redirect("Você não tem permissão para essa ação.", 403, fallback_tab=fallback_tab)
 
             return fn(*args, **kwargs)
         return wrapper
@@ -2411,147 +2366,6 @@ def _escala_label(e: Escala | None) -> str:
     contrato_txt = (e.contrato or "").strip()
     parts = [x for x in [data_txt, turno_txt, horario_txt, contrato_txt] if x]
     return " • ".join(parts)
-
-HIST_RETENTION_DAYS = 31
-
-
-def _history_cutoff_dt() -> datetime:
-    return datetime.utcnow() - timedelta(days=HIST_RETENTION_DAYS)
-
-
-def _safe_coop_nome_by_id(coop_id: int | None) -> str:
-    if not coop_id:
-        return ""
-    try:
-        c = Cooperado.query.get(int(coop_id))
-        return (c.nome or "").strip() if c else ""
-    except Exception:
-        return ""
-
-
-def _prune_histories() -> None:
-    cutoff = _history_cutoff_dt()
-    try:
-        EscalaHistorico.query.filter(EscalaHistorico.snapshot_em < cutoff).delete(synchronize_session=False)
-    except Exception:
-        pass
-    try:
-        TrocaHistorico.query.filter(TrocaHistorico.aplicada_em < cutoff).delete(synchronize_session=False)
-    except Exception:
-        pass
-
-
-def _log_escala_historico(*, origem: str, acao: str, escala_ref_id: int | None = None, troca_ref_id: int | None = None,
-                          grupo_ref: str | None = None, data: str = "", turno: str = "", horario: str = "",
-                          contrato: str = "", cooperado_id: int | None = None, cooperado_nome: str | None = None,
-                          saiu_nome: str | None = None, entrou_nome: str | None = None, admin_usuario_id: int | None = None,
-                          snapshot_em: datetime | None = None) -> None:
-    row = EscalaHistorico(
-        grupo_ref=grupo_ref,
-        origem=origem,
-        acao=acao,
-        escala_ref_id=escala_ref_id,
-        troca_ref_id=troca_ref_id,
-        admin_usuario_id=admin_usuario_id,
-        data=data or "",
-        turno=turno or "",
-        horario=horario or "",
-        contrato=contrato or "",
-        cooperado_id=cooperado_id,
-        cooperado_nome=(cooperado_nome or "").strip() or None,
-        saiu_nome=(saiu_nome or "").strip() or None,
-        entrou_nome=(entrou_nome or "").strip() or None,
-        snapshot_em=snapshot_em or datetime.utcnow(),
-    )
-    db.session.add(row)
-
-
-def _snapshot_escalas_atual(*, grupo_ref: str, origem: str = "upload", acao: str = "snapshot", admin_usuario_id: int | None = None,
-                            snapshot_em: datetime | None = None) -> None:
-    when = snapshot_em or datetime.utcnow()
-    escalas = Escala.query.order_by(Escala.id.asc()).all()
-    for e in escalas:
-        nome = _safe_coop_nome_by_id(getattr(e, 'cooperado_id', None)) or (getattr(e, 'cooperado_nome', None) or "")
-        _log_escala_historico(
-            origem=origem,
-            acao=acao,
-            escala_ref_id=e.id,
-            grupo_ref=grupo_ref,
-            admin_usuario_id=admin_usuario_id,
-            data=e.data or "",
-            turno=e.turno or "",
-            horario=e.horario or "",
-            contrato=e.contrato or "",
-            cooperado_id=e.cooperado_id,
-            cooperado_nome=nome,
-            snapshot_em=when,
-        )
-
-
-def _log_troca_historico_rows(troca_ref_id: int, linhas: list[dict], *, solicitante, destinatario, tipo: str, when: datetime | None = None) -> None:
-    ts = when or datetime.utcnow()
-    for linha in (linhas or []):
-        turno_txt, horario_txt = "", ""
-        raw = (linha.get('turno_horario') or '').strip()
-        if '•' in raw:
-            parts = [p.strip() for p in raw.split('•')]
-            if parts:
-                turno_txt = parts[0]
-            if len(parts) > 1:
-                horario_txt = parts[1]
-        else:
-            turno_txt = raw
-        db.session.add(TrocaHistorico(
-            troca_ref_id=troca_ref_id,
-            tipo=tipo,
-            solicitante_id=(getattr(solicitante, 'id', None) if solicitante else None),
-            solicitante_nome=(getattr(solicitante, 'nome', None) if solicitante else None),
-            destino_id=(getattr(destinatario, 'id', None) if destinatario else None),
-            destino_nome=(getattr(destinatario, 'nome', None) if destinatario else None),
-            data=(linha.get('dia') or ''),
-            turno=turno_txt,
-            horario=horario_txt,
-            contrato=(linha.get('contrato') or ''),
-            saiu_nome=(linha.get('saiu') or ''),
-            entrou_nome=(linha.get('entrou') or ''),
-            aplicada_em=ts,
-        ))
-
-
-def _parse_ymd_date(value: str | None) -> date | None:
-    if not value:
-        return None
-    try:
-        return datetime.strptime(value.strip(), '%Y-%m-%d').date()
-    except Exception:
-        return None
-
-
-def _history_rows_between(q, col, ini: date | None, fim: date | None):
-    if ini:
-        q = q.filter(col >= datetime.combine(ini, dtime.min))
-    if fim:
-        q = q.filter(col <= datetime.combine(fim, dtime.max))
-    return q
-
-
-def _resolve_change_columns(rows: list[dict], hist_rows: list[EscalaHistorico]) -> list[dict]:
-    latest = {}
-    for h in hist_rows:
-        key = ((h.data or '').strip(), (h.turno or '').strip(), (h.horario or '').strip(), (h.contrato or '').strip(), (h.cooperado_nome or '').strip())
-        prev = latest.get(key)
-        if prev is None or (h.snapshot_em or datetime.min) >= (prev.snapshot_em or datetime.min):
-            latest[key] = h
-    out = []
-    for r in rows:
-        key = ((r.get('data') or '').strip(), (r.get('turno') or '').strip(), (r.get('horario') or '').strip(), (r.get('contrato') or '').strip(), (r.get('cooperado_nome') or '').strip())
-        h = latest.get(key)
-        nr = dict(r)
-        nr['saiu_nome'] = (getattr(h, 'saiu_nome', '') or '') if h else ''
-        nr['entrou_nome'] = (getattr(h, 'entrou_nome', '') or '') if h else ''
-        out.append(nr)
-    return out
-
 
 def _carry_forward_contrato(escalas: list[Escala]) -> dict[int, str]:
     eff = {}
@@ -3788,62 +3602,6 @@ def admin_dashboard():
     current_date = date.today()
     data_limite = date(current_date.year, 12, 31)
 
-    escala_hist_inicio = _parse_ymd_date(args.get("escala_hist_inicio"))
-    escala_hist_fim = _parse_ymd_date(args.get("escala_hist_fim"))
-    trocas_hist_inicio = _parse_ymd_date(args.get("trocas_hist_inicio"))
-    trocas_hist_fim = _parse_ymd_date(args.get("trocas_hist_fim"))
-
-    escala_historico_rows = []
-    escala_editor_rows_export = []
-    trocas_historico_export = []
-    contagem_contrato_turno = []
-
-    if active_tab == "escalas":
-        if not escala_hist_inicio and not escala_hist_fim:
-            escala_hist_fim = current_date
-            escala_hist_inicio = current_date - timedelta(days=30)
-        elif escala_hist_inicio and not escala_hist_fim:
-            escala_hist_fim = escala_hist_inicio
-        elif escala_hist_fim and not escala_hist_inicio:
-            escala_hist_inicio = escala_hist_fim
-
-        escala_hist_q = _history_rows_between(EscalaHistorico.query, EscalaHistorico.snapshot_em, escala_hist_inicio, escala_hist_fim)
-        escala_hist_rows_db = escala_hist_q.order_by(EscalaHistorico.snapshot_em.desc(), EscalaHistorico.id.desc()).all()
-        for h in escala_hist_rows_db:
-            escala_historico_rows.append({
-                "snapshot_em": h.snapshot_em,
-                "data": h.data or "",
-                "turno": h.turno or "",
-                "horario": h.horario or "",
-                "contrato": h.contrato or "",
-                "cooperado_nome": h.cooperado_nome or "",
-                "saiu_nome": h.saiu_nome or "",
-                "entrou_nome": h.entrou_nome or "",
-                "origem": h.origem or "",
-                "acao": h.acao or "",
-            })
-
-        hist_rows_for_current = _history_rows_between(EscalaHistorico.query.filter(EscalaHistorico.saiu_nome.isnot(None)), EscalaHistorico.snapshot_em, escala_hist_inicio, escala_hist_fim).all()
-        escala_editor_rows_export = _resolve_change_columns(escala_editor_rows, hist_rows_for_current)
-    else:
-        escala_hist_fim = escala_hist_fim or current_date
-        escala_hist_inicio = escala_hist_inicio or (current_date - timedelta(days=30))
-
-    if active_tab == "trocas":
-        if not trocas_hist_inicio and not trocas_hist_fim:
-            trocas_hist_fim = current_date
-            trocas_hist_inicio = current_date - timedelta(days=30)
-        elif trocas_hist_inicio and not trocas_hist_fim:
-            trocas_hist_fim = trocas_hist_inicio
-        elif trocas_hist_fim and not trocas_hist_inicio:
-            trocas_hist_inicio = trocas_hist_fim
-
-        trocas_hist_q = _history_rows_between(TrocaHistorico.query, TrocaHistorico.aplicada_em, trocas_hist_inicio, trocas_hist_fim)
-        trocas_historico_export = trocas_hist_q.order_by(TrocaHistorico.aplicada_em.desc(), TrocaHistorico.id.desc()).all()
-    else:
-        trocas_hist_fim = trocas_hist_fim or current_date
-        trocas_hist_inicio = trocas_hist_inicio or (current_date - timedelta(days=30))
-
     return render_template(
         "admin_dashboard.html",
         tab=active_tab,
@@ -3893,15 +3651,7 @@ def admin_dashboard():
         admins_permissoes=admins_permissoes,
         filtro_periodo_aplicado=filtro_periodo_aplicado,
         escala_editor_rows=escala_editor_rows,
-        escala_editor_rows_export=escala_editor_rows_export,
         contratos_escala_opcoes=contratos_escala_opcoes,
-        escala_hist_inicio=escala_hist_inicio,
-        escala_hist_fim=escala_hist_fim,
-        trocas_hist_inicio=trocas_hist_inicio,
-        trocas_hist_fim=trocas_hist_fim,
-        escala_historico_rows=escala_historico_rows,
-        trocas_historico_export=trocas_historico_export,
-        contagem_contrato_turno=contagem_contrato_turno,
     )
     
 # =========================
@@ -6056,171 +5806,6 @@ def ratear_beneficios():
     return _redirect_back()
 
 # =========================
-# Escalas/Trocas — Exportações e histórico
-# =========================
-def _xlsx_finish_and_send(wb, filename, *, fast=False):
-    import io
-    from openpyxl.styles import Font, PatternFill, Alignment
-
-    if not fast:
-        for ws in wb.worksheets:
-            try:
-                header = next(ws.iter_rows(min_row=1, max_row=1))
-            except Exception:
-                header = []
-            for cell in header:
-                cell.font = Font(bold=True)
-                cell.alignment = Alignment(horizontal='center', vertical='center')
-                cell.fill = PatternFill(fill_type='solid', fgColor='DCE6F1')
-
-            max_scan_rows = 400
-            try:
-                max_col = ws.max_column or 0
-                max_row = ws.max_row or 0
-            except Exception:
-                max_col = 0
-                max_row = 0
-            if max_col:
-                widths = [10] * max_col
-                scan_to = min(max_row, max_scan_rows)
-                for row in ws.iter_rows(min_row=1, max_row=scan_to):
-                    for idx, cell in enumerate(row):
-                        try:
-                            widths[idx] = min(max(widths[idx], len(str(cell.value or '')) + 2), 36)
-                        except Exception:
-                            pass
-                from openpyxl.utils import get_column_letter
-                for idx, width in enumerate(widths, start=1):
-                    ws.column_dimensions[get_column_letter(idx)].width = width
-
-    bio = io.BytesIO()
-    wb.save(bio)
-    bio.seek(0)
-    return send_file(bio, as_attachment=True, download_name=filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-
-
-@app.get("/admin/escalas/exportar_atual")
-@admin_perm_required("escalas", "ver")
-def admin_exportar_escalas_atual():
-    from openpyxl import Workbook
-
-    hist_ini = _parse_ymd_date(request.args.get("escala_hist_inicio")) or (date.today() - timedelta(days=30))
-    hist_fim = _parse_ymd_date(request.args.get("escala_hist_fim")) or date.today()
-
-    latest = {}
-    hist_q = _history_rows_between(
-        db.session.query(
-            EscalaHistorico.data,
-            EscalaHistorico.turno,
-            EscalaHistorico.horario,
-            EscalaHistorico.contrato,
-            EscalaHistorico.cooperado_nome,
-            EscalaHistorico.saiu_nome,
-            EscalaHistorico.entrou_nome,
-            EscalaHistorico.snapshot_em,
-            EscalaHistorico.id,
-        ).filter(EscalaHistorico.saiu_nome.isnot(None)),
-        EscalaHistorico.snapshot_em,
-        hist_ini,
-        hist_fim,
-    ).order_by(EscalaHistorico.snapshot_em.desc(), EscalaHistorico.id.desc())
-    for h in hist_q.all():
-        k = ((h.data or '').strip(), (h.turno or '').strip(), (h.horario or '').strip(), (h.contrato or '').strip(), (h.cooperado_nome or '').strip())
-        if k not in latest:
-            latest[k] = h
-
-    wb = Workbook(write_only=True)
-    ws = wb.create_sheet(title='Escala atual')
-    ws.append(['Data', 'Turno', 'Horário', 'Nº', 'Contrato', 'Cooperado atual', 'Quem foi retirado', 'Quem entrou'])
-
-    escalas_all = db.session.query(
-        Escala.data,
-        Escala.turno,
-        Escala.horario,
-        Escala.contrato,
-        Escala.cooperado_nome,
-        Escala.cooperado_id,
-    ).order_by(Escala.data.asc(), Escala.turno.asc(), Escala.contrato.asc(), Escala.horario.asc(), Escala.id.asc()).all()
-
-    coop_ids = sorted({int(e.cooperado_id) for e in escalas_all if getattr(e, 'cooperado_id', None)})
-    cooperados_map = {}
-    if coop_ids:
-        cooperados_map = {c.id: c.nome for c in Cooperado.query.filter(Cooperado.id.in_(coop_ids)).all()}
-
-    slot_counts = defaultdict(int)
-    for e in escalas_all:
-        nome = cooperados_map.get(getattr(e, 'cooperado_id', None)) or (e.cooperado_nome or '')
-        group_key = ((e.data or '').strip(), (e.turno or '').strip(), (e.contrato or '').strip())
-        slot_counts[group_key] += 1
-        h = latest.get(((e.data or '').strip(), (e.turno or '').strip(), (e.horario or '').strip(), (e.contrato or '').strip(), nome.strip()))
-        ws.append([e.data or '', e.turno or '', e.horario or '', slot_counts[group_key], e.contrato or '', nome, (h.saiu_nome if h else ''), (h.entrou_nome if h else '')])
-
-    return _xlsx_finish_and_send(wb, 'escala_atual_com_alteracoes.xlsx', fast=True)
-
-
-@app.get("/admin/escalas/exportar_historico")
-@admin_perm_required("escalas", "ver")
-def admin_exportar_escalas_historico():
-    from openpyxl import Workbook
-    ini = _parse_ymd_date(request.args.get("escala_hist_inicio")) or (date.today() - timedelta(days=30))
-    fim = _parse_ymd_date(request.args.get("escala_hist_fim")) or date.today()
-    hist = _history_rows_between(
-        db.session.query(
-            EscalaHistorico.snapshot_em,
-            EscalaHistorico.origem,
-            EscalaHistorico.acao,
-            EscalaHistorico.data,
-            EscalaHistorico.turno,
-            EscalaHistorico.horario,
-            EscalaHistorico.contrato,
-            EscalaHistorico.cooperado_nome,
-            EscalaHistorico.saiu_nome,
-            EscalaHistorico.entrou_nome,
-        ),
-        EscalaHistorico.snapshot_em,
-        ini,
-        fim,
-    ).order_by(EscalaHistorico.snapshot_em.desc(), EscalaHistorico.id.desc())
-    wb = Workbook(write_only=True)
-    ws = wb.create_sheet(title='Histórico escalas')
-    ws.append(['Registrado em', 'Origem', 'Ação', 'Data', 'Turno', 'Horário', 'Contrato', 'Cooperado atual', 'Quem saiu', 'Quem entrou'])
-    for h in hist.all():
-        ws.append([h.snapshot_em.strftime('%d/%m/%Y %H:%M') if h.snapshot_em else '', h.origem or '', h.acao or '', h.data or '', h.turno or '', h.horario or '', h.contrato or '', h.cooperado_nome or '', h.saiu_nome or '', h.entrou_nome or ''])
-    return _xlsx_finish_and_send(wb, 'historico_escalas.xlsx', fast=True)
-
-
-@app.get("/admin/trocas/exportar_historico")
-@admin_perm_required("escalas", "ver")
-def admin_exportar_trocas_historico():
-    from openpyxl import Workbook
-    ini = _parse_ymd_date(request.args.get("trocas_hist_inicio")) or (date.today() - timedelta(days=30))
-    fim = _parse_ymd_date(request.args.get("trocas_hist_fim")) or date.today()
-    hist = _history_rows_between(
-        db.session.query(
-            TrocaHistorico.aplicada_em,
-            TrocaHistorico.tipo,
-            TrocaHistorico.solicitante_nome,
-            TrocaHistorico.destino_nome,
-            TrocaHistorico.data,
-            TrocaHistorico.turno,
-            TrocaHistorico.horario,
-            TrocaHistorico.contrato,
-            TrocaHistorico.saiu_nome,
-            TrocaHistorico.entrou_nome,
-        ),
-        TrocaHistorico.aplicada_em,
-        ini,
-        fim,
-    ).order_by(TrocaHistorico.aplicada_em.desc(), TrocaHistorico.id.desc())
-    wb = Workbook(write_only=True)
-    ws = wb.create_sheet(title='Histórico trocas')
-    ws.append(['Aplicada em', 'Tipo', 'Solicitante', 'Destino', 'Data', 'Turno', 'Horário', 'Contrato', 'Saiu', 'Entrou'])
-    for h in hist.all():
-        ws.append([h.aplicada_em.strftime('%d/%m/%Y %H:%M') if h.aplicada_em else '', h.tipo or '', h.solicitante_nome or '', h.destino_nome or '', h.data or '', h.turno or '', h.horario or '', h.contrato or '', h.saiu_nome or '', h.entrou_nome or ''])
-    return _xlsx_finish_and_send(wb, 'historico_trocas.xlsx', fast=True)
-
-
-# =========================
 # Escalas — Upload (substituição TOTAL sempre)
 # =========================
 @app.route("/escalas/upload", methods=["POST"])
@@ -6470,20 +6055,6 @@ def upload_escala():
                 c.ultima_atualizacao = datetime.now()
 
         db.session.commit()
-
-        try:
-            _prune_histories()
-            _snapshot_escalas_atual(
-                grupo_ref=str(uuid.uuid4()),
-                origem="upload",
-                acao="snapshot",
-                admin_usuario_id=session.get("user_id"),
-                snapshot_em=datetime.utcnow(),
-            )
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-
         flash(f"Escala substituída com sucesso. {len(linhas_novas)} linha(s) importada(s) (de {total_linhas_planilha}).", "success")
 
     except Exception as e:
@@ -6520,7 +6091,6 @@ def admin_escala_salvar(escala_id):
         flash(message, "danger")
         return redirect(url_for("admin_dashboard", tab="escalas", escala_dia=redirect_day))
 
-    before_nome = _safe_coop_nome_by_id(e.cooperado_id) or (e.cooperado_nome or "")
     if contrato_txt:
         e.contrato = contrato_txt
         e.restaurante_id = _match_restaurante_id(contrato_txt)
@@ -6546,29 +6116,6 @@ def admin_escala_salvar(escala_id):
         e.cooperado_id = None
         e.cooperado_nome = cooperado_nome_livre or None
 
-    after_nome = ""
-    if e.cooperado_id:
-        after_nome = _safe_coop_nome_by_id(e.cooperado_id)
-    if not after_nome:
-        after_nome = e.cooperado_nome or ""
-
-    _prune_histories()
-    _log_escala_historico(
-        origem="edicao_manual",
-        acao="substituicao",
-        escala_ref_id=e.id,
-        grupo_ref=str(uuid.uuid4()),
-        admin_usuario_id=session.get("user_id"),
-        data=e.data or "",
-        turno=e.turno or "",
-        horario=e.horario or "",
-        contrato=e.contrato or "",
-        cooperado_id=e.cooperado_id,
-        cooperado_nome=after_nome,
-        saiu_nome=(before_nome or "") if (before_nome or "") != (after_nome or "") else None,
-        entrou_nome=(after_nome or "") if (before_nome or "") != (after_nome or "") else None,
-        snapshot_em=datetime.utcnow(),
-    )
     db.session.commit()
     return _reply_ok("Linha da escala atualizada com sucesso.")
 
@@ -6705,28 +6252,6 @@ def admin_aprovar_troca(id):
     prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
     t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps(afetacao_json, ensure_ascii=False)
 
-    when = datetime.utcnow()
-    _prune_histories()
-    _log_troca_historico_rows(t.id, linhas, solicitante=solicitante, destinatario=destinatario, tipo="troca", when=when)
-    for linha in linhas:
-        turno_txt = linha.get("turno_horario", "")
-        turno_part = turno_txt.split("•")[0].strip() if turno_txt else ""
-        horario_part = turno_txt.split("•", 1)[1].strip() if "•" in turno_txt else ""
-        _log_escala_historico(
-            origem="troca_aprovada",
-            acao="troca",
-            troca_ref_id=t.id,
-            grupo_ref=str(uuid.uuid4()),
-            admin_usuario_id=session.get("user_id"),
-            data=linha.get("dia", ""),
-            turno=turno_part,
-            horario=horario_part,
-            contrato=linha.get("contrato", ""),
-            cooperado_nome=linha.get("entrou", ""),
-            saiu_nome=linha.get("saiu", ""),
-            entrou_nome=linha.get("entrou", ""),
-            snapshot_em=when,
-        )
     db.session.commit()
     flash("Troca aprovada e aplicada com sucesso!", "success")
     return redirect(url_for("admin_dashboard", tab="escalas"))
@@ -7623,29 +7148,6 @@ def aceitar_troca(troca_id):
         t.aplicada_em = datetime.utcnow()
         prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
         t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps(afetacao_json, ensure_ascii=False)
-        when = datetime.utcnow()
-        _prune_histories()
-        _log_troca_historico_rows(t.id, linhas, solicitante=solicitante, destinatario=destinatario, tipo="passagem", when=when)
-        for linha in linhas:
-            turno_txt = linha.get("turno_horario", "")
-            turno_part = turno_txt.split("•")[0].strip() if turno_txt else ""
-            horario_part = turno_txt.split("•", 1)[1].strip() if "•" in turno_txt else ""
-            _log_escala_historico(
-                origem="passagem_aprovada",
-                acao="passagem",
-                escala_ref_id=orig_e.id,
-                troca_ref_id=t.id,
-                grupo_ref=str(uuid.uuid4()),
-                data=linha.get("dia", ""),
-                turno=turno_part,
-                horario=horario_part,
-                contrato=linha.get("contrato", ""),
-                cooperado_id=destinatario.id,
-                cooperado_nome=linha.get("entrou", ""),
-                saiu_nome=linha.get("saiu", ""),
-                entrou_nome=linha.get("entrou", ""),
-                snapshot_em=when,
-            )
         db.session.commit()
         flash("Turno passado com sucesso!", "success")
         return _portal_cooperado_redirect_tab("trocas")
@@ -7688,27 +7190,6 @@ def aceitar_troca(troca_id):
     prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
     t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps(afetacao_json, ensure_ascii=False)
 
-    when = datetime.utcnow()
-    _prune_histories()
-    _log_troca_historico_rows(t.id, linhas, solicitante=solicitante, destinatario=destinatario, tipo="troca", when=when)
-    for linha in linhas:
-        turno_txt = linha.get("turno_horario", "")
-        turno_part = turno_txt.split("•")[0].strip() if turno_txt else ""
-        horario_part = turno_txt.split("•", 1)[1].strip() if "•" in turno_txt else ""
-        _log_escala_historico(
-            origem="troca_aprovada",
-            acao="troca",
-            troca_ref_id=t.id,
-            grupo_ref=str(uuid.uuid4()),
-            data=linha.get("dia", ""),
-            turno=turno_part,
-            horario=horario_part,
-            contrato=linha.get("contrato", ""),
-            cooperado_nome=linha.get("entrou", ""),
-            saiu_nome=linha.get("saiu", ""),
-            entrou_nome=linha.get("entrou", ""),
-            snapshot_em=when,
-        )
     db.session.commit()
     flash("Troca aplicada com sucesso!", "success")
     return _portal_cooperado_redirect_tab("trocas")
