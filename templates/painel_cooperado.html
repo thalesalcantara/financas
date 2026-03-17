@@ -749,7 +749,6 @@
           <input type="hidden" name="active_tab" value="trocas">
           <input type="hidden" name="from_escala_id" id="fromEscalaId">
           <input type="hidden" name="to_cooperado_id" id="toCooperadoId">
-          <input type="hidden" name="destino_escala_id" id="destinoEscalaTrocaId">
           <div class="mb-2">
             <div class="item-small">Seu plantão</div>
             <div class="fw-semibold" id="fromEscalaDesc">—</div>
@@ -761,13 +760,6 @@
             <div class="border rounded mt-2" style="max-height:220px;overflow:auto">
               <ul class="list-group list-group-flush" id="coopList"></ul>
             </div>
-          </div>
-          <div class="mb-2" id="destinoEscalaWrap" style="display:none">
-            <label class="form-label mb-1">Escolha o turno do cooperado no mesmo dia</label>
-            <div class="border rounded" style="max-height:220px;overflow:auto">
-              <ul class="list-group list-group-flush" id="destinoEscalaList"></ul>
-            </div>
-            <div class="form-text">Se ele estiver livre, você pode enviar assim mesmo como passagem de turno.</div>
           </div>
           <div class="mb-2">
             <label class="form-label mb-1">Mensagem (opcional)</label>
@@ -1062,7 +1054,6 @@
 <script>
 const COOPS_FINAL = {{ cooperados_json | default([]) | tojson }};
 const MY_ESCALA   = {{ minha_escala_json | default([]) | tojson }};
-const COOP_ESCALAS_MAP = {{ cooperados_escalas_map | default({}) | tojson }};
 </script>
 <script>
 (function(){
@@ -1137,114 +1128,43 @@ document.addEventListener('DOMContentLoaded', () => {
   const fromEscalaIdEl = document.getElementById('fromEscalaId');
   const fromEscalaDescEl = document.getElementById('fromEscalaDesc');
   const toCooperadoIdEl = document.getElementById('toCooperadoId');
-  const destinoEscalaTrocaIdEl = document.getElementById('destinoEscalaTrocaId');
-  const destinoEscalaWrapEl = document.getElementById('destinoEscalaWrap');
-  const destinoEscalaListEl = document.getElementById('destinoEscalaList');
   const btnEnviarTroca = document.getElementById('btnEnviarTroca');
   const trocaModalEl = document.getElementById('trocaModal');
 
-  function turnoBucket(turno, horario){
-    const t = String(turno || '').toLowerCase();
-    if (t.includes('noite') || t.includes('noturn')) return 'noite';
-    if (t.includes('dia') || t.includes('diurn') || t.includes('manha') || t.includes('tarde')) return 'dia';
-    const m = String(horario || '').match(/(\d{1,2}):(\d{2})/);
-    if (m){ const h = parseInt(m[1], 10); return (h >= 17 || h <= 6) ? 'noite' : 'dia'; }
-    return 'dia';
-  }
-
-  function renderDestinoEscalas(cooperadoId){
-    const minha = (Array.isArray(MY_ESCALA) ? MY_ESCALA : []).find(e => Number(e.id) === Number(fromEscalaIdEl.value || 0));
-    const weekday = minha?.weekday;
-    const bucket = minha?.turno_bucket || turnoBucket(minha?.turno, minha?.horario);
-    const escalas = (COOP_ESCALAS_MAP && COOP_ESCALAS_MAP[String(cooperadoId)]) || [];
-    const compativeis = escalas.filter(e => e.weekday === weekday && (e.turno_bucket || turnoBucket(e.turno, e.horario)) === bucket);
-
-    destinoEscalaTrocaIdEl.value = '';
-    destinoEscalaListEl.innerHTML = '';
-    destinoEscalaWrapEl.style.display = 'block';
-
-    if (!cooperadoId){
-      destinoEscalaWrapEl.style.display = 'none';
-      btnEnviarTroca.disabled = true;
-      return;
-    }
-
-    if (!compativeis.length){
-      destinoEscalaListEl.innerHTML = '<li class="list-group-item text-muted">Esse cooperado está livre nesse turno. Você pode enviar como passagem de turno.</li>';
-      btnEnviarTroca.disabled = false;
-      return;
-    }
-
-    compativeis.forEach((e, idx) => {
-      const li = document.createElement('li');
-      li.className = 'list-group-item d-flex align-items-center justify-content-between';
-      li.innerHTML = `<div class="me-2" style="word-break:break-word;overflow-wrap:anywhere"><div class="fw-semibold">${e.data} • ${e.turno || ''} • ${e.horario || ''} • ${e.contrato || ''}</div></div><button type="button" class="btn btn-sm btn-outline-primary">Usar</button>`;
-      li.querySelector('button').addEventListener('click', () => {
-        destinoEscalaTrocaIdEl.value = e.id;
-        btnEnviarTroca.disabled = false;
-        [...destinoEscalaListEl.querySelectorAll('.list-group-item')].forEach(x => x.classList.remove('active'));
-        li.classList.add('active');
-      });
-      destinoEscalaListEl.appendChild(li);
-      if (compativeis.length === 1 && idx === 0){
-        destinoEscalaTrocaIdEl.value = e.id;
-        li.classList.add('active');
-        btnEnviarTroca.disabled = false;
-      }
-    });
-
-    if (compativeis.length > 1){
-      btnEnviarTroca.disabled = true;
-    }
-  }
-
   function renderCoops(filter=''){
-    const q = (filter || '').trim().toLowerCase();
-    coopListEl.innerHTML = '';
-    const base = Array.isArray(COOPS_FINAL) ? COOPS_FINAL : [];
-    if (!base.length){ coopListEl.innerHTML = '<li class="list-group-item text-muted">Nenhum cooperado disponível para troca.</li>'; return; }
-    const filtered = base.filter(c => !q || String(c.nome || '').toLowerCase().includes(q)).slice(0, 200);
-    if (!filtered.length){ coopListEl.innerHTML = '<li class="list-group-item text-muted">Nenhum resultado.</li>'; return; }
-    filtered.forEach(c => {
-      const li = document.createElement('li'); li.className = 'list-group-item d-flex align-items-center'; li.style.cursor = 'pointer';
-      const avatar = document.createElement('img'); avatar.src = c.foto_url || '{{ url_for("static", filename="img/default.png") }}';
-      avatar.alt = ''; Object.assign(avatar.style, {width:'28px',height:'28px',objectFit:'cover',borderRadius:'50%',border:'1px solid #0001',marginRight:'.5rem'});
-      const name = document.createElement('div'); name.className = 'flex-fill'; name.innerHTML = `<div class="fw-semibold" style="word-break:break-word;overflow-wrap:anywhere">${c.nome || '—'}</div>`;
-      const choose = document.createElement('button'); choose.type = 'button'; choose.className = 'btn btn-sm btn-outline-primary'; choose.textContent = 'Selecionar';
-      choose.addEventListener('click', () => {
-        toCooperadoIdEl.value = c.id;
-        [...coopListEl.querySelectorAll('.list-group-item')].forEach(x => x.classList.remove('active'));
-        li.classList.add('active');
-        renderDestinoEscalas(c.id);
+    const q = (filter||'').trim().toLowerCase();
+    coopListEl.innerHTML='';
+    const base = Array.isArray(COOPS_FINAL)?COOPS_FINAL:[];
+    if (!base.length){ coopListEl.innerHTML='<li class="list-group-item text-muted">Nenhum cooperado disponível para troca.</li>'; return; }
+    const filtered = base.filter(c=>!q || String(c.nome||'').toLowerCase().includes(q)).slice(0,200);
+    if (!filtered.length){ coopListEl.innerHTML='<li class="list-group-item text-muted">Nenhum resultado.</li>'; return; }
+    filtered.forEach(c=>{
+      const li=document.createElement('li'); li.className='list-group-item d-flex align-items-center'; li.style.cursor='pointer';
+      const avatar=document.createElement('img'); avatar.src=c.foto_url || '{{ url_for("static", filename="img/default.png") }}';
+      avatar.alt=''; Object.assign(avatar.style,{width:'28px',height:'28px',objectFit:'cover',borderRadius:'50%',border:'1px solid #0001',marginRight:'.5rem'});
+      const name=document.createElement('div'); name.className='flex-fill'; name.innerHTML=`<div class="fw-semibold" style="word-break:break-word;overflow-wrap:anywhere">${c.nome||'—'}</div>`;
+      const choose=document.createElement('button'); choose.type='button'; choose.className='btn btn-sm btn-outline-primary'; choose.textContent='Selecionar';
+      choose.addEventListener('click', ()=>{
+        const esc = fromEscalaDescEl.textContent||'';
+        if (confirm(`Deseja solicitar a troca:\n\n${esc}\n\ncom "${c.nome}"?`)){
+          toCooperadoIdEl.value=c.id; btnEnviarTroca.disabled=false;
+          [...coopListEl.querySelectorAll('.list-group-item')].forEach(x=>x.classList.remove('active')); li.classList.add('active');
+        }
       });
-      li.append(avatar, name, choose); coopListEl.appendChild(li);
+      li.append(avatar,name,choose); coopListEl.appendChild(li);
     });
   }
 
-  coopSearchEl?.addEventListener('input', () => renderCoops(coopSearchEl.value));
-  trocaModalEl?.addEventListener('show.bs.modal', (ev) => {
-    const btn = ev.relatedTarget;
-    const escalaId = btn?.getAttribute('data-escala-id') || '';
-    const escalaDesc = btn?.getAttribute('data-escala-desc') || '';
-    fromEscalaIdEl.value = escalaId;
-    fromEscalaDescEl.textContent = escalaDesc;
-    toCooperadoIdEl.value = '';
-    destinoEscalaTrocaIdEl.value = '';
-    btnEnviarTroca.disabled = true;
-    destinoEscalaWrapEl.style.display = 'none';
-    destinoEscalaListEl.innerHTML = '';
-    coopSearchEl.value = '';
-    renderCoops('');
+  coopSearchEl?.addEventListener('input', ()=> renderCoops(coopSearchEl.value));
+  trocaModalEl?.addEventListener('show.bs.modal', (ev)=>{
+    const btn=ev.relatedTarget; const escalaId=btn?.getAttribute('data-escala-id')||''; const escalaDesc=btn?.getAttribute('data-escala-desc')||'';
+    fromEscalaIdEl.value=escalaId; fromEscalaDescEl.textContent=escalaDesc; toCooperadoIdEl.value=''; btnEnviarTroca.disabled=true;
+    coopSearchEl.value=''; renderCoops('');
   });
 
-  document.getElementById('trocaForm')?.addEventListener('submit', (e) => {
-    if (!fromEscalaIdEl.value || !toCooperadoIdEl.value){
-      e.preventDefault();
-      alert('Selecione um cooperado para a troca.');
-      return;
-    }
+  document.getElementById('trocaForm')?.addEventListener('submit', (e)=>{
+    if (!fromEscalaIdEl.value || !toCooperadoIdEl.value){ e.preventDefault(); alert('Selecione um cooperado.'); }
   });
-});
 });
 </script>
 <script>
