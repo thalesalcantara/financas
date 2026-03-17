@@ -4196,6 +4196,27 @@
         </div>
       </div>
 
+      <div class="card border-0 bg-light-subtle p-3 mb-3">
+        <div class="row g-2 align-items-end">
+          <div class="col-lg-2 col-md-6">
+            <label class="form-label mb-1">Histórico escalas de</label>
+            <input type="date" class="form-control form-control-sm" name="escala_hist_inicio" form="formEscalaHist" value="{{ escala_hist_inicio.strftime('%Y-%m-%d') if escala_hist_inicio else '' }}">
+          </div>
+          <div class="col-lg-2 col-md-6">
+            <label class="form-label mb-1">até</label>
+            <input type="date" class="form-control form-control-sm" name="escala_hist_fim" form="formEscalaHist" value="{{ escala_hist_fim.strftime('%Y-%m-%d') if escala_hist_fim else '' }}">
+          </div>
+          <div class="col-lg-8 d-flex flex-wrap gap-2 justify-content-lg-end">
+            <form id="formEscalaHist" method="GET" action="{{ url_for('admin_dashboard') }}" class="d-flex gap-2 flex-wrap">
+              <input type="hidden" name="tab" value="escalas">
+              <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-clock-history me-1"></i>Ver histórico</button>
+            </form>
+            <a class="btn btn-outline-success btn-sm" href="{{ url_for('admin_exportar_escalas_atual', escala_hist_inicio=(escala_hist_inicio.strftime('%Y-%m-%d') if escala_hist_inicio else ''), escala_hist_fim=(escala_hist_fim.strftime('%Y-%m-%d') if escala_hist_fim else '')) }}"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Exportar escala atual + alterações</a>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_exportar_escalas_historico', escala_hist_inicio=(escala_hist_inicio.strftime('%Y-%m-%d') if escala_hist_inicio else ''), escala_hist_fim=(escala_hist_fim.strftime('%Y-%m-%d') if escala_hist_fim else '')) }}"><i class="bi bi-download me-1"></i>Exportar histórico de escalas</a>
+          </div>
+        </div>
+      </div>
+
       <div class="escala-day-tabs mb-3" id="escalaDayTabs">
         <button type="button" class="btn btn-sm btn-royal active" data-day-filter="semana">Semana</button>
         <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="1">Segunda</button>
@@ -4216,6 +4237,84 @@
       </div>
     </div>
   </div>
+  <div class="card p-3 mb-3 border-0 shadow-sm">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div>
+        <h6 class="mb-0 section-title">Contagem por contrato e turno</h6>
+        <small class="section-subtitle">Mostra quantos cooperados estão em cada contrato por turno.</small>
+      </div>
+      <span class="badge-soft">{{ contagem_contrato_turno|length if contagem_contrato_turno else 0 }} linha(s)</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Turno</th>
+            <th>Contrato</th>
+            <th class="text-center">Qtd cooperados</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in contagem_contrato_turno or [] %}
+          <tr>
+            <td>{{ item.data }}</td>
+            <td>{{ item.turno or '—' }}</td>
+            <td>{{ item.contrato or '—' }}</td>
+            <td class="text-center">{{ item.qtd_cooperados }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-center text-muted">Sem dados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card p-3 mb-3 border-0 shadow-sm">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div>
+        <h6 class="mb-0 section-title">Histórico de escalas</h6>
+        <small class="section-subtitle">Últimos 31 dias das modificações e snapshots da escala.</small>
+      </div>
+      <span class="badge-soft">{{ escala_historico_rows|length if escala_historico_rows else 0 }} registro(s)</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Registrado em</th>
+            <th>Origem</th>
+            <th>Data</th>
+            <th>Turno</th>
+            <th>Horário</th>
+            <th>Contrato</th>
+            <th>Cooperado atual</th>
+            <th>Retirado</th>
+            <th>Entrou</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in escala_historico_rows or [] %}
+          <tr>
+            <td>{{ h.snapshot_em.strftime('%d/%m/%Y %H:%M') if h.snapshot_em else '—' }}</td>
+            <td>{{ h.origem or h.acao }}</td>
+            <td>{{ h.data }}</td>
+            <td>{{ h.turno or '—' }}</td>
+            <td>{{ h.horario or '—' }}</td>
+            <td>{{ h.contrato or '—' }}</td>
+            <td>{{ h.cooperado_nome or '—' }}</td>
+            <td>{{ h.saiu_nome or '—' }}</td>
+            <td>{{ h.entrou_nome or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="text-center text-muted">Sem histórico no período.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Cooperados & Escalas -->
   <div class="card p-3 mb-3">
     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -4595,7 +4694,7 @@
 
   <!-- HISTÓRICO DE TROCAS (aplicadas) -->
   <div class="card p-3 mb-3">
-    <div class="d-flex justify-content-between align-items-center">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
       <div>
         <h5 class="mb-0 section-title">
           Trocas de Escala - Aplicadas
@@ -4607,6 +4706,23 @@
       <span class="badge-soft">
         {{ trocas_historico|length if trocas_historico else 0 }} registro(s)
       </span>
+    </div>
+    <div class="row g-2 align-items-end mt-2 mb-2">
+      <div class="col-lg-2 col-md-6">
+        <label class="form-label mb-1">Histórico trocas de</label>
+        <input type="date" class="form-control form-control-sm" name="trocas_hist_inicio" form="formTrocasHist" value="{{ trocas_hist_inicio.strftime('%Y-%m-%d') if trocas_hist_inicio else '' }}">
+      </div>
+      <div class="col-lg-2 col-md-6">
+        <label class="form-label mb-1">até</label>
+        <input type="date" class="form-control form-control-sm" name="trocas_hist_fim" form="formTrocasHist" value="{{ trocas_hist_fim.strftime('%Y-%m-%d') if trocas_hist_fim else '' }}">
+      </div>
+      <div class="col-lg-8 d-flex flex-wrap gap-2 justify-content-lg-end">
+        <form id="formTrocasHist" method="GET" action="{{ url_for('admin_dashboard') }}" class="d-flex gap-2 flex-wrap">
+          <input type="hidden" name="tab" value="escalas">
+          <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-funnel me-1"></i>Filtrar histórico</button>
+        </form>
+        <a class="btn btn-outline-success btn-sm" href="{{ url_for('admin_exportar_trocas_historico', trocas_hist_inicio=(trocas_hist_inicio.strftime('%Y-%m-%d') if trocas_hist_inicio else ''), trocas_hist_fim=(trocas_hist_fim.strftime('%Y-%m-%d') if trocas_hist_fim else '')) }}"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Exportar trocas</a>
+      </div>
     </div>
 
     {% if trocas_historico %}
