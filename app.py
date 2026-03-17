@@ -3368,6 +3368,8 @@ def admin_dashboard():
             rq2 = rq2.filter(ReceitaCooperado.cooperado_id == cooperado_id)
             dq2 = dq2.filter(DespesaCooperado.cooperado_id == cooperado_id)
 
+        somente_pendentes = bool((request.args.get('somente_pendentes') or '').strip())
+
         receitas_coop = rq2.order_by(
             ReceitaCooperado.data.desc(),
             ReceitaCooperado.id.desc()
@@ -3377,6 +3379,11 @@ def admin_dashboard():
             DespesaCooperado.data_fim.desc().nullslast(),
             DespesaCooperado.id.desc()
         ).all()
+
+        if somente_pendentes and cooperado_id:
+            snap_pend = _compute_coop_debt_snapshot(cooperado_id, data_inicio, data_fim)
+            pend_ids = {item['id'] for item in snap_pend['itens'] if item['status'] in ('pendente', 'parcial', 'a_descontar') and item['restante'] > 0}
+            despesas_coop = [d for d in despesas_coop if d.id in pend_ids]
 
         total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
         total_despesas_coop = sum(
@@ -5812,9 +5819,115 @@ def delete_receita_coop(id):
 
 def _competencia_ref(data_base, competencia_semana):
     base = data_base or date.today()
-    if (competencia_semana or '').strip().lower() == 'passada':
+    comp = (competencia_semana or '').strip().lower()
+    if comp in ('passada', 'semana_passada'):
         base = base - timedelta(days=7)
+    elif comp in ('proxima', 'proxima_semana'):
+        base = base + timedelta(days=7)
     return base
+
+def _competencia_label(comp):
+    comp = (comp or '').strip().lower()
+    if comp in ('passada', 'semana_passada'):
+        return 'semana_passada'
+    if comp in ('proxima', 'proxima_semana'):
+        return 'proxima_semana'
+    return 'esta_semana'
+
+def _despesa_due_date(dc):
+    base = dc.data_fim or dc.data or date.today()
+    comp = _competencia_label(getattr(dc, 'competencia_desconto', 'esta_semana'))
+    if comp == 'semana_passada':
+        return base - timedelta(days=7)
+    if comp == 'proxima_semana':
+        return base + timedelta(days=7)
+    return base
+
+def _compute_coop_debt_snapshot(coop_id, di, df):
+    q_prod = Lancamento.query.filter(Lancamento.cooperado_id == coop_id)
+    if di:
+        q_prod = q_prod.filter(Lancamento.data >= di)
+    if df:
+        q_prod = q_prod.filter(Lancamento.data <= df)
+    prods = q_prod.all()
+
+    q_rec = ReceitaCooperado.query.filter(ReceitaCooperado.cooperado_id == coop_id)
+    if di:
+        q_rec = q_rec.filter(ReceitaCooperado.data >= di)
+    if df:
+        q_rec = q_rec.filter(ReceitaCooperado.data <= df)
+    recs = q_rec.all()
+
+    bruto = sum((p.valor or 0.0) for p in prods) + sum((r.valor or 0.0) for r in recs)
+    inss = sum((p.valor or 0.0) * INSS_ALIQ for p in prods)
+    sest = sum((p.valor or 0.0) * SEST_ALIQ for p in prods)
+    disponivel_auto = max(0.0, bruto - inss - sest)
+
+    q_desp = DespesaCooperado.query.filter(DespesaCooperado.cooperado_id == coop_id).order_by(
+        DespesaCooperado.data_fim.asc().nullslast(), DespesaCooperado.id.asc()
+    )
+    despesas = q_desp.all()
+
+    itens = []
+    total_vencido_pendente = 0.0
+    total_programado = 0.0
+
+    for dc in despesas:
+        valor_total = float(dc.valor or 0.0)
+        pago_manual = sum((ab.valor or 0.0) for ab in getattr(dc, 'abatimentos', []))
+        pago_manual = min(valor_total, float(pago_manual))
+        restante = max(0.0, valor_total - pago_manual)
+
+        due_date = _despesa_due_date(dc)
+        vencida = (df is not None and due_date <= df)
+
+        pago_auto = 0.0
+        if vencida and restante > 0 and disponivel_auto > 0:
+            pago_auto = min(restante, disponivel_auto)
+            disponivel_auto -= pago_auto
+            restante = max(0.0, restante - pago_auto)
+
+        if restante <= 0.0001:
+            status = 'quitada'
+        elif (pago_manual + pago_auto) > 0:
+            status = 'parcial'
+        elif vencida:
+            status = 'pendente'
+        else:
+            status = 'a_descontar'
+
+        if restante > 0:
+            if vencida:
+                total_vencido_pendente += restante
+            else:
+                total_programado += restante
+
+        itens.append({
+            'id': dc.id,
+            'data': dc.data,
+            'data_inicio': dc.data_inicio,
+            'data_fim': dc.data_fim,
+            'due_date': due_date,
+            'descricao': dc.descricao or '',
+            'valor_total': round(valor_total, 2),
+            'pago_manual': round(pago_manual, 2),
+            'pago_auto': round(pago_auto, 2),
+            'pago_total': round(pago_manual + pago_auto, 2),
+            'restante': round(restante, 2),
+            'eh_adiantamento': bool(getattr(dc, 'eh_adiantamento', False)),
+            'competencia_desconto': _competencia_label(getattr(dc, 'competencia_desconto', 'esta_semana')),
+            'status': status,
+        })
+
+    return {
+        'bruto': round(bruto, 2),
+        'inss': round(inss, 2),
+        'sest': round(sest, 2),
+        'disponivel_auto_restante': round(disponivel_auto, 2),
+        'itens': itens,
+        'saldo_devedor': round(total_vencido_pendente, 2),
+        'a_descontar': round(total_programado, 2),
+    }
 
 
 @app.route("/coop/despesas/delete-bulk", methods=["POST"])
@@ -5888,7 +6001,7 @@ def add_despesa_coop():
     valor_total = f.get("valor", type=float) or 0.0
     d = _parse_date(f.get("data"))
     eh_adiantamento = bool(f.get("eh_adiantamento"))
-    competencia_semana = (f.get("competencia_semana") or "atual").strip().lower()
+    competencia_semana = (f.get("competencia_desconto") or f.get("competencia_semana") or "esta_semana").strip().lower()
 
     if not ids:
         flash("Selecione pelo menos um cooperado.", "warning")
@@ -5932,7 +6045,7 @@ def edit_despesa_coop(id):
     dc.descricao = (f.get("descricao") or "").strip()
     dc.valor = f.get("valor", type=float)
     data_edit = _parse_date(f.get("data")) or dc.data or date.today()
-    competencia_semana = (f.get("competencia_semana") or "atual").strip().lower()
+    competencia_semana = (f.get("competencia_desconto") or f.get("competencia_semana") or "esta_semana").strip().lower()
     data_comp = _competencia_ref(data_edit, competencia_semana)
     di_comp, df_comp = semana_bounds(data_comp)
     dc.data = df_comp
@@ -7203,9 +7316,14 @@ def portal_cooperado():
 
     encargos_valor = inss_valor + sest_valor
 
-    total_descontos = sum((d.valor or 0.0) for d in despesas_coop)
+    debt_snapshot = _compute_coop_debt_snapshot(coop.id, di, df)
 
-    total_liquido = total_bruto - encargos_valor - total_descontos
+    # só o que venceu entra automaticamente no período; o futuro fica em "a descontar"
+    total_descontos = sum((it['pago_manual'] + it['pago_auto']) for it in debt_snapshot['itens'])
+    total_liquido = max(0.0, total_bruto - encargos_valor - total_descontos)
+    saldo_devedor = debt_snapshot['saldo_devedor']
+    total_a_descontar = debt_snapshot['a_descontar']
+    despesas_detalhadas = debt_snapshot['itens']
 
 
        # =====================================================
@@ -7469,6 +7587,9 @@ def portal_cooperado():
         total_entregas_vida=total_entregas_vida,
         data_inicio=di,
         data_fim=df,
+        saldo_devedor=saldo_devedor,
+        total_a_descontar=total_a_descontar,
+        despesas_detalhadas=despesas_detalhadas,
     )
 
 # === AVALIAR RESTAURANTE (cooperado -> restaurante)
