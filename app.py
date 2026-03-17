@@ -198,19 +198,42 @@ def _get_or_create_sso_user(tipo: str = "admin") -> Usuario:
 
 def ajustar_banco():
     try:
-        # se você tiver essa função _is_sqlite, use; senão pode checar pela URI
         if _is_sqlite():
             cols = db.session.execute(sa_text("PRAGMA table_info(despesas_cooperado);")).fetchall()
             colnames = {row[1] for row in cols}
             if "eh_adiantamento" not in colnames:
-                db.session.execute(sa_text(
-                    "ALTER TABLE despesas_cooperado ADD COLUMN eh_adiantamento BOOLEAN DEFAULT 0"
-                ))
+                db.session.execute(sa_text("ALTER TABLE despesas_cooperado ADD COLUMN eh_adiantamento BOOLEAN DEFAULT 0"))
+
+            tabs = db.session.execute(sa_text("SELECT name FROM sqlite_master WHERE type='table' AND name='abatimentos_despesa_cooperado'" )).fetchall()
+            if not tabs:
+                db.session.execute(sa_text("""
+                    CREATE TABLE abatimentos_despesa_cooperado (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        despesa_id INTEGER NOT NULL,
+                        data_pagamento DATE NOT NULL,
+                        valor FLOAT NOT NULL DEFAULT 0,
+                        origem VARCHAR(30) DEFAULT 'manual',
+                        observacao VARCHAR(255),
+                        criado_em DATETIME,
+                        FOREIGN KEY(despesa_id) REFERENCES despesas_cooperado(id) ON DELETE CASCADE
+                    )
+                """))
             db.session.commit()
         else:
             db.session.execute(sa_text("""
                 ALTER TABLE IF EXISTS public.despesas_cooperado
                 ADD COLUMN IF NOT EXISTS eh_adiantamento BOOLEAN DEFAULT FALSE
+            """))
+            db.session.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS public.abatimentos_despesa_cooperado (
+                    id SERIAL PRIMARY KEY,
+                    despesa_id INTEGER NOT NULL REFERENCES public.despesas_cooperado(id) ON DELETE CASCADE,
+                    data_pagamento DATE NOT NULL,
+                    valor DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    origem VARCHAR(30) DEFAULT 'manual',
+                    observacao VARCHAR(255),
+                    criado_em TIMESTAMP DEFAULT NOW()
+                )
             """))
             db.session.commit()
     except Exception:
@@ -503,24 +526,27 @@ class DespesaCooperado(db.Model):
 
     # 🔴 NOVO: marca se é adiantamento
     eh_adiantamento = db.Column(db.Boolean, default=False)
-    competencia_desconto = db.Column(db.String(20), default='atual')
-    
+
+    abatimentos = db.relationship(
+        "AbatimentoDespesaCooperado",
+        back_populates="despesa",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="AbatimentoDespesaCooperado.data_pagamento.asc()"
+    )
 
 
-class DespesaCooperadoAbatimento(db.Model):
-    __tablename__ = "despesas_cooperado_abatimentos"
+class AbatimentoDespesaCooperado(db.Model):
+    __tablename__ = "abatimentos_despesa_cooperado"
     id = db.Column(db.Integer, primary_key=True)
     despesa_id = db.Column(db.Integer, db.ForeignKey("despesas_cooperado.id", ondelete="CASCADE"), nullable=False, index=True)
-    data = db.Column(db.Date, nullable=False, default=date.today)
-    valor = db.Column(db.Float, default=0.0)
-    origem = db.Column(db.String(30), default="manual")
+    data_pagamento = db.Column(db.Date, nullable=False, default=date.today)
+    valor = db.Column(db.Float, default=0.0, nullable=False)
+    origem = db.Column(db.String(30), default="manual")  # manual | lancamento | pix | dinheiro | desconto
     observacao = db.Column(db.String(255))
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
-    despesa = db.relationship(
-        "DespesaCooperado",
-        backref=db.backref("abatimentos", cascade="all, delete-orphan", order_by="DespesaCooperadoAbatimento.data.desc(), DespesaCooperadoAbatimento.id.desc()")
-    )
+    despesa = db.relationship("DespesaCooperado", back_populates="abatimentos")
 
 
 class BeneficioRegistro(db.Model):
@@ -1006,61 +1032,6 @@ def init_db():
     except Exception:
         db.session.rollback()
 
-
-
-    # 4.za) competencia_desconto em despesas_cooperado
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(despesas_cooperado);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "competencia_desconto" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE despesas_cooperado ADD COLUMN competencia_desconto VARCHAR(20) DEFAULT 'atual'"))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text("""
-                ALTER TABLE IF EXISTS public.despesas_cooperado
-                ADD COLUMN IF NOT EXISTS competencia_desconto VARCHAR(20) DEFAULT 'atual'
-            """))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
-
-    # 4.zb) tabela de abatimentos de despesas do cooperado
-    try:
-        if _is_sqlite():
-            db.session.execute(sa_text("""
-                CREATE TABLE IF NOT EXISTS despesas_cooperado_abatimentos (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    despesa_id INTEGER NOT NULL,
-                    data DATE NOT NULL,
-                    valor FLOAT DEFAULT 0.0,
-                    origem VARCHAR(30) DEFAULT 'manual',
-                    observacao VARCHAR(255),
-                    criado_em DATETIME,
-                    FOREIGN KEY(despesa_id) REFERENCES despesas_cooperado(id) ON DELETE CASCADE
-                )
-            """))
-            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_despesas_cooperado_abatimentos_despesa_id ON despesas_cooperado_abatimentos (despesa_id)"))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text("""
-                CREATE TABLE IF NOT EXISTS public.despesas_cooperado_abatimentos (
-                    id SERIAL PRIMARY KEY,
-                    despesa_id INTEGER NOT NULL REFERENCES public.despesas_cooperado(id) ON DELETE CASCADE,
-                    data DATE NOT NULL,
-                    valor DOUBLE PRECISION DEFAULT 0.0,
-                    origem VARCHAR(30) DEFAULT 'manual',
-                    observacao VARCHAR(255),
-                    criado_em TIMESTAMP
-                )
-            """))
-            db.session.execute(sa_text("""
-                CREATE INDEX IF NOT EXISTS ix_despesas_cooperado_abatimentos_despesa_id
-                ON public.despesas_cooperado_abatimentos (despesa_id)
-            """))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
 
     # 4.1) cooperado_nome em escalas
     try:
@@ -3364,10 +3335,6 @@ def admin_dashboard():
         elif data_fim:
             dq2 = dq2.filter(DespesaCooperado.data_inicio <= data_fim)
 
-        if cooperado_id:
-            rq2 = rq2.filter(ReceitaCooperado.cooperado_id == cooperado_id)
-            dq2 = dq2.filter(DespesaCooperado.cooperado_id == cooperado_id)
-
         receitas_coop = rq2.order_by(
             ReceitaCooperado.data.desc(),
             ReceitaCooperado.id.desc()
@@ -3940,6 +3907,7 @@ def admin_dashboard():
         despesas=despesas,
         receitas_coop=receitas_coop,
         despesas_coop=despesas_coop,
+        despesas_coop_resumo=[_despesa_resumo(dc) for dc in despesas_coop],
         cooperados=cooperados,
         restaurantes=restaurantes,
         beneficios_view=beneficios_view,
@@ -5766,6 +5734,52 @@ def salvar_permissoes_admin(usuario_id):
 # =========================
 # Receitas/Despesas Cooperado (Admin)
 # =========================
+def _despesa_total_abatido(dc):
+    try:
+        return round(sum(float(a.valor or 0) for a in (dc.abatimentos or [])), 2)
+    except Exception:
+        return 0.0
+
+
+def _despesa_saldo(dc):
+    return round(max(0.0, float(dc.valor or 0) - _despesa_total_abatido(dc)), 2)
+
+
+def _despesa_status(dc):
+    abatido = _despesa_total_abatido(dc)
+    total = float(dc.valor or 0)
+    if abatido <= 0:
+        return "aberta"
+    if abatido + 0.009 >= total:
+        return "quitada"
+    return "parcial"
+
+
+def _despesa_resumo(dc):
+    abatido = _despesa_total_abatido(dc)
+    saldo = _despesa_saldo(dc)
+    return {
+        "id": dc.id,
+        "cooperado_nome": dc.cooperado.nome if dc.cooperado else "Todos",
+        "descricao": dc.descricao or "",
+        "valor": float(dc.valor or 0),
+        "abatido": abatido,
+        "saldo": saldo,
+        "status": _despesa_status(dc),
+        "eh_adiantamento": bool(getattr(dc, "eh_adiantamento", False)),
+        "data": dc.data,
+        "abatimentos": [
+            {
+                "id": a.id,
+                "data_pagamento": a.data_pagamento,
+                "valor": float(a.valor or 0),
+                "origem": a.origem or "manual",
+                "observacao": a.observacao or "",
+            }
+            for a in (dc.abatimentos or [])
+        ]
+    }
+
 @app.route("/coop/receitas/add", methods=["POST"])
 @admin_perm_required("coop_receitas", "criar")
 def add_receita_coop():
@@ -5810,95 +5824,20 @@ def delete_receita_coop(id):
     return redirect(url_for("admin_dashboard", tab="coop_receitas"))
 
 
-def _competencia_ref(data_base, competencia_semana):
-    base = data_base or date.today()
-    if (competencia_semana or '').strip().lower() == 'passada':
-        base = base - timedelta(days=7)
-    return base
-
-
-@app.route("/coop/despesas/delete-bulk", methods=["POST"])
-@admin_perm_required("coop_despesas", "excluir")
-def delete_despesa_coop_bulk():
-    ids = request.form.getlist("ids[]") or request.form.getlist("ids")
-    ids_int = []
-    for v in ids:
-        try:
-            ids_int.append(int(v))
-        except Exception:
-            pass
-    if not ids_int:
-        flash("Selecione pelo menos uma despesa para excluir.", "warning")
-        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-    DespesaCooperado.query.filter(DespesaCooperado.id.in_(ids_int)).delete(synchronize_session=False)
-    db.session.commit()
-    flash(f"{len(ids_int)} despesa(s) excluída(s).", "success")
-    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-
-
-@app.route("/coop/despesas/bulk-delete-alias", methods=["POST"], endpoint="bulk_delete_despesa_coop")
-@admin_perm_required("coop_despesas", "excluir")
-def bulk_delete_despesa_coop_alias():
-    return delete_despesa_coop_bulk()
-
-
-@app.route("/coop/despesas/<int:id>/abatimentos/add", methods=["POST"])
-@admin_perm_required("coop_despesas", "editar")
-def add_abatimento_despesa_coop(id):
-    dc = DespesaCooperado.query.get_or_404(id)
-    f = request.form
-    data_ab = _parse_date(f.get("data")) or date.today()
-    valor = f.get("valor", type=float) or 0.0
-    origem = (f.get("origem") or "manual").strip().lower()[:30]
-    observacao = (f.get("observacao") or "").strip()[:255]
-
-    if valor <= 0:
-        flash("Informe um valor válido para o abatimento.", "warning")
-        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-    restante_atual = max(0.0, (dc.valor or 0.0) - sum((ab.valor or 0.0) for ab in getattr(dc, "abatimentos", [])))
-    valor_final = min(valor, restante_atual) if restante_atual > 0 else 0.0
-    if valor_final <= 0:
-        flash("Essa despesa já está quitada.", "info")
-        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-    db.session.add(
-        DespesaCooperadoAbatimento(
-            despesa_id=dc.id,
-            data=data_ab,
-            valor=valor_final,
-            origem=origem,
-            observacao=observacao
-        )
-    )
-    db.session.commit()
-    flash("Abatimento registrado com sucesso.", "success")
-    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-
 @app.route("/coop/despesas/add", methods=["POST"])
 @admin_perm_required("coop_despesas", "criar")
 def add_despesa_coop():
     f = request.form
-    ids = f.getlist("cooperado_ids[]")
+    ids = [x for x in f.getlist("cooperado_ids[]") if x and x != "all"]
 
     descricao = (f.get("descricao") or "").strip()
     valor_total = f.get("valor", type=float) or 0.0
-    d = _parse_date(f.get("data"))
+    d = _parse_date(f.get("data")) or date.today()
     eh_adiantamento = bool(f.get("eh_adiantamento"))
-    competencia_semana = (f.get("competencia_semana") or "atual").strip().lower()
 
     if not ids:
         flash("Selecione pelo menos um cooperado.", "warning")
         return redirect(url_for("admin_dashboard", tab="coop_despesas"))
-
-    if not d:
-        d = date.today()
-
-    data_comp = _competencia_ref(d, competencia_semana)
-    di_comp, df_comp = semana_bounds(data_comp)
 
     qtd = len(ids)
     valor_unit = valor_total / qtd if qtd > 0 else 0.0
@@ -5906,14 +5845,11 @@ def add_despesa_coop():
     for cid in ids:
         db.session.add(
             DespesaCooperado(
-                cooperado_id=cid,
+                cooperado_id=int(cid),
                 descricao=descricao,
                 valor=valor_unit,
-                data=df_comp,
-                data_inicio=di_comp,
-                data_fim=df_comp,
+                data=d,
                 eh_adiantamento=eh_adiantamento,
-                competencia_desconto=competencia_semana,
             )
         )
 
@@ -5930,19 +5866,96 @@ def edit_despesa_coop(id):
 
     dc.cooperado_id = f.get("cooperado_id", type=int)
     dc.descricao = (f.get("descricao") or "").strip()
-    dc.valor = f.get("valor", type=float)
-    data_edit = _parse_date(f.get("data")) or dc.data or date.today()
-    competencia_semana = (f.get("competencia_semana") or "atual").strip().lower()
-    data_comp = _competencia_ref(data_edit, competencia_semana)
-    di_comp, df_comp = semana_bounds(data_comp)
-    dc.data = df_comp
-    dc.data_inicio = di_comp
-    dc.data_fim = df_comp
+    dc.valor = f.get("valor", type=float) or 0.0
+    dc.data = _parse_date(f.get("data")) or dc.data
     dc.eh_adiantamento = bool(f.get("eh_adiantamento"))
-    dc.competencia_desconto = competencia_semana
 
     db.session.commit()
     flash("Despesa do cooperado atualizada.", "success")
+    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+
+@app.route("/coop/despesas/<int:id>/abater", methods=["POST"])
+@admin_perm_required("coop_despesas", "editar")
+def abater_despesa_coop(id):
+    dc = DespesaCooperado.query.get_or_404(id)
+    valor = request.form.get("valor", type=float) or 0.0
+    data_pagamento = _parse_date(request.form.get("data_pagamento")) or date.today()
+    origem = (request.form.get("origem") or "manual").strip() or "manual"
+    observacao = (request.form.get("observacao") or "").strip()
+
+    saldo = _despesa_saldo(dc)
+    if valor <= 0:
+        flash("Informe um valor maior que zero para o abatimento.", "warning")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+    if valor - saldo > 0.009:
+        flash(f"O abatimento não pode ser maior que o saldo restante (R$ {saldo:.2f}).", "warning")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    db.session.add(AbatimentoDespesaCooperado(
+        despesa_id=dc.id,
+        data_pagamento=data_pagamento,
+        valor=valor,
+        origem=origem,
+        observacao=observacao,
+    ))
+    db.session.commit()
+    flash("Abatimento registrado com sucesso.", "success")
+    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+
+@app.route("/coop/despesas/abatimentos/<int:id>/edit", methods=["POST"])
+@admin_perm_required("coop_despesas", "editar")
+def edit_abatimento_despesa_coop(id):
+    ab = AbatimentoDespesaCooperado.query.get_or_404(id)
+    dc = ab.despesa
+    novo_valor = request.form.get("valor", type=float) or 0.0
+    nova_data = _parse_date(request.form.get("data_pagamento")) or ab.data_pagamento or date.today()
+    nova_origem = (request.form.get("origem") or ab.origem or "manual").strip() or "manual"
+    nova_obs = (request.form.get("observacao") or "").strip()
+
+    if novo_valor <= 0:
+        flash("Informe um valor maior que zero para o abatimento.", "warning")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    total_outros = sum(float(x.valor or 0) for x in (dc.abatimentos or []) if x.id != ab.id)
+    maximo = max(0.0, float(dc.valor or 0) - total_outros)
+    if novo_valor - maximo > 0.009:
+        flash(f"O abatimento editado não pode ultrapassar o saldo disponível dessa despesa (R$ {maximo:.2f}).", "warning")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    ab.valor = novo_valor
+    ab.data_pagamento = nova_data
+    ab.origem = nova_origem
+    ab.observacao = nova_obs
+    db.session.commit()
+    flash("Abatimento atualizado com sucesso.", "success")
+    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+
+@app.route("/coop/despesas/abatimentos/<int:id>/delete", methods=["POST"])
+@admin_perm_required("coop_despesas", "excluir")
+def delete_abatimento_despesa_coop(id):
+    ab = AbatimentoDespesaCooperado.query.get_or_404(id)
+    db.session.delete(ab)
+    db.session.commit()
+    flash("Abatimento excluído.", "success")
+    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+
+@app.route("/coop/despesas/bulk-delete", methods=["POST"])
+@admin_perm_required("coop_despesas", "excluir")
+def bulk_delete_despesa_coop():
+    ids = [int(x) for x in request.form.getlist("ids[]") if str(x).isdigit()]
+    if not ids:
+        flash("Marque pelo menos uma despesa para excluir.", "warning")
+        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+    itens = DespesaCooperado.query.filter(DespesaCooperado.id.in_(ids)).all()
+    for item in itens:
+        db.session.delete(item)
+    db.session.commit()
+    flash(f"{len(itens)} despesa(s) excluída(s).", "success")
     return redirect(url_for("admin_dashboard", tab="coop_despesas"))
 
 
