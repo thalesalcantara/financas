@@ -458,10 +458,38 @@
             <div class="kpi-sub">Meta sugerida</div>
           </div>
           <div class="kpi-card span-2">
-            <div class="kpi-title">Total líquido</div>
+            <div class="kpi-title">A receber</div>
             <div class="kpi-value mono" style="color:var(--ok);font-size:1.2rem">R$ {{ '%.2f'|format(total_liquido|default(0)) }}</div>
             <div class="kpi-sub">Após descontos e encargos</div>
           </div>
+          <div class="kpi-card span-2">
+            <div class="kpi-title">Saldo devedor</div>
+            <div class="kpi-value mono" style="color:var(--danger);font-size:1.2rem">R$ {{ '%.2f'|format(saldo_devedor_total|default(0)) }}</div>
+            <div class="kpi-sub">Pendências em aberto</div>
+          </div>
+        </div>
+        <div class="section-card mt-3">
+          <div class="section-head"><h2 class="section-title">Saldo devedor</h2><span class="section-chip mono">R$ {{ '%.2f'|format(saldo_devedor_total|default(0)) }}</span></div>
+          {% if dividas_pendentes_rows %}
+          <div class="list-stack">
+            {% for d in dividas_pendentes_rows if d.valor_restante > 0 %}
+            <div class="item-card">
+              <div class="item-row">
+                <div class="flex-grow-1 min-w-0">
+                  <div class="item-title">{{ d.descricao }}</div>
+                  <div class="item-meta mt-1">{{ d.data.strftime('%d/%m/%Y') if d.data else '—' }} · {% if d.eh_adiantamento %}Adiantamento{% else %}Despesa{% endif %}</div>
+                </div>
+                <div class="text-end">
+                  <div class="item-amount mono">R$ {{ '%.2f'|format(d.valor_restante) }}</div>
+                  <div class="item-small">Original: R$ {{ '%.2f'|format(d.valor_total) }}</div>
+                  <div class="item-small">Abatido: R$ {{ '%.2f'|format(d.valor_pago_total) }}</div>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+            {% if total_adiantamento_pendente %}<div class="item-small muted">Total de adiantamento pendente: R$ {{ '%.2f'|format(total_adiantamento_pendente) }}</div>{% endif %}
+          </div>
+          {% else %}<div class="muted">Nenhuma pendência em aberto.</div>{% endif %}
         </div>
       </div>
     </section>
