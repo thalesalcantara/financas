@@ -2704,11 +2704,10 @@
       <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
       <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
       <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
         <div class="col-md-3">
           <label class="form-label">Cooperado</label>
           <select class="form-select form-select-sm" name="cooperado_id" required>
-            <option disabled selected>Selecione o Cooperado</option>
+            <option value="" selected disabled>Selecione o Cooperado</option>
             {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
           </select>
         </div>
@@ -6352,27 +6351,18 @@ document.addEventListener('DOMContentLoaded', function(){
       const resp = await fetch(buildSaveUrl(rowId), {
         method: 'POST',
         body: fd,
-        headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' }
+        headers: { 'X-Requested-With':'XMLHttpRequest' }
       });
-
-      const rawText = await resp.text();
-      let data = null;
-      try {
-        data = rawText ? JSON.parse(rawText) : null;
-      } catch (_) {
-        if (!resp.ok) {
-          throw new Error('Resposta inválida do servidor. Verifique login e permissão de editar em Escalas.');
-        }
-        throw new Error('O servidor respondeu em formato inesperado ao salvar a linha.');
+      const contentType = resp.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('Resposta inválida do servidor. Verifique login e permissão de editar em Escalas.');
       }
-
-      if (!resp.ok || !data || !data.ok) {
-        throw new Error((data && data.message) || 'Erro ao salvar');
-      }
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.message || 'Erro ao salvar');
 
       const row = rows.find(r => String(r.id) === String(rowId));
       if (row) {
-        row.contrato = contratoEl?.value || row.contrato || '';
+        row.contrato = contratoEl?.value || '';
         row.cooperado_id = coopEl?.value ? Number(coopEl.value) : null;
         row.cooperado_nome_livre = nomeLivreEl?.value || '';
         const coop = cooperadosFull.find(c => String(c.id) === String(coopEl?.value || ''));
