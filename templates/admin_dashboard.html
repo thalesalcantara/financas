@@ -1036,9 +1036,9 @@
               <div class="kpi-border kpi-entregas-periodo"></div>
               <div class="d-flex align-items-center justify-content-between">
                 <div>
-                  <div class="text-uppercase text-muted small">Total de Adiantamento</div>
-                  <div id="kpiQtdEntregasPeriodo" class="fw-bold fs-5">R$ 0,00</div>
-                  <div class="small text-muted">Adiantamentos no período</div>
+                  <div class="text-uppercase text-muted small">Quantidade de Entregas</div>
+                  <div id="kpiQtdEntregasPeriodo" class="fw-bold fs-5">0</div>
+                  <div class="small text-muted">No período filtrado</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-bicycle"></i></div>
               </div>
@@ -1050,9 +1050,9 @@
               <div class="kpi-border kpi-ticket-periodo"></div>
               <div class="d-flex align-items-center justify-content-between">
                 <div>
-                  <div class="text-uppercase text-muted small">Total de Pendências</div>
+                  <div class="text-uppercase text-muted small">Ticket Médio</div>
                   <div id="kpiTicketMedioPeriodo" class="fw-bold fs-5">R$ 0,00</div>
-                  <div class="small text-muted">Valor ainda não pago</div>
+                  <div class="small text-muted">Média por entrega</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-receipt"></i></div>
               </div>
@@ -1096,9 +1096,9 @@
                     <th class="text-end">SEST/SENAT (0,5%)</th>
                     <th class="text-end text-success">Receitas</th>
                     <th class="text-end text-danger">Despesas</th>
-                    <th class="text-end text-danger">Adiantamento</th>
+                    <th class="text-end text-warning">Adiantamento</th>
                     <th class="text-end">A Receber</th>
-                    <th class="text-end text-warning">Saldo Pendente</th>
+                    <th class="text-end">Saldo Pendente</th>
                   </tr>
                 </thead>
 
@@ -1114,9 +1114,9 @@
                     <td class="text-end" id="tSEST05">R$ 0,00</td>
                     <td class="text-end text-success" id="tRec">R$ 0,00</td>
                     <td class="text-end text-danger" id="tDes">R$ 0,00</td>
-                    <td class="text-end text-danger" id="tAdi">R$ 0,00</td>
-                    <td class="text-end fw-bold" id="tLiq">R$ 0,00</td>
-                    <td class="text-end fw-bold text-warning" id="tPend">R$ 0,00</td>
+                    <td class="text-end text-warning" id="tAd">R$ 0,00</td>
+                    <td class="text-end fw-bold" id="tRecber">R$ 0,00</td>
+                    <td class="text-end fw-bold" id="tPend">R$ 0,00</td>
                   </tr>
                 </tfoot>
               </table>
@@ -1340,8 +1340,7 @@
       // mas ele NÃO será usado para criar coluna nem somar separado.
       const DESP_COOP = [
         {% for d in despesas_coop %}
-          {% set _is_ad_js = 1 if (d.eh_adiantamento if d.eh_adiantamento is defined else (d.adiantamento in [True, 1, '1', 'true', 'True', 'on'])) else 0 %}
-          {% set _abat_manual = namespace(v=0) %}{% if d.abatimentos is defined %}{% for ab in d.abatimentos %}{% set _abat_manual.v = _abat_manual.v + (ab.valor or 0) %}{% endfor %}{% endif %}
+          {% set _is_ad_js = (d.adiantamento in [True, 1, '1', 'true', 'True', 'on']) %}
           {
             id: {{ d.id }},
             data: "{{ ymd(d.data) }}",
@@ -1349,9 +1348,9 @@
             cooperado_id: {{ d.cooperado.id if d.cooperado else 'null' }},
             cooperado_nome: "{{ (d.cooperado.nome if d.cooperado else (d.cooperado_nome if d.cooperado_nome is defined else ''))|e }}",
             descricao: "{{ (d.descricao or '')|e }}",
-            adiantamento: {{ _is_ad_js }},
-            competencia_desconto: "{{ (d.competencia_desconto if d.competencia_desconto is defined else 'esta_semana')|e }}",
-            valor_pago_manual: {{ _abat_manual.v|float }}
+            data_inicio: "{{ ymd(d.data_inicio or d.data) }}",
+            data_fim: "{{ ymd(d.data_fim or d.data) }}",
+            adiantamento: {{ 1 if _is_ad_js else 0 }}
           }{{ "," if not loop.last }}
         {% endfor %}
       ];
@@ -1443,8 +1442,21 @@
         (FILTER.cid == null || r.cooperado_id === FILTER.cid)
       );
 
+      const overlapsRange = (start, end) => {
+        const di = parseISO(FILTER.ri);
+        const df = parseISO(FILTER.rf);
+        const s = parseISO(start || end);
+        const e = parseISO(end || start);
+        if (!s && !e) return true;
+        const ss = s || e;
+        const ee = e || s;
+        if (di && ee < di) return false;
+        if (df && ss > df) return false;
+        return true;
+      };
+
       const filteredDESp = DESP_COOP.filter(d => {
-        if (!inRange(d.data)) return false;
+        if (!overlapsRange(d.data_inicio || d.data, d.data_fim || d.data)) return false;
         if (FILTER.cid == null) return true;
 
         if (d.cooperado_id === FILTER.cid) return true;
@@ -1513,10 +1525,11 @@
       // ---- Função de resumo (usada na tabela e no XLSX) ----
       function computeResumoCoopRows() {
         const map = new Map();
+
         const ensure = (id, nome) => {
           const key = coopKey(id, nome);
           if (!map.has(key)) {
-            map.set(key, { key, id, nome, prod: 0, inss4: 0, sest05: 0, rec: 0, des: 0, adiant: 0, aReceber: 0, saldoPendente: 0 });
+            map.set(key, { key, id, nome, prod: 0, inss4: 0, sest05: 0, rec: 0, des: 0, ad: 0, aReceber: 0, saldoPendente: 0 });
           }
           return map.get(key);
         };
@@ -1527,54 +1540,84 @@
           row.inss4 += p.valor * 0.04;
           row.sest05 += p.valor * 0.005;
         });
+
         filteredRECp.forEach(r => {
           const row = ensure(r.cooperado_id, r.cooperado_nome);
           row.rec += r.valor;
         });
+
         filteredDESp.forEach(d => {
           const row = ensure(d.cooperado_id, d.cooperado_nome || '—');
-          if (d.adiantamento) row.adiant += d.valor;
+          if (d.adiantamento) row.ad += d.valor;
           else row.des += d.valor;
         });
 
-        map.forEach((row) => {
-          const brutoDisponivel = Math.max(0, row.prod + row.rec - row.inss4 - row.sest05);
-          const totalDividas = row.des + row.adiant;
-          row.aReceber = Math.max(0, brutoDisponivel - totalDividas);
-          row.saldoPendente = Math.max(0, totalDividas - brutoDisponivel);
+        Array.from(map.values()).forEach(row => {
+          const baseReceber = row.prod + row.rec - row.inss4 - row.sest05;
+          const dividas = row.des + row.ad;
+          row.aReceber = Math.max(0, baseReceber - dividas);
+          row.saldoPendente = Math.max(0, dividas - baseReceber);
         });
-        return Array.from(map.values()).sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+
+        return Array.from(map.values()).sort((a, b) =>
+          (a.nome || '').localeCompare(b.nome || '', 'pt-BR')
+        );
       }
 
       const RESUMO_COOP_ROWS = computeResumoCoopRows();
-      const kpiTotalAdiantamento = RESUMO_COOP_ROWS.reduce((acc,r)=>acc+(r.adiant||0),0);
-      const kpiTotalPendencias = RESUMO_COOP_ROWS.reduce((acc,r)=>acc+(r.saldoPendente||0),0);
-      const qtdEl = document.getElementById('kpiQtdEntregasPeriodo'); if (qtdEl) qtdEl.textContent = fmtBR(kpiTotalAdiantamento);
-      const ticketEl = document.getElementById('kpiTicketMedioPeriodo'); if (ticketEl) ticketEl.textContent = fmtBR(kpiTotalPendencias);
 
-      // ---- Tabela Resumo por Cooperado (7 colunas) ----
       (function renderResumoCoopTable() {
         const rows  = RESUMO_COOP_ROWS;
         const tbody = document.querySelector('#tblResumoCoop tbody');
         if (!tbody) return;
 
-        tbody.innerHTML = rows.length ? '' : '<tr><td colspan="9" class="text-center text-muted">Sem dados no filtro.</td></tr>';
-        let tProd=0,tINSS4=0,tSEST05=0,tRec=0,tDes=0,tAdi=0,tRecber=0,tPend=0;
+        tbody.innerHTML = rows.length
+          ? ''
+          : '<tr><td colspan="9" class="text-center text-muted">Sem dados no filtro.</td></tr>';
+
+        let tProd = 0, tINSS4 = 0, tSEST05 = 0, tRec = 0, tDes = 0, tAd = 0, tReceber = 0, tPend = 0;
+
         rows.forEach(r => {
-          tProd += r.prod; tINSS4 += r.inss4; tSEST05 += r.sest05; tRec += r.rec; tDes += r.des; tAdi += r.adiant; tRecber += r.aReceber; tPend += r.saldoPendente;
-          const saldoHtml = r.saldoPendente > 0 && r.id != null ? `<a class="text-warning fw-bold" href="?tab=coop_despesas&cooperado_id=${encodeURIComponent(r.id)}&somente_pendentes=1">${fmtBR(r.saldoPendente)}</a>` : fmtBR(r.saldoPendente);
+          tProd += r.prod;
+          tINSS4 += r.inss4;
+          tSEST05 += r.sest05;
+          tRec += r.rec;
+          tDes += r.des;
+          tAd += r.ad;
+          tReceber += r.aReceber;
+          tPend += r.saldoPendente;
+
+          const pendLink = (r.saldoPendente > 0 && r.id != null)
+            ? `<a class="fw-bold text-danger text-decoration-none" href="${location.pathname}?tab=coop_despesas&cooperado_id=${encodeURIComponent(r.id)}&data_inicio=${encodeURIComponent(FILTER.ri || '')}&data_fim=${encodeURIComponent(FILTER.rf || '')}&somente_pendentes=1">${fmtBR(r.saldoPendente)}</a>`
+            : fmtBR(r.saldoPendente);
+
           const tr = document.createElement('tr');
-          tr.innerHTML = `<td class="text-break">${r.nome || '—'}</td><td class="text-end">${fmtBR(r.prod)}</td><td class="text-end">${fmtBR(r.inss4)}</td><td class="text-end">${fmtBR(r.sest05)}</td><td class="text-end text-success">${fmtBR(r.rec)}</td><td class="text-end text-danger">${fmtBR(r.des)}</td><td class="text-end text-danger">${fmtBR(r.adiant)}</td><td class="text-end fw-bold">${fmtBR(r.aReceber)}</td><td class="text-end fw-bold">${saldoHtml}</td>`;
+          tr.innerHTML = `
+            <td class="text-break">${r.nome || '—'}</td>
+            <td class="text-end">${fmtBR(r.prod)}</td>
+            <td class="text-end">${fmtBR(r.inss4)}</td>
+            <td class="text-end">${fmtBR(r.sest05)}</td>
+            <td class="text-end text-success">${fmtBR(r.rec)}</td>
+            <td class="text-end text-danger">${fmtBR(r.des)}</td>
+            <td class="text-end text-warning">${fmtBR(r.ad)}</td>
+            <td class="text-end fw-bold">${fmtBR(r.aReceber)}</td>
+            <td class="text-end">${pendLink}</td>`;
           tbody.appendChild(tr);
         });
-        document.getElementById('tProd').textContent=fmtBR(tProd);
-        document.getElementById('tINSS4').textContent=fmtBR(tINSS4);
-        document.getElementById('tSEST05').textContent=fmtBR(tSEST05);
-        document.getElementById('tRec').textContent=fmtBR(tRec);
-        document.getElementById('tDes').textContent=fmtBR(tDes);
-        document.getElementById('tAdi').textContent=fmtBR(tAdi);
-        document.getElementById('tLiq').textContent=fmtBR(tRecber);
-        document.getElementById('tPend').textContent=fmtBR(tPend);
+
+        const tRecEl = document.getElementById('tRec');
+        const tDesEl = document.getElementById('tDes');
+        const tAdEl = document.getElementById('tAd');
+        const tReceberEl = document.getElementById('tRecber');
+        const tPendEl = document.getElementById('tPend');
+        document.getElementById('tProd').textContent = fmtBR(tProd);
+        document.getElementById('tINSS4').textContent = fmtBR(tINSS4);
+        document.getElementById('tSEST05').textContent = fmtBR(tSEST05);
+        if (tRecEl) tRecEl.textContent = fmtBR(tRec);
+        if (tDesEl) tDesEl.textContent = fmtBR(tDes);
+        if (tAdEl) tAdEl.textContent = fmtBR(tAd);
+        if (tReceberEl) tReceberEl.textContent = fmtBR(tReceber);
+        if (tPendEl) tPendEl.textContent = fmtBR(tPend);
       })();
 
       // ---- Gráficos (Chart.js via CDN) ----
@@ -1870,14 +1913,22 @@
 
         // >>> SEM ADIANTAMENTOS no XLSX também
         const resumoAOA = [['Cooperado', 'Produções', 'INSS (4,0%)', 'SEST/SENAT (0,5%)', 'Receitas', 'Despesas', 'Adiantamento', 'A Receber', 'Saldo Pendente']];
-        let tProd = 0, tINSS4 = 0, tSEST05 = 0, tRec = 0, tDes = 0, tAdi = 0, tLiq = 0, tPend = 0;
+        let tProd = 0, tINSS4 = 0, tSEST05 = 0, tRec = 0, tDes = 0, tAd = 0, tReceber = 0, tPend = 0;
 
         RESUMO_COOP_ROWS.forEach(r => {
-          tProd += r.prod; tINSS4 += r.inss4; tSEST05 += r.sest05; tRec += r.rec; tDes += r.des; tAdi += r.adiant; tLiq += r.aReceber; tPend += r.saldoPendente;
-          resumoAOA.push([r.nome || '—', r.prod, r.inss4, r.sest05, r.rec, r.des, r.adiant, r.aReceber, r.saldoPendente]);
+          tProd += r.prod;
+          tINSS4 += r.inss4;
+          tSEST05 += r.sest05;
+          tRec += r.rec;
+          tDes += r.des;
+          tAd += r.ad;
+          tReceber += r.aReceber;
+          tPend += r.saldoPendente;
+
+          resumoAOA.push([r.nome || '—', r.prod, r.inss4, r.sest05, r.rec, r.des, r.ad, r.aReceber, r.saldoPendente]);
         });
 
-        resumoAOA.push(['TOTAIS', tProd, tINSS4, tSEST05, tRec, tDes, tAdi, tLiq, tPend]);
+        resumoAOA.push(['TOTAIS', tProd, tINSS4, tSEST05, tRec, tDes, tAd, tReceber, tPend]);
         aoaToSheet('Resumo_Cooperados', resumoAOA, wb);
 
         const byC_rec = {};
@@ -2221,7 +2272,7 @@
               <th class="text-end">R$ {{ "%.2f"|format(soma_inss_4) }}</th>
               <th class="text-end">R$ {{ "%.2f"|format(soma_sest_05) }}</th>
               <th class="text-end">R$ {{ "%.2f"|format(soma_liq) }}</th>
-              <th></th><th></th><th></th><th></th><th></th>
+              <th></th>
             </tr>
           </tfoot>
         </table>
@@ -2693,14 +2744,6 @@
           <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
         </div>
         <div class="col-md-2">
-          <label class="form-label">Competência</label>
-          <select class="form-select form-select-sm" name="competencia_desconto">
-            <option value="esta_semana" selected>Produção desta semana</option>
-            <option value="semana_passada">Produção da semana passada</option>
-            <option value="proxima_semana">Produção da próxima semana</option>
-          </select>
-        </div>
-        <div class="col-md-2">
           <label class="form-label">Valor (R$)</label>
           <div class="input-group input-group-sm">
             <span class="input-group-text">R$</span>
@@ -2765,7 +2808,7 @@
           </tbody>
           <tfoot>
             <tr class="table-light">
-              <th colspan="6" class="text-end">Total</th>
+              <th colspan="3" class="text-end">Total</th>
               <th class="text-end">R$ {{ '%.2f'|format(total_receitas_coop_table) }}</th>
               <th></th>
             </tr>
@@ -2887,10 +2930,23 @@
           <label class="form-label">Data</label>
           <input type="date" class="form-control form-control-sm" name="data" required>
         </div>
+
         <div class="col-md-2">
-          <label class="form-label">Tipo</label>
-          <div class="form-check pt-2"><input class="form-check-input" type="checkbox" name="eh_adiantamento" id="ehAdiantamentoNovaDesp"><label class="form-check-label" for="ehAdiantamentoNovaDesp">Adiantamento</label></div>
+          <label class="form-label">Competência</label>
+          <select class="form-select form-select-sm" name="competencia_semana">
+            <option value="atual" selected>Produção desta semana</option>
+            <option value="passada">Produção da semana passada</option>
+          </select>
         </div>
+
+        <div class="col-md-2">
+          <label class="form-label d-block">Tipo</label>
+          <div class="form-check form-switch pt-2">
+            <input class="form-check-input" type="checkbox" name="eh_adiantamento" value="1" id="ehAdiantamentoNovo">
+            <label class="form-check-label" for="ehAdiantamentoNovo">Adiantamento</label>
+          </div>
+        </div>
+
         <div class="col-md-1 d-flex flex-column">
           <label class="form-label d-none d-md-block">&nbsp;</label>
           <button class="btn btn-danger btn-sm w-100" title="Salvar">
@@ -2904,43 +2960,41 @@
   <!-- Tabela -->
   <div class="card border-0 shadow-sm rounded-3">
     <div class="card-body p-2 p-md-3">
-      <form method="POST" action="{{ url_for('delete_despesa_coop_bulk') }}" id="bulkDeleteDespesasForm" class="mb-2 d-flex justify-content-end"><button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Excluir despesas selecionadas?');"><i class="bi bi-trash"></i> Excluir marcadas</button></form>
       <div class="table-responsive">
+        <form method="POST" action="{{ url_for('delete_despesa_coop_bulk') }}" id="formBulkDespesaCoop">
+        </form>
+        <div class="d-flex justify-content-end mb-2">
+          <button type="submit" form="formBulkDespesaCoop" class="btn btn-outline-danger btn-sm" onclick="return confirm('Excluir despesas marcadas?');"><i class="bi bi-trash"></i> Excluir marcadas</button>
+        </div>
         <table class="table table-sm table-bordered table-hover align-middle" id="tblDespesasCoop">
           <thead class="table-light">
             <tr class="text-nowrap">
-              <th style="width:36px"><input type="checkbox" id="checkAllDespesas"></th>
+              <th class="text-center" style="width:36px"><input type="checkbox" id="checkAllDespCoop"></th>
               <th style="width:120px">Data</th>
               <th style="width:260px">Cooperado</th>
               <th>Descrição</th>
-              <th style="width:120px">Tipo</th>
-              <th style="width:160px">Competência</th>
+              <th style="width:140px">Tipo</th>
               <th class="text-end" style="width:160px">Valor</th>
-              <th class="text-end" style="width:160px">Pago manual</th>
-              <th class="text-end" style="width:160px">Restante</th>
-              <th class="text-center" style="width:120px">Status</th>
-              <th class="text-center" style="width:200px">Ações</th>
+              <th class="text-center" style="width:140px">Ações</th>
             </tr>
           </thead>
 
           <tbody>
             {% for dc in despesas_coop %}
               {% set coop_nome = (dc.cooperado.nome if dc.cooperado else 'Todos') %}
-              {% set _abat_manual = namespace(v=0) %}{% if dc.abatimentos is defined %}{% for ab in dc.abatimentos %}{% set _abat_manual.v = _abat_manual.v + (ab.valor or 0) %}{% endfor %}{% endif %}{% set _restante = (dc.valor or 0) - _abat_manual.v %}
-              <tr data-coop="{{ coop_nome|lower }}" data-desc="{{ (dc.descricao or '')|lower }}">
-                <td class="text-center"><input type="checkbox" name="ids[]" form="bulkDeleteDespesasForm" value="{{ dc.id }}"></td>
+              <tr
+                data-coop="{{ coop_nome|lower }}"
+                data-desc="{{ (dc.descricao or '')|lower }}"
+              >
+                <td class="text-center"><input type="checkbox" class="chkDespCoop" name="ids[]" value="{{ dc.id }}" form="formBulkDespesaCoop"></td>
                 <td>{{ dc.data.strftime('%d/%m/%Y') if dc.data else '-' }}</td>
                 <td class="text-break">{{ coop_nome }}</td>
                 <td class="text-break">{{ dc.descricao }}</td>
                 <td>{% if dc.eh_adiantamento %}<span class="badge bg-warning text-dark">Adiantamento</span>{% else %}<span class="badge bg-light text-dark border">Despesa</span>{% endif %}</td>
-                <td>{% if dc.competencia_desconto=='semana_passada' %}Semana passada{% elif dc.competencia_desconto=='proxima_semana' %}Próxima semana{% else %}Esta semana{% endif %}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(dc.valor) }}</td>
-                <td class="text-end">R$ {{ "%.2f"|format(_abat_manual.v) }}</td>
-                <td class="text-end">R$ {{ "%.2f"|format(_restante if _restante>0 else 0) }}</td>
-                <td class="text-center">{% if _restante <= 0 %}<span class="badge bg-success">Quitada</span>{% elif _abat_manual.v > 0 %}<span class="badge bg-warning text-dark">Parcial</span>{% else %}<span class="badge bg-secondary">Aberta</span>{% endif %}</td>
+
                 <td class="text-center text-nowrap">
-                  {% if can_coop_despesas_editar %}<button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalAbatimentoDespesaCoop" data-url="{{ url_for('add_abatimento_despesa_coop', id=dc.id) }}" title="Registrar abatimento"><i class="bi bi-cash-stack"></i></button>
-                  <button class="btn btn-warning btn-sm"
+                  {% if can_coop_despesas_editar %}<button class="btn btn-warning btn-sm"
                           data-bs-toggle="modal"
                           data-bs-target="#modalEditDespesaCoop"
                           data-id="{{ dc.id }}"
@@ -2948,7 +3002,9 @@
                           data-descricao="{{ dc.descricao }}"
                           data-valor="{{ dc.valor }}"
                           data-data="{{ dc.data.strftime('%Y-%m-%d') if dc.data else '' }}"
-                          data-url="{{ url_for('edit_despesa_coop', id=dc.id) }}">
+                          data-url="{{ url_for('edit_despesa_coop', id=dc.id) }}"
+                          data-adiantamento="{{ 1 if dc.eh_adiantamento else 0 }}"
+                          data-competencia="atual">
                     <i class="bi bi-pencil"></i>
                   </button>{% endif %}
 
@@ -2968,13 +3024,13 @@
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="5" class="text-center text-muted">Nenhuma despesa</td></tr>
+              <tr><td colspan="7" class="text-center text-muted">Nenhuma despesa</td></tr>
             {% endfor %}
           </tbody>
 
           <tfoot>
             <tr class="table-light">
-              <th colspan="3" class="text-end">Total</th>
+              <th colspan="5" class="text-end">Total</th>
               <th class="text-end">R$ {{ '%.2f'|format(_total_geral) }}</th>
               <th></th>
             </tr>
@@ -3023,6 +3079,15 @@
         });
       }
       apply();
+    })();
+
+    (function(){
+      const checkAll = document.getElementById('checkAllDespCoop');
+      const tbl = document.getElementById('tblDespesasCoop');
+      if (!checkAll || !tbl) return;
+      checkAll.addEventListener('change', ()=>{
+        tbl.querySelectorAll('.chkDespCoop').forEach(ch => ch.checked = checkAll.checked);
+      });
     })();
   </script>
 </section>
@@ -5493,6 +5558,16 @@
           <div class="col-12"><input type="text" class="form-control" name="descricao" required></div>
           <div class="col-12"><input type="number" step="0.01" class="form-control" name="valor" required></div>
           <div class="col-12"><input type="date" class="form-control" name="data" required></div>
+          <div class="col-12">
+            <select class="form-select" name="competencia_semana">
+              <option value="atual">Produção desta semana</option>
+              <option value="passada">Produção da semana passada</option>
+            </select>
+          </div>
+          <div class="col-12 form-check ms-2">
+            <input class="form-check-input" type="checkbox" name="eh_adiantamento" value="1" id="editEhAdiantamento">
+            <label class="form-check-label" for="editEhAdiantamento">Marcar como adiantamento</label>
+          </div>
         </div>
         <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
       </form>
@@ -5663,6 +5738,17 @@
   bindModal('modalEditDespesa',      { id:'id', descricao:'descricao', valor:'valor', data:'data' });
   bindModal('modalEditReceitaCoop',  { id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data' });
   bindModal('modalEditDespesaCoop',  { id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data' });
+
+  const modalEditDespesaCoopEl = document.getElementById('modalEditDespesaCoop');
+  modalEditDespesaCoopEl?.addEventListener('show.bs.modal', (ev) => {
+    const btn = ev.relatedTarget;
+    const form = modalEditDespesaCoopEl.querySelector('form');
+    if (!btn || !form) return;
+    const chk = form.querySelector('[name="eh_adiantamento"]');
+    const comp = form.querySelector('[name="competencia_semana"]');
+    if (chk) chk.checked = String(btn.dataset.adiantamento || '') === '1';
+    if (comp) comp.value = btn.dataset.competencia || 'atual';
+  });
   bindModal('modalEditCooperado',    { id:'id', nome:'nome', usuario:'usuario' });
   bindModal('modalResetSenhaCooperado', { id:'id' });
   bindModal('modalEditRestaurante',  { id:'id', nome:'nome', periodo:'periodo', usuario:'usuario' });
@@ -6488,12 +6574,6 @@ document.addEventListener('DOMContentLoaded', function(){
   pollAlertas();
   setInterval(pollAlertas, 60000);
 });
-</script>
-
-
-<div class="modal fade" id="modalAbatimentoDespesaCoop" tabindex="-1"><div class="modal-dialog"><form method="POST" class="modal-content"><div class="modal-header"><h5 class="modal-title">Registrar abatimento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body row g-2 px-3"><div class="col-12"><label class="form-label">Data</label><input type="date" class="form-control" name="data" required></div><div class="col-12"><label class="form-label">Valor</label><input type="number" step="0.01" class="form-control" name="valor" required></div><div class="col-12"><label class="form-label">Origem</label><select class="form-select" name="origem"><option value="manual">Manual</option><option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="desconto">Desconto</option></select></div><div class="col-12"><label class="form-label">Observação</label><input type="text" class="form-control" name="observacao"></div></div><div class="modal-footer"><button class="btn btn-royal">Salvar</button></div></form></div></div>
-<script>
-document.addEventListener('DOMContentLoaded', function(){ const cAll=document.getElementById('checkAllDespesas'); cAll?.addEventListener('change', ()=> document.querySelectorAll('#tblDespesasCoop tbody input[type="checkbox"]').forEach(ch=> ch.checked=cAll.checked)); const el=document.getElementById('modalAbatimentoDespesaCoop'); el?.addEventListener('show.bs.modal', (ev)=>{ const btn=ev.relatedTarget; const form=el.querySelector('form'); if(form && btn?.dataset?.url) form.action=btn.dataset.url; });});
 </script>
 
 </body>
