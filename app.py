@@ -3772,56 +3772,56 @@ def admin_dashboard():
     trocas_hist_inicio = _parse_ymd_date(args.get("trocas_hist_inicio"))
     trocas_hist_fim = _parse_ymd_date(args.get("trocas_hist_fim"))
 
-    if not escala_hist_inicio and not escala_hist_fim:
-        escala_hist_fim = current_date
-        escala_hist_inicio = current_date - timedelta(days=30)
-    elif escala_hist_inicio and not escala_hist_fim:
-        escala_hist_fim = escala_hist_inicio
-    elif escala_hist_fim and not escala_hist_inicio:
-        escala_hist_inicio = escala_hist_fim
-
-    if not trocas_hist_inicio and not trocas_hist_fim:
-        trocas_hist_fim = current_date
-        trocas_hist_inicio = current_date - timedelta(days=30)
-    elif trocas_hist_inicio and not trocas_hist_fim:
-        trocas_hist_fim = trocas_hist_inicio
-    elif trocas_hist_fim and not trocas_hist_inicio:
-        trocas_hist_inicio = trocas_hist_fim
-
-    escala_hist_q = _history_rows_between(EscalaHistorico.query, EscalaHistorico.snapshot_em, escala_hist_inicio, escala_hist_fim)
-    escala_hist_rows_db = escala_hist_q.order_by(EscalaHistorico.snapshot_em.desc(), EscalaHistorico.id.desc()).all()
     escala_historico_rows = []
-    for h in escala_hist_rows_db:
-        escala_historico_rows.append({
-            "snapshot_em": h.snapshot_em,
-            "data": h.data or "",
-            "turno": h.turno or "",
-            "horario": h.horario or "",
-            "contrato": h.contrato or "",
-            "cooperado_nome": h.cooperado_nome or "",
-            "saiu_nome": h.saiu_nome or "",
-            "entrou_nome": h.entrou_nome or "",
-            "origem": h.origem or "",
-            "acao": h.acao or "",
-        })
-
-    hist_rows_for_current = _history_rows_between(EscalaHistorico.query.filter(EscalaHistorico.saiu_nome.isnot(None)), EscalaHistorico.snapshot_em, escala_hist_inicio, escala_hist_fim).all()
-    escala_editor_rows_export = _resolve_change_columns(escala_editor_rows, hist_rows_for_current)
-
+    escala_editor_rows_export = []
+    trocas_historico_export = []
     contagem_contrato_turno = []
-    counts = defaultdict(int)
-    for e in escalas_all:
-        counts[((e.data or '').strip(), (e.turno or '').strip(), (e.contrato or '').strip())] += 1
-    for (data_txt, turno_txt, contrato_txt), qtd in sorted(counts.items(), key=lambda x: (x[0][0], x[0][1], x[0][2])):
-        contagem_contrato_turno.append({
-            'data': data_txt,
-            'turno': turno_txt,
-            'contrato': contrato_txt,
-            'qtd_cooperados': qtd,
-        })
 
-    trocas_hist_q = _history_rows_between(TrocaHistorico.query, TrocaHistorico.aplicada_em, trocas_hist_inicio, trocas_hist_fim)
-    trocas_historico_export = trocas_hist_q.order_by(TrocaHistorico.aplicada_em.desc(), TrocaHistorico.id.desc()).all()
+    if active_tab == "escalas":
+        if not escala_hist_inicio and not escala_hist_fim:
+            escala_hist_fim = current_date
+            escala_hist_inicio = current_date - timedelta(days=30)
+        elif escala_hist_inicio and not escala_hist_fim:
+            escala_hist_fim = escala_hist_inicio
+        elif escala_hist_fim and not escala_hist_inicio:
+            escala_hist_inicio = escala_hist_fim
+
+        escala_hist_q = _history_rows_between(EscalaHistorico.query, EscalaHistorico.snapshot_em, escala_hist_inicio, escala_hist_fim)
+        escala_hist_rows_db = escala_hist_q.order_by(EscalaHistorico.snapshot_em.desc(), EscalaHistorico.id.desc()).all()
+        for h in escala_hist_rows_db:
+            escala_historico_rows.append({
+                "snapshot_em": h.snapshot_em,
+                "data": h.data or "",
+                "turno": h.turno or "",
+                "horario": h.horario or "",
+                "contrato": h.contrato or "",
+                "cooperado_nome": h.cooperado_nome or "",
+                "saiu_nome": h.saiu_nome or "",
+                "entrou_nome": h.entrou_nome or "",
+                "origem": h.origem or "",
+                "acao": h.acao or "",
+            })
+
+        hist_rows_for_current = _history_rows_between(EscalaHistorico.query.filter(EscalaHistorico.saiu_nome.isnot(None)), EscalaHistorico.snapshot_em, escala_hist_inicio, escala_hist_fim).all()
+        escala_editor_rows_export = _resolve_change_columns(escala_editor_rows, hist_rows_for_current)
+    else:
+        escala_hist_fim = escala_hist_fim or current_date
+        escala_hist_inicio = escala_hist_inicio or (current_date - timedelta(days=30))
+
+    if active_tab == "trocas":
+        if not trocas_hist_inicio and not trocas_hist_fim:
+            trocas_hist_fim = current_date
+            trocas_hist_inicio = current_date - timedelta(days=30)
+        elif trocas_hist_inicio and not trocas_hist_fim:
+            trocas_hist_fim = trocas_hist_inicio
+        elif trocas_hist_fim and not trocas_hist_inicio:
+            trocas_hist_inicio = trocas_hist_fim
+
+        trocas_hist_q = _history_rows_between(TrocaHistorico.query, TrocaHistorico.aplicada_em, trocas_hist_inicio, trocas_hist_fim)
+        trocas_historico_export = trocas_hist_q.order_by(TrocaHistorico.aplicada_em.desc(), TrocaHistorico.id.desc()).all()
+    else:
+        trocas_hist_fim = trocas_hist_fim or current_date
+        trocas_hist_inicio = trocas_hist_inicio or (current_date - timedelta(days=30))
 
     return render_template(
         "admin_dashboard.html",
@@ -6037,6 +6037,27 @@ def ratear_beneficios():
 # =========================
 # Escalas/Trocas — Exportações e histórico
 # =========================
+def _xlsx_finish_and_send(wb, filename):
+    import io
+    from openpyxl.styles import Font, PatternFill, Alignment
+    for ws in wb.worksheets:
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.fill = PatternFill(fill_type='solid', fgColor='DCE6F1')
+        for col in ws.columns:
+            max_len = 0
+            col_letter = col[0].column_letter
+            for cell in col:
+                try:
+                    max_len = max(max_len, len(str(cell.value or '')))
+                except Exception:
+                    pass
+            ws.column_dimensions[col_letter].width = min(max(max_len + 2, 10), 40)
+    bio = io.BytesIO(); wb.save(bio); bio.seek(0)
+    return send_file(bio, as_attachment=True, download_name=filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
 @app.get("/admin/escalas/exportar_atual")
 @admin_perm_required("escalas", "ver")
 def admin_exportar_escalas_atual():
@@ -6053,23 +6074,22 @@ def admin_exportar_escalas_atual():
         k = ((h.data or '').strip(), (h.turno or '').strip(), (h.horario or '').strip(), (h.contrato or '').strip(), (h.cooperado_nome or '').strip())
         latest[k] = h
 
-    counts = defaultdict(int)
-    for e in escalas_all:
-        counts[((e.data or '').strip(), (e.turno or '').strip(), (e.contrato or '').strip())] += 1
+    slot_counts = defaultdict(int)
 
     for e in sorted(escalas_all, key=_escala_sort_key):
         nome = _safe_coop_nome_by_id(e.cooperado_id) or (e.cooperado_nome or '')
         h = latest.get(((e.data or '').strip(), (e.turno or '').strip(), (e.horario or '').strip(), (e.contrato or '').strip(), nome.strip()))
-        rows.append([e.data or '', e.turno or '', e.horario or '', e.contrato or '', nome, (h.saiu_nome if h else ''), (h.entrou_nome if h else ''), counts[((e.data or '').strip(), (e.turno or '').strip(), (e.contrato or '').strip())]])
+        group_key = ((e.data or '').strip(), (e.turno or '').strip(), (e.contrato or '').strip())
+        slot_counts[group_key] += 1
+        rows.append([e.data or '', e.turno or '', e.horario or '', slot_counts[group_key], e.contrato or '', nome, (h.saiu_nome if h else ''), (h.entrou_nome if h else '')])
 
     wb = Workbook()
     ws = wb.active
     ws.title = 'Escala atual'
-    ws.append(['Data', 'Turno', 'Horário', 'Contrato', 'Cooperado atual', 'Quem foi retirado', 'Quem entrou', 'Qtd cooperados no contrato/turno'])
+    ws.append(['Data', 'Turno', 'Horário', 'Nº', 'Contrato', 'Cooperado atual', 'Quem foi retirado', 'Quem entrou'])
     for r in rows:
         ws.append(r)
-    bio = io.BytesIO(); wb.save(bio); bio.seek(0)
-    return send_file(bio, as_attachment=True, download_name='escala_atual_com_historico.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return _xlsx_finish_and_send(wb, 'escala_atual_com_alteracoes.xlsx')
 
 
 @app.get("/admin/escalas/exportar_historico")
@@ -6084,8 +6104,7 @@ def admin_exportar_escalas_historico():
     ws.append(['Registrado em', 'Origem', 'Ação', 'Data', 'Turno', 'Horário', 'Contrato', 'Cooperado atual', 'Quem saiu', 'Quem entrou'])
     for h in hist:
         ws.append([h.snapshot_em.strftime('%d/%m/%Y %H:%M') if h.snapshot_em else '', h.origem or '', h.acao or '', h.data or '', h.turno or '', h.horario or '', h.contrato or '', h.cooperado_nome or '', h.saiu_nome or '', h.entrou_nome or ''])
-    bio = io.BytesIO(); wb.save(bio); bio.seek(0)
-    return send_file(bio, as_attachment=True, download_name='historico_escalas.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return _xlsx_finish_and_send(wb, 'historico_escalas.xlsx')
 
 
 @app.get("/admin/trocas/exportar_historico")
@@ -6100,8 +6119,7 @@ def admin_exportar_trocas_historico():
     ws.append(['Aplicada em', 'Tipo', 'Solicitante', 'Destino', 'Data', 'Turno', 'Horário', 'Contrato', 'Saiu', 'Entrou'])
     for h in hist:
         ws.append([h.aplicada_em.strftime('%d/%m/%Y %H:%M') if h.aplicada_em else '', h.tipo or '', h.solicitante_nome or '', h.destino_nome or '', h.data or '', h.turno or '', h.horario or '', h.contrato or '', h.saiu_nome or '', h.entrou_nome or ''])
-    bio = io.BytesIO(); wb.save(bio); bio.seek(0)
-    return send_file(bio, as_attachment=True, download_name='historico_trocas.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return _xlsx_finish_and_send(wb, 'historico_trocas.xlsx')
 
 
 # =========================
