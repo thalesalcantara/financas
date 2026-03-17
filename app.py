@@ -6699,6 +6699,21 @@ def portal_cooperado():
         {"id": c.id, "nome": c.nome, "foto_url": (c.foto_url or "")}
         for c in coops
     ]
+    cooperados_escalas_map = {}
+    for c in coops:
+        escalas_c = (Escala.query.filter_by(cooperado_id=c.id).order_by(Escala.data.asc(), Escala.id.asc()).all())
+        cooperados_escalas_map[str(c.id)] = [
+            {
+                "id": e.id,
+                "data": e.data or "",
+                "turno": e.turno or "",
+                "horario": e.horario or "",
+                "contrato": e.contrato or "",
+                "weekday": _weekday_from_data_str(e.data),
+                "turno_bucket": _turno_bucket(e.turno, e.horario),
+            }
+            for e in escalas_c
+        ]
 
     def _escala_desc(e: Escala | None) -> str:
         return _escala_label(e)
@@ -6777,6 +6792,7 @@ def portal_cooperado():
         minha_escala=minha_escala,
         minha_escala_json=minha_escala_json,
         cooperados_json=cooperados_json,
+        cooperados_escalas_map=cooperados_escalas_map,
         trocas_recebidas_pendentes=trocas_recebidas_pendentes,
         trocas_recebidas_historico=trocas_recebidas_historico,
         trocas_enviadas=trocas_enviadas,
@@ -6914,15 +6930,16 @@ def solicitar_troca():
 
     from_escala_id = request.form.get("from_escala_id", type=int)
     to_cooperado_id = request.form.get("to_cooperado_id", type=int)
+    destino_escala_id = request.form.get("destino_escala_id", type=int)
     mensagem = (request.form.get("mensagem") or "").strip()
 
     if not from_escala_id or not to_cooperado_id:
-        flash("Selecione a escala e o cooperado de destino.", "warning")
+        flash("Selecione o seu turno e o cooperado de destino.", "warning")
         return _portal_cooperado_redirect_tab("trocas")
 
     origem = Escala.query.get(from_escala_id)
     if not origem or origem.cooperado_id != me.id:
-        flash("Escala inválida para solicitação.", "danger")
+        flash("Turno inválido para solicitação.", "danger")
         return _portal_cooperado_redirect_tab("trocas")
 
     destino = Cooperado.query.get(to_cooperado_id)
@@ -6950,28 +6967,39 @@ def solicitar_troca():
             "contrato": _norm(getattr(e, "contrato", "") or ""),
         }
 
-    def _same_slot(sig_a, sig_b) -> bool:
+    def _same_turno(sig_a, sig_b) -> bool:
         return bool(
             sig_a and sig_b
             and sig_a["weekday"] == sig_b["weekday"]
             and sig_a["bucket"] == sig_b["bucket"]
-            and sig_a["horario"] == sig_b["horario"]
         )
 
     nova_sig = _escala_signature(origem)
     if not nova_sig:
-        flash("Não foi possível identificar essa escala para a troca.", "danger")
+        flash("Não foi possível identificar esse turno para a troca.", "danger")
         return _portal_cooperado_redirect_tab("trocas")
 
     escalas_destino_compativeis = []
     for e_dest in Escala.query.filter_by(cooperado_id=destino.id).order_by(Escala.id.asc()).all():
         sig_dest = _escala_signature(e_dest)
-        if sig_dest and _same_slot(sig_dest, nova_sig):
+        if sig_dest and _same_turno(sig_dest, nova_sig):
             escalas_destino_compativeis.append(e_dest)
 
-    if not escalas_destino_compativeis:
-        flash("Esse cooperado não possui plantão compatível no mesmo dia, turno e horário.", "warning")
-        return _portal_cooperado_redirect_tab("trocas")
+    escala_destino_escolhida = None
+    modo_passagem = False
+    if escalas_destino_compativeis:
+        if destino_escala_id:
+            escala_destino_escolhida = next((e for e in escalas_destino_compativeis if int(e.id) == int(destino_escala_id)), None)
+            if not escala_destino_escolhida:
+                flash("O turno escolhido do cooperado não é compatível com essa troca.", "warning")
+                return _portal_cooperado_redirect_tab("trocas")
+        elif len(escalas_destino_compativeis) == 1:
+            escala_destino_escolhida = escalas_destino_compativeis[0]
+        else:
+            flash("Esse cooperado possui mais de um turno compatível. Escolha qual turno dele será usado na troca.", "info")
+            return _portal_cooperado_redirect_tab("trocas")
+    else:
+        modo_passagem = True
 
     contratos_destino = {
         _norm(getattr(e, "contrato", "") or "")
@@ -6985,14 +7013,8 @@ def solicitar_troca():
         .filter(TrocaSolicitacao.status == "pendente")
         .filter(
             or_(
-                and_(
-                    TrocaSolicitacao.solicitante_id == me.id,
-                    TrocaSolicitacao.destino_id == destino.id,
-                ),
-                and_(
-                    TrocaSolicitacao.solicitante_id == destino.id,
-                    TrocaSolicitacao.destino_id == me.id,
-                ),
+                and_(TrocaSolicitacao.solicitante_id == me.id, TrocaSolicitacao.destino_id == destino.id),
+                and_(TrocaSolicitacao.solicitante_id == destino.id, TrocaSolicitacao.destino_id == me.id),
             )
         )
         .order_by(TrocaSolicitacao.id.desc())
@@ -7003,43 +7025,37 @@ def solicitar_troca():
         esc_exist = Escala.query.get(t_exist.origem_escala_id)
         if not esc_exist:
             continue
-
         exist_sig = _escala_signature(esc_exist)
-        if not exist_sig or not _same_slot(nova_sig, exist_sig):
+        if not exist_sig or not _same_turno(nova_sig, exist_sig):
             continue
 
         contrato_exist = _norm(getattr(esc_exist, "contrato", "") or "")
         mesma_origem = int(t_exist.origem_escala_id or 0) == int(origem.id)
 
         troca_reversa_equivalente = (
-            t_exist.solicitante_id == destino.id
-            and (
+            t_exist.solicitante_id == destino.id and (
                 mesma_origem
+                or int(getattr(esc_exist, "id", 0) or 0) == int(getattr(escala_destino_escolhida, "id", 0) or 0)
                 or int(getattr(esc_exist, "id", 0) or 0) in ids_destino_compativeis
                 or (contrato_exist and contrato_exist in contratos_destino)
+                or modo_passagem
             )
         )
-
         troca_mesmo_sentido = (
-            t_exist.solicitante_id == me.id
-            and (
+            t_exist.solicitante_id == me.id and (
                 mesma_origem
+                or int(getattr(esc_exist, "id", 0) or 0) == int(getattr(escala_destino_escolhida, "id", 0) or 0)
                 or (contrato_exist and contrato_exist == _norm(getattr(origem, "contrato", "") or ""))
+                or modo_passagem
             )
         )
 
         if troca_reversa_equivalente:
-            flash(
-                "Esse cooperado já enviou essa mesma troca para você. Vá na aba Trocas e apenas aceite a solicitação existente.",
-                "info"
-            )
+            flash("Já existe uma solicitação dessa mesma troca. Vá na aba Trocas e aceite a solicitação que já foi enviada.", "info")
             return _portal_cooperado_redirect_tab("trocas")
 
         if troca_mesmo_sentido:
-            flash(
-                "Já existe uma solicitação pendente equivalente entre vocês para essa escala. Abra a aba Trocas para acompanhar.",
-                "warning"
-            )
+            flash("Já existe uma solicitação pendente para esse mesmo turno com esse cooperado. Abra a aba Trocas para acompanhar.", "warning")
             return _portal_cooperado_redirect_tab("trocas")
 
     t = TrocaSolicitacao(
@@ -7052,7 +7068,10 @@ def solicitar_troca():
     db.session.add(t)
     db.session.commit()
 
-    flash("Solicitação de troca enviada com sucesso.", "success")
+    if modo_passagem:
+        flash("Solicitação de passagem de turno enviada com sucesso. Agora o cooperado precisa aceitar.", "success")
+    else:
+        flash("Solicitação de troca enviada com sucesso.", "success")
     return _portal_cooperado_redirect_tab("trocas")
 
 @app.post("/trocas/<int:troca_id>/aceitar")
@@ -7073,62 +7092,69 @@ def aceitar_troca(troca_id):
     orig_e = Escala.query.get(t.origem_escala_id)
 
     if not orig_e:
-        flash("Plantão de origem inválido.", "danger")
+        flash("Turno de origem inválido.", "danger")
         return _portal_cooperado_redirect_tab("trocas")
 
-    if not destino_escala_id:
-        minhas = Escala.query.filter_by(cooperado_id=me.id).order_by(Escala.id.asc()).all()
-        wd_o = _weekday_from_data_str(orig_e.data)
-        buck_o = _turno_bucket(orig_e.turno, orig_e.horario)
+    minhas = Escala.query.filter_by(cooperado_id=me.id).order_by(Escala.id.asc()).all()
+    wd_o = _weekday_from_data_str(orig_e.data)
+    buck_o = _turno_bucket(orig_e.turno, orig_e.horario)
+    candidatas = [
+        e for e in minhas
+        if _weekday_from_data_str(e.data) == wd_o
+        and _turno_bucket(e.turno, e.horario) == buck_o
+    ]
 
-        candidatas = [
-            e for e in minhas
-            if _weekday_from_data_str(e.data) == wd_o
-            and _turno_bucket(e.turno, e.horario) == buck_o
-        ]
-
-        if len(candidatas) == 1:
-            destino_escala_id = candidatas[0].id
-        elif len(candidatas) == 0:
-            flash("Você não tem plantões compatíveis (mesmo dia da semana e turno).", "danger")
+    dest_e = None
+    if destino_escala_id:
+        dest_e = Escala.query.get(destino_escala_id)
+        if not dest_e or dest_e.cooperado_id != me.id:
+            flash("Seleção de turno inválida.", "danger")
             return _portal_cooperado_redirect_tab("trocas")
-        else:
-            flash("Selecione na aba Trocas qual dos seus plantões compatíveis deseja usar.", "warning")
-            return _portal_cooperado_redirect_tab("trocas")
-
-    dest_e = Escala.query.get(destino_escala_id)
-
-    if not dest_e or dest_e.cooperado_id != me.id:
-        flash("Seleção de escala inválida.", "danger")
-        return _portal_cooperado_redirect_tab("trocas")
-
-    wd_orig = _weekday_from_data_str(orig_e.data)
-    wd_dest = _weekday_from_data_str(dest_e.data)
-    buck_orig = _turno_bucket(orig_e.turno, orig_e.horario)
-    buck_dest = _turno_bucket(dest_e.turno, dest_e.horario)
-
-    if wd_orig is None or wd_dest is None or wd_orig != wd_dest or buck_orig != buck_dest:
-        flash("Troca incompatível: precisa ser mesmo dia da semana e mesmo turno (dia/noite).", "danger")
+    elif len(candidatas) == 1:
+        dest_e = candidatas[0]
+    elif len(candidatas) > 1:
+        flash("Escolha na aba Trocas qual dos seus turnos compatíveis deseja usar.", "warning")
         return _portal_cooperado_redirect_tab("trocas")
 
     solicitante = Cooperado.query.get(t.solicitante_id)
     destinatario = me
 
+    if dest_e is None:
+        linhas = [{
+            "dia": _escala_label(orig_e).split(" • ")[0],
+            "turno_horario": " • ".join([x for x in [(orig_e.turno or "").strip(), (orig_e.horario or "").strip()] if x]),
+            "contrato": (orig_e.contrato or "").strip(),
+            "saiu": solicitante.nome if solicitante else "",
+            "entrou": destinatario.nome,
+        }]
+        afetacao_json = {"linhas": linhas}
+        orig_e.cooperado_id = destinatario.id
+        orig_e.cooperado_nome = None
+        t.status = "aprovada"
+        t.aplicada_em = datetime.utcnow()
+        prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
+        t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps(afetacao_json, ensure_ascii=False)
+        db.session.commit()
+        flash("Turno passado com sucesso!", "success")
+        return _portal_cooperado_redirect_tab("trocas")
+
+    wd_dest = _weekday_from_data_str(dest_e.data)
+    buck_dest = _turno_bucket(dest_e.turno, dest_e.horario)
+    if wd_o is None or wd_dest is None or wd_o != wd_dest or buck_o != buck_dest:
+        flash("Troca incompatível: precisa ser no mesmo dia da semana e no mesmo turno.", "danger")
+        return _portal_cooperado_redirect_tab("trocas")
+
     linhas = [
         {
             "dia": _escala_label(orig_e).split(" • ")[0],
-            "turno_horario": " • ".join(
-                [x for x in [(orig_e.turno or "").strip(), (orig_e.horario or "").strip()] if x]
-            ),
+            "turno_horario": " • ".join([x for x in [(orig_e.turno or "").strip(), (orig_e.horario or "").strip()] if x]),
             "contrato": (orig_e.contrato or "").strip(),
             "saiu": solicitante.nome if solicitante else "",
             "entrou": destinatario.nome,
         },
         {
             "dia": _escala_label(dest_e).split(" • ")[0],
-            "turno_horario": " • ".join(
-                [x for x in [(dest_e.turno or "").strip(), (dest_e.horario or "").strip()] if x]
-            ),
+            "turno_horario": " • ".join([x for x in [(dest_e.turno or "").strip(), (dest_e.horario or "").strip()] if x]),
             "contrato": (dest_e.contrato or "").strip(),
             "saiu": destinatario.nome,
             "entrou": solicitante.nome if solicitante else "",
@@ -7138,10 +7164,8 @@ def aceitar_troca(troca_id):
 
     solicitante_id = orig_e.cooperado_id
     destino_id = dest_e.cooperado_id
-
     orig_e.cooperado_id = destino_id
     dest_e.cooperado_id = solicitante_id
-
     if orig_e.cooperado_id:
         orig_e.cooperado_nome = None
     if dest_e.cooperado_id:
@@ -7149,15 +7173,12 @@ def aceitar_troca(troca_id):
 
     t.status = "aprovada"
     t.aplicada_em = datetime.utcnow()
-
     prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
     t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps(afetacao_json, ensure_ascii=False)
 
     db.session.commit()
     flash("Troca aplicada com sucesso!", "success")
     return _portal_cooperado_redirect_tab("trocas")
-
-
 
 @app.post("/trocas/<int:troca_id>/recusar")
 @role_required("cooperado")
