@@ -400,7 +400,7 @@
             <button class="btn btn-royal" type="submit"><i class="bi bi-funnel"></i></button>
           </div>
         </div>
-        <div class="filter-note">O painel permanece na mesma aba.</div>
+        
       </form>
     </div>
   </section>
@@ -422,10 +422,10 @@
       <div class="section-card" style="background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);border-color:rgba(39,71,217,.10)">
         <div class="section-head" style="align-items:flex-start">
           <div>
-            <h2 class="section-title" style="font-size:1.05rem">Resumo fácil</h2>
-            <div class="item-small mt-1">Aqui você vê só o que realmente importa no período.</div>
+            <h2 class="section-title" style="font-size:1.05rem">Resumo</h2>
+            
           </div>
-          <span class="section-chip"><i class="bi bi-check2-circle"></i> simples</span>
+          <span class="section-chip"><i class="bi bi-check2-circle"></i> Coopex</span>
         </div>
 
         <div class="kpi-grid" style="grid-template-columns:1fr 1fr">
@@ -442,20 +442,23 @@
           </div>
 
           <div class="kpi-card">
-            <div class="kpi-title">INSS + SEST/SENAT</div>
-            <div class="kpi-value mono">R$ {{ '%.2f'|format((inss_valor|default(0)) + (sest_senat_valor|default(0))) }}</div>
-            <div class="kpi-sub">Encargos sobre a produção</div>
+            <div class="kpi-title">INSS / SEST-SENAT</div>
+            <div class="kpi-value mono" style="font-size:1rem;line-height:1.45">
+              INSS (4%): R$ {{ '%.2f'|format(inss_valor|default(0)) }}<br>
+              SEST/SENAT (0,5%): R$ {{ '%.2f'|format(sest_senat_valor|default(0)) }}
+            </div>
+            <div class="kpi-sub">Valores separados</div>
           </div>
 
           <div class="kpi-card">
             <div class="kpi-title">
-              Complemento
+              Complemento INSS
               <span class="help-tip" onclick="document.getElementById('helpComplemento')?.classList.toggle('show')">?</span>
             </div>
-            <div class="kpi-value mono">R$ {{ '%.2f'|format(complemento_inss|default(0)) }}</div>
-            <div class="kpi-sub">Valor que falta para atingir a meta do INSS</div>
+            <div class="kpi-value mono">R$ {{ '%.2f'|format(inss_complemento|default(0)) }}</div>
+            <div class="kpi-sub">Meta sugerida</div>
             <div class="help-box" id="helpComplemento">
-              O complemento é o valor total que ainda falta para atingir a meta do INSS. Esse complemento é opcional. Caso tenha interesse em complementar, fale com a administração.
+              O complemento é o valor total que devemos atingir para o INSS. Esse complemento é opcional. Caso tenha interesse em complementar, fale com a administração.
             </div>
           </div>
 
