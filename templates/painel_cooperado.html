@@ -344,6 +344,17 @@
   .chart-month-card.compacto{padding:10px}
   .chart-month-card.compacto .chart-canvas-box{height:160px}
 }
+
+.collapse-chart{margin-top:10px}
+.collapse-chart summary{
+  list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;
+  gap:10px;padding:10px 12px;border-radius:14px;background:#f8fbff;border:1px solid rgba(39,71,217,.08);
+  font-size:.84rem;font-weight:800;color:var(--text)
+}
+.collapse-chart summary::-webkit-details-marker{display:none}
+.collapse-chart .sum-sub{font-size:.72rem;font-weight:600;color:var(--muted)}
+.collapse-chart .sum-right{display:flex;align-items:center;gap:8px;color:var(--royal);font-size:.78rem}
+.collapse-chart[open] summary{margin-bottom:10px}
 </style>
 </head>
 <body>
@@ -456,7 +467,6 @@
             <button class="btn btn-royal" type="submit"><i class="bi bi-funnel"></i></button>
           </div>
         </div>
-        <div class="filter-note">O painel permanece na mesma aba.</div>
       </form>
     </div>
   </section>
@@ -480,9 +490,7 @@
         <div class="section-head" style="align-items:flex-start;margin-bottom:10px">
           <div>
             <h2 class="section-title" style="font-size:1rem">Resumo</h2>
-            <div class="item-small mt-1">Tudo importante sem precisar rolar muito.</div>
-          </div>
-          <span class="section-chip"><i class="bi bi-check2-circle"></i> Coopex Entregas</span>
+          <span class="section-chip"><i class="bi bi-check2-circle"></i> Coopex</span>
         </div>
 
         <div class="resumo-top-grid">
@@ -520,7 +528,7 @@
                 <div class="kpi-value mono" style="font-size:1.02rem">R$ {{ '%.2f'|format(complemento_inss|default(0)) }}</div>
                 <div class="kpi-sub">Opcional</div>
                 <div class="help-box" id="helpComplemento">
-                  O complemento é o valor total que tem que atingir para o INSS. Esse complemento é opcional. Caso tenha interesse em complementar, fale com a administração.
+                  O complemento é o valor total que ainda falta para atingir a meta do INSS. Esse complemento é opcional. Caso tenha interesse em complementar, fale com a administração.
                 </div>
               </div>
 
@@ -544,27 +552,41 @@
             </div>
           </div>
 
-          <div class="chart-month-card compacto">
-            <div class="chart-month-head">
+          
+<details class="collapse-chart">
+            <summary>
               <div>
-                <div class="chart-month-title">Receitas por mês</div>
-                <div class="chart-month-sub">Veja em quais meses você produziu mais.</div>
+                <div>Receitas por mês</div>
+                <div class="sum-sub">Abra para ver sua evolução mensal</div>
               </div>
-              <div class="chart-month-kpis">
-                <div class="chart-mini-pill">
-                  Melhor mês
-                  <b id="melhorMesLabel">—</b>
+              <div class="sum-right">
+                <span id="melhorMesResumo">Melhor mês: —</span>
+                <i class="bi bi-chevron-down"></i>
+              </div>
+            </summary>
+            <div class="chart-month-card compacto">
+              <div class="chart-month-head">
+                <div>
+                  <div class="chart-month-title">Receitas por mês</div>
+                  <div class="chart-month-sub">Mostra sua evolução mês a mês.</div>
                 </div>
-                <div class="chart-mini-pill">
-                  Média mensal
-                  <b id="mediaMensalLabel">R$ 0,00</b>
+                <div class="chart-month-kpis">
+                  <div class="chart-mini-pill">
+                    Melhor mês
+                    <b id="melhorMesLabel">—</b>
+                  </div>
+                  <div class="chart-mini-pill">
+                    Média mensal
+                    <b id="mediaMensalLabel">R$ 0,00</b>
+                  </div>
                 </div>
+              </div>
+              <div class="chart-canvas-box">
+                <canvas id="chartReceitasMensais"></canvas>
               </div>
             </div>
-            <div class="chart-canvas-box">
-              <canvas id="chartReceitasMensais"></canvas>
-            </div>
-          </div>
+          </details>
+
         </div>
 
         <div class="resumo-info-compact">
@@ -1518,7 +1540,11 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>
 (function(){
   const pontos = [
-    {% if producoes is defined %}
+    {% if all_producoes_mensal is defined and all_producoes_mensal %}
+      {% for p in all_producoes_mensal %}
+        { data: "{{ p.data.strftime('%Y-%m-%d') if p.data else '' }}", valor: {{ (p.valor or 0)|float }} }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    {% elif producoes is defined %}
       {% for p in producoes %}
         { data: "{{ p.data.strftime('%Y-%m-%d') if p.data else '' }}", valor: {{ (p.valor or 0)|float }} }{% if not loop.last %},{% endif %}
       {% endfor %}
@@ -1562,6 +1588,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const mediaEl = document.getElementById('mediaMensalLabel');
   if (melhorMesEl) melhorMesEl.textContent = melhorMesTxt;
   if (mediaEl) mediaEl.textContent = mediaTxt;
+  const melhorMesResumo = document.getElementById('melhorMesResumo');
+  if (melhorMesResumo) melhorMesResumo.textContent = `Melhor mês: ${melhorMesTxt}`;
 
   const canvas = document.getElementById('chartReceitasMensais');
   if (!canvas || typeof Chart === 'undefined') return;
@@ -1611,6 +1639,150 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
+})();
+</script>
+
+
+<script>
+(function(){
+  const pontosAno = [
+    {% if all_producoes_mensal is defined and all_producoes_mensal %}
+      {% for p in all_producoes_mensal %}
+        { data: "{{ p.data.strftime('%Y-%m-%d') if p.data else '' }}", valor: {{ (p.valor or 0)|float }} }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    {% elif producoes is defined %}
+      {% for p in producoes %}
+        { data: "{{ p.data.strftime('%Y-%m-%d') if p.data else '' }}", valor: {{ (p.valor or 0)|float }} }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    {% endif %}
+  ];
+
+  function fmtBR(v){
+    return 'R$ ' + Number(v || 0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+
+  const porAnoMes = {};
+  pontosAno.forEach(p => {
+    if (!p.data) return;
+    const d = new Date(p.data + 'T00:00:00');
+    if (isNaN(d)) return;
+    const ano = d.getFullYear();
+    const mes = d.getMonth();
+    porAnoMes[ano] ||= Array(12).fill(0);
+    porAnoMes[ano][mes] += Number(p.valor || 0);
+  });
+
+  const anos = Object.keys(porAnoMes).map(Number).sort((a,b)=>a-b);
+  const anoAtual = new Date().getFullYear();
+  const fallbackAnos = anos.length ? anos : [anoAtual];
+  const ano1Sel = document.getElementById('receitaAno1');
+  const ano2Sel = document.getElementById('receitaAno2');
+  const btn = document.getElementById('btnAtualizarComparativoAno');
+  const tbody = document.getElementById('tbodyReceitasAno');
+  const thAno1 = document.getElementById('thAno1');
+  const thAno2 = document.getElementById('thAno2');
+  const total1El = document.getElementById('receitaAno1Total');
+  const total2El = document.getElementById('receitaAno2Total');
+  const labelEl = document.getElementById('comparativoAnoLabel');
+  const canvas = document.getElementById('chartReceitasAnoComparativo');
+
+  if (!ano1Sel || !ano2Sel || !tbody || !canvas || typeof Chart === 'undefined') return;
+
+  const opts = fallbackAnos.map(a => `<option value="${a}">${a}</option>`).join('');
+  ano1Sel.innerHTML = opts;
+  ano2Sel.innerHTML = '<option value="">Sem comparação</option>' + opts;
+
+  ano1Sel.value = String(fallbackAnos[fallbackAnos.length - 1]);
+  if (fallbackAnos.length >= 2) ano2Sel.value = String(fallbackAnos[fallbackAnos.length - 2]);
+
+  const mesesBR = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  let chart;
+
+  function renderAnoComparativo(){
+    const ano1 = Number(ano1Sel.value || 0);
+    const ano2 = Number(ano2Sel.value || 0);
+    const vals1 = (porAnoMes[ano1] || Array(12).fill(0)).map(v => Number(v.toFixed(2)));
+    const vals2 = ano2 ? (porAnoMes[ano2] || Array(12).fill(0)).map(v => Number(v.toFixed(2))) : Array(12).fill(0);
+
+    const total1 = vals1.reduce((a,b)=>a+b,0);
+    const total2 = vals2.reduce((a,b)=>a+b,0);
+
+    if (thAno1) thAno1.textContent = String(ano1 || 'Ano 1');
+    if (thAno2) thAno2.textContent = ano2 ? String(ano2) : '—';
+    if (total1El) total1El.textContent = fmtBR(total1);
+    if (total2El) total2El.textContent = ano2 ? fmtBR(total2) : '—';
+    if (labelEl) labelEl.textContent = ano2 ? `${ano1} x ${ano2}` : `${ano1}`;
+
+    tbody.innerHTML = mesesBR.map((mes, i) => {
+      const d1 = vals1[i] || 0;
+      const d2 = vals2[i] || 0;
+      const diff = d1 - d2;
+      return `
+        <tr>
+          <td>${mes}</td>
+          <td class="text-end">${fmtBR(d1)}</td>
+          <td class="text-end">${ano2 ? fmtBR(d2) : '—'}</td>
+          <td class="text-end ${diff > 0 ? 'text-success' : (diff < 0 ? 'text-danger' : '')}">${ano2 ? fmtBR(diff) : '—'}</td>
+        </tr>`;
+    }).join('');
+
+    if (chart) chart.destroy();
+    chart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: mesesBR.map(m => m.slice(0,3)),
+        datasets: [
+          {
+            label: String(ano1),
+            data: vals1,
+            backgroundColor: 'rgba(39,71,217,0.82)',
+            borderColor: 'rgba(39,71,217,1)',
+            borderWidth: 1.2,
+            borderRadius: 8,
+            maxBarThickness: 24
+          },
+          ...(ano2 ? [{
+            label: String(ano2),
+            data: vals2,
+            backgroundColor: 'rgba(22,163,74,0.78)',
+            borderColor: 'rgba(22,163,74,1)',
+            borderWidth: 1.2,
+            borderRadius: 8,
+            maxBarThickness: 24
+          }] : [])
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display:true, position:'bottom' },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ' ' + fmtBR(ctx.parsed.y || 0)
+            }
+          }
+        },
+        scales: {
+          x: { grid:{ display:false }, ticks:{ color:'#64748b', font:{ size:11 } } },
+          y: {
+            beginAtZero:true,
+            grid:{ color:'rgba(148,163,184,.18)' },
+            ticks:{
+              color:'#64748b',
+              font:{ size:11 },
+              callback:(v)=>fmtBR(v)
+            }
+          }
+        }
+      }
+    });
+  }
+
+  btn?.addEventListener('click', renderAnoComparativo);
+  ano1Sel.addEventListener('change', renderAnoComparativo);
+  ano2Sel.addEventListener('change', renderAnoComparativo);
+  renderAnoComparativo();
 })();
 </script>
 
