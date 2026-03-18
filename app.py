@@ -5843,6 +5843,7 @@ def _despesa_due_date(dc):
         return base + timedelta(days=7)
     return base
 
+
 def _compute_coop_debt_snapshot(coop_id, di, df):
     q_prod = Lancamento.query.filter(Lancamento.cooperado_id == coop_id)
     if di:
@@ -5868,6 +5869,9 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
     )
     despesas = q_desp.all()
 
+    # regra pedida: saldo devedor do cooperado começa da semana passada em diante
+    lower_due = (di - timedelta(days=7)) if di else None
+
     itens = []
     total_vencido_pendente = 0.0
     total_programado = 0.0
@@ -5879,6 +5883,9 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
         restante = max(0.0, valor_total - pago_manual)
 
         due_date = _despesa_due_date(dc)
+        if lower_due and due_date < lower_due:
+            continue
+
         vencida = (df is not None and due_date <= df)
 
         pago_auto = 0.0
