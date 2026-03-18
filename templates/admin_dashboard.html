@@ -1519,6 +1519,10 @@
   let tProd = 0, tINSS4 = 0, tSEST05 = 0, tRec = 0, tDes = 0, tAdiant = 0, tReceber = 0, tPend = 0;
 
   rows.forEach(r => {
+    const saldoPend = (r.saldo_pendente ?? r.saldoPendente ?? 0);
+    const aReceber = (r.a_receber ?? r.aReceber ?? 0);
+    const pendProg = (r.pend_programado ?? r.pendProgramado ?? 0);
+
     tProd  += r.prod || 0;
     tINSS4 += r.inss4 || 0;
     tSEST05 += r.sest05 || 0;
@@ -1527,10 +1531,6 @@
     tAdiant += r.adiant || 0;
     tReceber += aReceber || 0;
     tPend += saldoPend || 0;
-
-    const saldoPend = (r.saldo_pendente ?? r.saldoPendente ?? 0);
-    const aReceber = (r.a_receber ?? r.aReceber ?? 0);
-    const pendProg = (r.pend_programado ?? r.pendProgramado ?? 0);
     const pendLink = saldoPend > 0 && r.id
       ? `<a class="fw-bold text-warning text-decoration-none" href="/admin?tab=coop_despesas&cooperado_id=${encodeURIComponent(r.id)}&somente_pendentes=1">${fmtBR(saldoPend)}</a>`
       : fmtBR(saldoPend);
