@@ -1525,12 +1525,15 @@
     tRec   += r.rec || 0;
     tDes   += r.des || 0;
     tAdiant += r.adiant || 0;
-    tReceber += r.aReceber || 0;
-    tPend += r.saldoPendente || 0;
+    tReceber += aReceber || 0;
+    tPend += saldoPend || 0;
 
-    const pendLink = (r.saldoPendente || 0) > 0 && r.id
-      ? `<a class="fw-bold text-warning text-decoration-none" href="/admin?tab=coop_despesas&cooperado_id=${encodeURIComponent(r.id)}&somente_pendentes=1">${fmtBR(r.saldoPendente)}</a>`
-      : fmtBR(r.saldoPendente || 0);
+    const saldoPend = (r.saldo_pendente ?? r.saldoPendente ?? 0);
+    const aReceber = (r.a_receber ?? r.aReceber ?? 0);
+    const pendProg = (r.pend_programado ?? r.pendProgramado ?? 0);
+    const pendLink = saldoPend > 0 && r.id
+      ? `<a class="fw-bold text-warning text-decoration-none" href="/admin?tab=coop_despesas&cooperado_id=${encodeURIComponent(r.id)}&somente_pendentes=1">${fmtBR(saldoPend)}</a>`
+      : fmtBR(saldoPend);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -1541,7 +1544,7 @@
       <td class="text-end text-success">${fmtBR(r.rec || 0)}</td>
       <td class="text-end text-danger">${fmtBR(r.des || 0)}</td>
       <td class="text-end text-danger">${fmtBR(r.adiant || 0)}</td>
-      <td class="text-end fw-bold ${(r.aReceber||0) <= 0 ? 'text-danger' : ''}">${fmtBR(r.aReceber || 0)}</td>
+      <td class="text-end fw-bold ${(aReceber||0) <= 0 ? 'text-danger' : ''}">${fmtBR(aReceber || 0)}</td>
       <td class="text-end">${pendLink}</td>`;
     tbody.appendChild(tr);
   });
@@ -1561,7 +1564,7 @@
   if (tPendEl) tPendEl.textContent = fmtBR(tPend);
 
   const kpiTotalAdiantamento = rows.reduce((acc,r)=>acc+(r.adiant||0),0);
-  const kpiTotalPendencias = rows.reduce((acc,r)=>acc+((r.saldoPendente||0)+(r.pendProgramado||0)),0);
+  const kpiTotalPendencias = rows.reduce((acc,r)=>acc+((r.saldo_pendente ?? r.saldoPendente ?? 0)+(r.pend_programado ?? r.pendProgramado ?? 0)),0);
   const adiantEl = document.getElementById('kpiQtdEntregasPeriodo');
   if (adiantEl) adiantEl.textContent = fmtBR(kpiTotalAdiantamento);
   const pendEl = document.getElementById('kpiTicketMedioPeriodo');
