@@ -1037,7 +1037,7 @@
               <div class="d-flex align-items-center justify-content-between">
                 <div>
                   <div class="text-uppercase text-muted small">Total de Adiantamento</div>
-                  <div id="kpiQtdEntregasPeriodo" class="fw-bold fs-5">R$ 0,00</div>
+                  <div id="kpiQtdEntregasPeriodo" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_adiantamentos_coop|default(0)) }}</div>
                   <div class="small text-muted">Adiantamentos no período</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-bicycle"></i></div>
@@ -1051,7 +1051,7 @@
               <div class="d-flex align-items-center justify-content-between">
                 <div>
                   <div class="text-uppercase text-muted small">Total de Pendências</div>
-                  <div id="kpiTicketMedioPeriodo" class="fw-bold fs-5">R$ 0,00</div>
+                  <div id="kpiTicketMedioPeriodo" class="fw-bold fs-5">R$ {{ '%.2f'|format((resumo_totais.saldo_pendente|default(0)) + (resumo_totais.pend_programado|default(0))) }}</div>
                   <div class="small text-muted">Valor ainda não pago</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-receipt"></i></div>
@@ -1109,14 +1109,14 @@
                 <tfoot>
                   <tr class="table-light fw-bold">
                     <td>Total</td>
-                    <td class="text-end" id="tProd">R$ 0,00</td>
-                    <td class="text-end" id="tINSS4">R$ 0,00</td>
-                    <td class="text-end" id="tSEST05">R$ 0,00</td>
-                    <td class="text-end text-success" id="tRec">R$ 0,00</td>
-                    <td class="text-end text-danger" id="tDes">R$ 0,00</td>
+                    <td class="text-end" id="tProd">R$ {{ '%.2f'|format(resumo_totais.prod|default(0)) }}</td>
+                    <td class="text-end" id="tINSS4">R$ {{ '%.2f'|format(resumo_totais.inss4|default(0)) }}</td>
+                    <td class="text-end" id="tSEST05">R$ {{ '%.2f'|format(resumo_totais.sest05|default(0)) }}</td>
+                    <td class="text-end text-success" id="tRec">R$ {{ '%.2f'|format(resumo_totais.rec|default(0)) }}</td>
+                    <td class="text-end text-danger" id="tDes">R$ {{ '%.2f'|format(resumo_totais.des|default(0)) }}</td>
                     <td class="text-end text-danger" id="tAdi">R$ 0,00</td>
-                    <td class="text-end fw-bold" id="tLiq">R$ 0,00</td>
-                    <td class="text-end fw-bold text-warning" id="tPend">R$ 0,00</td>
+                    <td class="text-end fw-bold" id="tLiq">R$ {{ '%.2f'|format(resumo_totais.a_receber|default(0)) }}</td>
+                    <td class="text-end fw-bold text-warning" id="tPend">R$ {{ '%.2f'|format((resumo_totais.saldo_pendente|default(0)) + (resumo_totais.pend_programado|default(0))) }}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -1507,69 +1507,6 @@
       const RESUMO_COOP_ROWS = {{ resumo_coop_rows|default([])|tojson|safe }};
       // ---- Tabela Resumo por Cooperado (7 colunas) ----
       
-(function renderResumoCoopTable() {
-  const rows  = RESUMO_COOP_ROWS;
-  const tbody = document.querySelector('#tblResumoCoop tbody');
-  if (!tbody) return;
-
-  tbody.innerHTML = rows.length
-    ? ''
-    : '<tr><td colspan="9" class="text-center text-muted">Sem dados no filtro.</td></tr>';
-
-  let tProd = 0, tINSS4 = 0, tSEST05 = 0, tRec = 0, tDes = 0, tAdiant = 0, tReceber = 0, tPend = 0;
-
-  rows.forEach(r => {
-    const saldoPend = (r.saldo_pendente ?? r.saldoPendente ?? 0);
-    const aReceber = (r.a_receber ?? r.aReceber ?? 0);
-    const pendProg = (r.pend_programado ?? r.pendProgramado ?? 0);
-
-    tProd  += r.prod || 0;
-    tINSS4 += r.inss4 || 0;
-    tSEST05 += r.sest05 || 0;
-    tRec   += r.rec || 0;
-    tDes   += r.des || 0;
-    tAdiant += r.adiant || 0;
-    tReceber += aReceber || 0;
-    tPend += saldoPend || 0;
-    const pendLink = saldoPend > 0 && r.id
-      ? `<a class="fw-bold text-warning text-decoration-none" href="/admin?tab=coop_despesas&cooperado_id=${encodeURIComponent(r.id)}&somente_pendentes=1">${fmtBR(saldoPend)}</a>`
-      : fmtBR(saldoPend);
-
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="text-break">${r.nome || '—'}</td>
-      <td class="text-end">${fmtBR(r.prod || 0)}</td>
-      <td class="text-end">${fmtBR(r.inss4 || 0)}</td>
-      <td class="text-end">${fmtBR(r.sest05 || 0)}</td>
-      <td class="text-end text-success">${fmtBR(r.rec || 0)}</td>
-      <td class="text-end text-danger">${fmtBR(r.des || 0)}</td>
-      <td class="text-end text-danger">${fmtBR(r.adiant || 0)}</td>
-      <td class="text-end fw-bold ${(aReceber||0) <= 0 ? 'text-danger' : ''}">${fmtBR(aReceber || 0)}</td>
-      <td class="text-end">${pendLink}</td>`;
-    tbody.appendChild(tr);
-  });
-
-  document.getElementById('tProd').textContent   = fmtBR(tProd);
-  document.getElementById('tINSS4').textContent  = fmtBR(tINSS4);
-  document.getElementById('tSEST05').textContent = fmtBR(tSEST05);
-  const tRecEl = document.getElementById('tRec');
-  const tDesEl = document.getElementById('tDes');
-  const tAdiantEl = document.getElementById('tAdiant');
-  const tLiqEl = document.getElementById('tLiq');
-  const tPendEl = document.getElementById('tPend');
-  if (tRecEl) tRecEl.textContent = fmtBR(tRec);
-  if (tDesEl) tDesEl.textContent = fmtBR(tDes);
-  if (tAdiantEl) tAdiantEl.textContent = fmtBR(tAdiant);
-  if (tLiqEl) tLiqEl.textContent = fmtBR(tReceber);
-  if (tPendEl) tPendEl.textContent = fmtBR(tPend);
-
-  const kpiTotalAdiantamento = rows.reduce((acc,r)=>acc+(r.adiant||0),0);
-  const kpiTotalPendencias = rows.reduce((acc,r)=>acc+((r.saldo_pendente ?? r.saldoPendente ?? 0)+(r.pend_programado ?? r.pendProgramado ?? 0)),0);
-  const adiantEl = document.getElementById('kpiQtdEntregasPeriodo');
-  if (adiantEl) adiantEl.textContent = fmtBR(kpiTotalAdiantamento);
-  const pendEl = document.getElementById('kpiTicketMedioPeriodo');
-  if (pendEl) pendEl.textContent = fmtBR(kpiTotalPendencias);
-})();
 
 
       // ---- Gráficos (Chart.js via CDN) ----
@@ -2851,6 +2788,12 @@
       </div>
 
       <form method="POST" action="{{ url_for('add_despesa_coop') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_coop_despesas_criar">
+      <input type="hidden" name="tab" value="coop_despesas">
+      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+      {% if request.args.get('somente_pendentes') %}<input type="hidden" name="somente_pendentes" value="1">{% endif %}
 
       <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
       <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
@@ -2907,7 +2850,15 @@
   <!-- Tabela -->
   <div class="card border-0 shadow-sm rounded-3">
     <div class="card-body p-2 p-md-3">
-      <form method="POST" action="{{ url_for('delete_despesa_coop_bulk') }}" id="bulkDeleteDespesasForm" class="mb-2 d-flex justify-content-end"><button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Excluir despesas selecionadas?');"><i class="bi bi-trash"></i> Excluir marcadas</button></form>
+      <form method="POST" action="{{ url_for('delete_despesa_coop_bulk') }}" id="bulkDeleteDespesasForm" class="mb-2 d-flex justify-content-end gap-2">
+        <input type="hidden" name="tab" value="coop_despesas">
+        <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+        <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+        {% if request.args.get('somente_pendentes') %}<input type="hidden" name="somente_pendentes" value="1">{% endif %}
+        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Excluir despesas selecionadas?');"><i class="bi bi-trash"></i> Excluir marcadas</button>
+      </form>
       <div class="table-responsive">
         <table class="table table-sm table-bordered table-hover align-middle" id="tblDespesasCoop">
           <thead class="table-light">
@@ -2919,6 +2870,7 @@
               <th style="width:120px">Tipo</th>
               <th style="width:160px">Competência</th>
               <th class="text-end" style="width:160px">Valor</th>
+              <th class="text-end" style="width:160px">Abatido automático</th>
               <th class="text-end" style="width:160px">Restante</th>
               <th class="text-center" style="width:120px">Status</th>
               <th class="text-center" style="width:200px">Ações</th>
@@ -2928,7 +2880,7 @@
           <tbody>
             {% for dc in despesas_coop %}
               {% set coop_nome = (dc.cooperado.nome if dc.cooperado else 'Todos') %}
-              {% set _abat_manual = namespace(v=0) %}{% if dc.abatimentos is defined %}{% for ab in dc.abatimentos %}{% set _abat_manual.v = _abat_manual.v + (ab.valor or 0) %}{% endfor %}{% endif %}{% set _restante = (dc.valor or 0) - _abat_manual.v %}
+              {% set snap = despesa_snapshot_map.get(dc.id) if despesa_snapshot_map is defined else None %}{% set _abat_auto = (snap.pago_auto if snap else 0) %}{% set _restante = (snap.restante if snap else (dc.valor or 0)) %}
               <tr data-coop="{{ coop_nome|lower }}" data-desc="{{ (dc.descricao or '')|lower }}">
                 <td class="text-center"><input type="checkbox" name="ids[]" form="bulkDeleteDespesasForm" value="{{ dc.id }}"></td>
                 <td>{{ dc.data.strftime('%d/%m/%Y') if dc.data else '-' }}</td>
@@ -2937,9 +2889,9 @@
                 <td>{% if dc.eh_adiantamento %}<span class="badge bg-warning text-dark">Adiantamento</span>{% else %}<span class="badge bg-light text-dark border">Despesa</span>{% endif %}</td>
                 <td>{% if dc.competencia_desconto=='semana_passada' %}Semana passada{% elif dc.competencia_desconto=='proxima_semana' %}Próxima semana{% else %}Esta semana{% endif %}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(dc.valor) }}</td>
-                <td class="text-end">R$ {{ "%.2f"|format(_abat_manual.v) }}</td>
+                <td class="text-end">R$ {{ "%.2f"|format(_abat_auto or 0) }}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(_restante if _restante>0 else 0) }}</td>
-                <td class="text-center">{% if _restante <= 0 %}<span class="badge bg-success">Quitada</span>{% elif _abat_manual.v > 0 %}<span class="badge bg-warning text-dark">Parcial</span>{% else %}<span class="badge bg-secondary">Aberta</span>{% endif %}</td>
+                <td class="text-center">{% if snap %}{% if snap.status == "quitada" %}<span class="badge bg-success">Recebida</span>{% elif snap.status == "parcial" %}<span class="badge bg-warning text-dark">Parcial</span>{% elif snap.status == "a_descontar" %}<span class="badge bg-info text-dark">A descontar</span>{% else %}<span class="badge bg-secondary">Aberta</span>{% endif %}{% else %}<span class="badge bg-secondary">Aberta</span>{% endif %}</td>
                 <td class="text-center text-nowrap"><button class="btn btn-warning btn-sm"
                           data-bs-toggle="modal"
                           data-bs-target="#modalEditDespesaCoop"
@@ -2970,15 +2922,15 @@
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="5" class="text-center text-muted">Nenhuma despesa</td></tr>
+              <tr><td colspan="10" class="text-center text-muted">Nenhuma despesa</td></tr>
             {% endfor %}
           </tbody>
 
           <tfoot>
             <tr class="table-light">
-              <th colspan="3" class="text-end">Total</th>
+              <th colspan="6" class="text-end">Total</th>
               <th class="text-end">R$ {{ '%.2f'|format(_total_geral) }}</th>
-              <th></th>
+              <th></th><th></th><th></th>
             </tr>
           </tfoot>
         </table>
@@ -5445,6 +5397,12 @@
   <div class="modal fade" id="modalEditLancamento" tabindex="-1">
     <div class="modal-dialog modal-lg">
       <form method="POST" class="modal-content">
+          <input type="hidden" name="tab" value="coop_despesas">
+          <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+          <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+          <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+          <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+          {% if request.args.get('somente_pendentes') %}<input type="hidden" name="somente_pendentes" value="1">{% endif %}
         <div class="modal-header"><h5 class="modal-title">Editar Lançamento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body row g-2 px-3">
           <input type="hidden" name="id">
