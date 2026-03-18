@@ -1472,12 +1472,9 @@
 
       const kpiRecCooperadosFull = kpiProd + sumBy(filteredRECp, x => x.valor);
 
-      // >>> SEM ADIANTAMENTO: despesas cooperados soma TUDO
-      const kpiDespCooperados = sumBy(filteredDESp, x => x.valor);
-
+      const kpiDespCooperados = sumBy(filteredDESp.filter(x => !x.adiantamento), x => x.valor);
       const kpiResultadoCoop      = kpiRecCoopCorp - kpiDespCoopCorp;
       const kpiTotalReceitasGeral = kpiRecCoopCorp + kpiRecCooperadosFull;
-      const kpiTicketMedioPeriodo = qtdEntregasPeriodo ? (kpiProd / qtdEntregasPeriodo) : 0;
       const kpiBeneficiosRateados = sumBy(filteredBEN, x => x.valor_total);
 
       // aplica KPIs na tela
@@ -1490,9 +1487,9 @@
       document.getElementById('kpiDespCooperados').textContent     = fmtBR(kpiDespCooperados);
       document.getElementById('kpiTotalReceitasGeral').textContent = fmtBR(kpiTotalReceitasGeral);
       const qtdEl = document.getElementById('kpiQtdEntregasPeriodo');
-      if (qtdEl) qtdEl.textContent = Number(qtdEntregasPeriodo || 0).toLocaleString('pt-BR');
+      if (qtdEl) qtdEl.textContent = fmtBR(kpiTotalAdiantamento);
       const ticketEl = document.getElementById('kpiTicketMedioPeriodo');
-      if (ticketEl) ticketEl.textContent = fmtBR(kpiTicketMedioPeriodo);
+      if (ticketEl) ticketEl.textContent = fmtBR(kpiTotalPendencias);
       const benEl = document.getElementById('kpiBeneficiosRateados');
       if (benEl) benEl.textContent = fmtBR(kpiBeneficiosRateados);
 
@@ -1512,45 +1509,74 @@
 
       // ---- Função de resumo (usada na tabela e no XLSX) ----
       function computeResumoCoopRows() {
-        const map = new Map();
-        const ensure = (id, nome) => {
-          const key = coopKey(id, nome);
-          if (!map.has(key)) {
-            map.set(key, { key, id, nome, prod: 0, inss4: 0, sest05: 0, rec: 0, des: 0, adiant: 0, aReceber: 0, saldoPendente: 0 });
-          }
-          return map.get(key);
-        };
+  const map = new Map();
+  const ensure = (id, nome) => {
+    const key = coopKey(id, nome);
+    if (!map.has(key)) {
+      map.set(key, { key, id, nome, prod: 0, inss4: 0, sest05: 0, rec: 0, des: 0, adiant: 0, aReceber: 0, saldoPendente: 0, pendProgramado: 0, debts: [] });
+    }
+    return map.get(key);
+  };
 
-        filteredPROD.forEach(p => {
-          const row = ensure(p.cooperado_id, p.cooperado_nome);
-          row.prod += p.valor;
-          row.inss4 += p.valor * 0.04;
-          row.sest05 += p.valor * 0.005;
-        });
-        filteredRECp.forEach(r => {
-          const row = ensure(r.cooperado_id, r.cooperado_nome);
-          row.rec += r.valor;
-        });
-        filteredDESp.forEach(d => {
-          const row = ensure(d.cooperado_id, d.cooperado_nome || '—');
-          if (d.adiantamento) row.adiant += d.valor;
-          else row.des += d.valor;
-        });
+  filteredPROD.forEach(p => {
+    const row = ensure(p.cooperado_id, p.cooperado_nome);
+    row.prod += p.valor;
+    row.inss4 += p.valor * 0.04;
+    row.sest05 += p.valor * 0.005;
+  });
+  filteredRECp.forEach(r => {
+    const row = ensure(r.cooperado_id, r.cooperado_nome);
+    row.rec += r.valor;
+  });
+  filteredDESp.forEach(d => {
+    const row = ensure(d.cooperado_id, d.cooperado_nome || '—');
+    row.debts.push({ ...d });
+  });
 
-        map.forEach((row) => {
-          const brutoDisponivel = Math.max(0, row.prod + row.rec - row.inss4 - row.sest05);
-          const totalDividas = row.des + row.adiant;
-          row.aReceber = Math.max(0, brutoDisponivel - totalDividas);
-          row.saldoPendente = Math.max(0, totalDividas - brutoDisponivel);
-        });
-        return Array.from(map.values()).sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+  const refEnd = parseISO(FILTER.rf) || new Date();
+
+  map.forEach((row) => {
+    row.debts.sort((a,b) => String(a.data||'').localeCompare(String(b.data||'')) || (a.id||0)-(b.id||0));
+    let disponivel = Math.max(0, row.prod + row.rec - row.inss4 - row.sest05);
+
+    row.debts.forEach((d) => {
+      let due = parseISO(d.data);
+      const comp = String(d.competencia_desconto || 'esta_semana');
+      if (due) {
+        if (comp === 'semana_passada') due = new Date(due.getTime() - 7*86400000);
+        else if (comp === 'proxima_semana') due = new Date(due.getTime() + 7*86400000);
       }
+      const manual = Math.max(0, Number(d.valor_pago_manual || 0));
+      let restante = Math.max(0, Number(d.valor || 0) - manual);
+      const vencida = !due || due <= refEnd;
+      let auto = 0;
+      if (vencida && restante > 0 && disponivel > 0) {
+        auto = Math.min(restante, disponivel);
+        disponivel -= auto;
+        restante -= auto;
+      }
+      if (restante > 0) {
+        if (vencida) {
+          if (d.adiantamento) row.adiant += restante;
+          else row.des += restante;
+          row.saldoPendente += restante;
+        } else {
+          row.pendProgramado += restante;
+        }
+      }
+    });
 
-      const RESUMO_COOP_ROWS = computeResumoCoopRows();
+    row.aReceber = Math.max(0, disponivel);
+  });
+
+  return Array.from(map.values()).sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+}
+
+const RESUMO_COOP_ROWS = computeResumoCoopRows();
       const kpiTotalAdiantamento = RESUMO_COOP_ROWS.reduce((acc,r)=>acc+(r.adiant||0),0);
       const kpiTotalPendencias = RESUMO_COOP_ROWS.reduce((acc,r)=>acc+(r.saldoPendente||0),0);
-      const qtdEl = document.getElementById('kpiQtdEntregasPeriodo'); if (qtdEl) qtdEl.textContent = fmtBR(kpiTotalAdiantamento);
-      const ticketEl = document.getElementById('kpiTicketMedioPeriodo'); if (ticketEl) ticketEl.textContent = fmtBR(kpiTotalPendencias);
+      const adiantEl = document.getElementById('kpiQtdEntregasPeriodo'); if (adiantEl) adiantEl.textContent = fmtBR(kpiTotalAdiantamento);
+      const pendEl = document.getElementById('kpiTicketMedioPeriodo'); if (pendEl) pendEl.textContent = fmtBR(kpiTotalPendencias);
 
       // ---- Tabela Resumo por Cooperado (7 colunas) ----
       (function renderResumoCoopTable() {
@@ -2948,6 +2974,8 @@
                           data-descricao="{{ dc.descricao }}"
                           data-valor="{{ dc.valor }}"
                           data-data="{{ dc.data.strftime('%Y-%m-%d') if dc.data else '' }}"
+                          data-competencia="{{ dc.competencia_desconto if dc.competencia_desconto is defined else 'esta_semana' }}"
+                          data-eh_adiantamento="{{ 1 if dc.eh_adiantamento else 0 }}"
                           data-url="{{ url_for('edit_despesa_coop', id=dc.id) }}">
                     <i class="bi bi-pencil"></i>
                   </button>{% endif %}
@@ -5546,8 +5574,22 @@
             </select>
           </div>
           <div class="col-12"><input type="text" class="form-control" name="descricao" required></div>
-          <div class="col-12"><input type="number" step="0.01" class="form-control" name="valor" required></div>
-          <div class="col-12"><input type="date" class="form-control" name="data" required></div>
+          <div class="col-md-6"><input type="number" step="0.01" class="form-control" name="valor" required></div>
+          <div class="col-md-6"><input type="date" class="form-control" name="data" required></div>
+          <div class="col-md-8">
+            <label class="form-label">Competência</label>
+            <select class="form-select" name="competencia_desconto">
+              <option value="esta_semana">Produção desta semana</option>
+              <option value="semana_passada">Produção da semana passada</option>
+              <option value="proxima_semana">Produção da próxima semana</option>
+            </select>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="eh_adiantamento" id="editEhAdiantamentoDesp">
+              <label class="form-check-label" for="editEhAdiantamentoDesp">Adiantamento</label>
+            </div>
+          </div>
         </div>
         <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
       </form>
@@ -5662,11 +5704,22 @@
   bindModal('modalEditReceita',      { id:'id', descricao:'descricao', valor:'valor', data:'data' });
   bindModal('modalEditDespesa',      { id:'id', descricao:'descricao', valor:'valor', data:'data' });
   bindModal('modalEditReceitaCoop',  { id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data' });
-  bindModal('modalEditDespesaCoop',  { id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data' });
+  bindModal('modalEditDespesaCoop',  { id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', competencia:'competencia_desconto' });
   bindModal('modalEditCooperado',    { id:'id', nome:'nome', usuario:'usuario' });
   bindModal('modalResetSenhaCooperado', { id:'id' });
   bindModal('modalEditRestaurante',  { id:'id', nome:'nome', periodo:'periodo', usuario:'usuario' });
   bindModal('modalResetSenhaRestaurante', { id:'id' });
+
+  (function(){
+    const modal = document.getElementById('modalEditDespesaCoop');
+    if (!modal) return;
+    modal.addEventListener('show.bs.modal', (ev) => {
+      const btn = ev.relatedTarget;
+      const form = modal.querySelector('form');
+      const chk = form?.querySelector('[name="eh_adiantamento"]');
+      if (chk) chk.checked = String(btn?.dataset?.eh_adiantamento || '0') === '1';
+    });
+  })();
 
   // ===== Gráficos =====
   const rawLancCoop   = {{ (chart_data_lancamentos_coop or {'labels':[], 'values':[]}) | tojson }};
