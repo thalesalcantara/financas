@@ -428,7 +428,7 @@
     <section class="tab-pane-custom" id="tab-resumo">
       <div class="section-card">
         <div class="section-head">
-          <h2 class="section-title">Resumo do período</h2>
+          <h2 class="section-title">Visão geral</h2>
           <span class="section-chip"><i class="bi bi-stars"></i> Coopex</span>
         </div>
         <div class="kpi-grid">
@@ -448,9 +448,9 @@
             <div class="kpi-sub">Recebido no período</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-title">Descontos aplicados</div>
+            <div class="kpi-title">Descontos</div>
             <div class="kpi-value mono">R$ {{ '%.2f'|format(total_descontos|default(0)) }}</div>
-            <div class="kpi-sub">Já abatidos no período</div>
+            <div class="kpi-sub">Individuais</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-title">INSS (4%)</div>
@@ -466,10 +466,21 @@
             <div class="kpi-title">Complemento INSS</div>
             <div class="kpi-value mono">R$ {{ '%.2f'|format(inss_complemento|default(0)) }}</div>
             <div class="kpi-sub">Meta sugerida</div>
-          </div>          <div class="kpi-card span-2">
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Saldo devedor</div>
+            <div class="kpi-value mono" style="color:var(--danger);font-size:1.1rem">R$ {{ '%.2f'|format(saldo_devedor|default(0)) }}</div>
+            <div class="kpi-sub">Já vencido</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">A descontar</div>
+            <div class="kpi-value mono">R$ {{ '%.2f'|format(total_a_descontar|default(0)) }}</div>
+            <div class="kpi-sub">Competência futura</div>
+          </div>
+          <div class="kpi-card span-2">
             <div class="kpi-title">Total a receber</div>
             <div class="kpi-value mono" style="color:var(--ok);font-size:1.2rem">R$ {{ '%.2f'|format(total_liquido|default(0)) }}</div>
-            <div class="kpi-sub">Após descontos e encargos. Pendências e valores a descontar ficam no topo e na aba Ajust. Coop.</div>
+            <div class="kpi-sub">Após descontos e encargos</div>
           </div>
         </div>
       </div>
@@ -603,8 +614,7 @@
                   · {% if d.status == 'quitada' %}Quitada{% elif d.status == 'parcial' %}Parcial{% elif d.status == 'a_descontar' %}A descontar{% else %}Pendente{% endif %}
                 </div>
                 <div class="item-meta mt-1">
-                  Pago manual: <b>R$ {{ '%.2f'|format(d.pago_manual|default(0)) }}</b>
-                  · Pago automático: <b>R$ {{ '%.2f'|format(d.pago_auto|default(0)) }}</b>
+                  Descontado automaticamente: <b>R$ {{ '%.2f'|format(d.pago_auto|default(0)) }}</b>
                   · Restante: <b>R$ {{ '%.2f'|format(d.restante|default(0)) }}</b>
                 </div>
               </div>
