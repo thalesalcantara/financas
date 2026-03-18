@@ -1505,9 +1505,77 @@
 
       // ---- Função de resumo (usada na tabela e no XLSX) ----
       const RESUMO_COOP_ROWS = {{ resumo_coop_rows|default([])|tojson|safe }};
-      // ---- Tabela Resumo por Cooperado (7 colunas) ----
-      
+      // ---- Tabela Resumo por Cooperado (render backend) ----
+      (function renderResumoCoopTable() {
+        const rows  = Array.isArray(RESUMO_COOP_ROWS) ? RESUMO_COOP_ROWS : [];
+        const tbody = document.querySelector('#tblResumoCoop tbody');
+        if (!tbody) return;
 
+        tbody.innerHTML = rows.length
+          ? ''
+          : '<tr><td colspan="9" class="text-center text-muted">Sem dados no filtro.</td></tr>';
+
+        let tProd = 0, tINSS4 = 0, tSEST05 = 0, tRec = 0, tDes = 0, tAdiant = 0, tReceber = 0, tPend = 0;
+
+        rows.forEach(r => {
+          const prod = Number(r.prod || 0);
+          const inss4 = Number(r.inss4 || 0);
+          const sest05 = Number(r.sest05 || 0);
+          const rec = Number(r.rec || 0);
+          const des = Number(r.des || 0);
+          const adiant = Number(r.adiant || 0);
+          const aReceber = Number(r.a_receber ?? r.aReceber ?? 0);
+          const saldoPend = Number(r.saldo_pendente ?? r.saldoPendente ?? 0);
+
+          tProd += prod;
+          tINSS4 += inss4;
+          tSEST05 += sest05;
+          tRec += rec;
+          tDes += des;
+          tAdiant += adiant;
+          tReceber += aReceber;
+          tPend += saldoPend;
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="text-break">${r.nome || '—'}</td>
+            <td class="text-end">${fmtBR(prod)}</td>
+            <td class="text-end">${fmtBR(inss4)}</td>
+            <td class="text-end">${fmtBR(sest05)}</td>
+            <td class="text-end text-success">${fmtBR(rec)}</td>
+            <td class="text-end text-danger">${fmtBR(des)}</td>
+            <td class="text-end text-danger">${fmtBR(adiant)}</td>
+            <td class="text-end fw-bold">${fmtBR(aReceber)}</td>
+            <td class="text-end fw-bold text-warning">${fmtBR(saldoPend)}</td>`;
+          tbody.appendChild(tr);
+        });
+
+        const setText = (id, value) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = fmtBR(value);
+        };
+
+        setText('tProd', tProd);
+        setText('tINSS4', tINSS4);
+        setText('tSEST05', tSEST05);
+        setText('tRec', tRec);
+        setText('tDes', tDes);
+
+        const tAdEl = document.getElementById('tAdiant');
+        if (tAdEl) tAdEl.textContent = fmtBR(tAdiant);
+
+        const tLiqEl = document.getElementById('tLiq');
+        if (tLiqEl) tLiqEl.textContent = fmtBR(tReceber);
+
+        const tPendEl = document.getElementById('tPend');
+        if (tPendEl) tPendEl.textContent = fmtBR(tPend);
+
+        const adiantEl = document.getElementById('kpiQtdEntregasPeriodo');
+        if (adiantEl) adiantEl.textContent = fmtBR(tAdiant);
+
+        const pendEl = document.getElementById('kpiTicketMedioPeriodo');
+        if (pendEl) pendEl.textContent = fmtBR(tPend);
+      })();
 
       // ---- Gráficos (Chart.js via CDN) ----
       const ensureChart = () => new Promise(res => {
