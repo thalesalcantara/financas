@@ -3395,6 +3395,12 @@ def admin_dashboard():
             if getattr(d, "eh_adiantamento", False)
         )
 
+        despesa_snapshot_map = {}
+        for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
+            _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
+            for _it in _snap["itens"]:
+                despesa_snapshot_map[_it["id"]] = _it
+
     cfg = get_config()
 
     cooperados = (
@@ -3943,8 +3949,8 @@ def admin_dashboard():
         rec = sum((r.valor or 0.0) for r in receitas_coop if getattr(r, "cooperado_id", None) == coop.id)
         inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
         sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-        des = sum((it["restante"] for it in snap["itens"] if (not it["eh_adiantamento"]) and it["status"] in ("pendente","parcial")), 0.0)
-        adiant = sum((it["restante"] for it in snap["itens"] if it["eh_adiantamento"] and it["status"] in ("pendente","parcial")), 0.0)
+        des = round(snap.get("descontado_despesa", 0.0), 2)
+        adiant = round(snap.get("descontado_adiant", 0.0), 2)
         if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
             _a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
             _saldo_pendente = round(snap["saldo_devedor"], 2)
@@ -4035,6 +4041,7 @@ def admin_dashboard():
         contagem_contrato_turno=contagem_contrato_turno,
         resumo_coop_rows=resumo_coop_rows,
         resumo_totais=resumo_totais,
+        despesa_snapshot_map=despesa_snapshot_map,
     )
     
 # =========================
@@ -5892,6 +5899,20 @@ def _despesa_due_date(dc):
     return base
 
 
+
+def _admin_redirect_with_filters(default_tab="coop_despesas"):
+    args = {
+        "tab": request.form.get("tab") or request.args.get("tab") or default_tab,
+        "data_inicio": request.form.get("data_inicio") or request.args.get("data_inicio") or "",
+        "data_fim": request.form.get("data_fim") or request.args.get("data_fim") or "",
+        "restaurante_id": request.form.get("restaurante_id") or request.args.get("restaurante_id") or "",
+        "cooperado_id": request.form.get("cooperado_id") or request.args.get("cooperado_id") or "",
+    }
+    if request.form.get("somente_pendentes") or request.args.get("somente_pendentes"):
+        args["somente_pendentes"] = "1"
+    return redirect(url_for("admin_dashboard", **args))
+
+
 def _compute_coop_debt_snapshot(coop_id, di, df):
     q_prod = Lancamento.query.filter(Lancamento.cooperado_id == coop_id)
     if di:
@@ -5917,23 +5938,26 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
     )
     despesas = q_desp.all()
 
-    # regra pedida: saldo devedor do cooperado começa da semana passada em diante
     lower_due = (di - timedelta(days=7)) if di else None
 
     itens = []
     total_vencido_pendente = 0.0
     total_programado = 0.0
+    total_descontado_despesa = 0.0
+    total_descontado_adiant = 0.0
 
     for dc in despesas:
         valor_total = float(dc.valor or 0.0)
-        pago_manual = 0.0
-        restante = max(0.0, valor_total)
+        if valor_total <= 0:
+            continue
 
         due_date = _despesa_due_date(dc)
         if lower_due and due_date < lower_due:
             continue
 
         vencida = (df is not None and due_date <= df)
+        pago_manual = 0.0
+        restante = valor_total
 
         pago_auto = 0.0
         if vencida and restante > 0 and disponivel_auto > 0:
@@ -5943,12 +5967,18 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
 
         if restante <= 0.0001:
             status = 'quitada'
-        elif (pago_manual + pago_auto) > 0:
+        elif pago_auto > 0:
             status = 'parcial'
         elif vencida:
-            status = 'pendente'
+            status = 'aberta'
         else:
             status = 'a_descontar'
+
+        if vencida:
+            if getattr(dc, 'eh_adiantamento', False):
+                total_descontado_adiant += valor_total - restante
+            else:
+                total_descontado_despesa += valor_total - restante
 
         if restante > 0:
             if vencida:
@@ -5966,7 +5996,7 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
             'valor_total': round(valor_total, 2),
             'pago_manual': round(pago_manual, 2),
             'pago_auto': round(pago_auto, 2),
-            'pago_total': round(pago_manual + pago_auto, 2),
+            'pago_total': round(pago_auto, 2),
             'restante': round(restante, 2),
             'eh_adiantamento': bool(getattr(dc, 'eh_adiantamento', False)),
             'competencia_desconto': _competencia_label(getattr(dc, 'competencia_desconto', 'esta_semana')),
@@ -5981,6 +6011,8 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
         'itens': itens,
         'saldo_devedor': round(total_vencido_pendente, 2),
         'a_descontar': round(total_programado, 2),
+        'descontado_despesa': round(total_descontado_despesa, 2),
+        'descontado_adiant': round(total_descontado_adiant, 2),
     }
 
 
@@ -5996,12 +6028,12 @@ def delete_despesa_coop_bulk():
             pass
     if not ids_int:
         flash("Selecione pelo menos uma despesa para excluir.", "warning")
-        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+        return _admin_redirect_with_filters("coop_despesas")
 
     DespesaCooperado.query.filter(DespesaCooperado.id.in_(ids_int)).delete(synchronize_session=False)
     db.session.commit()
     flash(f"{len(ids_int)} despesa(s) excluída(s).", "success")
-    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+    return _admin_redirect_with_filters("coop_despesas")
 
 
 
@@ -6023,13 +6055,13 @@ def add_abatimento_despesa_coop(id):
 
     if valor <= 0:
         flash("Informe um valor válido para o abatimento.", "warning")
-        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+        return _admin_redirect_with_filters("coop_despesas")
 
     restante_atual = max(0.0, (dc.valor or 0.0) - sum((ab.valor or 0.0) for ab in getattr(dc, "abatimentos", [])))
     valor_final = min(valor, restante_atual) if restante_atual > 0 else 0.0
     if valor_final <= 0:
         flash("Essa despesa já está quitada.", "info")
-        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+        return _admin_redirect_with_filters("coop_despesas")
 
     db.session.add(
         DespesaCooperadoAbatimento(
@@ -6042,7 +6074,7 @@ def add_abatimento_despesa_coop(id):
     )
     db.session.commit()
     flash("Abatimento registrado com sucesso.", "success")
-    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+    return _admin_redirect_with_filters("coop_despesas")
 
 
 @app.route("/coop/despesas/add", methods=["POST"])
@@ -6059,7 +6091,7 @@ def add_despesa_coop():
 
     if not ids:
         flash("Selecione pelo menos um cooperado.", "warning")
-        return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+        return _admin_redirect_with_filters("coop_despesas")
 
     if not d:
         d = date.today()
@@ -6086,7 +6118,7 @@ def add_despesa_coop():
 
     db.session.commit()
     flash("Despesa(s) lançada(s).", "success")
-    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+    return _admin_redirect_with_filters("coop_despesas")
 
 
 @app.route("/coop/despesas/<int:id>/edit", methods=["POST"])
@@ -6110,7 +6142,7 @@ def edit_despesa_coop(id):
 
     db.session.commit()
     flash("Despesa do cooperado atualizada.", "success")
-    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+    return _admin_redirect_with_filters("coop_despesas")
 
 
 @app.route("/coop/despesas/<int:id>/delete", methods=["GET", "POST"])
@@ -6120,7 +6152,7 @@ def delete_despesa_coop(id):
     db.session.delete(dc)
     db.session.commit()
     flash("Despesa do cooperado excluída.", "success")
-    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+    return _admin_redirect_with_filters("coop_despesas")
 
 # =========================
 # Benefícios — Editar / Excluir (Admin)
