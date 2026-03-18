@@ -3946,6 +3946,9 @@ def admin_dashboard():
         des = sum((it["restante"] for it in snap["itens"] if (not it["eh_adiantamento"]) and it["status"] in ("pendente","parcial")), 0.0)
         adiant = sum((it["restante"] for it in snap["itens"] if it["eh_adiantamento"] and it["status"] in ("pendente","parcial")), 0.0)
         if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
+            _a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
+            _saldo_pendente = round(snap["saldo_devedor"], 2)
+            _pend_programado = round(snap["a_descontar"], 2)
             resumo_coop_rows.append({
                 "id": coop.id,
                 "nome": coop.nome,
@@ -3955,9 +3958,12 @@ def admin_dashboard():
                 "rec": round(rec,2),
                 "des": round(des,2),
                 "adiant": round(adiant,2),
-                "a_receber": round(max(0.0, snap["disponivel_auto_restante"]),2),
-                "saldo_pendente": round(snap["saldo_devedor"],2),
-                "pend_programado": round(snap["a_descontar"],2),
+                "a_receber": _a_receber,
+                "aReceber": _a_receber,
+                "saldo_pendente": _saldo_pendente,
+                "saldoPendente": _saldo_pendente,
+                "pend_programado": _pend_programado,
+                "pendProgramado": _pend_programado,
             })
             resumo_totais["prod"] += prod
             resumo_totais["inss4"] += inss4
