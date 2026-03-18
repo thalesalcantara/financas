@@ -443,10 +443,12 @@
 
           <div class="kpi-card">
             <div class="kpi-title">INSS / SEST-SENAT</div>
-            <div class="mono" style="font-size:1rem;line-height:1.45">
-              <div style="margin-bottom:12px"><strong>INSS (4%):</strong>R$ {{ '%.2f'|format(inss_valor|default(0)) }}</div>
-              <div><strong>SEST/SENAT (0,5%):</strong></div> R$ {{ '%.2f'|format(sest_senat_valor|default(0)) }}</div>
+            <div class="kpi-value mono" style="font-size:1rem;line-height:1.45">
+              INSS (4%): R$ {{ '%.2f'|format(inss_valor|default(0)) }}<br>
+
+              SEST/SENAT (0,5%): R$ {{ '%.2f'|format(sest_senat_valor|default(0)) }}
             </div>
+            <div class="kpi-sub">Valores separados</div>
           </div>
 
           <div class="kpi-card">
@@ -1186,7 +1188,6 @@ const MY_ESCALA   = {{ minha_escala_json | default([]) | tojson }};
   const buttons=[...document.querySelectorAll('.tab-btn')];
   const panes=[...document.querySelectorAll('.tab-pane-custom')];
   const activeInput=document.getElementById('activeTabInput');
-  const tabsWrap=document.getElementById('painelTabsContent');
   const params=new URLSearchParams(window.location.search);
   const valid=['resumo','producoes','ajustes','escalas','trocas'];
   let current=params.get('active_tab') || localStorage.getItem('coopex_active_tab') || (activeInput?.value || 'resumo');
@@ -1196,7 +1197,6 @@ const MY_ESCALA   = {{ minha_escala_json | default([]) | tojson }};
     buttons.forEach(btn=>btn.classList.toggle('active', btn.dataset.tab===name));
     panes.forEach(p=>p.classList.toggle('active', p.id===`tab-${name}`));
     if (activeInput) activeInput.value=name;
-    current=name;
     localStorage.setItem('coopex_active_tab', name);
     if (updateHistory){
       const url=new URL(window.location.href);
@@ -1206,38 +1206,6 @@ const MY_ESCALA   = {{ minha_escala_json | default([]) | tojson }};
   }
 
   buttons.forEach(btn=>btn.addEventListener('click', ()=>showTab(btn.dataset.tab)));
-
-  let touchStartX=0;
-  let touchStartY=0;
-  let touchMoved=false;
-
-  tabsWrap?.addEventListener('touchstart', (e)=>{
-    const t=e.changedTouches?.[0];
-    if (!t) return;
-    touchStartX=t.clientX;
-    touchStartY=t.clientY;
-    touchMoved=false;
-  }, {passive:true});
-
-  tabsWrap?.addEventListener('touchmove', (e)=>{
-    const t=e.changedTouches?.[0];
-    if (!t) return;
-    const dx=t.clientX-touchStartX;
-    const dy=t.clientY-touchStartY;
-    if (Math.abs(dx)>8 || Math.abs(dy)>8) touchMoved=true;
-  }, {passive:true});
-
-  tabsWrap?.addEventListener('touchend', (e)=>{
-    const t=e.changedTouches?.[0];
-    if (!t || !touchMoved) return;
-    const dx=t.clientX-touchStartX;
-    const dy=t.clientY-touchStartY;
-    if (Math.abs(dx) < 60 || Math.abs(dx) <= Math.abs(dy)) return;
-    const idx=valid.indexOf(current);
-    if (dx < 0 && idx < valid.length-1) showTab(valid[idx+1]);
-    if (dx > 0 && idx > 0) showTab(valid[idx-1]);
-  }, {passive:true});
-
   showTab(current, false);
 })();
 </script>
