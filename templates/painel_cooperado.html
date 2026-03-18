@@ -356,6 +356,16 @@
         <div class="hero-sub">Total recebido</div>
       </div>
       <div class="hero-card">
+        <div class="hero-label">Saldo devedor</div>
+        <div class="hero-value tight mono">R$ {{ '%.2f'|format(saldo_devedor|default(0)) }}</div>
+        <div class="hero-sub">Já vencido</div>
+      </div>
+      <div class="hero-card">
+        <div class="hero-label">A descontar</div>
+        <div class="hero-value tight mono">R$ {{ '%.2f'|format(total_a_descontar|default(0)) }}</div>
+        <div class="hero-sub">Competência futura</div>
+      </div>
+      <div class="hero-card">
         <div class="hero-label">Avisos</div>
         <div class="hero-value tight mono">{{ unread }}</div>
         <div class="hero-sub">Não lidos</div>
@@ -457,39 +467,21 @@
             <div class="kpi-value mono">R$ {{ '%.2f'|format(inss_complemento|default(0)) }}</div>
             <div class="kpi-sub">Meta sugerida</div>
           </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Saldo devedor</div>
+            <div class="kpi-value mono" style="color:var(--danger);font-size:1.1rem">R$ {{ '%.2f'|format(saldo_devedor|default(0)) }}</div>
+            <div class="kpi-sub">Já vencido</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">A descontar</div>
+            <div class="kpi-value mono">R$ {{ '%.2f'|format(total_a_descontar|default(0)) }}</div>
+            <div class="kpi-sub">Competência futura</div>
+          </div>
           <div class="kpi-card span-2">
-            <div class="kpi-title">A receber</div>
+            <div class="kpi-title">Total a receber</div>
             <div class="kpi-value mono" style="color:var(--ok);font-size:1.2rem">R$ {{ '%.2f'|format(total_liquido|default(0)) }}</div>
             <div class="kpi-sub">Após descontos e encargos</div>
           </div>
-          <div class="kpi-card span-2">
-            <div class="kpi-title">Saldo devedor</div>
-            <div class="kpi-value mono" style="color:var(--danger);font-size:1.2rem">R$ {{ '%.2f'|format(saldo_devedor_total|default(0)) }}</div>
-            <div class="kpi-sub">Pendências em aberto</div>
-          </div>
-        </div>
-        <div class="section-card mt-3">
-          <div class="section-head"><h2 class="section-title">Saldo devedor</h2><span class="section-chip mono">R$ {{ '%.2f'|format(saldo_devedor_total|default(0)) }}</span></div>
-          {% if dividas_pendentes_rows %}
-          <div class="list-stack">
-            {% for d in dividas_pendentes_rows if d.valor_restante > 0 %}
-            <div class="item-card">
-              <div class="item-row">
-                <div class="flex-grow-1 min-w-0">
-                  <div class="item-title">{{ d.descricao }}</div>
-                  <div class="item-meta mt-1">{{ d.data.strftime('%d/%m/%Y') if d.data else '—' }} · {% if d.eh_adiantamento %}Adiantamento{% else %}Despesa{% endif %}</div>
-                </div>
-                <div class="text-end">
-                  <div class="item-amount mono">R$ {{ '%.2f'|format(d.valor_restante) }}</div>
-                  <div class="item-small">Original: R$ {{ '%.2f'|format(d.valor_total) }}</div>
-                  <div class="item-small">Abatido: R$ {{ '%.2f'|format(d.valor_pago_total) }}</div>
-                </div>
-              </div>
-            </div>
-            {% endfor %}
-            {% if total_adiantamento_pendente %}<div class="item-small muted">Total de adiantamento pendente: R$ {{ '%.2f'|format(total_adiantamento_pendente) }}</div>{% endif %}
-          </div>
-          {% else %}<div class="muted">Nenhuma pendência em aberto.</div>{% endif %}
         </div>
       </div>
     </section>
@@ -597,6 +589,43 @@
           </div>
           {% else %}
           <div class="item-card text-center muted">Nenhum crédito lançado para você.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+
+      <div class="section-card">
+        <div class="section-head">
+          <h2 class="section-title">Saldo devedor detalhado</h2>
+          <span class="section-chip mono">R$ {{ '%.2f'|format((saldo_devedor|default(0)) + (total_a_descontar|default(0))) }}</span>
+        </div>
+        <div class="list-stack">
+          {% for d in despesas_detalhadas %}
+          <div class="item-card">
+            <div class="item-row">
+              <div class="flex-grow-1">
+                <div class="item-title">
+                  {% if d.eh_adiantamento %}<i class="bi bi-cash-coin me-1"></i>Adiantamento{% else %}<i class="bi bi-dash-circle me-1"></i>Despesa{% endif %}
+                  — {{ d.descricao }}
+                </div>
+                <div class="item-meta mt-1">
+                  Ref.: {{ d.data_fim.strftime('%d/%m/%Y') if d.data_fim else (d.data.strftime('%d/%m/%Y') if d.data else '—') }}
+                  · {% if d.competencia_desconto == 'semana_passada' %}Produção da semana passada{% elif d.competencia_desconto == 'proxima_semana' %}Produção da próxima semana{% else %}Produção desta semana{% endif %}
+                  · {% if d.status == 'quitada' %}Quitada{% elif d.status == 'parcial' %}Parcial{% elif d.status == 'a_descontar' %}A descontar{% else %}Pendente{% endif %}
+                </div>
+                <div class="item-meta mt-1">
+                  Pago manual: <b>R$ {{ '%.2f'|format(d.pago_manual|default(0)) }}</b>
+                  · Pago automático: <b>R$ {{ '%.2f'|format(d.pago_auto|default(0)) }}</b>
+                  · Restante: <b>R$ {{ '%.2f'|format(d.restante|default(0)) }}</b>
+                </div>
+              </div>
+              <div class="text-end">
+                <div class="item-amount danger mono">R$ {{ '%.2f'|format(d.valor_total|default(0)) }}</div>
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <div class="item-card text-center muted">Nenhuma dívida pendente.</div>
           {% endfor %}
         </div>
       </div>
