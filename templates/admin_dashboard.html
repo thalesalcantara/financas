@@ -5036,6 +5036,66 @@
           </div>
         </div>
       </div>
+
+    </div>
+
+    <div class="row g-3 mt-1">
+      <div class="col-12 col-xl-6">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="mb-2">Backup completo do sistema</h5>
+            <p class="text-muted small mb-3">
+              Baixe um arquivo Excel <strong>.xlsx</strong> com usuários administradores, cooperados, restaurantes, permissões e configurações.
+            </p>
+
+            <div class="alert alert-info border-0 small mb-3">
+              <i class="bi bi-shield-check"></i>
+              Use este backup como segurança para restaurar depois sem perder cadastros principais.
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 justify-content-end">
+              <a href="{{ url_for('exportar_backup_admin_xlsx') }}" class="btn btn-royal">
+                <i class="bi bi-file-earmark-excel"></i> Baixar backup XLSX
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-xl-6">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="mb-2">Importar backup do sistema</h5>
+            <p class="text-muted small mb-3">
+              Envie o arquivo <strong>.xlsx</strong> exportado pelo sistema para restaurar os dados principais de admins, cooperados e restaurantes.
+            </p>
+
+            <form method="POST" action="{{ url_for('importar_backup_admin_xlsx') }}" enctype="multipart/form-data" class="row g-2" data-perm-form="can_config_editar">
+              {% if csrf_token is defined %}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {% endif %}
+
+              <div class="col-12">
+                <label class="form-label">Arquivo de backup (.xlsx)</label>
+                <input class="form-control" type="file" name="arquivo_backup" accept=".xlsx" required>
+              </div>
+
+              <div class="col-12">
+                <div class="alert alert-warning small mb-0">
+                  <i class="bi bi-exclamation-triangle"></i>
+                  Importe somente arquivos gerados por este backup para evitar inconsistências.
+                </div>
+              </div>
+
+              <div class="col-12 d-flex justify-content-end mt-2">
+                <button class="btn btn-royal" type="submit">
+                  <i class="bi bi-upload"></i> Importar backup XLSX
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ADMINS SECUNDÁRIOS -->
