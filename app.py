@@ -6639,15 +6639,21 @@ def _competencia_ref(data_base, competencia_semana):
     base = data_base or date.today()
     comp = (competencia_semana or '').strip().lower()
     if comp in ('passada', 'semana_passada'):
-        base = base - timedelta(days=7)
-    elif comp in ('proxima', 'proxima_semana'):
-        base = base + timedelta(days=7)
+        return base - timedelta(days=7)
+    if comp in ('semana_data', 'semana_da_data', 'data_escolhida'):
+        return base
+    # compatibilidade com registros antigos
+    if comp in ('proxima', 'proxima_semana'):
+        return base + timedelta(days=7)
     return base
 
 def _competencia_label(comp):
     comp = (comp or '').strip().lower()
     if comp in ('passada', 'semana_passada'):
         return 'semana_passada'
+    if comp in ('semana_data', 'semana_da_data', 'data_escolhida'):
+        return 'semana_da_data'
+    # compatibilidade com registros antigos
     if comp in ('proxima', 'proxima_semana'):
         return 'proxima_semana'
     return 'esta_semana'
