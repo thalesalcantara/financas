@@ -389,8 +389,7 @@ class Restaurante(db.Model):
     taxa_admin_data_base = db.Column(db.Date)
     taxa_admin_multa_percentual = db.Column(db.Float, default=2.0)
     taxa_admin_juros_dia_percentual = db.Column(db.Float, default=0.03)
-    ativo = db.Column(db.Boolean, nullable=False, default=True, server_default=text("true"))
-    ativado_em = db.Column(db.Date, default=date.today)
+    ativo = db.Column(db.Boolean, default=True)
 
     # Foto no banco (bytea)
     foto_bytes = db.Column(db.LargeBinary)
@@ -1275,6 +1274,8 @@ def init_db():
                 db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN taxa_admin_multa_percentual FLOAT DEFAULT 2.0"))
             if "taxa_admin_juros_dia_percentual" not in colnames:
                 db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN taxa_admin_juros_dia_percentual FLOAT DEFAULT 0.03"))
+            if "ativo" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN ativo BOOLEAN DEFAULT 1"))
             db.session.commit()
 
             cols = db.session.execute(sa_text("PRAGMA table_info(receitas_coop);")).fetchall()
@@ -1304,6 +1305,7 @@ def init_db():
                 ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS taxa_admin_data_base DATE;
                 ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS taxa_admin_multa_percentual DOUBLE PRECISION DEFAULT 2.0;
                 ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS taxa_admin_juros_dia_percentual DOUBLE PRECISION DEFAULT 0.03;
+                ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT TRUE;
                 ALTER TABLE IF EXISTS public.receitas_coop ADD COLUMN IF NOT EXISTS restaurante_id INTEGER;
                 ALTER TABLE IF EXISTS public.receitas_coop ADD COLUMN IF NOT EXISTS auto_taxa_adm BOOLEAN DEFAULT FALSE;
                 ALTER TABLE IF EXISTS public.receitas_coop ADD COLUMN IF NOT EXISTS competencia VARCHAR(7);
@@ -1327,30 +1329,6 @@ def init_db():
             db.session.rollback()
     except Exception:
         db.session.rollback()
-
-    # 4.5.y) status ativo + data de ativacao em restaurantes
-    try:
-        if _is_sqlite():
-            cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
-            colnames = {row[1] for row in cols}
-            if "ativo" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN ativo BOOLEAN DEFAULT 1"))
-            if "ativado_em" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN ativado_em DATE"))
-            db.session.execute(sa_text("UPDATE restaurantes SET ativo = 1 WHERE ativo IS NULL"))
-            db.session.execute(sa_text("UPDATE restaurantes SET ativado_em = COALESCE(ativado_em, CURRENT_DATE) WHERE ativado_em IS NULL"))
-            db.session.commit()
-        else:
-            db.session.execute(sa_text("""
-                ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT TRUE;
-                ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS ativado_em DATE;
-            """))
-            db.session.execute(sa_text("UPDATE public.restaurantes SET ativo = TRUE WHERE ativo IS NULL"))
-            db.session.execute(sa_text("UPDATE public.restaurantes SET ativado_em = COALESCE(ativado_em, CURRENT_DATE) WHERE ativado_em IS NULL"))
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
-
 
     # 5) Bootstrap mínimo (admin e config) — só se os modelos existirem
     try:
@@ -3229,16 +3207,15 @@ def _calc_taxa_admin_encargos(valor_principal: float, data_vencimento: date | No
     }
 
 
-def _taxa_competencia_iter(data_base: date | None, start_from: date | None = None, end_date: date | None = None):
+def _taxa_competencia_iter(data_base: date | None, months_back: int = 0):
     if not data_base:
         return []
     hoje = date.today()
-    start_ref = start_from or hoje
-    end_ref = end_date or date(hoje.year, 12, 31)
-    cur = date(start_ref.year, start_ref.month, 1)
-    end_month = date(end_ref.year, end_ref.month, 1)
+    start = date(hoje.year, hoje.month, 1)
+    end = date(hoje.year, 12, 1)
+    cur = start
     items = []
-    while cur <= end_month:
+    while cur <= end:
         last_day = (cur + relativedelta(months=1) - timedelta(days=1)).day
         day = min(data_base.day, last_day)
         venc = date(cur.year, cur.month, day)
@@ -3247,40 +3224,54 @@ def _taxa_competencia_iter(data_base: date | None, start_from: date | None = Non
     return items
 
 
-def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], end_date: date | None = None):
-    changed = False
-    hoje = date.today()
-    end_date = end_date or date(hoje.year, 12, 31)
+def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], months_back: int = 0):
+    restaurantes_validos = []
+    wanted = set()
     for rest in restaurantes:
-        if not bool(getattr(rest, 'ativo', True)):
-            continue
         valor = _safe_float(getattr(rest, 'taxa_admin_valor', 0.0))
         data_base = getattr(rest, 'taxa_admin_data_base', None)
-        if valor <= 0 or not data_base:
+        ativo_rest = bool(getattr(rest, 'ativo', True)) if hasattr(rest, 'ativo') else True
+        if (not ativo_rest) or valor <= 0 or not data_base:
             continue
+        comps = _taxa_competencia_iter(data_base, months_back=months_back)
+        if not comps:
+            continue
+        restaurantes_validos.append((rest, valor, data_base, comps))
+        for competencia, _ in comps:
+            wanted.add((rest.id, competencia))
+
+    if not restaurantes_validos:
+        return
+
+    rest_ids = [rest.id for rest, _, _, _ in restaurantes_validos]
+    existing_rows = ReceitaCooperativa.query.filter(
+        ReceitaCooperativa.auto_taxa_adm.is_(True),
+        ReceitaCooperativa.restaurante_id.in_(rest_ids),
+    ).all()
+    existing = {(r.restaurante_id, (r.competencia or '')): r for r in existing_rows}
+
+    changed = False
+    for rest, valor, data_base, comps in restaurantes_validos:
         multa_p = _safe_float(getattr(rest, 'taxa_admin_multa_percentual', 2.0), 2.0)
         juros_p = _safe_float(getattr(rest, 'taxa_admin_juros_dia_percentual', 0.03), 0.03)
-        start_from = getattr(rest, 'ativado_em', None) or hoje
-        # sempre do mês atual ou da reativação pra frente
-        if start_from < date(hoje.year, hoje.month, 1):
-            start_from = date(hoje.year, hoje.month, 1)
-        for competencia, venc in _taxa_competencia_iter(data_base, start_from=start_from, end_date=end_date):
-            existente = ReceitaCooperativa.query.filter_by(restaurante_id=rest.id, auto_taxa_adm=True, competencia=competencia).first()
+        for competencia, venc in comps:
+            existente = existing.get((rest.id, competencia))
             if existente:
-                if not getattr(existente, 'data_vencimento', None):
+                if getattr(existente, 'data_vencimento', None) != venc:
                     existente.data_vencimento = venc
+                    existente.data = venc
                     changed = True
-                existente.descricao = f'Taxa administrativa - {rest.nome} - {competencia}'
+                if (getattr(existente, 'descricao', None) or '') != f'Taxa administrativa - {rest.nome} - {competencia}':
+                    existente.descricao = f'Taxa administrativa - {rest.nome} - {competencia}'
+                    changed = True
                 if abs(_safe_float(getattr(existente, 'valor_previsto', 0.0)) - valor) > 0.009:
                     existente.valor_previsto = valor
                     existente.valor_principal = valor
                     changed = True
                 existente.multa_percentual = multa_p
                 existente.juros_dia_percentual = juros_p
-                if (getattr(existente, 'status_pagamento', 'nao_pago') or 'nao_pago') == 'nao_pago':
-                    existente.valor_total = 0.0
-                changed = True
                 continue
+
             novo = ReceitaCooperativa(
                 descricao=f'Taxa administrativa - {rest.nome} - {competencia}',
                 valor_total=0.0,
@@ -3300,6 +3291,7 @@ def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], end_date: date
             )
             db.session.add(novo)
             changed = True
+
     if changed:
         db.session.commit()
 
@@ -3549,8 +3541,12 @@ def admin_dashboard():
         data_inicio = data_fim
     elif not data_inicio and not data_fim:
         hoje_ref = date.today()
-        data_inicio = hoje_ref - timedelta(days=hoje_ref.weekday())
-        data_fim = data_inicio + timedelta(days=6)
+        if active_tab == 'receitas':
+            data_inicio = date(hoje_ref.year, hoje_ref.month, 1)
+            data_fim = (data_inicio + relativedelta(months=1)) - timedelta(days=1)
+        else:
+            data_inicio = hoje_ref - timedelta(days=hoje_ref.weekday())
+            data_fim = data_inicio + timedelta(days=6)
 
     restaurante_id = args.get("restaurante_id", type=int)
     cooperado_id = args.get("cooperado_id", type=int)
@@ -3708,7 +3704,7 @@ def admin_dashboard():
     )
 
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
-    _ensure_taxas_admin_receitas(restaurantes)
+    _ensure_taxas_admin_receitas(restaurantes, months_back=0)
     if data_inicio or data_fim:
         rq = ReceitaCooperativa.query
         if data_inicio:
@@ -5918,11 +5914,6 @@ def add_restaurante():
     usuario_login = (f.get("usuario") or "").strip()
     senha = f.get("senha", "")
     foto = request.files.get("foto")
-    taxa_admin_valor = f.get("taxa_admin_valor", type=float) or 0.0
-    taxa_admin_data_base = _parse_date(f.get("taxa_admin_data_base"))
-    taxa_admin_multa_percentual = f.get("taxa_admin_multa_percentual", type=float) or 2.0
-    taxa_admin_juros_dia_percentual = f.get("taxa_admin_juros_dia_percentual", type=float) or 0.03
-    ativo = str(f.get("ativo") or "1").strip() in ("1", "true", "True", "on")
 
     if Usuario.query.filter_by(usuario=usuario_login).first():
         flash("Usuário já existente.", "warning")
@@ -5933,17 +5924,7 @@ def add_restaurante():
     db.session.add(u)
     db.session.flush()
 
-    r = Restaurante(
-        nome=nome,
-        periodo=periodo,
-        usuario_id=u.id,
-        taxa_admin_valor=taxa_admin_valor,
-        taxa_admin_data_base=taxa_admin_data_base,
-        taxa_admin_multa_percentual=taxa_admin_multa_percentual,
-        taxa_admin_juros_dia_percentual=taxa_admin_juros_dia_percentual,
-        ativo=ativo,
-        ativado_em=(date.today() if ativo else None),
-    )
+    r = Restaurante(nome=nome, periodo=periodo, usuario_id=u.id, taxa_admin_valor=taxa_admin_valor, taxa_admin_data_base=taxa_admin_data_base, taxa_admin_multa_percentual=taxa_admin_multa_percentual, taxa_admin_juros_dia_percentual=taxa_admin_juros_dia_percentual, ativo=True)
     db.session.add(r)
     db.session.flush()
 
@@ -5951,24 +5932,7 @@ def add_restaurante():
         _save_foto_to_db(r, foto, is_cooperado=False)
 
     db.session.commit()
-    if r.ativo and r.taxa_admin_valor > 0 and r.taxa_admin_data_base:
-        _ensure_taxas_admin_receitas([r])
-    flash("Estabelecimento cadastrado.", "success")
-    return redirect(url_for("admin_dashboard", tab="restaurantes"))
-
-    u = Usuario(usuario=usuario_login, tipo="restaurante", senha_hash="")
-    u.set_password(senha)
-    db.session.add(u)
-    db.session.flush()
-
-    r = Restaurante(nome=nome, periodo=periodo, usuario_id=u.id, taxa_admin_valor=taxa_admin_valor, taxa_admin_data_base=taxa_admin_data_base, taxa_admin_multa_percentual=taxa_admin_multa_percentual, taxa_admin_juros_dia_percentual=taxa_admin_juros_dia_percentual)
-    db.session.add(r)
-    db.session.flush()
-
-    if foto and foto.filename:
-        _save_foto_to_db(r, foto, is_cooperado=False)
-
-    db.session.commit()
+    _ensure_taxas_admin_receitas([r], months_back=0)
     flash("Estabelecimento cadastrado.", "success")
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
 
@@ -5986,18 +5950,16 @@ def edit_restaurante(id):
     r.taxa_admin_data_base = _parse_date(f.get("taxa_admin_data_base"))
     r.taxa_admin_multa_percentual = f.get("taxa_admin_multa_percentual", type=float) or 2.0
     r.taxa_admin_juros_dia_percentual = f.get("taxa_admin_juros_dia_percentual", type=float) or 0.03
-    novo_ativo = str(f.get("ativo") or "1").strip() in ("1", "true", "True", "on")
-    if novo_ativo and not bool(getattr(r, 'ativo', True)):
-        r.ativado_em = date.today()
-    r.ativo = novo_ativo
+    if hasattr(r, 'ativo'):
+        status_raw = (f.get('ativo') or '1').strip().lower()
+        r.ativo = status_raw in ('1','true','ativo','on','sim')
 
     foto = request.files.get("foto")
     if foto and foto.filename:
         _save_foto_to_db(r, foto, is_cooperado=False)
 
     db.session.commit()
-    if r.ativo and r.taxa_admin_valor > 0 and r.taxa_admin_data_base:
-        _ensure_taxas_admin_receitas([r])
+    _ensure_taxas_admin_receitas([r], months_back=0)
     flash("Estabelecimento atualizado.", "success")
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
 
