@@ -5054,19 +5054,7 @@ def admin_avaliacoes():
         q = db.session.query(func.coalesce(func.avg(coluna), 0.0))
         if filtros:
             q = q.select_from(Model).filter(and_(*filtros))
-        v = q.scalar()
-        try:
-            return float(v or 0.0)
-        except Exception:
-            return 0.0
-
-    def _score(v):
-        try:
-            if v is None:
-                return 0.0
-            return float(v)
-        except Exception:
-            return 0.0
+        return float(q.scalar() or 0.0)
 
     kpis = {
         "qtd": total,
@@ -5112,10 +5100,10 @@ def admin_avaliacoes():
         ranking = [{
             "rest_nome": r.nome,
             "qtd": int(r.qtd or 0),
-            "m_geral": _score(r.m_geral),
-            "m_trat": _score(r.m_trat),
-            "m_amb": _score(r.m_amb),
-            "m_sup": _score(r.m_sup),
+            "m_geral": float(r.m_geral or 0),
+            "m_trat": float(r.m_trat or 0),
+            "m_amb": float(r.m_amb or 0),
+            "m_sup": float(r.m_sup or 0),
         } for r in ranking_rows]
 
         top = sorted(
@@ -5152,11 +5140,11 @@ def admin_avaliacoes():
         ranking = [{
             "coop_nome": r.nome,
             "qtd": int(r.qtd or 0),
-            "m_geral": _score(r.m_geral),
-            "m_pont": _score(r.m_pont),
-            "m_educ": _score(r.m_educ),
-            "m_efic": _score(r.m_efic),
-            "m_apres": _score(r.m_apres),
+            "m_geral": float(r.m_geral or 0),
+            "m_pont": float(r.m_pont or 0),
+            "m_educ": float(r.m_educ or 0),
+            "m_efic": float(r.m_efic or 0),
+            "m_apres": float(r.m_apres or 0),
         } for r in ranking_rows]
 
         top = sorted(
