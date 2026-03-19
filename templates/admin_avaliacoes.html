@@ -1388,21 +1388,96 @@
           {% endif %}
         </div>
 
+                <section class="detail-grid">
+          <div class="detail-card">
+            <div class="detail-head">
+              <h3 class="detail-title"><i class="bi bi-clipboard-data"></i>Resumo geral por {{ 'cooperado' if (tipo|default('cooperado'))=='cooperado' else 'estabelecimento' }}</h3>
+              <span class="text-muted-soft" style="font-size:.82rem;">Sentimento e melhoria baseados em todas as avaliações do período filtrado</span>
+            </div>
+            <div class="detail-body">
+              <div class="table-wrap">
+                <table class="table table-slim align-middle">
+                  <thead>
+                    <tr>
+                      <th>{{ 'Cooperado' if (tipo|default('cooperado'))=='cooperado' else 'Estabelecimento' }}</th>
+                      <th class="text-center">Aval.</th>
+                      <th class="text-center">Geral</th>
+                      {% if (tipo|default('cooperado'))=='restaurante' %}
+                        <th class="text-center">Trat.</th>
+                        <th class="text-center">Amb.</th>
+                        <th class="text-center">Sup.</th>
+                      {% else %}
+                        <th class="text-center">Pont.</th>
+                        <th class="text-center">Educ.</th>
+                        <th class="text-center">Efic.</th>
+                        <th class="text-center">Apres.</th>
+                      {% endif %}
+                      <th class="text-center">Sentimento geral</th>
+                      <th>Onde melhorar</th>
+                      <th>Ponto forte</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% set _res = resumo_principal|default([]) %}
+                    {% if _res %}
+                      {% for r in _res %}
+                        <tr>
+                          <td class="fw-semibold">{{ r.nome }}</td>
+                          <td class="text-center"><span class="mini-badge">{{ r.qtd }}</span></td>
+                          <td class="text-center"><span class="score-pill"><i class="bi bi-star-fill text-warning"></i>{{ '%.2f'|format(r.m_geral|default(0)) }}</span></td>
+                          {% if (tipo|default('cooperado'))=='restaurante' %}
+                            <td class="text-center">{{ '%.2f'|format(r.m_trat|default(0)) if r.m_trat is not none else '-' }}</td>
+                            <td class="text-center">{{ '%.2f'|format(r.m_amb|default(0)) if r.m_amb is not none else '-' }}</td>
+                            <td class="text-center">{{ '%.2f'|format(r.m_sup|default(0)) if r.m_sup is not none else '-' }}</td>
+                          {% else %}
+                            <td class="text-center">{{ '%.2f'|format(r.m_pont|default(0)) if r.m_pont is not none else '-' }}</td>
+                            <td class="text-center">{{ '%.2f'|format(r.m_educ|default(0)) if r.m_educ is not none else '-' }}</td>
+                            <td class="text-center">{{ '%.2f'|format(r.m_efic|default(0)) if r.m_efic is not none else '-' }}</td>
+                            <td class="text-center">{{ '%.2f'|format(r.m_apres|default(0)) if r.m_apres is not none else '-' }}</td>
+                          {% endif %}
+                          <td class="text-center"><span class="sent-pill {{ r.sentimento|lower }}">{{ r.sentimento|upper }}</span></td>
+                          <td>{{ r.onde_melhorar }}</td>
+                          <td>{{ r.ponto_forte }}</td>
+                        </tr>
+                      {% endfor %}
+                    {% else %}
+                      <tr>
+                        <td colspan="{{ 8 if (tipo|default('cooperado'))=='restaurante' else 10 }}" class="text-center text-muted-soft">Sem dados no período filtrado.</td>
+                      </tr>
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-card">
+            <div class="detail-head">
+              <h3 class="detail-title"><i class="bi bi-info-circle"></i>Leitura geral do período</h3>
+              <span class="text-muted-soft" style="font-size:.82rem;">Resumo consolidado do filtro atual</span>
+            </div>
+            <div class="detail-body p-3">
+              <div class="insight-grid" id="insightsWrap"></div>
+            </div>
+          </div>
+        </section>
+
         <section class="card-modern section-card">
           <h3 class="section-title">
             <i class="bi bi-list-stars"></i>
-            Avaliações detalhadas
+            Histórico detalhado — avaliação por avaliação
           </h3>
+          <div class="text-muted-soft mb-3" style="font-size:.84rem;">A tabela abaixo mostra apenas as notas individuais realmente avaliadas, comentário, quem avaliou, quem foi avaliado e a data/hora real do Brasil.</div>
 
           <div class="table-wrap">
             <table class="table table-modern table-detail align-middle">
               <thead>
                 <tr>
-                  <th>Data</th>
-                  <th>Restaurante</th>
-                  <th>Cooperado</th>
+                  <th>Data/hora Brasil</th>
+                  <th>{{ 'Avaliador (estabelecimento)' if (tipo|default('cooperado'))=='cooperado' else 'Avaliador (cooperado)' }}</th>
+                  <th>{{ 'Cooperado avaliado' if (tipo|default('cooperado'))=='cooperado' else 'Estabelecimento avaliado' }}</th>
                   <th class="text-center">Geral</th>
-                  {% if (tipo|default('restaurante'))=='restaurante' %}
+                  {% if (tipo|default('cooperado'))=='restaurante' %}
                     <th class="text-center">Trat.</th>
                     <th class="text-center">Amb.</th>
                     <th class="text-center">Sup.</th>
@@ -1413,9 +1488,6 @@
                     <th class="text-center">Apres.</th>
                   {% endif %}
                   <th>Comentário</th>
-                  <th class="text-center">Média</th>
-                  <th class="text-center">Sentimento</th>
-                  <th>Onde melhorar</th>
                   <th class="text-center">Crítico?</th>
                 </tr>
               </thead>
@@ -1424,44 +1496,29 @@
                 {% if _avs and (_avs|length) > 0 %}
                   {% for a in _avs %}
                     <tr>
-                      <td class="text-nowrap">{{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em else '-' }}</td>
-                      <td class="fw-semibold">{{ a.rest_nome|default('-') }}</td>
-                      <td class="fw-semibold">{{ a.coop_nome|default('-') }}</td>
-                      <td class="text-center"><span class="score-pill">{{ a.geral|default('') }}</span></td>
-
-                      {% if (tipo|default('restaurante'))=='restaurante' %}
-                        <td class="text-center">{{ a.trat|default('') }}</td>
-                        <td class="text-center">{{ a.amb|default('') }}</td>
-                        <td class="text-center">{{ a.sup|default('') }}</td>
+                      <td class="text-nowrap">{{ a.criado_em_br|default('-') }}</td>
+                      <td class="fw-semibold">{{ a.avaliador_nome|default('-') }}</td>
+                      <td class="fw-semibold">{{ a.avaliado_nome|default('-') }}</td>
+                      <td class="text-center"><span class="score-pill">{{ a.geral if a.geral is not none else '-' }}</span></td>
+                      {% if (tipo|default('cooperado'))=='restaurante' %}
+                        <td class="text-center">{{ a.trat if a.trat is not none else '-' }}</td>
+                        <td class="text-center">{{ a.amb if a.amb is not none else '-' }}</td>
+                        <td class="text-center">{{ a.sup if a.sup is not none else '-' }}</td>
                       {% else %}
-                        <td class="text-center">{{ a.pont|default('') }}</td>
-                        <td class="text-center">{{ a.educ|default('') }}</td>
-                        <td class="text-center">{{ a.efic|default('') }}</td>
-                        <td class="text-center">{{ a.apres|default('') }}</td>
+                        <td class="text-center">{{ a.pont if a.pont is not none else '-' }}</td>
+                        <td class="text-center">{{ a.educ if a.educ is not none else '-' }}</td>
+                        <td class="text-center">{{ a.efic if a.efic is not none else '-' }}</td>
+                        <td class="text-center">{{ a.apres if a.apres is not none else '-' }}</td>
                       {% endif %}
-
-                      <td>{{ a.comentario|default('') }}</td>
-                      <td class="text-center">{{ a.media if a.media is not none else '' }}</td>
+                      <td>{{ a.comentario|default('-') if a.comentario else '-' }}</td>
                       <td class="text-center">
-                        {% set sent = (a.sentimento|default('')|lower) %}
-                        <span class="sent-pill {{ sent if sent in ['positivo','neutro','negativo'] else 'neutro' }}">
-                          {{ (a.sentimento|default('neutro'))|capitalize }}
-                        </span>
-                      </td>
-                      <td>{{ a.temas|default('Sem pontos críticos') }}</td>
-                      <td class="text-center">
-                        <span class="critico-pill {{ 'sim' if a.alerta else 'nao' }}">
-                          {{ 'SIM' if a.alerta else 'NÃO' }}
-                        </span>
+                        <span class="critico-pill {{ 'sim' if a.alerta else 'nao' }}">{{ 'SIM' if a.alerta else 'NÃO' }}</span>
                       </td>
                     </tr>
                   {% endfor %}
                 {% else %}
                   <tr>
-                    <td colspan="{{ 11 if (tipo|default('restaurante'))=='restaurante' else 13 }}"
-                        class="text-center text-muted-soft">
-                      Nenhuma avaliação
-                    </td>
+                    <td colspan="{{ 9 if (tipo|default('cooperado'))=='restaurante' else 11 }}" class="text-center text-muted-soft">Nenhuma avaliação no período filtrado.</td>
                   </tr>
                 {% endif %}
               </tbody>
@@ -1488,6 +1545,7 @@
               <div class="kpi-icon"><i class="bi bi-star-half"></i></div>
             </div>
             <div class="kpi-value">{{ '%.2f'|format(_k.geral|default(0)) }}</div>
+            <div class="legend-note mt-2">Sentimento geral: <strong>{{ (_k.sentimento_geral|default('neutro'))|upper }}</strong></div>
           </div>
 
           {% if (tipo|default('restaurante'))=='restaurante' %}
@@ -1931,38 +1989,17 @@
       }
 
       if (tipo === 'restaurante') {
-        const vals = [
-          { label:'Tratamento', v:Number(k.trat || 0) },
-          { label:'Ambiente',   v:Number(k.amb || 0) },
-          { label:'Suporte',    v:Number(k.sup || 0) }
-        ];
-
-        const sorted = vals.slice().sort((a,b)=>a.v-b.v);
-        const worst = sorted[0];
-        const best = sorted[sorted.length - 1];
         const comp = pct(k.geral || 0);
-
         wrap.appendChild(card('Compatibilidade média', comp + '%'));
-        wrap.appendChild(card('Ponto forte', `${best.label} · ${best.v.toFixed(2)}★`));
-        wrap.appendChild(card('Ponto de atenção', `${worst.label} · ${worst.v.toFixed(2)}★`));
-        wrap.appendChild(card('Amostra', `${(k.qtd || 0)} avaliação(ões)`));
+        wrap.appendChild(card('Sentimento geral', String(k.sentimento_geral || 'neutro').toUpperCase()));
+        wrap.appendChild(card('Onde melhorar', k.onde_melhorar || 'Sem pontos críticos'));
+        wrap.appendChild(card('Ponto forte', k.ponto_forte || '-'));
       } else {
-        const vals = [
-          { label:'Pontualidade', v:Number(k.pont || 0) },
-          { label:'Educação',     v:Number(k.educ || 0) },
-          { label:'Eficiência',   v:Number(k.efic || 0) },
-          { label:'Apresentação', v:Number(k.apres || 0) }
-        ];
-
-        const sorted = vals.slice().sort((a,b)=>a.v-b.v);
-        const worst = sorted[0];
-        const best = sorted[sorted.length - 1];
         const comp = pct(k.geral || 0);
-
         wrap.appendChild(card('Compatibilidade média', comp + '%'));
-        wrap.appendChild(card('Ponto forte', `${best.label} · ${best.v.toFixed(2)}★`));
-        wrap.appendChild(card('Ponto de atenção', `${worst.label} · ${worst.v.toFixed(2)}★`));
-        wrap.appendChild(card('Amostra', `${(k.qtd || 0)} avaliação(ões)`));
+        wrap.appendChild(card('Sentimento geral', String(k.sentimento_geral || 'neutro').toUpperCase()));
+        wrap.appendChild(card('Onde melhorar', k.onde_melhorar || 'Sem pontos críticos'));
+        wrap.appendChild(card('Ponto forte', k.ponto_forte || '-'));
       }
     })();
 
