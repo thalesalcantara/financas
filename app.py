@@ -4268,7 +4268,7 @@ def admin_dashboard():
         inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
         sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
         des = round(snap.get("descontado_despesa", 0.0), 2)
-        adiant = round(snap.get("descontado_adiant", 0.0), 2)
+        adiant = round(sum((d.valor or 0.0) for d in despesas_coop if getattr(d, "cooperado_id", None) == coop.id and bool(getattr(d, "eh_adiantamento", False))), 2)
         if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
             _a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
             _saldo_pendente = round(snap["saldo_devedor"], 2)
@@ -6639,21 +6639,15 @@ def _competencia_ref(data_base, competencia_semana):
     base = data_base or date.today()
     comp = (competencia_semana or '').strip().lower()
     if comp in ('passada', 'semana_passada'):
-        return base - timedelta(days=7)
-    if comp in ('semana_data', 'semana_da_data', 'data_escolhida'):
-        return base
-    # compatibilidade com registros antigos
-    if comp in ('proxima', 'proxima_semana'):
-        return base + timedelta(days=7)
+        base = base - timedelta(days=7)
+    elif comp in ('proxima', 'proxima_semana'):
+        base = base + timedelta(days=7)
     return base
 
 def _competencia_label(comp):
     comp = (comp or '').strip().lower()
     if comp in ('passada', 'semana_passada'):
         return 'semana_passada'
-    if comp in ('semana_data', 'semana_da_data', 'data_escolhida'):
-        return 'semana_da_data'
-    # compatibilidade com registros antigos
     if comp in ('proxima', 'proxima_semana'):
         return 'proxima_semana'
     return 'esta_semana'
