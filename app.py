@@ -9571,29 +9571,31 @@ def marcar_todos_avisos_lidos_restaurante():
     db.session.commit()
     return redirect(url_for("portal_restaurante_avisos"))
 
-# routes/avisos.py
-from flask import Blueprint, jsonify
-from flask_login import login_required, current_user
+# =========================
+# Avisos: contagem de não lidos (Cooperado/Restaurante)
+# =========================
+def _nocache_json(payload: dict, status: int = 200):
+    resp = jsonify(payload)
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp, status
 
-bp = Blueprint("avisos", __name__)
 
-# aceita com e sem barra final, evitando 308/404 dependendo do strict_slashes
 @app.get("/avisos/unread_count")
 @app.get("/avisos/unread_count/")
+@with_db_retry
 def avisos_unread_count():
     """
-    Retorna o número de avisos não lidos para o usuário atual.
-    Mantém a lógica original (cooperado/restaurante) e melhora robustez/headers.
+    Retorna a quantidade de avisos não lidos para o usuário logado.
+    Responde sempre em JSON e evita quebrar o painel quando houver sessão vazia,
+    usuário sem vínculo, ou qualquer falha na busca.
     """
-    def _nocache(resp):
-        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        return resp
-
-    if "user_id" not in session:
-        return _nocache(jsonify(count=0)), 401
-
     user_id = session.get("user_id")
-    user_tipo = (session.get("user_tipo") or "").lower()
+    user_tipo = (session.get("user_tipo") or "").strip().lower()
+
+    if not user_id:
+        return _nocache_json({"ok": False, "unread": 0, "count": 0, "error": "Sessão ausente"}, 401)
 
     try:
         count = 0
@@ -9601,39 +9603,43 @@ def avisos_unread_count():
         if user_tipo == "cooperado":
             coop = Cooperado.query.filter_by(usuario_id=user_id).first()
             if not coop:
-                return _nocache(jsonify(count=0)), 403
+                return _nocache_json({"ok": False, "unread": 0, "count": 0, "error": "Cooperado não encontrado"}, 404)
 
-            avisos = list(get_avisos_for_cooperado(coop))
-            # busca apenas os IDs já lidos (consulta mais leve)
+            avisos = get_avisos_for_cooperado(coop) or []
             lidos_ids = {
-                row[0] for row in
-                db.session.query(AvisoLeitura.aviso_id).filter_by(cooperado_id=coop.id).all()
+                aviso_id
+                for (aviso_id,) in db.session.query(AvisoLeitura.aviso_id)
+                .filter(AvisoLeitura.cooperado_id == coop.id)
+                .all()
             }
             count = sum(1 for a in avisos if a.id not in lidos_ids)
 
         elif user_tipo == "restaurante":
             rest = Restaurante.query.filter_by(usuario_id=user_id).first()
             if not rest:
-                return _nocache(jsonify(count=0)), 403
+                return _nocache_json({"ok": False, "unread": 0, "count": 0, "error": "Restaurante não encontrado"}, 404)
 
-            avisos = list(get_avisos_for_restaurante(rest))
+            avisos = get_avisos_for_restaurante(rest) or []
             lidos_ids = {
-                row[0] for row in
-                db.session.query(AvisoLeitura.aviso_id).filter_by(restaurante_id=rest.id).all()
+                aviso_id
+                for (aviso_id,) in db.session.query(AvisoLeitura.aviso_id)
+                .filter(AvisoLeitura.restaurante_id == rest.id)
+                .all()
             }
             count = sum(1 for a in avisos if a.id not in lidos_ids)
 
-        # outros tipos: count = 0
-        resp = jsonify(count=int(count))
-        return _nocache(resp), 200
+        else:
+            return _nocache_json({"ok": True, "unread": 0, "count": 0, "error": "Tipo de usuário sem avisos"}, 200)
 
-    except Exception:
+        return _nocache_json({"ok": True, "unread": int(count), "count": int(count)}, 200)
+
+    except Exception as e:
         db.session.rollback()
         try:
             current_app.logger.exception("Erro ao calcular /avisos/unread_count")
         except Exception:
             pass
-        return _nocache(jsonify(count=0)), 500
+        return _nocache_json({"ok": False, "unread": 0, "count": 0, "error": str(e)}, 500)
 
 import click
 
