@@ -1089,7 +1089,7 @@
             <div class="table-responsive">
               <table id="tblResumoCoop" class="table table-sm table-bordered table-hover align-middle table-resumo">
                 <thead class="table-light">
-                  <tr class="text-nowrap">
+                  <tr>
                     <th>Cooperado</th>
                     <th class="text-end">Produções</th>
                     <th class="text-end">INSS (4,0%)</th>
@@ -2143,12 +2143,11 @@
   <!-- Tabela -->
   <div class="card lanc-table-card">
     <div class="card-body p-2 p-md-3">
-      <div class="table-responsive">
+      <div class="lanc-table-wrap">
         <table class="table table-sm align-middle table-hover lanc-table">
           <thead>
-            <tr class="text-nowrap">
+            <tr>
               <th>Restaurante</th>
-              <th>Período</th>
               <th>Cooperado</th>
               <th>Descrição</th>
               <th class="text-end">Valor</th>
@@ -2167,22 +2166,19 @@
               {% set sest_05 = (l.valor or 0) * 0.005 %}
               {% set liq     = (l.valor or 0) - inss_4 - sest_05 %}
               <tr>
-                <td class="text-nowrap"><span class="table-main-text">{{ l.restaurante.nome }}</span></td>
-                <td class="text-nowrap">
-                  <span class="badge bg-light text-dark border">{{ l.restaurante.periodo }}</span>
-                </td>
-                <td class="text-nowrap">{{ l.cooperado.nome }}</td>
-                <td class="text-break">{{ l.descricao }}</td>
+                <td class="lanc-col-rest"><span class="table-main-text">{{ l.restaurante.nome }}</span></td>
+                <td class="lanc-col-coop">{{ l.cooperado.nome }}</td>
+                <td class="lanc-col-desc">{{ l.descricao or "—" }}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(l.valor) }}</td>
                 <td class="text-center">
                   <span class="badge bg-soft-count">{{ l.qtd_entregas if l.qtd_entregas is not none else '—' }}</span>
                 </td>
-                <td class="text-nowrap">{{ l.data.strftime('%d/%m/%Y') }}</td>
-                <td class="text-nowrap">{{ l.hora_inicio }}{% if l.hora_fim %} às {{ l.hora_fim }}{% endif %}</td>
+                <td class="lanc-col-data">{{ l.data.strftime('%d/%m/%Y') }}</td>
+                <td class="lanc-col-hora">{{ l.hora_inicio }}{% if l.hora_fim %} às {{ l.hora_fim }}{% endif %}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(inss_4) }}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(sest_05) }}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(liq) }}</td>
-                <td class="text-center text-nowrap">
+                <td class="text-center lanc-col-acoes">
                   {% if can_lanc_editar %}<button class="btn btn-warning btn-sm rounded-pill"
                           data-bs-toggle="modal"
                           data-bs-target="#modalEditLancamento"
@@ -2207,13 +2203,13 @@
               </tr>
             {% else %}
               <tr>
-                <td colspan="12" class="text-center text-muted py-3">Nenhum lançamento encontrado</td>
+                <td colspan="11" class="text-center text-muted py-3">Nenhum lançamento encontrado</td>
               </tr>
             {% endfor %}
           </tbody>
           <tfoot>
             <tr class="lanc-tfoot-row">
-              <th colspan="4" class="text-end">Totais do filtro:</th>
+              <th colspan="3" class="text-end">Totais do filtro:</th>
               <th class="text-end">R$ {{ "%.2f"|format(soma_valor) }}</th>
               <th class="text-center">{{ soma_qtd }}</th>
               <th></th>
@@ -2221,7 +2217,7 @@
               <th class="text-end">R$ {{ "%.2f"|format(soma_inss_4) }}</th>
               <th class="text-end">R$ {{ "%.2f"|format(soma_sest_05) }}</th>
               <th class="text-end">R$ {{ "%.2f"|format(soma_liq) }}</th>
-              <th></th><th></th><th></th><th></th><th></th>
+              <th></th>
             </tr>
           </tfoot>
         </table>
@@ -2355,6 +2351,93 @@
 
   .lanc-tfoot-row { background: #f8fafc; font-size: 0.78rem; }
 
+  .lanc-table-wrap {
+    overflow: visible;
+  }
+
+  .lanc-table {
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .lanc-table th,
+  .lanc-table td {
+    white-space: normal !important;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  .lanc-table thead th:nth-child(1),
+  .lanc-table tbody td:nth-child(1) { width: 17%; }
+  .lanc-table thead th:nth-child(2),
+  .lanc-table tbody td:nth-child(2) { width: 21%; }
+  .lanc-table thead th:nth-child(3),
+  .lanc-table tbody td:nth-child(3) { width: 13%; }
+  .lanc-table thead th:nth-child(4),
+  .lanc-table tbody td:nth-child(4) { width: 7%; }
+  .lanc-table thead th:nth-child(5),
+  .lanc-table tbody td:nth-child(5) { width: 5%; }
+  .lanc-table thead th:nth-child(6),
+  .lanc-table tbody td:nth-child(6) { width: 8%; }
+  .lanc-table thead th:nth-child(7),
+  .lanc-table tbody td:nth-child(7) { width: 9%; }
+  .lanc-table thead th:nth-child(8),
+  .lanc-table tbody td:nth-child(8) { width: 7%; }
+  .lanc-table thead th:nth-child(9),
+  .lanc-table tbody td:nth-child(9) { width: 10%; }
+  .lanc-table thead th:nth-child(10),
+  .lanc-table tbody td:nth-child(10) { width: 7%; }
+  .lanc-table thead th:nth-child(11),
+  .lanc-table tbody td:nth-child(11) { width: 10%; }
+
+  .lanc-col-rest,
+  .lanc-col-coop,
+  .lanc-col-desc {
+    line-height: 1.35;
+  }
+
+
+  .lanc-col-data,
+  .lanc-col-hora {
+    line-height: 1.25;
+  }
+
+  .lanc-col-acoes {
+    min-width: 0;
+  }
+
+  .lanc-col-acoes .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    height: 30px;
+    padding: 0.25rem 0.4rem;
+    margin: 1px;
+  }
+
+  @media (max-width: 1400px) {
+    .lanc-table th, .lanc-table td {
+      font-size: 0.73rem;
+      padding: 0.4rem 0.34rem;
+    }
+    .lanc-table thead th {
+      letter-spacing: 0.02em;
+    }
+  }
+
+  @media (max-width: 1200px) {
+    .lanc-table th, .lanc-table td {
+      font-size: 0.69rem;
+      padding: 0.34rem 0.28rem;
+    }
+    .lanc-col-acoes .btn {
+      min-width: 28px;
+      height: 28px;
+      padding: 0.2rem 0.3rem;
+    }
+  }
+
   .btn-del { transition: transform 0.12s ease-out; }
   .btn-del:hover { transform: translateY(-1px); }
 </style>
@@ -2477,7 +2560,7 @@
         <div class="table-responsive mt-3">
           <table class="table table-sm table-bordered table-hover align-middle">
             <thead class="table-light">
-              <tr class="text-nowrap">
+              <tr>
                 <th style="width:38px"><input type="checkbox" id="taxaAdmToggleAll"></th>
                 <th>Estabelecimento</th>
                 <th>Competência</th>
@@ -2544,7 +2627,7 @@
       <div class="table-responsive">
         <table class="table table-sm table-bordered table-hover align-middle">
           <thead class="table-light">
-            <tr class="text-nowrap">
+            <tr>
               <th style="width:120px">Data</th>
               <th>Descrição</th>
               <th class="text-end" style="width:160px">Valor</th>
@@ -2558,7 +2641,7 @@
                 <td>{{ r.data.strftime('%d/%m/%Y') if r.data else '-' }}</td>
                 <td class="text-break">{{ r.descricao }}{% if r.auto_taxa_adm %}<div class="small text-muted">{{ r.restaurante.nome if r.restaurante else '' }} • {{ r.competencia or '' }} • {{ r.status_pagamento or 'nao_pago' }}</div>{% endif %}</td>
                 <td class="text-end">R$ {{ '%.2f'|format(v_row) }}</td>
-                <td class="text-center text-nowrap">
+                <td class="text-center lanc-col-acoes">
                   {% if can_receitas_editar %}<button class="btn btn-warning btn-sm"
                           data-bs-toggle="modal"
                           data-bs-target="#modalEditReceita"
@@ -2685,7 +2768,7 @@
       <div class="table-responsive">
         <table class="table table-sm table-bordered table-hover align-middle">
           <thead class="table-light">
-            <tr class="text-nowrap">
+            <tr>
               <th style="width:120px">Data</th>
               <th>Descrição</th>
               <th class="text-end" style="width:160px">Valor</th>
@@ -2698,7 +2781,7 @@
                 <td>{{ d.data.strftime('%d/%m/%Y') if d.data else '-' }}</td>
                 <td class="text-break">{{ d.descricao }}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(d.valor) }}</td>
-                <td class="text-center text-nowrap">
+                <td class="text-center lanc-col-acoes">
                   {% if can_despesas_editar %}<button class="btn btn-warning btn-sm"
                           data-bs-toggle="modal"
                           data-bs-target="#modalEditDespesa"
@@ -2830,7 +2913,7 @@
       <div class="table-responsive">
         <table class="table table-sm table-bordered table-hover align-middle">
           <thead class="table-light">
-            <tr class="text-nowrap">
+            <tr>
               <th style="width:120px">Data</th>
               <th style="width:260px">Cooperado</th>
               <th>Descrição</th>
@@ -2845,7 +2928,7 @@
                 <td class="text-break">{{ rc.cooperado.nome }}</td>
                 <td class="text-break">{{ rc.descricao }}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(rc.valor) }}</td>
-                <td class="text-center text-nowrap">
+                <td class="text-center lanc-col-acoes">
                   {% if can_coop_receitas_editar %}<button class="btn btn-warning btn-sm"
                           data-bs-toggle="modal"
                           data-bs-target="#modalEditReceitaCoop"
@@ -3034,7 +3117,7 @@
       <div class="table-responsive">
         <table class="table table-sm table-bordered table-hover align-middle" id="tblDespesasCoop">
           <thead class="table-light">
-            <tr class="text-nowrap">
+            <tr>
               <th style="width:36px"><input type="checkbox" id="checkAllDespesas"></th>
               <th style="width:120px">Data</th>
               <th style="width:260px">Cooperado</th>
@@ -3064,7 +3147,7 @@
                 <td class="text-end">R$ {{ "%.2f"|format(_abat_auto or 0) }}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(_restante if _restante>0 else 0) }}</td>
                 <td class="text-center">{% if snap %}{% if snap.status == "quitada" %}<span class="badge bg-success">Recebida</span>{% elif snap.status == "parcial" %}<span class="badge bg-warning text-dark">Parcial</span>{% elif snap.status == "a_descontar" %}<span class="badge bg-info text-dark">A descontar</span>{% else %}<span class="badge bg-secondary">Aberta</span>{% endif %}{% else %}<span class="badge bg-secondary">Aberta</span>{% endif %}</td>
-                <td class="text-center text-nowrap"><button class="btn btn-warning btn-sm"
+                <td class="text-center lanc-col-acoes"><button class="btn btn-warning btn-sm"
                           data-bs-toggle="modal"
                           data-bs-target="#modalEditDespesaCoop"
                           data-id="{{ dc.id }}"
@@ -3326,7 +3409,7 @@
 <div class="table-responsive mt-3">
   <table class="table table-sm table-bordered table-hover align-middle" id="tabela-beneficios">
     <thead class="table-light">
-      <tr class="text-nowrap">
+      <tr>
         <th class="text-center" style="width:36px;">
           <input type="checkbox" id="check_all">
         </th>
@@ -3624,7 +3707,7 @@
       <div class="table-responsive">
         <table class="table table-sm table-bordered table-hover align-middle">
           <thead class="table-light">
-            <tr class="text-nowrap">
+            <tr>
               <th style="width:60px;">Foto</th>
               <th>Nome</th>
               <th>Usuário</th>
@@ -4085,7 +4168,7 @@
       <div class="table-responsive">
         <table class="table table-sm table-bordered table-hover align-middle">
           <thead class="table-light">
-            <tr class="text-nowrap">
+            <tr>
               <th style="width:60px;">Logo</th>
               <th>Nome</th>
               <th>Usuário</th>
@@ -5359,7 +5442,7 @@
             <div class="table-responsive">
               <table class="table table-sm align-middle table-bordered table-hover">
                 <thead class="table-light">
-                  <tr class="text-nowrap">
+                  <tr>
                     <th>Nome</th>
                     <th>Usuário</th>
                     <th class="text-center">Tipo</th>
