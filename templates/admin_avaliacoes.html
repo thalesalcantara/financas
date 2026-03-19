@@ -1415,7 +1415,7 @@
                   <th>Comentário</th>
                   <th class="text-center">Média</th>
                   <th class="text-center">Sentimento</th>
-                  <th>Temas</th>
+                  <th>Onde melhorar</th>
                   <th class="text-center">Crítico?</th>
                 </tr>
               </thead>
@@ -1445,10 +1445,10 @@
                       <td class="text-center">
                         {% set sent = (a.sentimento|default('')|lower) %}
                         <span class="sent-pill {{ sent if sent in ['positivo','neutro','negativo'] else 'neutro' }}">
-                          {{ a.sentimento|default('-') }}
+                          {{ (a.sentimento|default('neutro'))|capitalize }}
                         </span>
                       </td>
-                      <td>{{ a.temas|default('') }}</td>
+                      <td>{{ a.temas|default('Sem pontos críticos') }}</td>
                       <td class="text-center">
                         <span class="critico-pill {{ 'sim' if a.alerta else 'nao' }}">
                           {{ 'SIM' if a.alerta else 'NÃO' }}
