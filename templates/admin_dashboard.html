@@ -2458,11 +2458,17 @@
           <span class="badge bg-danger-subtle text-danger border">Em aberto: <b>R$ {{ '%.2f'|format(taxa_admin_totais.em_aberto|default(0)) }}</b></span>
         </div>
       </div>
-      {% set taxas_alerta = taxa_admin_rows|selectattr('status','in',['nao_pago','parcial'])|list %}
+
+      {% set taxas_alerta = taxa_admin_rows|selectattr('status', 'in', ['nao_pago','parcial'])|list %}
       {% if taxas_alerta %}
-      <div class="alert alert-warning border-0 shadow-sm mb-3">
-        <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle-fill"></i> Taxas administrativas vencidas ou parciais</div>
-        <div class="small">Existem <b>{{ taxas_alerta|length }}</b> competência(s) pendente(s) na receita da cooperativa.</div>
+      <div class="alert alert-warning border mb-3">
+        <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle"></i> Taxas administrativas vencidas ou parciais</div>
+        <div class="small">
+          {% for tx in taxas_alerta[:8] %}
+            <span class="me-3 d-inline-block">{{ tx.restaurante_nome }} · {{ tx.competencia }} · em aberto R$ {{ '%.2f'|format(tx.valor_em_aberto) }}</span>
+          {% endfor %}
+          {% if taxas_alerta|length > 8 %}<span class="text-muted">e mais {{ taxas_alerta|length - 8 }}...</span>{% endif %}
+        </div>
       </div>
       {% endif %}
 
@@ -4003,26 +4009,18 @@
         </div>
 
         <div class="col-md-2">
-          <label class="form-label">Data base da taxa</label>
+          <label class="form-label">Data base</label>
           <input type="date" class="form-control form-control-sm" name="taxa_admin_data_base">
-          <small class="text-muted">Serve só para a taxa administrativa.</small>
+          <small class="text-muted">Dia do vencimento mensal.</small>
         </div>
 
         <div class="col-md-2">
-          <label class="form-label">Multa / Juros dia</label>
+          <label class="form-label">Multa / Juros</label>
           <div class="input-group input-group-sm">
             <input type="number" step="0.01" class="form-control" name="taxa_admin_multa_percentual" value="2">
             <span class="input-group-text">% +</span>
             <input type="number" step="0.01" class="form-control" name="taxa_admin_juros_dia_percentual" value="0.03">
           </div>
-        </div>
-
-        <div class="col-md-2">
-          <label class="form-label">Status</label>
-          <select class="form-select form-select-sm" name="ativo">
-            <option value="1" selected>Ativo</option>
-            <option value="0">Inativo</option>
-          </select>
         </div>
 
         <div class="col-md-2">
@@ -4068,8 +4066,7 @@
               <th style="width:140px;">Período</th>
               <th style="width:140px;">Taxa adm.</th>
               <th style="width:130px;">Data base</th>
-              <th style="width:100px;">Status</th>
-              <th class="text-center" style="width:220px;">Ações</th>
+              <th class="text-center" style="width:200px;">Ações</th>
             </tr>
           </thead>
           <tbody id="tbodyRestaurantes">
@@ -4092,12 +4089,10 @@
                 </td>
                 <td class="text-nowrap">R$ {{ "%.2f"|format(r.taxa_admin_valor|default(0)) }}</td>
                 <td class="text-nowrap">{{ r.taxa_admin_data_base.strftime('%d/%m/%Y') if r.taxa_admin_data_base else '-' }}</td>
-                <td>{% if r.ativo is not defined or r.ativo %}<span class="badge bg-success">Ativo</span>{% else %}<span class="badge bg-secondary">Inativo</span>{% endif %}</td>
                 <td class="text-center">
                   <div class="btn-group btn-group-sm" role="group">
                     {% if can_restaurantes_editar %}<button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalEditRestaurante"
                             data-id="{{ r.id }}" data-nome="{{ r.nome }}" data-usuario="{{ r.usuario_ref.usuario }}" data-periodo="{{ r.periodo }}" data-taxa-admin-valor="{{ '%.2f'|format(r.taxa_admin_valor|default(0)) }}" data-taxa-admin-data-base="{{ r.taxa_admin_data_base.strftime('%Y-%m-%d') if r.taxa_admin_data_base else '' }}" data-taxa-admin-multa="{{ '%.2f'|format(r.taxa_admin_multa_percentual|default(2)) }}" data-taxa-admin-juros-dia="{{ '%.2f'|format(r.taxa_admin_juros_dia_percentual|default(0.03)) }}"
-                            data-ativo="{{ 1 if r.ativo is not defined or r.ativo else 0 }}"
                             data-url="{{ url_for('edit_restaurante', id=r.id) }}" title="Editar">
                       <i class="bi bi-pencil"></i>
                     </button>
@@ -4122,7 +4117,7 @@
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="8" class="text-center text-muted">Nenhum estabelecimento</td></tr>
+              <tr><td colspan="7" class="text-center text-muted">Nenhum estabelecimento</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -5855,20 +5850,21 @@
   </div>
 
   <div class="modal fade" id="modalEditRestaurante" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog">
       <form method="POST" enctype="multipart/form-data" class="modal-content">
         <div class="modal-header"><h5 class="modal-title">Editar Estabelecimento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body row g-2 px-3">
           <input type="hidden" name="id">
-          <div class="col-md-6"><label class="form-label">Nome</label><input type="text" class="form-control" name="nome" required></div>
-          <div class="col-md-3"><label class="form-label">Período</label><select class="form-select" name="periodo" required><option value="seg-dom">Seg a Dom</option><option value="sab-sex">Sáb a Sex</option><option value="sex-qui">Sex a Qui</option></select></div>
-          <div class="col-md-3"><label class="form-label">Status</label><select class="form-select" name="ativo"><option value="1">Ativo</option><option value="0">Inativo</option></select></div>
-          <div class="col-md-6"><label class="form-label">Usuário</label><input type="text" class="form-control" name="usuario" required></div>
-          <div class="col-md-3"><label class="form-label">Taxa adm. (R$)</label><input type="number" step="0.01" class="form-control" name="taxa_admin_valor"></div>
-          <div class="col-md-3"><label class="form-label">Data base taxa</label><input type="date" class="form-control" name="taxa_admin_data_base"></div>
-          <div class="col-md-3"><label class="form-label">Multa (%)</label><input type="number" step="0.01" class="form-control" name="taxa_admin_multa_percentual"></div>
-          <div class="col-md-3"><label class="form-label">Juros dia (%)</label><input type="number" step="0.01" class="form-control" name="taxa_admin_juros_dia_percentual"></div>
-          <div class="col-md-6"><label class="form-label">Logo</label><input type="file" class="form-control" name="foto"></div>
+          <div class="col-12"><input type="text" class="form-control" name="nome" required></div>
+          <div class="col-12">
+            <select class="form-select" name="periodo" required>
+              <option value="seg-dom">Seg a Dom</option>
+              <option value="sab-sex">Sáb a Sex</option>
+              <option value="sex-qui">Sex a Qui</option>
+            </select>
+          </div>
+          <div class="col-12"><input type="text" class="form-control" name="usuario" required></div>
+          <div class="col-12"><input type="file" class="form-control" name="foto"></div>
         </div>
         <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
       </form>
@@ -5935,7 +5931,7 @@
   bindModal('modalEditDespesaCoop',  { id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', competencia:'competencia_desconto' });
   bindModal('modalEditCooperado',    { id:'id', nome:'nome', usuario:'usuario' });
   bindModal('modalResetSenhaCooperado', { id:'id' });
-  bindModal('modalEditRestaurante',  { id:'id', nome:'nome', periodo:'periodo', usuario:'usuario', taxaAdminValor:'taxa_admin_valor', taxaAdminDataBase:'taxa_admin_data_base', taxaAdminMulta:'taxa_admin_multa_percentual', taxaAdminJurosDia:'taxa_admin_juros_dia_percentual', ativo:'ativo' });
+  bindModal('modalEditRestaurante',  { id:'id', nome:'nome', periodo:'periodo', usuario:'usuario' });
   bindModal('modalResetSenhaRestaurante', { id:'id' });
 
   (function(){
@@ -6404,6 +6400,8 @@ document.addEventListener('DOMContentLoaded', function(){
   const permMap = {
     can_lanc_criar: {{ 'true' if can_lanc_criar else 'false' }},
     can_receitas_criar: {{ 'true' if can_receitas_criar else 'false' }},
+    can_receitas_editar: {{ 'true' if can_receitas_editar else 'false' }},
+    can_receitas_excluir: {{ 'true' if can_receitas_excluir else 'false' }},
     can_despesas_criar: {{ 'true' if can_despesas_criar else 'false' }},
     can_coop_receitas_criar: {{ 'true' if can_coop_receitas_criar else 'false' }},
     can_coop_despesas_criar: {{ 'true' if can_coop_despesas_criar else 'false' }},
