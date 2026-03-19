@@ -389,6 +389,9 @@ class Restaurante(db.Model):
     taxa_admin_data_base = db.Column(db.Date)
     taxa_admin_multa_percentual = db.Column(db.Float, default=2.0)
     taxa_admin_juros_dia_percentual = db.Column(db.Float, default=0.03)
+    taxa_admin_ativa = db.Column(db.Boolean, default=True)
+    ativo = db.Column(db.Boolean, default=True)
+    taxa_admin_inicio = db.Column(db.Date)
 
     # Foto no banco (bytea)
     foto_bytes = db.Column(db.LargeBinary)
@@ -1323,6 +1326,30 @@ def init_db():
             db.session.commit()
         except Exception:
             db.session.rollback()
+    except Exception:
+        db.session.rollback()
+
+    # 4.6) taxa administrativa e status em restaurantes
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
+            colnames = {row[1] for row in cols}
+            defs = {
+                "taxa_admin_ativa": "ALTER TABLE restaurantes ADD COLUMN taxa_admin_ativa BOOLEAN DEFAULT 1",
+                "ativo": "ALTER TABLE restaurantes ADD COLUMN ativo BOOLEAN DEFAULT 1",
+                "taxa_admin_inicio": "ALTER TABLE restaurantes ADD COLUMN taxa_admin_inicio DATE",
+            }
+            for col, sql in defs.items():
+                if col not in colnames:
+                    db.session.execute(sa_text(sql))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("""
+                ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS taxa_admin_ativa BOOLEAN DEFAULT TRUE;
+                ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT TRUE;
+                ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS taxa_admin_inicio DATE;
+            """))
+            db.session.commit()
     except Exception:
         db.session.rollback()
 
@@ -3219,16 +3246,35 @@ def _taxa_competencia_iter(data_base: date | None, months_back: int = 12):
     return items
 
 
+def _mes_primeiro_dia(dref: date | None = None) -> date:
+    dref = dref or date.today()
+    return date(dref.year, dref.month, 1)
+
+
+def _restaurante_ativo(rest: Restaurante) -> bool:
+    return bool(getattr(rest, 'ativo', True) is not False)
+
+
+def _restaurante_taxa_ativa(rest: Restaurante) -> bool:
+    return _restaurante_ativo(rest) and bool(getattr(rest, 'taxa_admin_ativa', True) is not False) and _safe_float(getattr(rest, 'taxa_admin_valor', 0.0)) > 0 and bool(getattr(rest, 'taxa_admin_data_base', None))
+
+
+def _taxa_inicio_rest(rest: Restaurante) -> date:
+    return getattr(rest, 'taxa_admin_inicio', None) or _mes_primeiro_dia(date.today())
+
 def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], months_back: int = 12):
     changed = False
     for rest in restaurantes:
         valor = _safe_float(getattr(rest, 'taxa_admin_valor', 0.0))
         data_base = getattr(rest, 'taxa_admin_data_base', None)
-        if valor <= 0 or not data_base:
+        if not _restaurante_taxa_ativa(rest):
             continue
+        inicio_cobranca = _taxa_inicio_rest(rest)
         multa_p = _safe_float(getattr(rest, 'taxa_admin_multa_percentual', 2.0), 2.0)
         juros_p = _safe_float(getattr(rest, 'taxa_admin_juros_dia_percentual', 0.03), 0.03)
         for competencia, venc in _taxa_competencia_iter(data_base, months_back=months_back):
+            if date(venc.year, venc.month, 1) < date(inicio_cobranca.year, inicio_cobranca.month, 1):
+                continue
             existente = ReceitaCooperativa.query.filter_by(restaurante_id=rest.id, auto_taxa_adm=True, competencia=competencia).first()
             if existente:
                 if not getattr(existente, 'data_vencimento', None):
@@ -3574,6 +3620,8 @@ def admin_dashboard():
     despesas = []
     total_receitas = 0.0
     total_despesas = 0.0
+
+    _ensure_taxas_admin_receitas(Restaurante.query.order_by(Restaurante.nome).all(), months_back=12)
 
     if True:
         rq = ReceitaCooperativa.query
@@ -4275,6 +4323,7 @@ def admin_dashboard():
         despesas_coop=despesas_coop,
         cooperados=cooperados,
         restaurantes=restaurantes,
+        restaurantes_todos=restaurantes_todos,
         beneficios_view=beneficios_view,
         historico_beneficios=historico_beneficios,
         current_date=current_date,
@@ -5639,6 +5688,7 @@ def admin_avisos():
         avisos=avisos,
         cooperados=cooperados,
         restaurantes=restaurantes,
+        restaurantes_todos=restaurantes_todos,
         agora=now_dt,
     )
 
@@ -5885,6 +5935,13 @@ def add_restaurante():
     usuario_login = (f.get("usuario") or "").strip()
     senha = f.get("senha", "")
     foto = request.files.get("foto")
+    taxa_admin_valor = f.get("taxa_admin_valor", type=float) or 0.0
+    taxa_admin_data_base = _parse_date(f.get("taxa_admin_data_base"))
+    taxa_admin_multa_percentual = f.get("taxa_admin_multa_percentual", type=float) or 2.0
+    taxa_admin_juros_dia_percentual = f.get("taxa_admin_juros_dia_percentual", type=float) or 0.03
+    taxa_admin_ativa = bool(f.get("taxa_admin_ativa") or taxa_admin_valor > 0)
+    ativo = str(f.get("ativo") or "1") != "0"
+    taxa_admin_inicio = _mes_primeiro_dia(date.today())
 
     if Usuario.query.filter_by(usuario=usuario_login).first():
         flash("Usuário já existente.", "warning")
@@ -5895,7 +5952,16 @@ def add_restaurante():
     db.session.add(u)
     db.session.flush()
 
-    r = Restaurante(nome=nome, periodo=periodo, usuario_id=u.id, taxa_admin_valor=taxa_admin_valor, taxa_admin_data_base=taxa_admin_data_base, taxa_admin_multa_percentual=taxa_admin_multa_percentual, taxa_admin_juros_dia_percentual=taxa_admin_juros_dia_percentual)
+    r = Restaurante(
+        nome=nome, periodo=periodo, usuario_id=u.id,
+        taxa_admin_valor=taxa_admin_valor,
+        taxa_admin_data_base=taxa_admin_data_base,
+        taxa_admin_multa_percentual=taxa_admin_multa_percentual,
+        taxa_admin_juros_dia_percentual=taxa_admin_juros_dia_percentual,
+        taxa_admin_ativa=taxa_admin_ativa,
+        ativo=ativo,
+        taxa_admin_inicio=taxa_admin_inicio,
+    )
     db.session.add(r)
     db.session.flush()
 
@@ -5913,6 +5979,7 @@ def edit_restaurante(id):
     r = Restaurante.query.get_or_404(id)
     f = request.form
 
+    ativo_antes = bool(getattr(r, 'ativo', True))
     r.nome = (f.get("nome") or "").strip()
     r.periodo = f.get("periodo", "seg-dom")
     r.usuario_ref.usuario = (f.get("usuario") or "").strip()
@@ -5920,6 +5987,12 @@ def edit_restaurante(id):
     r.taxa_admin_data_base = _parse_date(f.get("taxa_admin_data_base"))
     r.taxa_admin_multa_percentual = f.get("taxa_admin_multa_percentual", type=float) or 2.0
     r.taxa_admin_juros_dia_percentual = f.get("taxa_admin_juros_dia_percentual", type=float) or 0.03
+    r.taxa_admin_ativa = str(f.get("taxa_admin_ativa") or ('1' if r.taxa_admin_valor > 0 else '0')) != '0'
+    r.ativo = str(f.get("ativo") or ('1' if getattr(r, 'ativo', True) else '0')) != '0'
+    if not getattr(r, 'taxa_admin_inicio', None) and r.taxa_admin_valor > 0 and r.taxa_admin_data_base:
+        r.taxa_admin_inicio = _mes_primeiro_dia(date.today())
+    if ativo_antes is False and r.ativo is True:
+        r.taxa_admin_inicio = _mes_primeiro_dia(date.today())
 
     foto = request.files.get("foto")
     if foto and foto.filename:
@@ -9248,6 +9321,9 @@ def portal_restaurante():
         lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
         total_lanc_valor=total_lanc_valor,
         total_lanc_entregas=total_lanc_entregas,
+        taxa_admin_rows=taxa_admin_rows,
+        taxa_admin_totais=taxa_admin_totais,
+        taxa_admin_alertas=taxa_admin_alertas,
         url_lancar_producao=url_lancar_producao,
         has_editar_lanc=has_editar_lanc,
     )
@@ -9472,6 +9548,9 @@ def portal_restaurante():
         lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
         total_lanc_valor=total_lanc_valor,
         total_lanc_entregas=total_lanc_entregas,
+        taxa_admin_rows=taxa_admin_rows,
+        taxa_admin_totais=taxa_admin_totais,
+        taxa_admin_alertas=taxa_admin_alertas,
         url_lancar_producao=url_lancar_producao,
         has_editar_lanc=has_editar_lanc,
         escalados_hoje=escalados_hoje,
