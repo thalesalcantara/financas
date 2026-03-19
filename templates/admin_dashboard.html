@@ -2882,9 +2882,9 @@
         <div class="col-md-2">
           <label class="form-label">Competência</label>
           <select class="form-select form-select-sm" name="competencia_desconto">
-            <option value="esta_semana" selected>Produção desta semana</option>
-            <option value="semana_passada">Produção da semana passada</option>
-            <option value="proxima_semana">Produção da próxima semana</option>
+            <option value="semana_da_data">Semana da data escolhida</option>
+            <option value="esta_semana" selected>Esta semana</option>
+            <option value="semana_passada">Semana passada</option>
           </select>
         </div>
         <div class="col-md-2">
@@ -3087,9 +3087,9 @@
         <div class="col-md-2">
           <label class="form-label">Competência</label>
           <select class="form-select form-select-sm" name="competencia_desconto">
-            <option value="esta_semana" selected>Produção desta semana</option>
-            <option value="semana_passada">Produção da semana passada</option>
-            <option value="proxima_semana">Produção da próxima semana</option>
+            <option value="semana_da_data">Semana da data escolhida</option>
+            <option value="esta_semana" selected>Esta semana</option>
+            <option value="semana_passada">Semana passada</option>
           </select>
         </div>
         <div class="col-md-1 d-flex flex-column">
@@ -3142,7 +3142,7 @@
                 <td class="text-break">{{ coop_nome }}</td>
                 <td class="text-break">{{ dc.descricao }}</td>
                 <td>{% if dc.eh_adiantamento %}<span class="badge bg-warning text-dark">Adiantamento</span>{% else %}<span class="badge bg-light text-dark border">Despesa</span>{% endif %}</td>
-                <td>{% if dc.competencia_desconto=='semana_passada' %}Semana passada{% elif dc.competencia_desconto=='proxima_semana' %}Próxima semana{% else %}Esta semana{% endif %}</td>
+                <td>{% if dc.competencia_desconto in ['semana_da_data','semana_data','data_escolhida'] %}Semana da data escolhida{% elif dc.competencia_desconto=='semana_passada' %}Semana passada{% elif dc.competencia_desconto=='proxima_semana' %}Próxima semana{% else %}Esta semana{% endif %}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(dc.valor) }}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(_abat_auto or 0) }}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(_restante if _restante>0 else 0) }}</td>
@@ -5912,9 +5912,9 @@
           <div class="col-md-8">
             <label class="form-label">Competência</label>
             <select class="form-select" name="competencia_desconto">
-              <option value="esta_semana">Produção desta semana</option>
-              <option value="semana_passada">Produção da semana passada</option>
-              <option value="proxima_semana">Produção da próxima semana</option>
+              <option value="semana_da_data">Semana da data escolhida</option>
+              <option value="esta_semana">Esta semana</option>
+              <option value="semana_passada">Semana passada</option>
             </select>
           </div>
           <div class="col-md-4 d-flex align-items-end">
