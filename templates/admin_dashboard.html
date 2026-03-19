@@ -1114,7 +1114,7 @@
                     <td class="text-end" id="tSEST05">R$ {{ '%.2f'|format(resumo_totais.sest05|default(0)) }}</td>
                     <td class="text-end text-success" id="tRec">R$ {{ '%.2f'|format(resumo_totais.rec|default(0)) }}</td>
                     <td class="text-end text-danger" id="tDes">R$ {{ '%.2f'|format(resumo_totais.des|default(0)) }}</td>
-                    <td class="text-end text-danger" id="tAdiant">R$ 0,00</td>
+                    <td class="text-end text-danger" id="tAdiant">R$ {{ '%.2f'|format(resumo_totais.adiant|default(0)) }}</td>
                     <td class="text-end fw-bold" id="tLiq">R$ {{ '%.2f'|format(resumo_totais.a_receber|default(0)) }}</td>
                     <td class="text-end fw-bold text-warning" id="tPend">R$ {{ '%.2f'|format((resumo_totais.saldo_pendente|default(0)) + (resumo_totais.pend_programado|default(0))) }}</td>
                   </tr>
@@ -1336,8 +1336,7 @@
         {% endfor %}
       ];
 
-      // >>> IMPORTANTE: mantemos o campo adiantamento aqui só porque existe no banco,
-      // mas ele NÃO será usado para criar coluna nem somar separado.
+      // Adiantamento deve aparecer na coluna própria do resumo e no total do rodapé.
       const DESP_COOP = [
         {% for d in despesas_coop %}
           {% set _is_ad_js = 1 if (d.eh_adiantamento if d.eh_adiantamento is defined else (d.adiantamento in [True, 1, '1', 'true', 'True', 'on'])) else 0 %}
@@ -1868,7 +1867,7 @@
         Object.entries(byR).sort((a, b) => b[1] - a[1]).forEach(([nome, v]) => estAOA.push([nome, v]));
         aoaToSheet('Estabelecimentos', estAOA, wb);
 
-        // >>> SEM ADIANTAMENTOS no XLSX também
+        // >>> COM ADIANTAMENTOS no XLSX também
         const resumoAOA = [['Cooperado', 'Produções', 'INSS (4,0%)', 'SEST/SENAT (0,5%)', 'Receitas', 'Despesas', 'Adiantamento', 'A Receber', 'Saldo Pendente']];
         let tProd = 0, tINSS4 = 0, tSEST05 = 0, tRec = 0, tDes = 0, tAdi = 0, tLiq = 0, tPend = 0;
 
