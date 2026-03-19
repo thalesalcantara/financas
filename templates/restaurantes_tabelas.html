@@ -93,19 +93,19 @@
       <button id="btnTheme" class="theme-toggle" type="button"><i class="bi bi-moon"></i><span id="lblTheme">Escuro</span></button>
 
       <nav class="navmenu" id="sideNav">
-        <a href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-person-lines-fill"></i><span>Cooperados</span></a>
-        <a href="{{ url_for('portal_restaurante', view='lancamentos') }}"><i class="bi bi-receipt"></i><span>Lançamentos</span></a>
-        <a href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-calendar-week"></i><span>Escala</span></a>
+        <a data-target="lancar" class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos','tabelas']) else '' }}" href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-person-lines-fill"></i><span>Cooperados</span></a>
+        <a data-target="lancamentos" class="{{ 'active' if view=='lancamentos' else '' }}" href="{{ url_for('portal_restaurante', view='lancamentos') }}"><i class="bi bi-receipt"></i><span>Lançamentos</span></a>
+        <a data-target="escalas" class="{{ 'active' if view=='escalas' else '' }}" href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-calendar-week"></i><span>Escala</span></a>
 
         {% if session.get('user_tipo') == 'restaurante' %}
-        <a id="linkTabelas" class="active" href="{{ url_for('rest_tabelas') }}">
+        <a id="linkTabelas" data-target="tabelas" class="{{ 'active' if view=='tabelas' else '' }}" href="{{ url_for('rest_tabelas') }}">
           <i class="bi bi-table"></i><span>Tabelas</span>
         </a>
         {% endif %}
 
-        <a href="{{ url_for('portal_restaurante', view='config') }}"><i class="bi bi-gear"></i><span>Configuração</span></a>
+        <a data-target="config" class="{{ 'active' if view=='config' else '' }}" href="{{ url_for('portal_restaurante', view='config') }}"><i class="bi bi-gear"></i><span>Configuração</span></a>
 
-        <a id="linkAvisos" href="{{ url_for('portal_restaurante_avisos') }}">
+        <a id="linkAvisos" data-target="avisos" class="{{ 'active' if view=='avisos' else '' }}" href="{{ url_for('portal_restaurante', view='avisos') }}">
           <i class="bi bi-megaphone"></i><span>Avisos</span>
           {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
           <span class="badge-dot" id="badgeSidebar" {% if _cntAvisos == 0 %}style="display:none"{% endif %}>{{ _cntAvisos }}</span>
