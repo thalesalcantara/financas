@@ -5981,9 +5981,12 @@ def edit_restaurante(id):
     r.taxa_admin_data_base = _parse_date(f.get("taxa_admin_data_base"))
     r.taxa_admin_multa_percentual = f.get("taxa_admin_multa_percentual", type=float) or 2.0
     r.taxa_admin_juros_dia_percentual = f.get("taxa_admin_juros_dia_percentual", type=float) or 0.03
+    status_raw = (f.get('ativo') or '1').strip().lower()
+    ativo_rest = status_raw in ('1','true','ativo','on','sim')
     if hasattr(r, 'ativo'):
-        status_raw = (f.get('ativo') or '1').strip().lower()
-        r.ativo = status_raw in ('1','true','ativo','on','sim')
+        r.ativo = ativo_rest
+    if getattr(r, 'usuario_ref', None) is not None and hasattr(r.usuario_ref, 'ativo'):
+        r.usuario_ref.ativo = ativo_rest
 
     foto = request.files.get("foto")
     if foto and foto.filename:
