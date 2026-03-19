@@ -5841,24 +5841,127 @@ def _backup_tables_in_order():
     return list(db.metadata.sorted_tables)
 
 
+def _backup_lookup_maps():
+    maps = {}
+    try:
+        maps['cooperados'] = {
+            int(r['id']): (r.get('nome') or '')
+            for r in db.session.execute(sa_text('SELECT id, nome FROM cooperados')).mappings().all()
+        }
+    except Exception:
+        maps['cooperados'] = {}
+
+    try:
+        maps['restaurantes'] = {
+            int(r['id']): (r.get('nome') or '')
+            for r in db.session.execute(sa_text('SELECT id, nome FROM restaurantes')).mappings().all()
+        }
+    except Exception:
+        maps['restaurantes'] = {}
+
+    try:
+        maps['usuarios'] = {
+            int(r['id']): (r.get('nome') or r.get('usuario') or '')
+            for r in db.session.execute(sa_text('SELECT id, nome, usuario FROM usuarios')).mappings().all()
+        }
+    except Exception:
+        maps['usuarios'] = {}
+
+    return maps
+
+
+def _backup_extra_columns_for_table(table, row, lookup_maps):
+    extras = []
+    for col in table.columns:
+        raw_val = row.get(col.name)
+        if raw_val in (None, ''):
+            continue
+
+        ref_table = None
+        for fk in getattr(col, 'foreign_keys', set()):
+            try:
+                ref_table = fk.column.table.name
+                break
+            except Exception:
+                continue
+
+        if not ref_table:
+            name = col.name.lower()
+            if name == 'cooperado_id' or name.endswith('_cooperado_id'):
+                ref_table = 'cooperados'
+            elif name == 'restaurante_id' or name.endswith('_restaurante_id'):
+                ref_table = 'restaurantes'
+            elif name == 'usuario_id' or name.endswith('_usuario_id') or name == 'admin_id' or name.endswith('_admin_id'):
+                ref_table = 'usuarios'
+
+        if ref_table not in lookup_maps:
+            continue
+
+        try:
+            key = int(raw_val)
+        except Exception:
+            try:
+                key = int(float(raw_val))
+            except Exception:
+                continue
+
+        nome_ref = lookup_maps.get(ref_table, {}).get(key)
+        if not nome_ref:
+            continue
+
+        if ref_table == 'cooperados':
+            suffix = 'nome_cooperado'
+        elif ref_table == 'restaurantes':
+            suffix = 'nome_restaurante'
+        elif ref_table == 'usuarios':
+            suffix = 'nome_usuario'
+        else:
+            suffix = f'nome_{ref_table[:-1] if ref_table.endswith("s") else ref_table}'
+
+        extras.append((f'{col.name}_{suffix}', nome_ref))
+    return extras
+
+
 def _backup_workbook_bytes() -> io.BytesIO:
     wb = Workbook()
     ws0 = wb.active
     wb.remove(ws0)
 
     tables = _backup_tables_in_order()
+    lookup_maps = _backup_lookup_maps()
+
     for table in tables:
-        headers = [c.name for c in table.columns]
+        base_headers = [c.name for c in table.columns]
         rows_db = db.session.execute(table.select().order_by(*list(table.primary_key.columns))).mappings().all()
-        rows = [[_serialize_backup_value(row.get(col)) for col in headers] for row in rows_db]
-        _sheet_from_rows(wb, _excel_safe_sheet_name(table.name), headers, rows)
+
+        extra_headers = []
+        rows = []
+        for row in rows_db:
+            extras = _backup_extra_columns_for_table(table, row, lookup_maps)
+            for extra_name, _ in extras:
+                if extra_name not in extra_headers:
+                    extra_headers.append(extra_name)
+
+            row_map = {col: _serialize_backup_value(row.get(col)) for col in base_headers}
+            for extra_name, extra_value in extras:
+                row_map[extra_name] = _serialize_backup_value(extra_value)
+            rows.append(row_map)
+
+        headers = base_headers + extra_headers
+        out_rows = []
+        for row_map in rows:
+            out_rows.append([row_map.get(col) for col in headers])
+
+        _sheet_from_rows(wb, _excel_safe_sheet_name(table.name), headers, out_rows)
 
     meta = wb.create_sheet(title='instrucoes')
     meta['A1'] = 'Backup completo COOPEX'
     meta['A2'] = 'Este arquivo exporta todas as tabelas do banco em abas separadas.'
-    meta['A3'] = 'A importação restaura os dados presentes nas abas reconhecidas, sem apagar dados ao exportar.'
-    meta['A4'] = 'Não altere os nomes das abas nem os cabeçalhos das colunas.'
-    meta['A5'] = 'Total de abas de dados: {}'.format(len(tables))
+    meta['A3'] = 'Além dos IDs, o XLSX leva colunas auxiliares com nomes de cooperados, restaurantes e usuários para leitura humana.'
+    meta['A4'] = 'A importação restaura os dados presentes nas abas reconhecidas, sem apagar dados ao exportar.'
+    meta['A5'] = 'Não altere os nomes das abas nem os cabeçalhos originais das colunas.'
+    meta['A6'] = 'As colunas auxiliares de nome servem para leitura e são ignoradas na importação.'
+    meta['A7'] = 'Total de abas de dados: {}'.format(len(tables))
     meta.column_dimensions['A'].width = 120
 
     bio = io.BytesIO()
