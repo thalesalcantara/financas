@@ -2249,10 +2249,10 @@ def _fmt_br(d: date | None) -> str:
 # === Helpers de Avaliação (NLP leve + métricas) =============================
 def _clamp_star(v):
     try:
-        v = int(float(v))
+        v = int(v)
     except Exception:
         return None
-    return v if 1 <= v <= 5 else None
+    return min(5, max(1, v))
 
 def _media_ponderada(geral, pont, educ, efic, apres):
     """
@@ -2298,10 +2298,7 @@ _TEMAS = {
     "Pontualidade":  ["pontual", "atras", "horario", "horário", "demor", "rápido", "rapido", "lent"],
     "Educação":      ["educad", "grosseir", "simpat", "antipatic", "mal trat", "sem paciencia", "sem paciência", "atencios"],
     "Eficiência":    ["amass", "vazou", "quebrad", "frio", "bagunça", "bagunca", "cuidado", "eficien", "desorgan"],
-    "Apresentação": ["uniform", "higien", "apresenta", "limpo", "cheiroso", "aparencia", "aparência"],
-    "Tratamento":    ["tratamento", "grosseir", "educad", "atendimento", "respeito"],
-    "Ambiente":      ["ambiente", "local", "estrutura", "organiza", "limpeza"],
-    "Suporte":       ["suporte", "apoio", "ajuda", "atendimento", "resposta"],
+    "Bem apresentado": ["uniform", "higien", "apresenta", "limpo", "cheiroso", "aparencia", "aparência"],
 }
 
 def _identifica_temas(txt: str | None) -> list[str]:
@@ -2312,89 +2309,15 @@ def _identifica_temas(txt: str | None) -> list[str]:
     for tema, keys in _TEMAS.items():
         if any(k in t for k in keys):
             hits.append(tema)
-    seen = []
-    for tema in hits:
-        if tema not in seen:
-            seen.append(tema)
-    return seen[:4]
+    return hits[:4]
 
-_DIMENSOES_AVALIACAO = {
-    "cooperado": [("pont", "Pontualidade"), ("educ", "Educação"), ("efic", "Eficiência"), ("apres", "Apresentação")],
-    "restaurante": [("trat", "Tratamento"), ("amb", "Ambiente"), ("sup", "Suporte")],
-}
+_RISCO = ["ameaça","ameaca","acidente","quebrado","agress","roubo","violên","violenc","lesão","lesao","sangue","caiu","bateu","droga","alcool","álcool"]
 
-def _nota_limpa(v):
-    try:
-        n = int(float(v))
-    except Exception:
-        return None
-    return n if 1 <= n <= 5 else None
-
-
-def _br_datetime(dt: datetime | None) -> datetime | None:
-    if not dt:
-        return None
-    return dt - timedelta(hours=3)
-
-
-def _fmt_dt_br(dt: datetime | None) -> str:
-    d = _br_datetime(dt)
-    return d.strftime("%d/%m/%Y %H:%M") if d else "-"
-
-
-def _sentimento_por_media(media: float | None) -> str:
-    if media is None:
-        return "neutro"
-    if media >= 4.2:
-        return "positivo"
-    if media >= 3.0:
-        return "neutro"
-    return "negativo"
-
-
-def _temas_por_notas(tipo: str, notas: dict) -> list[str]:
-    dims = []
-    for chave, rotulo in _DIMENSOES_AVALIACAO.get(tipo, []):
-        nota = _nota_limpa(notas.get(chave))
-        if nota is not None:
-            dims.append((nota, rotulo))
-    if not dims:
-        return []
-    ruins = [rot for nota, rot in sorted(dims, key=lambda x: (x[0], x[1])) if nota <= 3]
-    if ruins:
-        return ruins[:3]
-    menor = min(nota for nota, _ in dims)
-    return [rot for nota, rot in sorted(dims, key=lambda x: (x[0], x[1])) if nota == menor][:2]
-
-
-def _combinar_temas(tipo: str, notas: dict, comentario: str | None) -> list[str]:
-    temas = []
-    for tema in _temas_por_notas(tipo, notas) + _identifica_temas(comentario):
-        if tema and tema not in temas:
-            temas.append(tema)
-    return temas[:4]
-
-
-def _media_validas(valores):
-    nums = [float(v) for v in valores if isinstance(v, (int, float)) and 1 <= float(v) <= 5]
-    return round(sum(nums) / len(nums), 2) if nums else None
-
-
-def _resumo_sentimento_e_melhoria(tipo: str, notas_media: dict):
-    ordem = _DIMENSOES_AVALIACAO.get(tipo, [])
-    existentes = [(rotulo, notas_media.get(chave)) for chave, rotulo in ordem if notas_media.get(chave) is not None]
-    media_geral = notas_media.get('geral')
-    sentimento = _sentimento_por_media(media_geral)
-    if not existentes:
-        return sentimento, "Sem dados suficientes", "Sem dados suficientes"
-    ordenados = sorted(existentes, key=lambda x: (x[1], x[0]))
-    piores = [rot for rot, nota in ordenados if nota is not None and nota < 4.0][:2]
-    if not piores:
-        piores = [ordenados[0][0]]
-    melhores = sorted(existentes, key=lambda x: (-(x[1] or 0), x[0]))
-    ponto_forte = melhores[0][0] if melhores else "-"
-    return sentimento, ", ".join(piores), ponto_forte
-
+def _sinaliza_crise(nota_geral: int | None, txt: str | None) -> bool:
+    if nota_geral == 1 and txt:
+        low = txt.lower()
+        return any(k in low for k in _RISCO)
+    return False
 
 def _gerar_feedback(pont, educ, efic, apres, comentario, sentimento):
     partes = []
@@ -4963,12 +4886,19 @@ def admin_avaliacoes():
 
     restaurante_id = request.args.get("restaurante_id", type=int)
     cooperado_id = request.args.get("cooperado_id", type=int)
+
     data_inicio = (request.args.get("data_inicio") or "").strip()
     data_fim = (request.args.get("data_fim") or "").strip()
 
-    filtro_manual = bool(restaurante_id or cooperado_id or data_inicio or data_fim)
+    filtro_manual = bool(
+        restaurante_id
+        or cooperado_id
+        or data_inicio
+        or data_fim
+    )
+
     if not filtro_manual:
-        hoje = _brasil_now().date()
+        hoje = date.today()
         di = hoje - timedelta(days=hoje.weekday())
         df = di + timedelta(days=6)
         data_inicio = di.strftime("%Y-%m-%d")
@@ -4976,6 +4906,7 @@ def admin_avaliacoes():
     else:
         di = _parse_date(data_inicio)
         df = _parse_date(data_fim)
+
         if di and not df:
             df = di
             data_fim = df.strftime("%Y-%m-%d")
@@ -4984,6 +4915,24 @@ def admin_avaliacoes():
             data_inicio = di.strftime("%Y-%m-%d")
 
     Model = AvaliacaoRestaurante if tipo == "restaurante" else AvaliacaoCooperado
+
+    def col(*names):
+        for n in names:
+            if hasattr(Model, n):
+                return getattr(Model, n)
+        return None
+
+    f_geral = col("estrelas_geral")
+
+    if tipo == "restaurante":
+        f_trat = col("estrelas_tratamento", "estrelas_pontualidade")
+        f_amb = col("estrelas_ambiente", "estrelas_educacao")
+        f_sup = col("estrelas_suporte", "estrelas_eficiencia")
+    else:
+        f_pont = col("estrelas_pontualidade")
+        f_educ = col("estrelas_educacao")
+        f_efic = col("estrelas_eficiencia")
+        f_apres = col("estrelas_apresentacao")
 
     base = (
         db.session.query(
@@ -4998,201 +4947,307 @@ def admin_avaliacoes():
     )
 
     filtros = []
+
     if restaurante_id:
         filtros.append(Model.restaurante_id == restaurante_id)
+
     if cooperado_id:
         filtros.append(Model.cooperado_id == cooperado_id)
+
     if di:
         filtros.append(Model.criado_em >= datetime.combine(di, datetime.min.time()))
+
     if df:
         filtros.append(Model.criado_em <= datetime.combine(df, datetime.max.time()))
+
     if filtros:
         base = base.filter(and_(*filtros))
 
-    all_rows = base.order_by(Model.criado_em.desc()).all()
-    total = len(all_rows)
+    total = base.with_entities(func.count(Model.id)).scalar() or 0
 
-    def _media_linha(notas: dict):
-        return _media_validas(list(notas.values()))
-
-    itens_all = []
-    for a, rest_id, rest_nome, coop_id, coop_nome in all_rows:
-        if tipo == "restaurante":
-            notas = {
-                "trat": _nota_limpa(getattr(a, "estrelas_tratamento", None)),
-                "amb": _nota_limpa(getattr(a, "estrelas_ambiente", None)),
-                "sup": _nota_limpa(getattr(a, "estrelas_suporte", None)),
-            }
-            geral = getattr(a, "estrelas_geral", None)
-            geral = round(float(geral), 1) if isinstance(geral, (int, float)) and float(geral) > 0 else _media_linha(notas)
-            sentimento = _sentimento_por_media(geral)
-            temas = "; ".join(_combinar_temas("restaurante", notas, getattr(a, "comentario", None)))
-            item = {
-                "id": getattr(a, "id", None),
-                "criado_em": getattr(a, "criado_em", None),
-                "criado_em_br": _fmt_dt_br(getattr(a, "criado_em", None)),
-                "rest_id": rest_id,
-                "rest_nome": rest_nome,
-                "coop_id": coop_id,
-                "coop_nome": coop_nome,
-                "avaliador_nome": coop_nome,
-                "avaliado_nome": rest_nome,
-                "geral": geral,
-                "comentario": (getattr(a, "comentario", "") or "").strip(),
-                "media": _media_linha(notas),
-                "sentimento": sentimento,
-                "temas": temas,
-                "alerta": bool(getattr(a, "alerta_crise", False)) or (geral is not None and geral <= 2.0),
-                "trat": notas["trat"],
-                "amb": notas["amb"],
-                "sup": notas["sup"],
-                "pont": None,
-                "educ": None,
-                "efic": None,
-                "apres": None,
-            }
-        else:
-            notas = {
-                "pont": _nota_limpa(getattr(a, "estrelas_pontualidade", None)),
-                "educ": _nota_limpa(getattr(a, "estrelas_educacao", None)),
-                "efic": _nota_limpa(getattr(a, "estrelas_eficiencia", None)),
-                "apres": _nota_limpa(getattr(a, "estrelas_apresentacao", None)),
-            }
-            geral = _nota_limpa(getattr(a, "estrelas_geral", None))
-            geral = float(geral) if geral is not None else _media_linha(notas)
-            sentimento = _sentimento_por_media(geral)
-            temas = "; ".join(_combinar_temas("cooperado", notas, getattr(a, "comentario", None)))
-            item = {
-                "id": getattr(a, "id", None),
-                "criado_em": getattr(a, "criado_em", None),
-                "criado_em_br": _fmt_dt_br(getattr(a, "criado_em", None)),
-                "rest_id": rest_id,
-                "rest_nome": rest_nome,
-                "coop_id": coop_id,
-                "coop_nome": coop_nome,
-                "avaliador_nome": rest_nome,
-                "avaliado_nome": coop_nome,
-                "geral": geral,
-                "comentario": (getattr(a, "comentario", "") or "").strip(),
-                "media": _media_linha(notas),
-                "sentimento": sentimento,
-                "temas": temas,
-                "alerta": bool(getattr(a, "alerta_crise", False)) or (geral is not None and geral <= 2.0),
-                "trat": None,
-                "amb": None,
-                "sup": None,
-                "pont": notas["pont"],
-                "educ": notas["educ"],
-                "efic": notas["efic"],
-                "apres": notas["apres"],
-            }
-        itens_all.append(SimpleNamespace(**item))
-
-    total = len(itens_all)
     page = request.args.get("page", type=int) or 1
     per_page = request.args.get("per_page", type=int) or 10000
-    per_page = 200 if per_page > 200 else max(1, per_page)
-    start = (page - 1) * per_page
-    end = start + per_page
-    avaliacoes = itens_all[start:end]
-    pages = max(1, (total + per_page - 1) // per_page)
-    pager = SimpleNamespace(page=page, per_page=per_page, total=total, pages=pages, has_prev=(page > 1), has_next=(page < pages))
+    if per_page > 200:
+        per_page = 200
 
-    def _avg_attr(items, attr):
-        return _media_validas([getattr(i, attr, None) for i in items]) or 0.0
+    offset = (page - 1) * per_page
+
+    rows = (
+        base.order_by(Model.criado_em.desc())
+        .limit(per_page)
+        .offset(offset)
+        .all()
+    )
+
+    pages = max(1, (total + per_page - 1) // per_page)
+
+    pager = SimpleNamespace(
+        page=page,
+        per_page=per_page,
+        total=total,
+        pages=pages,
+        has_prev=(page > 1),
+        has_next=(page < pages),
+    )
+
+    avaliacoes = []
+    for a, rest_id, rest_nome, coop_id, coop_nome in rows:
+        item = {
+            "criado_em": a.criado_em,
+            "rest_id": rest_id,
+            "rest_nome": rest_nome,
+            "coop_id": coop_id,
+            "coop_nome": coop_nome,
+            "geral": getattr(a, "estrelas_geral", 0) or 0,
+            "comentario": (getattr(a, "comentario", "") or "").strip(),
+            "media": getattr(a, "media_ponderada", None),
+            "sentimento": getattr(a, "sentimento", None),
+            "temas": getattr(a, "temas", None),
+            "alerta": bool(getattr(a, "alerta_crise", False)),
+            "tratamento": 0,
+            "ambiente": 0,
+            "suporte": 0,
+            "trat": 0,
+            "amb": 0,
+            "sup": 0,
+            "pont": 0,
+            "educ": 0,
+            "efic": 0,
+            "apres": 0,
+        }
+
+        if tipo == "restaurante":
+            trat = getattr(a, "estrelas_tratamento", None)
+            if trat is None:
+                trat = getattr(a, "estrelas_pontualidade", 0)
+
+            amb = getattr(a, "estrelas_ambiente", None)
+            if amb is None:
+                amb = getattr(a, "estrelas_educacao", 0)
+
+            sup = getattr(a, "estrelas_suporte", None)
+            if sup is None:
+                sup = getattr(a, "estrelas_eficiencia", 0)
+
+            item.update({
+                "tratamento": trat or 0,
+                "ambiente": amb or 0,
+                "suporte": sup or 0,
+                "trat": trat or 0,
+                "amb": amb or 0,
+                "sup": sup or 0,
+            })
+        else:
+            item.update({
+                "pont": getattr(a, "estrelas_pontualidade", 0) or 0,
+                "educ": getattr(a, "estrelas_educacao", 0) or 0,
+                "efic": getattr(a, "estrelas_eficiencia", 0) or 0,
+                "apres": getattr(a, "estrelas_apresentacao", 0) or 0,
+            })
+
+        avaliacoes.append(SimpleNamespace(**item))
+
+    def avg_or_zero(coluna):
+        if coluna is None:
+            return 0.0
+
+        q = db.session.query(func.coalesce(func.avg(coluna), 0.0))
+        if filtros:
+            q = q.select_from(Model).filter(and_(*filtros))
+        v = q.scalar()
+        try:
+            return float(v or 0.0)
+        except Exception:
+            return 0.0
+
+    def _score(v):
+        try:
+            if v is None:
+                return 0.0
+            return float(v)
+        except Exception:
+            return 0.0
+
+    kpis = {
+        "qtd": total,
+        "geral": avg_or_zero(f_geral),
+    }
 
     if tipo == "restaurante":
-        kpis = {
-            "qtd": total,
-            "geral": _avg_attr(itens_all, "geral"),
-            "trat": _avg_attr(itens_all, "trat"),
-            "amb": _avg_attr(itens_all, "amb"),
-            "sup": _avg_attr(itens_all, "sup"),
-        }
-        notas_media = {"geral": kpis["geral"] or None, "trat": kpis["trat"] or None, "amb": kpis["amb"] or None, "sup": kpis["sup"] or None}
+        kpis.update({
+            "trat": avg_or_zero(f_trat),
+            "amb": avg_or_zero(f_amb),
+            "sup": avg_or_zero(f_sup),
+        })
     else:
-        kpis = {
-            "qtd": total,
-            "geral": _avg_attr(itens_all, "geral"),
-            "pont": _avg_attr(itens_all, "pont"),
-            "educ": _avg_attr(itens_all, "educ"),
-            "efic": _avg_attr(itens_all, "efic"),
-            "apres": _avg_attr(itens_all, "apres"),
+        kpis.update({
+            "pont": avg_or_zero(f_pont),
+            "educ": avg_or_zero(f_educ),
+            "efic": avg_or_zero(f_efic),
+            "apres": avg_or_zero(f_apres),
+        })
+
+    ranking = []
+    chart_top = {"labels": [], "values": []}
+
+    if tipo == "restaurante":
+        q_rank = (
+            db.session.query(
+                Restaurante.id.label("id"),
+                Restaurante.nome.label("nome"),
+                func.count(Model.id).label("qtd"),
+                func.coalesce(func.avg(f_geral), 0.0).label("m_geral"),
+                (func.coalesce(func.avg(f_trat), 0.0) if f_trat is not None else literal(0.0)).label("m_trat"),
+                (func.coalesce(func.avg(f_amb), 0.0) if f_amb is not None else literal(0.0)).label("m_amb"),
+                (func.coalesce(func.avg(f_sup), 0.0) if f_sup is not None else literal(0.0)).label("m_sup"),
+            )
+            .join(Model, Model.restaurante_id == Restaurante.id)
+        )
+
+        if filtros:
+            q_rank = q_rank.filter(and_(*filtros))
+
+        ranking_rows = q_rank.group_by(Restaurante.id, Restaurante.nome).all()
+
+        ranking = [{
+            "rest_nome": r.nome,
+            "qtd": int(r.qtd or 0),
+            "m_geral": _score(r.m_geral),
+            "m_trat": _score(r.m_trat),
+            "m_amb": _score(r.m_amb),
+            "m_sup": _score(r.m_sup),
+        } for r in ranking_rows]
+
+        top = sorted(
+            [x for x in ranking if x["qtd"] >= 3],
+            key=lambda x: x["m_geral"],
+            reverse=True,
+        )[:10]
+
+        chart_top = {
+            "labels": [r["rest_nome"] for r in top],
+            "values": [round(r["m_geral"], 2) for r in top],
         }
-        notas_media = {"geral": kpis["geral"] or None, "pont": kpis["pont"] or None, "educ": kpis["educ"] or None, "efic": kpis["efic"] or None, "apres": kpis["apres"] or None}
-    sentimento_geral, onde_melhorar_geral, ponto_forte_geral = _resumo_sentimento_e_melhoria(tipo, notas_media)
-    kpis["sentimento_geral"] = sentimento_geral
-    kpis["onde_melhorar"] = onde_melhorar_geral
-    kpis["ponto_forte"] = ponto_forte_geral
 
-    def _build_resumo(items, entidade_tipo):
-        if entidade_tipo == "restaurante":
-            key_id, key_nome = "rest_id", "rest_nome"
-            attrs = ["geral", "trat", "amb", "sup"]
-        else:
-            key_id, key_nome = "coop_id", "coop_nome"
-            attrs = ["geral", "pont", "educ", "efic", "apres"]
-        groups = {}
-        for i in items:
-            gid = getattr(i, key_id)
-            g = groups.setdefault(gid, {"id": gid, "nome": getattr(i, key_nome), "items": []})
-            g["items"].append(i)
-        out = []
-        for g in groups.values():
-            sub = g["items"]
-            medias = {a: _media_validas([getattr(x, a, None) for x in sub]) for a in attrs}
-            sentimento, onde_melhorar, ponto_forte = _resumo_sentimento_e_melhoria(entidade_tipo, medias)
-            row = {
-                "id": g["id"],
-                "nome": g["nome"],
-                "qtd": len(sub),
-                "sentimento": sentimento,
-                "onde_melhorar": onde_melhorar,
-                "ponto_forte": ponto_forte,
-                "m_geral": medias.get("geral"),
-                "m_pont": medias.get("pont"),
-                "m_educ": medias.get("educ"),
-                "m_efic": medias.get("efic"),
-                "m_apres": medias.get("apres"),
-                "m_trat": medias.get("trat"),
-                "m_amb": medias.get("amb"),
-                "m_sup": medias.get("sup"),
-            }
-            out.append(SimpleNamespace(**row))
-        out.sort(key=lambda r: (-(r.m_geral or 0), -(r.qtd or 0), r.nome or ""))
-        return out
+    else:
+        q_rank = (
+            db.session.query(
+                Cooperado.id.label("id"),
+                Cooperado.nome.label("nome"),
+                func.count(Model.id).label("qtd"),
+                func.coalesce(func.avg(f_geral), 0.0).label("m_geral"),
+                (func.coalesce(func.avg(f_pont), 0.0) if f_pont is not None else literal(0.0)).label("m_pont"),
+                (func.coalesce(func.avg(f_educ), 0.0) if f_educ is not None else literal(0.0)).label("m_educ"),
+                (func.coalesce(func.avg(f_efic), 0.0) if f_efic is not None else literal(0.0)).label("m_efic"),
+                (func.coalesce(func.avg(f_apres), 0.0) if f_apres is not None else literal(0.0)).label("m_apres"),
+            )
+            .join(Model, Model.cooperado_id == Cooperado.id)
+        )
 
-    resumo_principal = _build_resumo(itens_all, tipo)
-    ranking = resumo_principal[:]
-    chart_top = [{"label": r.nome, "valor": round(float(r.m_geral or 0), 2)} for r in ranking[:10]]
+        if filtros:
+            q_rank = q_rank.filter(and_(*filtros))
+
+        ranking_rows = q_rank.group_by(Cooperado.id, Cooperado.nome).all()
+
+        ranking = [{
+            "coop_nome": r.nome,
+            "qtd": int(r.qtd or 0),
+            "m_geral": _score(r.m_geral),
+            "m_pont": _score(r.m_pont),
+            "m_educ": _score(r.m_educ),
+            "m_efic": _score(r.m_efic),
+            "m_apres": _score(r.m_apres),
+        } for r in ranking_rows]
+
+        top = sorted(
+            [x for x in ranking if x["qtd"] >= 3],
+            key=lambda x: x["m_geral"],
+            reverse=True,
+        )[:10]
+
+        chart_top = {
+            "labels": [r["coop_nome"] for r in top],
+            "values": [round(r["m_geral"], 2) for r in top],
+        }
 
     compat_map = {}
-    for a in itens_all:
+    for a in avaliacoes:
         key = (a.coop_id, a.rest_id)
         d = compat_map.get(key)
+
         if not d:
-            d = {"coop": a.coop_nome, "rest": a.rest_nome, "sum": 0.0, "count": 0}
-        if a.geral is not None:
-            d["sum"] += float(a.geral)
-            d["count"] += 1
+            d = {
+                "coop": a.coop_nome,
+                "rest": a.rest_nome,
+                "sum": 0.0,
+                "count": 0,
+            }
+
+        d["sum"] += (a.geral or 0)
+        d["count"] += 1
         compat_map[key] = d
+
     compat = []
     for d in compat_map.values():
         avg = (d["sum"] / d["count"]) if d["count"] else 0.0
-        compat.append({"coop": d["coop"], "rest": d["rest"], "avg": avg, "count": d["count"]})
-    compat.sort(key=lambda x: (-(x["avg"] or 0), -(x["count"] or 0), x["coop"], x["rest"]))
+        compat.append({
+            "coop": d["coop"],
+            "rest": d["rest"],
+            "avg": avg,
+            "count": d["count"],
+        })
 
-    _flt = SimpleNamespace(restaurante_id=restaurante_id, cooperado_id=cooperado_id, data_inicio=data_inicio or "", data_fim=data_fim or "")
+    compat.sort(
+        key=lambda x: (-(x["avg"] or 0), -(x["count"] or 0), x["coop"], x["rest"])
+    )
+
+    _flt = SimpleNamespace(
+        restaurante_id=restaurante_id,
+        cooperado_id=cooperado_id,
+        data_inicio=data_inicio or "",
+        data_fim=data_fim or "",
+    )
+
     preserve = request.args.to_dict(flat=True)
     preserve.pop("page", None)
+
     cfg = get_config()
-    admin_user = (Usuario.query.filter_by(tipo="admin", is_master=True).order_by(Usuario.id.asc()).first() or Usuario.query.filter_by(tipo="admin").order_by(Usuario.id.asc()).first())
+
+    admin_user = (
+        Usuario.query
+        .filter_by(tipo="admin", is_master=True)
+        .order_by(Usuario.id.asc())
+        .first()
+    )
+    if not admin_user:
+        admin_user = (
+            Usuario.query
+            .filter_by(tipo="admin")
+            .order_by(Usuario.id.asc())
+            .first()
+        )
+
     admin_logado = _usuario_logado()
+
     if admin_logado and getattr(admin_logado, "is_master", False):
-        admin_perms = {aba: {"ver": True, "criar": True, "editar": True, "excluir": True} for aba in ADMIN_ABAS.keys()}
+        admin_perms = {
+            aba: {
+                "ver": True,
+                "criar": True,
+                "editar": True,
+                "excluir": True,
+            }
+            for aba in ADMIN_ABAS.keys()
+        }
     else:
         admin_perms = get_admin_permissions_map(admin_logado.id) if admin_logado else {}
-    admins_secundarios = Usuario.query.filter_by(tipo="admin", is_master=False).order_by(Usuario.id.asc()).all()
+
+    admins_secundarios = (
+        Usuario.query
+        .filter_by(tipo="admin", is_master=False)
+        .order_by(Usuario.id.asc())
+        .all()
+    )
 
     return render_template(
         "admin_avaliacoes.html",
@@ -5203,7 +5258,6 @@ def admin_avaliacoes():
         ranking=ranking,
         chart_top=chart_top,
         compat=compat,
-        resumo_principal=resumo_principal,
         _flt=_flt,
         restaurantes=Restaurante.query.order_by(Restaurante.nome).all(),
         cooperados=Cooperado.query.order_by(Cooperado.nome).all(),
@@ -5218,6 +5272,7 @@ def admin_avaliacoes():
         ADMIN_ABAS=ADMIN_ABAS,
         admins_secundarios=admins_secundarios,
     )
+
 
 @app.route("/admin/avaliacoes/export")
 @admin_perm_required("avaliacoes", "ver")
@@ -8458,15 +8513,15 @@ def producoes_avaliar(lanc_id):
 
     # Derivados opcionais — mantém compat se suas funções existirem
     try:
-        senti = _sentimento_por_media(media_ponderada)
+        senti = _analise_sentimento(comentario) if comentario else None
     except Exception:
         senti = None
     try:
-        temas = "; ".join(_combinar_temas("restaurante", {"trat": trat, "amb": amb, "sup": sup}, comentario))
+        temas = "; ".join(_identifica_temas(comentario)) if comentario else None
     except Exception:
         temas = None
     try:
-        crise = _sinaliza_crise(estrelas_geral, comentario) or (media_ponderada is not None and media_ponderada <= 2.0)
+        crise = _sinaliza_crise(estrelas_geral, comentario)
     except Exception:
         crise = False
 
@@ -9543,9 +9598,9 @@ def lancar_producao():
     tem_avaliacao = any(x is not None for x in (g, p, ed, ef, ap)) or bool(txt)
     if tem_avaliacao:
         media = _media_ponderada(g, p, ed, ef, ap)
-        senti = _sentimento_por_media(media)
-        temas = _combinar_temas("cooperado", {"pont": p, "educ": ed, "efic": ef, "apres": ap}, txt)
-        crise = _sinaliza_crise(g, txt) or (media is not None and media <= 2.0)
+        senti = _analise_sentimento(txt)
+        temas = _identifica_temas(txt)
+        crise = _sinaliza_crise(g, txt)
         feed  = _gerar_feedback(p, ed, ef, ap, txt, senti)
 
         av = AvaliacaoCooperado(
