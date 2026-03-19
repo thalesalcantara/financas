@@ -371,12 +371,6 @@ class Cooperado(db.Model):
 
     ultima_atualizacao = db.Column(db.DateTime)
 
-    cota_valor_manual = db.Column(db.Float, default=0.0)
-    cota_parcela_semanal = db.Column(db.Float, default=33.0)
-    cota_integralizar_salario = db.Column(db.Boolean, default=True)
-    nao_descontar_cota = db.Column(db.Boolean, default=False)
-    cota_devolvida = db.Column(db.Float, default=0.0)
-
 
 class Restaurante(db.Model):
     __tablename__ = "restaurantes"
@@ -534,8 +528,6 @@ class DespesaCooperado(db.Model):
     # 🔴 NOVO: marca se é adiantamento
     eh_adiantamento = db.Column(db.Boolean, default=False)
     competencia_desconto = db.Column(db.String(20), default='atual')
-    eh_cota_parte = db.Column(db.Boolean, default=False)
-    nao_descontar_automatico = db.Column(db.Boolean, default=False)
     
 
 
@@ -1169,47 +1161,6 @@ def init_db():
             db.session.execute(sa_text(
                 "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
             db.session.commit()
-    except Exception:
-        db.session.rollback()
-
-    # 4.3.w) cota-parte em cooperados
-    try:
-        if DIALECT == "sqlite":
-            cols = db.session.execute(sa_text("PRAGMA table_info(cooperados);")).fetchall()
-            colnames = {c[1] for c in cols}
-            if "cota_valor_manual" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN cota_valor_manual FLOAT DEFAULT 0"))
-            if "cota_parcela_semanal" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN cota_parcela_semanal FLOAT DEFAULT 33"))
-            if "cota_integralizar_salario" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN cota_integralizar_salario BOOLEAN DEFAULT 1"))
-            if "nao_descontar_cota" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN nao_descontar_cota BOOLEAN DEFAULT 0"))
-            if "cota_devolvida" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE cooperados ADD COLUMN cota_devolvida FLOAT DEFAULT 0"))
-        else:
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS cota_valor_manual DOUBLE PRECISION DEFAULT 0"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS cota_parcela_semanal DOUBLE PRECISION DEFAULT 33"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS cota_integralizar_salario BOOLEAN DEFAULT TRUE"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS nao_descontar_cota BOOLEAN DEFAULT FALSE"))
-            db.session.execute(sa_text("ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS cota_devolvida DOUBLE PRECISION DEFAULT 0"))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-
-    # 4.3.z) marcações de cota em despesas_cooperado
-    try:
-        if DIALECT == "sqlite":
-            cols = db.session.execute(sa_text("PRAGMA table_info(despesas_cooperado);")).fetchall()
-            colnames = {c[1] for c in cols}
-            if "eh_cota_parte" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE despesas_cooperado ADD COLUMN eh_cota_parte BOOLEAN DEFAULT 0"))
-            if "nao_descontar_automatico" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE despesas_cooperado ADD COLUMN nao_descontar_automatico BOOLEAN DEFAULT 0"))
-        else:
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS public.despesas_cooperado ADD COLUMN IF NOT EXISTS eh_cota_parte BOOLEAN DEFAULT FALSE"))
-            db.session.execute(sa_text("ALTER TABLE IF EXISTS public.despesas_cooperado ADD COLUMN IF NOT EXISTS nao_descontar_automatico BOOLEAN DEFAULT FALSE"))
-        db.session.commit()
     except Exception:
         db.session.rollback()
 
@@ -3517,83 +3468,6 @@ def admin_delete_admin(usuario_id):
 
 @app.route("/admin", methods=["GET"])
 @admin_required
-def _cota_meta_cooperado(coop: Cooperado, salario_minimo_atual: float) -> float:
-    if getattr(coop, "cota_integralizar_salario", True):
-        return round(float(salario_minimo_atual or 0.0), 2)
-    return round(float(getattr(coop, "cota_valor_manual", 0.0) or 0.0), 2)
-
-
-def _cota_integralizada_cooperado(coop_id: int, meta: float | None = None) -> float:
-    total = 0.0
-    despesas = (
-        DespesaCooperado.query
-        .filter(DespesaCooperado.cooperado_id == coop_id, DespesaCooperado.eh_cota_parte.is_(True))
-        .all()
-    )
-    for dc in despesas:
-        valor_total = float(dc.valor or 0.0)
-        pago_manual = sum(float(ab.valor or 0.0) for ab in getattr(dc, 'abatimentos', []) or [])
-        restante = max(0.0, valor_total - pago_manual)
-        if not getattr(dc, 'nao_descontar_automatico', False):
-            # usa o snapshot atual para estimar o abatimento automático já consumido
-            pass
-        total += min(valor_total, pago_manual)
-
-    snap = _compute_coop_debt_snapshot(coop_id, None, date.today())
-    for item in snap.get('itens', []):
-        if item.get('eh_cota_parte'):
-            total += float(item.get('pago_auto', 0.0) or 0.0)
-    if meta is not None and meta > 0:
-        return round(min(total, meta), 2)
-    return round(total, 2)
-
-
-def _ensure_cotas_semanais(cooperados_lista, salario_minimo_atual: float):
-    hoje = date.today()
-    semana_ini, semana_fim = semana_bounds(hoje)
-    for coop in cooperados_lista:
-        meta = _cota_meta_cooperado(coop, salario_minimo_atual)
-        if meta <= 0:
-            continue
-        parcela = round(float(getattr(coop, 'cota_parcela_semanal', 33.0) or 33.0), 2)
-        if parcela <= 0:
-            parcela = 33.0
-        ja = _cota_integralizada_cooperado(coop.id, None)
-        if ja >= meta - 0.009:
-            continue
-        existe = (
-            DespesaCooperado.query
-            .filter(
-                DespesaCooperado.cooperado_id == coop.id,
-                DespesaCooperado.eh_cota_parte.is_(True),
-                DespesaCooperado.data_inicio == semana_ini,
-                DespesaCooperado.data_fim == semana_fim,
-            )
-            .first()
-        )
-        if existe:
-            continue
-        restante = round(max(0.0, meta - ja), 2)
-        valor = round(min(parcela, restante), 2)
-        if valor <= 0:
-            continue
-        db.session.add(DespesaCooperado(
-            cooperado_id=coop.id,
-            descricao=f"Cota-parte semanal - {semana_ini.strftime('%d/%m/%Y')} a {semana_fim.strftime('%d/%m/%Y')}",
-            valor=valor,
-            data=semana_fim,
-            data_inicio=semana_ini,
-            data_fim=semana_fim,
-            eh_cota_parte=True,
-            nao_descontar_automatico=bool(getattr(coop, 'nao_descontar_cota', False)),
-            competencia_desconto='atual',
-        ))
-    try:
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-
-
 def admin_dashboard():
     args = request.args
     active_tab = (args.get("tab") or "lancamentos").strip().lower()
@@ -3828,13 +3702,6 @@ def admin_dashboard():
         .order_by(Cooperado.nome)
         .all()
     )
-    cooperados_todos = (
-        Cooperado.query
-        .join(Usuario, Cooperado.usuario_id == Usuario.id)
-        .order_by(Cooperado.nome)
-        .all()
-    )
-    _ensure_cotas_semanais(cooperados_todos, (cfg.salario_minimo or 0.0) if cfg else 0.0)
 
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
     _ensure_taxas_admin_receitas(restaurantes, months_back=0)
@@ -3863,34 +3730,7 @@ def admin_dashboard():
     total_despesas = sum((d.valor or 0.0) for d in despesas)
     taxa_admin_rows, taxa_admin_totais = _build_taxa_admin_rows(receitas)
     juros_arrecadados_total = round(sum((r['valor_multa'] + r['valor_juros']) for r in taxa_admin_rows if r['status'] == 'pago'), 2)
-    taxa_admin_arrecadada_mes = round(sum((r['valor_pago'] or 0.0) for r in taxa_admin_rows if r.get('status') == 'pago'), 2)
     cooperados_map = {c.id: c for c in cooperados}
-    cota_resumo_rows = []
-    cota_totais = {"meta_total": 0.0, "integralizado_total": 0.0, "faltante_total": 0.0, "devolvido_total": 0.0, "qtd_total": len(cooperados_todos), "qtd_ativos": 0, "qtd_inativos": 0}
-    for coop in cooperados_todos:
-        meta = _cota_meta_cooperado(coop, (cfg.salario_minimo or 0.0) if cfg else 0.0)
-        integralizado = _cota_integralizada_cooperado(coop.id, meta)
-        devolvido = round(float(getattr(coop, 'cota_devolvida', 0.0) or 0.0), 2)
-        faltante = round(max(0.0, meta - integralizado), 2)
-        ativo = bool(getattr(getattr(coop, 'usuario_ref', None), 'ativo', False))
-        cota_totais['meta_total'] += meta
-        cota_totais['integralizado_total'] += integralizado
-        cota_totais['faltante_total'] += faltante
-        cota_totais['devolvido_total'] += devolvido
-        cota_totais['qtd_ativos' if ativo else 'qtd_inativos'] += 1
-        cota_resumo_rows.append({
-            'id': coop.id,
-            'nome': coop.nome,
-            'ativo': ativo,
-            'meta': round(meta,2),
-            'integralizado': round(integralizado,2),
-            'faltante': faltante,
-            'parcela_semanal': round(float(getattr(coop,'cota_parcela_semanal',33.0) or 33.0),2),
-            'nao_descontar': bool(getattr(coop,'nao_descontar_cota',False)),
-            'devolvido': devolvido,
-        })
-    for k in ('meta_total','integralizado_total','faltante_total','devolvido_total'):
-        cota_totais[k] = round(cota_totais[k], 2)
 
     # =========================
     # Documentos / status
@@ -4478,7 +4318,6 @@ def admin_dashboard():
         receitas_coop=receitas_coop,
         despesas_coop=despesas_coop,
         cooperados=cooperados,
-        cooperados_todos=cooperados_todos,
         restaurantes=restaurantes,
         beneficios_view=beneficios_view,
         historico_beneficios=historico_beneficios,
@@ -4524,9 +4363,6 @@ def admin_dashboard():
         taxa_admin_rows=taxa_admin_rows,
         taxa_admin_totais=taxa_admin_totais,
         juros_arrecadados_total=juros_arrecadados_total,
-        taxa_admin_arrecadada_mes=taxa_admin_arrecadada_mes,
-        cota_resumo_rows=cota_resumo_rows,
-        cota_totais=cota_totais,
     )
     
 # =========================
@@ -5951,11 +5787,6 @@ def add_cooperado():
     senha = f.get("senha") or ""
     telefone = (f.get("telefone") or "").strip()
     foto = request.files.get("foto")
-    cota_valor_manual = f.get("cota_valor_manual", type=float) or 0.0
-    cota_parcela_semanal = f.get("cota_parcela_semanal", type=float) or 33.0
-    cota_integralizar_salario = bool((f.get("cota_integralizar_salario") or "1").strip() not in ("0","false","False","off"))
-    nao_descontar_cota = bool((f.get("nao_descontar_cota") or "").strip())
-    cota_devolvida = f.get("cota_devolvida", type=float) or 0.0
     taxa_admin_valor = f.get("taxa_admin_valor", type=float) or 0.0
     taxa_admin_data_base = _parse_date(f.get("taxa_admin_data_base"))
     taxa_admin_multa_percentual = f.get("taxa_admin_multa_percentual", type=float) or 2.0
@@ -5974,11 +5805,6 @@ def add_cooperado():
         nome=nome,
         usuario_id=u.id,
         telefone=telefone,
-        cota_valor_manual=cota_valor_manual,
-        cota_parcela_semanal=cota_parcela_semanal,
-        cota_integralizar_salario=cota_integralizar_salario,
-        nao_descontar_cota=nao_descontar_cota,
-        cota_devolvida=cota_devolvida,
         ultima_atualizacao=datetime.now(),
     )
     db.session.add(c)
@@ -6001,11 +5827,6 @@ def edit_cooperado(id):
     c.nome = (f.get("nome") or "").strip()
     c.usuario_ref.usuario = (f.get("usuario") or "").strip()
     c.telefone = (f.get("telefone") or "").strip()
-    c.cota_valor_manual = f.get("cota_valor_manual", type=float) or 0.0
-    c.cota_parcela_semanal = f.get("cota_parcela_semanal", type=float) or 33.0
-    c.cota_integralizar_salario = bool((f.get("cota_integralizar_salario") or "1").strip() not in ("0","false","False","off"))
-    c.nao_descontar_cota = bool((f.get("nao_descontar_cota") or "").strip())
-    c.cota_devolvida = f.get("cota_devolvida", type=float) or 0.0
 
     foto = request.files.get("foto")
     if foto and foto.filename:
@@ -6898,12 +6719,11 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
             continue
 
         vencida = (df is not None and due_date <= df)
-        pago_manual = sum(float(ab.valor or 0.0) for ab in getattr(dc, 'abatimentos', []) or [])
-        restante = max(0.0, valor_total - pago_manual)
+        pago_manual = 0.0
+        restante = valor_total
 
         pago_auto = 0.0
-        pode_auto = not bool(getattr(dc, 'nao_descontar_automatico', False))
-        if vencida and restante > 0 and disponivel_auto > 0 and pode_auto:
+        if vencida and restante > 0 and disponivel_auto > 0:
             pago_auto = min(restante, disponivel_auto)
             disponivel_auto -= pago_auto
             restante = max(0.0, restante - pago_auto)
@@ -6939,11 +6759,9 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
             'valor_total': round(valor_total, 2),
             'pago_manual': round(pago_manual, 2),
             'pago_auto': round(pago_auto, 2),
-            'pago_total': round(pago_manual + pago_auto, 2),
+            'pago_total': round(pago_auto, 2),
             'restante': round(restante, 2),
             'eh_adiantamento': bool(getattr(dc, 'eh_adiantamento', False)),
-            'eh_cota_parte': bool(getattr(dc, 'eh_cota_parte', False)),
-            'nao_descontar_automatico': bool(getattr(dc, 'nao_descontar_automatico', False)),
             'competencia_desconto': _competencia_label(getattr(dc, 'competencia_desconto', 'esta_semana')),
             'status': status,
         })
