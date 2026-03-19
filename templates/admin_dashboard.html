@@ -899,7 +899,7 @@
 
         <!-- KPIs -->
         <div class="row g-2 resumo-kpi-row">
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="kpi-col">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-prod"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -912,9 +912,7 @@
               </div>
             </div>
           </div>
-
-          <!-- INSS 4% -->
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="kpi-col">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-inss"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -927,9 +925,7 @@
               </div>
             </div>
           </div>
-
-          <!-- SEST/SENAT 0,5% -->
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="kpi-col">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-sest"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -942,8 +938,7 @@
               </div>
             </div>
           </div>
-
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="kpi-col">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-rec-coop"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -956,8 +951,7 @@
               </div>
             </div>
           </div>
-
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="kpi-col">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-desp-coop"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -970,8 +964,7 @@
               </div>
             </div>
           </div>
-
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="kpi-col">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-rec-coop2"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -984,8 +977,7 @@
               </div>
             </div>
           </div>
-
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="kpi-col">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-desp-coop2"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -998,26 +990,20 @@
               </div>
             </div>
           </div>
-
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="kpi-col">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-res-coop"></div>
               <div class="d-flex align-items-center justify-content-between">
                 <div>
                   <div class="text-uppercase text-muted small">Resultado Cooperativa</div>
-                  <div class="fw-bold fs-5">
-                    <span id="kpiResultadoCoop" class="{{ 'text-success' if _resultado_corp >= 0 else 'text-danger' }}">
-                      R$ {{ '%.2f'|format(_resultado_corp) }}
-                    </span>
-                  </div>
+                  <div class="fw-bold fs-5"><span id="kpiResultadoCoop" class="{{ 'text-success' if _resultado_corp >= 0 else 'text-danger' }}">R$ {{ '%.2f'|format(_resultado_corp) }}</span></div>
                   <div class="small text-muted">Receitas − Despesas (coop)</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-pie-chart"></i></div>
               </div>
             </div>
           </div>
-
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="kpi-col">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-total-rec"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1030,8 +1016,7 @@
               </div>
             </div>
           </div>
-
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="kpi-col">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-entregas-periodo"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1044,8 +1029,7 @@
               </div>
             </div>
           </div>
-
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="kpi-col">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-ticket-periodo"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1058,8 +1042,7 @@
               </div>
             </div>
           </div>
-
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="kpi-col">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-benef-rateados"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1069,6 +1052,45 @@
                   <div class="small text-muted">Total lançado no período</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-heart-pulse"></i></div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-col">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-rec-coop"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Cota-parte Integralizada</div>
+                  <div id="kpiCotaIntegralizada" class="fw-bold fs-5">R$ {{ '%.2f'|format(cota_totais.integralizado_total|default(0)) }}</div>
+                  <div class="small text-muted">Total acumulado dos cooperados</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-piggy-bank"></i></div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-col">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-ticket-periodo"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Taxa Administrativa Mês</div>
+                  <div id="kpiTaxaAdminMes" class="fw-bold fs-5">R$ {{ '%.2f'|format(taxa_admin_arrecadada_mes|default(0)) }}</div>
+                  <div class="small text-muted">Recebido no período filtrado</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-bank2"></i></div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-col">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-total-rec"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Total de Cooperados</div>
+                  <div id="kpiTotalCooperados" class="fw-bold fs-5">{{ cota_totais.qtd_total|default((cooperados_todos or cooperados)|length) }}</div>
+                  <div class="small text-muted">{{ cota_totais.qtd_ativos|default(cooperados|length) }} ativos / {{ cota_totais.qtd_inativos|default(0) }} inativos</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-people-fill"></i></div>
               </div>
             </div>
           </div>
@@ -1191,6 +1213,47 @@
         #resumo .resumo-title{
           font-size: 1.05rem;
           font-weight: 600;
+        }
+
+        #resumo .resumo-kpi-row {
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 0.5rem;
+          margin: 0;
+        }
+
+        #resumo .resumo-kpi-row > .kpi-col {
+          min-width: 0;
+        }
+
+        #resumo .resumo-kpi-row .card.kpi-card {
+          padding: 0.72rem 0.82rem !important;
+          min-height: 96px;
+        }
+
+        #resumo .resumo-kpi-row .card.kpi-card .fw-bold.fs-5 {
+          font-size: 1.03rem !important;
+          line-height: 1.1;
+        }
+
+        #resumo .resumo-kpi-row .kpi-icon {
+          width: 36px;
+          height: 36px;
+          border-radius: 12px;
+          font-size: 0.95rem;
+          flex: 0 0 36px;
+        }
+
+        @media (max-width: 1400px) {
+          #resumo .resumo-kpi-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 1100px) {
+          #resumo .resumo-kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 768px) {
+          #resumo .resumo-kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
 
         #resumo .resumo-kpi-row .card.kpi-card {
@@ -2135,6 +2198,9 @@
           <button class="btn btn-royal btn-sm w-100 rounded-pill mt-2 mt-md-0">
             <i class="bi bi-plus-circle"></i> Lançar
           </button>
+        </div>
+        <div class="col-12">
+          <div class="alert alert-light border small mb-0">A cota-parte é configurada na aba <b>Cooperados</b>. O sistema lança a parcela semanal automaticamente em <b>Despesas Cooperados</b> e só desconta da produção quando <b>Não descontar automático</b> não estiver marcado.</div>
         </div>
       </form>
     </div>
@@ -3141,7 +3207,7 @@
                 <td>{{ dc.data.strftime('%d/%m/%Y') if dc.data else '-' }}</td>
                 <td class="text-break">{{ coop_nome }}</td>
                 <td class="text-break">{{ dc.descricao }}</td>
-                <td>{% if dc.eh_adiantamento %}<span class="badge bg-warning text-dark">Adiantamento</span>{% else %}<span class="badge bg-light text-dark border">Despesa</span>{% endif %}</td>
+                <td>{% if dc.eh_cota_parte %}<span class="badge bg-primary">Cota-parte</span>{% elif dc.eh_adiantamento %}<span class="badge bg-warning text-dark">Adiantamento</span>{% else %}<span class="badge bg-light text-dark border">Despesa</span>{% endif %}{% if dc.nao_descontar_automatico %}<div class="small text-warning mt-1">Sem auto desconto</div>{% endif %}</td>
                 <td>{% if dc.competencia_desconto=='semana_passada' %}Semana passada{% elif dc.competencia_desconto=='proxima_semana' %}Próxima semana{% else %}Esta semana{% endif %}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(dc.valor) }}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(_abat_auto or 0) }}</td>
@@ -3620,188 +3686,71 @@
       
 <!-- COOPERADOS (versão profissional / drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
-  {% set qtd_coops = cooperados|length %}
+  {% set coop_list = cooperados_todos|default(cooperados) %}
+  {% set qtd_coops = coop_list|length %}
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-    <h5 class="m-0 d-flex align-items-center gap-2">
-      <i class="bi bi-person-badge"></i> Cadastro de Cooperados
-    </h5>
-    <span class="badge-soft">Total: <b>{{ qtd_coops }}</b></span>
+    <h5 class="m-0 d-flex align-items-center gap-2"><i class="bi bi-person-badge"></i> Cadastro de Cooperados</h5>
+    <span class="badge-soft">Total: <b>{{ qtd_coops }}</b> · Ativos: <b>{{ cota_totais.qtd_ativos|default(cooperados|length) }}</b> · Inativos: <b>{{ cota_totais.qtd_inativos|default(0) }}</b></span>
   </div>
 
-  <!-- Novo cooperado -->
   <div class="card border-0 shadow-sm rounded-3 mb-3">
     <div class="card-body">
       <form method="POST" action="{{ url_for('add_cooperado') }}" enctype="multipart/form-data" class="row g-3 align-items-end" data-perm-form="can_cooperados_criar">
-        {% if csrf_token is defined %}
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        {% endif %}
-
-        <div class="col-md-3">
-          <label class="form-label">Nome</label>
-          <input type="text" class="form-control form-control-sm" name="nome" placeholder="Nome completo" required>
-        </div>
-
-        <div class="col-md-3">
-          <label class="form-label">Usuário</label>
-          <div class="input-group input-group-sm">
-            <span class="input-group-text"><i class="bi bi-at"></i></span>
-            <input type="text" class="form-control" name="usuario" placeholder="usuario" required>
-          </div>
-          <small class="text-muted">Usado no login.</small>
-        </div>
-
-        <div class="col-md-3">
-          <label class="form-label">Senha</label>
-          <div class="input-group input-group-sm">
-            <input type="password" class="form-control" name="senha" id="coopSenha" placeholder="********" required>
-            <button class="btn btn-outline-secondary" type="button" id="btnToggleSenha" title="Mostrar/ocultar">
-              <i class="bi bi-eye"></i>
-            </button>
-          </div>
-        </div>
-
-        <!-- Telefone (WhatsApp) -->
-        <div class="col-md-3">
-          <label class="form-label">Telefone (WhatsApp)</label>
-          <input type="tel"
-                 class="form-control form-control-sm"
-                 name="telefone"
-                 id="coopTelefone"
-                 inputmode="numeric"
-                 placeholder="(00) 00000-0000">
-          <small class="text-muted">Cole/insira só dígitos; formatamos automaticamente.</small>
-        </div>
-
-        <div class="col-md-3">
-          <label class="form-label">Foto (opcional)</label>
-          <input type="file" class="form-control form-control-sm" name="foto" id="coopFoto" accept="image/*">
-          <div class="d-flex align-items-center gap-2 mt-2">
-            <img id="coopPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt="" style="width:40px;height:40px;object-fit:cover;">
-            <small class="text-muted">Prévia</small>
-          </div>
-        </div>
-
-        <div class="col-12">
-          <button class="btn btn-royal">
-            <i class="bi bi-save"></i> Cadastrar
-          </button>
-          <button type="reset" class="btn btn-light ms-1">Limpar</button>
-        </div>
+        {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+        <div class="col-md-3"><label class="form-label">Nome</label><input type="text" class="form-control form-control-sm" name="nome" placeholder="Nome completo" required></div>
+        <div class="col-md-2"><label class="form-label">Usuário</label><div class="input-group input-group-sm"><span class="input-group-text"><i class="bi bi-at"></i></span><input type="text" class="form-control" name="usuario" placeholder="usuario" required></div><small class="text-muted">Usado no login.</small></div>
+        <div class="col-md-2"><label class="form-label">Senha</label><div class="input-group input-group-sm"><input type="password" class="form-control" name="senha" id="coopSenha" placeholder="********" required><button class="btn btn-outline-secondary" type="button" id="btnToggleSenha" title="Mostrar/ocultar"><i class="bi bi-eye"></i></button></div></div>
+        <div class="col-md-2"><label class="form-label">Telefone</label><input type="tel" class="form-control form-control-sm" name="telefone" id="coopTelefone" inputmode="numeric" placeholder="(00) 00000-0000"></div>
+        <div class="col-md-3"><label class="form-label">Foto (opcional)</label><input type="file" class="form-control form-control-sm" name="foto" id="coopFoto" accept="image/*"><div class="d-flex align-items-center gap-2 mt-2"><img id="coopPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt="" style="width:40px;height:40px;object-fit:cover;"><small class="text-muted">Prévia</small></div></div>
+        <div class="col-md-2"><label class="form-label">Cota manual (R$)</label><input type="number" step="0.01" min="0" class="form-control form-control-sm" name="cota_valor_manual" value="0"><small class="text-muted">0 usa salário mínimo.</small></div>
+        <div class="col-md-2"><label class="form-label">Parcela semanal</label><input type="number" step="0.01" min="0" class="form-control form-control-sm" name="cota_parcela_semanal" value="33.00"></div>
+        <div class="col-md-2"><label class="form-label">Cota devolvida</label><input type="number" step="0.01" min="0" class="form-control form-control-sm" name="cota_devolvida" value="0"></div>
+        <div class="col-md-3"><label class="form-label">Meta da cota</label><div class="form-check pt-2"><input class="form-check-input" type="checkbox" name="cota_integralizar_salario" id="cotaIntegralizarSalario" checked><label class="form-check-label" for="cotaIntegralizarSalario">Usar salário mínimo atual</label></div></div>
+        <div class="col-md-3"><label class="form-label">Desconto automático</label><div class="form-check pt-2"><input class="form-check-input" type="checkbox" name="nao_descontar_cota" id="naoDescontarCota"><label class="form-check-label" for="naoDescontarCota">Não descontar automático</label></div></div>
+        <div class="col-12"><button class="btn btn-royal"><i class="bi bi-save"></i> Cadastrar</button><button type="reset" class="btn btn-light ms-1">Limpar</button></div>
       </form>
     </div>
   </div>
 
-  <!-- Lista de cooperados -->
   <div class="card border-0 shadow-sm rounded-3">
     <div class="card-body">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-        <h6 class="m-0 d-flex align-items-center gap-2">
-          <i class="bi bi-people"></i> Cooperados cadastrados
-        </h6>
-        <div class="input-group input-group-sm" style="max-width:340px;">
-          <span class="input-group-text"><i class="bi bi-search"></i></span>
-          <input type="text" class="form-control" id="buscaCooperados" placeholder="Filtrar por nome, usuário ou telefone...">
-        </div>
+        <h6 class="m-0 d-flex align-items-center gap-2"><i class="bi bi-people"></i> Cooperados cadastrados</h6>
+        <div class="input-group input-group-sm" style="max-width:340px;"><span class="input-group-text"><i class="bi bi-search"></i></span><input type="text" class="form-control" id="buscaCooperados" placeholder="Filtrar por nome, usuário ou telefone..."></div>
       </div>
-
       <div class="table-responsive">
         <table class="table table-sm table-bordered table-hover align-middle">
           <thead class="table-light">
             <tr>
-              <th style="width:60px;">Foto</th>
-              <th>Nome</th>
-              <th>Usuário</th>
-              <th style="width:170px;">Telefone</th>
-              <th style="width:120px;" class="text-center">Status</th>
-              <th class="text-center" style="width:260px;">Ações</th>
+              <th style="width:60px;">Foto</th><th>Nome</th><th>Usuário</th><th style="width:170px;">Telefone</th><th style="width:110px;" class="text-center">Status</th><th class="text-end" style="width:120px;">Meta cota</th><th class="text-end" style="width:120px;">Integralizado</th><th class="text-end" style="width:120px;">Falta</th><th class="text-end" style="width:120px;">Devolvido</th><th class="text-end" style="width:120px;">Parc. semanal</th><th style="width:110px;" class="text-center">Auto desc.</th><th class="text-center" style="width:260px;">Ações</th>
             </tr>
           </thead>
           <tbody id="tbodyCooperados">
-            {% for coop in cooperados %}
-              <tr data-nome="{{ coop.nome|lower }}"
-                  data-user="{{ coop.usuario_ref.usuario|lower }}"
-                  data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','')|lower }}">
-                <td class="text-center">
-                  <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
-                       class="avatar border" alt="{{ coop.nome }}"
-                       style="width:40px;height:40px;object-fit:cover;">
-                </td>
-
+            {% for coop in coop_list %}
+              {% set cota_row = (cota_resumo_rows|selectattr('id','equalto',coop.id)|list|first) if cota_resumo_rows is defined else None %}
+              <tr data-nome="{{ coop.nome|lower }}" data-user="{{ coop.usuario_ref.usuario|lower }}" data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','')|lower }}">
+                <td class="text-center"><img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}" class="avatar border" alt="{{ coop.nome }}" style="width:40px;height:40px;object-fit:cover;"></td>
                 <td class="fw-medium">{{ coop.nome }}</td>
                 <td class="text-muted">{{ coop.usuario_ref.usuario }}</td>
-
-                <td class="text-monospace">
-                  {% if coop.telefone %}
-                    <span class="fone" data-raw="{{ coop.telefone }}">{{ coop.telefone }}</span>
-                    <a class="ms-1 btn btn-sm btn-outline-success"
-                       target="_blank"
-                       href="https://wa.me/55{{ (coop.telefone|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','')) }}">
-                      <i class="bi bi-whatsapp"></i>
-                    </a>
-                  {% else %}
-                    —
-                  {% endif %}
-                </td>
-
-                <!-- Badge de status -->
-                <td class="text-center">
-                  <span id="badge-ativo-{{ coop.id }}"
-                        class="badge {{ 'bg-success' if coop.usuario_ref.ativo else 'bg-secondary' }}">
-                    {{ 'Ativo' if coop.usuario_ref.ativo else 'Inativo' }}
-                  </span>
-                </td>
-
+                <td class="text-monospace">{% if coop.telefone %}<span class="fone" data-raw="{{ coop.telefone }}">{{ coop.telefone }}</span><a class="ms-1 btn btn-sm btn-outline-success" target="_blank" href="https://wa.me/55{{ (coop.telefone|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','')) }}"><i class="bi bi-whatsapp"></i></a>{% else %}—{% endif %}</td>
+                <td class="text-center"><span id="badge-ativo-{{ coop.id }}" class="badge {{ 'bg-success' if coop.usuario_ref.ativo else 'bg-secondary' }}">{{ 'Ativo' if coop.usuario_ref.ativo else 'Inativo' }}</span></td>
+                <td class="text-end">R$ {{ '%.2f'|format(cota_row.meta if cota_row else 0) }}</td>
+                <td class="text-end">R$ {{ '%.2f'|format(cota_row.integralizado if cota_row else 0) }}</td>
+                <td class="text-end {{ 'text-danger fw-semibold' if (cota_row and cota_row.faltante > 0) else '' }}">R$ {{ '%.2f'|format(cota_row.faltante if cota_row else 0) }}</td>
+                <td class="text-end">R$ {{ '%.2f'|format(cota_row.devolvido if cota_row else 0) }}</td>
+                <td class="text-end">R$ {{ '%.2f'|format(cota_row.parcela_semanal if cota_row else 33) }}</td>
+                <td class="text-center">{% if cota_row and cota_row.nao_descontar %}<span class="badge bg-warning text-dark">Não</span>{% else %}<span class="badge bg-success">Sim</span>{% endif %}</td>
                 <td class="text-center">
                   <div class="btn-group btn-group-sm" role="group">
-                    <!-- Toggle ativo/inativo -->
-                    <button class="btn {{ 'btn-outline-danger' if coop.usuario_ref.ativo else 'btn-outline-success' }}"
-                            type="button"
-                            title="{{ 'Desativar' if coop.usuario_ref.ativo else 'Ativar' }}"
-                            data-id="{{ coop.id }}"
-                            data-ativo="{{ 1 if coop.usuario_ref.ativo else 0 }}"
-                            onclick="toggleAtivoCooperado(this)">
-                      <i class="bi {{ 'bi-person-dash' if coop.usuario_ref.ativo else 'bi-person-check' }}"></i>
-                      <span class="d-none d-sm-inline">{{ 'Desativar' if coop.usuario_ref.ativo else 'Ativar' }}</span>
-                    </button>
-
-                    <!-- Editar (AGORA passa a foto atual também) -->
-                    {% if can_cooperados_editar %}<button class="btn btn-warning"
-                            data-bs-toggle="modal"
-                            data-bs-target="#modalEditCooperado"
-                            data-id="{{ coop.id }}"
-                            data-nome="{{ coop.nome }}"
-                            data-usuario="{{ coop.usuario_ref.usuario }}"
-                            data-telefone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
-                            data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
-                            data-url="{{ url_for('edit_cooperado', id=coop.id) }}"
-                            title="Editar">
-                      <i class="bi bi-pencil"></i>
-                    </button>
-
-                    <!-- Resetar senha -->
-                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalResetSenhaCooperado"
-                            data-id="{{ coop.id }}" data-url="{{ url_for('reset_senha_cooperado', id=coop.id) }}" title="Redefinir senha">
-                      <i class="bi bi-key"></i>
-                    </button>
-
-                    <!-- Excluir -->
-                    {% if can_cooperados_excluir %}<form action="{{ url_for('delete_cooperado', id=coop.id) }}"
-                          method="POST"
-                          class="d-inline"
-                          onsubmit="return confirm('Excluir {{ coop.nome }}? Esta ação não pode ser desfeita.');">
-                      {% if csrf_token is defined %}
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      {% endif %}
-                      <button type="submit" class="btn btn-danger btn-del" title="Excluir">
-                        <i class="bi bi-trash"></i>
-                      </button>
-                    </form>{% endif %}
-                    {% endif %}
+                    <button class="btn {{ 'btn-outline-danger' if coop.usuario_ref.ativo else 'btn-outline-success' }}" type="button" title="{{ 'Desativar' if coop.usuario_ref.ativo else 'Ativar' }}" data-id="{{ coop.id }}" data-ativo="{{ 1 if coop.usuario_ref.ativo else 0 }}" onclick="toggleAtivoCooperado(this)"><i class="bi {{ 'bi-person-dash' if coop.usuario_ref.ativo else 'bi-person-check' }}"></i><span class="d-none d-sm-inline">{{ 'Desativar' if coop.usuario_ref.ativo else 'Ativar' }}</span></button>
+                    {% if can_cooperados_editar %}<button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalEditCooperado" data-id="{{ coop.id }}" data-nome="{{ coop.nome }}" data-usuario="{{ coop.usuario_ref.usuario }}" data-telefone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}" data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}" data-cota_valor_manual="{{ coop.cota_valor_manual|default(0) }}" data-cota_parcela_semanal="{{ coop.cota_parcela_semanal|default(33) }}" data-cota_integralizar_salario="{{ 1 if coop.cota_integralizar_salario else 0 }}" data-nao_descontar_cota="{{ 1 if coop.nao_descontar_cota else 0 }}" data-cota_devolvida="{{ coop.cota_devolvida|default(0) }}" data-cota_meta="{{ cota_row.meta if cota_row else 0 }}" data-cota_integralizada="{{ cota_row.integralizado if cota_row else 0 }}" data-cota_faltante="{{ cota_row.faltante if cota_row else 0 }}" data-url="{{ url_for('edit_cooperado', id=coop.id) }}" title="Editar"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalResetSenhaCooperado" data-id="{{ coop.id }}" data-url="{{ url_for('reset_senha_cooperado', id=coop.id) }}" title="Redefinir senha"><i class="bi bi-key"></i></button>
+                    {% if can_cooperados_excluir %}<form action="{{ url_for('delete_cooperado', id=coop.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Excluir {{ coop.nome }}? Esta ação não pode ser desfeita.');">{% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}<button type="submit" class="btn btn-danger btn-del" title="Excluir"><i class="bi bi-trash"></i></button></form>{% endif %}{% endif %}
                   </div>
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="6" class="text-center text-muted">Nenhum cooperado</td></tr>
+              <tr><td colspan="12" class="text-center text-muted">Nenhum cooperado</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -3809,9 +3758,7 @@
     </div>
   </div>
 
-    <!-- UX Helpers -->
   <script>
-    // Formata BR: (00) 0000-0000 ou (00) 00000-0000
     function formatPhoneBR(v) {
       let d = (v || '').toString().replace(/\D/g, '');
       if (d.length > 11 && d.startsWith('55')) d = d.slice(d.length - 11);
@@ -3828,8 +3775,6 @@
       }
       return d.replace(/^(\d{2})(\d{5})(\d{4}).*$/, '($1) $2-$3');
     }
-
-    // filtro local por nome/usuário e dígitos do telefone
     (function(){
       const input = document.getElementById('buscaCooperados');
       const tbody = document.getElementById('tbodyCooperados');
@@ -3843,181 +3788,83 @@
           tr.style.display = (!qRaw || nome.includes(qRaw) || user.includes(qRaw) || (qDigits && fone.includes(qDigits))) ? '' : 'none';
         });
       });
-    })();
-
-    // Formata todos os <span class="fone" data-raw="..."> renderizados
-    (function(){
       document.querySelectorAll('span.fone[data-raw]').forEach(span => {
         const raw = span.getAttribute('data-raw') || '';
         const formatted = formatPhoneBR(raw);
         if (formatted) span.textContent = formatted;
       });
-    })();
-
-    // prévia da foto (form de NOVO cooperado)
-    (function(){
       const file = document.getElementById('coopFoto');
       const prev = document.getElementById('coopPreview');
       file?.addEventListener('change', () => {
-        const f = file.files?.[0];
-        if(!f) { return; }
-        const reader = new FileReader();
-        reader.onload = e => prev.src = e.target.result;
-        reader.readAsDataURL(f);
+        const f = file.files?.[0]; if(!f) return; const rd = new FileReader(); rd.onload = e => { if(prev) prev.src = e.target.result; }; rd.readAsDataURL(f);
       });
-    })();
-
-    // mostrar/ocultar senha
-    (function(){
+      const senha = document.getElementById('coopSenha');
       const btn = document.getElementById('btnToggleSenha');
-      const inp = document.getElementById('coopSenha');
-      btn?.addEventListener('click', () => {
-        const isPwd = inp.type === 'password';
-        inp.type = isPwd ? 'text' : 'password';
-        btn.innerHTML = isPwd ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
-      });
-    })();
-
-    // Preenche o modal de edição (agora inclui FOTO atual + prévia) e aplica máscara no campo
-    (function(){
+      btn?.addEventListener('click', () => { const isPwd = senha.type === 'password'; senha.type = isPwd ? 'text' : 'password'; btn.innerHTML = isPwd ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>'; });
+      const telNovo = document.getElementById('coopTelefone');
+      telNovo?.addEventListener('input', () => { const f = formatPhoneBR(telNovo.value); if (telNovo.value !== f) telNovo.value = f; });
+      telNovo?.addEventListener('blur', () => telNovo.value = formatPhoneBR(telNovo.value));
       const modal = document.getElementById('modalEditCooperado');
       modal?.addEventListener('show.bs.modal', (ev) => {
         const btn = ev.relatedTarget;
         const form = modal.querySelector('form');
-        const nome = form?.querySelector('[name="nome"]');
-        const usuario = form?.querySelector('[name="usuario"]');
-        const tel = form?.querySelector('[name="telefone"]');
-        const file = form?.querySelector('input[type="file"][name="foto"]');
-        const prev = form?.querySelector('#editCoopPreview');
-
         if (form && btn?.dataset?.url) form.setAttribute('action', btn.dataset.url);
-        if (nome)    nome.value    = btn?.dataset?.nome    || '';
-        if (usuario) usuario.value = btn?.dataset?.usuario || '';
-        if (tel)     tel.value     = formatPhoneBR(btn?.dataset?.telefone || '');
-
-        // foto atual (para a prévia do modal)
-        const fotoAtual = btn?.dataset?.foto || '{{ url_for("static", filename="img/default.png") }}';
-        if (prev) prev.src = fotoAtual;
-
-        // limpar input file ao abrir
-        if (file) file.value = '';
+        const map = {
+          nome: btn?.dataset?.nome || '', usuario: btn?.dataset?.usuario || '', telefone: formatPhoneBR(btn?.dataset?.telefone || ''), cota_valor_manual: btn?.dataset?.cota_valor_manual || '0', cota_parcela_semanal: btn?.dataset?.cota_parcela_semanal || '33', cota_devolvida: btn?.dataset?.cota_devolvida || '0', cota_meta_preview: 'R$ ' + Number(btn?.dataset?.cota_meta || 0).toFixed(2), cota_integralizada_preview: 'R$ ' + Number(btn?.dataset?.cota_integralizada || 0).toFixed(2), cota_faltante_preview: 'R$ ' + Number(btn?.dataset?.cota_faltante || 0).toFixed(2)
+        };
+        Object.entries(map).forEach(([k,v]) => { const el = form?.querySelector(`[name="${k}"]`); if (el) el.value = v; });
+        const usaSal = form?.querySelector('[name="cota_integralizar_salario"]');
+        const naoDesc = form?.querySelector('[name="nao_descontar_cota"]');
+        if (usaSal) usaSal.checked = (btn?.dataset?.cota_integralizar_salario || '1') === '1';
+        if (naoDesc) naoDesc.checked = (btn?.dataset?.nao_descontar_cota || '0') === '1';
+        const prev = form?.querySelector('#editCoopPreview');
+        if (prev) prev.src = btn?.dataset?.foto || '{{ url_for("static", filename="img/default.png") }}';
+        const fileIn = form?.querySelector('input[type="file"][name="foto"]');
+        if (fileIn) fileIn.value = '';
       });
-
-      // máscara tel no modal
-      const tel = document.getElementById('editTelefone');
-      tel?.addEventListener('input', () => {
-        const f = formatPhoneBR(tel.value);
-        if (tel.value !== f) tel.value = f;
-      });
-      tel?.addEventListener('blur', () => tel.value = formatPhoneBR(tel.value));
-
-      // prévia da foto no MODAL de edição
-      const modalForm = document.querySelector('#modalEditCooperado form');
-      const fileIn = modalForm?.querySelector('input[type="file"][name="foto"]');
-      const prevImg = modalForm?.querySelector('#editCoopPreview');
-      fileIn?.addEventListener('change', ()=>{
-        const f = fileIn.files?.[0];
-        if(!f) return;
-        const rd = new FileReader();
-        rd.onload = e => { if(prevImg) prevImg.src = e.target.result; };
-        rd.readAsDataURL(f);
-      });
+      const telEdit = document.getElementById('editTelefone');
+      telEdit?.addEventListener('input', () => { const f = formatPhoneBR(telEdit.value); if (telEdit.value !== f) telEdit.value = f; });
+      telEdit?.addEventListener('blur', () => telEdit.value = formatPhoneBR(telEdit.value));
+      const fileIn = document.querySelector('#modalEditCooperado input[type="file"][name="foto"]');
+      const prevImg = document.querySelector('#modalEditCooperado #editCoopPreview');
+      fileIn?.addEventListener('change', ()=>{ const f = fileIn.files?.[0]; if(!f) return; const rd = new FileReader(); rd.onload = e => { if(prevImg) prevImg.src = e.target.result; }; rd.readAsDataURL(f); });
     })();
-
-    // alternar ativo/inativo
     async function toggleAtivoCooperado(btn) {
       const id = btn.dataset.id;
-
       const headers = { 'X-Requested-With': 'fetch' };
-      {% if csrf_token is defined %}
-        headers['X-CSRFToken'] = '{{ csrf_token() }}';
-      {% endif %}
-
+      {% if csrf_token is defined %}headers['X-CSRFToken'] = '{{ csrf_token() }}';{% endif %}
       try {
-        const resp = await fetch(`/admin/cooperados/${id}/toggle-status`, {
-          method: 'POST',
-          headers
-        });
+        const resp = await fetch(`/admin/cooperados/${id}/toggle-status`, { method: 'POST', headers });
         const data = await resp.json();
-
-        if (!data.ok) {
-          alert(data.error || 'Falha ao alternar status');
-          return;
-        }
-
+        if (!data.ok) { alert(data.error || 'Falha ao alternar status'); return; }
         const ativo = !!data.ativo;
-
-        // Badge
         const badge = document.getElementById(`badge-ativo-${id}`);
-        if (badge) {
-          badge.textContent = ativo ? 'Ativo' : 'Inativo';
-          badge.classList.toggle('bg-success', ativo);
-          badge.classList.toggle('bg-secondary', !ativo);
-        }
-
-        // Botão
-        btn.dataset.ativo = ativo ? 1 : 0;
-        btn.title = ativo ? 'Desativar' : 'Ativar';
-        btn.classList.toggle('btn-outline-danger', ativo);
-        btn.classList.toggle('btn-outline-success', !ativo);
-        btn.innerHTML = ativo
-          ? '<i class="bi bi-person-dash"></i> <span class="d-none d-sm-inline">Desativar</span>'
-          : '<i class="bi bi-person-check"></i> <span class="d-none d-sm-inline">Ativar</span>';
-
-      } catch (e) {
-        console.error(e);
-        alert('Erro de rede ao alternar status');
-      }
+        if (badge) { badge.textContent = ativo ? 'Ativo' : 'Inativo'; badge.classList.toggle('bg-success', ativo); badge.classList.toggle('bg-secondary', !ativo); }
+        btn.dataset.ativo = ativo ? 1 : 0; btn.title = ativo ? 'Desativar' : 'Ativar'; btn.classList.toggle('btn-outline-danger', ativo); btn.classList.toggle('btn-outline-success', !ativo); btn.innerHTML = ativo ? '<i class="bi bi-person-dash"></i><span class="d-none d-sm-inline">Desativar</span>' : '<i class="bi bi-person-check"></i><span class="d-none d-sm-inline">Ativar</span>';
+      } catch (e) { alert('Falha de comunicação ao alternar status.'); }
     }
   </script>
 
-  {# Modal de edição do cooperado (agora com enctype e prévia da foto) #}
   <div class="modal fade" id="modalEditCooperado" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
       <form method="POST" enctype="multipart/form-data" class="modal-content">
-        {% if csrf_token is defined %}
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        {% endif %}
-        <div class="modal-header">
-          <h5 class="modal-title">Editar Cooperado</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-        </div>
-        <div class="modal-body">
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label">Nome</label>
-              <input type="text" class="form-control form-control-sm" name="nome" required>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Usuário</label>
-              <input type="text" class="form-control form-control-sm" name="usuario" required>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Telefone (WhatsApp)</label>
-              <input type="tel"
-                     class="form-control form-control-sm"
-                     name="telefone"
-                     id="editTelefone"
-                     inputmode="numeric"
-                     placeholder="(00) 00000-0000">
-              <small class="text-muted">Só dígitos; formatamos automaticamente.</small>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Foto (opcional)</label>
-              <input type="file" class="form-control form-control-sm" name="foto" accept="image/*">
-              <div class="d-flex align-items-center gap-2 mt-2">
-                <img id="editCoopPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt="" style="width:40px;height:40px;object-fit:cover;">
-                <small class="text-muted">Prévia</small>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-royal">
-            <i class="bi bi-save"></i> Salvar
-          </button>
-        </div>
+        {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+        <div class="modal-header"><h5 class="modal-title">Editar Cooperado</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+        <div class="modal-body"><div class="row g-3">
+          <div class="col-md-6"><label class="form-label">Nome</label><input type="text" class="form-control form-control-sm" name="nome" required></div>
+          <div class="col-md-6"><label class="form-label">Usuário</label><input type="text" class="form-control form-control-sm" name="usuario" required></div>
+          <div class="col-md-6"><label class="form-label">Telefone</label><input type="tel" class="form-control form-control-sm" name="telefone" id="editTelefone" inputmode="numeric" placeholder="(00) 00000-0000"></div>
+          <div class="col-md-6"><label class="form-label">Foto (opcional)</label><input type="file" class="form-control form-control-sm" name="foto" accept="image/*"><div class="d-flex align-items-center gap-2 mt-2"><img id="editCoopPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt="" style="width:40px;height:40px;object-fit:cover;"><small class="text-muted">Prévia</small></div></div>
+          <div class="col-md-4"><label class="form-label">Cota manual (R$)</label><input type="number" step="0.01" min="0" class="form-control form-control-sm" name="cota_valor_manual"></div>
+          <div class="col-md-4"><label class="form-label">Parcela semanal</label><input type="number" step="0.01" min="0" class="form-control form-control-sm" name="cota_parcela_semanal"></div>
+          <div class="col-md-4"><label class="form-label">Cota devolvida</label><input type="number" step="0.01" min="0" class="form-control form-control-sm" name="cota_devolvida"></div>
+          <div class="col-md-4"><label class="form-label">Meta atual</label><input type="text" class="form-control form-control-sm" name="cota_meta_preview" readonly></div>
+          <div class="col-md-4"><label class="form-label">Integralizado</label><input type="text" class="form-control form-control-sm" name="cota_integralizada_preview" readonly></div>
+          <div class="col-md-4"><label class="form-label">Falta</label><input type="text" class="form-control form-control-sm" name="cota_faltante_preview" readonly></div>
+          <div class="col-md-6"><div class="form-check mt-2"><input class="form-check-input" type="checkbox" name="cota_integralizar_salario" id="editCotaIntegralizarSalario" value="1"><label class="form-check-label" for="editCotaIntegralizarSalario">Usar salário mínimo atual como meta</label></div></div>
+          <div class="col-md-6"><div class="form-check mt-2"><input class="form-check-input" type="checkbox" name="nao_descontar_cota" id="editNaoDescontarCota" value="1"><label class="form-check-label" for="editNaoDescontarCota">Não descontar automático</label></div></div>
+        </div></div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
       </form>
     </div>
   </div>
@@ -5923,21 +5770,6 @@
               <label class="form-check-label" for="editEhAdiantamentoDesp">Adiantamento</label>
             </div>
           </div>
-        </div>
-        <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
-      </form>
-    </div>
-  </div>
-
-  <div class="modal fade" id="modalEditCooperado" tabindex="-1">
-    <div class="modal-dialog">
-      <form method="POST" enctype="multipart/form-data" class="modal-content">
-        <div class="modal-header"><h5 class="modal-title">Editar Cooperado</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body row g-2 px-3">
-          <input type="hidden" name="id">
-          <div class="col-12"><input type="text" class="form-control" name="nome" required></div>
-          <div class="col-12"><input type="text" class="form-control" name="usuario" required></div>
-          <div class="col-12"><input type="file" class="form-control" name="foto"></div>
         </div>
         <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
       </form>
