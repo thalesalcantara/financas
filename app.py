@@ -2282,42 +2282,99 @@ _NEG = set("""
 ruim péssimo pessimo horrível horrivel sujo atrasado grosseiro mal educado agressivo impaciente amassado quebrado frio derramou
 """.split())
 
+def _texto_base(txt: str | None) -> str:
+    base = unicodedata.normalize("NFKD", (txt or "").lower())
+    return "".join(ch for ch in base if not unicodedata.combining(ch))
+
 def _analise_sentimento(txt: str | None) -> str:
     if not txt:
         return "neutro"
-    t = (txt or "").lower()
-    # contagem bem simples
-    pos = sum(1 for w in _POS if w in t)
-    neg = sum(1 for w in _NEG if w in t)
-    if neg > pos + 0: return "negativo"
-    if pos > neg + 0: return "positivo"
+    t = _texto_base(txt)
+    pos = sum(1 for w in _POS if _texto_base(w) in t)
+    neg = sum(1 for w in _NEG if _texto_base(w) in t)
+    if neg > pos:
+        return "negativo"
+    if pos > neg:
+        return "positivo"
     return "neutro"
 
-# mapeia temas por palavras-chave simples
 _TEMAS = {
-    "Pontualidade":  ["pontual", "atras", "horario", "horário", "demor", "rápido", "rapido", "lent"],
-    "Educação":      ["educad", "grosseir", "simpat", "antipatic", "mal trat", "sem paciencia", "sem paciência", "atencios"],
-    "Eficiência":    ["amass", "vazou", "quebrad", "frio", "bagunça", "bagunca", "cuidado", "eficien", "desorgan"],
-    "Bem apresentado": ["uniform", "higien", "apresenta", "limpo", "cheiroso", "aparencia", "aparência"],
+    "Pontualidade": ["pontual", "atras", "horario", "demor", "rapido", "lent"],
+    "Educação": ["educad", "grosseir", "simpat", "antipatic", "mal trat", "sem paciencia", "atencios"],
+    "Eficiência": ["amass", "vazou", "quebrad", "frio", "bagunca", "cuidado", "eficien", "desorgan", "derram"],
+    "Bem apresentado": ["uniform", "higien", "apresenta", "limpo", "cheiroso", "aparencia"],
+    "Ambiente": ["ambiente", "espera", "bagunca", "barulho", "suj"],
+    "Tratamento": ["tratamento", "grosseir", "educad", "respeito", "atendimento", "mal trat"],
+    "Suporte": ["suporte", "apoio", "organiz", "orient", "ajuda"],
 }
 
 def _identifica_temas(txt: str | None) -> list[str]:
     if not txt:
         return []
-    t = (txt or "").lower()
+    t = _texto_base(txt)
     hits = []
     for tema, keys in _TEMAS.items():
-        if any(k in t for k in keys):
+        if any(_texto_base(k) in t for k in keys):
             hits.append(tema)
     return hits[:4]
 
-_RISCO = ["ameaça","ameaca","acidente","quebrado","agress","roubo","violên","violenc","lesão","lesao","sangue","caiu","bateu","droga","alcool","álcool"]
+_RISCO = ["ameaca", "acidente", "quebrado", "agress", "roubo", "violenc", "lesao", "sangue", "caiu", "bateu", "droga", "alcool"]
 
-def _sinaliza_crise(nota_geral: int | None, txt: str | None) -> bool:
-    if nota_geral == 1 and txt:
-        low = txt.lower()
-        return any(k in low for k in _RISCO)
+def _sinaliza_crise(nota_geral: int | float | None, txt: str | None) -> bool:
+    t = _texto_base(txt)
+    if nota_geral is not None and float(nota_geral) <= 1.5 and t:
+        return any(k in t for k in _RISCO)
     return False
+
+def _temas_por_notas(tipo: str, **notas) -> list[str]:
+    temas = []
+    if tipo == "cooperado":
+        mapa = [
+            ("Pontualidade", notas.get("pont")),
+            ("Educação", notas.get("educ")),
+            ("Eficiência", notas.get("efic")),
+            ("Bem apresentado", notas.get("apres")),
+        ]
+    else:
+        mapa = [
+            ("Tratamento", notas.get("trat")),
+            ("Ambiente", notas.get("amb")),
+            ("Suporte", notas.get("sup")),
+        ]
+    for nome, nota in mapa:
+        if nota is not None and float(nota) <= 3:
+            temas.append(nome)
+    return temas
+
+
+def _resolver_sentimento_e_temas(tipo: str, comentario: str | None = None, nota_geral: int | float | None = None, media: float | None = None, **notas):
+    temas = _temas_por_notas(tipo, **notas)
+    for tema in _identifica_temas(comentario):
+        if tema not in temas:
+            temas.append(tema)
+
+    base_nota = media if media is not None else nota_geral
+    valores = [float(v) for v in notas.values() if v is not None]
+    min_nota = min(valores) if valores else None
+    sent_txt = _analise_sentimento(comentario)
+
+    if base_nota is not None:
+        b = float(base_nota)
+        if b <= 2.4 or (min_nota is not None and min_nota <= 2):
+            sentimento = "negativo"
+        elif b >= 4.4 and (min_nota is None or min_nota >= 4):
+            sentimento = "positivo"
+        elif sent_txt != "neutro":
+            sentimento = sent_txt
+        elif temas:
+            sentimento = "negativo" if any((notas.get(k) is not None and float(notas.get(k)) <= 2) for k in notas) else "neutro"
+        else:
+            sentimento = "neutro"
+    else:
+        sentimento = sent_txt
+
+    return sentimento, temas[:4]
+
 
 def _gerar_feedback(pont, educ, efic, apres, comentario, sentimento):
     partes = []
@@ -2326,17 +2383,22 @@ def _gerar_feedback(pont, educ, efic, apres, comentario, sentimento):
 
     for nome, nota in (("Pontualidade", pont), ("Educação", educ), ("Eficiência", efic), ("Apresentação", apres)):
         b = badge(nome, nota)
-        if b: partes.append(b)
+        if b:
+            partes.append(b)
 
     dicas = []
-    if educ is not None and educ <= 2: dicas.append("melhore a abordagem/educação ao falar com o cliente")
-    if pont is not None and pont <= 2: dicas.append("tente chegar no horário combinado")
-    if efic is not None and efic <= 2: dicas.append("redobre o cuidado com o pedido durante o transporte")
-    if apres is not None and apres <= 2: dicas.append("capriche na apresentação pessoal (higiene/uniforme)")
+    if educ is not None and educ <= 2:
+        dicas.append("melhore a abordagem e a educação ao falar com o cliente")
+    if pont is not None and pont <= 2:
+        dicas.append("tente chegar no horário combinado")
+    if efic is not None and efic <= 2:
+        dicas.append("redobre o cuidado com o pedido durante o transporte")
+    if apres is not None and apres <= 2:
+        dicas.append("capriche na apresentação pessoal, higiene e uniforme")
 
     txt = f"Notas — " + " | ".join(partes) if partes else "Obrigado pelo trabalho!"
     if comentario:
-        txt += f". Cliente comentou: \"{comentario.strip()}\""
+        txt += f'. Cliente comentou: "{comentario.strip()}"'
     if dicas:
         txt += ". Dica: " + "; ".join(dicas) + "."
     if sentimento == "positivo":
@@ -5029,6 +5091,15 @@ def admin_avaliacoes():
             if sup is None:
                 sup = getattr(a, "estrelas_eficiencia", 0)
 
+            sentimento_calc, temas_calc = _resolver_sentimento_e_temas(
+                "restaurante",
+                comentario=item["comentario"],
+                nota_geral=item["geral"],
+                media=item["media"],
+                trat=trat,
+                amb=amb,
+                sup=sup,
+            )
             item.update({
                 "tratamento": trat or 0,
                 "ambiente": amb or 0,
@@ -5038,12 +5109,30 @@ def admin_avaliacoes():
                 "sup": sup or 0,
             })
         else:
+            pont = getattr(a, "estrelas_pontualidade", 0) or 0
+            educ = getattr(a, "estrelas_educacao", 0) or 0
+            efic = getattr(a, "estrelas_eficiencia", 0) or 0
+            apres = getattr(a, "estrelas_apresentacao", 0) or 0
+            sentimento_calc, temas_calc = _resolver_sentimento_e_temas(
+                "cooperado",
+                comentario=item["comentario"],
+                nota_geral=item["geral"],
+                media=item["media"],
+                pont=pont,
+                educ=educ,
+                efic=efic,
+                apres=apres,
+            )
             item.update({
-                "pont": getattr(a, "estrelas_pontualidade", 0) or 0,
-                "educ": getattr(a, "estrelas_educacao", 0) or 0,
-                "efic": getattr(a, "estrelas_eficiencia", 0) or 0,
-                "apres": getattr(a, "estrelas_apresentacao", 0) or 0,
+                "pont": pont,
+                "educ": educ,
+                "efic": efic,
+                "apres": apres,
             })
+
+        item["sentimento"] = sentimento_calc or item.get("sentimento") or "neutro"
+        item["temas"] = "; ".join(temas_calc) if temas_calc else (item.get("temas") or "Sem pontos críticos")
+        item["alerta"] = bool(item.get("alerta")) or item["sentimento"] == "negativo"
 
         avaliacoes.append(SimpleNamespace(**item))
 
@@ -8499,17 +8588,22 @@ def producoes_avaliar(lanc_id):
 
     comentario = (_get("av_comentario") or "").strip() or None
 
-    # Derivados opcionais — mantém compat se suas funções existirem
     try:
-        senti = _analise_sentimento(comentario) if comentario else None
+        senti, temas_list = _resolver_sentimento_e_temas(
+            "restaurante",
+            comentario=comentario,
+            nota_geral=estrelas_geral,
+            media=media_ponderada,
+            trat=trat,
+            amb=amb,
+            sup=sup,
+        )
+        temas = "; ".join(temas_list)
     except Exception:
-        senti = None
+        senti = _analise_sentimento(comentario) if comentario else "neutro"
+        temas = "; ".join(_identifica_temas(comentario)) if comentario else ""
     try:
-        temas = "; ".join(_identifica_temas(comentario)) if comentario else None
-    except Exception:
-        temas = None
-    try:
-        crise = _sinaliza_crise(estrelas_geral, comentario)
+        crise = _sinaliza_crise(estrelas_geral, comentario) or any(v is not None and v <= 1 for v in (amb, trat, sup))
     except Exception:
         crise = False
 
@@ -9586,9 +9680,17 @@ def lancar_producao():
     tem_avaliacao = any(x is not None for x in (g, p, ed, ef, ap)) or bool(txt)
     if tem_avaliacao:
         media = _media_ponderada(g, p, ed, ef, ap)
-        senti = _analise_sentimento(txt)
-        temas = _identifica_temas(txt)
-        crise = _sinaliza_crise(g, txt)
+        senti, temas = _resolver_sentimento_e_temas(
+            "cooperado",
+            comentario=txt,
+            nota_geral=g,
+            media=media,
+            pont=p,
+            educ=ed,
+            efic=ef,
+            apres=ap,
+        )
+        crise = _sinaliza_crise(g, txt) or any(v is not None and v <= 1 for v in (g, p, ed, ef, ap))
         feed  = _gerar_feedback(p, ed, ef, ap, txt, senti)
 
         av = AvaliacaoCooperado(
