@@ -3705,14 +3705,29 @@ def admin_dashboard():
 
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
     _ensure_taxas_admin_receitas(restaurantes, months_back=0)
-    if data_inicio or data_fim:
-        rq = ReceitaCooperativa.query
-        if data_inicio:
-            rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
-        if data_fim:
-            rq = rq.filter(ReceitaCooperativa.data <= data_fim)
-        receitas = rq.order_by(ReceitaCooperativa.data.desc().nullslast(), ReceitaCooperativa.id.desc()).all()
-        total_receitas = sum(_receita_total_real(r) for r in receitas)
+
+    # Recarrega SEMPRE as receitas/despesas após gerar taxas automáticas.
+    # Assim, sem filtro manual, a aba de receitas já abre mostrando o mês atual,
+    # e com filtro continua respeitando o período informado.
+    rq = ReceitaCooperativa.query
+    dq = DespesaCooperativa.query
+    if data_inicio:
+        rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
+        dq = dq.filter(DespesaCooperativa.data >= data_inicio)
+    if data_fim:
+        rq = rq.filter(ReceitaCooperativa.data <= data_fim)
+        dq = dq.filter(DespesaCooperativa.data <= data_fim)
+
+    receitas = rq.order_by(
+        ReceitaCooperativa.data.desc().nullslast(),
+        ReceitaCooperativa.id.desc(),
+    ).all()
+    despesas = dq.order_by(
+        DespesaCooperativa.data.desc(),
+        DespesaCooperativa.id.desc(),
+    ).all()
+    total_receitas = sum(_receita_total_real(r) for r in receitas)
+    total_despesas = sum((d.valor or 0.0) for d in despesas)
     taxa_admin_rows, taxa_admin_totais = _build_taxa_admin_rows(receitas)
     juros_arrecadados_total = round(sum((r['valor_multa'] + r['valor_juros']) for r in taxa_admin_rows if r['status'] == 'pago'), 2)
     cooperados_map = {c.id: c for c in cooperados}
@@ -5915,6 +5930,13 @@ def add_restaurante():
     senha = f.get("senha", "")
     foto = request.files.get("foto")
 
+    taxa_admin_valor = f.get("taxa_admin_valor", type=float) or 0.0
+    taxa_admin_data_base = _parse_date(f.get("taxa_admin_data_base"))
+    taxa_admin_multa_percentual = f.get("taxa_admin_multa_percentual", type=float) or 2.0
+    taxa_admin_juros_dia_percentual = f.get("taxa_admin_juros_dia_percentual", type=float) or 0.03
+    status_raw = (f.get("ativo") or "1").strip().lower()
+    ativo_rest = status_raw in ("1", "true", "ativo", "on", "sim")
+
     if Usuario.query.filter_by(usuario=usuario_login).first():
         flash("Usuário já existente.", "warning")
         return redirect(url_for("admin_dashboard", tab="restaurantes"))
@@ -5924,7 +5946,16 @@ def add_restaurante():
     db.session.add(u)
     db.session.flush()
 
-    r = Restaurante(nome=nome, periodo=periodo, usuario_id=u.id, taxa_admin_valor=taxa_admin_valor, taxa_admin_data_base=taxa_admin_data_base, taxa_admin_multa_percentual=taxa_admin_multa_percentual, taxa_admin_juros_dia_percentual=taxa_admin_juros_dia_percentual, ativo=True)
+    r = Restaurante(
+        nome=nome,
+        periodo=periodo,
+        usuario_id=u.id,
+        taxa_admin_valor=taxa_admin_valor,
+        taxa_admin_data_base=taxa_admin_data_base,
+        taxa_admin_multa_percentual=taxa_admin_multa_percentual,
+        taxa_admin_juros_dia_percentual=taxa_admin_juros_dia_percentual,
+        ativo=ativo_rest,
+    )
     db.session.add(r)
     db.session.flush()
 
