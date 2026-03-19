@@ -2365,7 +2365,7 @@
   {# total defensivo: aceita r.valor OU r.valor_total #}
   {% set ns_total = namespace(v=0) %}
   {% for r in receitas or [] %}
-    {% set v_item = r.valor|default(r.valor_total, true)|default(0, true) %}
+    {% set v_item = (r.valor_pago|default(0,true) + r.valor_multa|default(0,true) + r.valor_juros|default(0,true)) if r.auto_taxa_adm else r.valor|default(r.valor_total, true)|default(0, true) %}
     {% set ns_total.v = ns_total.v + (v_item or 0) %}
   {% endfor %}
   {% set total_receitas_coop_table = ns_total.v %}
@@ -2444,6 +2444,101 @@
     </div>
   </div>
 
+  <div class="card border-0 shadow-sm rounded-3 mb-3">
+    <div class="card-body">
+      <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <div>
+          <h6 class="m-0"><i class="bi bi-building-check"></i> Taxas administrativas</h6>
+          <div class="small text-muted">Multa fixa de 2% e juros de 0,03% ao dia sobre o valor principal. A receita entra no total da cooperativa somente quando estiver paga.</div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <span class="badge bg-light text-dark border">Previsto: <b>R$ {{ '%.2f'|format(taxa_admin_totais.previsto|default(0)) }}</b></span>
+          <span class="badge bg-success-subtle text-success border">Recebido: <b>R$ {{ '%.2f'|format(taxa_admin_totais.recebido|default(0)) }}</b></span>
+          <span class="badge bg-warning-subtle text-warning border">Juros/Multa arrec.: <b>R$ {{ '%.2f'|format(juros_arrecadados_total|default(0)) }}</b></span>
+          <span class="badge bg-danger-subtle text-danger border">Em aberto: <b>R$ {{ '%.2f'|format(taxa_admin_totais.em_aberto|default(0)) }}</b></span>
+        </div>
+      </div>
+
+      <form method="POST" action="{{ url_for('atualizar_taxa_admin_lote') }}" class="mb-3" data-perm-form="can_receitas_editar">
+        <div class="d-flex flex-wrap gap-2 align-items-end">
+          <div>
+            <label class="form-label">Ação em lote</label>
+            <select name="acao" class="form-select form-select-sm">
+              <option value="pago">Marcar selecionadas como pagas hoje</option>
+              <option value="nao_pago">Marcar selecionadas como não pagas</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label d-none d-md-block">&nbsp;</label>
+            <button class="btn btn-royal btn-sm"><i class="bi bi-check2-square"></i> Aplicar</button>
+          </div>
+        </div>
+
+        <div class="table-responsive mt-3">
+          <table class="table table-sm table-bordered table-hover align-middle">
+            <thead class="table-light">
+              <tr class="text-nowrap">
+                <th style="width:38px"><input type="checkbox" id="taxaAdmToggleAll"></th>
+                <th>Estabelecimento</th>
+                <th>Competência</th>
+                <th>Vencimento</th>
+                <th class="text-end">Principal</th>
+                <th class="text-end">Juros calc.</th>
+                <th class="text-end">Multa calc.</th>
+                <th class="text-end">Recebido</th>
+                <th class="text-end">Em aberto</th>
+                <th>Status</th>
+                <th style="width:320px">Atualizar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for tx in taxa_admin_rows %}
+              <tr>
+                <td><input type="checkbox" name="ids[]" value="{{ tx.id }}" class="taxaAdmItem"></td>
+                <td>{{ tx.restaurante_nome or '-' }}</td>
+                <td>{{ tx.competencia or '-' }}</td>
+                <td>{{ tx.data_vencimento.strftime('%d/%m/%Y') if tx.data_vencimento else '-' }}</td>
+                <td class="text-end">R$ {{ '%.2f'|format(tx.valor_previsto) }}</td>
+                <td class="text-end">R$ {{ '%.2f'|format(tx.valor_juros) }}</td>
+                <td class="text-end">R$ {{ '%.2f'|format(tx.valor_multa) }}</td>
+                <td class="text-end">R$ {{ '%.2f'|format(tx.valor_recebido) }}</td>
+                <td class="text-end">R$ {{ '%.2f'|format(tx.valor_em_aberto) }}</td>
+                <td>
+                  {% if tx.status == 'pago' %}<span class="badge bg-success">Pago</span>
+                  {% elif tx.status == 'parcial' %}<span class="badge bg-warning text-dark">Parcial</span>
+                  {% else %}<span class="badge bg-secondary">Não pago</span>{% endif %}
+                </td>
+                <td>
+                  <form method="POST" action="{{ url_for('atualizar_taxa_admin_status', id=tx.id) }}" class="row g-2 align-items-end">
+                    <div class="col-4">
+                      <select name="status_pagamento" class="form-select form-select-sm">
+                        <option value="nao_pago" {{ 'selected' if tx.status == 'nao_pago' else '' }}>Não pago</option>
+                        <option value="parcial" {{ 'selected' if tx.status == 'parcial' else '' }}>Parcial</option>
+                        <option value="pago" {{ 'selected' if tx.status == 'pago' else '' }}>Pago</option>
+                      </select>
+                    </div>
+                    <div class="col-3">
+                      <input type="number" step="0.01" name="valor_pago" class="form-control form-control-sm" value="{{ '%.2f'|format(tx.valor_pago) }}" placeholder="Pago">
+                    </div>
+                    <div class="col-3">
+                      <input type="date" name="data_pagamento" class="form-control form-control-sm" value="{{ tx.data_pagamento.strftime('%Y-%m-%d') if tx.data_pagamento else '' }}">
+                    </div>
+                    <div class="col-2 d-grid">
+                      <button class="btn btn-success btn-sm"><i class="bi bi-save"></i></button>
+                    </div>
+                  </form>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="11" class="text-center text-muted">Nenhuma taxa administrativa encontrada no período.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="card border-0 shadow-sm rounded-3">
     <div class="card-body p-2 p-md-3">
       <div class="table-responsive">
@@ -2461,7 +2556,7 @@
               {% set v_row = r.valor|default(r.valor_total, true)|default(0, true) %}
               <tr>
                 <td>{{ r.data.strftime('%d/%m/%Y') if r.data else '-' }}</td>
-                <td class="text-break">{{ r.descricao }}</td>
+                <td class="text-break">{{ r.descricao }}{% if r.auto_taxa_adm %}<div class="small text-muted">{{ r.restaurante.nome if r.restaurante else '' }} • {{ r.competencia or '' }} • {{ r.status_pagamento or 'nao_pago' }}</div>{% endif %}</td>
                 <td class="text-end">R$ {{ '%.2f'|format(v_row) }}</td>
                 <td class="text-center text-nowrap">
                   {% if can_receitas_editar %}<button class="btn btn-warning btn-sm"
@@ -2495,6 +2590,15 @@
       </div>
     </div>
   </div>
+  <script>
+    (function(){
+      const all = document.getElementById('taxaAdmToggleAll');
+      if(!all) return;
+      all.addEventListener('change', function(){
+        document.querySelectorAll('.taxaAdmItem').forEach(cb => cb.checked = all.checked);
+      });
+    })();
+  </script>
 </section>
 
 
@@ -3884,6 +3988,29 @@
         </div>
 
         <div class="col-md-2">
+          <label class="form-label">Taxa adm. (R$)</label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text">R$</span>
+            <input type="number" step="0.01" class="form-control" name="taxa_admin_valor" placeholder="0,00">
+          </div>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Data base</label>
+          <input type="date" class="form-control form-control-sm" name="taxa_admin_data_base">
+          <small class="text-muted">Dia do vencimento mensal.</small>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Multa / Juros</label>
+          <div class="input-group input-group-sm">
+            <input type="number" step="0.01" class="form-control" name="taxa_admin_multa_percentual" value="2">
+            <span class="input-group-text">% +</span>
+            <input type="number" step="0.01" class="form-control" name="taxa_admin_juros_dia_percentual" value="0.03">
+          </div>
+        </div>
+
+        <div class="col-md-2">
           <label class="form-label">Logo (opcional)</label>
           <input type="file" class="form-control form-control-sm" name="foto" id="restFoto" accept="image/*">
           <div class="d-flex align-items-center gap-2 mt-2">
@@ -3924,6 +4051,8 @@
               <th>Nome</th>
               <th>Usuário</th>
               <th style="width:140px;">Período</th>
+              <th style="width:140px;">Taxa adm.</th>
+              <th style="width:130px;">Data base</th>
               <th class="text-center" style="width:200px;">Ações</th>
             </tr>
           </thead>
@@ -3945,10 +4074,12 @@
                     {% else %}{{ r.periodo }}{% endif %}
                   </span>
                 </td>
+                <td class="text-nowrap">R$ {{ "%.2f"|format(r.taxa_admin_valor|default(0)) }}</td>
+                <td class="text-nowrap">{{ r.taxa_admin_data_base.strftime('%d/%m/%Y') if r.taxa_admin_data_base else '-' }}</td>
                 <td class="text-center">
                   <div class="btn-group btn-group-sm" role="group">
                     {% if can_restaurantes_editar %}<button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalEditRestaurante"
-                            data-id="{{ r.id }}" data-nome="{{ r.nome }}" data-usuario="{{ r.usuario_ref.usuario }}" data-periodo="{{ r.periodo }}"
+                            data-id="{{ r.id }}" data-nome="{{ r.nome }}" data-usuario="{{ r.usuario_ref.usuario }}" data-periodo="{{ r.periodo }}" data-taxa-admin-valor="{{ '%.2f'|format(r.taxa_admin_valor|default(0)) }}" data-taxa-admin-data-base="{{ r.taxa_admin_data_base.strftime('%Y-%m-%d') if r.taxa_admin_data_base else '' }}" data-taxa-admin-multa="{{ '%.2f'|format(r.taxa_admin_multa_percentual|default(2)) }}" data-taxa-admin-juros-dia="{{ '%.2f'|format(r.taxa_admin_juros_dia_percentual|default(0.03)) }}"
                             data-url="{{ url_for('edit_restaurante', id=r.id) }}" title="Editar">
                       <i class="bi bi-pencil"></i>
                     </button>
@@ -3973,7 +4104,7 @@
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="5" class="text-center text-muted">Nenhum estabelecimento</td></tr>
+              <tr><td colspan="7" class="text-center text-muted">Nenhum estabelecimento</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -4019,6 +4150,26 @@
         const isPwd = inp.type === 'password';
         inp.type = isPwd ? 'text' : 'password';
         btn.innerHTML = isPwd ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+      });
+    })();
+
+    // preencher modal de edição do restaurante
+    (function(){
+      const modal = document.getElementById('modalEditRestaurante');
+      if(!modal) return;
+      modal.addEventListener('show.bs.modal', function(ev){
+        const btn = ev.relatedTarget;
+        if(!btn) return;
+        const form = modal.querySelector('form');
+        if(form && btn.dataset.url) form.action = btn.dataset.url;
+        const set = (id, v) => { const el = document.getElementById(id); if(el) el.value = v || ''; };
+        set('editRestNome', btn.dataset.nome);
+        set('editRestUsuario', btn.dataset.usuario);
+        set('editRestPeriodo', btn.dataset.periodo);
+        set('editRestTaxaAdminValor', btn.dataset.taxaAdminValor);
+        set('editRestTaxaAdminDataBase', btn.dataset.taxaAdminDataBase);
+        set('editRestTaxaAdminMulta', btn.dataset.taxaAdminMulta);
+        set('editRestTaxaAdminJurosDia', btn.dataset.taxaAdminJurosDia);
       });
     })();
 
