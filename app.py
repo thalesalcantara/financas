@@ -49,7 +49,7 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError, Di
 from sqlalchemy import delete as sa_delete
 
 # 👉 Novo: para gerar XLSX em memória
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 
@@ -5648,6 +5648,350 @@ def alterar_senha_rest():
     flash("Senha alterada com sucesso!", "success")
     return redirect(url_for("portal_restaurante", view="config"))
 
+
+
+# =========================
+# Backup / Restauração XLSX
+# =========================
+def _xlsx_cell(v):
+    if isinstance(v, (datetime, date)):
+        try:
+            return v.isoformat()
+        except Exception:
+            return str(v)
+    if isinstance(v, bool):
+        return 1 if v else 0
+    return "" if v is None else v
+
+
+def _sheet_from_rows(wb: Workbook, title: str, headers: list[str], rows: list[list]):
+    ws = wb.create_sheet(title=title)
+    ws.append(headers)
+    for row in rows:
+        ws.append([_xlsx_cell(v) for v in row])
+    for idx, col in enumerate(ws.columns, start=1):
+        max_len = 0
+        for cell in col:
+            val = "" if cell.value is None else str(cell.value)
+            if len(val) > max_len:
+                max_len = len(val)
+        ws.column_dimensions[get_column_letter(idx)].width = min(max(max_len + 2, 12), 40)
+    return ws
+
+
+def _coerce_bool(v, default=False):
+    if v is None or v == "":
+        return default
+    if isinstance(v, bool):
+        return v
+    s = str(v).strip().lower()
+    return s in ("1", "true", "sim", "yes", "y", "on")
+
+
+def _coerce_int(v, default=None):
+    if v in (None, ""):
+        return default
+    try:
+        return int(v)
+    except Exception:
+        try:
+            return int(float(v))
+        except Exception:
+            return default
+
+
+def _coerce_date(v):
+    if v in (None, ""):
+        return None
+    if isinstance(v, datetime):
+        return v.date()
+    if isinstance(v, date):
+        return v
+    return _parse_date(str(v))
+
+
+def _sync_pk_sequence(model):
+    try:
+        table = model.__tablename__
+        pk = sa_inspect(model).primary_key[0].name
+        max_id = db.session.execute(sa_text(f'SELECT COALESCE(MAX({pk}), 0) FROM {table}')).scalar() or 0
+        if _is_sqlite():
+            try:
+                db.session.execute(sa_text("UPDATE sqlite_sequence SET seq = :seq WHERE name = :name"), {"seq": max_id, "name": table})
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+        else:
+            db.session.execute(sa_text("SELECT setval(pg_get_serial_sequence(:table, :pk), :value, true)"), {"table": table, "pk": pk, "value": max_id if max_id > 0 else 1})
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
+def _backup_workbook_bytes() -> io.BytesIO:
+    wb = Workbook()
+    ws0 = wb.active
+    wb.remove(ws0)
+
+    usuarios = Usuario.query.order_by(Usuario.id.asc()).all()
+    cooperados = Cooperado.query.order_by(Cooperado.id.asc()).all()
+    restaurantes = Restaurante.query.order_by(Restaurante.id.asc()).all()
+    admins = Usuario.query.filter_by(tipo="admin").order_by(Usuario.id.asc()).all()
+    permissoes = AdminPermissao.query.order_by(AdminPermissao.usuario_id.asc(), AdminPermissao.aba.asc()).all()
+    cfg = get_config()
+
+    _sheet_from_rows(
+        wb,
+        "usuarios",
+        ["id", "usuario", "senha_hash", "tipo", "is_master", "ativo"],
+        [[u.id, u.usuario, u.senha_hash, u.tipo, u.is_master, u.ativo] for u in usuarios],
+    )
+
+    _sheet_from_rows(
+        wb,
+        "cooperados",
+        [
+            "id", "nome", "usuario_id", "usuario_login", "telefone", "cnh_numero",
+            "cnh_validade", "placa", "placa_validade", "ultima_atualizacao"
+        ],
+        [[
+            c.id, c.nome, c.usuario_id, (c.usuario_ref.usuario if c.usuario_ref else ""), c.telefone,
+            c.cnh_numero, c.cnh_validade, c.placa, c.placa_validade, c.ultima_atualizacao
+        ] for c in cooperados],
+    )
+
+    _sheet_from_rows(
+        wb,
+        "restaurantes",
+        ["id", "nome", "periodo", "usuario_id", "usuario_login", "foto_url"],
+        [[r.id, r.nome, r.periodo, r.usuario_id, (r.usuario_ref.usuario if r.usuario_ref else ""), r.foto_url] for r in restaurantes],
+    )
+
+    _sheet_from_rows(
+        wb,
+        "admins",
+        ["id", "usuario", "is_master", "ativo"],
+        [[a.id, a.usuario, a.is_master, a.ativo] for a in admins],
+    )
+
+    _sheet_from_rows(
+        wb,
+        "admin_permissoes",
+        ["id", "usuario_id", "usuario_login", "aba", "pode_ver", "pode_criar", "pode_editar", "pode_excluir"],
+        [[p.id, p.usuario_id, (p.usuario.usuario if p.usuario else ""), p.aba, p.pode_ver, p.pode_criar, p.pode_editar, p.pode_excluir] for p in permissoes],
+    )
+
+    _sheet_from_rows(
+        wb,
+        "config",
+        ["id", "salario_minimo"],
+        [[cfg.id if cfg else 1, cfg.salario_minimo if cfg else 0.0]],
+    )
+
+    meta = wb.create_sheet(title="instrucoes")
+    meta["A1"] = "Backup COOPEX"
+    meta["A2"] = "Importe este arquivo na aba Configurações para restaurar usuários, cooperados, restaurantes, permissões e config."
+    meta["A3"] = "Não altere os nomes das abas."
+    meta.column_dimensions["A"].width = 120
+
+    bio = io.BytesIO()
+    wb.save(bio)
+    bio.seek(0)
+    return bio
+
+
+def _sheet_rows(ws):
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        return []
+    headers = [str(h).strip() if h is not None else "" for h in rows[0]]
+    out = []
+    for row in rows[1:]:
+        if row is None:
+            continue
+        item = {}
+        has_data = False
+        for i, header in enumerate(headers):
+            if not header:
+                continue
+            val = row[i] if i < len(row) else None
+            if val not in (None, ""):
+                has_data = True
+            item[header] = val
+        if has_data:
+            out.append(item)
+    return out
+
+
+def _import_backup_workbook(file_storage):
+    wb = load_workbook(file_storage, data_only=True)
+    required = ["usuarios", "cooperados", "restaurantes", "admin_permissoes", "config"]
+    missing = [name for name in required if name not in wb.sheetnames]
+    if missing:
+        raise ValueError("Abas obrigatórias ausentes: " + ", ".join(missing))
+
+    usuarios_rows = _sheet_rows(wb["usuarios"])
+    cooperados_rows = _sheet_rows(wb["cooperados"])
+    restaurantes_rows = _sheet_rows(wb["restaurantes"])
+    permissoes_rows = _sheet_rows(wb["admin_permissoes"])
+    config_rows = _sheet_rows(wb["config"])
+
+    # usuários
+    user_map_by_id = {}
+    user_map_by_login = {}
+    for row in usuarios_rows:
+        raw_id = _coerce_int(row.get("id"))
+        login = (str(row.get("usuario") or "")).strip()
+        if not login:
+            continue
+        user = None
+        if raw_id is not None:
+            user = Usuario.query.get(raw_id)
+        if not user:
+            user = Usuario.query.filter_by(usuario=login).first()
+        if not user:
+            user = Usuario(id=raw_id, usuario=login, senha_hash=str(row.get("senha_hash") or ""), tipo=str(row.get("tipo") or "cooperado"))
+            db.session.add(user)
+        else:
+            if raw_id is not None and not getattr(user, "id", None):
+                user.id = raw_id
+            user.usuario = login
+            user.senha_hash = str(row.get("senha_hash") or user.senha_hash or "")
+            user.tipo = str(row.get("tipo") or user.tipo or "cooperado")
+        user.is_master = _coerce_bool(row.get("is_master"), False)
+        user.ativo = _coerce_bool(row.get("ativo"), True)
+        db.session.flush()
+        user_map_by_id[raw_id] = user
+        user_map_by_login[login] = user
+
+    # cooperados
+    for row in cooperados_rows:
+        raw_id = _coerce_int(row.get("id"))
+        login = (str(row.get("usuario_login") or "")).strip()
+        usuario_id = _coerce_int(row.get("usuario_id"))
+        user = user_map_by_id.get(usuario_id) or user_map_by_login.get(login)
+        if not user:
+            continue
+        coop = Cooperado.query.get(raw_id) if raw_id is not None else None
+        if not coop and raw_id is None:
+            coop = Cooperado.query.filter_by(usuario_id=user.id).first()
+        if not coop:
+            coop = Cooperado(id=raw_id, usuario_id=user.id, nome=str(row.get("nome") or login or "Cooperado"))
+            db.session.add(coop)
+        coop.nome = str(row.get("nome") or coop.nome or login or "Cooperado")
+        coop.usuario_id = user.id
+        coop.telefone = str(row.get("telefone") or "") or None
+        coop.cnh_numero = str(row.get("cnh_numero") or "") or None
+        coop.cnh_validade = _coerce_date(row.get("cnh_validade"))
+        coop.placa = str(row.get("placa") or "") or None
+        coop.placa_validade = _coerce_date(row.get("placa_validade"))
+        ua = row.get("ultima_atualizacao")
+        if isinstance(ua, datetime):
+            coop.ultima_atualizacao = ua
+        elif isinstance(ua, date):
+            coop.ultima_atualizacao = datetime.combine(ua, dtime.min)
+        elif ua:
+            try:
+                coop.ultima_atualizacao = datetime.fromisoformat(str(ua))
+            except Exception:
+                pass
+        db.session.flush()
+
+    # restaurantes
+    for row in restaurantes_rows:
+        raw_id = _coerce_int(row.get("id"))
+        login = (str(row.get("usuario_login") or "")).strip()
+        usuario_id = _coerce_int(row.get("usuario_id"))
+        user = user_map_by_id.get(usuario_id) or user_map_by_login.get(login)
+        if not user:
+            continue
+        rest = Restaurante.query.get(raw_id) if raw_id is not None else None
+        if not rest and raw_id is None:
+            rest = Restaurante.query.filter_by(usuario_id=user.id).first()
+        if not rest:
+            rest = Restaurante(id=raw_id, usuario_id=user.id, nome=str(row.get("nome") or login or "Restaurante"), periodo=str(row.get("periodo") or "seg-dom"))
+            db.session.add(rest)
+        rest.nome = str(row.get("nome") or rest.nome or login or "Restaurante")
+        rest.periodo = str(row.get("periodo") or rest.periodo or "seg-dom")
+        rest.usuario_id = user.id
+        rest.foto_url = str(row.get("foto_url") or "") or None
+        db.session.flush()
+
+    # permissões admin
+    for row in permissoes_rows:
+        usuario_id = _coerce_int(row.get("usuario_id"))
+        login = (str(row.get("usuario_login") or "")).strip()
+        user = user_map_by_id.get(usuario_id) or user_map_by_login.get(login)
+        aba = (str(row.get("aba") or "")).strip()
+        if not user or not aba:
+            continue
+        perm = AdminPermissao.query.filter_by(usuario_id=user.id, aba=aba).first()
+        if not perm:
+            perm = AdminPermissao(usuario_id=user.id, aba=aba)
+            db.session.add(perm)
+        perm.pode_ver = _coerce_bool(row.get("pode_ver"), False)
+        perm.pode_criar = _coerce_bool(row.get("pode_criar"), False)
+        perm.pode_editar = _coerce_bool(row.get("pode_editar"), False)
+        perm.pode_excluir = _coerce_bool(row.get("pode_excluir"), False)
+
+    # config
+    if config_rows:
+        cfg = get_config()
+        row = config_rows[0]
+        try:
+            cfg.salario_minimo = float(row.get("salario_minimo") or 0.0)
+        except Exception:
+            cfg.salario_minimo = 0.0
+
+    db.session.flush()
+    for model in (Usuario, Cooperado, Restaurante, AdminPermissao, Config):
+        _sync_pk_sequence(model)
+
+@app.route("/admin/backup/exportar", methods=["GET"])
+@admin_perm_required("config", "ver")
+def exportar_backup_admin_xlsx():
+    if not is_admin_master():
+        flash("Apenas o administrador master pode exportar o backup completo.", "danger")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    arquivo = _backup_workbook_bytes()
+    nome = f"backup_coopex_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return send_file(
+        arquivo,
+        as_attachment=True,
+        download_name=nome,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+@app.route("/admin/backup/importar", methods=["POST"])
+@admin_perm_required("config", "editar")
+def importar_backup_admin_xlsx():
+    if not is_admin_master():
+        flash("Apenas o administrador master pode importar backup completo.", "danger")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    arquivo = request.files.get("arquivo_backup")
+    if not arquivo or not getattr(arquivo, "filename", ""):
+        flash("Selecione um arquivo XLSX para importar.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    if not arquivo.filename.lower().endswith(".xlsx"):
+        flash("Envie um arquivo no formato .xlsx.", "warning")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    try:
+        _import_backup_workbook(arquivo)
+        db.session.commit()
+        flash("Backup importado com sucesso.", "success")
+    except Exception as e:
+        db.session.rollback()
+        try:
+            current_app.logger.exception(e)
+        except Exception:
+            pass
+        flash(f"Falha ao importar backup: {e}", "danger")
+
+    return redirect(url_for("admin_dashboard", tab="config"))
 
 # =========================
 # Configurações / Admins
