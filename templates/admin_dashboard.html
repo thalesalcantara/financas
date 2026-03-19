@@ -1036,9 +1036,9 @@
               <div class="kpi-border kpi-entregas-periodo"></div>
               <div class="d-flex align-items-center justify-content-between">
                 <div>
-                  <div class="text-uppercase text-muted small">Total de Adiantamento</div>
-                  <div id="kpiQtdEntregasPeriodo" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_adiantamentos_coop|default(0)) }}</div>
-                  <div class="small text-muted">Adiantamentos no período</div>
+                  <div class="text-uppercase text-muted small">Total de Cooperados</div>
+                  <div id="kpiQtdEntregasPeriodo" class="fw-bold fs-5">{{ cota_totais.qtd_total|default(0) }}</div>
+                  <div class="small text-muted">{{ cota_totais.qtd_ativos|default(0) }} ativos • {{ cota_totais.qtd_inativos|default(0) }} inativos</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-bicycle"></i></div>
               </div>
@@ -1064,14 +1064,42 @@
               <div class="kpi-border kpi-benef-rateados"></div>
               <div class="d-flex align-items-center justify-content-between">
                 <div>
-                  <div class="text-uppercase text-muted small">Benefícios Rateados</div>
-                  <div id="kpiBeneficiosRateados" class="fw-bold fs-5">R$ 0,00</div>
-                  <div class="small text-muted">Total lançado no período</div>
+                  <div class="text-uppercase text-muted small">Cota devolvida</div>
+                  <div id="kpiBeneficiosRateados" class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(cota_totais.devolvido_total|default(0)) }}</div>
+                  <div class="small text-muted">Total devolvido aos cooperados</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-heart-pulse"></i></div>
               </div>
             </div>
+          
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-rec-coop"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Taxa adm arrecadada</div>
+                  <div class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(taxa_admin_arrecadada_mes|default(0)) }}</div>
+                  <div class="small text-muted">Total pago no período</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-building-check"></i></div>
+              </div>
+            </div>
           </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-ticket-periodo"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Cota integralizada</div>
+                  <div class="fw-bold fs-5 text-primary">R$ {{ '%.2f'|format(cota_totais.integralizado_total|default(0)) }}</div>
+                  <div class="small text-muted">Meta: R$ {{ '%.2f'|format(cota_totais.meta_total|default(0)) }}</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-piggy-bank"></i></div>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         <!-- Resumo por Cooperado -->
@@ -1246,8 +1274,8 @@
         }
 
         #resumo .kpi-icon {
-          width: 42px;
-          height: 42px;
+          width: 36px;
+          height: 36px;
           border-radius: 14px;
           display: flex;
           align-items: center;
@@ -2872,7 +2900,7 @@
           <label class="form-label">Cooperado</label>
           <select class="form-select form-select-sm" name="cooperado_id" required>
             <option value="" selected disabled>Selecione o Cooperado</option>
-            {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+            {% for coop in coop_lista %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
           </select>
         </div>
         <div class="col-md-3">
@@ -3620,7 +3648,8 @@
       
 <!-- COOPERADOS (versão profissional / drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
-  {% set qtd_coops = cooperados|length %}
+  {% set coop_lista = cooperados_todos|default(cooperados) %}
+  {% set qtd_coops = coop_lista|length %}
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
     <h5 class="m-0 d-flex align-items-center gap-2">
       <i class="bi bi-person-badge"></i> Cadastro de Cooperados
@@ -3672,6 +3701,32 @@
           <small class="text-muted">Cole/insira só dígitos; formatamos automaticamente.</small>
         </div>
 
+        <div class="col-md-2">
+          <label class="form-label">Parcela semanal cota</label>
+          <input type="number" step="0.01" class="form-control form-control-sm" name="cota_parcela_semanal" value="33.00">
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Cota manual</label>
+          <input type="number" step="0.01" class="form-control form-control-sm" name="cota_valor_manual" value="0.00">
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Cota devolvida</label>
+          <input type="number" step="0.01" class="form-control form-control-sm" name="cota_devolvida" value="0.00">
+        </div>
+
+        <div class="col-md-3 d-flex flex-column gap-2">
+          <div class="form-check mt-4 pt-1">
+            <input class="form-check-input" type="checkbox" name="cota_integralizar_salario" id="cota_integralizar_salario" checked>
+            <label class="form-check-label" for="cota_integralizar_salario">Integralizar pelo salário mínimo</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="nao_descontar_cota" id="nao_descontar_cota">
+            <label class="form-check-label" for="nao_descontar_cota">Não descontar automático</label>
+          </div>
+        </div>
+
         <div class="col-md-3">
           <label class="form-label">Foto (opcional)</label>
           <input type="file" class="form-control form-control-sm" name="foto" id="coopFoto" accept="image/*">
@@ -3712,6 +3767,10 @@
               <th>Nome</th>
               <th>Usuário</th>
               <th style="width:170px;">Telefone</th>
+              <th class="text-end">Meta Cota</th>
+              <th class="text-end">Integralizado</th>
+              <th class="text-end">Falta</th>
+              <th class="text-end">Devolvido</th>
               <th style="width:120px;" class="text-center">Status</th>
               <th class="text-center" style="width:260px;">Ações</th>
             </tr>
@@ -3743,6 +3802,12 @@
                   {% endif %}
                 </td>
 
+                {% set cota_row = (cota_resumo_rows|selectattr('id','equalto',coop.id)|list|first) %}
+                <td class="text-end fw-semibold">R$ {{ '%.2f'|format((cota_row.meta if cota_row else 0)|default(0)) }}</td>
+                <td class="text-end text-success fw-semibold">R$ {{ '%.2f'|format((cota_row.integralizado if cota_row else 0)|default(0)) }}</td>
+                <td class="text-end text-warning fw-semibold">R$ {{ '%.2f'|format((cota_row.faltante if cota_row else 0)|default(0)) }}</td>
+                <td class="text-end text-danger fw-semibold">R$ {{ '%.2f'|format((cota_row.devolvido if cota_row else 0)|default(0)) }}</td>
+
                 <!-- Badge de status -->
                 <td class="text-center">
                   <span id="badge-ativo-{{ coop.id }}"
@@ -3772,6 +3837,11 @@
                             data-nome="{{ coop.nome }}"
                             data-usuario="{{ coop.usuario_ref.usuario }}"
                             data-telefone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
+                            data-cota-manual="{{ coop.cota_valor_manual or 0 }}"
+                            data-cota-semanal="{{ coop.cota_parcela_semanal or 33 }}"
+                            data-cota-devolvida="{{ coop.cota_devolvida or 0 }}"
+                            data-cota-integralizar="{{ 1 if coop.cota_integralizar_salario else 0 }}"
+                            data-nao-descontar="{{ 1 if coop.nao_descontar_cota else 0 }}"
                             data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
                             data-url="{{ url_for('edit_cooperado', id=coop.id) }}"
                             title="Editar">
@@ -3801,7 +3871,7 @@
                 </td>
               </tr>
             {% else %}
-              <tr><td colspan="6" class="text-center text-muted">Nenhum cooperado</td></tr>
+              <tr><td colspan="10" class="text-center text-muted">Nenhum cooperado</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -4001,6 +4071,28 @@
                      inputmode="numeric"
                      placeholder="(00) 00000-0000">
               <small class="text-muted">Só dígitos; formatamos automaticamente.</small>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Parcela semanal cota</label>
+              <input type="number" step="0.01" class="form-control form-control-sm" name="cota_parcela_semanal">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Cota manual</label>
+              <input type="number" step="0.01" class="form-control form-control-sm" name="cota_valor_manual">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Cota devolvida</label>
+              <input type="number" step="0.01" class="form-control form-control-sm" name="cota_devolvida">
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-3">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="cota_integralizar_salario" id="editCotaIntegralizar" value="1">
+                <label class="form-check-label" for="editCotaIntegralizar">Integralizar pelo salário mínimo</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="nao_descontar_cota" id="editNaoDescontar" value="1">
+                <label class="form-check-label" for="editNaoDescontar">Não descontar automático</label>
+              </div>
             </div>
             <div class="col-md-6">
               <label class="form-label">Foto (opcional)</label>
