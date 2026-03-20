@@ -312,6 +312,56 @@
 
     .table tbody tr:hover{ background:#f8fbff !important; }
 
+    .taxa-adm-table th:last-child,
+    .taxa-adm-table td:last-child{
+      min-width:360px;
+    }
+
+    .taxa-adm-actions-cell{
+      vertical-align:middle !important;
+    }
+
+    .taxa-adm-inline-form{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:nowrap;
+      width:100%;
+      margin:0;
+    }
+
+    .taxa-adm-inline-form .form-select,
+    .taxa-adm-inline-form .form-control{
+      min-height:40px;
+      margin:0;
+    }
+
+    .taxa-adm-status{
+      width:120px;
+      min-width:120px;
+    }
+
+    .taxa-adm-valor{
+      width:92px;
+      min-width:92px;
+      text-align:center;
+    }
+
+    .taxa-adm-data{
+      width:136px;
+      min-width:136px;
+    }
+
+    .taxa-adm-save{
+      width:42px;
+      min-width:42px;
+      height:40px;
+      padding:0 !important;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
+
     .badge-soft{
       display:inline-flex;
       align-items:center;
@@ -2541,7 +2591,7 @@
         </div>
       </div>
 
-      <form method="POST" action="{{ url_for('atualizar_taxa_admin_lote') }}" class="mb-3" data-perm-form="can_receitas_editar">
+      <form method="POST" action="{{ url_for('atualizar_taxa_admin_lote') }}" class="mb-3" data-perm-form="can_receitas_editar" id="taxaAdmLoteForm">
         <div class="d-flex flex-wrap gap-2 align-items-end">
           <div>
             <label class="form-label">Ação em lote</label>
@@ -2552,72 +2602,64 @@
           </div>
           <div>
             <label class="form-label d-none d-md-block">&nbsp;</label>
-            <button class="btn btn-royal btn-sm"><i class="bi bi-check2-square"></i> Aplicar</button>
+            <button class="btn btn-royal btn-sm" type="submit"><i class="bi bi-check2-square"></i> Aplicar</button>
           </div>
         </div>
-
-        <div class="table-responsive mt-3">
-          <table class="table table-sm table-bordered table-hover align-middle">
-            <thead class="table-light">
-              <tr>
-                <th style="width:38px"><input type="checkbox" id="taxaAdmToggleAll"></th>
-                <th>Estabelecimento</th>
-                <th>Competência</th>
-                <th>Vencimento</th>
-                <th class="text-end">Principal</th>
-                <th class="text-end">Juros calc.</th>
-                <th class="text-end">Multa calc.</th>
-                <th class="text-end">Recebido</th>
-                <th class="text-end">Em aberto</th>
-                <th>Status</th>
-                <th style="width:320px">Atualizar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for tx in taxa_admin_rows %}
-              <tr>
-                <td><input type="checkbox" name="ids[]" value="{{ tx.id }}" class="taxaAdmItem"></td>
-                <td>{{ tx.restaurante_nome or '-' }}</td>
-                <td>{{ tx.competencia or '-' }}</td>
-                <td>{{ tx.data_vencimento.strftime('%d/%m/%Y') if tx.data_vencimento else '-' }}</td>
-                <td class="text-end">R$ {{ '%.2f'|format(tx.valor_previsto) }}</td>
-                <td class="text-end">R$ {{ '%.2f'|format(tx.valor_juros) }}</td>
-                <td class="text-end">R$ {{ '%.2f'|format(tx.valor_multa) }}</td>
-                <td class="text-end">R$ {{ '%.2f'|format(tx.valor_recebido) }}</td>
-                <td class="text-end">R$ {{ '%.2f'|format(tx.valor_em_aberto) }}</td>
-                <td>
-                  {% if tx.status == 'pago' %}<span class="badge bg-success">Pago</span>
-                  {% elif tx.status == 'parcial' %}<span class="badge bg-warning text-dark">Parcial</span>
-                  {% else %}<span class="badge bg-secondary">Não pago</span>{% endif %}
-                </td>
-                <td>
-                  <form method="POST" action="{{ url_for('atualizar_taxa_admin_status', id=tx.id) }}" class="row g-2 align-items-end">
-                    <div class="col-4">
-                      <select name="status_pagamento" class="form-select form-select-sm">
-                        <option value="nao_pago" {{ 'selected' if tx.status == 'nao_pago' else '' }}>Não pago</option>
-                        <option value="parcial" {{ 'selected' if tx.status == 'parcial' else '' }}>Parcial</option>
-                        <option value="pago" {{ 'selected' if tx.status == 'pago' else '' }}>Pago</option>
-                      </select>
-                    </div>
-                    <div class="col-3">
-                      <input type="number" step="0.01" name="valor_pago" class="form-control form-control-sm" value="{{ '%.2f'|format(tx.valor_pago) }}" placeholder="Pago">
-                    </div>
-                    <div class="col-3">
-                      <input type="date" name="data_pagamento" class="form-control form-control-sm" value="{{ tx.data_pagamento.strftime('%Y-%m-%d') if tx.data_pagamento else '' }}">
-                    </div>
-                    <div class="col-2 d-grid">
-                      <button class="btn btn-success btn-sm"><i class="bi bi-save"></i></button>
-                    </div>
-                  </form>
-                </td>
-              </tr>
-              {% else %}
-              <tr><td colspan="11" class="text-center text-muted">Nenhuma taxa administrativa encontrada no período.</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
       </form>
+
+      <div class="table-responsive mt-3">
+        <table class="table table-sm table-bordered table-hover align-middle taxa-adm-table">
+          <thead class="table-light">
+            <tr>
+              <th style="width:38px"><input type="checkbox" id="taxaAdmToggleAll"></th>
+              <th>Estabelecimento</th>
+              <th>Competência</th>
+              <th>Vencimento</th>
+              <th class="text-end">Principal</th>
+              <th class="text-end">Juros calc.</th>
+              <th class="text-end">Multa calc.</th>
+              <th class="text-end">Recebido</th>
+              <th class="text-end">Em aberto</th>
+              <th>Status</th>
+              <th style="width:360px; min-width:360px;">Atualizar</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for tx in taxa_admin_rows %}
+            <tr>
+              <td><input type="checkbox" name="ids[]" value="{{ tx.id }}" class="taxaAdmItem" form="taxaAdmLoteForm"></td>
+              <td>{{ tx.restaurante_nome or '-' }}</td>
+              <td>{{ tx.competencia or '-' }}</td>
+              <td>{{ tx.data_vencimento.strftime('%d/%m/%Y') if tx.data_vencimento else '-' }}</td>
+              <td class="text-end">R$ {{ '%.2f'|format(tx.valor_previsto) }}</td>
+              <td class="text-end">R$ {{ '%.2f'|format(tx.valor_juros) }}</td>
+              <td class="text-end">R$ {{ '%.2f'|format(tx.valor_multa) }}</td>
+              <td class="text-end">R$ {{ '%.2f'|format(tx.valor_recebido) }}</td>
+              <td class="text-end">R$ {{ '%.2f'|format(tx.valor_em_aberto) }}</td>
+              <td>
+                {% if tx.status == 'pago' %}<span class="badge bg-success">Pago</span>
+                {% elif tx.status == 'parcial' %}<span class="badge bg-warning text-dark">Parcial</span>
+                {% else %}<span class="badge bg-secondary">Não pago</span>{% endif %}
+              </td>
+              <td class="taxa-adm-actions-cell">
+                <form method="POST" action="{{ url_for('atualizar_taxa_admin_status', id=tx.id) }}" class="taxa-adm-inline-form">
+                  <select name="status_pagamento" class="form-select form-select-sm taxa-adm-status">
+                    <option value="nao_pago" {{ 'selected' if tx.status == 'nao_pago' else '' }}>Não pago</option>
+                    <option value="parcial" {{ 'selected' if tx.status == 'parcial' else '' }}>Parcial</option>
+                    <option value="pago" {{ 'selected' if tx.status == 'pago' else '' }}>Pago</option>
+                  </select>
+                  <input type="number" step="0.01" name="valor_pago" class="form-control form-control-sm taxa-adm-valor" value="{{ '%.2f'|format(tx.valor_pago) }}" placeholder="Pago">
+                  <input type="date" name="data_pagamento" class="form-control form-control-sm taxa-adm-data" value="{{ tx.data_pagamento.strftime('%Y-%m-%d') if tx.data_pagamento else '' }}">
+                  <button class="btn btn-success btn-sm taxa-adm-save" type="submit"><i class="bi bi-save"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="11" class="text-center text-muted">Nenhuma taxa administrativa encontrada no período.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
