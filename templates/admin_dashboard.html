@@ -2642,15 +2642,14 @@
                 {% else %}<span class="badge bg-secondary">Não pago</span>{% endif %}
               </td>
               <td class="taxa-adm-actions-cell">
-                <form method="POST" action="{{ url_for('atualizar_taxa_admin_status', id=tx.id) }}" class="taxa-adm-inline-form">
+                <form method="POST" action="{{ url_for('atualizar_taxa_admin_status', id=tx.id) }}" class="taxa-adm-inline-form taxa-adm-inline-form-autodata" data-autosave-on-date="1">
                   <select name="status_pagamento" class="form-select form-select-sm taxa-adm-status">
                     <option value="nao_pago" {{ 'selected' if tx.status == 'nao_pago' else '' }}>Não pago</option>
                     <option value="parcial" {{ 'selected' if tx.status == 'parcial' else '' }}>Parcial</option>
                     <option value="pago" {{ 'selected' if tx.status == 'pago' else '' }}>Pago</option>
                   </select>
                   <input type="number" step="0.01" name="valor_pago" class="form-control form-control-sm taxa-adm-valor" value="{{ '%.2f'|format(tx.valor_pago) }}" placeholder="Pago">
-                  <input type="date" name="data_pagamento" class="form-control form-control-sm taxa-adm-data js-taxa-adm-autosave" value="{{ tx.data_pagamento.strftime('%Y-%m-%d') if tx.data_pagamento else '' }}" title="Ao escolher a data, salva esta linha automaticamente.">
-                  <button class="btn btn-success btn-sm taxa-adm-save" type="submit" title="Salvar esta linha"><i class="bi bi-save"></i></button>
+                  <input type="date" name="data_pagamento" class="form-control form-control-sm taxa-adm-data js-taxa-adm-date-autosave" value="{{ tx.data_pagamento.strftime('%Y-%m-%d') if tx.data_pagamento else '' }}">
                 </form>
               </td>
             </tr>
@@ -2993,7 +2992,7 @@
           </tbody>
           <tfoot>
             <tr class="table-light">
-              <th colspan="6" class="text-end">Total</th>
+              <th colspan="3" class="text-end">Total</th>
               <th class="text-end">R$ {{ '%.2f'|format(total_receitas_coop_table) }}</th>
               <th></th>
             </tr>
@@ -6922,34 +6921,19 @@ document.addEventListener('DOMContentLoaded', function(){ const cAll=document.ge
 
 
 <script>
-(function(){
-  function submitTaxaAdmForm(input){
-    const form = input && input.closest ? input.closest('form.taxa-adm-inline-form') : null;
-    if (!form || form.dataset.saving === '1') return;
-    form.dataset.saving = '1';
-
-    const btn = form.querySelector('.taxa-adm-save');
-    const original = btn ? btn.innerHTML : '';
-    if (btn){
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>';
-    }
-
-    form.submit();
-  }
-
-  document.addEventListener('change', function(e){
-    const target = e.target;
-    if (!target) return;
-
-    if (target.classList.contains('js-taxa-adm-autosave')){
-      if ((target.value || '').trim()){
-        submitTaxaAdmForm(target);
-      }
-    }
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('.js-taxa-adm-date-autosave').forEach(function(input){
+    input.addEventListener('change', function(){
+      const form = input.closest('form.taxa-adm-inline-form-autodata');
+      if (!form || form.dataset.sending === '1') return;
+      form.dataset.sending = '1';
+      input.setAttribute('readonly', 'readonly');
+      form.submit();
+    });
   });
-})();
+});
 </script>
+
 </body>
 </html>
 
