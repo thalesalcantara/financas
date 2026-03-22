@@ -172,7 +172,7 @@ app.config.update(
 db = SQLAlchemy(app)
 
 def _sso_serializer():
-    secret = os.environ.get("SSO_SHARED_SECRET") or app.secret_key
+    secret = os.environ.get("SSO_SHARED_SECRET") or "COOPEX_SSO_SHARED_2026_FIXED"
     # "salt" separa o token SSO de outros usos do secret
     return URLSafeTimedSerializer(secret_key=secret, salt="coopex-sso-v1")
 
@@ -226,6 +226,24 @@ def _build_remote_sso_url(base_url: str, aud: str, role: str = 'master', next_pa
         'next': next_path,
     })
     return f"{base_url.rstrip('/')}/autologin?token={token}"
+
+
+
+def _get_real_master_admin() -> "Usuario":
+    u = (
+        Usuario.query.filter(func.lower(Usuario.usuario) == 'coopex').filter_by(tipo='admin').order_by(Usuario.id.asc()).first()
+        or Usuario.query.filter_by(tipo='admin', is_master=True).order_by(Usuario.id.asc()).first()
+    )
+    if not u:
+        u = Usuario(usuario='coopex', nome='COOPEX', tipo='admin', senha_hash='!', is_master=True, ativo=True)
+        db.session.add(u)
+        db.session.commit()
+    elif not getattr(u, 'is_master', False):
+        u.is_master = True
+        if getattr(u, 'ativo', None) is None:
+            u.ativo = True
+        db.session.commit()
+    return u
 
 def _get_or_create_sso_user(tipo: str = "admin") -> Usuario:
     """
@@ -3205,6 +3223,7 @@ def sso_entrar():
         return redirect(url_for("login"))
 
     tipo = (data.get("tipo") or "admin").strip().lower()
+    role = (data.get("role") or "master").strip().lower()
     if tipo == "supervisao":
         u = _get_or_create_supervisao_admin()
         session.clear()
@@ -3214,7 +3233,10 @@ def sso_entrar():
         next_url = data.get("next") or url_for("admin_dashboard", tab="escalas")
         return redirect(next_url)
 
-    u = _get_or_create_sso_user(tipo="admin")
+    if role == 'master' or (data.get('orig') in ('sistema1','sistema2')):
+        u = _get_real_master_admin()
+    else:
+        u = _get_or_create_sso_user(tipo="admin")
     session.clear()
     session.permanent = True
     session["user_id"] = u.id
@@ -3528,7 +3550,7 @@ def admin_sistemas_abrir(sistema):
     if sistema == 'sistema1':
         return redirect(_build_remote_sso_url(PORTAL_SISTEMA1_URL, aud='sistema1', role='master', next_path='/admin'))
     if sistema == 'sistema2':
-        return redirect(_build_remote_sso_url(PORTAL_SISTEMA2_URL, aud='sistema2', role='admin', next_path='/dashboard'))
+        return redirect(_build_remote_sso_url(PORTAL_SISTEMA2_URL, aud='sistema2', role='master', next_path='/dashboard'))
     flash('Sistema inválido.', 'warning')
     return redirect(url_for('admin_dashboard', tab='sistemas'))
 
