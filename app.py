@@ -173,92 +173,64 @@ db = SQLAlchemy(app)
 
 def _sso_serializer():
     secret = os.environ.get("SSO_SHARED_SECRET") or "COOPEX_SSO_SHARED_2026_FIXED"
-    # "salt" separa o token SSO de outros usos do secret
     return URLSafeTimedSerializer(secret_key=secret, salt="coopex-sso-v1")
 
 def sso_load(token: str, max_age_seconds: int = 45) -> dict:
-    s = _sso_serializer()
-    return s.loads(token, max_age=max_age_seconds)
+    return _sso_serializer().loads(token, max_age=max_age_seconds)
 
+def sso_dump(payload: dict) -> str:
+    return _sso_serializer().dumps(payload)
+
+PORTAL_PRINCIPAL_URL = os.environ.get("PORTAL_PRINCIPAL_URL", "https://financas-dxsu.onrender.com")
 PORTAL_SISTEMA1_URL = os.environ.get("PORTAL_SISTEMA1_URL", "https://escalas-2-1.onrender.com")
 PORTAL_SISTEMA2_URL = os.environ.get("PORTAL_SISTEMA2_URL", "https://kratossystem.onrender.com")
 
-def _ensure_admin_permission_rows(usuario: 'Usuario | None'):
-    if not usuario or (getattr(usuario, 'tipo', '') or '').strip().lower() != 'admin':
-        return
-    changed = False
-    existentes = {p.aba for p in AdminPermissao.query.filter_by(usuario_id=usuario.id).all()}
+def _find_admin_usuario(*candidates: str, must_be_master: bool | None = None):
+    cleaned = [str(c).strip() for c in candidates if str(c).strip()]
+    for cand in cleaned:
+        u = Usuario.query.filter(func.lower(Usuario.usuario) == cand.lower(), Usuario.tipo == "admin").first()
+        if u and (must_be_master is None or bool(getattr(u, "is_master", False)) == bool(must_be_master)):
+            return u
+    q = Usuario.query.filter_by(tipo="admin")
+    if must_be_master is True:
+        q = q.filter_by(is_master=True)
+    elif must_be_master is False:
+        q = q.filter_by(is_master=False)
+    return q.order_by(Usuario.id.asc()).first()
+
+def _ensure_admin_perm_rows(usuario_id: int):
     for aba in ADMIN_ABAS.keys():
-        if aba not in existentes:
-            db.session.add(AdminPermissao(usuario_id=usuario.id, aba=aba, pode_ver=False, pode_criar=False, pode_editar=False, pode_excluir=False))
-            changed = True
-    if changed:
-        db.session.commit()
+        perm = AdminPermissao.query.filter_by(usuario_id=usuario_id, aba=aba).first()
+        if not perm:
+            db.session.add(AdminPermissao(usuario_id=usuario_id, aba=aba, pode_ver=False, pode_criar=False, pode_editar=False, pode_excluir=False))
+    db.session.flush()
 
-def _get_or_create_supervisao_admin() -> 'Usuario':
-    u = (
-        Usuario.query.filter(func.lower(Usuario.usuario) == 'supervisao').first()
-        or Usuario.query.filter(func.lower(Usuario.nome) == 'supervisao').first()
-    )
+def _get_or_create_supervisao_admin() -> Usuario:
+    u = _find_admin_usuario("SUPERVISAO", must_be_master=False)
     if not u:
-        u = Usuario(usuario='SUPERVISAO', nome='SUPERVISAO', tipo='admin', senha_hash='!', is_master=False, ativo=True)
+        u = Usuario(nome="SUPERVISAO", usuario="SUPERVISAO", tipo="admin", senha_hash="", is_master=False, ativo=True)
+        u.set_password(os.environ.get("SUPERVISAO_PASSWORD", "84253700"))
         db.session.add(u)
+        db.session.flush()
+        _ensure_admin_perm_rows(u.id)
+        for aba in ADMIN_ABAS.keys():
+            perm = AdminPermissao.query.filter_by(usuario_id=u.id, aba=aba).first()
+            if perm:
+                allow = (aba == "escalas")
+                perm.pode_ver = allow
+                perm.pode_criar = allow
+                perm.pode_editar = allow
+                perm.pode_excluir = False
         db.session.commit()
-    elif (u.tipo or '').strip().lower() != 'admin':
-        u.tipo = 'admin'
-        u.is_master = False
-        if getattr(u, 'ativo', None) is None:
-            u.ativo = True
-        db.session.commit()
-    _ensure_admin_permission_rows(u)
-    perm_esc = AdminPermissao.query.filter_by(usuario_id=u.id, aba='escalas').first()
-    if perm_esc and not any([perm_esc.pode_ver, perm_esc.pode_criar, perm_esc.pode_editar, perm_esc.pode_excluir]):
-        perm_esc.pode_ver = True
-        db.session.commit()
-    return u
-
-def _build_remote_sso_url(base_url: str, aud: str, role: str = 'master', next_path: str = '/') -> str:
-    token = _sso_serializer().dumps({
-        'aud': aud,
-        'role': role,
-        'orig': 'principal',
-        'iat': int(datetime.utcnow().timestamp()),
-        'next': next_path,
-    })
-    return f"{base_url.rstrip('/')}/autologin?token={token}"
-
-
-
-def _get_real_master_admin() -> "Usuario":
-    u = (
-        Usuario.query.filter(func.lower(Usuario.usuario) == 'coopex').filter_by(tipo='admin').order_by(Usuario.id.asc()).first()
-        or Usuario.query.filter_by(tipo='admin', is_master=True).order_by(Usuario.id.asc()).first()
-    )
-    if not u:
-        u = Usuario(usuario='coopex', nome='COOPEX', tipo='admin', senha_hash='!', is_master=True, ativo=True)
-        db.session.add(u)
-        db.session.commit()
-    elif not getattr(u, 'is_master', False):
-        u.is_master = True
-        if getattr(u, 'ativo', None) is None:
-            u.ativo = True
+    else:
+        _ensure_admin_perm_rows(u.id)
         db.session.commit()
     return u
 
-def _get_or_create_sso_user(tipo: str = "admin") -> Usuario:
-    """
-    Garante um usuário técnico para sessão SSO, evitando quebrar rotas que consultam Usuario.
-    """
-    username = f"sso_{tipo}"
-    u = Usuario.query.filter_by(usuario=username).first()
-    if u:
-        return u
-
-    # cria user técnico sem senha (não loga pelo /login)
-    u = Usuario(usuario=username, tipo=tipo, senha_hash="!")
-    db.session.add(u)
-    db.session.commit()
-    return u
+def _build_remote_sso_url(base_url: str, aud: str, role: str, next_path: str):
+    payload = {"aud": aud, "orig": "principal", "role": role, "next": next_path, "iat": int(datetime.utcnow().timestamp())}
+    token = sso_dump(payload)
+    return (f"{base_url.rstrip('/')}" + "/autologin?token=" + token)
     
 
 def ajustar_banco():
@@ -1580,9 +1552,9 @@ ADMIN_ABAS = {
     "documentos": "Documentos",
     "tabelas": "Tabelas",
     "avaliacoes": "Avaliações",
-    "sistemas": "Sistemas",
     "config": "Configurações",
     "folha": "Folha",
+    "sistemas": "Sistemas",
 }
 
 
@@ -1611,7 +1583,6 @@ def is_admin_master() -> bool:
 
 
 def get_admin_permissions_map(usuario_id: int) -> dict:
-    _ensure_admin_permission_rows(Usuario.query.get(usuario_id))
     perms = AdminPermissao.query.filter_by(usuario_id=usuario_id).all()
     out = {}
 
@@ -3208,40 +3179,32 @@ def sso_entrar():
     token = (request.args.get("token") or "").strip()
     if not token:
         return redirect(url_for("login"))
-
     try:
-        data = sso_load(token, max_age_seconds=45)
+        data = sso_load(token, max_age_seconds=60)
     except SignatureExpired:
         flash("Link expirou. Clique novamente no botão.", "danger")
         return redirect(url_for("login"))
     except BadSignature:
         flash("Link inválido.", "danger")
         return redirect(url_for("login"))
-
     if data.get("aud") != "painel-destino":
         flash("Token com destino inválido.", "danger")
         return redirect(url_for("login"))
-
     tipo = (data.get("tipo") or "admin").strip().lower()
-    role = (data.get("role") or "master").strip().lower()
+    principal_user = (data.get("principal_user") or "").strip()
     if tipo == "supervisao":
-        u = _get_or_create_supervisao_admin()
-        session.clear()
-        session.permanent = True
-        session["user_id"] = u.id
-        session["user_tipo"] = "admin"
-        next_url = data.get("next") or url_for("admin_dashboard", tab="escalas")
-        return redirect(next_url)
-
-    if role == 'master' or (data.get('orig') in ('sistema1','sistema2')):
-        u = _get_real_master_admin()
+        u = _find_admin_usuario(principal_user, "SUPERVISAO", must_be_master=False) or _get_or_create_supervisao_admin()
+        next_url = "/admin?tab=escalas"
     else:
-        u = _get_or_create_sso_user(tipo="admin")
+        u = _find_admin_usuario(principal_user, "COOPEX", "coopex", must_be_master=True)
+        if not u:
+            flash("Administrador master do principal não encontrado.", "danger")
+            return redirect(url_for("login"))
+        next_url = data.get("next") or url_for("admin_dashboard", tab="sistemas")
     session.clear()
     session.permanent = True
     session["user_id"] = u.id
     session["user_tipo"] = "admin"
-    next_url = data.get("next") or url_for("admin_dashboard", tab="sistemas")
     return redirect(next_url)
     
 def _safe_float(v, default=0.0):
@@ -3542,17 +3505,16 @@ def admin_delete_admin(usuario_id):
     return redirect(url_for("admin_dashboard", tab="config"))
     
 
-
 @app.get("/admin/sistemas/abrir/<sistema>")
 @admin_perm_required("sistemas", "ver")
 def admin_sistemas_abrir(sistema):
-    sistema = (sistema or '').strip().lower()
-    if sistema == 'sistema1':
-        return redirect(_build_remote_sso_url(PORTAL_SISTEMA1_URL, aud='sistema1', role='master', next_path='/admin'))
-    if sistema == 'sistema2':
-        return redirect(_build_remote_sso_url(PORTAL_SISTEMA2_URL, aud='sistema2', role='master', next_path='/dashboard'))
-    flash('Sistema inválido.', 'warning')
-    return redirect(url_for('admin_dashboard', tab='sistemas'))
+    sistema = (sistema or "").strip().lower()
+    if sistema == "sistema1":
+        return redirect(_build_remote_sso_url(PORTAL_SISTEMA1_URL, aud="sistema1", role="master", next_path="/admin"))
+    if sistema == "sistema2":
+        return redirect(_build_remote_sso_url(PORTAL_SISTEMA2_URL, aud="sistema2", role="admin", next_path="/dashboard"))
+    flash("Sistema inválido.", "warning")
+    return redirect(url_for("admin_dashboard", tab="sistemas"))
 
 @app.route("/admin", methods=["GET"])
 @admin_required
@@ -3561,7 +3523,6 @@ def admin_dashboard():
     active_tab = (args.get("tab") or "lancamentos").strip().lower()
 
     admin_logado = _usuario_logado()
-    _ensure_admin_permission_rows(admin_logado)
     if not admin_logado:
         session.clear()
         flash("Sessão inválida. Faça login novamente.", "danger")
@@ -5305,7 +5266,6 @@ def admin_avaliacoes():
         )
 
     admin_logado = _usuario_logado()
-    _ensure_admin_permission_rows(admin_logado)
 
     if admin_logado and getattr(admin_logado, "is_master", False):
         admin_perms = {
@@ -5326,8 +5286,6 @@ def admin_avaliacoes():
         .order_by(Usuario.id.asc())
         .all()
     )
-    for _adm in admins_secundarios:
-        _ensure_admin_permission_rows(_adm)
 
     return render_template(
         "admin_avaliacoes.html",
@@ -7956,7 +7914,6 @@ def admin_escala_salvar(escala_id):
 @admin_perm_required("escalas", "ver")
 def admin_api_escala_alertas_1h():
     admin_logado = _usuario_logado()
-    _ensure_admin_permission_rows(admin_logado)
     if not admin_logado or (admin_logado.tipo or "").strip().lower() != "admin":
         return jsonify({"ok": False, "message": "Não autorizado."}), 403
 
