@@ -675,6 +675,19 @@
 
       <!-- Config (TAB) e Sair (rota) ---------------------------------------->
       <div class="sidebar-footer">
+
+      <div class="nav-section-label">Integrações</div>
+      <a class="nav-link-main {{ 'active' if _tab=='sistemas' else '' }}"
+         data-bs-toggle="tab"
+         href="#sistemas"
+         data-admin-tab="sistemas"
+         role="tab">
+        <div class="nav-link-left">
+          <span class="nav-link-icon"><i class="bi bi-boxes"></i></span>
+          <span class="nav-link-label">Sistemas</span>
+        </div>
+      </a>
+
         {% if can_config_ver %}<a class="nav-link-main {{ 'active' if _tab=='config' else '' }}"
            data-bs-toggle="tab"
            data-bs-target="#config"
@@ -703,6 +716,42 @@
 <!-- Main -->
 <main class="main">
   <div class="tab-content">
+
+    <!-- === SISTEMAS === -->
+    <section class="tab-pane fade {{ 'show active' if _tab=='sistemas' else '' }}" id="sistemas" role="tabpanel">
+      <div class="content-shell">
+        <div class="page-header">
+          <h3><i class="bi bi-boxes"></i> Sistemas</h3>
+          <small>Acesse os outros sistemas sem precisar fazer novo login.</small>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12 col-lg-6">
+            <div class="card h-100">
+              <div class="card-body d-flex flex-column">
+                <h5 class="mb-2"><i class="bi bi-broadcast"></i> Supervisão</h5>
+                <p class="text-muted mb-3">Abrir o sistema de supervisão já autenticado.</p>
+                <div class="mt-auto">
+                  <a class="btn btn-primary" href="{{ url_for('admin_sistemas_abrir', sistema='sistema1') }}">Abrir Supervisão</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-lg-6">
+            <div class="card h-100">
+              <div class="card-body d-flex flex-column">
+                <h5 class="mb-2"><i class="bi bi-diagram-3"></i> Parceria</h5>
+                <p class="text-muted mb-3">Abrir o sistema de parceria já autenticado.</p>
+                <div class="mt-auto">
+                  <a class="btn btn-primary" href="{{ url_for('admin_sistemas_abrir', sistema='sistema2') }}">Abrir Parceria</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- === RESUMO (Dashboard Financeiro Completo) === -->
     <section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
@@ -1804,31 +1853,7 @@
               labels,
               datasets: [{ label: 'Produções por Estabelecimento', data: vals, backgroundColor: 'rgba(16, 185, 129, 0.8)', borderRadius: 6 }]
             },
-            options: {
-              ...baseChartOptions,
-              indexAxis: 'y',
-              plugins: {
-                ...baseChartOptions.plugins,
-                legend: { display: false },
-                tooltip: {
-                  ...baseChartOptions.plugins.tooltip,
-                  callbacks: {
-                    label: (ctx) => `Produções por Estabelecimento: ${moneyTick(ctx.parsed.x ?? 0)}`
-                  }
-                }
-              },
-              scales: {
-                x: {
-                  beginAtZero: true,
-                  grid: { display: true, color: 'rgba(148,163,184,0.25)' },
-                  ticks: { callback: (v) => moneyTick(v) }
-                },
-                y: {
-                  grid: { display: false },
-                  ticks: { callback: (v, i) => labels[i] ?? '' }
-                }
-              }
-            }
+            options: { ...baseChartOptions, plugins: { ...baseChartOptions.plugins, legend: { display: false } }, indexAxis: 'y' }
           });
         })();
       });
@@ -3017,7 +3042,7 @@
           </tbody>
           <tfoot>
             <tr class="table-light">
-              <th colspan="3" class="text-end">Total</th>
+              <th colspan="6" class="text-end">Total</th>
               <th class="text-end">R$ {{ '%.2f'|format(total_receitas_coop_table) }}</th>
               <th></th>
             </tr>
