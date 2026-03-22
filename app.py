@@ -172,13 +172,17 @@ app.config.update(
 db = SQLAlchemy(app)
 
 def _sso_serializer():
-    secret = os.environ.get("SSO_SHARED_SECRET") or app.secret_key
+    secret = os.environ.get("SSO_SHARED_SECRET", "COOPEX_SSO_SHARED_CHANGE_ME_2026")
     # "salt" separa o token SSO de outros usos do secret
     return URLSafeTimedSerializer(secret_key=secret, salt="coopex-sso-v1")
 
 def sso_load(token: str, max_age_seconds: int = 45) -> dict:
     s = _sso_serializer()
     return s.loads(token, max_age=max_age_seconds)
+
+def sso_dump(payload: dict) -> str:
+    s = _sso_serializer()
+    return s.dumps(payload)
 
 def _get_or_create_sso_user(tipo: str = "admin") -> Usuario:
     """
@@ -3157,6 +3161,63 @@ def index():
 # =========================
 # Auth
 # =========================
+
+PORTAL_PRINCIPAL_URL = os.environ.get("PORTAL_PRINCIPAL_URL", "https://financas-dxsu.onrender.com")
+PORTAL_SISTEMA1_URL = os.environ.get("PORTAL_SISTEMA1_URL", "https://escalas-2-1.onrender.com")
+PORTAL_SISTEMA2_URL = os.environ.get("PORTAL_SISTEMA2_URL", "https://kratossystem.onrender.com")
+
+PORTAL_SISTEMAS = {
+    "principal": {
+        "label": "Sistema Principal",
+        "url": PORTAL_PRINCIPAL_URL,
+        "autologin_path": None,
+        "next": "/admin",
+        "aud": "painel-destino",
+        "descricao": "Financeiro / admin central",
+    },
+    "sistema1": {
+        "label": "Supervisão",
+        "url": PORTAL_SISTEMA1_URL,
+        "autologin_path": "/autologin",
+        "next": "/admin",
+        "aud": "sistema-1",
+        "descricao": "Supervisão",
+    },
+    "sistema2": {
+        "label": "Parceria",
+        "url": PORTAL_SISTEMA2_URL,
+        "autologin_path": "/autologin",
+        "next": "/dashboard",
+        "aud": "sistema-2",
+        "descricao": "Parceria",
+    },
+}
+
+@app.get("/admin/sistemas")
+@admin_required
+def admin_sistemas():
+    return redirect(url_for("admin_dashboard", tab="sistemas"))
+
+@app.get("/admin/sistemas/abrir/<sistema>")
+@admin_required
+def admin_sistemas_abrir(sistema: str):
+    cfg = PORTAL_SISTEMAS.get((sistema or "").strip().lower())
+    if not cfg:
+        flash("Sistema inválido.", "danger")
+        return redirect(url_for("admin_dashboard", tab="sistemas"))
+
+    if sistema == "principal":
+        return redirect(url_for("admin_dashboard", tab="sistemas"))
+
+    token = sso_dump({
+        "aud": cfg["aud"],
+        "orig": "principal",
+        "tipo": "admin",
+        "next": cfg["next"],
+        "iat": int(datetime.utcnow().timestamp()),
+    })
+    return redirect(f"{cfg['url']}{cfg['autologin_path']}?token={token}")
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     erro_login = None
