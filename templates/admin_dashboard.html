@@ -1188,28 +1188,6 @@
           </div>
         </div>
 
-        <!-- Gráficos -->
-        <div class="row g-2 mt-3">
-          <div class="col-12 col-lg-6">
-            <div class="card border-0 shadow-sm rounded-4 p-3">
-              <h6 class="mb-2 d-flex align-items-center gap-1">
-                <span class="resumo-pill-label"><i class="bi bi-graph-up-arrow"></i></span>
-                <span>Evolução Mensal — Cooperativa</span>
-              </h6>
-              <canvas id="chartCoop"></canvas>
-            </div>
-          </div>
-          <div class="col-12 col-lg-6">
-            <div class="card border-0 shadow-sm rounded-4 p-3">
-              <h6 class="mb-2 d-flex align-items-center gap-1">
-                <span class="resumo-pill-label"><i class="bi bi-graph-up-arrow"></i></span>
-                <span>Evolução Mensal — Cooperados</span>
-              </h6>
-              <canvas id="chartCooperados"></canvas>
-            </div>
-          </div>
-        </div>
-
         <div class="row g-2 mt-3">
           <div class="col-12">
             <div class="card border-0 shadow-sm rounded-4 p-3">
@@ -1217,7 +1195,6 @@
                 <span class="resumo-pill-label"><i class="bi bi-shop"></i></span>
                 <span>Top Estabelecimentos (Produções no período)</span>
               </h6>
-              <canvas id="chartEstabs"></canvas>
               <div class="table-responsive mt-3">
                 <table class="table table-sm table-bordered table-hover align-middle" id="tblTopEstabsResumo">
                   <thead class="table-light">
@@ -6156,6 +6133,8 @@
   })();
 
   // ===== Gráficos =====
+  const rawLancCoop   = {{ (chart_data_lancamentos_coop or {'labels':[], 'values':[]}) | tojson }};
+  const rawLancCooper = {{ (chart_data_lancamentos_cooperados or {'labels':[], 'values':[]}) | tojson }};
 
   const totalProducoesFallback = parseFloat('{{ total_producoes|default(0) }}') || 0;
 
@@ -6985,53 +6964,62 @@ document.addEventListener('DOMContentLoaded', function(){ const cAll=document.ge
 
 <script>
 (function(){
-  const adminRoot = document;
-  function currentTabPane(el){ return el.closest('.tab-pane'); }
-  async function swapFromResponse(text, paneId){
-    const doc = new DOMParser().parseFromString(text, 'text/html');
-    const fresh = doc.getElementById(paneId);
-    const old = document.getElementById(paneId);
-    if (fresh && old) {
-      old.replaceWith(fresh);
-      const newUrl = doc.querySelector('link[rel="canonical"]')?.href || null;
-      return true;
-    }
-    return false;
+  const TABS = new Set(['resumo','lancamentos','receitas','despesas','coop_receitas','coop_despesas','beneficios','cooperados','restaurantes','documentos','tabelas','escalas','avisos','sistemas','config']);
+  async function swapTab(tab, responseText, url){
+    const doc = new DOMParser().parseFromString(responseText, 'text/html');
+    const incoming = doc.getElementById(tab);
+    const current = document.getElementById(tab);
+    if (incoming && current) current.innerHTML = incoming.innerHTML;
+    const incomingPanel = doc.querySelector('.panel-head');
+    const currentPanel = document.querySelector('.panel-head');
+    if (incomingPanel && currentPanel) currentPanel.innerHTML = incomingPanel.innerHTML;
+    if (url) history.replaceState(null, '', url);
   }
-  adminRoot.addEventListener('submit', async function(e){
-    const form = e.target;
-    if (!(form instanceof HTMLFormElement)) return;
-    const pane = currentTabPane(form);
-    if (!pane) return;
-    const action = form.getAttribute('action') || window.location.href;
-    if (/exportar|download|xlsx|csv/i.test(action)) return;
-    e.preventDefault();
-    const method = (form.getAttribute('method') || 'GET').toUpperCase();
-    const fd = new FormData(form);
-    let url = action;
-    const opts = { method, headers: {'X-Requested-With':'XMLHttpRequest'} };
-    if (method === 'GET') {
-      const qs = new URLSearchParams(fd).toString();
-      url = action + (action.includes('?') ? '&' : '?') + qs;
-    } else {
-      opts.body = fd;
+  async function ajaxLoad(url, opts, tab, fallback){
+    try {
+      const resp = await fetch(url, Object.assign({headers:{'X-Requested-With':'XMLHttpRequest'}}, opts||{}));
+      const text = await resp.text();
+      await swapTab(tab, text, (new URL(url, location.origin)).pathname + (new URL(url, location.origin)).search);
+      const trigger = document.querySelector(`.sidebar a[href="#${tab}"]`);
+      if (trigger && window.bootstrap) bootstrap.Tab.getOrCreateInstance(trigger).show();
+    } catch(err) {
+      if (fallback) fallback();
     }
-    const resp = await fetch(url, opts);
-    const text = await resp.text();
-    await swapFromResponse(text, pane.id);
-  });
-  adminRoot.addEventListener('click', async function(e){
-    const a = e.target.closest('a');
+  }
+  document.addEventListener('submit', function(ev){
+    const form = ev.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    const pane = form.closest('.tab-pane');
+    if (!pane || !TABS.has(pane.id)) return;
+    if (form.matches('.no-ajax, [data-no-ajax="1"]')) return;
+    ev.preventDefault();
+    const tab = pane.id;
+    const action = form.getAttribute('action') || location.href;
+    const method = (form.getAttribute('method') || 'GET').toUpperCase();
+    if (method === 'GET') {
+      const url = new URL(action, location.origin);
+      const fd = new FormData(form);
+      for (const [k,v] of fd.entries()) url.searchParams.set(k, v);
+      if (!url.searchParams.get('tab')) url.searchParams.set('tab', tab);
+      ajaxLoad(url.toString(), {method:'GET'}, tab, ()=>form.submit());
+    } else {
+      const fd = new FormData(form);
+      if (!fd.get('tab')) fd.set('tab', tab);
+      ajaxLoad(action, {method:'POST', body:fd}, tab, ()=>form.submit());
+    }
+  }, true);
+  document.addEventListener('click', function(ev){
+    const a = ev.target.closest('a');
     if (!a) return;
-    const pane = currentTabPane(a);
-    if (!pane) return;
+    const pane = a.closest('.tab-pane');
+    if (!pane || !TABS.has(pane.id)) return;
     const href = a.getAttribute('href') || '';
-    if (!href || href.startsWith('#') || a.hasAttribute('download') || /exportar|download|xlsx|csv/i.test(href) || a.dataset.bsToggle) return;
-    e.preventDefault();
-    const resp = await fetch(href, {headers:{'X-Requested-With':'XMLHttpRequest'}});
-    const text = await resp.text();
-    await swapFromResponse(text, pane.id);
-  });
+    if (!href || href.startsWith('#') || a.hasAttribute('download') || a.target === '_blank') return;
+    if (href.includes('/export') || href.includes('/download') || href.includes('/baixar')) return;
+    if (!a.classList.contains('btn-del') && !href.includes('/delete') && !href.includes('/admin?') && !href.includes('/filtrar_')) return;
+    ev.preventDefault();
+    ajaxLoad(new URL(href, location.origin).toString(), {method:'GET'}, pane.id, ()=>location.href = href);
+  }, true);
 })();
 </script>
 
