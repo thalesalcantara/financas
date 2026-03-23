@@ -3688,7 +3688,7 @@ def admin_dashboard():
     total_adiantamentos_coop = 0.0
 
     if True:
-        rq2 = ReceitaCooperado.query.options(selectinload(ReceitaCooperado.cooperado))
+        rq2 = ReceitaCooperado.query
         dq2 = DespesaCooperado.query.options(selectinload(DespesaCooperado.cooperado))
 
         if data_inicio:
@@ -3738,10 +3738,11 @@ def admin_dashboard():
         )
 
         despesa_snapshot_map = {}
-        for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
-            _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
-            for _it in _snap["itens"]:
-                despesa_snapshot_map[_it["id"]] = _it
+        if active_tab == "coop_despesas":
+            for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
+                _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
+                for _it in _snap["itens"]:
+                    despesa_snapshot_map[_it["id"]] = _it
 
     cfg = get_config()
 
@@ -4474,7 +4475,7 @@ def exportar_lancamentos():
     data_fim       = _parse_date(args.get("data_fim"))
     dows           = set(args.getlist("dow"))  # '0'..'6'
 
-    q = Lancamento.query.options(selectinload(Lancamento.restaurante), selectinload(Lancamento.cooperado))
+    q = Lancamento.query
     if restaurante_id:
         q = q.filter(Lancamento.restaurante_id == restaurante_id)
     if cooperado_id:
@@ -6717,24 +6718,29 @@ def _despesa_due_date(dc):
 
 
 def _admin_redirect_with_filters(default_tab="coop_despesas"):
-    def _pick(*names):
-        for name in names:
-            v = request.form.get(name)
-            if v not in (None, ""):
-                return v
-            v = request.args.get(name)
-            if v not in (None, ""):
-                return v
-        return ""
+    def _pick(form_key, arg_key=None):
+        arg_key = arg_key or form_key
+        return (
+            request.form.get(f"filtro_{form_key}")
+            or request.args.get(f"filtro_{arg_key}")
+            or request.form.get(form_key)
+            or request.args.get(arg_key)
+            or ""
+        )
 
     args = {
-        "tab": _pick("tab", "preserve_tab") or default_tab,
-        "data_inicio": _pick("data_inicio", "preserve_data_inicio"),
-        "data_fim": _pick("data_fim", "preserve_data_fim"),
-        "restaurante_id": _pick("restaurante_id", "preserve_restaurante_id"),
-        "cooperado_id": _pick("cooperado_id", "preserve_cooperado_id"),
+        "tab": request.form.get("tab") or request.args.get("tab") or default_tab,
+        "data_inicio": _pick("data_inicio"),
+        "data_fim": _pick("data_fim"),
+        "restaurante_id": _pick("restaurante_id"),
+        "cooperado_id": _pick("cooperado_id"),
     }
-    if _pick("somente_pendentes", "preserve_somente_pendentes"):
+    if (
+        request.form.get("filtro_somente_pendentes")
+        or request.args.get("filtro_somente_pendentes")
+        or request.form.get("somente_pendentes")
+        or request.args.get("somente_pendentes")
+    ):
         args["somente_pendentes"] = "1"
     return redirect(url_for("admin_dashboard", **args))
 
@@ -7048,11 +7054,10 @@ def add_despesa_coop():
     data_comp = _competencia_ref(d, competencia_semana)
     di_comp, df_comp = semana_bounds(data_comp)
 
-    qtd = len(ids)
-    valor_unit = round(valor_total, 2) if qtd > 0 else 0.0
-    valores = [valor_unit] * qtd
+    valor_unit = round(valor_total, 2)
 
-    for cid, v in zip(ids, valores):
+    for cid in ids:
+        v = valor_unit
         db.session.add(
             DespesaCooperado(
                 cooperado_id=cid,
@@ -7067,7 +7072,7 @@ def add_despesa_coop():
         )
 
     db.session.commit()
-    flash(f"Despesa(s) lançada(s): {qtd} cooperado(s) x R$ {valor_unit:.2f}.", "success")
+    flash("Despesa(s) lançada(s).", "success")
     return _admin_redirect_with_filters("coop_despesas")
 
 
@@ -7077,7 +7082,7 @@ def edit_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
     f = request.form
 
-    dc.cooperado_id = f.get("cooperado_id", type=int)
+    dc.cooperado_id = f.get("edit_cooperado_id", type=int) or f.get("cooperado_id", type=int)
     dc.descricao = (f.get("descricao") or "").strip()
     dc.valor = f.get("valor", type=float)
     data_edit = _parse_date(f.get("data")) or dc.data or date.today()
