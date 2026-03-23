@@ -1167,23 +1167,7 @@
                 </thead>
 
                 <tbody>
-                  {% if resumo_coop_rows %}
-                    {% for r in resumo_coop_rows %}
-                    <tr>
-                      <td class="text-break">{{ r.nome or '—' }}</td>
-                      <td class="text-end">R$ {{ '%.2f'|format(r.prod|default(0)) }}</td>
-                      <td class="text-end">R$ {{ '%.2f'|format(r.inss4|default(0)) }}</td>
-                      <td class="text-end">R$ {{ '%.2f'|format(r.sest05|default(0)) }}</td>
-                      <td class="text-end text-success">R$ {{ '%.2f'|format(r.rec|default(0)) }}</td>
-                      <td class="text-end text-danger">R$ {{ '%.2f'|format(r.des|default(0)) }}</td>
-                      <td class="text-end text-danger">R$ {{ '%.2f'|format(r.adiant|default(0)) }}</td>
-                      <td class="text-end fw-bold">R$ {{ '%.2f'|format(r.a_receber|default(0)) }}</td>
-                      <td class="text-end fw-bold text-warning">R$ {{ '%.2f'|format(r.saldo_pendente|default(0)) }}</td>
-                    </tr>
-                    {% endfor %}
-                  {% else %}
-                    <tr><td colspan="9" class="text-center text-muted">Sem dados no filtro.</td></tr>
-                  {% endif %}
+                  <tr><td colspan="9" class="text-center text-muted">Carregando…</td></tr>
                 </tbody>
 
                 <tfoot>
@@ -1583,6 +1567,79 @@
       };
 
       // ---- Função de resumo (usada na tabela e no XLSX) ----
+      const RESUMO_COOP_ROWS = {{ resumo_coop_rows|default([])|tojson|safe }};
+      // ---- Tabela Resumo por Cooperado (render backend) ----
+      (function renderResumoCoopTable() {
+        const rows  = Array.isArray(RESUMO_COOP_ROWS) ? RESUMO_COOP_ROWS : [];
+        const tbody = document.querySelector('#tblResumoCoop tbody');
+        if (!tbody) return;
+
+        tbody.innerHTML = rows.length
+          ? ''
+          : '<tr><td colspan="9" class="text-center text-muted">Sem dados no filtro.</td></tr>';
+
+        let tProd = 0, tINSS4 = 0, tSEST05 = 0, tRec = 0, tDes = 0, tAdiant = 0, tReceber = 0, tPend = 0;
+
+        rows.forEach(r => {
+          const prod = Number(r.prod || 0);
+          const inss4 = Number(r.inss4 || 0);
+          const sest05 = Number(r.sest05 || 0);
+          const rec = Number(r.rec || 0);
+          const des = Number(r.des || 0);
+          const adiant = Number(r.adiant || 0);
+          const aReceber = Number(r.a_receber ?? r.aReceber ?? 0);
+          const saldoPend = Number(r.saldo_pendente ?? r.saldoPendente ?? 0);
+
+          tProd += prod;
+          tINSS4 += inss4;
+          tSEST05 += sest05;
+          tRec += rec;
+          tDes += des;
+          tAdiant += adiant;
+          tReceber += aReceber;
+          tPend += saldoPend;
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="text-break">${r.nome || '—'}</td>
+            <td class="text-end">${fmtBR(prod)}</td>
+            <td class="text-end">${fmtBR(inss4)}</td>
+            <td class="text-end">${fmtBR(sest05)}</td>
+            <td class="text-end text-success">${fmtBR(rec)}</td>
+            <td class="text-end text-danger">${fmtBR(des)}</td>
+            <td class="text-end text-danger">${fmtBR(adiant)}</td>
+            <td class="text-end fw-bold">${fmtBR(aReceber)}</td>
+            <td class="text-end fw-bold text-warning">${fmtBR(saldoPend)}</td>`;
+          tbody.appendChild(tr);
+        });
+
+        const setText = (id, value) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = fmtBR(value);
+        };
+
+        setText('tProd', tProd);
+        setText('tINSS4', tINSS4);
+        setText('tSEST05', tSEST05);
+        setText('tRec', tRec);
+        setText('tDes', tDes);
+
+        const tAdEl = document.getElementById('tAdiant');
+        if (tAdEl) tAdEl.textContent = fmtBR(tAdiant);
+
+        const tLiqEl = document.getElementById('tLiq');
+        if (tLiqEl) tLiqEl.textContent = fmtBR(tReceber);
+
+        const tPendEl = document.getElementById('tPend');
+        if (tPendEl) tPendEl.textContent = fmtBR(tPend);
+
+        const adiantEl = document.getElementById('kpiQtdEntregasPeriodo');
+        if (adiantEl) adiantEl.textContent = fmtBR(tAdiant);
+
+        const pendEl = document.getElementById('kpiTicketMedioPeriodo');
+        if (pendEl) pendEl.textContent = fmtBR(tPend);
+      })();
+
       // ---- Gráficos (Chart.js via CDN) ----
       const ensureChart = () => new Promise(res => {
         if (window.Chart) return res();
@@ -2201,7 +2258,7 @@
                     <i class="bi bi-pencil"></i>
                   </button>
                   {% if can_lanc_excluir %}<a class="btn btn-danger btn-sm rounded-pill btn-del"
-                     href="{{ url_for('admin_delete_lancamento', id=l.id, tab='lancamentos', data_inicio=request.args.get('data_inicio', request.args.get('resumo_inicio','')), data_fim=request.args.get('data_fim', request.args.get('resumo_fim','')), restaurante_id=request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')), cooperado_id=request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')), somente_pendentes=request.args.get('somente_pendentes')) }}">
+                     href="{{ url_for('admin_delete_lancamento', id=l.id) }}">
                     <i class="bi bi-trash"></i>
                   </a>{% endif %}
                   {% endif %}
@@ -2504,16 +2561,16 @@
 
       <form method="POST" action="{{ url_for('add_receita') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_receitas_criar">
 
-      <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-      <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-      <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-      <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
         <div class="col-md-5">
           <label class="form-label">Descrição</label>
           <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
         </div>
         <div class="col-md-2">
-          <label class="form-label">Valor por cooperado (R$)</label>
+          <label class="form-label">Valor (R$)</label>
           <div class="input-group input-group-sm">
             <span class="input-group-text">R$</span>
             <input type="number" step="0.01" class="form-control" name="valor" placeholder="0,00" required>
@@ -2732,10 +2789,10 @@
 
       <form method="POST" action="{{ url_for('add_despesa') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_despesas_criar">
 
-      <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-      <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-      <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-      <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
         <div class="col-md-5">
           <label class="form-label">Descrição</label>
           <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
@@ -2863,9 +2920,9 @@
 
       <form method="POST" action="{{ url_for('add_receita_coop') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_coop_receitas_criar">
 
-      <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-      <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-      <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
         <div class="col-md-3">
           <label class="form-label">Cooperado</label>
           <select class="form-select form-select-sm" name="cooperado_id" required>
@@ -2998,7 +3055,7 @@
       </div>
 
       <form method="GET" class="row g-2 align-items-end">
-        <input type="hidden" name="tab" value="lancamentos">
+        <input type="hidden" name="tab" value="coop_despesas">
         <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
         <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
 
@@ -3042,23 +3099,23 @@
 
       <form method="POST" action="{{ url_for('add_despesa_coop') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_coop_despesas_criar">
       <input type="hidden" name="tab" value="coop_despesas">
-      <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-      <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-      <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-      <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
-      {% if request.args.get('somente_pendentes') %}<input type="hidden" name="filtro_somente_pendentes" value="1">{% endif %}
+      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+      {% if request.args.get('somente_pendentes') %}<input type="hidden" name="somente_pendentes" value="1">{% endif %}
 
-      <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-      <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-      <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-      <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
         <div class="col-md-4">
           <label class="form-label">Cooperados</label>
           <select class="form-select form-select-sm" name="cooperado_ids[]" multiple size="5">
             <option value="all">Todos</option>
             {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
           </select>
-          <small class="text-muted">Use Ctrl/Cmd para múltiplos. O valor informado será lançado para cada cooperado marcado.</small>
+          <small class="text-muted">Use Ctrl/Cmd para múltiplos.</small>
         </div>
 
         <div class="col-md-3">
@@ -3105,11 +3162,11 @@
     <div class="card-body p-2 p-md-3">
       <form method="POST" action="{{ url_for('delete_despesa_coop_bulk') }}" id="bulkDeleteDespesasForm" class="mb-2 d-flex justify-content-end gap-2">
         <input type="hidden" name="tab" value="coop_despesas">
-        <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-        <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-        <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-        <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
-        {% if request.args.get('somente_pendentes') %}<input type="hidden" name="filtro_somente_pendentes" value="1">{% endif %}
+        <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+        <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+        {% if request.args.get('somente_pendentes') %}<input type="hidden" name="somente_pendentes" value="1">{% endif %}
         <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Excluir despesas selecionadas?');"><i class="bi bi-trash"></i> Excluir marcadas</button>
       </form>
       <div class="table-responsive">
@@ -3162,10 +3219,10 @@
                   <!-- EXCLUIR via POST (evita 405) -->
                   {% if can_coop_despesas_excluir %}<form method="POST" action="{{ url_for('delete_despesa_coop', id=dc.id) }}" class="d-inline">
 
-                  <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-                  <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-                  <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-                  <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+                  <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+                  <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+                  <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+                  <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
                     {# Se você usa Flask-WTF/CSRF, descomente a linha abaixo #}
                     {# {{ csrf_token() }} #}
                     <button type="submit" class="btn btn-danger btn-sm btn-del" onclick="return confirm('Excluir esta despesa?');">
@@ -5826,12 +5883,12 @@
   <div class="modal fade" id="modalEditLancamento" tabindex="-1">
     <div class="modal-dialog modal-lg">
       <form method="POST" class="modal-content">
-          <input type="hidden" name="tab" value="lancamentos">
-          <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-          <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-          <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-          <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
-          {% if request.args.get('somente_pendentes') %}<input type="hidden" name="filtro_somente_pendentes" value="1">{% endif %}
+          <input type="hidden" name="tab" value="coop_despesas">
+          <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+          <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+          <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+          <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+          {% if request.args.get('somente_pendentes') %}<input type="hidden" name="somente_pendentes" value="1">{% endif %}
         <div class="modal-header"><h5 class="modal-title">Editar Lançamento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body row g-2 px-3">
           <input type="hidden" name="id">
@@ -5858,10 +5915,6 @@
           <div class="col-md-3">
             <label class="form-label">Data</label>
             <input type="date" class="form-control" name="data" required>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Quantidade</label>
-            <input type="number" min="0" step="1" class="form-control" name="qtd_entregas">
           </div>
           <div class="col-md-6">
             <label class="form-label">Horário</label>
@@ -5930,17 +5983,11 @@
   <div class="modal fade" id="modalEditDespesaCoop" tabindex="-1">
     <div class="modal-dialog">
       <form method="POST" class="modal-content">
-        <input type="hidden" name="tab" value="coop_despesas">
-        <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-        <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-        <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-        <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
-        {% if request.args.get('somente_pendentes') %}<input type="hidden" name="filtro_somente_pendentes" value="1">{% endif %}
         <div class="modal-header"><h5 class="modal-title">Editar Despesa (Cooperado)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body row g-2 px-3">
           <input type="hidden" name="id">
           <div class="col-12">
-            <select class="form-select" name="edit_cooperado_id" required>
+            <select class="form-select" name="cooperado_id" required>
               {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
             </select>
           </div>
@@ -6077,11 +6124,11 @@
     });
   }
 
-  bindModal('modalEditLancamento',   { id:'id', restaurante:'restaurante_id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', hora_inicio:'hora_inicio', hora_fim:'hora_fim', qtd_entregas:'qtd_entregas' });
+  bindModal('modalEditLancamento',   { id:'id', restaurante:'restaurante_id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', hora_inicio:'hora_inicio', hora_fim:'hora_fim' });
   bindModal('modalEditReceita',      { id:'id', descricao:'descricao', valor:'valor', data:'data' });
   bindModal('modalEditDespesa',      { id:'id', descricao:'descricao', valor:'valor', data:'data' });
   bindModal('modalEditReceitaCoop',  { id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data' });
-  bindModal('modalEditDespesaCoop',  { id:'id', cooperado:'edit_cooperado_id', descricao:'descricao', valor:'valor', data:'data', competencia:'competencia_desconto' });
+  bindModal('modalEditDespesaCoop',  { id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', competencia:'competencia_desconto' });
   bindModal('modalEditCooperado',    { id:'id', nome:'nome', usuario:'usuario' });
   bindModal('modalResetSenhaCooperado', { id:'id' });
   bindModal('modalEditRestaurante',  { id:'id', nome:'nome', periodo:'periodo', usuario:'usuario' });
