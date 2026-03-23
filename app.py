@@ -3688,8 +3688,8 @@ def admin_dashboard():
     total_adiantamentos_coop = 0.0
 
     if True:
-        rq2 = ReceitaCooperado.query.options(selectinload(ReceitaCooperado.cooperado))
-        dq2 = DespesaCooperado.query.options(selectinload(DespesaCooperado.cooperado), selectinload(DespesaCooperado.abatimentos))
+        rq2 = ReceitaCooperado.query
+        dq2 = DespesaCooperado.query.options(selectinload(DespesaCooperado.cooperado))
 
         if data_inicio:
             rq2 = rq2.filter(ReceitaCooperado.data >= data_inicio)
@@ -3755,11 +3755,9 @@ def admin_dashboard():
     )
 
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
-    if active_tab in {"receitas", "resumo"}:
-        _ensure_taxas_admin_receitas(restaurantes, months_back=0)
+    _ensure_taxas_admin_receitas(restaurantes, months_back=0)
 
-    # Recarrega receitas/despesas; a garantia automática de taxas fica restrita
-    # às abas que realmente precisam desse cálculo.
+    # Recarrega SEMPRE as receitas/despesas após gerar taxas automáticas.
     # Assim, sem filtro manual, a aba de receitas já abre mostrando o mês atual,
     # e com filtro continua respeitando o período informado.
     rq = ReceitaCooperativa.query
@@ -4907,7 +4905,7 @@ def admin_edit_lancamento(id):
 
     db.session.commit()
     flash("Lançamento atualizado.", "success")
-    return redirect(url_for("admin_dashboard", tab="lancamentos"))
+    return _admin_redirect_with_filters("lancamentos")
 
 
 @app.route("/admin/lancamentos/<int:id>/delete", methods=["GET", "POST"])
@@ -4925,7 +4923,7 @@ def admin_delete_lancamento(id):
     db.session.delete(l)
     db.session.commit()
     flash("Lançamento excluído.", "success")
-    return redirect(url_for("admin_dashboard", tab="lancamentos"))
+    return _admin_redirect_with_filters("lancamentos")
 
 
 # =========================
@@ -6720,15 +6718,29 @@ def _despesa_due_date(dc):
 
 
 def _admin_redirect_with_filters(default_tab="coop_despesas"):
-    tab = request.form.get("filtro_tab") or request.form.get("tab") or request.args.get("tab") or default_tab
+    def _pick(form_key, arg_key=None):
+        arg_key = arg_key or form_key
+        return (
+            request.form.get(f"filtro_{form_key}")
+            or request.args.get(f"filtro_{arg_key}")
+            or request.form.get(form_key)
+            or request.args.get(arg_key)
+            or ""
+        )
+
     args = {
-        "tab": tab,
-        "data_inicio": request.form.get("filtro_data_inicio") or request.form.get("data_inicio") or request.args.get("data_inicio") or "",
-        "data_fim": request.form.get("filtro_data_fim") or request.form.get("data_fim") or request.args.get("data_fim") or "",
-        "restaurante_id": request.form.get("filtro_restaurante_id") or request.form.get("restaurante_id") or request.args.get("restaurante_id") or "",
-        "cooperado_id": request.form.get("filtro_cooperado_id") or request.form.get("cooperado_id") or request.args.get("cooperado_id") or "",
+        "tab": request.form.get("tab") or request.args.get("tab") or default_tab,
+        "data_inicio": _pick("data_inicio"),
+        "data_fim": _pick("data_fim"),
+        "restaurante_id": _pick("restaurante_id"),
+        "cooperado_id": _pick("cooperado_id"),
     }
-    if request.form.get("filtro_somente_pendentes") or request.form.get("somente_pendentes") or request.args.get("somente_pendentes"):
+    if (
+        request.form.get("filtro_somente_pendentes")
+        or request.args.get("filtro_somente_pendentes")
+        or request.form.get("somente_pendentes")
+        or request.args.get("somente_pendentes")
+    ):
         args["somente_pendentes"] = "1"
     return redirect(url_for("admin_dashboard", **args))
 
@@ -6997,7 +7009,7 @@ def add_despesa_coop():
     usar_todos = any(str(v).lower() == "all" for v in ids_raw)
 
     descricao = (f.get("descricao") or "").strip()
-    valor_unitario = f.get("valor", type=float) or 0.0
+    valor_total = f.get("valor", type=float) or 0.0
     d = _parse_date(f.get("data"))
     eh_adiantamento = bool(f.get("eh_adiantamento"))
     competencia_semana = (f.get("competencia_desconto") or f.get("competencia_semana") or "esta_semana").strip().lower()
@@ -7042,12 +7054,10 @@ def add_despesa_coop():
     data_comp = _competencia_ref(d, competencia_semana)
     di_comp, df_comp = semana_bounds(data_comp)
 
-    if valor_unitario <= 0:
-        flash("Informe um valor válido para cada cooperado.", "warning")
-        return _admin_redirect_with_filters("coop_despesas")
+    valor_unit = round(valor_total, 2)
 
     for cid in ids:
-        v = round(valor_unitario, 2)
+        v = valor_unit
         db.session.add(
             DespesaCooperado(
                 cooperado_id=cid,
@@ -7062,7 +7072,7 @@ def add_despesa_coop():
         )
 
     db.session.commit()
-    flash("Despesa(s) lançada(s) com valor por cooperado.", "success")
+    flash("Despesa(s) lançada(s).", "success")
     return _admin_redirect_with_filters("coop_despesas")
 
 
@@ -7072,7 +7082,7 @@ def edit_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
     f = request.form
 
-    dc.cooperado_id = f.get("cooperado_id", type=int)
+    dc.cooperado_id = f.get("edit_cooperado_id", type=int) or f.get("cooperado_id", type=int)
     dc.descricao = (f.get("descricao") or "").strip()
     dc.valor = f.get("valor", type=float)
     data_edit = _parse_date(f.get("data")) or dc.data or date.today()
