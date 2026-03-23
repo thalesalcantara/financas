@@ -2427,9 +2427,6 @@ def avisos_list():
     avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
     current_year = datetime.now().year
 
-    chart_data_lancamentos_coop = locals().get("chart_data_lancamentos_coop", {"labels": [], "values": []})
-    chart_data_lancamentos_cooperados = locals().get("chart_data_lancamentos_cooperados", {"labels": [], "values": []})
-
     return render_template(
         "portal_cooperado_avisos.html",
         avisos=avisos,
