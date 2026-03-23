@@ -3612,7 +3612,7 @@ def admin_dashboard():
     total_sest = 0.0
     total_encargos = 0.0
 
-    q = Lancamento.query
+    q = Lancamento.query.options(selectinload(Lancamento.restaurante), selectinload(Lancamento.cooperado))
 
     if restaurante_id:
         q = q.filter(Lancamento.restaurante_id == restaurante_id)
@@ -3688,8 +3688,8 @@ def admin_dashboard():
     total_adiantamentos_coop = 0.0
 
     if True:
-        rq2 = ReceitaCooperado.query
-        dq2 = DespesaCooperado.query
+        rq2 = ReceitaCooperado.query.options(selectinload(ReceitaCooperado.cooperado))
+        dq2 = DespesaCooperado.query.options(selectinload(DespesaCooperado.cooperado))
 
         if data_inicio:
             rq2 = rq2.filter(ReceitaCooperado.data >= data_inicio)
@@ -3738,10 +3738,11 @@ def admin_dashboard():
         )
 
         despesa_snapshot_map = {}
-        for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
-            _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
-            for _it in _snap["itens"]:
-                despesa_snapshot_map[_it["id"]] = _it
+        if active_tab == "coop_despesas":
+            for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
+                _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
+                for _it in _snap["itens"]:
+                    despesa_snapshot_map[_it["id"]] = _it
 
     cfg = get_config()
 
@@ -3754,30 +3755,29 @@ def admin_dashboard():
     )
 
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
-    _ensure_taxas_admin_receitas(restaurantes, months_back=0)
+    if active_tab in ("receitas", "despesas", "resumo"):
+        _ensure_taxas_admin_receitas(restaurantes, months_back=0)
 
-    # Recarrega SEMPRE as receitas/despesas após gerar taxas automáticas.
-    # Assim, sem filtro manual, a aba de receitas já abre mostrando o mês atual,
-    # e com filtro continua respeitando o período informado.
-    rq = ReceitaCooperativa.query
-    dq = DespesaCooperativa.query
-    if data_inicio:
-        rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
-        dq = dq.filter(DespesaCooperativa.data >= data_inicio)
-    if data_fim:
-        rq = rq.filter(ReceitaCooperativa.data <= data_fim)
-        dq = dq.filter(DespesaCooperativa.data <= data_fim)
+        # Recarrega apenas quando a aba realmente depende das taxas automáticas.
+        rq = ReceitaCooperativa.query
+        dq = DespesaCooperativa.query
+        if data_inicio:
+            rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
+            dq = dq.filter(DespesaCooperativa.data >= data_inicio)
+        if data_fim:
+            rq = rq.filter(ReceitaCooperativa.data <= data_fim)
+            dq = dq.filter(DespesaCooperativa.data <= data_fim)
 
-    receitas = rq.order_by(
-        ReceitaCooperativa.data.desc().nullslast(),
-        ReceitaCooperativa.id.desc(),
-    ).all()
-    despesas = dq.order_by(
-        DespesaCooperativa.data.desc(),
-        DespesaCooperativa.id.desc(),
-    ).all()
-    total_receitas = sum(_receita_total_real(r) for r in receitas)
-    total_despesas = sum((d.valor or 0.0) for d in despesas)
+        receitas = rq.order_by(
+            ReceitaCooperativa.data.desc().nullslast(),
+            ReceitaCooperativa.id.desc(),
+        ).all()
+        despesas = dq.order_by(
+            DespesaCooperativa.data.desc(),
+            DespesaCooperativa.id.desc(),
+        ).all()
+        total_receitas = sum(_receita_total_real(r) for r in receitas)
+        total_despesas = sum((d.valor or 0.0) for d in despesas)
     taxa_admin_rows, taxa_admin_totais = _build_taxa_admin_rows(receitas)
     juros_arrecadados_total = round(sum((r['valor_multa'] + r['valor_juros']) for r in taxa_admin_rows if r['status'] == 'pago'), 2)
     cooperados_map = {c.id: c for c in cooperados}
@@ -4474,7 +4474,7 @@ def exportar_lancamentos():
     data_fim       = _parse_date(args.get("data_fim"))
     dows           = set(args.getlist("dow"))  # '0'..'6'
 
-    q = Lancamento.query
+    q = Lancamento.query.options(selectinload(Lancamento.restaurante), selectinload(Lancamento.cooperado))
     if restaurante_id:
         q = q.filter(Lancamento.restaurante_id == restaurante_id)
     if cooperado_id:
@@ -6719,12 +6719,12 @@ def _despesa_due_date(dc):
 def _admin_redirect_with_filters(default_tab="coop_despesas"):
     args = {
         "tab": request.form.get("tab") or request.args.get("tab") or default_tab,
-        "data_inicio": request.form.get("data_inicio") or request.args.get("data_inicio") or "",
-        "data_fim": request.form.get("data_fim") or request.args.get("data_fim") or "",
-        "restaurante_id": request.form.get("restaurante_id") or request.args.get("restaurante_id") or "",
-        "cooperado_id": request.form.get("cooperado_id") or request.args.get("cooperado_id") or "",
+        "data_inicio": request.form.get("filtro_data_inicio") or request.form.get("data_inicio") or request.args.get("data_inicio") or "",
+        "data_fim": request.form.get("filtro_data_fim") or request.form.get("data_fim") or request.args.get("data_fim") or "",
+        "restaurante_id": request.form.get("filtro_restaurante_id") or request.form.get("restaurante_id") or request.args.get("restaurante_id") or "",
+        "cooperado_id": request.form.get("filtro_cooperado_id") or request.form.get("cooperado_id") or request.args.get("cooperado_id") or "",
     }
-    if request.form.get("somente_pendentes") or request.args.get("somente_pendentes"):
+    if request.form.get("filtro_somente_pendentes") or request.form.get("somente_pendentes") or request.args.get("somente_pendentes"):
         args["somente_pendentes"] = "1"
     return redirect(url_for("admin_dashboard", **args))
 
