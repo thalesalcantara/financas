@@ -1187,29 +1187,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Gráficos -->
-        <div class="row g-2 mt-3">
-          <div class="col-12 col-lg-6">
-            <div class="card border-0 shadow-sm rounded-4 p-3">
-              <h6 class="mb-2 d-flex align-items-center gap-1">
-                <span class="resumo-pill-label"><i class="bi bi-graph-up-arrow"></i></span>
-                <span>Evolução Mensal — Cooperativa</span>
-              </h6>
-              <canvas id="chartCoop"></canvas>
-            </div>
-          </div>
-          <div class="col-12 col-lg-6">
-            <div class="card border-0 shadow-sm rounded-4 p-3">
-              <h6 class="mb-2 d-flex align-items-center gap-1">
-                <span class="resumo-pill-label"><i class="bi bi-graph-up-arrow"></i></span>
-                <span>Evolução Mensal — Cooperados</span>
-              </h6>
-              <canvas id="chartCooperados"></canvas>
-            </div>
-          </div>
-        </div>
-
         <div class="row g-2 mt-3">
           <div class="col-12">
             <div class="card border-0 shadow-sm rounded-4 p-3">
@@ -1217,7 +1194,6 @@
                 <span class="resumo-pill-label"><i class="bi bi-shop"></i></span>
                 <span>Top Estabelecimentos (Produções no período)</span>
               </h6>
-              <canvas id="chartEstabs"></canvas>
               <div class="table-responsive mt-3">
                 <table class="table table-sm table-bordered table-hover align-middle" id="tblTopEstabsResumo">
                   <thead class="table-light">
@@ -1346,9 +1322,6 @@
           font-weight: 600;
         }
 
-        #resumo canvas {
-          max-height: 280px;
-        }
 
         @media (max-width: 576px) {
           #resumo .resumo-shell{
@@ -2001,7 +1974,7 @@
       <div class="d-flex flex-wrap gap-2 justify-content-end">
         <div class="kpi-chip kpi-neutral">
           <span class="kpi-label">Registros</span>
-          <span class="kpi-value">{{ lancamentos|length if lancamentos else 0 }}</span>
+          <span class="kpi-value">{{ lancamentos_total_count|default(lancamentos|length if lancamentos else 0) }}</span>
         </div>
         <div class="kpi-chip kpi-info">
           <span class="kpi-label">Bruto</span>
@@ -2287,6 +2260,35 @@
       </div>
     </div>
   </div>
+
+  {% if lancamentos_total_pages|default(1) > 1 %}
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+    <div class="small text-muted">
+      Mostrando {{ ((lancamentos_page - 1) * lancamentos_per_page) + 1 if lancamentos_total_count else 0 }}
+      até {{ (((lancamentos_page - 1) * lancamentos_per_page) + (lancamentos|length)) if lancamentos_total_count else 0 }}
+      de {{ lancamentos_total_count }} registros
+    </div>
+    <nav aria-label="Paginação de lançamentos">
+      <ul class="pagination pagination-sm mb-0">
+        <li class="page-item {{ 'disabled' if lancamentos_page <= 1 else '' }}">
+          <a class="page-link" href="{{ url_for('admin_dashboard') }}?{{ lancamentos_qs_base }}&page_lanc={{ lancamentos_page - 1 }}">Anterior</a>
+        </li>
+        {% for p in range(1, lancamentos_total_pages + 1) %}
+          {% if p == 1 or p == lancamentos_total_pages or (p >= lancamentos_page - 2 and p <= lancamentos_page + 2) %}
+            <li class="page-item {{ 'active' if p == lancamentos_page else '' }}">
+              <a class="page-link" href="{{ url_for('admin_dashboard') }}?{{ lancamentos_qs_base }}&page_lanc={{ p }}">{{ p }}</a>
+            </li>
+          {% elif p == lancamentos_page - 3 or p == lancamentos_page + 3 %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+          {% endif %}
+        {% endfor %}
+        <li class="page-item {{ 'disabled' if lancamentos_page >= lancamentos_total_pages else '' }}">
+          <a class="page-link" href="{{ url_for('admin_dashboard') }}?{{ lancamentos_qs_base }}&page_lanc={{ lancamentos_page + 1 }}">Próxima</a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
 </section>
 
 <style>
@@ -3055,7 +3057,7 @@
       </div>
 
       <form method="GET" class="row g-2 align-items-end">
-        <input type="hidden" name="tab" value="coop_despesas">
+        <input type="hidden" name="filtro_tab" value="lancamentos">
         <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
         <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
 
@@ -3103,7 +3105,7 @@
       <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
       <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
       <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
-      {% if request.args.get('somente_pendentes') %}<input type="hidden" name="somente_pendentes" value="1">{% endif %}
+      {% if request.args.get('somente_pendentes') %}<input type="hidden" name="filtro_somente_pendentes" value="1">{% endif %}
 
       <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
       <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
@@ -5987,12 +5989,12 @@
   <div class="modal fade" id="modalEditDespesaCoop" tabindex="-1">
     <div class="modal-dialog">
       <form method="POST" class="modal-content">
-        <input type="hidden" name="tab" value="coop_despesas">
+        <input type="hidden" name="filtro_tab" value="coop_despesas">
         <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
         <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
         <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
         <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
-        {% if request.args.get('somente_pendentes') %}<input type="hidden" name="somente_pendentes" value="1">{% endif %}
+        {% if request.args.get('somente_pendentes') %}<input type="hidden" name="filtro_somente_pendentes" value="1">{% endif %}
         <div class="modal-header"><h5 class="modal-title">Editar Despesa (Cooperado)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body row g-2 px-3">
           <input type="hidden" name="id">
