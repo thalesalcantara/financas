@@ -1366,6 +1366,7 @@
       </style>
     </section>
 
+    {% if _tab=='resumo' %}
     <!-- Dados (seguros p/ JS) + Scripts (Chart.js + XLSX) -->
     <script>
     (function(){
@@ -1975,6 +1976,7 @@
       document.getElementById('btnExportXLSX')?.addEventListener('click', exportXLSX);
     })();
     </script>
+    {% endif %}
 </section>
 
 <!-- LANÇAMENTOS (versão moderna/compacta – drop-in) -->
