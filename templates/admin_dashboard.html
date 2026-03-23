@@ -2075,12 +2075,12 @@
 
         <div class="col-md-2">
           <label class="form-label lanc-label">Data Início</label>
-          <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+          <input type="date" class="form-control form-control-sm" name="filtro_data_inicio" value="{{ request.args.get('data_inicio','') }}">
         </div>
 
         <div class="col-md-2">
           <label class="form-label lanc-label">Data Fim</label>
-          <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+          <input type="date" class="form-control form-control-sm" name="filtro_data_fim" value="{{ request.args.get('data_fim','') }}">
         </div>
 
         <div class="col-md-2">
@@ -2534,15 +2534,15 @@
       </div>
       <form method="GET" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="receitas">
-        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
-        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+        <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+        <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
         <div class="col-md-3">
           <label class="form-label">Data Início</label>
-          <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+          <input type="date" class="form-control form-control-sm" name="filtro_data_inicio" value="{{ request.args.get('data_inicio','') }}">
         </div>
         <div class="col-md-3">
           <label class="form-label">Data Fim</label>
-          <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+          <input type="date" class="form-control form-control-sm" name="filtro_data_fim" value="{{ request.args.get('data_fim','') }}">
         </div>
         <div class="col-md-3">
           <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
@@ -2561,10 +2561,10 @@
 
       <form method="POST" action="{{ url_for('add_receita') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_receitas_criar">
 
-      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+      <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
         <div class="col-md-5">
           <label class="form-label">Descrição</label>
           <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
@@ -2762,15 +2762,15 @@
       </div>
       <form method="GET" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="despesas">
-        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
-        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+        <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+        <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
         <div class="col-md-3">
           <label class="form-label">Data Início</label>
-          <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+          <input type="date" class="form-control form-control-sm" name="filtro_data_inicio" value="{{ request.args.get('data_inicio','') }}">
         </div>
         <div class="col-md-3">
           <label class="form-label">Data Fim</label>
-          <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+          <input type="date" class="form-control form-control-sm" name="filtro_data_fim" value="{{ request.args.get('data_fim','') }}">
         </div>
         <div class="col-md-3">
           <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
@@ -2789,10 +2789,10 @@
 
       <form method="POST" action="{{ url_for('add_despesa') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_despesas_criar">
 
-      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+      <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
         <div class="col-md-5">
           <label class="form-label">Descrição</label>
           <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
@@ -2893,15 +2893,15 @@
       </div>
       <form method="GET" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="coop_receitas">
-        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
-        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+        <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+        <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
         <div class="col-md-3">
           <label class="form-label">Data Início</label>
-          <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+          <input type="date" class="form-control form-control-sm" name="filtro_data_inicio" value="{{ request.args.get('data_inicio','') }}">
         </div>
         <div class="col-md-3">
           <label class="form-label">Data Fim</label>
-          <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+          <input type="date" class="form-control form-control-sm" name="filtro_data_fim" value="{{ request.args.get('data_fim','') }}">
         </div>
         <div class="col-md-3">
           <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
@@ -2920,9 +2920,9 @@
 
       <form method="POST" action="{{ url_for('add_receita_coop') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_coop_receitas_criar">
 
-      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
         <div class="col-md-3">
           <label class="form-label">Cooperado</label>
           <select class="form-select form-select-sm" name="cooperado_id" required>
@@ -3056,16 +3056,16 @@
 
       <form method="GET" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="coop_despesas">
-        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
-        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+        <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+        <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
 
         <div class="col-md-3">
           <label class="form-label">Data Início</label>
-          <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+          <input type="date" class="form-control form-control-sm" name="filtro_data_inicio" value="{{ request.args.get('data_inicio','') }}">
         </div>
         <div class="col-md-3">
           <label class="form-label">Data Fim</label>
-          <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+          <input type="date" class="form-control form-control-sm" name="filtro_data_fim" value="{{ request.args.get('data_fim','') }}">
         </div>
 
         <div class="col-md-4">
@@ -3099,16 +3099,16 @@
 
       <form method="POST" action="{{ url_for('add_despesa_coop') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_coop_despesas_criar">
       <input type="hidden" name="tab" value="coop_despesas">
-      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+      <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
       {% if request.args.get('somente_pendentes') %}<input type="hidden" name="somente_pendentes" value="1">{% endif %}
 
-      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+      <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
         <div class="col-md-4">
           <label class="form-label">Cooperados</label>
           <select class="form-select form-select-sm" name="cooperado_ids[]" multiple size="5">
@@ -3162,10 +3162,10 @@
     <div class="card-body p-2 p-md-3">
       <form method="POST" action="{{ url_for('delete_despesa_coop_bulk') }}" id="bulkDeleteDespesasForm" class="mb-2 d-flex justify-content-end gap-2">
         <input type="hidden" name="tab" value="coop_despesas">
-        <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-        <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+        <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+        <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+        <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+        <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
         {% if request.args.get('somente_pendentes') %}<input type="hidden" name="somente_pendentes" value="1">{% endif %}
         <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Excluir despesas selecionadas?');"><i class="bi bi-trash"></i> Excluir marcadas</button>
       </form>
@@ -3219,10 +3219,10 @@
                   <!-- EXCLUIR via POST (evita 405) -->
                   {% if can_coop_despesas_excluir %}<form method="POST" action="{{ url_for('delete_despesa_coop', id=dc.id) }}" class="d-inline">
 
-                  <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-                  <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-                  <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-                  <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+                  <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+                  <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+                  <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+                  <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
                     {# Se você usa Flask-WTF/CSRF, descomente a linha abaixo #}
                     {# {{ csrf_token() }} #}
                     <button type="submit" class="btn btn-danger btn-sm btn-del" onclick="return confirm('Excluir esta despesa?');">
@@ -3305,10 +3305,10 @@
     <div class="card-body">
 
       <form id="form-beneficios" method="POST" action="{{ url_for('ratear_beneficios') }}" class="row g-3" data-perm-form="can_beneficios_criar_or_editar">
-        <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
-        <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim','') }}">
-        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
-        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+        <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio','') }}">
+        <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim','') }}">
+        <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+        <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
         <div class="col-12 col-md-3">
           <label class="form-label">Data inicial</label>
           <input type="date" class="form-control form-control-sm" name="data_inicial" required value="{{ request.args.get('data_inicio','') }}">
@@ -3424,10 +3424,10 @@
         </h6>
         <form method="GET" class="row g-2 align-items-end">
           <input type="hidden" name="tab" value="beneficios">
-          <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
-          <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim','') }}">
-          <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
-          <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+          <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio','') }}">
+          <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim','') }}">
+          <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+          <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
           <div class="col-md-3">
             <label class="form-label">De</label>
             <input type="date" class="form-control form-control-sm" name="b_ini" value="{{ request.args.get('b_ini','') }}">
@@ -5884,10 +5884,10 @@
     <div class="modal-dialog modal-lg">
       <form method="POST" class="modal-content">
           <input type="hidden" name="tab" value="coop_despesas">
-          <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-          <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-          <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-          <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+          <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+          <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+          <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+          <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
           {% if request.args.get('somente_pendentes') %}<input type="hidden" name="somente_pendentes" value="1">{% endif %}
         <div class="modal-header"><h5 class="modal-title">Editar Lançamento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body row g-2 px-3">
@@ -6124,7 +6124,7 @@
     });
   }
 
-  bindModal('modalEditLancamento',   { id:'id', restaurante:'restaurante_id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', hora_inicio:'hora_inicio', hora_fim:'hora_fim' });
+  bindModal('modalEditLancamento',   { id:'id', restaurante:'restaurante_id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data', hora_inicio:'hora_inicio', hora_fim:'hora_fim', qtd_entregas:'qtd_entregas' });
   bindModal('modalEditReceita',      { id:'id', descricao:'descricao', valor:'valor', data:'data' });
   bindModal('modalEditDespesa',      { id:'id', descricao:'descricao', valor:'valor', data:'data' });
   bindModal('modalEditReceitaCoop',  { id:'id', cooperado:'cooperado_id', descricao:'descricao', valor:'valor', data:'data' });
