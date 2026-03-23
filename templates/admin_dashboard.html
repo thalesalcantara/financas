@@ -1167,7 +1167,23 @@
                 </thead>
 
                 <tbody>
-                  <tr><td colspan="9" class="text-center text-muted">Carregando…</td></tr>
+                  {% if resumo_coop_rows %}
+                    {% for r in resumo_coop_rows %}
+                    <tr>
+                      <td class="text-break">{{ r.nome or '—' }}</td>
+                      <td class="text-end">R$ {{ '%.2f'|format(r.prod|default(0)) }}</td>
+                      <td class="text-end">R$ {{ '%.2f'|format(r.inss4|default(0)) }}</td>
+                      <td class="text-end">R$ {{ '%.2f'|format(r.sest05|default(0)) }}</td>
+                      <td class="text-end text-success">R$ {{ '%.2f'|format(r.rec|default(0)) }}</td>
+                      <td class="text-end text-danger">R$ {{ '%.2f'|format(r.des|default(0)) }}</td>
+                      <td class="text-end text-danger">R$ {{ '%.2f'|format(r.adiant|default(0)) }}</td>
+                      <td class="text-end fw-bold">R$ {{ '%.2f'|format(r.a_receber|default(0)) }}</td>
+                      <td class="text-end fw-bold text-warning">R$ {{ '%.2f'|format(r.saldo_pendente|default(0)) }}</td>
+                    </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr><td colspan="9" class="text-center text-muted">Sem dados no filtro.</td></tr>
+                  {% endif %}
                 </tbody>
 
                 <tfoot>
@@ -1188,6 +1204,28 @@
           </div>
         </div>
 
+        <!-- Gráficos -->
+        <div class="row g-2 mt-3">
+          <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3">
+              <h6 class="mb-2 d-flex align-items-center gap-1">
+                <span class="resumo-pill-label"><i class="bi bi-graph-up-arrow"></i></span>
+                <span>Evolução Mensal — Cooperativa</span>
+              </h6>
+              <canvas id="chartCoop"></canvas>
+            </div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3">
+              <h6 class="mb-2 d-flex align-items-center gap-1">
+                <span class="resumo-pill-label"><i class="bi bi-graph-up-arrow"></i></span>
+                <span>Evolução Mensal — Cooperados</span>
+              </h6>
+              <canvas id="chartCooperados"></canvas>
+            </div>
+          </div>
+        </div>
+
         <div class="row g-2 mt-3">
           <div class="col-12">
             <div class="card border-0 shadow-sm rounded-4 p-3">
@@ -1195,6 +1233,7 @@
                 <span class="resumo-pill-label"><i class="bi bi-shop"></i></span>
                 <span>Top Estabelecimentos (Produções no período)</span>
               </h6>
+              <canvas id="chartEstabs"></canvas>
               <div class="table-responsive mt-3">
                 <table class="table table-sm table-bordered table-hover align-middle" id="tblTopEstabsResumo">
                   <thead class="table-light">
@@ -1544,79 +1583,6 @@
       };
 
       // ---- Função de resumo (usada na tabela e no XLSX) ----
-      const RESUMO_COOP_ROWS = {{ resumo_coop_rows|default([])|tojson|safe }};
-      // ---- Tabela Resumo por Cooperado (render backend) ----
-      (function renderResumoCoopTable() {
-        const rows  = Array.isArray(RESUMO_COOP_ROWS) ? RESUMO_COOP_ROWS : [];
-        const tbody = document.querySelector('#tblResumoCoop tbody');
-        if (!tbody) return;
-
-        tbody.innerHTML = rows.length
-          ? ''
-          : '<tr><td colspan="9" class="text-center text-muted">Sem dados no filtro.</td></tr>';
-
-        let tProd = 0, tINSS4 = 0, tSEST05 = 0, tRec = 0, tDes = 0, tAdiant = 0, tReceber = 0, tPend = 0;
-
-        rows.forEach(r => {
-          const prod = Number(r.prod || 0);
-          const inss4 = Number(r.inss4 || 0);
-          const sest05 = Number(r.sest05 || 0);
-          const rec = Number(r.rec || 0);
-          const des = Number(r.des || 0);
-          const adiant = Number(r.adiant || 0);
-          const aReceber = Number(r.a_receber ?? r.aReceber ?? 0);
-          const saldoPend = Number(r.saldo_pendente ?? r.saldoPendente ?? 0);
-
-          tProd += prod;
-          tINSS4 += inss4;
-          tSEST05 += sest05;
-          tRec += rec;
-          tDes += des;
-          tAdiant += adiant;
-          tReceber += aReceber;
-          tPend += saldoPend;
-
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td class="text-break">${r.nome || '—'}</td>
-            <td class="text-end">${fmtBR(prod)}</td>
-            <td class="text-end">${fmtBR(inss4)}</td>
-            <td class="text-end">${fmtBR(sest05)}</td>
-            <td class="text-end text-success">${fmtBR(rec)}</td>
-            <td class="text-end text-danger">${fmtBR(des)}</td>
-            <td class="text-end text-danger">${fmtBR(adiant)}</td>
-            <td class="text-end fw-bold">${fmtBR(aReceber)}</td>
-            <td class="text-end fw-bold text-warning">${fmtBR(saldoPend)}</td>`;
-          tbody.appendChild(tr);
-        });
-
-        const setText = (id, value) => {
-          const el = document.getElementById(id);
-          if (el) el.textContent = fmtBR(value);
-        };
-
-        setText('tProd', tProd);
-        setText('tINSS4', tINSS4);
-        setText('tSEST05', tSEST05);
-        setText('tRec', tRec);
-        setText('tDes', tDes);
-
-        const tAdEl = document.getElementById('tAdiant');
-        if (tAdEl) tAdEl.textContent = fmtBR(tAdiant);
-
-        const tLiqEl = document.getElementById('tLiq');
-        if (tLiqEl) tLiqEl.textContent = fmtBR(tReceber);
-
-        const tPendEl = document.getElementById('tPend');
-        if (tPendEl) tPendEl.textContent = fmtBR(tPend);
-
-        const adiantEl = document.getElementById('kpiQtdEntregasPeriodo');
-        if (adiantEl) adiantEl.textContent = fmtBR(tAdiant);
-
-        const pendEl = document.getElementById('kpiTicketMedioPeriodo');
-        if (pendEl) pendEl.textContent = fmtBR(tPend);
-      })();
-
       // ---- Gráficos (Chart.js via CDN) ----
       const ensureChart = () => new Promise(res => {
         if (window.Chart) return res();
@@ -6959,68 +6925,6 @@ document.addEventListener('DOMContentLoaded', function(){
 <div class="modal fade" id="modalAbatimentoDespesaCoop" tabindex="-1"><div class="modal-dialog"><form method="POST" class="modal-content"><div class="modal-header"><h5 class="modal-title">Registrar abatimento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body row g-2 px-3"><div class="col-12"><label class="form-label">Data</label><input type="date" class="form-control" name="data" required></div><div class="col-12"><label class="form-label">Valor</label><input type="number" step="0.01" class="form-control" name="valor" required></div><div class="col-12"><label class="form-label">Origem</label><select class="form-select" name="origem"><option value="manual">Manual</option><option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="desconto">Desconto</option></select></div><div class="col-12"><label class="form-label">Observação</label><input type="text" class="form-control" name="observacao"></div></div><div class="modal-footer"><button class="btn btn-royal">Salvar</button></div></form></div></div>
 <script>
 document.addEventListener('DOMContentLoaded', function(){ const cAll=document.getElementById('checkAllDespesas'); cAll?.addEventListener('change', ()=> document.querySelectorAll('#tblDespesasCoop tbody input[type="checkbox"]').forEach(ch=> ch.checked=cAll.checked)); const el=document.getElementById('modalAbatimentoDespesaCoop'); el?.addEventListener('show.bs.modal', (ev)=>{ const btn=ev.relatedTarget; const form=el.querySelector('form'); if(form && btn?.dataset?.url) form.action=btn.dataset.url; });});
-</script>
-
-
-<script>
-(function(){
-  const TABS = new Set(['resumo','lancamentos','receitas','despesas','coop_receitas','coop_despesas','beneficios','cooperados','restaurantes','documentos','tabelas','escalas','avisos','sistemas','config']);
-  async function swapTab(tab, responseText, url){
-    const doc = new DOMParser().parseFromString(responseText, 'text/html');
-    const incoming = doc.getElementById(tab);
-    const current = document.getElementById(tab);
-    if (incoming && current) current.innerHTML = incoming.innerHTML;
-    const incomingPanel = doc.querySelector('.panel-head');
-    const currentPanel = document.querySelector('.panel-head');
-    if (incomingPanel && currentPanel) currentPanel.innerHTML = incomingPanel.innerHTML;
-    if (url) history.replaceState(null, '', url);
-  }
-  async function ajaxLoad(url, opts, tab, fallback){
-    try {
-      const resp = await fetch(url, Object.assign({headers:{'X-Requested-With':'XMLHttpRequest'}}, opts||{}));
-      const text = await resp.text();
-      await swapTab(tab, text, (new URL(url, location.origin)).pathname + (new URL(url, location.origin)).search);
-      const trigger = document.querySelector(`.sidebar a[href="#${tab}"]`);
-      if (trigger && window.bootstrap) bootstrap.Tab.getOrCreateInstance(trigger).show();
-    } catch(err) {
-      if (fallback) fallback();
-    }
-  }
-  document.addEventListener('submit', function(ev){
-    const form = ev.target;
-    if (!(form instanceof HTMLFormElement)) return;
-    const pane = form.closest('.tab-pane');
-    if (!pane || !TABS.has(pane.id)) return;
-    if (form.matches('.no-ajax, [data-no-ajax="1"]')) return;
-    ev.preventDefault();
-    const tab = pane.id;
-    const action = form.getAttribute('action') || location.href;
-    const method = (form.getAttribute('method') || 'GET').toUpperCase();
-    if (method === 'GET') {
-      const url = new URL(action, location.origin);
-      const fd = new FormData(form);
-      for (const [k,v] of fd.entries()) url.searchParams.set(k, v);
-      if (!url.searchParams.get('tab')) url.searchParams.set('tab', tab);
-      ajaxLoad(url.toString(), {method:'GET'}, tab, ()=>form.submit());
-    } else {
-      const fd = new FormData(form);
-      if (!fd.get('tab')) fd.set('tab', tab);
-      ajaxLoad(action, {method:'POST', body:fd}, tab, ()=>form.submit());
-    }
-  }, true);
-  document.addEventListener('click', function(ev){
-    const a = ev.target.closest('a');
-    if (!a) return;
-    const pane = a.closest('.tab-pane');
-    if (!pane || !TABS.has(pane.id)) return;
-    const href = a.getAttribute('href') || '';
-    if (!href || href.startsWith('#') || a.hasAttribute('download') || a.target === '_blank') return;
-    if (href.includes('/export') || href.includes('/download') || href.includes('/baixar')) return;
-    if (!a.classList.contains('btn-del') && !href.includes('/delete') && !href.includes('/admin?') && !href.includes('/filtrar_')) return;
-    ev.preventDefault();
-    ajaxLoad(new URL(href, location.origin).toString(), {method:'GET'}, pane.id, ()=>location.href = href);
-  }, true);
-})();
 </script>
 
 </body>
