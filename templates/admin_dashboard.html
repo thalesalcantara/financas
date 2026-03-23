@@ -894,7 +894,7 @@
               {% endif %}
             </div>
 
-            <form method="GET" class="row g-2 align-items-end" data-async-section="coop_despesas">
+            <form method="GET" class="row g-2 align-items-end">
               <input type="hidden" name="tab" value="resumo">
               <div class="col-md-2">
                 <label class="form-label">De</label>
@@ -922,9 +922,317 @@
                   {% endfor %}
                 </select>
               </div>
+
+              <div class="col-12 d-flex flex-wrap gap-2 mt-2 align-items-end resumo-filter-actions">
+                <button class="btn btn-royal btn-sm">
+                  <i class="bi bi-funnel"></i> Filtrar
+                </button>
+                {% if ri or rf or rid or cid %}
+                  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_dashboard', tab='resumo') }}">
+                    <i class="bi bi-x-circle"></i> Limpar
+                  </a>
+                {% endif %}
+                <button id="btnExportXLSX" type="button" class="btn btn-outline-success btn-sm">
+                  <i class="bi bi-file-earmark-excel"></i> Exportar XLSX (com filtros)
+                </button>
+                <div class="d-flex flex-wrap gap-2 align-items-end ms-lg-auto">
+                  <div>
+                    <label class="form-label mb-1">Filtro mensal</label>
+                    <input type="month" class="form-control form-control-sm" id="quickMonthResumo">
+                  </div>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnQuickMonthResumo">
+                    <i class="bi bi-calendar3"></i> Aplicar mês
+                  </button>
+                  <div>
+                    <label class="form-label mb-1">Filtro anual</label>
+                    <select class="form-select form-select-sm" id="quickYearResumo">
+                      <option value="">Ano</option>
+                      {% for ano in range(2025, 2101) %}
+                        <option value="{{ ano }}">{{ ano }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnQuickYearResumo">
+                    <i class="bi bi-calendar-range"></i> Aplicar ano
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="row g-2 resumo-kpi-row">
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-prod"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Total Produções</div>
+                  <div id="kpiTotalProds" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_producoes_f) }}</div>
+                  <div class="small text-muted">Bruto no período</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-graph-up"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- INSS 4% -->
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-inss"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Total INSS</div>
+                  <div id="kpiINSS4" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_inss_4_f) }}</div>
+                  <div class="small text-muted">4,0% s/ produções</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-shield-check"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SEST/SENAT 0,5% -->
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-sest"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Total SEST/SENAT</div>
+                  <div id="kpiSEST05" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_sest_05_f) }}</div>
+                  <div class="small text-muted">0,5% s/ produções</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-shield"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-rec-coop"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Receitas Cooperativa</div>
+                  <div id="kpiRecCoopCorp" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(total_receitas_corp_f) }}</div>
+                  <div class="small text-muted">Entradas da coop</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-cash-coin"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-desp-coop"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Despesas Cooperativa</div>
+                  <div id="kpiDespCoopCorp" class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_despesas_corp_f) }}</div>
+                  <div class="small text-muted">Saídas da coop</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-cart-dash"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-rec-coop2"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Receitas Cooperados</div>
+                  <div id="kpiRecCooperadosFull" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(total_receitas_coop_full_f) }}</div>
+                  <div class="small text-muted">Produções + Receitas</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-currency-exchange"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-desp-coop2"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Despesas Cooperados</div>
+                  <div id="kpiDespCooperados" class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_despesas_coop_f) }}</div>
+                  <div class="small text-muted">Débitos/benefícios</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-bank"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-res-coop"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Resultado Cooperativa</div>
+                  <div class="fw-bold fs-5">
+                    <span id="kpiResultadoCoop" class="{{ 'text-success' if _resultado_corp >= 0 else 'text-danger' }}">
+                      R$ {{ '%.2f'|format(_resultado_corp) }}
+                    </span>
+                  </div>
+                  <div class="small text-muted">Receitas − Despesas (coop)</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-pie-chart"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-total-rec"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Total de Receitas (Geral)</div>
+                  <div id="kpiTotalReceitasGeral" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(_total_receitas_geral) }}</div>
+                  <div class="small text-muted">Coop + (Prod + Rec Cooperados)</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-cash-stack"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-entregas-periodo"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Total de Adiantamento</div>
+                  <div id="kpiQtdEntregasPeriodo" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_adiantamentos_coop|default(0)) }}</div>
+                  <div class="small text-muted">Adiantamentos no período</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-bicycle"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-ticket-periodo"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Total de Pendências</div>
+                  <div id="kpiTicketMedioPeriodo" class="fw-bold fs-5">R$ {{ '%.2f'|format((resumo_totais.saldo_pendente|default(0)) + (resumo_totais.pend_programado|default(0))) }}</div>
+                  <div class="small text-muted">Valor ainda não pago</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-receipt"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-benef-rateados"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Benefícios Rateados</div>
+                  <div id="kpiBeneficiosRateados" class="fw-bold fs-5">R$ 0,00</div>
+                  <div class="small text-muted">Total lançado no período</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-heart-pulse"></i></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resumo por Cooperado -->
+        <div class="card border-0 shadow-sm rounded-4 mt-3">
+          <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+              <div class="d-flex align-items-center gap-2">
+                <div class="resumo-pill-label"><i class="bi bi-people"></i></div>
+                <div>
+                  <h6 class="m-0">Resumo por Cooperado (filtro aplicado)</h6>
+                </div>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table id="tblResumoCoop" class="table table-sm table-bordered table-hover align-middle table-resumo">
+                <thead class="table-light">
+                  <tr>
+                    <th>Cooperado</th>
+                    <th class="text-end">Produções</th>
+                    <th class="text-end">INSS (4,0%)</th>
+                    <th class="text-end">SEST/SENAT (0,5%)</th>
+                    <th class="text-end text-success">Receitas</th>
+                    <th class="text-end text-danger">Despesas</th>
+                    <th class="text-end text-danger">Adiantamento</th>
+                    <th class="text-end">A Receber</th>
+                    <th class="text-end text-warning">Saldo Pendente</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <tr><td colspan="9" class="text-center text-muted">Carregando…</td></tr>
+                </tbody>
+
+                <tfoot>
+                  <tr class="table-light fw-bold">
+                    <td>Total</td>
+                    <td class="text-end" id="tProd">R$ {{ '%.2f'|format(resumo_totais.prod|default(0)) }}</td>
+                    <td class="text-end" id="tINSS4">R$ {{ '%.2f'|format(resumo_totais.inss4|default(0)) }}</td>
+                    <td class="text-end" id="tSEST05">R$ {{ '%.2f'|format(resumo_totais.sest05|default(0)) }}</td>
+                    <td class="text-end text-success" id="tRec">R$ {{ '%.2f'|format(resumo_totais.rec|default(0)) }}</td>
+                    <td class="text-end text-danger" id="tDes">R$ {{ '%.2f'|format(resumo_totais.des|default(0)) }}</td>
+                    <td class="text-end text-danger" id="tAdiant">R$ {{ '%.2f'|format(resumo_totais.adiant|default(0)) }}</td>
+                    <td class="text-end fw-bold" id="tLiq">R$ {{ '%.2f'|format(resumo_totais.a_receber|default(0)) }}</td>
+                    <td class="text-end fw-bold text-warning" id="tPend">R$ {{ '%.2f'|format((resumo_totais.saldo_pendente|default(0)) + (resumo_totais.pend_programado|default(0))) }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="row g-2 mt-3">
+          <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3">
+              <h6 class="mb-2 d-flex align-items-center gap-1">
+                <span class="resumo-pill-label"><i class="bi bi-graph-up-arrow"></i></span>
+                <span>Evolução Mensal — Cooperativa</span>
+              </h6>
+              <canvas id="chartCoop"></canvas>
+            </div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3">
+              <h6 class="mb-2 d-flex align-items-center gap-1">
+                <span class="resumo-pill-label"><i class="bi bi-graph-up-arrow"></i></span>
+                <span>Evolução Mensal — Cooperados</span>
+              </h6>
+              <canvas id="chartCooperados"></canvas>
+            </div>
+          </div>
         </div>
 
         <div class="row g-2 mt-3">
+          <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-4 p-3">
+              <h6 class="mb-2 d-flex align-items-center gap-1">
+                <span class="resumo-pill-label"><i class="bi bi-shop"></i></span>
+                <span>Top Estabelecimentos (Produções no período)</span>
+              </h6>
+              <canvas id="chartEstabs"></canvas>
+              <div class="table-responsive mt-3">
+                <table class="table table-sm table-bordered table-hover align-middle" id="tblTopEstabsResumo">
+                  <thead class="table-light">
+                    <tr>
+                      <th style="width:72px">#</th>
+                      <th>Estabelecimento</th>
+                      <th class="text-end">Produção real</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td colspan="3" class="text-center text-muted">Carregando…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1331,6 +1639,190 @@
         const pendEl = document.getElementById('kpiTicketMedioPeriodo');
         if (pendEl) pendEl.textContent = fmtBR(tPend);
       })();
+
+      // ---- Gráficos (Chart.js via CDN) ----
+      const ensureChart = () => new Promise(res => {
+        if (window.Chart) return res();
+        const s = document.createElement('script');
+        s.src = "https://cdn.jsdelivr.net/npm/chart.js";
+        s.onload = () => res();
+        document.head.appendChild(s);
+      });
+
+      ensureChart().then(() => {
+        const moneyTick = (value) => 'R$ ' + Number(value || 0).toLocaleString('pt-BR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+
+        const baseChartOptions = {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { usePointStyle: true, padding: 18, boxWidth: 10, boxHeight: 10 }
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              callbacks: {
+                label: (ctx) => {
+                  const label = ctx.dataset.label || '';
+                  const v = ctx.parsed.y ?? ctx.parsed.x ?? 0;
+                  return `${label}: ${moneyTick(v)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: { grid: { display: false } },
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(148,163,184,0.25)' },
+              ticks: { callback: (v) => moneyTick(v) }
+            }
+          }
+        };
+
+        // Cooperativa: Receitas vs Despesas por mês
+        (function () {
+          const byM = {};
+          filteredRECc.forEach(r => {
+            const k = byMonthKey(r.data) || '—';
+            (byM[k] ??= { r: 0, d: 0 }).r += r.valor;
+          });
+          filteredDESc.forEach(d => {
+            const k = byMonthKey(d.data) || '—';
+            (byM[k] ??= { r: 0, d: 0 }).d += d.valor;
+          });
+
+          const labels = Object.keys(byM).sort();
+          const rec    = labels.map(k => byM[k].r);
+          const des    = labels.map(k => byM[k].d);
+
+          const ctx = document.getElementById('chartCoop');
+          if (!ctx) return;
+
+          new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels,
+              datasets: [
+                { label: 'Receitas', data: rec, backgroundColor: 'rgba(37, 99, 235, 0.75)', borderRadius: 6 },
+                { label: 'Despesas', data: des, backgroundColor: 'rgba(239, 68, 68, 0.75)', borderRadius: 6 }
+              ]
+            },
+            options: baseChartOptions
+          });
+        })();
+
+        // Cooperados: Produções + INSS 4% + SEST 0,5% por mês
+        (function () {
+          const byM = {};
+          filteredPROD.forEach(p => {
+            const k = byMonthKey(p.data) || '—';
+            (byM[k] ??= { prod: 0, inss4: 0, sest05: 0 }).prod += p.valor;
+            byM[k].inss4  += p.valor * 0.04;
+            byM[k].sest05 += p.valor * 0.005;
+          });
+
+          const labels = Object.keys(byM).sort();
+          const prod   = labels.map(k => byM[k].prod);
+          const inss4  = labels.map(k => byM[k].inss4);
+          const sest05 = labels.map(k => byM[k].sest05);
+
+          const ctx = document.getElementById('chartCooperados');
+          if (!ctx) return;
+
+          new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels,
+              datasets: [
+                {
+                  label: 'Produções (bruto)',
+                  data: prod,
+                  borderColor: 'rgba(37, 99, 235, 1)',
+                  backgroundColor: 'rgba(37, 99, 235, 0.18)',
+                  borderWidth: 2,
+                  tension: 0.3,
+                  fill: true,
+                  pointRadius: 3,
+                  pointHoverRadius: 4
+                },
+                {
+                  label: 'INSS (4,0%)',
+                  data: inss4,
+                  borderColor: 'rgba(56, 189, 248, 1)',
+                  backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                  borderWidth: 2,
+                  tension: 0.3,
+                  fill: true,
+                  pointRadius: 3,
+                  pointHoverRadius: 4
+                },
+                {
+                  label: 'SEST/SENAT (0,5%)',
+                  data: sest05,
+                  borderColor: 'rgba(2, 132, 199, 1)',
+                  backgroundColor: 'rgba(2, 132, 199, 0.10)',
+                  borderWidth: 2,
+                  tension: 0.3,
+                  fill: true,
+                  pointRadius: 3,
+                  pointHoverRadius: 4
+                }
+              ]
+            },
+            options: baseChartOptions
+          });
+        })();
+
+        // Estabelecimentos — barra horizontal + tabela real
+        (function () {
+          const byR = {};
+          filteredPROD.forEach(p => {
+            if (p.restaurante_id == null && !p.restaurante_nome) return;
+            const nome = (p.restaurante_nome || '—').trim() || '—';
+            byR[nome] = (byR[nome] || 0) + (+p.valor || 0);
+          });
+
+          const entries = Object.entries(byR)
+            .map(([nome, valor]) => ({ nome, valor: +(valor || 0) }))
+            .sort((a, b) => b.valor - a.valor)
+            .slice(0, 20);
+
+          const labels = entries.map(e => e.nome);
+          const vals   = entries.map(e => Number(e.valor.toFixed(2)));
+
+          const tbody = document.querySelector('#tblTopEstabsResumo tbody');
+          if (tbody) {
+            tbody.innerHTML = entries.length ? '' : '<tr><td colspan="3" class="text-center text-muted">Sem dados no período.</td></tr>';
+            entries.forEach((item, idx) => {
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                <td>${idx + 1}</td>
+                <td class="text-break">${item.nome}</td>
+                <td class="text-end fw-semibold">${fmtBR(item.valor)}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+          }
+
+          const ctx = document.getElementById('chartEstabs');
+          if (!ctx) return;
+
+          new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels,
+              datasets: [{ label: 'Produções por Estabelecimento', data: vals, backgroundColor: 'rgba(16, 185, 129, 0.8)', borderRadius: 6 }]
+            },
+            options: { ...baseChartOptions, plugins: { ...baseChartOptions.plugins, legend: { display: false } }, indexAxis: 'y' }
+          });
+        })();
+      });
+
       // ---- Atalhos de filtro mensal / anual ----
       (function(){
         const form = document.querySelector('#resumo form[method="GET"]');
@@ -1554,7 +2046,7 @@
         </button>
       </div>
 
-      <form method="GET" action="{{ url_for('filtrar_lancamentos') }}" class="row g-2 align-items-end" data-async-section="lancamentos">
+      <form method="GET" action="{{ url_for('filtrar_lancamentos') }}" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="lancamentos">
 
         <div class="col-md-3">
@@ -1651,7 +2143,7 @@
         </div>
       </div>
 
-      <form method="POST" action="{{ url_for('admin_add_lancamento') }}" class="row g-2 align-items-end mt-3" data-perm-form="can_lanc_criar" data-async-section="lancamentos">
+      <form method="POST" action="{{ url_for('admin_add_lancamento') }}" class="row g-2 align-items-end mt-3" data-perm-form="can_lanc_criar">
         <div class="col-md-3">
           <label class="form-label lanc-label">Restaurante</label>
           <select class="form-select form-select-sm" name="restaurante_id" required>
@@ -1766,7 +2258,7 @@
                     <i class="bi bi-pencil"></i>
                   </button>
                   {% if can_lanc_excluir %}<a class="btn btn-danger btn-sm rounded-pill btn-del"
-                     data-async-section="lancamentos" href="{{ url_for('admin_delete_lancamento', id=l.id, tab='lancamentos', data_inicio=request.args.get('data_inicio', request.args.get('resumo_inicio','')), data_fim=request.args.get('data_fim', request.args.get('resumo_fim','')), restaurante_id=request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')), cooperado_id=request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')), somente_pendentes=request.args.get('somente_pendentes')) }}">
+                     href="{{ url_for('admin_delete_lancamento', id=l.id, tab='lancamentos', data_inicio=request.args.get('data_inicio', request.args.get('resumo_inicio','')), data_fim=request.args.get('data_fim', request.args.get('resumo_fim','')), restaurante_id=request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')), cooperado_id=request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')), somente_pendentes=request.args.get('somente_pendentes')) }}">
                     <i class="bi bi-trash"></i>
                   </a>{% endif %}
                   {% endif %}
@@ -2605,7 +3097,7 @@
         </span>
       </div>
 
-      <form method="POST" action="{{ url_for('add_despesa_coop') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_coop_despesas_criar" data-async-section="coop_despesas">
+      <form method="POST" action="{{ url_for('add_despesa_coop') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_coop_despesas_criar">
       <input type="hidden" name="tab" value="coop_despesas">
       <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
       <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
@@ -2725,7 +3217,7 @@
                   </button>
 
                   <!-- EXCLUIR via POST (evita 405) -->
-                  {% if can_coop_despesas_excluir %}<form method="POST" action="{{ url_for('delete_despesa_coop', id=dc.id) }}" class="d-inline" data-async-section="coop_despesas">
+                  {% if can_coop_despesas_excluir %}<form method="POST" action="{{ url_for('delete_despesa_coop', id=dc.id) }}" class="d-inline">
 
                   <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
                   <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
@@ -5390,7 +5882,7 @@
   <!-- MODAIS =================================================== -->
   <div class="modal fade" id="modalEditLancamento" tabindex="-1">
     <div class="modal-dialog modal-lg">
-      <form method="POST" class="modal-content" data-async-section="lancamentos">
+      <form method="POST" class="modal-content">
           <input type="hidden" name="tab" value="lancamentos">
           <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
           <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
@@ -5494,7 +5986,7 @@
 
   <div class="modal fade" id="modalEditDespesaCoop" tabindex="-1">
     <div class="modal-dialog">
-      <form method="POST" class="modal-content" data-async-section="coop_despesas">
+      <form method="POST" class="modal-content">
         <input type="hidden" name="tab" value="coop_despesas">
         <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
         <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
@@ -5605,6 +6097,7 @@
 
   <!-- JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
 <script>
   // Confirmar exclusão
@@ -5661,6 +6154,59 @@
       if (chk) chk.checked = String(btn?.dataset?.eh_adiantamento || '0') === '1';
     });
   })();
+
+  // ===== Gráficos =====
+
+  const totalProducoesFallback = parseFloat('{{ total_producoes|default(0) }}') || 0;
+
+  const fallbackLancCoop   = { labels: ['Total'], values: [totalProducoesFallback] };
+  const fallbackLancCooper = { labels: ['Total'], values: [totalProducoesFallback] };
+
+  const dataLancCoop = (rawLancCoop?.labels?.length && rawLancCoop?.values?.length) ? rawLancCoop : fallbackLancCoop;
+  const dataLancCooperados = (rawLancCooper?.labels?.length && rawLancCooper?.values?.length) ? rawLancCooper : fallbackLancCooper;
+
+  function buildLineChart(canvasId, labels, values, label) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: label,
+          data: values,
+          tension: .25,
+          borderWidth: 2,
+          pointRadius: 3,
+          fill: false
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: (v) => 'R$ ' + Number(v).toLocaleString('pt-BR')
+            }
+          }
+        },
+        plugins: {
+          legend: { display: true },
+          tooltip: {
+            callbacks: {
+              label: (c) => 'R$ ' + Number(c.parsed.y).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+            }
+          }
+        }
+      }
+    });
+  }
+
+  buildLineChart('chartLancCoop', dataLancCoop.labels, dataLancCoop.values, 'Lançamentos/Produções');
+  buildLineChart('chartLancCooperados', dataLancCooperados.labels, dataLancCooperados.values, 'Lançamentos/Produções');
 
   // ===== Preservar aba ativa via ?tab= =====
   document.addEventListener('DOMContentLoaded', () => {
@@ -6439,48 +6985,56 @@ document.addEventListener('DOMContentLoaded', function(){ const cAll=document.ge
 
 <script>
 (function(){
-  function norm(s){ return (s||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim(); }
-  function initDespesaSearch(scope){
-    const root = scope || document;
-    const input = root.querySelector('#qDespCoop');
-    const btnClear = root.querySelector('#btnClearQDesp');
-    const tbl = root.querySelector('#tblDespesasCoop');
-    if(!input || !tbl || input.dataset.bound==='1') return;
-    input.dataset.bound='1';
-    function apply(){ const q=norm(input.value); tbl.querySelectorAll('tbody tr').forEach(tr=>{ const coop=norm(tr.getAttribute('data-coop')||''); const desc=norm(tr.getAttribute('data-desc')||''); tr.style.display = (!q || coop.includes(q) || desc.includes(q)) ? '' : 'none'; }); }
-    input.addEventListener('input', apply);
-    btnClear && btnClear.addEventListener('click', ()=>{ input.value=''; input.focus(); apply(); });
-    apply();
+  const adminRoot = document;
+  function currentTabPane(el){ return el.closest('.tab-pane'); }
+  async function swapFromResponse(text, paneId){
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+    const fresh = doc.getElementById(paneId);
+    const old = document.getElementById(paneId);
+    if (fresh && old) {
+      old.replaceWith(fresh);
+      const newUrl = doc.querySelector('link[rel="canonical"]')?.href || null;
+      return true;
+    }
+    return false;
   }
-  function closeModal(el){ const modalEl=el.closest('.modal'); if(modalEl && window.bootstrap){ const inst=bootstrap.Modal.getInstance(modalEl); inst && inst.hide(); } }
-  async function refreshSection(sectionId, htmlText, url){
-    const doc = new DOMParser().parseFromString(htmlText, 'text/html');
-    const next = doc.getElementById(sectionId);
-    const cur = document.getElementById(sectionId);
-    if(!next || !cur) return;
-    cur.innerHTML = next.innerHTML;
-    cur.className = next.className;
-    if(url) history.replaceState({}, '', url);
-    initDespesaSearch(cur);
-  }
-  async function submitAsync(form){
-    const sectionId = form.dataset.asyncSection; if(!sectionId) return;
-    const method=(form.method||'GET').toUpperCase();
-    let url=form.action || location.href;
-    const opts={method, headers:{'X-Requested-With':'XMLHttpRequest'}};
-    if(method==='GET'){ const qs=new URLSearchParams(new FormData(form)).toString(); url += (url.includes('?')?'&':'?') + qs; } else { opts.body = new FormData(form); }
-    form.querySelectorAll('button, input[type="submit"]').forEach(b=>b.disabled=true);
-    try{ const resp=await fetch(url, opts); const text=await resp.text(); await refreshSection(sectionId, text, resp.url); closeModal(form); }
-    finally{ form.querySelectorAll('button, input[type="submit"]').forEach(b=>b.disabled=false); }
-  }
-  document.addEventListener('submit', function(ev){ const form = ev.target.closest('form[data-async-section]'); if(!form) return; ev.preventDefault(); submitAsync(form); });
-  document.addEventListener('click', function(ev){
-    const link = ev.target.closest('a[data-async-section]');
-    if(link){ ev.preventDefault(); fetch(link.href,{headers:{'X-Requested-With':'XMLHttpRequest'}}).then(async r=>refreshSection(link.dataset.asyncSection, await r.text(), r.url)); return; }
+  adminRoot.addEventListener('submit', async function(e){
+    const form = e.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    const pane = currentTabPane(form);
+    if (!pane) return;
+    const action = form.getAttribute('action') || window.location.href;
+    if (/exportar|download|xlsx|csv/i.test(action)) return;
+    e.preventDefault();
+    const method = (form.getAttribute('method') || 'GET').toUpperCase();
+    const fd = new FormData(form);
+    let url = action;
+    const opts = { method, headers: {'X-Requested-With':'XMLHttpRequest'} };
+    if (method === 'GET') {
+      const qs = new URLSearchParams(fd).toString();
+      url = action + (action.includes('?') ? '&' : '?') + qs;
+    } else {
+      opts.body = fd;
+    }
+    const resp = await fetch(url, opts);
+    const text = await resp.text();
+    await swapFromResponse(text, pane.id);
   });
-  document.addEventListener('DOMContentLoaded', function(){ initDespesaSearch(document); });
+  adminRoot.addEventListener('click', async function(e){
+    const a = e.target.closest('a');
+    if (!a) return;
+    const pane = currentTabPane(a);
+    if (!pane) return;
+    const href = a.getAttribute('href') || '';
+    if (!href || href.startsWith('#') || a.hasAttribute('download') || /exportar|download|xlsx|csv/i.test(href) || a.dataset.bsToggle) return;
+    e.preventDefault();
+    const resp = await fetch(href, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    const text = await resp.text();
+    await swapFromResponse(text, pane.id);
+  });
 })();
 </script>
+
 </body>
 </html>
 
