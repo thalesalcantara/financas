@@ -3603,11 +3603,6 @@ def admin_dashboard():
     considerar_periodo = bool(args.get("considerar_periodo"))
     dows = set(args.getlist("dow"))
 
-    page_lanc = max(args.get("page_lanc", default=1, type=int) or 1, 1)
-    page_coop_desp = max(args.get("page_coop_desp", default=1, type=int) or 1, 1)
-    per_page_lanc = 100
-    per_page_coop_desp = 100
-
     # =========================
     # Lançamentos
     # =========================
@@ -3616,8 +3611,6 @@ def admin_dashboard():
     total_inss = 0.0
     total_sest = 0.0
     total_encargos = 0.0
-    total_lancamentos_registros = 0
-    lancamentos_pages = 1
 
     q = Lancamento.query.options(selectinload(Lancamento.restaurante), selectinload(Lancamento.cooperado))
 
@@ -3630,47 +3623,25 @@ def admin_dashboard():
     if data_fim:
         q = q.filter(Lancamento.data <= data_fim)
 
-    usar_fallback_lanc = bool(dows) or bool(considerar_periodo and restaurante_id)
+    lanc_base = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
 
-    if usar_fallback_lanc:
-        lanc_base = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
-        if dows:
-            lanc_filtrados = [l for l in lanc_base if l.data and _dow(l.data) in dows]
-        else:
-            lanc_filtrados = lanc_base
-
-        if considerar_periodo and restaurante_id:
-            rest = Restaurante.query.get(restaurante_id)
-            if rest:
-                mapa = {
-                    "seg-dom": {"1", "2", "3", "4", "5", "6", "7"},
-                    "sab-sex": {"6", "7", "1", "2", "3", "4", "5"},
-                    "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
-                }
-                permitidos = mapa.get(rest.periodo, {"1", "2", "3", "4", "5", "6", "7"})
-                lanc_filtrados = [l for l in lanc_filtrados if l.data and _dow(l.data) in permitidos]
-
-        total_lancamentos_registros = len(lanc_filtrados)
-        lancamentos_pages = max(1, (total_lancamentos_registros + per_page_lanc - 1) // per_page_lanc)
-        if page_lanc > lancamentos_pages:
-            page_lanc = lancamentos_pages
-        ini = (page_lanc - 1) * per_page_lanc
-        fim = ini + per_page_lanc
-        lancamentos = lanc_filtrados[ini:fim]
-        total_producoes = sum((l.valor or 0.0) for l in lanc_filtrados)
+    if dows:
+        lancamentos = [l for l in lanc_base if l.data and _dow(l.data) in dows]
     else:
-        total_lancamentos_registros = q.order_by(None).count()
-        lancamentos_pages = max(1, (total_lancamentos_registros + per_page_lanc - 1) // per_page_lanc)
-        if page_lanc > lancamentos_pages:
-            page_lanc = lancamentos_pages
-        total_producoes = float(q.with_entities(func.coalesce(func.sum(Lancamento.valor), 0.0)).scalar() or 0.0)
-        lancamentos = (
-            q.order_by(Lancamento.data.desc(), Lancamento.id.desc())
-             .offset((page_lanc - 1) * per_page_lanc)
-             .limit(per_page_lanc)
-             .all()
-        )
+        lancamentos = lanc_base
 
+    if considerar_periodo and restaurante_id:
+        rest = Restaurante.query.get(restaurante_id)
+        if rest:
+            mapa = {
+                "seg-dom": {"1", "2", "3", "4", "5", "6", "7"},
+                "sab-sex": {"6", "7", "1", "2", "3", "4", "5"},
+                "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
+            }
+            permitidos = mapa.get(rest.periodo, {"1", "2", "3", "4", "5", "6", "7"})
+            lancamentos = [l for l in lancamentos if l.data and _dow(l.data) in permitidos]
+
+    total_producoes = sum((l.valor or 0.0) for l in lancamentos)
     total_inss = round(total_producoes * INSS_ALIQ, 2)
     total_sest = round(total_producoes * SEST_ALIQ, 2)
     total_encargos = round(total_inss + total_sest, 2)
@@ -3715,9 +3686,6 @@ def admin_dashboard():
     total_receitas_coop = 0.0
     total_despesas_coop = 0.0
     total_adiantamentos_coop = 0.0
-    total_despesas_coop_registros = 0
-    coop_despesas_pages = 1
-    despesa_snapshot_map = {}
 
     if True:
         rq2 = ReceitaCooperado.query
@@ -3749,43 +3717,27 @@ def admin_dashboard():
             ReceitaCooperado.id.desc()
         ).all()
 
-        total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
+        despesas_coop = dq2.order_by(
+            DespesaCooperado.data_fim.desc().nullslast(),
+            DespesaCooperado.id.desc()
+        ).all()
 
         if somente_pendentes and cooperado_id:
-            despesas_coop_full = dq2.order_by(
-                DespesaCooperado.data_fim.desc().nullslast(),
-                DespesaCooperado.id.desc()
-            ).all()
             snap_pend = _compute_coop_debt_snapshot(cooperado_id, data_inicio, data_fim)
             pend_ids = {item['id'] for item in snap_pend['itens'] if item['status'] in ('pendente', 'parcial', 'a_descontar') and item['restante'] > 0}
-            despesas_coop_full = [d for d in despesas_coop_full if d.id in pend_ids]
-            total_despesas_coop_registros = len(despesas_coop_full)
-            coop_despesas_pages = max(1, (total_despesas_coop_registros + per_page_coop_desp - 1) // per_page_coop_desp)
-            if page_coop_desp > coop_despesas_pages:
-                page_coop_desp = coop_despesas_pages
-            ini = (page_coop_desp - 1) * per_page_coop_desp
-            fim = ini + per_page_coop_desp
-            despesas_coop = despesas_coop_full[ini:fim]
-            total_despesas_coop = sum((d.valor or 0.0) for d in despesas_coop_full if not getattr(d, "eh_adiantamento", False))
-            total_adiantamentos_coop = sum((d.valor or 0.0) for d in despesas_coop_full if getattr(d, "eh_adiantamento", False))
-        else:
-            total_despesas_coop_registros = dq2.order_by(None).count()
-            coop_despesas_pages = max(1, (total_despesas_coop_registros + per_page_coop_desp - 1) // per_page_coop_desp)
-            if page_coop_desp > coop_despesas_pages:
-                page_coop_desp = coop_despesas_pages
-            total_despesas_coop = float(
-                dq2.filter(or_(DespesaCooperado.eh_adiantamento.is_(False), DespesaCooperado.eh_adiantamento.is_(None)))
-                  .with_entities(func.coalesce(func.sum(DespesaCooperado.valor), 0.0)).scalar() or 0.0
-            )
-            total_adiantamentos_coop = float(
-                dq2.filter(DespesaCooperado.eh_adiantamento.is_(True))
-                  .with_entities(func.coalesce(func.sum(DespesaCooperado.valor), 0.0)).scalar() or 0.0
-            )
-            despesas_coop = dq2.order_by(
-                DespesaCooperado.data_fim.desc().nullslast(),
-                DespesaCooperado.id.desc()
-            ).offset((page_coop_desp - 1) * per_page_coop_desp).limit(per_page_coop_desp).all()
+            despesas_coop = [d for d in despesas_coop if d.id in pend_ids]
 
+        total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
+        total_despesas_coop = sum(
+            (d.valor or 0.0) for d in despesas_coop
+            if not getattr(d, "eh_adiantamento", False)
+        )
+        total_adiantamentos_coop = sum(
+            (d.valor or 0.0) for d in despesas_coop
+            if getattr(d, "eh_adiantamento", False)
+        )
+
+        despesa_snapshot_map = {}
         if active_tab == "coop_despesas":
             for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
                 _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
@@ -3924,8 +3876,26 @@ def admin_dashboard():
     # =========================
     # Gráficos
     # =========================
-    chart_data_lancamentos_coop = {"labels": [], "values": []}
-    chart_data_lancamentos_cooperados = {"labels": [], "values": []}
+    sums = {}
+    for l in lancamentos:
+        if not l.data:
+            continue
+        key = l.data.strftime("%Y-%m")
+        sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
+
+    labels_ord = sorted(sums.keys())
+
+    def _fmt_label(k: str) -> str:
+        parts = k.split("-")
+        if len(parts) == 2 and parts[0] and parts[1]:
+            year, month = parts[0], parts[1]
+            return f"{month}/{year[-2:]}"
+        return k
+
+    labels_fmt = [_fmt_label(k) for k in labels_ord]
+    values = [round(sums[k], 2) for k in labels_ord]
+    chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
+    chart_data_lancamentos_cooperados = {"labels": labels_fmt, "values": values}
 
     # =========================
     # Admin master / principal
@@ -4394,18 +4364,10 @@ def admin_dashboard():
         total_adiantamentos_coop=total_adiantamentos_coop,
         salario_minimo=(cfg.salario_minimo or 0.0) if cfg else 0.0,
         lancamentos=lancamentos,
-        page_lanc=page_lanc,
-        per_page_lanc=per_page_lanc,
-        total_lancamentos_registros=total_lancamentos_registros,
-        lancamentos_pages=lancamentos_pages,
         receitas=receitas,
         despesas=despesas,
         receitas_coop=receitas_coop,
         despesas_coop=despesas_coop,
-        page_coop_desp=page_coop_desp,
-        per_page_coop_desp=per_page_coop_desp,
-        total_despesas_coop_registros=total_despesas_coop_registros,
-        coop_despesas_pages=coop_despesas_pages,
         cooperados=cooperados,
         restaurantes=restaurantes,
         beneficios_view=beneficios_view,
