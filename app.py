@@ -2859,7 +2859,6 @@ def to_css_color(v: str) -> str:
 # ---------- AVISOS: helpers ----------
 from sqlalchemy import case, or_, and_, func
 from sqlalchemy.orm import selectinload
-from urllib.parse import urlencode
 
 def _avisos_base_query():
     # usa o relógio do banco; evita divergência de TZ/UTC da app
@@ -3647,31 +3646,6 @@ def admin_dashboard():
     total_sest = round(total_producoes * SEST_ALIQ, 2)
     total_encargos = round(total_inss + total_sest, 2)
 
-    lancamentos_total_count = len(lancamentos)
-    lancamentos_page = max(args.get("page_lanc", 1, type=int) or 1, 1)
-    lancamentos_per_page = 50
-    lancamentos_total_pages = max(1, ((lancamentos_total_count - 1) // lancamentos_per_page) + 1) if lancamentos_total_count else 1
-    if lancamentos_page > lancamentos_total_pages:
-        lancamentos_page = lancamentos_total_pages
-    _lanc_start = (lancamentos_page - 1) * lancamentos_per_page
-    _lanc_end = _lanc_start + lancamentos_per_page
-    lancamentos = lancamentos[_lanc_start:_lanc_end]
-
-    _lanc_qs_items = [("tab", "lancamentos")]
-    if restaurante_id:
-        _lanc_qs_items.append(("restaurante_id", str(restaurante_id)))
-    if cooperado_id:
-        _lanc_qs_items.append(("cooperado_id", str(cooperado_id)))
-    if data_inicio:
-        _lanc_qs_items.append(("data_inicio", data_inicio.strftime("%Y-%m-%d")))
-    if data_fim:
-        _lanc_qs_items.append(("data_fim", data_fim.strftime("%Y-%m-%d")))
-    if considerar_periodo:
-        _lanc_qs_items.append(("considerar_periodo", "1"))
-    for _dow_item in sorted(dows):
-        _lanc_qs_items.append(("dow", _dow_item))
-    lancamentos_qs_base = urlencode(_lanc_qs_items, doseq=True)
-
     # =========================
     # Receitas / Despesas Coop
     # =========================
@@ -4392,11 +4366,6 @@ def admin_dashboard():
         total_adiantamentos_coop=total_adiantamentos_coop,
         salario_minimo=(cfg.salario_minimo or 0.0) if cfg else 0.0,
         lancamentos=lancamentos,
-        lancamentos_total_count=lancamentos_total_count,
-        lancamentos_page=lancamentos_page,
-        lancamentos_per_page=lancamentos_per_page,
-        lancamentos_total_pages=lancamentos_total_pages,
-        lancamentos_qs_base=lancamentos_qs_base,
         receitas=receitas,
         despesas=despesas,
         receitas_coop=receitas_coop,
