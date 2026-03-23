@@ -3536,17 +3536,6 @@ def admin_dashboard():
     if active_tab not in ADMIN_ABAS:
         active_tab = "lancamentos"
 
-    load_resumo = active_tab == 'resumo'
-    load_lancamentos = active_tab == 'lancamentos'
-    load_receitas = active_tab == 'receitas'
-    load_despesas = active_tab == 'despesas'
-    load_coop_receitas = active_tab == 'coop_receitas'
-    load_coop_despesas = active_tab == 'coop_despesas'
-    load_beneficios = active_tab == 'beneficios'
-    load_escalas = active_tab == 'escalas'
-    load_trocas = active_tab == 'trocas'
-    load_config = active_tab == 'config'
-
     # monta o mapa de permissões logo no início
     if getattr(admin_logado, "is_master", False):
         admin_perms = {
@@ -3614,6 +3603,10 @@ def admin_dashboard():
     considerar_periodo = bool(args.get("considerar_periodo"))
     dows = set(args.getlist("dow"))
 
+    chart_data_lancamentos_coop = {"labels": [], "values": []}
+    chart_data_lancamentos_cooperados = {"labels": [], "values": []}
+    despesa_snapshot_map = {}
+
     # =========================
     # Lançamentos
     # =========================
@@ -3623,7 +3616,7 @@ def admin_dashboard():
     total_sest = 0.0
     total_encargos = 0.0
 
-    if load_lancamentos or load_resumo:
+    if active_tab in {"resumo", "lancamentos"}:
         q = Lancamento.query.options(selectinload(Lancamento.restaurante), selectinload(Lancamento.cooperado))
 
         if restaurante_id:
@@ -3666,7 +3659,7 @@ def admin_dashboard():
     total_receitas = 0.0
     total_despesas = 0.0
 
-    if load_receitas or load_despesas or load_resumo:
+    if active_tab in {"resumo", "receitas", "despesas"}:
         rq = ReceitaCooperativa.query
         dq = DespesaCooperativa.query
 
@@ -3699,7 +3692,7 @@ def admin_dashboard():
     total_despesas_coop = 0.0
     total_adiantamentos_coop = 0.0
 
-    if load_coop_receitas or load_coop_despesas or load_resumo:
+    if active_tab in {"resumo", "coop_receitas", "coop_despesas"}:
         rq2 = ReceitaCooperado.query
         dq2 = DespesaCooperado.query.options(selectinload(DespesaCooperado.cooperado))
 
@@ -3749,8 +3742,7 @@ def admin_dashboard():
             if getattr(d, "eh_adiantamento", False)
         )
 
-        despesa_snapshot_map = {}
-        if load_coop_despesas:
+        if active_tab == "coop_despesas":
             for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
                 _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
                 for _it in _snap["itens"]:
@@ -3767,10 +3759,15 @@ def admin_dashboard():
     )
 
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
-    if load_receitas or load_resumo:
+    if active_tab in {"resumo", "receitas"}:
         _ensure_taxas_admin_receitas(restaurantes, months_back=0)
 
-    if load_receitas or load_despesas or load_resumo:
+    # Recarrega receitas/despesas apenas quando a aba precisar.
+    # Assim, sem filtro manual, a aba de receitas já abre mostrando o mês atual,
+    # e com filtro continua respeitando o período informado.
+    taxa_admin_rows, taxa_admin_totais = [], {}
+    juros_arrecadados_total = 0.0
+    if active_tab in {"resumo", "receitas", "despesas"}:
         rq = ReceitaCooperativa.query
         dq = DespesaCooperativa.query
         if data_inicio:
@@ -3791,9 +3788,7 @@ def admin_dashboard():
         total_receitas = sum(_receita_total_real(r) for r in receitas)
         total_despesas = sum((d.valor or 0.0) for d in despesas)
         taxa_admin_rows, taxa_admin_totais = _build_taxa_admin_rows(receitas)
-    else:
-        taxa_admin_rows, taxa_admin_totais = [], {}
-    juros_arrecadados_total = round(sum((r['valor_multa'] + r['valor_juros']) for r in taxa_admin_rows if r['status'] == 'pago'), 2)
+        juros_arrecadados_total = round(sum((r['valor_multa'] + r['valor_juros']) for r in taxa_admin_rows if r['status'] == 'pago'), 2)
     cooperados_map = {c.id: c for c in cooperados}
 
     # =========================
@@ -3811,9 +3806,7 @@ def admin_dashboard():
     # =========================
     # Escalas
     # =========================
-    escalas_all = []
-    if load_escalas or load_trocas:
-        escalas_all = (
+    escalas_all = (
         db.session.query(Escala)
         .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
         .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
@@ -3891,9 +3884,7 @@ def admin_dashboard():
     # =========================
     # Gráficos
     # =========================
-    chart_data_lancamentos_coop = {'labels': [], 'values': []}
-    chart_data_lancamentos_cooperados = {'labels': [], 'values': []}
-    if load_resumo:
+    if active_tab == "lancamentos":
         sums = {}
         for l in lancamentos:
             if not l.data:
@@ -4048,7 +4039,7 @@ def admin_dashboard():
     historico_beneficios = []
     beneficios_view = []
 
-    if True:
+    if active_tab in {"resumo", "beneficios"}:
         if b_ini and not b_fim:
             b_fim = b_ini
         elif b_fim and not b_ini:
@@ -4330,7 +4321,7 @@ def admin_dashboard():
         "des": 0.0, "adiant": 0.0, "a_receber": 0.0, "saldo_pendente": 0.0,
         "pend_programado": 0.0
     }
-    if load_resumo:
+    if active_tab == "resumo":
         for coop in cooperados:
             snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
             prod = sum((l.valor or 0.0) for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
