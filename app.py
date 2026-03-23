@@ -3603,10 +3603,6 @@ def admin_dashboard():
     considerar_periodo = bool(args.get("considerar_periodo"))
     dows = set(args.getlist("dow"))
 
-    chart_data_lancamentos_coop = {"labels": [], "values": []}
-    chart_data_lancamentos_cooperados = {"labels": [], "values": []}
-    despesa_snapshot_map = {}
-
     # =========================
     # Lançamentos
     # =========================
@@ -3616,40 +3612,39 @@ def admin_dashboard():
     total_sest = 0.0
     total_encargos = 0.0
 
-    if active_tab in {"resumo", "lancamentos"}:
-        q = Lancamento.query.options(selectinload(Lancamento.restaurante), selectinload(Lancamento.cooperado))
+    q = Lancamento.query
 
-        if restaurante_id:
-            q = q.filter(Lancamento.restaurante_id == restaurante_id)
-        if cooperado_id:
-            q = q.filter(Lancamento.cooperado_id == cooperado_id)
-        if data_inicio:
-            q = q.filter(Lancamento.data >= data_inicio)
-        if data_fim:
-            q = q.filter(Lancamento.data <= data_fim)
+    if restaurante_id:
+        q = q.filter(Lancamento.restaurante_id == restaurante_id)
+    if cooperado_id:
+        q = q.filter(Lancamento.cooperado_id == cooperado_id)
+    if data_inicio:
+        q = q.filter(Lancamento.data >= data_inicio)
+    if data_fim:
+        q = q.filter(Lancamento.data <= data_fim)
 
-        lanc_base = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
+    lanc_base = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
 
-        if dows:
-            lancamentos = [l for l in lanc_base if l.data and _dow(l.data) in dows]
-        else:
-            lancamentos = lanc_base
+    if dows:
+        lancamentos = [l for l in lanc_base if l.data and _dow(l.data) in dows]
+    else:
+        lancamentos = lanc_base
 
-        if considerar_periodo and restaurante_id:
-            rest = Restaurante.query.get(restaurante_id)
-            if rest:
-                mapa = {
-                    "seg-dom": {"1", "2", "3", "4", "5", "6", "7"},
-                    "sab-sex": {"6", "7", "1", "2", "3", "4", "5"},
-                    "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
-                }
-                permitidos = mapa.get(rest.periodo, {"1", "2", "3", "4", "5", "6", "7"})
-                lancamentos = [l for l in lancamentos if l.data and _dow(l.data) in permitidos]
+    if considerar_periodo and restaurante_id:
+        rest = Restaurante.query.get(restaurante_id)
+        if rest:
+            mapa = {
+                "seg-dom": {"1", "2", "3", "4", "5", "6", "7"},
+                "sab-sex": {"6", "7", "1", "2", "3", "4", "5"},
+                "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
+            }
+            permitidos = mapa.get(rest.periodo, {"1", "2", "3", "4", "5", "6", "7"})
+            lancamentos = [l for l in lancamentos if l.data and _dow(l.data) in permitidos]
 
-        total_producoes = sum((l.valor or 0.0) for l in lancamentos)
-        total_inss = round(total_producoes * INSS_ALIQ, 2)
-        total_sest = round(total_producoes * SEST_ALIQ, 2)
-        total_encargos = round(total_inss + total_sest, 2)
+    total_producoes = sum((l.valor or 0.0) for l in lancamentos)
+    total_inss = round(total_producoes * INSS_ALIQ, 2)
+    total_sest = round(total_producoes * SEST_ALIQ, 2)
+    total_encargos = round(total_inss + total_sest, 2)
 
     # =========================
     # Receitas / Despesas Coop
@@ -3659,7 +3654,7 @@ def admin_dashboard():
     total_receitas = 0.0
     total_despesas = 0.0
 
-    if active_tab in {"resumo", "receitas", "despesas"}:
+    if True:
         rq = ReceitaCooperativa.query
         dq = DespesaCooperativa.query
 
@@ -3692,9 +3687,9 @@ def admin_dashboard():
     total_despesas_coop = 0.0
     total_adiantamentos_coop = 0.0
 
-    if active_tab in {"resumo", "coop_receitas", "coop_despesas"}:
+    if True:
         rq2 = ReceitaCooperado.query
-        dq2 = DespesaCooperado.query.options(selectinload(DespesaCooperado.cooperado))
+        dq2 = DespesaCooperado.query
 
         if data_inicio:
             rq2 = rq2.filter(ReceitaCooperado.data >= data_inicio)
@@ -3742,11 +3737,11 @@ def admin_dashboard():
             if getattr(d, "eh_adiantamento", False)
         )
 
-        if active_tab == "coop_despesas":
-            for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
-                _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
-                for _it in _snap["itens"]:
-                    despesa_snapshot_map[_it["id"]] = _it
+        despesa_snapshot_map = {}
+        for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
+            _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
+            for _it in _snap["itens"]:
+                despesa_snapshot_map[_it["id"]] = _it
 
     cfg = get_config()
 
@@ -3759,36 +3754,32 @@ def admin_dashboard():
     )
 
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
-    if active_tab in {"resumo", "receitas"}:
-        _ensure_taxas_admin_receitas(restaurantes, months_back=0)
+    _ensure_taxas_admin_receitas(restaurantes, months_back=0)
 
-    # Recarrega receitas/despesas apenas quando a aba precisar.
+    # Recarrega SEMPRE as receitas/despesas após gerar taxas automáticas.
     # Assim, sem filtro manual, a aba de receitas já abre mostrando o mês atual,
     # e com filtro continua respeitando o período informado.
-    taxa_admin_rows, taxa_admin_totais = [], {}
-    juros_arrecadados_total = 0.0
-    if active_tab in {"resumo", "receitas", "despesas"}:
-        rq = ReceitaCooperativa.query
-        dq = DespesaCooperativa.query
-        if data_inicio:
-            rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
-            dq = dq.filter(DespesaCooperativa.data >= data_inicio)
-        if data_fim:
-            rq = rq.filter(ReceitaCooperativa.data <= data_fim)
-            dq = dq.filter(DespesaCooperativa.data <= data_fim)
+    rq = ReceitaCooperativa.query
+    dq = DespesaCooperativa.query
+    if data_inicio:
+        rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
+        dq = dq.filter(DespesaCooperativa.data >= data_inicio)
+    if data_fim:
+        rq = rq.filter(ReceitaCooperativa.data <= data_fim)
+        dq = dq.filter(DespesaCooperativa.data <= data_fim)
 
-        receitas = rq.order_by(
-            ReceitaCooperativa.data.desc().nullslast(),
-            ReceitaCooperativa.id.desc(),
-        ).all()
-        despesas = dq.order_by(
-            DespesaCooperativa.data.desc(),
-            DespesaCooperativa.id.desc(),
-        ).all()
-        total_receitas = sum(_receita_total_real(r) for r in receitas)
-        total_despesas = sum((d.valor or 0.0) for d in despesas)
-        taxa_admin_rows, taxa_admin_totais = _build_taxa_admin_rows(receitas)
-        juros_arrecadados_total = round(sum((r['valor_multa'] + r['valor_juros']) for r in taxa_admin_rows if r['status'] == 'pago'), 2)
+    receitas = rq.order_by(
+        ReceitaCooperativa.data.desc().nullslast(),
+        ReceitaCooperativa.id.desc(),
+    ).all()
+    despesas = dq.order_by(
+        DespesaCooperativa.data.desc(),
+        DespesaCooperativa.id.desc(),
+    ).all()
+    total_receitas = sum(_receita_total_real(r) for r in receitas)
+    total_despesas = sum((d.valor or 0.0) for d in despesas)
+    taxa_admin_rows, taxa_admin_totais = _build_taxa_admin_rows(receitas)
+    juros_arrecadados_total = round(sum((r['valor_multa'] + r['valor_juros']) for r in taxa_admin_rows if r['status'] == 'pago'), 2)
     cooperados_map = {c.id: c for c in cooperados}
 
     # =========================
@@ -3884,27 +3875,26 @@ def admin_dashboard():
     # =========================
     # Gráficos
     # =========================
-    if active_tab == "lancamentos":
-        sums = {}
-        for l in lancamentos:
-            if not l.data:
-                continue
-            key = l.data.strftime("%Y-%m")
-            sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
+    sums = {}
+    for l in lancamentos:
+        if not l.data:
+            continue
+        key = l.data.strftime("%Y-%m")
+        sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
 
-        labels_ord = sorted(sums.keys())
+    labels_ord = sorted(sums.keys())
 
-        def _fmt_label(k: str) -> str:
-            parts = k.split("-")
-            if len(parts) == 2 and parts[0] and parts[1]:
-                year, month = parts[0], parts[1]
-                return f"{month}/{year[-2:]}"
-            return k
+    def _fmt_label(k: str) -> str:
+        parts = k.split("-")
+        if len(parts) == 2 and parts[0] and parts[1]:
+            year, month = parts[0], parts[1]
+            return f"{month}/{year[-2:]}"
+        return k
 
-        labels_fmt = [_fmt_label(k) for k in labels_ord]
-        values = [round(sums[k], 2) for k in labels_ord]
-        chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
-        chart_data_lancamentos_cooperados = {"labels": labels_fmt, "values": values}
+    labels_fmt = [_fmt_label(k) for k in labels_ord]
+    values = [round(sums[k], 2) for k in labels_ord]
+    chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
+    chart_data_lancamentos_cooperados = {"labels": labels_fmt, "values": values}
 
     # =========================
     # Admin master / principal
@@ -4039,7 +4029,7 @@ def admin_dashboard():
     historico_beneficios = []
     beneficios_view = []
 
-    if active_tab in {"resumo", "beneficios"}:
+    if True:
         if b_ini and not b_fim:
             b_fim = b_ini
         elif b_fim and not b_ini:
@@ -4321,44 +4311,43 @@ def admin_dashboard():
         "des": 0.0, "adiant": 0.0, "a_receber": 0.0, "saldo_pendente": 0.0,
         "pend_programado": 0.0
     }
-    if active_tab == "resumo":
-        for coop in cooperados:
-            snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
-            prod = sum((l.valor or 0.0) for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-            rec = sum((r.valor or 0.0) for r in receitas_coop if getattr(r, "cooperado_id", None) == coop.id)
-            inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-            sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-            des = round(snap.get("descontado_despesa", 0.0), 2)
-            adiant = round(snap.get("descontado_adiant", 0.0), 2)
-            if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
-                _a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
-                _saldo_pendente = round(snap["saldo_devedor"], 2)
-                _pend_programado = round(snap["a_descontar"], 2)
-                resumo_coop_rows.append({
-                    "id": coop.id,
-                    "nome": coop.nome,
-                    "prod": round(prod,2),
-                    "inss4": round(inss4,2),
-                    "sest05": round(sest05,2),
-                    "rec": round(rec,2),
-                    "des": round(des,2),
-                    "adiant": round(adiant,2),
-                    "a_receber": _a_receber,
-                    "aReceber": _a_receber,
-                    "saldo_pendente": _saldo_pendente,
-                    "saldoPendente": _saldo_pendente,
-                    "pend_programado": _pend_programado,
-                    "pendProgramado": _pend_programado,
-                })
-                resumo_totais["prod"] += prod
-                resumo_totais["inss4"] += inss4
-                resumo_totais["sest05"] += sest05
-                resumo_totais["rec"] += rec
-                resumo_totais["des"] += des
-                resumo_totais["adiant"] += adiant
-                resumo_totais["a_receber"] += max(0.0, snap["disponivel_auto_restante"])
-                resumo_totais["saldo_pendente"] += snap["saldo_devedor"]
-                resumo_totais["pend_programado"] += snap["a_descontar"]
+    for coop in cooperados:
+        snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
+        prod = sum((l.valor or 0.0) for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
+        rec = sum((r.valor or 0.0) for r in receitas_coop if getattr(r, "cooperado_id", None) == coop.id)
+        inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
+        sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
+        des = round(snap.get("descontado_despesa", 0.0), 2)
+        adiant = round(snap.get("descontado_adiant", 0.0), 2)
+        if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
+            _a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
+            _saldo_pendente = round(snap["saldo_devedor"], 2)
+            _pend_programado = round(snap["a_descontar"], 2)
+            resumo_coop_rows.append({
+                "id": coop.id,
+                "nome": coop.nome,
+                "prod": round(prod,2),
+                "inss4": round(inss4,2),
+                "sest05": round(sest05,2),
+                "rec": round(rec,2),
+                "des": round(des,2),
+                "adiant": round(adiant,2),
+                "a_receber": _a_receber,
+                "aReceber": _a_receber,
+                "saldo_pendente": _saldo_pendente,
+                "saldoPendente": _saldo_pendente,
+                "pend_programado": _pend_programado,
+                "pendProgramado": _pend_programado,
+            })
+            resumo_totais["prod"] += prod
+            resumo_totais["inss4"] += inss4
+            resumo_totais["sest05"] += sest05
+            resumo_totais["rec"] += rec
+            resumo_totais["des"] += des
+            resumo_totais["adiant"] += adiant
+            resumo_totais["a_receber"] += max(0.0, snap["disponivel_auto_restante"])
+            resumo_totais["saldo_pendente"] += snap["saldo_devedor"]
+            resumo_totais["pend_programado"] += snap["a_descontar"]
 
     return render_template(
         "admin_dashboard.html",
@@ -4915,7 +4904,7 @@ def admin_edit_lancamento(id):
 
     db.session.commit()
     flash("Lançamento atualizado.", "success")
-    return _admin_redirect_with_filters("lancamentos")
+    return redirect(url_for("admin_dashboard", tab="lancamentos"))
 
 
 @app.route("/admin/lancamentos/<int:id>/delete", methods=["GET", "POST"])
@@ -4933,7 +4922,7 @@ def admin_delete_lancamento(id):
     db.session.delete(l)
     db.session.commit()
     flash("Lançamento excluído.", "success")
-    return _admin_redirect_with_filters("lancamentos")
+    return redirect(url_for("admin_dashboard", tab="lancamentos"))
 
 
 # =========================
@@ -6728,29 +6717,14 @@ def _despesa_due_date(dc):
 
 
 def _admin_redirect_with_filters(default_tab="coop_despesas"):
-    def _pick(form_key, arg_key=None):
-        arg_key = arg_key or form_key
-        return (
-            request.form.get(f"filtro_{form_key}")
-            or request.args.get(f"filtro_{arg_key}")
-            or request.form.get(form_key)
-            or request.args.get(arg_key)
-            or ""
-        )
-
     args = {
         "tab": request.form.get("tab") or request.args.get("tab") or default_tab,
-        "data_inicio": _pick("data_inicio"),
-        "data_fim": _pick("data_fim"),
-        "restaurante_id": _pick("restaurante_id"),
-        "cooperado_id": _pick("cooperado_id"),
+        "data_inicio": request.form.get("data_inicio") or request.args.get("data_inicio") or "",
+        "data_fim": request.form.get("data_fim") or request.args.get("data_fim") or "",
+        "restaurante_id": request.form.get("restaurante_id") or request.args.get("restaurante_id") or "",
+        "cooperado_id": request.form.get("cooperado_id") or request.args.get("cooperado_id") or "",
     }
-    if (
-        request.form.get("filtro_somente_pendentes")
-        or request.args.get("filtro_somente_pendentes")
-        or request.form.get("somente_pendentes")
-        or request.args.get("somente_pendentes")
-    ):
+    if request.form.get("somente_pendentes") or request.args.get("somente_pendentes"):
         args["somente_pendentes"] = "1"
     return redirect(url_for("admin_dashboard", **args))
 
@@ -7064,10 +7038,16 @@ def add_despesa_coop():
     data_comp = _competencia_ref(d, competencia_semana)
     di_comp, df_comp = semana_bounds(data_comp)
 
-    valor_unit = round(valor_total, 2)
+    qtd = len(ids)
+    valor_unit = round(valor_total / qtd, 2) if qtd > 0 else 0.0
+    valores = [valor_unit] * qtd
+    # ajusta centavos no último para fechar exatamente o total
+    if qtd > 0:
+        soma_base = round(valor_unit * qtd, 2)
+        diff = round(valor_total - soma_base, 2)
+        valores[-1] = round(valores[-1] + diff, 2)
 
-    for cid in ids:
-        v = valor_unit
+    for cid, v in zip(ids, valores):
         db.session.add(
             DespesaCooperado(
                 cooperado_id=cid,
@@ -7092,7 +7072,7 @@ def edit_despesa_coop(id):
     dc = DespesaCooperado.query.get_or_404(id)
     f = request.form
 
-    dc.cooperado_id = f.get("edit_cooperado_id", type=int) or f.get("cooperado_id", type=int)
+    dc.cooperado_id = f.get("cooperado_id", type=int)
     dc.descricao = (f.get("descricao") or "").strip()
     dc.valor = f.get("valor", type=float)
     data_edit = _parse_date(f.get("data")) or dc.data or date.today()
