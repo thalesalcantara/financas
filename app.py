@@ -1016,11 +1016,11 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text("""
-                ALTER TABLE IF NOT EXISTS public.despesas_cooperado
+                ALTER TABLE IF EXISTS public.despesas_cooperado
                 ADD COLUMN IF NOT EXISTS data_inicio DATE
             """))
             db.session.execute(sa_text("""
-                ALTER TABLE IF NOT EXISTS public.despesas_cooperado
+                ALTER TABLE IF EXISTS public.despesas_cooperado
                 ADD COLUMN IF NOT EXISTS data_fim DATE
             """))
             db.session.commit()
@@ -1150,7 +1150,7 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS escalas "
+                "ALTER TABLE IF EXISTS escalas "
                 "ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"
             ))
             db.session.commit()
@@ -1167,7 +1167,7 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS escalas "
+                "ALTER TABLE IF EXISTS escalas "
                 "ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"
             ))
             db.session.commit()
@@ -1190,13 +1190,13 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
@@ -1211,7 +1211,7 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados "
+                "ALTER TABLE IF EXISTS cooperados "
                 "ADD COLUMN IF NOT EXISTS telefone VARCHAR(30)"
             ))
             db.session.commit()
@@ -1252,9 +1252,9 @@ def init_db():
                   cooperado_id   INTEGER NOT NULL,
                   lancamento_id  INTEGER UNIQUE,
                   estrelas_geral INTEGER,
-                  estrelas_ambiente   = db.Column(db.Integer)
-                  estrelas_tratamento = db.Column(db.Integer)
-                  estrelas_suporte    = db.Column(db.Integer)
+                  estrelas_ambiente INTEGER,
+                  estrelas_tratamento INTEGER,
+                  estrelas_suporte INTEGER,
                   comentario TEXT,
                   media_ponderada DOUBLE PRECISION,
                   sentimento VARCHAR(12),
@@ -1287,13 +1287,13 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
