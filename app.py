@@ -21,7 +21,7 @@ mimetypes.add_type("application/vnd.ms-powerpoint", ".ppt")
 # ============ Terceiros ============
 from flask import (
     Flask, render_template, request, redirect, url_for, session,
-    flash, send_file, abort, jsonify, current_app
+    flash, send_file, abort, jsonify, current_app, render_template_string
 )
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -4081,6 +4081,115 @@ def admin_dashboard():
                 "recebedores": recs,
             })
 
+    ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
+    ajax_financeiros = {"resumo", "lancamentos", "receitas", "despesas", "coop_receitas", "coop_despesas", "beneficios"}
+    if ajax_partial in ajax_financeiros:
+        resumo_coop_rows = []
+        resumo_totais = {
+            "prod": 0.0, "inss4": 0.0, "sest05": 0.0, "rec": 0.0,
+            "des": 0.0, "adiant": 0.0, "a_receber": 0.0, "saldo_pendente": 0.0,
+            "pend_programado": 0.0
+        }
+        chart_data_lancamentos_coop = {"labels": [], "values": []}
+        chart_data_lancamentos_cooperados = {"labels": [], "values": []}
+
+        if ajax_partial == "resumo":
+            sums = {}
+            for l in lancamentos:
+                if not l.data:
+                    continue
+                key = l.data.strftime("%Y-%m")
+                sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
+
+            labels_ord = sorted(sums.keys())
+            labels_fmt = []
+            for k in labels_ord:
+                parts = k.split("-")
+                if len(parts) == 2 and parts[0] and parts[1]:
+                    year, month = parts[0], parts[1]
+                    labels_fmt.append(f"{month}/{year[-2:]}")
+                else:
+                    labels_fmt.append(k)
+            values = [round(sums[k], 2) for k in labels_ord]
+            chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
+            chart_data_lancamentos_cooperados = {"labels": labels_fmt, "values": values}
+
+            for coop in cooperados:
+                snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
+                prod = sum((l.valor or 0.0) for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
+                rec = sum((r.valor or 0.0) for r in receitas_coop if getattr(r, "cooperado_id", None) == coop.id)
+                inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
+                sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
+                des = round(snap.get("descontado_despesa", 0.0), 2)
+                adiant = round(snap.get("descontado_adiant", 0.0), 2)
+                if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
+                    a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
+                    saldo_pendente = round(snap["saldo_devedor"], 2)
+                    pend_programado = round(snap["a_descontar"], 2)
+                    resumo_coop_rows.append({
+                        "id": coop.id,
+                        "nome": coop.nome,
+                        "prod": round(prod,2),
+                        "inss4": round(inss4,2),
+                        "sest05": round(sest05,2),
+                        "rec": round(rec,2),
+                        "des": round(des,2),
+                        "adiant": round(adiant,2),
+                        "a_receber": a_receber,
+                        "aReceber": a_receber,
+                        "saldo_pendente": saldo_pendente,
+                        "saldoPendente": saldo_pendente,
+                        "pend_programado": pend_programado,
+                        "pendProgramado": pend_programado,
+                    })
+                    resumo_totais["prod"] += prod
+                    resumo_totais["inss4"] += inss4
+                    resumo_totais["sest05"] += sest05
+                    resumo_totais["rec"] += rec
+                    resumo_totais["des"] += des
+                    resumo_totais["adiant"] += adiant
+                    resumo_totais["a_receber"] += max(0.0, snap["disponivel_auto_restante"])
+                    resumo_totais["saldo_pendente"] += snap["saldo_devedor"]
+                    resumo_totais["pend_programado"] += snap["a_descontar"]
+
+        partial_context = dict(
+            tab=ajax_partial,
+            fast_mode=False,
+            total_producoes=total_producoes,
+            total_inss=total_inss,
+            total_sest=total_sest,
+            total_encargos=total_encargos,
+            total_receitas=total_receitas,
+            total_despesas=total_despesas,
+            total_receitas_coop=total_receitas_coop,
+            total_despesas_coop=total_despesas_coop,
+            total_adiantamentos_coop=total_adiantamentos_coop,
+            salario_minimo=(cfg.salario_minimo or 0.0) if cfg else 0.0,
+            lancamentos=lancamentos,
+            receitas=receitas,
+            despesas=despesas,
+            receitas_coop=receitas_coop,
+            despesas_coop=despesas_coop,
+            cooperados=cooperados,
+            restaurantes=restaurantes,
+            beneficios_view=beneficios_view,
+            historico_beneficios=historico_beneficios,
+            admin_perms=admin_perms,
+            admin_is_master=is_admin_master(),
+            taxa_admin_rows=taxa_admin_rows,
+            taxa_admin_totais=taxa_admin_totais,
+            juros_arrecadados_total=juros_arrecadados_total,
+            resumo_coop_rows=resumo_coop_rows,
+            resumo_totais=resumo_totais,
+            chart_data_lancamentos_coop=chart_data_lancamentos_coop,
+            chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
+            despesa_snapshot_map=despesa_snapshot_map if 'despesa_snapshot_map' in locals() else {},
+            current_date=date.today(),
+            data_limite=date(date.today().year, 12, 31),
+            filtro_periodo_aplicado=filtro_periodo_aplicado,
+        )
+        return _render_admin_dashboard_partial(ajax_partial, **partial_context)
+
     # =========================
     # Trocas
     # =========================
@@ -4416,12 +4525,21 @@ def admin_dashboard():
     )
 
     ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
-    if ajax_partial in {"lancamentos", "resumo"}:
-        import re
-        marker = "LANC" if ajax_partial == "lancamentos" else "RESUMO"
-        m = re.search(rf"<!--AJAX_{marker}_START-->(.*?)<!--AJAX_{marker}_END-->", _rendered_html, flags=re.DOTALL)
-        if m:
-            return m.group(1)
+    if ajax_partial:
+        marker_map = {
+            "resumo": "RESUMO",
+            "lancamentos": "LANC",
+            "receitas": "RECEITAS",
+            "despesas": "DESPESAS",
+            "coop_receitas": "COOP_RECEITAS",
+            "coop_despesas": "COOP_DESPESAS",
+            "beneficios": "BENEFICIOS",
+        }
+        marker = marker_map.get(ajax_partial)
+        if marker:
+            m = re.search(rf"<!--AJAX_{marker}_START-->(.*?)<!--AJAX_{marker}_END-->", _rendered_html, flags=re.DOTALL)
+            if m:
+                return m.group(1)
     return _rendered_html
     
 # =========================
@@ -4437,6 +4555,16 @@ def filtrar_lancamentos():
 
 
 from datetime import datetime, date
+
+
+
+def _render_admin_dashboard_partial(partial_name: str, **context):
+    template_src, _, _ = current_app.jinja_loader.get_source(current_app.jinja_env, "admin_dashboard.html")
+    marker = (partial_name or "").strip().upper()
+    m = re.search(rf"<!--AJAX_{marker}_START-->(.*?)<!--AJAX_{marker}_END-->", template_src, flags=re.DOTALL)
+    if not m:
+        return "", 404
+    return render_template_string(m.group(1), **context)
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -6959,18 +7087,13 @@ def delete_despesa_coop_bulk():
         except Exception:
             pass
     if not ids_int:
-        if _wants_json_response():
-            return jsonify({"ok": False, "message": "Selecione pelo menos uma despesa para excluir."}), 400
         flash("Selecione pelo menos uma despesa para excluir.", "warning")
         return _admin_redirect_with_filters("coop_despesas")
 
     DespesaCooperado.query.filter(DespesaCooperado.id.in_(ids_int)).delete(synchronize_session=False)
     db.session.commit()
-    return _json_or_redirect_success(
-        f"{len(ids_int)} despesa(s) excluída(s).",
-        "coop_despesas",
-        {"deleted_ids": ids_int},
-    )
+    flash(f"{len(ids_int)} despesa(s) excluída(s).", "success")
+    return _admin_redirect_with_filters("coop_despesas")
 
 
 
@@ -7055,11 +7178,10 @@ def add_despesa_coop():
             excluir_ids.add(cid)
 
     ids = [cid for cid in ids if cid not in excluir_ids]
+    # remove duplicados preservando ordem
     ids = list(dict.fromkeys(ids))
 
     if not ids:
-        if _wants_json_response():
-            return jsonify({"ok": False, "message": "Selecione pelo menos um cooperado ativo."}), 400
         flash("Selecione pelo menos um cooperado ativo.", "warning")
         return _admin_redirect_with_filters("coop_despesas")
 
@@ -7070,49 +7192,31 @@ def add_despesa_coop():
     di_comp, df_comp = semana_bounds(data_comp)
 
     qtd = len(ids)
-    valores = [round(valor_total, 2)] * qtd
+    valor_unit = round(valor_total / qtd, 2) if qtd > 0 else 0.0
+    valores = [valor_unit] * qtd
+    # ajusta centavos no último para fechar exatamente o total
+    if qtd > 0:
+        soma_base = round(valor_unit * qtd, 2)
+        diff = round(valor_total - soma_base, 2)
+        valores[-1] = round(valores[-1] + diff, 2)
 
-    created_rows = []
     for cid, v in zip(ids, valores):
-        dc = DespesaCooperado(
-            cooperado_id=cid,
-            descricao=descricao,
-            valor=v,
-            data=df_comp,
-            data_inicio=di_comp,
-            data_fim=df_comp,
-            eh_adiantamento=eh_adiantamento,
-            competencia_desconto=competencia_semana,
+        db.session.add(
+            DespesaCooperado(
+                cooperado_id=cid,
+                descricao=descricao,
+                valor=v,
+                data=df_comp,
+                data_inicio=di_comp,
+                data_fim=df_comp,
+                eh_adiantamento=eh_adiantamento,
+                competencia_desconto=competencia_semana,
+            )
         )
-        db.session.add(dc)
-        created_rows.append(dc)
 
     db.session.commit()
-
-    payload_rows = []
-    for dc in created_rows:
-        coop = ativos.get(dc.cooperado_id)
-        payload_rows.append({
-            "id": dc.id,
-            "data": dc.data.isoformat() if dc.data else "",
-            "cooperado_id": dc.cooperado_id,
-            "cooperado_nome": (coop.nome if coop else "Todos"),
-            "descricao": dc.descricao or "",
-            "eh_adiantamento": bool(dc.eh_adiantamento),
-            "competencia_desconto": dc.competencia_desconto or "esta_semana",
-            "valor": float(dc.valor or 0),
-            "abatido_automatico": 0.0,
-            "restante": float(dc.valor or 0),
-            "status": "aberta",
-            "edit_url": url_for("edit_despesa_coop", id=dc.id),
-            "delete_url": url_for("delete_despesa_coop", id=dc.id),
-        })
-
-    return _json_or_redirect_success(
-        "Despesa(s) lançada(s).",
-        "coop_despesas",
-        {"created_count": len(payload_rows), "rows": payload_rows},
-    )
+    flash("Despesa(s) lançada(s).", "success")
+    return _admin_redirect_with_filters("coop_despesas")
 
 
 @app.route("/coop/despesas/<int:id>/edit", methods=["POST"])
