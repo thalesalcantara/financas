@@ -1016,11 +1016,11 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text("""
-                ALTER TABLE IF NOT EXISTS public.despesas_cooperado
+                ALTER TABLE IF EXISTS public.despesas_cooperado
                 ADD COLUMN IF NOT EXISTS data_inicio DATE
             """))
             db.session.execute(sa_text("""
-                ALTER TABLE IF NOT EXISTS public.despesas_cooperado
+                ALTER TABLE IF EXISTS public.despesas_cooperado
                 ADD COLUMN IF NOT EXISTS data_fim DATE
             """))
             db.session.commit()
@@ -1150,7 +1150,7 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS escalas "
+                "ALTER TABLE IF EXISTS escalas "
                 "ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"
             ))
             db.session.commit()
@@ -1167,7 +1167,7 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS escalas "
+                "ALTER TABLE IF EXISTS escalas "
                 "ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"
             ))
             db.session.commit()
@@ -1190,13 +1190,13 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
@@ -1211,7 +1211,7 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados "
+                "ALTER TABLE IF EXISTS cooperados "
                 "ADD COLUMN IF NOT EXISTS telefone VARCHAR(30)"
             ))
             db.session.commit()
@@ -1223,11 +1223,11 @@ def init_db():
         if _is_sqlite():
             db.session.execute(sa_text("""
                 CREATE TABLE IF NOT EXISTS avaliacoes_restaurante (
-                id SERIAL PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 restaurante_id INTEGER NOT NULL,
                 cooperado_id INTEGER NOT NULL,
                 lancamento_id INTEGER UNIQUE,
-                estrelas_geral DOUBLE PRECISION,
+                estrelas_geral INTEGER,
                 estrelas_ambiente INTEGER,
                 estrelas_tratamento INTEGER,
                 estrelas_suporte INTEGER,
@@ -1237,7 +1237,7 @@ def init_db():
                 temas VARCHAR(255),
                 alerta_crise BOOLEAN DEFAULT FALSE,
                 criado_em TIMESTAMP
-              );
+              )
            """))
             db.session.execute(sa_text(
                 "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
@@ -1252,16 +1252,16 @@ def init_db():
                   cooperado_id   INTEGER NOT NULL,
                   lancamento_id  INTEGER UNIQUE,
                   estrelas_geral INTEGER,
-                  estrelas_ambiente   = db.Column(db.Integer)
-                  estrelas_tratamento = db.Column(db.Integer)
-                  estrelas_suporte    = db.Column(db.Integer)
+                  estrelas_ambiente INTEGER,
+                  estrelas_tratamento INTEGER,
+                  estrelas_suporte INTEGER,
                   comentario TEXT,
                   media_ponderada DOUBLE PRECISION,
                   sentimento VARCHAR(12),
                   temas VARCHAR(255),
                   alerta_crise BOOLEAN DEFAULT FALSE,
                   criado_em TIMESTAMP
-                );
+                )
             """))
             db.session.execute(sa_text(
                 "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
@@ -1287,13 +1287,13 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
@@ -9832,11 +9832,7 @@ def lancar_producao():
             flash("⚠️ Avaliação crítica registrada (1★ + termo de risco). A gerência deve revisar.", "danger")
 
     db.session.commit()
-    msg = "Produção lançada" + (" + avaliação salva." if tem_avaliacao else ".")
-    if _wants_json_response():
-        coop = Cooperado.query.get(l.cooperado_id) if l.cooperado_id else None
-        return jsonify({"ok": True, "message": msg, "item": _serialize_lancamento_portal(l, coop_nome=(coop.nome if coop else ""), contrato_nome=rest.nome)})
-    flash(msg, "success")
+    flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
     return redirect(url_for("portal_restaurante", view="lancar"))
 
 @app.route("/lancamentos/<int:id>/editar", methods=["GET", "POST"])
@@ -9848,33 +9844,24 @@ def editar_lancamento(id):
     if not rest or l.restaurante_id != rest.id:
         abort(403)
 
-    if request.method == "GET" and _wants_json_response():
-        coop = Cooperado.query.get(l.cooperado_id) if l.cooperado_id else None
-        return jsonify({"ok": True, "item": _serialize_lancamento_portal(l, coop_nome=(coop.nome if coop else ""), contrato_nome=rest.nome)})
-
     if request.method == "POST":
-        f = request.form if request.form else (request.get_json(silent=True) or {})
-        l.valor = float(f.get("valor") or 0)
+        f = request.form
+        l.valor = f.get("valor", type=float)
         l.data = _parse_date(f.get("data")) or l.data
         l.hora_inicio = f.get("hora_inicio")
         l.hora_fim = f.get("hora_fim")
-        qtd = f.get("qtd_entregas")
-        try:
-            l.qtd_entregas = int(qtd) if qtd not in (None, "") else None
-        except Exception:
-            l.qtd_entregas = None
+        l.qtd_entregas = f.get("qtd_entregas", type=int)
+        # NOVO: permitir atualizar descrição se o form de edição trouxer o campo
         if "descricao" in f:
             l.descricao = (f.get("descricao") or "").strip() or None
         db.session.commit()
-        if _wants_json_response():
-            coop = Cooperado.query.get(l.cooperado_id) if l.cooperado_id else None
-            return jsonify({"ok": True, "message": "Lançamento atualizado.", "item": _serialize_lancamento_portal(l, coop_nome=(coop.nome if coop else ""), contrato_nome=rest.nome)})
         flash("Lançamento atualizado.", "success")
-        return redirect(url_for("portal_restaurante", view="lancamentos", data_inicio=(l.data and l.data.strftime("%Y-%m-%d"))))
+        return redirect(url_for("portal_restaurante", view="lancamentos",
+                                data_inicio=(l.data and l.data.strftime("%Y-%m-%d"))))
 
     return render_template("editar_lancamento.html", lanc=l)
 
-@app.route("/lancamentos/<int:id>/excluir", methods=["GET", "POST", "DELETE"])
+@app.get("/lancamentos/<int:id>/excluir")
 @role_required("restaurante")
 def excluir_lancamento(id):
     u_id = session.get("user_id")
@@ -9887,8 +9874,6 @@ def excluir_lancamento(id):
     db.session.execute(sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.lancamento_id == id))
     db.session.delete(l)
     db.session.commit()
-    if _wants_json_response() or request.method in ("POST", "DELETE"):
-        return jsonify({"ok": True, "message": "Lançamento excluído.", "id": id})
     flash("Lançamento excluído.", "success")
     return redirect(url_for("portal_restaurante", view="lancamentos"))
 
