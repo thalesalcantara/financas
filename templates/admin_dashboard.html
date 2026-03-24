@@ -719,7 +719,8 @@
   <div class="tab-content">
 
     <!-- === RESUMO (Dashboard Financeiro Completo) === -->
-    <section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
+    
+      <!--AJAX_RESUMO_START--><section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
       <div class="resumo-shell">
 
         {# ---------- Helpers de data ---------- #}
@@ -1975,12 +1976,13 @@
       document.getElementById('btnExportXLSX')?.addEventListener('click', exportXLSX);
     })();
     </script>
-</section>
+</section><!--AJAX_RESUMO_END-->
 
 <!-- LANÇAMENTOS (versão moderna/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='lancamentos' else '' }}" id="lancamentos" role="tabpanel">
   {# ====== TOTAIS DO FILTRO (já vem filtrado do backend) ====== #}
   {% set soma_valor    = (lancamentos|sum(attribute='valor')) if lancamentos else 0 %}
+<!--AJAX_LANC_START--><div id="lancamentosAjaxWrap">
   {% set soma_inss_4   = (soma_valor * 0.04) %}
   {% set soma_sest_05  = (soma_valor * 0.005) %}
   {% set soma_liq      = (soma_valor - soma_inss_4 - soma_sest_05) %}
@@ -2046,7 +2048,7 @@
         </button>
       </div>
 
-      <form method="GET" action="{{ url_for('filtrar_lancamentos') }}" class="row g-2 align-items-end">
+      <form id="formFiltroLancamentos" method="GET" action="{{ url_for('filtrar_lancamentos') }}" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="lancamentos">
 
         <div class="col-md-3">
@@ -2121,9 +2123,7 @@
             <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
           </a>
 
-          <button type="reset" class="btn btn-light btn-sm rounded-pill">
-            Limpar
-          </button>
+          <a href="{{ url_for('admin_dashboard', tab='lancamentos') }}" class="btn btn-light btn-sm rounded-pill">Limpar</a>
         </div>
       </form>
     </div>
@@ -2223,7 +2223,7 @@
               <th class="text-center">Ações</th>
             </tr>
           </thead>
-          <tbody id="lancamentos">
+          <tbody id="lancamentosTableBody">
             {% for l in lancamentos %}
               {% set inss_4  = (l.valor or 0) * 0.04 %}
               {% set sest_05 = (l.valor or 0) * 0.005 %}
@@ -2287,6 +2287,7 @@
       </div>
     </div>
   </div>
+</div><!--AJAX_LANC_END-->
 </section>
 
 <style>
@@ -6173,9 +6174,72 @@
     const [y,m,d] = String(yyyy_mm_dd).split('-');
     return [d,m,y].filter(Boolean).join('/');
   }
+
+
+  function initAjaxFilters(){
+    const resumoForm = document.getElementById('formFiltroResumo');
+    const lancForm = document.getElementById('formFiltroLancamentos');
+
+    async function fetchPartial(form, partial, wrapId, tabName){
+      const wrap = document.getElementById(wrapId);
+      if (!form || !wrap) return;
+      const params = new URLSearchParams(new FormData(form));
+      params.set('tab', tabName);
+      params.set('ajax_partial', partial);
+      const url = `${form.action}?${params.toString()}`;
+      wrap.style.opacity = '.65';
+      try{
+        const resp = await fetch(url, { headers:{ 'X-Requested-With':'XMLHttpRequest' }});
+        const html = await resp.text();
+        if (!resp.ok || !html.trim()) throw new Error('Falha ao filtrar.');
+
+        const holder = document.createElement('div');
+        holder.innerHTML = html;
+        const nodes = Array.from(holder.childNodes);
+        const firstEl = nodes.find(n => n.nodeType === 1);
+        wrap.replaceWith(...nodes);
+
+        if (firstEl){
+          firstEl.querySelectorAll('script').forEach(oldScript => {
+            const s = document.createElement('script');
+            if (oldScript.src) s.src = oldScript.src;
+            if (oldScript.type) s.type = oldScript.type;
+            s.textContent = oldScript.textContent;
+            oldScript.replaceWith(s);
+          });
+        }
+
+        if (window.history && window.history.replaceState){
+          window.history.replaceState({}, '', resp.url);
+        }
+        initAjaxFilters();
+      }catch(err){
+        alert(err.message || 'Falha ao filtrar.');
+        wrap.style.opacity = '1';
+      }
+    }
+
+    if (resumoForm && !resumoForm.dataset.ajaxBound){
+      resumoForm.dataset.ajaxBound = '1';
+      resumoForm.addEventListener('submit', function(e){
+        e.preventDefault();
+        fetchPartial(resumoForm, 'resumo', 'resumo', 'resumo');
+      });
+    }
+
+    if (lancForm && !lancForm.dataset.ajaxBound){
+      lancForm.dataset.ajaxBound = '1';
+      lancForm.addEventListener('submit', function(e){
+        e.preventDefault();
+        fetchPartial(lancForm, 'lancamentos', 'lancamentosAjaxWrap', 'lancamentos');
+      });
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', initAjaxFilters);
   function updateLancamentoRow(form){
     const id = form.querySelector('[name="id"]')?.value;
-    const row = document.querySelector(`#lancamentos tr[data-row-id="${id}"]`);
+    const row = document.querySelector(`#lancamentosTableBody tr[data-row-id="${id}"]`);
     if (!row) return false;
     const restaurante = form.querySelector('[name="restaurante_id"]');
     const cooperado = form.querySelector('[name="cooperado_id"]');
