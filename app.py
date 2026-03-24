@@ -4416,14 +4416,9 @@ def admin_dashboard():
     )
 
     ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
-    ajax_markers = {
-        "lancamentos": "LANC",
-        "resumo": "RESUMO",
-        "coop_despesas": "COOP_DESPESAS",
-    }
-    if ajax_partial in ajax_markers:
+    if ajax_partial in {"lancamentos", "resumo"}:
         import re
-        marker = ajax_markers[ajax_partial]
+        marker = "LANC" if ajax_partial == "lancamentos" else "RESUMO"
         m = re.search(rf"<!--AJAX_{marker}_START-->(.*?)<!--AJAX_{marker}_END-->", _rendered_html, flags=re.DOTALL)
         if m:
             return m.group(1)
@@ -7159,8 +7154,6 @@ def delete_despesa_coop(id=None):
                 pass
 
     if not ids:
-        if _wants_json_response():
-            return jsonify({"ok": False, "message": "Nenhuma despesa selecionada."}), 400
         flash("Nenhuma despesa selecionada.", "warning")
         return _admin_redirect_with_filters("coop_despesas")
 
