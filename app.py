@@ -6959,13 +6959,18 @@ def delete_despesa_coop_bulk():
         except Exception:
             pass
     if not ids_int:
+        if _wants_json_response():
+            return jsonify({"ok": False, "message": "Selecione pelo menos uma despesa para excluir."}), 400
         flash("Selecione pelo menos uma despesa para excluir.", "warning")
         return _admin_redirect_with_filters("coop_despesas")
 
     DespesaCooperado.query.filter(DespesaCooperado.id.in_(ids_int)).delete(synchronize_session=False)
     db.session.commit()
-    flash(f"{len(ids_int)} despesa(s) excluída(s).", "success")
-    return _admin_redirect_with_filters("coop_despesas")
+    return _json_or_redirect_success(
+        f"{len(ids_int)} despesa(s) excluída(s).",
+        "coop_despesas",
+        {"deleted_ids": ids_int},
+    )
 
 
 
@@ -7050,10 +7055,11 @@ def add_despesa_coop():
             excluir_ids.add(cid)
 
     ids = [cid for cid in ids if cid not in excluir_ids]
-    # remove duplicados preservando ordem
     ids = list(dict.fromkeys(ids))
 
     if not ids:
+        if _wants_json_response():
+            return jsonify({"ok": False, "message": "Selecione pelo menos um cooperado ativo."}), 400
         flash("Selecione pelo menos um cooperado ativo.", "warning")
         return _admin_redirect_with_filters("coop_despesas")
 
@@ -7066,23 +7072,47 @@ def add_despesa_coop():
     qtd = len(ids)
     valores = [round(valor_total, 2)] * qtd
 
+    created_rows = []
     for cid, v in zip(ids, valores):
-        db.session.add(
-            DespesaCooperado(
-                cooperado_id=cid,
-                descricao=descricao,
-                valor=v,
-                data=df_comp,
-                data_inicio=di_comp,
-                data_fim=df_comp,
-                eh_adiantamento=eh_adiantamento,
-                competencia_desconto=competencia_semana,
-            )
+        dc = DespesaCooperado(
+            cooperado_id=cid,
+            descricao=descricao,
+            valor=v,
+            data=df_comp,
+            data_inicio=di_comp,
+            data_fim=df_comp,
+            eh_adiantamento=eh_adiantamento,
+            competencia_desconto=competencia_semana,
         )
+        db.session.add(dc)
+        created_rows.append(dc)
 
     db.session.commit()
-    flash("Despesa(s) lançada(s).", "success")
-    return _admin_redirect_with_filters("coop_despesas")
+
+    payload_rows = []
+    for dc in created_rows:
+        coop = ativos.get(dc.cooperado_id)
+        payload_rows.append({
+            "id": dc.id,
+            "data": dc.data.isoformat() if dc.data else "",
+            "cooperado_id": dc.cooperado_id,
+            "cooperado_nome": (coop.nome if coop else "Todos"),
+            "descricao": dc.descricao or "",
+            "eh_adiantamento": bool(dc.eh_adiantamento),
+            "competencia_desconto": dc.competencia_desconto or "esta_semana",
+            "valor": float(dc.valor or 0),
+            "abatido_automatico": 0.0,
+            "restante": float(dc.valor or 0),
+            "status": "aberta",
+            "edit_url": url_for("edit_despesa_coop", id=dc.id),
+            "delete_url": url_for("delete_despesa_coop", id=dc.id),
+        })
+
+    return _json_or_redirect_success(
+        "Despesa(s) lançada(s).",
+        "coop_despesas",
+        {"created_count": len(payload_rows), "rows": payload_rows},
+    )
 
 
 @app.route("/coop/despesas/<int:id>/edit", methods=["POST"])
