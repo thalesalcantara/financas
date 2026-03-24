@@ -4416,27 +4416,12 @@ def admin_dashboard():
     )
 
     ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
-    if ajax_partial:
+    if ajax_partial in {"lancamentos", "resumo"}:
         import re
-        marker_map = {
-            "resumo": "RESUMO",
-            "lancamentos": "LANC",
-            "receitas": "RECEITAS",
-            "despesas": "DESPESAS",
-            "coop_receitas": "COOP_RECEITAS",
-            "coop_despesas": "COOP_DESPESAS",
-            "beneficios": "BENEFICIOS",
-            "cooperados": "COOPERADOS",
-            "restaurantes": "RESTAURANTES",
-            "escalas": "ESCALAS",
-            "sistemas": "SISTEMAS",
-            "config": "CONFIG",
-        }
-        marker = marker_map.get(ajax_partial)
-        if marker:
-            m = re.search(rf"<!--AJAX_{marker}_START-->(.*?)<!--AJAX_{marker}_END-->", _rendered_html, flags=re.DOTALL)
-            if m:
-                return m.group(1)
+        marker = "LANC" if ajax_partial == "lancamentos" else "RESUMO"
+        m = re.search(rf"<!--AJAX_{marker}_START-->(.*?)<!--AJAX_{marker}_END-->", _rendered_html, flags=re.DOTALL)
+        if m:
+            return m.group(1)
     return _rendered_html
     
 # =========================
@@ -5434,7 +5419,8 @@ def atualizar_taxa_admin_status(id):
         r.data = getattr(r, 'data_vencimento', None) or r.data
 
     db.session.commit()
-    return _json_or_redirect_success("Taxa administrativa atualizada.", "receitas", {"id": r.id})
+    flash("Taxa administrativa atualizada.", "success")
+    return redirect(url_for("admin_dashboard", tab="receitas"))
 
 
 @app.route("/receitas/taxas-admin/lote", methods=["POST"])
@@ -5477,7 +5463,8 @@ def atualizar_taxa_admin_lote():
             r.valor_total = 0.0
             r.data = getattr(r, 'data_vencimento', None) or r.data
     db.session.commit()
-    return _json_or_redirect_success("Taxas administrativas atualizadas em lote.", "receitas", {"ids": ids_int})
+    flash("Taxas administrativas atualizadas em lote.", "success")
+    return redirect(url_for("admin_dashboard", tab="receitas"))
 
 
 @app.route("/despesas/add", methods=["POST"])
