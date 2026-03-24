@@ -895,7 +895,7 @@
               {% endif %}
             </div>
 
-            <form method="GET" action="{{ url_for('admin_dashboard') }}" id="formFiltroResumo" class="row g-2 align-items-end">
+            <form method="GET" class="row g-2 align-items-end">
               <input type="hidden" name="tab" value="resumo">
               <div class="col-md-2">
                 <label class="form-label">De</label>
@@ -2561,6 +2561,11 @@
       </div>
 
       <form method="POST" action="{{ url_for('add_receita') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_receitas_criar">
+
+      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
         <div class="col-md-5">
           <label class="form-label">Descrição</label>
           <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
@@ -3016,7 +3021,7 @@
 
 
 <!-- DESPESAS COOPERADOS (versão profissional/compacta – SEM ADIANTAMENTO + PESQUISA) -->
-<!--AJAX_COOP_DESPESAS_START--><section class="tab-pane fade {{ 'show active' if _tab=='coop_despesas' else '' }}" id="coop_despesas" role="tabpanel">
+<section class="tab-pane fade {{ 'show active' if _tab=='coop_despesas' else '' }}" id="coop_despesas" role="tabpanel">
   {% set _despesas = (despesas_coop | default([]) | list) %}
 
   {# Totais (tudo entra como despesa) #}
@@ -3050,7 +3055,7 @@
         <h6 class="m-0"><i class="bi bi-funnel"></i> Filtrar</h6>
       </div>
 
-      <form method="GET" action="{{ url_for('admin_dashboard') }}" id="formFiltroCoopDespesas" class="row g-2 align-items-end">
+      <form method="GET" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="coop_despesas">
         <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
         <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
@@ -6272,10 +6277,9 @@
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok || data.ok === false) throw new Error(data.message || 'Falha ao excluir.');
         const row = form.closest('tr');
-        if (row) row.remove();
+        if (row) row.remove(); else window.location.reload();
         recalcDespesaCoopTotal();
         ensureDespesaCoopEmptyState();
-        await refreshResumoPartial(getCurrentAdminParams());
       } catch (err) {
         alert(err.message || 'Erro ao excluir.');
       }
@@ -6299,10 +6303,9 @@
             const data = await resp.json().catch(() => ({}));
             if (!resp.ok || data.ok === false) throw new Error(data.message || 'Falha ao excluir.');
             const row = btn.closest('tr');
-            if (row) row.remove();
+            if (row) row.remove(); else window.location.reload();
             recalcDespesaCoopTotal();
             ensureDespesaCoopEmptyState();
-            await refreshResumoPartial(getCurrentAdminParams());
           } catch (err) {
             alert(err.message || 'Erro ao excluir.');
           }
@@ -6342,7 +6345,6 @@
           formNova.reset();
           const tipo = document.getElementById('ehAdiantamentoNovaDesp');
           if (tipo) tipo.checked = false;
-          await refreshResumoPartial(getCurrentAdminParams());
           alert(data.message || 'Despesa(s) lançada(s).');
         } catch (err) {
           alert(err.message || 'Erro ao lançar despesa.');
@@ -6382,7 +6384,6 @@
           bulkForm.querySelectorAll('input[name="ids[]"], input[name="ids"]').forEach((chk) => { chk.checked = false; });
           const checkAll = document.getElementById('checkAllDespesas');
           if (checkAll) checkAll.checked = false;
-          await refreshResumoPartial(getCurrentAdminParams());
           alert(data.message || 'Despesas excluídas.');
         } catch (err) {
           alert(err.message || 'Erro ao excluir despesas.');
@@ -6399,120 +6400,62 @@
   }
 
 
-  function getCurrentAdminParams(){
-    return new URLSearchParams(window.location.search || '');
-  }
-
-  function mergeAdminFilterParams(source){
-    const params = getCurrentAdminParams();
-    const feed = source instanceof FormData ? source : new FormData(source);
-    for (const [key, value] of feed.entries()) {
-      if (value === undefined || value === null) continue;
-      params.delete(key);
-    }
-    for (const [key, value] of feed.entries()) {
-      params.append(key, value);
-    }
-    return params;
-  }
-
-  function replaceElementFromHtml(wrap, html){
-    const holder = document.createElement('div');
-    holder.innerHTML = html;
-    const nodes = Array.from(holder.childNodes);
-    const scriptNodes = [];
-    nodes.forEach((node) => {
-      if (node.nodeType === 1) scriptNodes.push(...node.querySelectorAll('script'));
-      if (node.nodeType === 1 && node.tagName === 'SCRIPT') scriptNodes.push(node);
-    });
-    wrap.replaceWith(...nodes);
-    scriptNodes.forEach((oldScript) => {
-      const s = document.createElement('script');
-      for (const attr of oldScript.attributes || []) s.setAttribute(attr.name, attr.value);
-      s.textContent = oldScript.textContent;
-      oldScript.replaceWith(s);
-    });
-  }
-
-  async function fetchAdminPartialByParams(params, partial, wrapId, tabName, replaceUrl){
-    const wrap = document.getElementById(wrapId);
-    if (!wrap) return null;
-    const qs = params instanceof URLSearchParams ? new URLSearchParams(params) : new URLSearchParams(params || '');
-    qs.set('tab', tabName);
-    qs.set('ajax_partial', partial);
-    const url = `{{ url_for('admin_dashboard') }}?${qs.toString()}`;
-    wrap.style.opacity = '.65';
-    try {
-      const resp = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-      const html = await resp.text();
-      if (!resp.ok || !html.trim()) throw new Error('Falha ao carregar.');
-      replaceElementFromHtml(wrap, html);
-      if (replaceUrl !== false && window.history && window.history.replaceState) {
-        const clean = new URL(resp.url, window.location.origin);
-        clean.searchParams.delete('ajax_partial');
-        window.history.replaceState({}, '', `${clean.pathname}?${clean.searchParams.toString()}`);
-      }
-      initAjaxFilters();
-      if (typeof initAjaxCoopDespesas === 'function') initAjaxCoopDespesas();
-      if (typeof bindExistingAjaxDeleteButtons === 'function') bindExistingAjaxDeleteButtons();
-      return true;
-    } catch (err) {
-      wrap.style.opacity = '1';
-      throw err;
-    }
-  }
-
-  async function refreshResumoPartial(params){
-    try {
-      await fetchAdminPartialByParams(params || getCurrentAdminParams(), 'resumo', 'resumo', 'resumo', false);
-    } catch (_) {}
-  }
-
-  async function refreshCoopDespesasAndResumo(params, replaceUrl){
-    await fetchAdminPartialByParams(params || getCurrentAdminParams(), 'coop_despesas', 'coop_despesas', 'coop_despesas', replaceUrl);
-    await refreshResumoPartial(params || getCurrentAdminParams());
-  }
-
   function initAjaxFilters(){
     const resumoForm = document.getElementById('formFiltroResumo');
     const lancForm = document.getElementById('formFiltroLancamentos');
-    const coopDespForm = document.getElementById('formFiltroCoopDespesas');
+
+    async function fetchPartial(form, partial, wrapId, tabName){
+      const wrap = document.getElementById(wrapId);
+      if (!form || !wrap) return;
+      const params = new URLSearchParams(new FormData(form));
+      params.set('tab', tabName);
+      params.set('ajax_partial', partial);
+      const url = `${form.action}?${params.toString()}`;
+      wrap.style.opacity = '.65';
+      try{
+        const resp = await fetch(url, { headers:{ 'X-Requested-With':'XMLHttpRequest' }});
+        const html = await resp.text();
+        if (!resp.ok || !html.trim()) throw new Error('Falha ao filtrar.');
+
+        const holder = document.createElement('div');
+        holder.innerHTML = html;
+        const nodes = Array.from(holder.childNodes);
+        const firstEl = nodes.find(n => n.nodeType === 1);
+        wrap.replaceWith(...nodes);
+
+        if (firstEl){
+          firstEl.querySelectorAll('script').forEach(oldScript => {
+            const s = document.createElement('script');
+            if (oldScript.src) s.src = oldScript.src;
+            if (oldScript.type) s.type = oldScript.type;
+            s.textContent = oldScript.textContent;
+            oldScript.replaceWith(s);
+          });
+        }
+
+        if (window.history && window.history.replaceState){
+          window.history.replaceState({}, '', resp.url);
+        }
+        initAjaxFilters();
+      }catch(err){
+        alert(err.message || 'Falha ao filtrar.');
+        wrap.style.opacity = '1';
+      }
+    }
 
     if (resumoForm && !resumoForm.dataset.ajaxBound){
       resumoForm.dataset.ajaxBound = '1';
-      resumoForm.addEventListener('submit', async function(e){
+      resumoForm.addEventListener('submit', function(e){
         e.preventDefault();
-        try {
-          await fetchAdminPartialByParams(mergeAdminFilterParams(resumoForm), 'resumo', 'resumo', 'resumo', true);
-        } catch (err) {
-          alert(err.message || 'Falha ao filtrar.');
-        }
+        fetchPartial(resumoForm, 'resumo', 'resumo', 'resumo');
       });
     }
 
     if (lancForm && !lancForm.dataset.ajaxBound){
       lancForm.dataset.ajaxBound = '1';
-      lancForm.addEventListener('submit', async function(e){
+      lancForm.addEventListener('submit', function(e){
         e.preventDefault();
-        try {
-          const params = mergeAdminFilterParams(lancForm);
-          await fetchAdminPartialByParams(params, 'lancamentos', 'lancamentosAjaxWrap', 'lancamentos', true);
-          await refreshResumoPartial(params);
-        } catch (err) {
-          alert(err.message || 'Falha ao filtrar.');
-        }
-      });
-    }
-
-    if (coopDespForm && !coopDespForm.dataset.ajaxBound){
-      coopDespForm.dataset.ajaxBound = '1';
-      coopDespForm.addEventListener('submit', async function(e){
-        e.preventDefault();
-        try {
-          await refreshCoopDespesasAndResumo(mergeAdminFilterParams(coopDespForm), true);
-        } catch (err) {
-          alert(err.message || 'Falha ao filtrar despesas.');
-        }
+        fetchPartial(lancForm, 'lancamentos', 'lancamentosAjaxWrap', 'lancamentos');
       });
     }
   }
@@ -6608,12 +6551,7 @@
         if (modalEl?.id === 'modalEditLancamento') {
           if (!updateLancamentoRow(form)) window.location.reload();
         } else if (modalEl?.id === 'modalEditDespesaCoop') {
-          if (!updateDespesaCoopRow(form)) {
-            await refreshCoopDespesasAndResumo(getCurrentAdminParams(), false);
-          } else {
-            recalcDespesaCoopTotal();
-            await refreshResumoPartial(getCurrentAdminParams());
-          }
+          if (!updateDespesaCoopRow(form)) window.location.reload();
         } else {
           window.location.reload();
         }
