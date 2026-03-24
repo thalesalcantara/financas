@@ -3612,7 +3612,7 @@ def admin_dashboard():
     total_sest = 0.0
     total_encargos = 0.0
 
-    q = Lancamento.query.options(selectinload(Lancamento.restaurante), selectinload(Lancamento.cooperado))
+    q = Lancamento.query
 
     if restaurante_id:
         q = q.filter(Lancamento.restaurante_id == restaurante_id)
@@ -3688,8 +3688,8 @@ def admin_dashboard():
     total_adiantamentos_coop = 0.0
 
     if True:
-        rq2 = ReceitaCooperado.query.options(selectinload(ReceitaCooperado.cooperado))
-        dq2 = DespesaCooperado.query.options(selectinload(DespesaCooperado.cooperado))
+        rq2 = ReceitaCooperado.query
+        dq2 = DespesaCooperado.query
 
         if data_inicio:
             rq2 = rq2.filter(ReceitaCooperado.data >= data_inicio)
@@ -3738,11 +3738,10 @@ def admin_dashboard():
         )
 
         despesa_snapshot_map = {}
-        if active_tab == "coop_despesas":
-            for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
-                _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
-                for _it in _snap["itens"]:
-                    despesa_snapshot_map[_it["id"]] = _it
+        for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
+            _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
+            for _it in _snap["itens"]:
+                despesa_snapshot_map[_it["id"]] = _it
 
     cfg = get_config()
 
@@ -3755,29 +3754,30 @@ def admin_dashboard():
     )
 
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
-    if active_tab in ("receitas", "despesas", "resumo"):
-        _ensure_taxas_admin_receitas(restaurantes, months_back=0)
+    _ensure_taxas_admin_receitas(restaurantes, months_back=0)
 
-        # Recarrega apenas quando a aba realmente depende das taxas automáticas.
-        rq = ReceitaCooperativa.query
-        dq = DespesaCooperativa.query
-        if data_inicio:
-            rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
-            dq = dq.filter(DespesaCooperativa.data >= data_inicio)
-        if data_fim:
-            rq = rq.filter(ReceitaCooperativa.data <= data_fim)
-            dq = dq.filter(DespesaCooperativa.data <= data_fim)
+    # Recarrega SEMPRE as receitas/despesas após gerar taxas automáticas.
+    # Assim, sem filtro manual, a aba de receitas já abre mostrando o mês atual,
+    # e com filtro continua respeitando o período informado.
+    rq = ReceitaCooperativa.query
+    dq = DespesaCooperativa.query
+    if data_inicio:
+        rq = rq.filter(ReceitaCooperativa.data >= data_inicio)
+        dq = dq.filter(DespesaCooperativa.data >= data_inicio)
+    if data_fim:
+        rq = rq.filter(ReceitaCooperativa.data <= data_fim)
+        dq = dq.filter(DespesaCooperativa.data <= data_fim)
 
-        receitas = rq.order_by(
-            ReceitaCooperativa.data.desc().nullslast(),
-            ReceitaCooperativa.id.desc(),
-        ).all()
-        despesas = dq.order_by(
-            DespesaCooperativa.data.desc(),
-            DespesaCooperativa.id.desc(),
-        ).all()
-        total_receitas = sum(_receita_total_real(r) for r in receitas)
-        total_despesas = sum((d.valor or 0.0) for d in despesas)
+    receitas = rq.order_by(
+        ReceitaCooperativa.data.desc().nullslast(),
+        ReceitaCooperativa.id.desc(),
+    ).all()
+    despesas = dq.order_by(
+        DespesaCooperativa.data.desc(),
+        DespesaCooperativa.id.desc(),
+    ).all()
+    total_receitas = sum(_receita_total_real(r) for r in receitas)
+    total_despesas = sum((d.valor or 0.0) for d in despesas)
     taxa_admin_rows, taxa_admin_totais = _build_taxa_admin_rows(receitas)
     juros_arrecadados_total = round(sum((r['valor_multa'] + r['valor_juros']) for r in taxa_admin_rows if r['status'] == 'pago'), 2)
     cooperados_map = {c.id: c for c in cooperados}
@@ -4474,7 +4474,7 @@ def exportar_lancamentos():
     data_fim       = _parse_date(args.get("data_fim"))
     dows           = set(args.getlist("dow"))  # '0'..'6'
 
-    q = Lancamento.query.options(selectinload(Lancamento.restaurante), selectinload(Lancamento.cooperado))
+    q = Lancamento.query
     if restaurante_id:
         q = q.filter(Lancamento.restaurante_id == restaurante_id)
     if cooperado_id:
@@ -4883,8 +4883,8 @@ def admin_add_lancamento():
 
     db.session.add(l)
     db.session.commit()
-    flash("Lançamento inserido.", "success")
-    return redirect(url_for("admin_dashboard", tab="lancamentos"))
+    payload = {"id": l.id}
+    return _json_or_redirect_success("Lançamento inserido.", "lancamentos", payload)
 
 
 @app.route("/admin/lancamentos/<int:id>/edit", methods=["POST"])
@@ -4903,8 +4903,8 @@ def admin_edit_lancamento(id):
     l.qtd_entregas = f.get("qtd_entregas", type=int)
 
     db.session.commit()
-    flash("Lançamento atualizado.", "success")
-    return redirect(url_for("admin_dashboard", tab="lancamentos"))
+    payload = {"id": l.id}
+    return _json_or_redirect_success("Lançamento atualizado.", "lancamentos", payload)
 
 
 @app.route("/admin/lancamentos/<int:id>/delete", methods=["GET", "POST"])
@@ -4921,8 +4921,7 @@ def admin_delete_lancamento(id):
 
     db.session.delete(l)
     db.session.commit()
-    flash("Lançamento excluído.", "success")
-    return redirect(url_for("admin_dashboard", tab="lancamentos"))
+    return _json_or_redirect_success("Lançamento excluído.", "lancamentos", {"deleted_id": id})
 
 
 # =========================
@@ -5355,8 +5354,7 @@ def edit_receita(id):
     r.data = _parse_date(f.get("data"))
 
     db.session.commit()
-    flash("Receita atualizada.", "success")
-    return redirect(url_for("admin_dashboard", tab="receitas"))
+    return _json_or_redirect_success("Receita atualizada.", "receitas", {"id": r.id})
 
 
 @app.route("/receitas/<int:id>/delete", methods=["GET", "POST"])
@@ -5365,8 +5363,7 @@ def delete_receita(id):
     r = ReceitaCooperativa.query.get_or_404(id)
     db.session.delete(r)
     db.session.commit()
-    flash("Receita excluída.", "success")
-    return redirect(url_for("admin_dashboard", tab="receitas"))
+    return _json_or_redirect_success("Receita excluída.", "receitas", {"deleted_id": id})
 
 
 @app.route("/receitas/taxas-admin/<int:id>/status", methods=["POST"])
@@ -5489,8 +5486,7 @@ def edit_despesa(id):
     d.data = _parse_date(f.get("data"))
 
     db.session.commit()
-    flash("Despesa atualizada.", "success")
-    return redirect(url_for("admin_dashboard", tab="despesas"))
+    return _json_or_redirect_success("Despesa atualizada.", "despesas", {"id": d.id})
 
 
 @app.route("/despesas/<int:id>/delete", methods=["GET", "POST"])
@@ -5499,8 +5495,7 @@ def delete_despesa(id):
     d = DespesaCooperativa.query.get_or_404(id)
     db.session.delete(d)
     db.session.commit()
-    flash("Despesa excluída.", "success")
-    return redirect(url_for("admin_dashboard", tab="despesas"))
+    return _json_or_redirect_success("Despesa excluída.", "despesas", {"deleted_id": id})
 
 
 # =========================
@@ -6716,17 +6711,38 @@ def _despesa_due_date(dc):
 
 
 
+def _wants_json_response() -> bool:
+    return (
+        request.headers.get("X-Requested-With") in ("XMLHttpRequest", "fetch")
+        or request.form.get("ajax") == "1"
+        or request.args.get("ajax") == "1"
+        or (request.accept_mimetypes.best == "application/json" and request.accept_mimetypes["application/json"] >= request.accept_mimetypes["text/html"])
+    )
+
+
 def _admin_redirect_with_filters(default_tab="coop_despesas"):
     args = {
         "tab": request.form.get("tab") or request.args.get("tab") or default_tab,
-        "data_inicio": request.form.get("filtro_data_inicio") or request.form.get("data_inicio") or request.args.get("data_inicio") or "",
-        "data_fim": request.form.get("filtro_data_fim") or request.form.get("data_fim") or request.args.get("data_fim") or "",
-        "restaurante_id": request.form.get("filtro_restaurante_id") or request.form.get("restaurante_id") or request.args.get("restaurante_id") or "",
-        "cooperado_id": request.form.get("filtro_cooperado_id") or request.form.get("cooperado_id") or request.args.get("cooperado_id") or "",
+        "data_inicio": request.form.get("data_inicio") or request.args.get("data_inicio") or "",
+        "data_fim": request.form.get("data_fim") or request.args.get("data_fim") or "",
+        "restaurante_id": request.form.get("restaurante_id") or request.args.get("restaurante_id") or "",
+        "cooperado_id": request.form.get("cooperado_id") or request.args.get("cooperado_id") or "",
     }
-    if request.form.get("filtro_somente_pendentes") or request.form.get("somente_pendentes") or request.args.get("somente_pendentes"):
+    if request.form.get("somente_pendentes") or request.args.get("somente_pendentes"):
         args["somente_pendentes"] = "1"
+    if request.args.get("fast_mode") or request.form.get("fast_mode"):
+        args["fast_mode"] = "1"
     return redirect(url_for("admin_dashboard", **args))
+
+
+def _json_or_redirect_success(message: str, default_tab: str, payload: dict | None = None):
+    if _wants_json_response():
+        body = {"ok": True, "message": message, "tab": default_tab}
+        if payload:
+            body.update(payload)
+        return jsonify(body)
+    flash(message, "success")
+    return _admin_redirect_with_filters(default_tab)
 
 
 def _compute_coop_debt_snapshot(coop_id, di, df):
@@ -7086,8 +7102,7 @@ def edit_despesa_coop(id):
     dc.competencia_desconto = competencia_semana
 
     db.session.commit()
-    flash("Despesa do cooperado atualizada.", "success")
-    return _admin_redirect_with_filters("coop_despesas")
+    return _json_or_redirect_success("Despesa do cooperado atualizada.", "coop_despesas", {"id": dc.id})
 
 
 @app.route("/coop/despesas/delete", methods=["POST"])
@@ -7111,8 +7126,7 @@ def delete_despesa_coop(id=None):
 
     DespesaCooperado.query.filter(DespesaCooperado.id.in_(ids)).delete(synchronize_session=False)
     db.session.commit()
-    flash(f"{len(ids)} despesa(s) do cooperado excluída(s).", "success")
-    return _admin_redirect_with_filters("coop_despesas")
+    return _json_or_redirect_success(f"{len(ids)} despesa(s) do cooperado excluída(s).", "coop_despesas", {"deleted_ids": ids})
 
 # =========================
 # Benefícios — Editar / Excluir (Admin)
