@@ -4349,7 +4349,7 @@ def admin_dashboard():
             resumo_totais["saldo_pendente"] += snap["saldo_devedor"]
             resumo_totais["pend_programado"] += snap["a_descontar"]
 
-    return render_template(
+    _rendered_html = render_template(
         "admin_dashboard.html",
         tab=active_tab,
         total_producoes=total_producoes,
@@ -4414,6 +4414,15 @@ def admin_dashboard():
         taxa_admin_totais=taxa_admin_totais,
         juros_arrecadados_total=juros_arrecadados_total,
     )
+
+    ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
+    if ajax_partial in {"lancamentos", "resumo"}:
+        import re
+        marker = "LANC" if ajax_partial == "lancamentos" else "RESUMO"
+        m = re.search(rf"<!--AJAX_{marker}_START-->(.*?)<!--AJAX_{marker}_END-->", _rendered_html, flags=re.DOTALL)
+        if m:
+            return m.group(1)
+    return _rendered_html
     
 # =========================
 # Navegação/Export util
