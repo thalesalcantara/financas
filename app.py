@@ -7064,13 +7064,7 @@ def add_despesa_coop():
     di_comp, df_comp = semana_bounds(data_comp)
 
     qtd = len(ids)
-    valor_unit = round(valor_total / qtd, 2) if qtd > 0 else 0.0
-    valores = [valor_unit] * qtd
-    # ajusta centavos no último para fechar exatamente o total
-    if qtd > 0:
-        soma_base = round(valor_unit * qtd, 2)
-        diff = round(valor_total - soma_base, 2)
-        valores[-1] = round(valores[-1] + diff, 2)
+    valores = [round(valor_total, 2)] * qtd
 
     for cid, v in zip(ids, valores):
         db.session.add(
