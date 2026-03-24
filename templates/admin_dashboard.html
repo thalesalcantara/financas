@@ -2075,12 +2075,12 @@
 
         <div class="col-md-2">
           <label class="form-label lanc-label">Data Início</label>
-          <input type="date" class="form-control form-control-sm" name="filtro_data_inicio" value="{{ request.args.get('data_inicio','') }}">
+          <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
         </div>
 
         <div class="col-md-2">
           <label class="form-label lanc-label">Data Fim</label>
-          <input type="date" class="form-control form-control-sm" name="filtro_data_fim" value="{{ request.args.get('data_fim','') }}">
+          <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ request.args.get('data_fim','') }}">
         </div>
 
         <div class="col-md-2">
@@ -2257,8 +2257,8 @@
                           data-url="{{ url_for('admin_edit_lancamento', id=l.id) }}">
                     <i class="bi bi-pencil"></i>
                   </button>
-                  {% if can_lanc_excluir %}<a class="btn btn-danger btn-sm rounded-pill btn-del"
-                     href="{{ url_for('admin_delete_lancamento', id=l.id) }}">
+                  {% if can_lanc_excluir %}<a class="btn btn-danger btn-sm rounded-pill btn-del btn-del-ajax"
+                     href="{{ url_for('admin_delete_lancamento', id=l.id) }}" data-row-id="{{ l.id }}">
                     <i class="bi bi-trash"></i>
                   </a>{% endif %}
                   {% endif %}
@@ -2534,15 +2534,15 @@
       </div>
       <form method="GET" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="receitas">
-        <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
-        <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
         <div class="col-md-3">
           <label class="form-label">Data Início</label>
-          <input type="date" class="form-control form-control-sm" name="filtro_data_inicio" value="{{ request.args.get('data_inicio','') }}">
+          <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
         </div>
         <div class="col-md-3">
           <label class="form-label">Data Fim</label>
-          <input type="date" class="form-control form-control-sm" name="filtro_data_fim" value="{{ request.args.get('data_fim','') }}">
+          <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ request.args.get('data_fim','') }}">
         </div>
         <div class="col-md-3">
           <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
@@ -2561,10 +2561,10 @@
 
       <form method="POST" action="{{ url_for('add_receita') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_receitas_criar">
 
-      <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-      <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-      <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-      <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
         <div class="col-md-5">
           <label class="form-label">Descrição</label>
           <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
@@ -2762,15 +2762,15 @@
       </div>
       <form method="GET" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="despesas">
-        <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
-        <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
         <div class="col-md-3">
           <label class="form-label">Data Início</label>
-          <input type="date" class="form-control form-control-sm" name="filtro_data_inicio" value="{{ request.args.get('data_inicio','') }}">
+          <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
         </div>
         <div class="col-md-3">
           <label class="form-label">Data Fim</label>
-          <input type="date" class="form-control form-control-sm" name="filtro_data_fim" value="{{ request.args.get('data_fim','') }}">
+          <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ request.args.get('data_fim','') }}">
         </div>
         <div class="col-md-3">
           <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
@@ -2789,10 +2789,10 @@
 
       <form method="POST" action="{{ url_for('add_despesa') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_despesas_criar">
 
-      <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-      <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-      <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-      <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
         <div class="col-md-5">
           <label class="form-label">Descrição</label>
           <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
@@ -2893,15 +2893,15 @@
       </div>
       <form method="GET" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="coop_receitas">
-        <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
-        <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
         <div class="col-md-3">
           <label class="form-label">Data Início</label>
-          <input type="date" class="form-control form-control-sm" name="filtro_data_inicio" value="{{ request.args.get('data_inicio','') }}">
+          <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
         </div>
         <div class="col-md-3">
           <label class="form-label">Data Fim</label>
-          <input type="date" class="form-control form-control-sm" name="filtro_data_fim" value="{{ request.args.get('data_fim','') }}">
+          <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ request.args.get('data_fim','') }}">
         </div>
         <div class="col-md-3">
           <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
@@ -2920,9 +2920,9 @@
 
       <form method="POST" action="{{ url_for('add_receita_coop') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_coop_receitas_criar">
 
-      <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-      <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-      <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
         <div class="col-md-3">
           <label class="form-label">Cooperado</label>
           <select class="form-select form-select-sm" name="cooperado_id" required>
@@ -3056,16 +3056,16 @@
 
       <form method="GET" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="coop_despesas">
-        <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
-        <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
 
         <div class="col-md-3">
           <label class="form-label">Data Início</label>
-          <input type="date" class="form-control form-control-sm" name="filtro_data_inicio" value="{{ request.args.get('data_inicio','') }}">
+          <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
         </div>
         <div class="col-md-3">
           <label class="form-label">Data Fim</label>
-          <input type="date" class="form-control form-control-sm" name="filtro_data_fim" value="{{ request.args.get('data_fim','') }}">
+          <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ request.args.get('data_fim','') }}">
         </div>
 
         <div class="col-md-4">
@@ -3099,16 +3099,16 @@
 
       <form method="POST" action="{{ url_for('add_despesa_coop') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_coop_despesas_criar">
       <input type="hidden" name="tab" value="coop_despesas">
-      <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-      <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-      <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-      <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
       {% if request.args.get('somente_pendentes') %}<input type="hidden" name="somente_pendentes" value="1">{% endif %}
 
-      <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-      <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-      <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-      <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
         <div class="col-md-4">
           <label class="form-label">Cooperados</label>
           <select class="form-select form-select-sm" name="cooperado_ids[]" multiple size="5">
@@ -3162,10 +3162,10 @@
     <div class="card-body p-2 p-md-3">
       <form method="POST" action="{{ url_for('delete_despesa_coop_bulk') }}" id="bulkDeleteDespesasForm" class="mb-2 d-flex justify-content-end gap-2">
         <input type="hidden" name="tab" value="coop_despesas">
-        <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-        <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-        <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-        <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+        <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+        <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
         {% if request.args.get('somente_pendentes') %}<input type="hidden" name="somente_pendentes" value="1">{% endif %}
         <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Excluir despesas selecionadas?');"><i class="bi bi-trash"></i> Excluir marcadas</button>
       </form>
@@ -3191,7 +3191,7 @@
             {% for dc in despesas_coop %}
               {% set coop_nome = (dc.cooperado.nome if dc.cooperado else 'Todos') %}
               {% set snap = despesa_snapshot_map.get(dc.id) if despesa_snapshot_map is defined else None %}{% set _abat_auto = (snap.pago_auto if snap else 0) %}{% set _restante = (snap.restante if snap else (dc.valor or 0)) %}
-              <tr data-coop="{{ coop_nome|lower }}" data-desc="{{ (dc.descricao or '')|lower }}">
+              <tr data-row-id="{{ dc.id }}" data-coop="{{ coop_nome|lower }}" data-desc="{{ (dc.descricao or '')|lower }}">
                 <td class="text-center"><input type="checkbox" name="ids[]" form="bulkDeleteDespesasForm" value="{{ dc.id }}"></td>
                 <td>{{ dc.data.strftime('%d/%m/%Y') if dc.data else '-' }}</td>
                 <td class="text-break">{{ coop_nome }}</td>
@@ -3219,13 +3219,13 @@
                   <!-- EXCLUIR via POST (evita 405) -->
                   {% if can_coop_despesas_excluir %}<form method="POST" action="{{ url_for('delete_despesa_coop', id=dc.id) }}" class="d-inline">
 
-                  <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-                  <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-                  <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-                  <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+                  <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+                  <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+                  <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+                  <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
                     {# Se você usa Flask-WTF/CSRF, descomente a linha abaixo #}
                     {# {{ csrf_token() }} #}
-                    <button type="submit" class="btn btn-danger btn-sm btn-del" onclick="return confirm('Excluir esta despesa?');">
+                    <button type="submit" class="btn btn-danger btn-sm btn-del btn-del-ajax" onclick="return confirm('Excluir esta despesa?');">
                       <i class="bi bi-trash"></i>
                     </button>
                   </form>{% endif %}
@@ -3305,10 +3305,10 @@
     <div class="card-body">
 
       <form id="form-beneficios" method="POST" action="{{ url_for('ratear_beneficios') }}" class="row g-3" data-perm-form="can_beneficios_criar_or_editar">
-        <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio','') }}">
-        <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim','') }}">
-        <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
-        <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+        <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+        <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
         <div class="col-12 col-md-3">
           <label class="form-label">Data inicial</label>
           <input type="date" class="form-control form-control-sm" name="data_inicial" required value="{{ request.args.get('data_inicio','') }}">
@@ -3424,10 +3424,10 @@
         </h6>
         <form method="GET" class="row g-2 align-items-end">
           <input type="hidden" name="tab" value="beneficios">
-          <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio','') }}">
-          <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim','') }}">
-          <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
-          <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+          <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+          <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+          <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+          <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
           <div class="col-md-3">
             <label class="form-label">De</label>
             <input type="date" class="form-control form-control-sm" name="b_ini" value="{{ request.args.get('b_ini','') }}">
@@ -5883,11 +5883,12 @@
   <div class="modal fade" id="modalEditLancamento" tabindex="-1">
     <div class="modal-dialog modal-lg">
       <form method="POST" class="modal-content">
-          <input type="hidden" name="tab" value="coop_despesas">
-          <input type="hidden" name="filtro_data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
-          <input type="hidden" name="filtro_data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-          <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-          <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+        <input type="hidden" name="ajax" value="1">
+          <input type="hidden" name="tab" value="lancamentos">
+          <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+          <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+          <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+          <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
           {% if request.args.get('somente_pendentes') %}<input type="hidden" name="somente_pendentes" value="1">{% endif %}
         <div class="modal-header"><h5 class="modal-title">Editar Lançamento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body row g-2 px-3">
@@ -5916,6 +5917,10 @@
             <label class="form-label">Data</label>
             <input type="date" class="form-control" name="data" required>
           </div>
+          <div class="col-md-3">
+            <label class="form-label">Qtd. entregas</label>
+            <input type="number" class="form-control" name="qtd_entregas" min="0">
+          </div>
           <div class="col-md-6">
             <label class="form-label">Horário</label>
             <div class="input-group">
@@ -5933,6 +5938,7 @@
   <div class="modal fade" id="modalEditReceita" tabindex="-1">
     <div class="modal-dialog">
       <form method="POST" class="modal-content">
+        <input type="hidden" name="ajax" value="1">
         <div class="modal-header"><h5 class="modal-title">Editar Receita (Cooperativa)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body row g-2 px-3">
           <input type="hidden" name="id">
@@ -5948,6 +5954,7 @@
   <div class="modal fade" id="modalEditDespesa" tabindex="-1">
     <div class="modal-dialog">
       <form method="POST" class="modal-content">
+        <input type="hidden" name="ajax" value="1">
         <div class="modal-header"><h5 class="modal-title">Editar Despesa (Cooperativa)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body row g-2 px-3">
           <input type="hidden" name="id">
@@ -5983,6 +5990,7 @@
   <div class="modal fade" id="modalEditDespesaCoop" tabindex="-1">
     <div class="modal-dialog">
       <form method="POST" class="modal-content">
+        <input type="hidden" name="ajax" value="1">
         <div class="modal-header"><h5 class="modal-title">Editar Despesa (Cooperado)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body row g-2 px-3">
           <input type="hidden" name="id">
@@ -6144,6 +6152,164 @@
       if (chk) chk.checked = String(btn?.dataset?.eh_adiantamento || '0') === '1';
     });
   })();
+
+
+  async function submitAdminAjaxForm(form){
+    const fd = new FormData(form);
+    fd.set('ajax', '1');
+    const resp = await fetch(form.action, {
+      method: form.method || 'POST',
+      headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
+      body: fd
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || data.ok === false) throw new Error(data.message || 'Falha ao salvar.');
+    return data;
+  }
+
+  function brMoney(v){ return 'R$ ' + Number(v || 0).toFixed(2).replace('.', ','); }
+  function brDate(yyyy_mm_dd){
+    if (!yyyy_mm_dd) return '-';
+    const [y,m,d] = String(yyyy_mm_dd).split('-');
+    return [d,m,y].filter(Boolean).join('/');
+  }
+  function updateLancamentoRow(form){
+    const id = form.querySelector('[name="id"]')?.value;
+    const row = document.querySelector(`#lancamentos tr[data-row-id="${id}"]`);
+    if (!row) return false;
+    const restaurante = form.querySelector('[name="restaurante_id"]');
+    const cooperado = form.querySelector('[name="cooperado_id"]');
+    const descricao = form.querySelector('[name="descricao"]')?.value || '';
+    const valor = parseFloat(form.querySelector('[name="valor"]')?.value || '0') || 0;
+    const qtd = form.querySelector('[name="qtd_entregas"]')?.value || '—';
+    const data = form.querySelector('[name="data"]')?.value || '';
+    const hi = form.querySelector('[name="hora_inicio"]')?.value || '';
+    const hf = form.querySelector('[name="hora_fim"]')?.value || '';
+    const inss = valor * 0.04;
+    const sest = valor * 0.005;
+    const liq = valor - inss - sest;
+    const tds = row.querySelectorAll('td');
+    if (tds.length < 11) return false;
+    tds[0].textContent = restaurante?.selectedOptions?.[0]?.textContent || '—';
+    tds[1].textContent = cooperado?.selectedOptions?.[0]?.textContent || '—';
+    tds[2].textContent = descricao;
+    tds[3].textContent = brMoney(valor);
+    const badge = tds[4].querySelector('.badge');
+    if (badge) badge.textContent = qtd;
+    else tds[4].textContent = qtd;
+    tds[5].textContent = brDate(data);
+    tds[6].textContent = hi ? (hf ? `${hi} às ${hf}` : hi) : '—';
+    tds[7].textContent = brMoney(inss);
+    tds[8].textContent = brMoney(sest);
+    tds[9].textContent = brMoney(liq);
+    const editBtn = row.querySelector('[data-bs-target="#modalEditLancamento"]');
+    if (editBtn){
+      editBtn.dataset.restaurante = restaurante?.value || '';
+      editBtn.dataset.cooperado = cooperado?.value || '';
+      editBtn.dataset.descricao = descricao;
+      editBtn.dataset.valor = String(valor);
+      editBtn.dataset.data = data;
+      editBtn.dataset.hora_inicio = hi;
+      editBtn.dataset.hora_fim = hf;
+      editBtn.dataset.qtd_entregas = form.querySelector('[name="qtd_entregas"]')?.value || '';
+    }
+    return true;
+  }
+  function updateDespesaCoopRow(form){
+    const id = form.querySelector('[name="id"]')?.value;
+    const row = document.querySelector(`#coop_despesas tr[data-row-id="${id}"]`);
+    if (!row) return false;
+    const cooperado = form.querySelector('[name="cooperado_id"]');
+    const descricao = form.querySelector('[name="descricao"]')?.value || '';
+    const valor = parseFloat(form.querySelector('[name="valor"]')?.value || '0') || 0;
+    const data = form.querySelector('[name="data"]')?.value || '';
+    const competencia = form.querySelector('[name="competencia_desconto"]')?.value || 'esta_semana';
+    const ehAd = !!form.querySelector('[name="eh_adiantamento"]')?.checked;
+    const tds = row.querySelectorAll('td');
+    if (tds.length < 11) return false;
+    tds[1].textContent = brDate(data);
+    tds[2].textContent = cooperado?.selectedOptions?.[0]?.textContent || 'Todos';
+    tds[3].textContent = descricao;
+    tds[4].innerHTML = ehAd ? '<span class="badge bg-warning text-dark">Adiantamento</span>' : '<span class="badge bg-light text-dark border">Despesa</span>';
+    tds[5].textContent = competencia === 'semana_passada' ? 'Semana passada' : (competencia === 'proxima_semana' ? 'Próxima semana' : (competencia === 'semana_da_data' ? 'Semana da data escolhida' : 'Esta semana'));
+    tds[6].textContent = brMoney(valor);
+    tds[7].textContent = brMoney(0);
+    tds[8].textContent = brMoney(valor);
+    tds[9].innerHTML = '<span class="badge bg-secondary">Aberta</span>';
+    row.dataset.coop = (cooperado?.selectedOptions?.[0]?.textContent || 'todos').toLowerCase();
+    row.dataset.desc = descricao.toLowerCase();
+    const editBtn = row.querySelector('[data-bs-target="#modalEditDespesaCoop"]');
+    if (editBtn){
+      editBtn.dataset.cooperado = cooperado?.value || '';
+      editBtn.dataset.descricao = descricao;
+      editBtn.dataset.valor = String(valor);
+      editBtn.dataset.data = data;
+      editBtn.dataset.competencia = competencia;
+      editBtn.dataset.eh_adiantamento = ehAd ? '1' : '0';
+    }
+    return true;
+  }
+
+  document.querySelectorAll('#modalEditLancamento form, #modalEditReceita form, #modalEditDespesa form, #modalEditDespesaCoop form').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await submitAdminAjaxForm(form);
+        const modalEl = form.closest('.modal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modalEl?.id === 'modalEditLancamento') {
+          if (!updateLancamentoRow(form)) window.location.reload();
+        } else if (modalEl?.id === 'modalEditDespesaCoop') {
+          if (!updateDespesaCoopRow(form)) window.location.reload();
+        } else {
+          window.location.reload();
+        }
+        if (modal) modal.hide();
+      } catch (err) {
+        alert(err.message || 'Erro ao salvar.');
+      }
+    });
+  });
+
+  document.querySelectorAll('.btn-del-ajax').forEach((btn) => {
+    const form = btn.closest('form');
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          const fd = new FormData(form);
+          fd.set('ajax', '1');
+          const resp = await fetch(form.action, {
+            method: form.method || 'POST',
+            headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
+            body: fd
+          });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok || data.ok === false) throw new Error(data.message || 'Falha ao excluir.');
+          const row = form.closest('tr');
+          if (row) row.remove(); else window.location.reload();
+        } catch (err) {
+          alert(err.message || 'Erro ao excluir.');
+        }
+      });
+    } else if (btn.tagName === 'A') {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+          const resp = await fetch(btn.href, {
+            method: 'POST',
+            headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' }
+          });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok || data.ok === false) throw new Error(data.message || 'Falha ao excluir.');
+          const row = btn.closest('tr');
+          if (row) row.remove(); else window.location.reload();
+        } catch (err) {
+          alert(err.message || 'Erro ao excluir.');
+        }
+      });
+    }
+  });
 
   // ===== Gráficos =====
   const rawLancCoop   = {{ (chart_data_lancamentos_coop or {'labels':[], 'values':[]}) | tojson }};
