@@ -2508,7 +2508,7 @@
 
 
 <!-- RECEITAS COOP (versão profissional/compacta – drop-in) -->
-<!--AJAX_RECEITAS_START--><section class="tab-pane fade {{ 'show active' if _tab=='receitas' else '' }}" id="receitas" role="tabpanel">
+<section class="tab-pane fade {{ 'show active' if _tab=='receitas' else '' }}" id="receitas" role="tabpanel">
   {# total defensivo: aceita r.valor OU r.valor_total #}
   {% set ns_total = namespace(v=0) %}
   {% for r in receitas or [] %}
@@ -2742,9 +2742,7 @@
 
 
 <!-- DESPESAS COOP (versão profissional/compacta – drop-in) -->
-<!--AJAX_RECEITAS_END-->
-
-<!--AJAX_DESPESAS_START--><section class="tab-pane fade {{ 'show active' if _tab=='despesas' else '' }}" id="despesas" role="tabpanel">
+<section class="tab-pane fade {{ 'show active' if _tab=='despesas' else '' }}" id="despesas" role="tabpanel">
   {% set total_despesas_coop_table = (despesas|sum(attribute='valor')) if despesas else 0 %}
   {% set qtd_registros = despesas|length if despesas else 0 %}
 
@@ -2875,9 +2873,7 @@
 
 
 <!-- RECEITAS COOPERADOS (versão profissional/compacta – drop-in) -->
-<!--AJAX_DESPESAS_END-->
-
-<!--AJAX_COOP_RECEITAS_START--><section class="tab-pane fade {{ 'show active' if _tab=='coop_receitas' else '' }}" id="coop_receitas" role="tabpanel">
+<section class="tab-pane fade {{ 'show active' if _tab=='coop_receitas' else '' }}" id="coop_receitas" role="tabpanel">
   {% set total_receitas_coop_table = (receitas_coop|sum(attribute='valor')) if receitas_coop else 0 %}
   {% set qtd_registros = receitas_coop|length if receitas_coop else 0 %}
 
@@ -3025,9 +3021,7 @@
 
 
 <!-- DESPESAS COOPERADOS (versão profissional/compacta – SEM ADIANTAMENTO + PESQUISA) -->
-<!--AJAX_COOP_RECEITAS_END-->
-
-<!--AJAX_COOP_DESPESAS_START--><section class="tab-pane fade {{ 'show active' if _tab=='coop_despesas' else '' }}" id="coop_despesas" role="tabpanel">
+<section class="tab-pane fade {{ 'show active' if _tab=='coop_despesas' else '' }}" id="coop_despesas" role="tabpanel">
   {% set _despesas = (despesas_coop | default([]) | list) %}
 
   {# Totais (tudo entra como despesa) #}
@@ -3299,9 +3293,7 @@
 </section>
 
      <!-- BENEFÍCIOS (versão profissional / sem alterar backend) -->
-<!--AJAX_COOP_DESPESAS_END-->
-
-<!--AJAX_BENEFICIOS_START--><section class="tab-pane fade {{ 'show active' if _tab=='beneficios' else '' }}" id="beneficios" role="tabpanel">
+<section class="tab-pane fade {{ 'show active' if _tab=='beneficios' else '' }}" id="beneficios" role="tabpanel">
   <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
     <h5 class="m-0 d-flex align-items-center gap-2">
       <i class="bi bi-heart-pulse"></i> Benefícios
@@ -3683,9 +3675,7 @@
 </script>
       
 <!-- COOPERADOS (versão profissional / drop-in) -->
-<!--AJAX_BENEFICIOS_END-->
-
-<!--AJAX_COOPERADOS_START--><section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
+<section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
   {% set qtd_coops = cooperados|length %}
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
     <h5 class="m-0 d-flex align-items-center gap-2">
@@ -4090,9 +4080,7 @@
 </section>
 
       <!-- RESTAURANTES (versão profissional / drop-in) -->
-<!--AJAX_COOPERADOS_END-->
-
-<!--AJAX_RESTAURANTES_START--><section class="tab-pane fade {{ 'show active' if _tab=='restaurantes' else '' }}" id="restaurantes" role="tabpanel">
+<section class="tab-pane fade {{ 'show active' if _tab=='restaurantes' else '' }}" id="restaurantes" role="tabpanel">
   {% set rest_list = restaurantes_todos|default(restaurantes) %}
   {% set qtd_rest = rest_list|length %}
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
@@ -4372,9 +4360,7 @@
 </section>
 
      <!-- ESCALAS -->
-<!--AJAX_RESTAURANTES_END-->
-
-<!--AJAX_ESCALAS_START--><section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
+<section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
   <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 align-items-lg-center mb-3">
     <div>
       <h5 class="mb-0 section-title">Gestão de Escalas</h5>
@@ -5270,9 +5256,7 @@
 
     <!-- === CONFIGURAÇÕES === -->
 
-<!--AJAX_ESCALAS_END-->
-
-<!--AJAX_SISTEMAS_START--><section class="tab-pane fade {{ 'show active' if _tab=='sistemas' else '' }}" id="sistemas" role="tabpanel">
+<section class="tab-pane fade {{ 'show active' if _tab=='sistemas' else '' }}" id="sistemas" role="tabpanel">
   <div class="card border-0 shadow-sm mb-3">
     <div class="card-body">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
@@ -5311,9 +5295,7 @@
   </div>
 </section>
 
-<!--AJAX_SISTEMAS_END-->
-
-<!--AJAX_CONFIG_START--><section class="tab-pane fade {{ 'show active' if _tab=='config' else '' }}" id="config" role="tabpanel">
+<section class="tab-pane fade {{ 'show active' if _tab=='config' else '' }}" id="config" role="tabpanel">
   <div class="content-shell">
     <div class="page-header">
       <h3><i class="bi bi-gear"></i> Configurações</h3>
@@ -5899,8 +5881,6 @@
 </script>
 
   <!-- MODAIS =================================================== -->
-<!--AJAX_CONFIG_END-->
-
   <div class="modal fade" id="modalEditLancamento" tabindex="-1">
     <div class="modal-dialog modal-lg">
       <form method="POST" class="modal-content">
@@ -6196,216 +6176,207 @@
   }
 
 
+  function initAjaxFilters(){
+    const resumoForm = document.getElementById('formFiltroResumo');
+    const lancForm = document.getElementById('formFiltroLancamentos');
 
-  const ADMIN_AJAX_TABS = new Set(['resumo','lancamentos','receitas','despesas','coop_receitas','coop_despesas','beneficios','cooperados','restaurantes','escalas','sistemas','config']);
-  const ADMIN_TAB_MARKERS = {
-    resumo: 'resumo',
-    lancamentos: 'lancamentosAjaxWrap',
-    receitas: 'receitas',
-    despesas: 'despesas',
-    coop_receitas: 'coop_receitas',
-    coop_despesas: 'coop_despesas',
-    beneficios: 'beneficios',
-    cooperados: 'cooperados',
-    restaurantes: 'restaurantes',
-    escalas: 'escalas',
-    sistemas: 'sistemas',
-    config: 'config'
-  };
+    async function fetchPartial(form, partial, wrapId, tabName){
+      const wrap = document.getElementById(wrapId);
+      if (!form || !wrap) return;
+      const params = new URLSearchParams(new FormData(form));
+      params.set('tab', tabName);
+      params.set('ajax_partial', partial);
+      const url = `${form.action}?${params.toString()}`;
+      wrap.style.opacity = '.65';
+      try{
+        const resp = await fetch(url, { headers:{ 'X-Requested-With':'XMLHttpRequest' }});
+        const html = await resp.text();
+        if (!resp.ok || !html.trim()) throw new Error('Falha ao filtrar.');
 
-  function currentAdminTab(){
-    return document.querySelector('.tab-pane.show.active')?.id || document.querySelector('.tab-pane.active')?.id || 'resumo';
-  }
+        const holder = document.createElement('div');
+        holder.innerHTML = html;
+        const nodes = Array.from(holder.childNodes);
+        const firstEl = nodes.find(n => n.nodeType === 1);
+        wrap.replaceWith(...nodes);
 
-  function formTabName(form){
-    return form?.querySelector('[name="tab"]')?.value || form?.closest('.tab-pane')?.id || currentAdminTab();
-  }
+        if (firstEl){
+          firstEl.querySelectorAll('script').forEach(oldScript => {
+            const s = document.createElement('script');
+            if (oldScript.src) s.src = oldScript.src;
+            if (oldScript.type) s.type = oldScript.type;
+            s.textContent = oldScript.textContent;
+            oldScript.replaceWith(s);
+          });
+        }
 
-  async function fetchAdminTabPartial(tabName, paramsSource){
-    if (!ADMIN_AJAX_TABS.has(tabName)) return;
-    const targetId = ADMIN_TAB_MARKERS[tabName] || tabName;
-    const wrap = document.getElementById(targetId);
-    if (!wrap) return;
-
-    let params = new URLSearchParams();
-    if (paramsSource instanceof HTMLFormElement) {
-      params = new URLSearchParams(new FormData(paramsSource));
-    } else if (paramsSource instanceof URLSearchParams) {
-      params = new URLSearchParams(paramsSource.toString());
-    } else {
-      const sourceForm = document.querySelector(`#${CSS.escape(tabName)} form[method="GET"], #${CSS.escape(tabName)} form:not([method]), #${CSS.escape(targetId)} form[method="GET"], #${CSS.escape(targetId)} form:not([method])`);
-      if (sourceForm) params = new URLSearchParams(new FormData(sourceForm));
-      else params = new URLSearchParams(window.location.search);
-    }
-    params.set('tab', tabName);
-    params.set('ajax_partial', tabName);
-
-    const url = `${window.location.pathname}?${params.toString()}`;
-    wrap.style.opacity = '.65';
-    wrap.style.pointerEvents = 'none';
-    try{
-      const resp = await fetch(url, { headers:{ 'X-Requested-With':'XMLHttpRequest' }});
-      const html = await resp.text();
-      if (!resp.ok || !html.trim()) throw new Error('Falha ao atualizar a aba.');
-      const holder = document.createElement('div');
-      holder.innerHTML = html;
-      const firstEl = holder.firstElementChild;
-      wrap.outerHTML = html;
-      if (window.history && window.history.replaceState){
-        const hist = new URL(window.location.href);
-        hist.search = params.toString();
-        window.history.replaceState({}, '', hist.toString());
+        if (window.history && window.history.replaceState){
+          window.history.replaceState({}, '', resp.url);
+        }
+        initAjaxFilters();
+      }catch(err){
+        alert(err.message || 'Falha ao filtrar.');
+        wrap.style.opacity = '1';
       }
-      rebindAdminAjax();
-      const activeBtn = document.querySelector(`[data-bs-target="#${tabName}"]`);
-      if (activeBtn) bootstrap.Tab.getOrCreateInstance(activeBtn).show();
-      return firstEl;
-    }catch(err){
-      wrap.style.opacity = '1';
-      wrap.style.pointerEvents = '';
-      throw err;
+    }
+
+    if (resumoForm && !resumoForm.dataset.ajaxBound){
+      resumoForm.dataset.ajaxBound = '1';
+      resumoForm.addEventListener('submit', function(e){
+        e.preventDefault();
+        fetchPartial(resumoForm, 'resumo', 'resumo', 'resumo');
+      });
+    }
+
+    if (lancForm && !lancForm.dataset.ajaxBound){
+      lancForm.dataset.ajaxBound = '1';
+      lancForm.addEventListener('submit', function(e){
+        e.preventDefault();
+        fetchPartial(lancForm, 'lancamentos', 'lancamentosAjaxWrap', 'lancamentos');
+      });
     }
   }
 
-  async function submitAdminAjaxForm(form){
-    const fd = new FormData(form);
-    fd.set('ajax', '1');
-    const resp = await fetch(form.action, {
-      method: form.method || 'POST',
-      headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json, text/html;q=0.9, */*;q=0.8' },
-      body: fd
-    });
-    const ctype = (resp.headers.get('content-type') || '').toLowerCase();
-    if (ctype.includes('application/json')) {
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok || data.ok === false) throw new Error(data.message || 'Falha ao salvar.');
-      return data;
+  document.addEventListener('DOMContentLoaded', initAjaxFilters);
+  function updateLancamentoRow(form){
+    const id = form.querySelector('[name="id"]')?.value;
+    const row = document.querySelector(`#lancamentosTableBody tr[data-row-id="${id}"]`);
+    if (!row) return false;
+    const restaurante = form.querySelector('[name="restaurante_id"]');
+    const cooperado = form.querySelector('[name="cooperado_id"]');
+    const descricao = form.querySelector('[name="descricao"]')?.value || '';
+    const valor = parseFloat(form.querySelector('[name="valor"]')?.value || '0') || 0;
+    const qtd = form.querySelector('[name="qtd_entregas"]')?.value || '—';
+    const data = form.querySelector('[name="data"]')?.value || '';
+    const hi = form.querySelector('[name="hora_inicio"]')?.value || '';
+    const hf = form.querySelector('[name="hora_fim"]')?.value || '';
+    const inss = valor * 0.04;
+    const sest = valor * 0.005;
+    const liq = valor - inss - sest;
+    const tds = row.querySelectorAll('td');
+    if (tds.length < 11) return false;
+    const restTxt = restaurante?.selectedOptions?.[0]?.textContent || '—';
+    const coopTxt = cooperado?.selectedOptions?.[0]?.textContent || '—';
+    const restSpan = tds[0].querySelector('.table-main-text');
+    if (restSpan) restSpan.textContent = restTxt; else tds[0].textContent = restTxt;
+    tds[1].textContent = coopTxt;
+    tds[2].textContent = descricao;
+    tds[3].textContent = brMoney(valor);
+    const badge = tds[4].querySelector('.badge');
+    if (badge) badge.textContent = qtd;
+    else tds[4].textContent = qtd;
+    tds[5].textContent = brDate(data);
+    tds[6].textContent = hi ? (hf ? `${hi} às ${hf}` : hi) : '—';
+    tds[7].textContent = brMoney(inss);
+    tds[8].textContent = brMoney(sest);
+    tds[9].textContent = brMoney(liq);
+    const editBtn = row.querySelector('[data-bs-target="#modalEditLancamento"]');
+    if (editBtn){
+      editBtn.dataset.restaurante = restaurante?.value || '';
+      editBtn.dataset.cooperado = cooperado?.value || '';
+      editBtn.dataset.descricao = descricao;
+      editBtn.dataset.valor = String(valor);
+      editBtn.dataset.data = data;
+      editBtn.dataset.hora_inicio = hi;
+      editBtn.dataset.hora_fim = hf;
+      editBtn.dataset.qtd_entregas = form.querySelector('[name="qtd_entregas"]')?.value || '';
     }
-    const text = await resp.text();
-    if (!resp.ok) throw new Error('Falha ao salvar.');
-    return { ok:true, html:text, redirected: resp.redirected, url: resp.url };
+    return true;
   }
-
-  async function handleAdminActionSuccess(formOrBtn, fallbackTab){
-    const tabName = fallbackTab || formTabName(formOrBtn instanceof HTMLFormElement ? formOrBtn : formOrBtn?.closest('form'));
-    if (ADMIN_AJAX_TABS.has(tabName)) {
-      await fetchAdminTabPartial(tabName);
-    } else {
-      window.location.reload();
+  function updateDespesaCoopRow(form){
+    const id = form.querySelector('[name="id"]')?.value;
+    const row = document.querySelector(`#coop_despesas tr[data-row-id="${id}"]`);
+    if (!row) return false;
+    const cooperado = form.querySelector('[name="cooperado_id"]');
+    const descricao = form.querySelector('[name="descricao"]')?.value || '';
+    const valor = parseFloat(form.querySelector('[name="valor"]')?.value || '0') || 0;
+    const data = form.querySelector('[name="data"]')?.value || '';
+    const competencia = form.querySelector('[name="competencia_desconto"]')?.value || 'esta_semana';
+    const ehAd = !!form.querySelector('[name="eh_adiantamento"]')?.checked;
+    const tds = row.querySelectorAll('td');
+    if (tds.length < 11) return false;
+    tds[1].textContent = brDate(data);
+    tds[2].textContent = cooperado?.selectedOptions?.[0]?.textContent || 'Todos';
+    tds[3].textContent = descricao;
+    tds[4].innerHTML = ehAd ? '<span class="badge bg-warning text-dark">Adiantamento</span>' : '<span class="badge bg-light text-dark border">Despesa</span>';
+    tds[5].textContent = competencia === 'semana_passada' ? 'Semana passada' : (competencia === 'proxima_semana' ? 'Próxima semana' : (competencia === 'semana_da_data' ? 'Semana da data escolhida' : 'Esta semana'));
+    tds[6].textContent = brMoney(valor);
+    tds[7].textContent = brMoney(0);
+    tds[8].textContent = brMoney(valor);
+    tds[9].innerHTML = '<span class="badge bg-secondary">Aberta</span>';
+    row.dataset.coop = (cooperado?.selectedOptions?.[0]?.textContent || 'todos').toLowerCase();
+    row.dataset.desc = descricao.toLowerCase();
+    const editBtn = row.querySelector('[data-bs-target="#modalEditDespesaCoop"]');
+    if (editBtn){
+      editBtn.dataset.cooperado = cooperado?.value || '';
+      editBtn.dataset.descricao = descricao;
+      editBtn.dataset.valor = String(valor);
+      editBtn.dataset.data = data;
+      editBtn.dataset.competencia = competencia;
+      editBtn.dataset.eh_adiantamento = ehAd ? '1' : '0';
     }
+    return true;
   }
 
-  function bindAdminFilterForms(){
-    document.querySelectorAll('.tab-pane form').forEach((form) => {
-      const method = (form.getAttribute('method') || 'GET').toUpperCase();
-      const tabName = formTabName(form);
-      if (method !== 'GET' || !ADMIN_AJAX_TABS.has(tabName)) return;
-      if (form.dataset.ajaxBound === '1') return;
-      form.dataset.ajaxBound = '1';
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        try {
-          await fetchAdminTabPartial(tabName, form);
-        } catch (err) {
-          alert(err.message || 'Falha ao filtrar.');
+  document.querySelectorAll('#modalEditLancamento form, #modalEditReceita form, #modalEditDespesa form, #modalEditDespesaCoop form').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await submitAdminAjaxForm(form);
+        const modalEl = form.closest('.modal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modalEl?.id === 'modalEditLancamento') {
+          if (!updateLancamentoRow(form)) window.location.reload();
+        } else if (modalEl?.id === 'modalEditDespesaCoop') {
+          if (!updateDespesaCoopRow(form)) window.location.reload();
+        } else {
+          window.location.reload();
         }
-      });
-    });
-  }
-
-  function bindAdminModalForms(){
-    document.querySelectorAll('#modalEditLancamento form, #modalEditReceita form, #modalEditDespesa form, #modalEditReceitaCoop form, #modalEditDespesaCoop form, #modalEditCooperado form, #modalEditRestaurante form, #modalResetSenhaCooperado form, #modalResetSenhaRestaurante form').forEach((form) => {
-      if (form.dataset.ajaxBound === '1') return;
-      form.dataset.ajaxBound = '1';
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        try {
-          await submitAdminAjaxForm(form);
-          const modalEl = form.closest('.modal');
-          const modal = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
-          if (modal) modal.hide();
-          await handleAdminActionSuccess(form, formTabName(form));
-        } catch (err) {
-          alert(err.message || 'Erro ao salvar.');
-        }
-      });
-    });
-  }
-
-  function bindAdminPostForms(){
-    document.querySelectorAll('.tab-pane form').forEach((form) => {
-      const method = (form.getAttribute('method') || 'GET').toUpperCase();
-      const tabName = formTabName(form);
-      if (method === 'GET' || !ADMIN_AJAX_TABS.has(tabName)) return;
-      if (form.closest('.modal')) return;
-      if (form.classList.contains('taxa-adm-inline-form')) return;
-      if (form.dataset.ajaxPostBound === '1') return;
-      form.dataset.ajaxPostBound = '1';
-      form.addEventListener('submit', async (e) => {
-        const isDelete = form.classList.contains('d-inline') || form.classList.contains('form-bulk-beneficios') || form.id === 'bulkDeleteDespesasForm' || form.classList.contains('btn-del-ajax');
-        if (isDelete && !confirm('Tem certeza que deseja excluir?')) {
-          e.preventDefault();
-          return;
-        }
-        e.preventDefault();
-        try {
-          await submitAdminAjaxForm(form);
-          await handleAdminActionSuccess(form, tabName);
-        } catch (err) {
-          alert(err.message || 'Erro ao salvar.');
-        }
-      });
-    });
-
-    document.querySelectorAll('.taxa-adm-inline-form').forEach((form) => {
-      if (form.dataset.ajaxPostBound === '1') return;
-      form.dataset.ajaxPostBound = '1';
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        try {
-          await submitAdminAjaxForm(form);
-          await handleAdminActionSuccess(form, 'receitas');
-        } catch (err) {
-          alert(err.message || 'Erro ao salvar taxa administrativa.');
-        }
-      });
-    });
-  }
-
-  function bindAdminDeleteLinks(){
-    document.querySelectorAll('.btn-del-ajax').forEach((btn) => {
-      if (btn.dataset.ajaxBound === '1') return;
-      btn.dataset.ajaxBound = '1';
-      const form = btn.closest('form');
-      if (form) return;
-      if (btn.tagName === 'A') {
-        btn.addEventListener('click', async (e) => {
-          e.preventDefault();
-          if (!confirm('Tem certeza que deseja excluir?')) return;
-          try {
-            const resp = await fetch(btn.href, {
-              method: 'POST',
-              headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json, text/html;q=0.9, */*;q=0.8' }
-            });
-            if (!resp.ok) throw new Error('Falha ao excluir.');
-            await handleAdminActionSuccess(btn, btn.closest('.tab-pane')?.id || currentAdminTab());
-          } catch (err) {
-            alert(err.message || 'Erro ao excluir.');
-          }
-        });
+        if (modal) modal.hide();
+      } catch (err) {
+        alert(err.message || 'Erro ao salvar.');
       }
     });
-  }
+  });
 
-  function rebindAdminAjax(){
-    bindAdminFilterForms();
-    bindAdminModalForms();
-    bindAdminPostForms();
-    bindAdminDeleteLinks();
-  }
-
-  document.addEventListener('DOMContentLoaded', rebindAdminAjax);
-
+  document.querySelectorAll('.btn-del-ajax').forEach((btn) => {
+    const form = btn.closest('form');
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          const fd = new FormData(form);
+          fd.set('ajax', '1');
+          const resp = await fetch(form.action, {
+            method: form.method || 'POST',
+            headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
+            body: fd
+          });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok || data.ok === false) throw new Error(data.message || 'Falha ao excluir.');
+          const row = form.closest('tr');
+          if (row) row.remove(); else window.location.reload();
+        } catch (err) {
+          alert(err.message || 'Erro ao excluir.');
+        }
+      });
+    } else if (btn.tagName === 'A') {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+          const resp = await fetch(btn.href, {
+            method: 'POST',
+            headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' }
+          });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok || data.ok === false) throw new Error(data.message || 'Falha ao excluir.');
+          const row = btn.closest('tr');
+          if (row) row.remove(); else window.location.reload();
+        } catch (err) {
+          alert(err.message || 'Erro ao excluir.');
+        }
+      });
+    }
+  });
 
   // ===== Gráficos =====
   const rawLancCoop   = {{ (chart_data_lancamentos_coop or {'labels':[], 'values':[]}) | tojson }};
