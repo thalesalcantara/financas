@@ -2223,12 +2223,12 @@
               <th class="text-center">Ações</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="lancamentos">
             {% for l in lancamentos %}
               {% set inss_4  = (l.valor or 0) * 0.04 %}
               {% set sest_05 = (l.valor or 0) * 0.005 %}
               {% set liq     = (l.valor or 0) - inss_4 - sest_05 %}
-              <tr>
+              <tr data-row-id="{{ l.id }}">
                 <td class="lanc-col-rest"><span class="table-main-text">{{ l.restaurante.nome }}</span></td>
                 <td class="lanc-col-coop">{{ l.cooperado.nome }}</td>
                 <td class="lanc-col-desc">{{ l.descricao or "—" }}</td>
@@ -5887,8 +5887,8 @@
           <input type="hidden" name="tab" value="lancamentos">
           <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
           <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
-          <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
-          <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+          <input type="hidden" name="filtro_restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+          <input type="hidden" name="filtro_cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
           {% if request.args.get('somente_pendentes') %}<input type="hidden" name="somente_pendentes" value="1">{% endif %}
         <div class="modal-header"><h5 class="modal-title">Editar Lançamento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body row g-2 px-3">
@@ -6190,8 +6190,11 @@
     const liq = valor - inss - sest;
     const tds = row.querySelectorAll('td');
     if (tds.length < 11) return false;
-    tds[0].textContent = restaurante?.selectedOptions?.[0]?.textContent || '—';
-    tds[1].textContent = cooperado?.selectedOptions?.[0]?.textContent || '—';
+    const restTxt = restaurante?.selectedOptions?.[0]?.textContent || '—';
+    const coopTxt = cooperado?.selectedOptions?.[0]?.textContent || '—';
+    const restSpan = tds[0].querySelector('.table-main-text');
+    if (restSpan) restSpan.textContent = restTxt; else tds[0].textContent = restTxt;
+    tds[1].textContent = coopTxt;
     tds[2].textContent = descricao;
     tds[3].textContent = brMoney(valor);
     const badge = tds[4].querySelector('.badge');
