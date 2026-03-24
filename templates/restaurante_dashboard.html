@@ -1887,7 +1887,7 @@
                       </thead>
                       <tbody>
                         {% for lanc in coop.lancamentos %}
-                          <tr>
+                          <tr data-id="{{ lanc.id }}" data-edit-url="{{ url_for('editar_lancamento', id=lanc.id) }}" data-delete-url="{{ url_for('excluir_lancamento', id=lanc.id) }}">
                             <td>R$ {{ '%.2f'|format(lanc.valor or 0) }}</td>
                             <td>{{ lanc.data.strftime('%d/%m/%Y') if lanc.data }}</td>
                             <td>
@@ -1898,13 +1898,13 @@
                             <td>{{ lanc.qtd_entregas if lanc.qtd_entregas is not none else '-' }}</td>
                             <td class="text-center">
                               {% if has_editar_lanc %}
-                                <a href="{{ url_for('editar_lancamento', id=lanc.id) }}" class="btn btn-outline-royal btn-sm">
+                                <a href="{{ url_for('editar_lancamento', id=lanc.id) }}" class="btn btn-outline-royal btn-sm js-edit-lanc">
                                   <i class="bi bi-pencil"></i>
                                 </a>
                               {% endif %}
                             </td>
                             <td class="text-center">
-                              <a href="{{ url_for('excluir_lancamento', id=lanc.id) }}" class="btn btn-outline-danger btn-sm">
+                              <a href="{{ url_for('excluir_lancamento', id=lanc.id) }}" class="btn btn-outline-danger btn-sm js-delete-lanc">
                                 <i class="bi bi-trash"></i>
                               </a>
                             </td>
@@ -3088,5 +3088,258 @@
       showSection(v);
     });
   </script>
+
+  <div class="modal fade" id="modalEditLanc" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Editar lançamento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <form id="formEditLanc">
+          <div class="modal-body row g-2">
+            <input type="hidden" name="id" id="editLancId">
+            <div class="col-md-6">
+              <label class="form-label">Valor (R$)</label>
+              <input type="number" class="form-control" name="valor" step="0.01" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Data</label>
+              <input type="date" class="form-control" name="data" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Hora início</label>
+              <input type="time" class="form-control" name="hora_inicio">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Hora fim</label>
+              <input type="time" class="form-control" name="hora_fim">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Entregas</label>
+              <input type="number" class="form-control" name="qtd_entregas" min="0" step="1">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Descrição</label>
+              <textarea class="form-control" name="descricao" rows="2"></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-royal"><i class="bi bi-check2-circle"></i> Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const money = n => Number(n || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  function lancRowHtml(x){
+    const horario = (x.hora_inicio || x.hora_fim) ? `${x.hora_inicio || ''} às ${x.hora_fim || ''}` : '&mdash;';
+    return `<tr data-id="${x.id}" data-coop="${x.cooperado_id || ''}" data-coopnome="${x.cooperado_nome || ''}" data-contrato="${x.contrato_nome || ''}" data-edit-url="/lancamentos/${x.id}/editar" data-delete-url="/lancamentos/${x.id}/excluir">
+      <td class="text-center">${x.data || ''}</td>
+      <td class="fw-semibold coop-name">${x.cooperado_nome || ''}</td>
+      <td>${x.contrato_nome || '&mdash;'}</td>
+      <td class="text-center">${horario}</td>
+      <td class="desc">${x.descricao || '-'}</td>
+      <td class="text-center entregas">${x.qtd_entregas ?? 0}</td>
+      <td class="text-end valor" data-valor="${Number(x.valor || 0).toFixed(2)}">R$ ${money(x.valor || 0)}</td>
+    </tr>`;
+  }
+
+  function miniRowHtml(x){
+    const horario = (x.hora_inicio || x.hora_fim) ? `${x.hora_inicio || ''} às ${x.hora_fim || ''}` : '&mdash;';
+    return `<tr data-id="${x.id}" data-edit-url="/lancamentos/${x.id}/editar" data-delete-url="/lancamentos/${x.id}/excluir">
+      <td>R$ ${money(x.valor || 0)}</td>
+      <td>${x.data || ''}</td>
+      <td>${horario}</td>
+      <td>${x.qtd_entregas ?? '-'}</td>
+      <td class="text-center"><a href="/lancamentos/${x.id}/editar" class="btn btn-outline-royal btn-sm js-edit-lanc"><i class="bi bi-pencil"></i></a></td>
+      <td class="text-center"><a href="/lancamentos/${x.id}/excluir" class="btn btn-outline-danger btn-sm js-delete-lanc"><i class="bi bi-trash"></i></a></td>
+    </tr>`;
+  }
+
+  async function carregarHistorico(){
+    const form = document.getElementById('formFiltroLanc');
+    if(!form) return;
+    const params = new URLSearchParams(new FormData(form));
+    const res = await fetch(`/restaurante/lancamentos/json?${params.toString()}`, {
+      headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'},
+      credentials:'same-origin'
+    });
+    const j = await res.json();
+    if(!j.ok) return;
+    const tbody = document.getElementById('tbodyLanc');
+    if(tbody){
+      tbody.innerHTML = (j.items || []).map(lancRowHtml).join('') || '<tr><td colspan="7" class="text-center text-muted">Nenhum lançamento no período</td></tr>';
+    }
+    const grid = document.getElementById('gridCoop');
+    if(grid){
+      grid.innerHTML = (j.cooperados || []).map(c => `<div class="col-md-6 col-xl-4"><div class="card card-body"><div class="fw-bold">${c.cooperado_nome || ''}</div><div class="small text-muted">${c.qtd_lancamentos} lançamentos • ${c.entregas} entregas</div><div class="mt-1">R$ ${money(c.valor || 0)}</div></div></div>`).join('');
+    }
+    const ftV = document.getElementById('ftValor'); if(ftV) ftV.textContent = `R$ ${money(j.total_valor || 0)}`;
+    const ftE = document.getElementById('ftEntregas'); if(ftE) ftE.textContent = String(j.total_entregas || 0);
+    const kV = document.getElementById('kpiTotalValor'); if(kV) kV.textContent = money(j.total_valor || 0);
+    const kE = document.getElementById('kpiTotalEntregas'); if(kE) kE.textContent = String(j.total_entregas || 0);
+    const txt = document.getElementById('txtPeriodo'); if(txt) txt.textContent = `${j.periodo_inicio || ''} a ${j.periodo_fim || ''}`;
+  }
+
+  async function carregarTabelaCoop(coopId){
+    if(!coopId) return;
+    const form = document.getElementById('formFiltroLanc');
+    const params = new URLSearchParams();
+    if(form){
+      for(const [k,v] of new FormData(form).entries()){
+        if(v) params.append(k, v);
+      }
+    }
+    const res = await fetch(`/restaurante/lancamentos/json?${params.toString()}`, {
+      headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'},
+      credentials:'same-origin'
+    });
+    const j = await res.json();
+    if(!j.ok) return;
+    const items = (j.items || []).filter(x => String(x.cooperado_id || '') === String(coopId));
+    const box = document.getElementById(`tabela-${coopId}`);
+    if(!box) return;
+    const tbody = box.querySelector('tbody');
+    if(!tbody) return;
+    tbody.innerHTML = items.map(miniRowHtml).join('') || '<tr><td colspan="6" class="text-center text-muted">Nenhum lançamento no período selecionado</td></tr>';
+  }
+
+  document.addEventListener('submit', async function(e){
+    const form = e.target;
+    if(form && form.id === 'formFiltroLanc'){
+      e.preventDefault();
+      await carregarHistorico();
+      history.replaceState({view:'lancamentos'}, '', `?view=lancamentos&${new URLSearchParams(new FormData(form)).toString()}`);
+      return;
+    }
+    if(form && form.id === 'formLancamento'){
+      e.preventDefault();
+      const btn = form.querySelector('button[type="submit"]');
+      if(btn) btn.disabled = true;
+      try{
+        const coopId = document.getElementById('inputCooperadoId')?.value || '';
+        const res = await fetch(form.action, {
+          method:'POST',
+          body:new FormData(form),
+          headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'},
+          credentials:'same-origin'
+        });
+        const j = await res.json();
+        if(!j.ok) throw new Error(j.error || 'Falha');
+        form.reset();
+        const boxAval = document.getElementById('boxAval'); if(boxAval) boxAval.style.display = 'none';
+        const chk = document.getElementById('chkAvaliar'); if(chk) chk.checked = false;
+        const inp = document.getElementById('inputAvaliar'); if(inp) inp.value = '0';
+        await carregarHistorico();
+        await carregarTabelaCoop(coopId);
+        alert(j.message || 'Produção lançada.');
+      }catch(err){
+        alert('Erro ao lançar produção.');
+      }finally{
+        if(btn) btn.disabled = false;
+      }
+      return;
+    }
+    if(form && form.id === 'formEditLanc'){
+      e.preventDefault();
+      const id = document.getElementById('editLancId').value;
+      try{
+        const res = await fetch(`/lancamentos/${id}/editar`, {
+          method:'POST',
+          body:new FormData(form),
+          headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'},
+          credentials:'same-origin'
+        });
+        const j = await res.json();
+        if(!j.ok) throw new Error();
+        bootstrap.Modal.getInstance(document.getElementById('modalEditLanc'))?.hide();
+        await carregarHistorico();
+        const coopId = document.getElementById('inputCooperadoId')?.value || '';
+        await carregarTabelaCoop(coopId);
+      }catch(err){
+        alert('Erro ao salvar edição.');
+      }
+    }
+  });
+
+  document.addEventListener('click', async function(e){
+    const edit = e.target.closest('.js-edit-lanc');
+    if(edit){
+      e.preventDefault();
+      const tr = edit.closest('tr');
+      const url = tr?.dataset?.editUrl || edit.getAttribute('href');
+      try{
+        const res = await fetch(url, {
+          headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'},
+          credentials:'same-origin'
+        });
+        const j = await res.json();
+        if(!j.ok) throw new Error();
+        const d = j.item || {};
+        const f = document.getElementById('formEditLanc');
+        f.valor.value = d.valor || '';
+        f.data.value = d.data_iso || '';
+        f.hora_inicio.value = d.hora_inicio || '';
+        f.hora_fim.value = d.hora_fim || '';
+        f.qtd_entregas.value = d.qtd_entregas ?? '';
+        f.descricao.value = d.descricao || '';
+        document.getElementById('editLancId').value = d.id;
+        new bootstrap.Modal(document.getElementById('modalEditLanc')).show();
+      }catch(err){
+        alert('Erro ao abrir edição.');
+      }
+      return;
+    }
+    const del = e.target.closest('.js-delete-lanc');
+    if(del){
+      e.preventDefault();
+      if(!confirm('Excluir este lançamento?')) return;
+      const tr = del.closest('tr');
+      const url = tr?.dataset?.deleteUrl || del.getAttribute('href');
+      try{
+        const res = await fetch(url, {
+          method:'POST',
+          headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'},
+          credentials:'same-origin'
+        });
+        const j = await res.json();
+        if(!j.ok) throw new Error();
+        tr?.remove();
+        await carregarHistorico();
+        const coopId = document.getElementById('inputCooperadoId')?.value || '';
+        await carregarTabelaCoop(coopId);
+      }catch(err){
+        alert('Erro ao excluir lançamento.');
+      }
+      return;
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', function(){
+    if(document.querySelector('[data-view="lancamentos"]')){
+      carregarHistorico().catch(() => {});
+    }
+  });
+
+  const oldSel = window.selecionarCooperado;
+  if(typeof oldSel === 'function'){
+    window.selecionarCooperado = function(){
+      const r = oldSel.apply(this, arguments);
+      try{
+        const coopId = document.getElementById('inputCooperadoId')?.value || '';
+        carregarTabelaCoop(coopId);
+      }catch(e){}
+      return r;
+    }
+  }
+})();
+</script>
+
 </body>
 </html>
