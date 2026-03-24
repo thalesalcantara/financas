@@ -1016,11 +1016,11 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text("""
-                ALTER TABLE IF NOT EXISTS public.despesas_cooperado
+                ALTER TABLE IF EXISTS public.despesas_cooperado
                 ADD COLUMN IF NOT EXISTS data_inicio DATE
             """))
             db.session.execute(sa_text("""
-                ALTER TABLE IF NOT EXISTS public.despesas_cooperado
+                ALTER TABLE IF EXISTS public.despesas_cooperado
                 ADD COLUMN IF NOT EXISTS data_fim DATE
             """))
             db.session.commit()
@@ -1150,7 +1150,7 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS escalas "
+                "ALTER TABLE IF EXISTS escalas "
                 "ADD COLUMN IF NOT EXISTS cooperado_nome VARCHAR(120)"
             ))
             db.session.commit()
@@ -1167,7 +1167,7 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS escalas "
+                "ALTER TABLE IF EXISTS escalas "
                 "ADD COLUMN IF NOT EXISTS restaurante_id INTEGER"
             ))
             db.session.commit()
@@ -1190,13 +1190,13 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+                "ALTER TABLE IF EXISTS cooperados ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
@@ -1211,7 +1211,7 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS cooperados "
+                "ALTER TABLE IF EXISTS cooperados "
                 "ADD COLUMN IF NOT EXISTS telefone VARCHAR(30)"
             ))
             db.session.commit()
@@ -1223,11 +1223,11 @@ def init_db():
         if _is_sqlite():
             db.session.execute(sa_text("""
                 CREATE TABLE IF NOT EXISTS avaliacoes_restaurante (
-                id SERIAL PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 restaurante_id INTEGER NOT NULL,
                 cooperado_id INTEGER NOT NULL,
                 lancamento_id INTEGER UNIQUE,
-                estrelas_geral DOUBLE PRECISION,
+                estrelas_geral INTEGER,
                 estrelas_ambiente INTEGER,
                 estrelas_tratamento INTEGER,
                 estrelas_suporte INTEGER,
@@ -1237,7 +1237,7 @@ def init_db():
                 temas VARCHAR(255),
                 alerta_crise BOOLEAN DEFAULT FALSE,
                 criado_em TIMESTAMP
-              );
+              )
            """))
             db.session.execute(sa_text(
                 "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
@@ -1252,16 +1252,16 @@ def init_db():
                   cooperado_id   INTEGER NOT NULL,
                   lancamento_id  INTEGER UNIQUE,
                   estrelas_geral INTEGER,
-                  estrelas_ambiente   = db.Column(db.Integer)
-                  estrelas_tratamento = db.Column(db.Integer)
-                  estrelas_suporte    = db.Column(db.Integer)
+                  estrelas_ambiente INTEGER,
+                  estrelas_tratamento INTEGER,
+                  estrelas_suporte INTEGER,
                   comentario TEXT,
                   media_ponderada DOUBLE PRECISION,
                   sentimento VARCHAR(12),
                   temas VARCHAR(255),
                   alerta_crise BOOLEAN DEFAULT FALSE,
                   criado_em TIMESTAMP
-                );
+                )
             """))
             db.session.execute(sa_text(
                 "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
@@ -1287,13 +1287,13 @@ def init_db():
             db.session.commit()
         else:
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_bytes BYTEA"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_mime VARCHAR(100)"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_filename VARCHAR(255)"))
             db.session.execute(sa_text(
-                "ALTER TABLE IF NOT EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
+                "ALTER TABLE IF EXISTS restaurantes ADD COLUMN IF NOT EXISTS foto_url VARCHAR(255)"))
             db.session.commit()
     except Exception:
         db.session.rollback()
@@ -9768,127 +9768,6 @@ def portal_restaurante():
 # =========================
 # Rotas de CRUD de lançamento
 # =========================
-
-
-def _wants_json_response() -> bool:
-    accept = (request.headers.get("Accept") or "").lower()
-    xrw = (request.headers.get("X-Requested-With") or "").lower()
-    return request.is_json or "application/json" in accept or xrw == "xmlhttprequest"
-
-
-def _fmt_portal_time(v):
-    if v is None:
-        return ""
-    if isinstance(v, str):
-        return v.strip()
-    try:
-        return v.strftime("%H:%M")
-    except Exception:
-        return str(v).strip()
-
-
-def _serialize_lancamento_portal(lanc, coop_nome: str = "", contrato_nome: str = ""):
-    return {
-        "id": lanc.id,
-        "data": (lanc.data.strftime("%d/%m/%Y") if getattr(lanc, "data", None) else ""),
-        "data_iso": (lanc.data.strftime("%Y-%m-%d") if getattr(lanc, "data", None) else ""),
-        "hora_inicio": _fmt_portal_time(getattr(lanc, "hora_inicio", None)),
-        "hora_fim": _fmt_portal_time(getattr(lanc, "hora_fim", None)),
-        "qtd_entregas": int(getattr(lanc, "qtd_entregas", 0) or 0),
-        "valor": float(getattr(lanc, "valor", 0) or 0),
-        "descricao": (getattr(lanc, "descricao", None) or ""),
-        "cooperado_id": getattr(lanc, "cooperado_id", None),
-        "cooperado_nome": coop_nome or "—",
-        "contrato_nome": contrato_nome or "",
-    }
-
-
-def _query_lancamentos_restaurante_json(rest, di, df, q_nome: str = ""):
-    qry = (
-        db.session.query(Lancamento, Cooperado)
-        .join(Cooperado, Cooperado.id == Lancamento.cooperado_id)
-        .filter(Lancamento.restaurante_id == rest.id)
-    )
-    if di:
-        qry = qry.filter(Lancamento.data >= di)
-    if df:
-        qry = qry.filter(Lancamento.data <= df)
-    if q_nome:
-        qry = qry.filter(Cooperado.nome.ilike(f"%{q_nome}%"))
-    qry = qry.order_by(Lancamento.data.desc(), Lancamento.id.desc())
-
-    items = []
-    total_valor = 0.0
-    total_entregas = 0
-    totais_por_cooperado = {}
-
-    for lanc, coop in qry.all():
-        item = _serialize_lancamento_portal(lanc, coop_nome=(coop.nome or ""), contrato_nome=(rest.nome or ""))
-        items.append(item)
-        total_valor += item["valor"]
-        total_entregas += item["qtd_entregas"]
-        cid = item["cooperado_id"]
-        bucket = totais_por_cooperado.setdefault(cid, {"nome": item["cooperado_nome"], "valor": 0.0, "ent": 0})
-        bucket["valor"] += item["valor"]
-        bucket["ent"] += item["qtd_entregas"]
-
-    totais_lista = [
-        {"cooperado_id": cid, "nome": v["nome"], "valor": float(v["valor"]), "ent": int(v["ent"])}
-        for cid, v in totais_por_cooperado.items()
-    ]
-    totais_lista.sort(key=lambda x: (-x["valor"], (x["nome"] or "").lower()))
-
-    return {
-        "items": items,
-        "total_valor": float(total_valor),
-        "total_entregas": int(total_entregas),
-        "totais_por_cooperado": totais_lista,
-    }
-
-
-@app.get("/restaurante/lancamentos/json")
-@role_required("restaurante")
-def restaurante_lancamentos_json():
-    from datetime import date, timedelta
-    import re
-
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-
-    def _parse_yyyy_mm_local(s: str):
-        if not s:
-            return None, None
-        m = re.fullmatch(r"(\d{4})-(\d{2})", s.strip())
-        if not m:
-            return None, None
-        y = int(m.group(1))
-        mth = int(m.group(2))
-        try:
-            di_ = date(y, mth, 1)
-            if mth == 12:
-                df_ = date(y + 1, 1, 1) - timedelta(days=1)
-            else:
-                df_ = date(y, mth + 1, 1) - timedelta(days=1)
-            return di_, df_
-        except Exception:
-            return None, None
-
-    di = _parse_date(request.args.get("data_inicio"))
-    df = _parse_date(request.args.get("data_fim"))
-    mes = (request.args.get("mes") or "").strip()
-    q_nome = (request.args.get("q") or "").strip()
-    if mes:
-        di_mes, df_mes = _parse_yyyy_mm_local(mes)
-        if di_mes and df_mes:
-            di, df = di_mes, df_mes
-    if not di or not df:
-        hoje = date.today()
-        di = di or hoje
-        df = df or hoje
-
-    payload = _query_lancamentos_restaurante_json(rest, di, df, q_nome=q_nome)
-    payload.update({"ok": True, "data_inicio": di.strftime("%Y-%m-%d") if di else "", "data_fim": df.strftime("%Y-%m-%d") if df else "", "mes": mes})
-    return jsonify(payload)
 @app.post("/restaurante/lancar_producao")
 @role_required("restaurante")
 def lancar_producao():
@@ -9898,16 +9777,15 @@ def lancar_producao():
         abort(403)
     f = request.form
 
+    # NOVO: captura a descrição do formulário (somente para o estabelecimento)
     desc_raw = (f.get("descricao") or "").strip()
-    desc_val = desc_raw or None
+    desc_val = desc_raw or None  # salva None se vazio
 
-    coop_id = f.get("cooperado_id", type=int)
-    coop = Cooperado.query.get(coop_id) if coop_id else None
-
+    # 1) cria o lançamento
     l = Lancamento(
         restaurante_id=rest.id,
-        cooperado_id=coop_id,
-        descricao=desc_val,
+        cooperado_id=f.get("cooperado_id", type=int),
+        descricao=desc_val,                            # <<< NOVO: salvar descrição
         valor=f.get("valor", type=float),
         data=_parse_date(f.get("data")) or date.today(),
         hora_inicio=f.get("hora_inicio"),
@@ -9915,8 +9793,9 @@ def lancar_producao():
         qtd_entregas=f.get("qtd_entregas", type=int),
     )
     db.session.add(l)
-    db.session.flush()
+    db.session.flush()  # garante l.id
 
+    # 2) avaliação (opcional)
     g   = _clamp_star(f.get("av_geral"))
     p   = _clamp_star(f.get("av_pontualidade"))
     ed  = _clamp_star(f.get("av_educacao"))
@@ -9953,12 +9832,7 @@ def lancar_producao():
             flash("⚠️ Avaliação crítica registrada (1★ + termo de risco). A gerência deve revisar.", "danger")
 
     db.session.commit()
-    msg = "Produção lançada" + (" + avaliação salva." if tem_avaliacao else ".")
-
-    if _wants_json_response():
-        return jsonify({"ok": True, "message": msg, "item": _serialize_lancamento_portal(l, coop_nome=(coop.nome if coop else ""), contrato_nome=rest.nome)})
-
-    flash(msg, "success")
+    flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
     return redirect(url_for("portal_restaurante", view="lancar"))
 
 @app.route("/lancamentos/<int:id>/editar", methods=["GET", "POST"])
@@ -9970,10 +9844,6 @@ def editar_lancamento(id):
     if not rest or l.restaurante_id != rest.id:
         abort(403)
 
-    if request.method == "GET" and _wants_json_response():
-        coop = Cooperado.query.get(l.cooperado_id) if l.cooperado_id else None
-        return jsonify({"ok": True, "item": _serialize_lancamento_portal(l, coop_nome=(coop.nome if coop else ""), contrato_nome=rest.nome)})
-
     if request.method == "POST":
         f = request.form
         l.valor = f.get("valor", type=float)
@@ -9981,18 +9851,17 @@ def editar_lancamento(id):
         l.hora_inicio = f.get("hora_inicio")
         l.hora_fim = f.get("hora_fim")
         l.qtd_entregas = f.get("qtd_entregas", type=int)
+        # NOVO: permitir atualizar descrição se o form de edição trouxer o campo
         if "descricao" in f:
             l.descricao = (f.get("descricao") or "").strip() or None
         db.session.commit()
-        coop = Cooperado.query.get(l.cooperado_id) if l.cooperado_id else None
-        if _wants_json_response():
-            return jsonify({"ok": True, "message": "Lançamento atualizado.", "item": _serialize_lancamento_portal(l, coop_nome=(coop.nome if coop else ""), contrato_nome=rest.nome)})
         flash("Lançamento atualizado.", "success")
-        return redirect(url_for("portal_restaurante", view="lancamentos", data_inicio=(l.data and l.data.strftime("%Y-%m-%d"))))
+        return redirect(url_for("portal_restaurante", view="lancamentos",
+                                data_inicio=(l.data and l.data.strftime("%Y-%m-%d"))))
 
     return render_template("editar_lancamento.html", lanc=l)
 
-@app.route("/lancamentos/<int:id>/excluir", methods=["GET", "POST"])
+@app.get("/lancamentos/<int:id>/excluir")
 @role_required("restaurante")
 def excluir_lancamento(id):
     u_id = session.get("user_id")
@@ -10005,10 +9874,6 @@ def excluir_lancamento(id):
     db.session.execute(sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.lancamento_id == id))
     db.session.delete(l)
     db.session.commit()
-
-    if _wants_json_response() or request.method == "POST":
-        return jsonify({"ok": True, "message": "Lançamento excluído.", "id": id})
-
     flash("Lançamento excluído.", "success")
     return redirect(url_for("portal_restaurante", view="lancamentos"))
 
