@@ -3123,7 +3123,8 @@
           </thead>
           <tbody id="adiantamentosAdminBody">
             {% for s in solicitacoes_adiantamento %}
-            <tr data-adiantamento-id="{{ s.id }}" data-despesa-id="{{ s.despesa_cooperado_id or '' }}">
+            {% set _locked_row = (s.status or 'em_analise') != 'em_analise' %}
+            <tr data-adiantamento-id="{{ s.id }}" data-despesa-id="{{ s.despesa_cooperado_id or '' }}" data-status="{{ s.status or 'em_analise' }}">
               <td>#{{ s.id }}</td>
               <td>{{ s.cooperado.nome if s.cooperado else '—' }}</td>
               <td>{{ s.pedido_em.strftime('%d/%m/%Y %H:%M') if s.pedido_em else '—' }}</td>
@@ -3133,30 +3134,21 @@
               <td class="js-data-desconto">{% if s.data_desconto %}{{ s.data_desconto.strftime('%d/%m/%Y') }} · {{ competencia_humana(s.competencia_desconto) }}{% else %}—{% endif %}</td>
               <td class="small js-motivo">{{ s.motivo_recusa or '—' }}</td>
               <td>
-                <form method="POST" action="{{ url_for('analisar_adiantamento_admin', id=s.id) }}" class="js-adiantamento-admin-form row g-1">
-                  <div class="col-md-4">
-                    <input class="form-control form-control-sm" type="number" step="0.01" min="0" name="valor_aprovado" value="{{ '%.2f'|format((s.valor_aprovado if s.valor_aprovado is not none else s.valor_solicitado) or 0) }}">
-                  </div>
-                  <div class="col-md-4">
-                    <input class="form-control form-control-sm" type="date" name="data_desconto" value="{{ s.data_desconto.strftime('%Y-%m-%d') if s.data_desconto else '' }}">
-                  </div>
-                  <div class="col-md-4">
-                    <select class="form-select form-select-sm" name="competencia_desconto">
-                      <option value="esta_semana" {{ 'selected' if (s.competencia_desconto or 'esta_semana')=='esta_semana' else '' }}>Esta semana</option>
-                      <option value="proxima_semana" {{ 'selected' if (s.competencia_desconto or '')=='proxima_semana' else '' }}>Próxima semana</option>
-                      <option value="semana_passada" {{ 'selected' if (s.competencia_desconto or '')=='semana_passada' else '' }}>Semana passada</option>
-                      <option value="semana_da_data" {{ 'selected' if (s.competencia_desconto or '')=='semana_da_data' else '' }}>Semana da data</option>
-                    </select>
-                  </div>
-                  <div class="col-12">
-                    <input class="form-control form-control-sm" type="text" name="motivo_recusa" placeholder="Motivo da recusa (obrigatório ao recusar)">
-                  </div>
-                  <div class="col-12">
-                    <input class="form-control form-control-sm" type="text" name="observacao_admin" placeholder="Observação do admin (opcional)">
-                  </div>
-                  <div class="col-12 d-flex gap-1">
-                    <button class="btn btn-sm btn-success" type="submit" name="acao" value="aprovar">Aprovar</button>
-                    <button class="btn btn-sm btn-outline-danger" type="submit" name="acao" value="recusar">Recusar</button>
+                <form method="POST" action="{{ url_for('analisar_adiantamento_admin', id=s.id) }}" class="js-adiantamento-admin-form d-flex flex-wrap align-items-center gap-2" data-locked="{{ '1' if _locked_row else '0' }}">
+                  <input class="form-control form-control-sm" style="width:90px" type="number" step="0.01" min="0" name="valor_aprovado" value="{{ '%.2f'|format((s.valor_aprovado if s.valor_aprovado is not none else s.valor_solicitado) or 0) }}" {{ 'disabled' if _locked_row else '' }}>
+                  <input class="form-control form-control-sm" style="width:130px" type="date" name="data_desconto" value="{{ s.data_desconto.strftime('%Y-%m-%d') if s.data_desconto else '' }}" {{ 'disabled' if _locked_row else '' }}>
+                  <select class="form-select form-select-sm" style="width:160px" name="competencia_desconto" {{ 'disabled' if _locked_row else '' }}>
+                    <option value="esta_semana" {{ 'selected' if (s.competencia_desconto or 'esta_semana')=='esta_semana' else '' }}>Esta semana</option>
+                    <option value="proxima_semana" {{ 'selected' if (s.competencia_desconto or '')=='proxima_semana' else '' }}>Próxima semana</option>
+                    <option value="semana_passada" {{ 'selected' if (s.competencia_desconto or '')=='semana_passada' else '' }}>Semana passada</option>
+                    <option value="semana_da_data" {{ 'selected' if (s.competencia_desconto or '')=='semana_da_data' else '' }}>Semana da data</option>
+                  </select>
+                  <input class="form-control form-control-sm flex-grow-1" style="min-width:190px" type="text" name="motivo_recusa" placeholder="Motivo da recusa" {{ 'disabled' if _locked_row else '' }}>
+                  <input class="form-control form-control-sm flex-grow-1" style="min-width:190px" type="text" name="observacao_admin" placeholder="Observação do admin" value="{{ s.observacao_admin or '' }}" {{ 'disabled' if _locked_row else '' }}>
+                  <div class="d-flex gap-1 ms-auto">
+                    <button class="btn btn-sm btn-success js-btn-aprovar" type="submit" name="acao" value="aprovar" {{ 'disabled' if _locked_row else '' }}>Aprovar</button>
+                    <button class="btn btn-sm btn-outline-danger js-btn-recusar" type="submit" name="acao" value="recusar" {{ 'disabled' if _locked_row else '' }}>Recusar</button>
+                    <button class="btn btn-sm btn-outline-primary js-btn-editar-adiantamento {{ '' if _locked_row else 'd-none' }}" type="button">Editar</button>
                   </div>
                 </form>
               </td>
@@ -6441,13 +6433,38 @@
     });
   });
 
+  function setAdiantamentoFormLocked(form, locked){
+    form.dataset.locked = locked ? '1' : '0';
+    form.querySelectorAll('input[name="valor_aprovado"], input[name="data_desconto"], select[name="competencia_desconto"], input[name="motivo_recusa"], input[name="observacao_admin"]').forEach((el) => {
+      el.disabled = !!locked;
+    });
+    const btnApr = form.querySelector('.js-btn-aprovar');
+    const btnRec = form.querySelector('.js-btn-recusar');
+    const btnEdit = form.querySelector('.js-btn-editar-adiantamento');
+    if (btnApr) btnApr.disabled = !!locked;
+    if (btnRec) btnRec.disabled = !!locked;
+    if (btnEdit) btnEdit.classList.toggle('d-none', !locked);
+  }
+
   document.querySelectorAll('.js-adiantamento-admin-form').forEach((form) => {
     if (form.dataset.bound === '1') return;
     form.dataset.bound = '1';
+    setAdiantamentoFormLocked(form, form.dataset.locked === '1');
+
+    const btnEdit = form.querySelector('.js-btn-editar-adiantamento');
+    if (btnEdit){
+      btnEdit.addEventListener('click', () => {
+        setAdiantamentoFormLocked(form, false);
+        const first = form.querySelector('input[name="valor_aprovado"]');
+        if (first) first.focus();
+      });
+    }
+
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
-      const fd = new FormData(form);
       const btn = ev.submitter;
+      if (!btn || btn.type === 'button') return;
+      const fd = new FormData(form);
       if (btn?.name && btn?.value) fd.set(btn.name, btn.value);
       try{
         const resp = await fetch(form.action, {
@@ -6459,6 +6476,7 @@
         if (!resp.ok || data.ok === false) throw new Error(data.message || 'Falha ao analisar.');
         const tr = form.closest('tr');
         if (tr && data.item){
+          tr.dataset.status = data.item.status || '';
           const statusEl = tr.querySelector('.js-status');
           if (statusEl){
             statusEl.className = `badge bg-${data.item.status_badge}${data.item.status_badge==='warning' ? ' text-dark' : ''} js-status`;
@@ -6470,6 +6488,7 @@
           if (aprovadoEl) aprovadoEl.textContent = data.item.valor_aprovado ? brMoney(data.item.valor_aprovado) : '—';
           const dataEl = tr.querySelector('.js-data-desconto');
           if (dataEl) dataEl.textContent = data.item.data_desconto && data.item.data_desconto !== '—' ? `${data.item.data_desconto} · ${data.item.competencia_label}` : '—';
+          setAdiantamentoFormLocked(form, data.item.status !== 'em_analise');
         }
         if (data.item?.despesa_id){
           const cell = document.querySelector(`[data-despesa-status-id="${data.item.despesa_id}"]`);
