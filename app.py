@@ -253,6 +253,22 @@ def ajustar_banco():
     except Exception:
         db.session.rollback()
 
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(config); ")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "bloquear_adiantamento" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE config ADD COLUMN bloquear_adiantamento BOOLEAN DEFAULT 0"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("""
+                ALTER TABLE IF EXISTS public.config
+                ADD COLUMN IF NOT EXISTS bloquear_adiantamento BOOLEAN DEFAULT FALSE
+            """))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
 
 # ========= Retry de conexão p/ rotas críticas =========
 def with_db_retry(fn):
@@ -565,8 +581,34 @@ class DespesaCooperado(db.Model):
     # 🔴 NOVO: marca se é adiantamento
     eh_adiantamento = db.Column(db.Boolean, default=False)
     competencia_desconto = db.Column(db.String(20), default='atual')
-    
 
+
+class SolicitacaoAdiantamento(db.Model):
+    __tablename__ = "solicitacoes_adiantamento"
+
+    id = db.Column(db.Integer, primary_key=True)
+    cooperado_id = db.Column(db.Integer, db.ForeignKey("cooperados.id"), nullable=False, index=True)
+    cooperado = db.relationship("Cooperado")
+
+    valor_solicitado = db.Column(db.Float, nullable=False, default=0.0)
+    valor_aprovado = db.Column(db.Float, nullable=True)
+
+    status = db.Column(db.String(20), nullable=False, default="em_analise", index=True)
+    motivo_recusa = db.Column(db.String(500))
+
+    pedido_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    analisado_em = db.Column(db.DateTime)
+
+    data_pedido = db.Column(db.Date, default=date.today, nullable=False)
+    data_desconto = db.Column(db.Date)
+    competencia_desconto = db.Column(db.String(20), default="esta_semana")
+
+    observacao_admin = db.Column(db.String(500))
+    despesa_cooperado_id = db.Column(db.Integer, db.ForeignKey("despesas_cooperado.id"), nullable=True, index=True)
+    despesa = db.relationship("DespesaCooperado", foreign_keys=[despesa_cooperado_id])
+
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 class DespesaCooperadoAbatimento(db.Model):
     __tablename__ = "despesas_cooperado_abatimentos"
@@ -744,6 +786,7 @@ class Config(db.Model):
     __tablename__ = "config"
     id = db.Column(db.Integer, primary_key=True)
     salario_minimo = db.Column(db.Float, default=0.0)
+    bloquear_adiantamento = db.Column(db.Boolean, default=False)
 
 
 class Documento(db.Model):
@@ -1103,6 +1146,23 @@ def init_db():
     except Exception:
         db.session.rollback()
 
+    # 4.zab) bloqueio global de solicitação de adiantamento
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(config); ")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "bloquear_adiantamento" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE config ADD COLUMN bloquear_adiantamento BOOLEAN DEFAULT 0"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("""
+                ALTER TABLE IF EXISTS public.config
+                ADD COLUMN IF NOT EXISTS bloquear_adiantamento BOOLEAN DEFAULT FALSE
+            """))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
     # 4.zb) tabela de abatimentos de despesas do cooperado
     try:
         if _is_sqlite():
@@ -1420,7 +1480,7 @@ def init_db():
 
         if has_config_model:
             if not Config.query.get(1):  # type: ignore[name-defined]
-                db.session.add(Config(id=1, salario_minimo=0.0))  # type: ignore[name-defined]
+                db.session.add(Config(id=1, salario_minimo=0.0, bloquear_adiantamento=False))  # type: ignore[name-defined]
                 db.session.commit()
     except Exception:
         db.session.rollback()
@@ -1451,7 +1511,7 @@ except Exception as e:
 def get_config() -> Config:
     cfg = Config.query.get(1)
     if not cfg:
-        cfg = Config(id=1, salario_minimo=0.0)
+        cfg = Config(id=1, salario_minimo=0.0, bloquear_adiantamento=False)
         db.session.add(cfg)
         db.session.commit()
     return cfg
@@ -3743,6 +3803,12 @@ def admin_dashboard():
             for _it in _snap["itens"]:
                 despesa_snapshot_map[_it["id"]] = _it
 
+    adiantamentos_q = SolicitacaoAdiantamento.query.join(Cooperado, SolicitacaoAdiantamento.cooperado_id == Cooperado.id)
+    if cooperado_id:
+        adiantamentos_q = adiantamentos_q.filter(SolicitacaoAdiantamento.cooperado_id == cooperado_id)
+    solicitacoes_adiantamento = adiantamentos_q.order_by(SolicitacaoAdiantamento.pedido_em.desc(), SolicitacaoAdiantamento.id.desc()).all()
+    adiantamento_status_map = {s.despesa_cooperado_id: s for s in solicitacoes_adiantamento if s.despesa_cooperado_id}
+
     cfg = get_config()
 
     cooperados = (
@@ -4165,6 +4231,7 @@ def admin_dashboard():
             total_despesas_coop=total_despesas_coop,
             total_adiantamentos_coop=total_adiantamentos_coop,
             salario_minimo=(cfg.salario_minimo or 0.0) if cfg else 0.0,
+        bloquear_adiantamento=bool(getattr(cfg, "bloquear_adiantamento", False)) if cfg else False,
             lancamentos=lancamentos,
             receitas=receitas,
             despesas=despesas,
@@ -4184,6 +4251,11 @@ def admin_dashboard():
             chart_data_lancamentos_coop=chart_data_lancamentos_coop,
             chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
             despesa_snapshot_map=despesa_snapshot_map if 'despesa_snapshot_map' in locals() else {},
+            solicitacoes_adiantamento=solicitacoes_adiantamento if 'solicitacoes_adiantamento' in locals() else [],
+            adiantamento_status_map=adiantamento_status_map if 'adiantamento_status_map' in locals() else {},
+            status_adiantamento_label=_status_adiantamento_label,
+            status_adiantamento_badge=_status_adiantamento_badge,
+            competencia_humana=_competencia_humana,
             current_date=date.today(),
             data_limite=date(date.today().year, 12, 31),
             filtro_periodo_aplicado=filtro_periodo_aplicado,
@@ -4471,6 +4543,7 @@ def admin_dashboard():
         total_despesas_coop=total_despesas_coop,
         total_adiantamentos_coop=total_adiantamentos_coop,
         salario_minimo=(cfg.salario_minimo or 0.0) if cfg else 0.0,
+        bloquear_adiantamento=bool(getattr(cfg, "bloquear_adiantamento", False)) if cfg else False,
         lancamentos=lancamentos,
         receitas=receitas,
         despesas=despesas,
@@ -6608,6 +6681,22 @@ def update_config():
     return redirect(url_for("admin_dashboard", tab="config"))
 
 
+@app.post("/admin/adiantamentos/config")
+@admin_perm_required("coop_despesas", "editar")
+def admin_config_adiantamentos():
+    cfg = get_config()
+    cfg.bloquear_adiantamento = bool(request.form.get("bloquear_adiantamento"))
+    db.session.commit()
+    if _wants_json_response():
+        return jsonify({
+            "ok": True,
+            "bloquear_adiantamento": bool(cfg.bloquear_adiantamento),
+            "message": "Pedidos de adiantamento bloqueados." if cfg.bloquear_adiantamento else "Pedidos de adiantamento liberados."
+        })
+    flash("Pedidos de adiantamento bloqueados." if cfg.bloquear_adiantamento else "Pedidos de adiantamento liberados.", "success")
+    return redirect(url_for("admin_dashboard", tab="coop_despesas"))
+
+
 @app.route("/admin/alterar_admin", methods=["POST"])
 @admin_perm_required("config", "editar")
 def alterar_admin():
@@ -6846,6 +6935,65 @@ def _despesa_due_date(dc):
         return base + timedelta(days=7)
     return base
 
+
+
+def _status_adiantamento_label(status: str | None) -> str:
+    s = (status or "").strip().lower()
+    if s == "aprovado":
+        return "Aprovado"
+    if s == "recusado":
+        return "Recusado"
+    return "Em análise"
+
+
+def _status_adiantamento_badge(status: str | None) -> str:
+    s = (status or "").strip().lower()
+    if s == "aprovado":
+        return "success"
+    if s == "recusado":
+        return "danger"
+    return "warning"
+
+
+def _competencia_humana(comp: str | None) -> str:
+    comp = _competencia_label(comp)
+    if comp == "semana_passada":
+        return "Semana passada"
+    if comp == "proxima_semana":
+        return "Próxima semana"
+    if comp == "semana_da_data":
+        return "Semana da data escolhida"
+    return "Esta semana"
+
+
+def _adiantamento_disponivel_cooperado(coop_id: int, di: date | None, df: date | None) -> float:
+    coop = Cooperado.query.get(coop_id)
+    if not coop:
+        return 0.0
+    ql = Lancamento.query.filter_by(cooperado_id=coop.id)
+    qr = ReceitaCooperado.query.filter_by(cooperado_id=coop.id)
+    if di:
+        ql = ql.filter(Lancamento.data >= di)
+        qr = qr.filter(ReceitaCooperado.data >= di)
+    if df:
+        ql = ql.filter(Lancamento.data <= df)
+        qr = qr.filter(ReceitaCooperado.data <= df)
+    producoes = ql.all()
+    receitas = qr.all()
+    total_bruto = sum((l.valor or 0.0) for l in producoes) + sum((r.valor or 0.0) for r in receitas)
+    encargos = sum((l.valor or 0.0) * INSS_ALIQ for l in producoes) + sum((l.valor or 0.0) * SEST_ALIQ for l in producoes)
+    snap = _compute_coop_debt_snapshot(coop.id, di, df)
+    descontos = sum((it['pago_manual'] + it['pago_auto']) for it in snap['itens'])
+    pendente_analise = (
+        db.session.query(func.coalesce(func.sum(SolicitacaoAdiantamento.valor_solicitado), 0.0))
+        .filter(
+            SolicitacaoAdiantamento.cooperado_id == coop.id,
+            SolicitacaoAdiantamento.status == 'em_analise'
+        )
+        .scalar()
+        or 0.0
+    )
+    return round(max(0.0, total_bruto - encargos - descontos - pendente_analise), 2)
 
 
 def _wants_json_response() -> bool:
@@ -8500,6 +8648,13 @@ def portal_cooperado():
         DespesaCooperado.id.desc()
     ).all()
 
+    solicitacoes_adiantamento = (
+        SolicitacaoAdiantamento.query
+        .filter_by(cooperado_id=coop.id)
+        .order_by(SolicitacaoAdiantamento.pedido_em.desc(), SolicitacaoAdiantamento.id.desc())
+        .all()
+    )
+
     # =========================
     # Totais
     # =========================
@@ -8521,6 +8676,7 @@ def portal_cooperado():
     saldo_devedor = debt_snapshot['saldo_devedor']
     total_a_descontar = debt_snapshot['a_descontar']
     despesas_detalhadas = debt_snapshot['itens']
+    adiantamento_disponivel = _adiantamento_disponivel_cooperado(coop.id, di, df)
 
 
        # =====================================================
@@ -8787,7 +8943,184 @@ def portal_cooperado():
         saldo_devedor=saldo_devedor,
         total_a_descontar=total_a_descontar,
         despesas_detalhadas=despesas_detalhadas,
+        solicitacoes_adiantamento=solicitacoes_adiantamento,
+        adiantamento_disponivel=adiantamento_disponivel,
+        bloquear_adiantamento=bool(getattr(cfg, "bloquear_adiantamento", False)),
+        status_adiantamento_label=_status_adiantamento_label,
+        status_adiantamento_badge=_status_adiantamento_badge,
+        competencia_humana=_competencia_humana,
     )
+
+@app.post("/portal/cooperado/adiantamento/solicitar")
+@role_required("cooperado")
+def solicitar_adiantamento_cooperado():
+    u_id = session.get("user_id")
+    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
+
+    cfg = get_config()
+    if bool(getattr(cfg, "bloquear_adiantamento", False)):
+        msg = "O pedido de adiantamento está temporariamente bloqueado pelo administrador."
+        if _wants_json_response():
+            return jsonify({"ok": False, "message": msg, "blocked": True}), 403
+        flash(msg, "warning")
+        return _portal_cooperado_redirect_tab("ajustes")
+
+    di = _parse_date(request.form.get("data_inicio"))
+    df = _parse_date(request.form.get("data_fim"))
+    if di and not df:
+        df = di
+    if df and not di:
+        di = df
+    elif not di and not df:
+        hoje = date.today()
+        di = hoje - timedelta(days=hoje.weekday())
+        df = di + timedelta(days=6)
+
+    valor = round(float(request.form.get("valor") or 0), 2)
+    disponivel = _adiantamento_disponivel_cooperado(coop.id, di, df)
+
+    if valor <= 0:
+        if _wants_json_response():
+            return jsonify({"ok": False, "message": "Informe um valor válido."}), 400
+        flash("Informe um valor válido.", "warning")
+        return _portal_cooperado_redirect_tab("ajustes")
+
+    if valor > disponivel:
+        msg = f"O valor solicitado ultrapassa o líquido disponível após descontos. Máximo disponível: R$ {disponivel:.2f}"
+        if _wants_json_response():
+            return jsonify({"ok": False, "message": msg, "disponivel": disponivel}), 400
+        flash(msg, "warning")
+        return _portal_cooperado_redirect_tab("ajustes")
+
+    s = SolicitacaoAdiantamento(
+        cooperado_id=coop.id,
+        valor_solicitado=valor,
+        status="em_analise",
+        data_pedido=date.today(),
+    )
+    db.session.add(s)
+    db.session.commit()
+
+    msg = "Solicitação de adiantamento enviada para análise."
+    if _wants_json_response():
+        return jsonify({
+            "ok": True,
+            "message": msg,
+            "item": {
+                "id": s.id,
+                "status": s.status,
+                "status_label": _status_adiantamento_label(s.status),
+                "status_badge": _status_adiantamento_badge(s.status),
+                "valor_solicitado": round(s.valor_solicitado or 0, 2),
+                "valor_aprovado": round(s.valor_aprovado or 0, 2),
+                "pedido_em": s.pedido_em.strftime("%d/%m/%Y %H:%M") if s.pedido_em else "—",
+                "data_desconto": "—",
+                "competencia_label": _competencia_humana(s.competencia_desconto),
+                "motivo_recusa": s.motivo_recusa or "",
+            },
+            "disponivel": round(max(0.0, disponivel - valor), 2)
+        })
+    flash(msg, "success")
+    return _portal_cooperado_redirect_tab("ajustes")
+
+
+@app.post("/admin/adiantamentos/<int:id>/analisar")
+@admin_perm_required("coop_despesas", "editar")
+def analisar_adiantamento_admin(id):
+    sol = SolicitacaoAdiantamento.query.get_or_404(id)
+    acao = (request.form.get("acao") or "").strip().lower()
+    motivo = (request.form.get("motivo_recusa") or "").strip()
+    observacao_admin = (request.form.get("observacao_admin") or "").strip()
+    valor_aprovado = round(float(request.form.get("valor_aprovado") or sol.valor_solicitado or 0), 2)
+    data_escolhida = _parse_date(request.form.get("data_desconto")) or date.today()
+    competencia_semana = (request.form.get("competencia_desconto") or "esta_semana").strip().lower()
+
+    if acao not in {"aprovar", "recusar"}:
+        return jsonify({"ok": False, "message": "Ação inválida."}), 400
+
+    if acao == "recusar" and not motivo:
+        return jsonify({"ok": False, "message": "Informe o motivo da recusa."}), 400
+
+    if acao == "aprovar" and valor_aprovado <= 0:
+        return jsonify({"ok": False, "message": "Informe um valor aprovado válido."}), 400
+
+    sol.analisado_em = datetime.utcnow()
+    sol.observacao_admin = observacao_admin or None
+
+    if acao == "recusar":
+        if sol.despesa_cooperado_id:
+            dc = DespesaCooperado.query.get(sol.despesa_cooperado_id)
+            if dc:
+                if getattr(dc, 'abatimentos', None):
+                    return jsonify({"ok": False, "message": "Esse adiantamento já teve descontos aplicados e não pode ser recusado."}), 400
+                db.session.delete(dc)
+            sol.despesa_cooperado_id = None
+        sol.status = "recusado"
+        sol.motivo_recusa = motivo
+        sol.valor_aprovado = None
+        sol.data_desconto = data_escolhida
+        sol.competencia_desconto = competencia_semana
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "message": "Solicitação recusada.",
+            "item": {
+                "id": sol.id,
+                "status": sol.status,
+                "status_label": _status_adiantamento_label(sol.status),
+                "status_badge": _status_adiantamento_badge(sol.status),
+                "motivo_recusa": sol.motivo_recusa or "",
+                "valor_aprovado": 0.0,
+                "data_desconto": sol.data_desconto.strftime("%d/%m/%Y") if sol.data_desconto else "—",
+                "competencia_label": _competencia_humana(sol.competencia_desconto),
+                "despesa_id": None,
+            }
+        })
+
+    data_comp = _competencia_ref(data_escolhida, competencia_semana)
+    di_comp, df_comp = semana_bounds(data_comp)
+
+    dc = None
+    if sol.despesa_cooperado_id:
+        dc = DespesaCooperado.query.get(sol.despesa_cooperado_id)
+    if not dc:
+        dc = DespesaCooperado(cooperado_id=sol.cooperado_id)
+        db.session.add(dc)
+        db.session.flush()
+        sol.despesa_cooperado_id = dc.id
+
+    dc.cooperado_id = sol.cooperado_id
+    dc.descricao = f"Adiantamento de produção solicitado em {sol.data_pedido.strftime('%d/%m/%Y')}"
+    dc.valor = valor_aprovado
+    dc.data = df_comp
+    dc.data_inicio = di_comp
+    dc.data_fim = df_comp
+    dc.eh_adiantamento = True
+    dc.competencia_desconto = competencia_semana
+
+    sol.status = "aprovado"
+    sol.motivo_recusa = None
+    sol.valor_aprovado = valor_aprovado
+    sol.data_desconto = data_escolhida
+    sol.competencia_desconto = competencia_semana
+
+    db.session.commit()
+    return jsonify({
+        "ok": True,
+        "message": "Solicitação aprovada e lançada como adiantamento.",
+        "item": {
+            "id": sol.id,
+            "status": sol.status,
+            "status_label": _status_adiantamento_label(sol.status),
+            "status_badge": _status_adiantamento_badge(sol.status),
+            "motivo_recusa": "",
+            "valor_aprovado": round(sol.valor_aprovado or 0, 2),
+            "data_desconto": sol.data_desconto.strftime("%d/%m/%Y") if sol.data_desconto else "—",
+            "competencia_label": _competencia_humana(sol.competencia_desconto),
+            "despesa_id": sol.despesa_cooperado_id,
+        }
+    })
+
 
 # === AVALIAR RESTAURANTE (cooperado -> restaurante)
 # Duas rotas para a MESMA função e MESMO endpoint (o do template):
