@@ -595,6 +595,66 @@
 
     
 <section class="tab-pane-custom" id="tab-ajustes">
+      <div class="section-card" id="cardAdiantamentoProducao" style="border:1px solid {{ 'rgba(220,38,38,.20)' if bloquear_adiantamento else 'rgba(16,185,129,.20)' }};background:{{ 'linear-gradient(180deg,#fff5f5 0%,#fff 100%)' if bloquear_adiantamento else 'linear-gradient(180deg,#f0fdf4 0%,#fff 100%)' }}">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title"><i class="bi {{ 'bi-lock-fill' if bloquear_adiantamento else 'bi-unlock-fill' }} me-1"></i> Adiantar produção</h2>
+            <div class="item-small mt-1 js-adiantamento-lock-text">{{ 'Pedido bloqueado pelo administrador no momento.' if bloquear_adiantamento else 'Disponível para solicitar. O limite considera o líquido após todos os descontos.' }}</div>
+          </div>
+          <span class="section-chip js-adiantamento-lock-chip" style="background:{{ '#fee2e2' if bloquear_adiantamento else '#dcfce7' }};color:{{ '#b91c1c' if bloquear_adiantamento else '#166534' }}">{{ 'Fechado' if bloquear_adiantamento else 'Aberto' }}</span>
+        </div>
+
+        <div class="soft-card p-3" style="background:#fff;border-color:rgba(39,71,217,.10)">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <div class="item-title">Disponível para pedir agora</div>
+              <div class="item-small mt-1">Somente valor líquido depois de encargos e descontos.</div>
+            </div>
+            <div class="item-amount mono text-success js-adiantamento-disponivel">R$ {{ '%.2f'|format(adiantamento_disponivel|default(0)) }}</div>
+          </div>
+          <form id="formSolicitarAdiantamento" method="POST" action="{{ url_for('solicitar_adiantamento_cooperado') }}" class="row g-2 align-items-end mt-2">
+            <input type="hidden" name="ajax" value="1">
+            <input type="hidden" name="data_inicio" value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '' }}">
+            <input type="hidden" name="data_fim" value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '' }}">
+            <div class="col-md-4">
+              <label class="form-label">Valor pretendido</label>
+              <input type="number" step="0.01" min="0" class="form-control" id="adiantamentoValor" name="valor" placeholder="0,00" {{ 'disabled' if bloquear_adiantamento else '' }}>
+            </div>
+            <div class="col-md-3 d-grid">
+              <button class="btn {{ 'btn-danger' if bloquear_adiantamento else 'btn-success' }}" type="submit" id="btnSolicitarAdiantamento" {{ 'disabled' if bloquear_adiantamento else '' }}>
+                <i class="bi {{ 'bi-lock-fill' if bloquear_adiantamento else 'bi-cash-coin' }} me-1"></i>
+                {{ 'Pedido bloqueado' if bloquear_adiantamento else 'Solicitar adiantamento' }}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="section-head mt-3">
+          <h2 class="section-title">Histórico de solicitações</h2>
+          <span class="section-chip">{{ solicitacoes_adiantamento|length }}</span>
+        </div>
+        <div class="list-stack" id="listaSolicitacoesAdiantamento">
+          {% for s in solicitacoes_adiantamento %}
+          <div class="item-card" data-sol-id="{{ s.id }}">
+            <div class="item-row">
+              <div class="flex-grow-1 min-w-0">
+                <div class="item-title">Pedido #{{ s.id }} · R$ {{ '%.2f'|format(s.valor_solicitado or 0) }}</div>
+                <div class="item-meta mt-1">Pedido em {{ s.pedido_em.strftime('%d/%m/%Y %H:%M') if s.pedido_em else '—' }}</div>
+                <div class="item-meta mt-1">Desconto: {{ s.data_desconto.strftime('%d/%m/%Y') if s.data_desconto else '—' }} · {{ competencia_humana(s.competencia_desconto) }}</div>
+                {% if s.status == 'recusado' and s.motivo_recusa %}<div class="item-small mt-1 text-danger js-sol-motivo">Motivo: {{ s.motivo_recusa }}</div>{% else %}<div class="item-small mt-1 js-sol-motivo">{% if s.status == 'aprovado' and s.valor_aprovado is not none %}Valor aprovado: R$ {{ '%.2f'|format(s.valor_aprovado or 0) }}{% else %}&nbsp;{% endif %}</div>{% endif %}
+              </div>
+              <div class="text-end">
+                <div><span class="badge bg-{{ status_adiantamento_badge(s.status) }}{% if status_adiantamento_badge(s.status) == 'warning' %} text-dark{% endif %} js-sol-status">{{ status_adiantamento_label(s.status) }}</span></div>
+                <div class="item-small mt-2 js-sol-aprovado">{% if s.valor_aprovado is not none %}R$ {{ '%.2f'|format(s.valor_aprovado or 0) }}{% else %}—{% endif %}</div>
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <div class="item-card text-center muted" id="semSolicitacoesAdiantamento">Nenhuma solicitação enviada.</div>
+          {% endfor %}
+        </div>
+      </div>
+
       <div class="section-card">
         <div class="section-head">
           <h2 class="section-title">Créditos da cooperativa</h2>
@@ -1486,5 +1546,55 @@ document.addEventListener('DOMContentLoaded', () => {
   tapeClear?.addEventListener('click', ()=> tapeEl.innerHTML='');
 });
 </script>
+<script>
+(function(){
+  const form = document.getElementById('formSolicitarAdiantamento');
+  if (!form) return;
+  const lista = document.getElementById('listaSolicitacoesAdiantamento');
+  const semLista = document.getElementById('semSolicitacoesAdiantamento');
+  const dispEl = document.querySelector('.js-adiantamento-disponivel');
+  const money = n => 'R$ ' + (Number(n)||0).toFixed(2).replace('.',',');
+  function renderItem(item){
+    const div = document.createElement('div');
+    div.className = 'item-card';
+    div.setAttribute('data-sol-id', item.id);
+    div.innerHTML = `
+      <div class="item-row">
+        <div class="flex-grow-1 min-w-0">
+          <div class="item-title">Pedido #${item.id} · ${money(item.valor_solicitado)}</div>
+          <div class="item-meta mt-1">Pedido em ${item.pedido_em || '—'}</div>
+          <div class="item-meta mt-1">Desconto: ${item.data_desconto || '—'} · ${item.competencia_label || 'Esta semana'}</div>
+          <div class="item-small mt-1 ${item.status === 'recusado' ? 'text-danger js-sol-motivo' : 'js-sol-motivo'}">${item.status === 'recusado' && item.motivo_recusa ? 'Motivo: ' + item.motivo_recusa : (item.valor_aprovado ? 'Valor aprovado: ' + money(item.valor_aprovado) : '&nbsp;')}</div>
+        </div>
+        <div class="text-end">
+          <div><span class="badge bg-${item.status_badge}${item.status_badge==='warning' ? ' text-dark' : ''} js-sol-status">${item.status_label}</span></div>
+          <div class="item-small mt-2 js-sol-aprovado">${item.valor_aprovado ? money(item.valor_aprovado) : '—'}</div>
+        </div>
+      </div>`;
+    return div;
+  }
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const fd = new FormData(form);
+    try {
+      const resp = await fetch(form.action, {
+        method: 'POST',
+        headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
+        body: fd
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || data.ok === false) throw new Error(data.message || 'Falha ao solicitar.');
+      if (semLista) semLista.remove();
+      if (lista && data.item) lista.prepend(renderItem(data.item));
+      if (dispEl && typeof data.disponivel !== 'undefined') dispEl.textContent = money(data.disponivel);
+      form.reset();
+      alert(data.message || 'Solicitação enviada.');
+    } catch (err) {
+      alert(err.message || 'Falha ao solicitar.');
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
