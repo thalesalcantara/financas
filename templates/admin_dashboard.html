@@ -3134,18 +3134,18 @@
               <td class="js-data-desconto">{% if s.data_desconto %}{{ s.data_desconto.strftime('%d/%m/%Y') }} · {{ competencia_humana(s.competencia_desconto) }}{% else %}—{% endif %}</td>
               <td class="small js-motivo">{{ s.motivo_recusa or '—' }}</td>
               <td>
-                <form method="POST" action="{{ url_for('analisar_adiantamento_admin', id=s.id) }}" class="js-adiantamento-admin-form d-flex flex-wrap align-items-center gap-2" data-locked="{{ '1' if _locked_row else '0' }}">
-                  <input class="form-control form-control-sm" style="width:90px" type="number" step="0.01" min="0" name="valor_aprovado" value="{{ '%.2f'|format((s.valor_aprovado if s.valor_aprovado is not none else s.valor_solicitado) or 0) }}" {{ 'disabled' if _locked_row else '' }}>
-                  <input class="form-control form-control-sm" style="width:130px" type="date" name="data_desconto" value="{{ s.data_desconto.strftime('%Y-%m-%d') if s.data_desconto else '' }}" {{ 'disabled' if _locked_row else '' }}>
-                  <select class="form-select form-select-sm" style="width:160px" name="competencia_desconto" {{ 'disabled' if _locked_row else '' }}>
+                <form method="POST" action="{{ url_for('analisar_adiantamento_admin', id=s.id) }}" class="js-adiantamento-admin-form d-flex align-items-center gap-1 flex-nowrap" data-locked="{{ '1' if _locked_row else '0' }}" style="white-space:nowrap; min-width:max-content;">
+                  <input class="form-control form-control-sm" style="width:82px" type="number" step="0.01" min="0" name="valor_aprovado" value="{{ '%.2f'|format((s.valor_aprovado if s.valor_aprovado is not none else s.valor_solicitado) or 0) }}" {{ 'disabled' if _locked_row else '' }}>
+                  <input class="form-control form-control-sm" style="width:132px" type="date" name="data_desconto" value="{{ s.data_desconto.strftime('%Y-%m-%d') if s.data_desconto else '' }}" {{ 'disabled' if _locked_row else '' }}>
+                  <select class="form-select form-select-sm" style="width:148px" name="competencia_desconto" {{ 'disabled' if _locked_row else '' }}>
                     <option value="esta_semana" {{ 'selected' if (s.competencia_desconto or 'esta_semana')=='esta_semana' else '' }}>Esta semana</option>
                     <option value="proxima_semana" {{ 'selected' if (s.competencia_desconto or '')=='proxima_semana' else '' }}>Próxima semana</option>
                     <option value="semana_passada" {{ 'selected' if (s.competencia_desconto or '')=='semana_passada' else '' }}>Semana passada</option>
                     <option value="semana_da_data" {{ 'selected' if (s.competencia_desconto or '')=='semana_da_data' else '' }}>Semana da data</option>
                   </select>
-                  <input class="form-control form-control-sm flex-grow-1" style="min-width:190px" type="text" name="motivo_recusa" placeholder="Motivo da recusa" {{ 'disabled' if _locked_row else '' }}>
-                  <input class="form-control form-control-sm flex-grow-1" style="min-width:190px" type="text" name="observacao_admin" placeholder="Observação do admin" value="{{ s.observacao_admin or '' }}" {{ 'disabled' if _locked_row else '' }}>
-                  <div class="d-flex gap-1 ms-auto">
+                  <input class="form-control form-control-sm" style="width:170px" type="text" name="motivo_recusa" placeholder="Motivo da recusa" {{ 'disabled' if _locked_row else '' }}>
+                  <input class="form-control form-control-sm" style="width:180px" type="text" name="observacao_admin" placeholder="Observação do admin" value="{{ s.observacao_admin or '' }}" {{ 'disabled' if _locked_row else '' }}>
+                  <div class="d-flex gap-1 flex-nowrap">
                     <button class="btn btn-sm btn-success js-btn-aprovar" type="submit" name="acao" value="aprovar" {{ 'disabled' if _locked_row else '' }}>Aprovar</button>
                     <button class="btn btn-sm btn-outline-danger js-btn-recusar" type="submit" name="acao" value="recusar" {{ 'disabled' if _locked_row else '' }}>Recusar</button>
                     <button class="btn btn-sm btn-outline-primary js-btn-editar-adiantamento {{ '' if _locked_row else 'd-none' }}" type="button">Editar</button>
