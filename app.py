@@ -4595,6 +4595,10 @@ def admin_dashboard():
         taxa_admin_rows=taxa_admin_rows,
         taxa_admin_totais=taxa_admin_totais,
         juros_arrecadados_total=juros_arrecadados_total,
+        solicitacoes_adiantamento=solicitacoes_adiantamento if 'solicitacoes_adiantamento' in locals() else [],
+        adiantamento_status_map=adiantamento_status_map if 'adiantamento_status_map' in locals() else {},
+        status_adiantamento_label=_status_adiantamento_label,
+        status_adiantamento_badge=_status_adiantamento_badge,
     )
 
     ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
@@ -9020,6 +9024,44 @@ def solicitar_adiantamento_cooperado():
             },
             "disponivel": round(max(0.0, disponivel - valor), 2)
         })
+    flash(msg, "success")
+    return _portal_cooperado_redirect_tab("ajustes")
+
+
+
+
+@app.post("/portal/cooperado/adiantamento/<int:id>/cancelar")
+@role_required("cooperado")
+def cancelar_adiantamento_cooperado(id):
+    u_id = session.get("user_id")
+    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
+    sol = SolicitacaoAdiantamento.query.filter_by(id=id, cooperado_id=coop.id).first_or_404()
+
+    if (sol.status or "").strip().lower() != "em_analise":
+        msg = "Só é possível cancelar solicitações em análise."
+        if _wants_json_response():
+            return jsonify({"ok": False, "message": msg}), 400
+        flash(msg, "warning")
+        return _portal_cooperado_redirect_tab("ajustes")
+
+    if sol.despesa_cooperado_id:
+        dc = DespesaCooperado.query.get(sol.despesa_cooperado_id)
+        if dc:
+            if getattr(dc, 'abatimentos', None):
+                msg = "Esta solicitação já teve descontos aplicados e não pode ser cancelada."
+                if _wants_json_response():
+                    return jsonify({"ok": False, "message": msg}), 400
+                flash(msg, "warning")
+                return _portal_cooperado_redirect_tab("ajustes")
+            db.session.delete(dc)
+        sol.despesa_cooperado_id = None
+
+    db.session.delete(sol)
+    db.session.commit()
+
+    msg = "Solicitação cancelada com sucesso."
+    if _wants_json_response():
+        return jsonify({"ok": True, "message": msg})
     flash(msg, "success")
     return _portal_cooperado_redirect_tab("ajustes")
 
