@@ -3272,7 +3272,7 @@
 
           <tbody>
             {% for dc in despesas_coop %}
-            {% set _sol = adiantamento_status_map.get(dc.id) %}
+            {% set _sol = (adiantamento_status_map or {}).get(dc.id) %}
               {% set coop_nome = (dc.cooperado.nome if dc.cooperado else 'Todos') %}
               {% set snap = despesa_snapshot_map.get(dc.id) if despesa_snapshot_map is defined else None %}{% set _abat_auto = (snap.pago_auto if snap else 0) %}{% set _restante = (snap.restante if snap else (dc.valor or 0)) %}
               <tr data-row-id="{{ dc.id }}" data-coop="{{ coop_nome|lower }}" data-desc="{{ (dc.descricao or '')|lower }}">
