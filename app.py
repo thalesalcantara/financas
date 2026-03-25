@@ -7243,9 +7243,12 @@ def delete_despesa_coop_bulk():
         flash("Selecione pelo menos uma despesa para excluir.", "warning")
         return _admin_redirect_with_filters("coop_despesas")
 
-    SolicitacaoAdiantamento.query.filter(
+    sols_vinculadas = SolicitacaoAdiantamento.query.filter(
         SolicitacaoAdiantamento.despesa_cooperado_id.in_(ids_int)
-    ).update({"despesa_cooperado_id": None}, synchronize_session=False)
+    ).all()
+    for sol in sols_vinculadas:
+        db.session.delete(sol)
+
     DespesaCooperado.query.filter(DespesaCooperado.id.in_(ids_int)).delete(synchronize_session=False)
     db.session.commit()
     flash(f"{len(ids_int)} despesa(s) excluída(s).", "success")
@@ -7416,6 +7419,12 @@ def delete_despesa_coop(id=None):
     if not ids:
         flash("Nenhuma despesa selecionada.", "warning")
         return _admin_redirect_with_filters("coop_despesas")
+
+    sols_vinculadas = SolicitacaoAdiantamento.query.filter(
+        SolicitacaoAdiantamento.despesa_cooperado_id.in_(ids)
+    ).all()
+    for sol in sols_vinculadas:
+        db.session.delete(sol)
 
     DespesaCooperado.query.filter(DespesaCooperado.id.in_(ids)).delete(synchronize_session=False)
     db.session.commit()
