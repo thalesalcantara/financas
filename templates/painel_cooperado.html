@@ -646,6 +646,12 @@
               <div class="text-end">
                 <div><span class="badge bg-{{ status_adiantamento_badge(s.status) }}{% if status_adiantamento_badge(s.status) == 'warning' %} text-dark{% endif %} js-sol-status">{{ status_adiantamento_label(s.status) }}</span></div>
                 <div class="item-small mt-2 js-sol-aprovado">{% if s.valor_aprovado is not none %}R$ {{ '%.2f'|format(s.valor_aprovado or 0) }}{% else %}—{% endif %}</div>
+                {% if s.status == 'em_analise' %}
+                <form method="POST" action="{{ url_for('cancelar_adiantamento_cooperado', id=s.id) }}" class="mt-2 js-cancelar-adiantamento-form">
+                  <input type="hidden" name="ajax" value="1">
+                  <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-x-circle me-1"></i>Cancelar</button>
+                </form>
+                {% endif %}
               </div>
             </div>
           </div>
@@ -1554,6 +1560,33 @@ document.addEventListener('DOMContentLoaded', () => {
   const semLista = document.getElementById('semSolicitacoesAdiantamento');
   const dispEl = document.querySelector('.js-adiantamento-disponivel');
   const money = n => 'R$ ' + (Number(n)||0).toFixed(2).replace('.',',');
+  function bindCancelForm(root){
+    const cancelForm = root?.querySelector('.js-cancelar-adiantamento-form');
+    if (!cancelForm) return;
+    cancelForm.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      try {
+        const resp = await fetch(cancelForm.action, {
+          method: 'POST',
+          headers: { 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
+          body: new FormData(cancelForm)
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || data.ok === false) throw new Error(data.message || 'Falha ao cancelar.');
+        root.remove();
+        if (lista && !lista.querySelector('[data-sol-id]') && !document.getElementById('semSolicitacoesAdiantamento')) {
+          const empty = document.createElement('div');
+          empty.className = 'item-card text-center muted';
+          empty.id = 'semSolicitacoesAdiantamento';
+          empty.textContent = 'Nenhuma solicitação enviada.';
+          lista.appendChild(empty);
+        }
+        alert(data.message || 'Solicitação cancelada.');
+      } catch (err) {
+        alert(err.message || 'Falha ao cancelar.');
+      }
+    });
+  }
   function renderItem(item){
     const div = document.createElement('div');
     div.className = 'item-card';
@@ -1569,10 +1602,14 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="text-end">
           <div><span class="badge bg-${item.status_badge}${item.status_badge==='warning' ? ' text-dark' : ''} js-sol-status">${item.status_label}</span></div>
           <div class="item-small mt-2 js-sol-aprovado">${item.valor_aprovado ? money(item.valor_aprovado) : '—'}</div>
+          ${item.status === 'em_analise' ? `<form method="POST" action="/portal/cooperado/adiantamento/${item.id}/cancelar" class="mt-2 js-cancelar-adiantamento-form"><input type="hidden" name="ajax" value="1"><button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-x-circle me-1"></i>Cancelar</button></form>` : ''}
         </div>
       </div>`;
+    bindCancelForm(div);
     return div;
   }
+  document.querySelectorAll('.js-cancelar-adiantamento-form').forEach((f) => bindCancelForm(f.closest('[data-sol-id]')));
+
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const fd = new FormData(form);
