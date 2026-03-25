@@ -9128,8 +9128,6 @@ def analisar_adiantamento_admin(id):
     if not dc:
         dc = DespesaCooperado(cooperado_id=sol.cooperado_id)
         db.session.add(dc)
-        db.session.flush()
-        sol.despesa_cooperado_id = dc.id
 
     dc.cooperado_id = sol.cooperado_id
     dc.descricao = f"Adiantamento de produção solicitado em {sol.data_pedido.strftime('%d/%m/%Y')}"
@@ -9146,6 +9144,8 @@ def analisar_adiantamento_admin(id):
     sol.data_desconto = data_escolhida
     sol.competencia_desconto = competencia_semana
 
+    db.session.flush()
+    sol.despesa_cooperado_id = dc.id
     db.session.commit()
     return jsonify({
         "ok": True,
