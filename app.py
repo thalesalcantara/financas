@@ -8600,7 +8600,10 @@ def portal_cooperado():
     except Exception:
         coop.usuario = ""
 
-    # ---------- FILTRO POR DATA (padrão = HOJE) ----------
+    active_tab = (request.args.get("active_tab") or "resumo").strip().lower()
+    if active_tab not in {"resumo", "producoes", "ajustes", "escalas", "trocas"}:
+        active_tab = "resumo"
+
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
 
@@ -8610,84 +8613,181 @@ def portal_cooperado():
         di = df
     elif not di and not df:
         hoje = date.today()
-        di = hoje - timedelta(days=hoje.weekday())   # segunda
-        df = di + timedelta(days=6)                  # domingo
+        di = hoje - timedelta(days=hoje.weekday())
+        df = di + timedelta(days=6)
 
     def in_range(qs, col):
         return qs.filter(col >= di, col <= df)
 
-    # =========================
-    # Produções (Lançamentos)
-    # =========================
-    ql = in_range(Lancamento.query.filter_by(cooperado_id=coop.id), Lancamento.data)
-    producoes = ql.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
+    total_lancamentos = (
+        db.session.query(func.coalesce(func.sum(Lancamento.valor), 0.0))
+        .filter(Lancamento.cooperado_id == coop.id, Lancamento.data >= di, Lancamento.data <= df)
+        .scalar()
+        or 0.0
+    )
+    total_receitas = (
+        db.session.query(func.coalesce(func.sum(ReceitaCooperado.valor), 0.0))
+        .filter(ReceitaCooperado.cooperado_id == coop.id, ReceitaCooperado.data >= di, ReceitaCooperado.data <= df)
+        .scalar()
+        or 0.0
+    )
 
-    ids = [l.id for l in producoes]
-    minhas = {}
+    producoes = []
+    receitas_coop = []
+    despesas_coop = []
+    solicitacoes_adiantamento = []
+    minha_escala = []
+    minha_escala_json = []
+    cooperados_json = []
+    cooperados_escalas_map = {}
+    trocas_recebidas_pendentes = []
+    trocas_recebidas_historico = []
+    trocas_enviadas = []
 
-    if ids:
-        rows = (
-            db.session.query(
-                AvaliacaoRestaurante.lancamento_id,
-                AvaliacaoRestaurante.estrelas_geral
+    if active_tab == "producoes":
+        ql = in_range(Lancamento.query.filter_by(cooperado_id=coop.id), Lancamento.data)
+        producoes = ql.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
+        ids = [l.id for l in producoes]
+        minhas = {}
+        if ids:
+            rows = (
+                db.session.query(AvaliacaoRestaurante.lancamento_id, AvaliacaoRestaurante.estrelas_geral)
+                .filter(AvaliacaoRestaurante.lancamento_id.in_(ids), AvaliacaoRestaurante.cooperado_id == coop.id)
+                .all()
             )
-            .filter(
-                AvaliacaoRestaurante.lancamento_id.in_(ids),
-                AvaliacaoRestaurante.cooperado_id == coop.id
-            )
+            minhas = {lid: nota for lid, nota in rows}
+        for l in producoes:
+            l.minha_avaliacao = minhas.get(l.id)
+
+    if active_tab == "ajustes":
+        qr = in_range(ReceitaCooperado.query.filter_by(cooperado_id=coop.id), ReceitaCooperado.data)
+        receitas_coop = qr.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
+
+        qd = DespesaCooperado.query.filter_by(cooperado_id=coop.id)
+        qd = qd.filter(DespesaCooperado.data_inicio <= df, DespesaCooperado.data_fim >= di)
+        despesas_coop = qd.order_by(DespesaCooperado.data_fim.desc().nullslast(), DespesaCooperado.id.desc()).all()
+
+        solicitacoes_adiantamento = (
+            SolicitacaoAdiantamento.query
+            .filter_by(cooperado_id=coop.id)
+            .filter(SolicitacaoAdiantamento.status != "cancelado")
+            .order_by(SolicitacaoAdiantamento.pedido_em.desc(), SolicitacaoAdiantamento.id.desc())
             .all()
         )
-        minhas = {lid: nota for lid, nota in rows}
 
-    for l in producoes:
-        l.minha_avaliacao = minhas.get(l.id)
+    if active_tab in {"escalas", "trocas"}:
+        raw_escala = (Escala.query.filter_by(cooperado_id=coop.id).order_by(Escala.id.asc()).all())
+        import unicodedata as _u, re as _re
+        def _norm_c(s: str) -> str:
+            s = _u.normalize("NFD", str(s or "").lower())
+            s = "".join(ch for ch in s if _u.category(ch) != "Mn")
+            return _re.sub(r"[^a-z0-9]+", " ", s).strip()
+        def _score(e):
+            h = (e.horario or "").strip()
+            return (1 if h else 0, len(h), e.id)
+        def _to_date_from_str(s: str):
+            m = _re.search(r'(\d{1,2})/(\d{1,2})/(\d{2,4})', str(s or ''))
+            if not m:
+                return None
+            d_, mth, y = map(int, m.groups())
+            if y < 100:
+                y += 2000
+            try:
+                return date(y, mth, d_)
+            except Exception:
+                return None
+        def _mins(h):
+            m = _re.search(r'(\d{1,2}):(\d{2})', str(h or ''))
+            if not m:
+                return 24*60 + 59
+            hh, mm = map(int, m.groups())
+            return hh*60 + mm
+        def _bucket_idx(turno, horario):
+            b = (_turno_bucket(turno, horario) or "").lower()
+            if "dia" in b:
+                return 1
+            if "noite" in b:
+                return 2
+            mins = _mins(horario)
+            return 2 if (mins >= 17*60 or mins <= 6*60) else 1
+        best = {}
+        for e in raw_escala:
+            key = (_norm_c(e.data), _norm_c(e.turno), _norm_c(e.contrato))
+            cur = best.get(key)
+            if not cur or _score(e) > _score(cur):
+                best[key] = e
+        cand = list(best.values())
+        today = date.today()
+        for e in cand:
+            d = _to_date_from_str(e.data) or date.min
+            mins = _mins(e.horario or "")
+            bidx = _bucket_idx(e.turno, e.horario)
+            e._ord = (d.toordinal(), bidx, mins, (e.contrato or ""), e.id)
+        minha_escala = sorted(cand, key=lambda x: x._ord)
+        for e in minha_escala:
+            dt = _to_date_from_str(e.data)
+            if dt is None:
+                status = 'unknown'
+            else:
+                if dt < today:
+                    status = 'past'
+                elif dt == today:
+                    status = 'today'
+                elif dt == today + timedelta(days=1):
+                    status = 'tomorrow'
+                else:
+                    status = 'future'
+            e.status = status
+            e.status_color = ('#ef4444' if status == 'past' else '#22c55e' if status == 'today' else '#3b82f6' if status in ('tomorrow', 'future') else 'transparent')
+        minha_escala_json = [{
+            "id": e.id, "data": e.data or "", "turno": e.turno or "", "horario": e.horario or "",
+            "contrato": e.contrato or "", "weekday": _weekday_from_data_str(e.data),
+            "turno_bucket": _turno_bucket(e.turno, e.horario),
+        } for e in minha_escala]
 
-    # =========================
-    # Receitas / Despesas
-    # =========================
-    qr = in_range(ReceitaCooperado.query.filter_by(cooperado_id=coop.id), ReceitaCooperado.data)
-    receitas_coop = qr.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
+    if active_tab == "trocas":
+        coops = (Cooperado.query.filter(Cooperado.id != coop.id).order_by(Cooperado.nome.asc()).all())
+        cooperados_json = [{"id": c.id, "nome": c.nome, "foto_url": (c.foto_url or "")} for c in coops]
+        for c in coops:
+            escalas_c = (Escala.query.filter_by(cooperado_id=c.id).order_by(Escala.data.asc(), Escala.id.asc()).all())
+            cooperados_escalas_map[str(c.id)] = [{
+                "id": e.id, "data": e.data or "", "turno": e.turno or "", "horario": e.horario or "",
+                "contrato": e.contrato or "", "weekday": _weekday_from_data_str(e.data),
+                "turno_bucket": _turno_bucket(e.turno, e.horario),
+            } for e in escalas_c]
+        def _escala_desc(e: Escala | None) -> str:
+            return _escala_label(e)
+        rx = (TrocaSolicitacao.query.filter(TrocaSolicitacao.destino_id == coop.id).order_by(TrocaSolicitacao.id.desc()).all())
+        for t in rx:
+            solicitante = Cooperado.query.get(t.solicitante_id)
+            orig = Escala.query.get(t.origem_escala_id)
+            mensagem_limpa = _strip_afetacao_blob(t.mensagem)
+            linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
+            item = {
+                "id": t.id, "status": t.status, "mensagem": mensagem_limpa, "criada_em": t.criada_em,
+                "aplicada_em": t.aplicada_em, "solicitante": solicitante, "origem": orig,
+                "origem_desc": _escala_desc(orig), "linhas_afetadas": linhas_afetadas,
+                "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
+                "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
+            }
+            (trocas_recebidas_pendentes if t.status == "pendente" else trocas_recebidas_historico).append(item)
+        ex = (TrocaSolicitacao.query.filter(TrocaSolicitacao.solicitante_id == coop.id).order_by(TrocaSolicitacao.id.desc()).all())
+        for t in ex:
+            destino = Cooperado.query.get(t.destino_id)
+            orig = Escala.query.get(t.origem_escala_id)
+            mensagem_limpa = _strip_afetacao_blob(t.mensagem)
+            linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
+            trocas_enviadas.append({
+                "id": t.id, "status": t.status, "mensagem": mensagem_limpa, "criada_em": t.criada_em,
+                "aplicada_em": t.aplicada_em, "destino": destino, "origem": orig,
+                "origem_desc": _escala_desc(orig), "linhas_afetadas": linhas_afetadas,
+            })
 
-    qd = DespesaCooperado.query.filter_by(cooperado_id=coop.id)
-
-    if di and df:
-        qd = qd.filter(
-            DespesaCooperado.data_inicio <= df,
-            DespesaCooperado.data_fim >= di,
-        )
-    elif di:
-        qd = qd.filter(DespesaCooperado.data_fim >= di)
-    elif df:
-        qd = qd.filter(DespesaCooperado.data_inicio <= df)
-
-    despesas_coop = qd.order_by(
-        DespesaCooperado.data_fim.desc().nullslast(),
-        DespesaCooperado.id.desc()
-    ).all()
-
-    solicitacoes_adiantamento = (
-        SolicitacaoAdiantamento.query
-        .filter_by(cooperado_id=coop.id)
-        .order_by(SolicitacaoAdiantamento.pedido_em.desc(), SolicitacaoAdiantamento.id.desc())
-        .all()
-    )
-
-    # =========================
-    # Totais
-    # =========================
-    total_bruto = (
-        sum((l.valor or 0.0) for l in producoes)
-        + sum((r.valor or 0.0) for r in receitas_coop)
-    )
-
-    inss_valor = sum((l.valor or 0.0) * 0.04 for l in producoes)
-    sest_valor = sum((l.valor or 0.0) * 0.005 for l in producoes)
-
+    total_bruto = float(total_lancamentos) + float(total_receitas)
+    inss_valor = float(total_lancamentos) * 0.04
+    sest_valor = float(total_lancamentos) * 0.005
     encargos_valor = inss_valor + sest_valor
-
     debt_snapshot = _compute_coop_debt_snapshot(coop.id, di, df)
-
-    # só o que venceu entra automaticamente no período; o futuro fica em "a descontar"
     total_descontos = sum((it['pago_manual'] + it['pago_auto']) for it in debt_snapshot['itens'])
     total_liquido = max(0.0, total_bruto - encargos_valor - total_descontos)
     saldo_devedor = debt_snapshot['saldo_devedor']
@@ -8695,277 +8795,36 @@ def portal_cooperado():
     despesas_detalhadas = debt_snapshot['itens']
     adiantamento_disponivel = _adiantamento_disponivel_cooperado(coop.id, di, df)
 
-
-       # =====================================================
-    # MÉTRICAS DA VIDA (NÃO DEPENDE DO FILTRO DE DATA)
-    # =====================================================
-
-    total_entregas_vida = (
-        db.session.query(func.count(Lancamento.id))
-        .filter(Lancamento.cooperado_id == coop.id)
-        .scalar()
-        or 0
-    )
-
-    nota_vida = (
-        db.session.query(func.avg(AvaliacaoCooperado.estrelas_geral))
-        .filter(AvaliacaoCooperado.cooperado_id == coop.id)
-        .scalar()
-    )
-
+    total_entregas_vida = db.session.query(func.count(Lancamento.id)).filter(Lancamento.cooperado_id == coop.id).scalar() or 0
+    nota_vida = db.session.query(func.avg(AvaliacaoCooperado.estrelas_geral)).filter(AvaliacaoCooperado.cooperado_id == coop.id).scalar()
     nota_vida = float(nota_vida or 5.0)
 
-# =====================================================
-# TOTAL DE ENTREGAS DA VIDA (SEM FILTRO DE DATA)
-# =====================================================
-
-    total_entregas_vida = db.session.query(func.count(Lancamento.id))\
-        .filter(Lancamento.cooperado_id == coop.id)\
-        .scalar() or 0
-
-
-    # =========================
-    # Config / Complemento
-    # =========================
     cfg = get_config()
     salario_minimo = cfg.salario_minimo or 0.0
     inss_complemento = salario_minimo * 0.20
-
     today = date.today()
-
     def dias_para_3112():
         alvo = date(today.year, 12, 31)
         if today > alvo:
             alvo = date(today.year + 1, 12, 31)
         return (alvo - today).days
+    doc_cnh = {"numero": coop.cnh_numero, "vencimento": coop.cnh_validade, "ok": (coop.cnh_validade is not None and coop.cnh_validade >= today), "dias_para_prazo": dias_para_3112()}
+    doc_placa = {"numero": coop.placa, "vencimento": coop.placa_validade, "ok": (coop.placa_validade is not None and coop.placa_validade >= today), "dias_para_prazo": dias_para_3112()}
 
-    doc_cnh = {
-        "numero": coop.cnh_numero,
-        "vencimento": coop.cnh_validade,
-        "ok": (coop.cnh_validade is not None and coop.cnh_validade >= today),
-        "dias_para_prazo": dias_para_3112(),
-    }
-    doc_placa = {
-        "numero": coop.placa,
-        "vencimento": coop.placa_validade,
-        "ok": (coop.placa_validade is not None and coop.placa_validade >= today),
-        "dias_para_prazo": dias_para_3112(),
-    }
-
-    # ---------- ESCALA (dedupe + ordenação cronológica robusta) ----------
-    raw_escala = (Escala.query
-                 .filter_by(cooperado_id=coop.id)
-                 .order_by(Escala.id.asc())
-                 .all())
-
-    import unicodedata as _u, re as _re
-    def _norm_c(s: str) -> str:
-        s = _u.normalize("NFD", str(s or "").lower())
-        s = "".join(ch for ch in s if _u.category(ch) != "Mn")
-        return _re.sub(r"[^a-z0-9]+", " ", s).strip()
-
-    def _score(e):
-        h = (e.horario or "").strip()
-        return (1 if h else 0, len(h), e.id)
-
-    def _to_date_from_str(s: str):
-        m = _re.search(r'(\d{1,2})/(\d{1,2})/(\d{2,4})', str(s or ''))
-        if not m:
-            return None
-        d_, mth, y = map(int, m.groups())
-        if y < 100:
-            y += 2000
-        try:
-            return date(y, mth, d_)
-        except Exception:
-            return None
-
-    def _mins(h):
-        m = _re.search(r'(\d{1,2}):(\d{2})', str(h or ''))
-        if not m:
-            return 24*60 + 59
-        hh, mm = map(int, m.groups())
-        return hh*60 + mm
-
-    def _bucket_idx(turno, horario):
-        b = (_turno_bucket(turno, horario) or "").lower()
-        if "dia" in b:
-            return 1
-        if "noite" in b:
-            return 2
-        mins = _mins(horario)
-        return 2 if (mins >= 17*60 or mins <= 6*60) else 1
-
-    best = {}
-    for e in raw_escala:
-        key = (_norm_c(e.data), _norm_c(e.turno), _norm_c(e.contrato))
-        cur = best.get(key)
-        if not cur or _score(e) > _score(cur):
-            best[key] = e
-
-    cand = list(best.values())
-    for e in cand:
-        d = _to_date_from_str(e.data) or date.min
-        mins = _mins(e.horario or "")
-        bidx = _bucket_idx(e.turno, e.horario)
-        e._ord = (d.toordinal(), bidx, mins, (e.contrato or ""), e.id)
-
-    minha_escala = sorted(cand, key=lambda x: x._ord)
-
-    for e in minha_escala:
-        dt = _to_date_from_str(e.data)
-        if dt is None:
-            status = 'unknown'
-        else:
-            if dt < today:
-                status = 'past'
-            elif dt == today:
-                status = 'today'
-            elif dt == today + timedelta(days=1):
-                status = 'tomorrow'
-            else:
-                status = 'future'
-        e.status = status
-        e.status_color = (
-            '#ef4444' if status == 'past' else
-            '#22c55e' if status == 'today' else
-            '#3b82f6' if status in ('tomorrow', 'future') else
-            'transparent'
-        )
-
-    minha_escala_json = []
-    for e in minha_escala:
-        minha_escala_json.append({
-            "id": e.id,
-            "data": e.data or "",
-            "turno": e.turno or "",
-            "horario": e.horario or "",
-            "contrato": e.contrato or "",
-            "weekday": _weekday_from_data_str(e.data),
-            "turno_bucket": _turno_bucket(e.turno, e.horario),
-        })
-
-    # ---------- Trocas ----------
-    coops = (Cooperado.query
-             .filter(Cooperado.id != coop.id)
-             .order_by(Cooperado.nome.asc())
-             .all())
-    cooperados_json = [
-        {"id": c.id, "nome": c.nome, "foto_url": (c.foto_url or "")}
-        for c in coops
-    ]
-    cooperados_escalas_map = {}
-    for c in coops:
-        escalas_c = (Escala.query.filter_by(cooperado_id=c.id).order_by(Escala.data.asc(), Escala.id.asc()).all())
-        cooperados_escalas_map[str(c.id)] = [
-            {
-                "id": e.id,
-                "data": e.data or "",
-                "turno": e.turno or "",
-                "horario": e.horario or "",
-                "contrato": e.contrato or "",
-                "weekday": _weekday_from_data_str(e.data),
-                "turno_bucket": _turno_bucket(e.turno, e.horario),
-            }
-            for e in escalas_c
-        ]
-
-    def _escala_desc(e: Escala | None) -> str:
-        return _escala_label(e)
-
-    rx = (TrocaSolicitacao.query
-          .filter(TrocaSolicitacao.destino_id == coop.id)
-          .order_by(TrocaSolicitacao.id.desc())
-          .all())
-
-    trocas_recebidas_pendentes = []
-    trocas_recebidas_historico = []
-    for t in rx:
-        solicitante = Cooperado.query.get(t.solicitante_id)
-        orig = Escala.query.get(t.origem_escala_id)
-
-        mensagem_limpa = _strip_afetacao_blob(t.mensagem)
-        linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
-
-        item = {
-            "id": t.id,
-            "status": t.status,
-            "mensagem": mensagem_limpa,
-            "criada_em": t.criada_em,
-            "aplicada_em": t.aplicada_em,
-            "solicitante": solicitante,
-            "origem": orig,
-            "origem_desc": _escala_desc(orig),
-            "linhas_afetadas": linhas_afetadas,
-            "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
-            "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
-        }
-
-        (trocas_recebidas_pendentes if t.status == "pendente" else trocas_recebidas_historico).append(item)
-
-    ex = (TrocaSolicitacao.query
-          .filter(TrocaSolicitacao.solicitante_id == coop.id)
-          .order_by(TrocaSolicitacao.id.desc())
-          .all())
-
-    trocas_enviadas = []
-    for t in ex:
-        destino = Cooperado.query.get(t.destino_id)
-        orig = Escala.query.get(t.origem_escala_id)
-        mensagem_limpa = _strip_afetacao_blob(t.mensagem)
-        linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
-        trocas_enviadas.append({
-            "id": t.id,
-            "status": t.status,
-            "mensagem": mensagem_limpa,
-            "criada_em": t.criada_em,
-            "aplicada_em": t.aplicada_em,
-            "destino": destino,
-            "origem": orig,
-            "origem_desc": _escala_desc(orig),
-            "linhas_afetadas": linhas_afetadas,
-        })
-
-
-    # return TEM que ficar aqui (fora do for)
     return render_template(
         "painel_cooperado.html",
-        cooperado=coop,
-        producoes=producoes,
-        receitas_coop=receitas_coop,
-        despesas_coop=despesas_coop,
-        total_bruto=total_bruto,
-        inss_valor=inss_valor,
-        sest_senat_valor=sest_valor,
-        total_descontos=total_descontos,
-        total_liquido=total_liquido,
-        inss_complemento=inss_complemento,
-        salario_minimo=salario_minimo,
-        current_year=today.year,
-        doc_cnh=doc_cnh,
-        doc_placa=doc_placa,
-        minha_escala=minha_escala,
-        minha_escala_json=minha_escala_json,
-        cooperados_json=cooperados_json,
-        cooperados_escalas_map=cooperados_escalas_map,
-        trocas_recebidas_pendentes=trocas_recebidas_pendentes,
-        trocas_recebidas_historico=trocas_recebidas_historico,
-        trocas_enviadas=trocas_enviadas,
-        
-        # MÉTRICAS DA VIDA
-        nota_vida=nota_vida,
-        total_entregas_vida=total_entregas_vida,
-        data_inicio=di,
-        data_fim=df,
-        saldo_devedor=saldo_devedor,
-        total_a_descontar=total_a_descontar,
-        despesas_detalhadas=despesas_detalhadas,
-        solicitacoes_adiantamento=solicitacoes_adiantamento,
-        adiantamento_disponivel=adiantamento_disponivel,
-        bloquear_adiantamento=bool(getattr(cfg, "bloquear_adiantamento", False)),
-        status_adiantamento_label=_status_adiantamento_label,
-        status_adiantamento_badge=_status_adiantamento_badge,
-        competencia_humana=_competencia_humana,
+        cooperado=coop, producoes=producoes, receitas_coop=receitas_coop, despesas_coop=despesas_coop,
+        total_bruto=total_bruto, inss_valor=inss_valor, sest_senat_valor=sest_valor, total_descontos=total_descontos,
+        total_liquido=total_liquido, inss_complemento=inss_complemento, salario_minimo=salario_minimo,
+        current_year=today.year, doc_cnh=doc_cnh, doc_placa=doc_placa, minha_escala=minha_escala,
+        minha_escala_json=minha_escala_json, cooperados_json=cooperados_json, cooperados_escalas_map=cooperados_escalas_map,
+        trocas_recebidas_pendentes=trocas_recebidas_pendentes, trocas_recebidas_historico=trocas_recebidas_historico,
+        trocas_enviadas=trocas_enviadas, nota_vida=nota_vida, total_entregas_vida=total_entregas_vida,
+        data_inicio=di, data_fim=df, saldo_devedor=saldo_devedor, total_a_descontar=total_a_descontar,
+        despesas_detalhadas=despesas_detalhadas, solicitacoes_adiantamento=solicitacoes_adiantamento,
+        adiantamento_disponivel=adiantamento_disponivel, bloquear_adiantamento=bool(getattr(cfg, "bloquear_adiantamento", False)),
+        status_adiantamento_label=_status_adiantamento_label, status_adiantamento_badge=_status_adiantamento_badge,
+        competencia_humana=_competencia_humana, active_tab=active_tab,
     )
 
 @app.post("/portal/cooperado/adiantamento/solicitar")
@@ -9287,6 +9146,16 @@ def coop_dashboard_alias():
 
 def _portal_cooperado_redirect_tab(tab: str = "resumo", **extra):
     params = {"active_tab": tab}
+    for src in (request.args, request.form):
+        try:
+            di = src.get("data_inicio")
+            df = src.get("data_fim")
+        except Exception:
+            di = df = None
+        if di and "data_inicio" not in params:
+            params["data_inicio"] = di
+        if df and "data_fim" not in params:
+            params["data_fim"] = df
     for k, v in (extra or {}).items():
         if v is not None and v != "":
             params[k] = v
