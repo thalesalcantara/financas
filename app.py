@@ -4599,6 +4599,7 @@ def admin_dashboard():
         adiantamento_status_map=adiantamento_status_map if 'adiantamento_status_map' in locals() else {},
         status_adiantamento_label=_status_adiantamento_label,
         status_adiantamento_badge=_status_adiantamento_badge,
+        competencia_humana=_competencia_humana,
     )
 
     ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
@@ -7242,6 +7243,9 @@ def delete_despesa_coop_bulk():
         flash("Selecione pelo menos uma despesa para excluir.", "warning")
         return _admin_redirect_with_filters("coop_despesas")
 
+    SolicitacaoAdiantamento.query.filter(
+        SolicitacaoAdiantamento.despesa_cooperado_id.in_(ids_int)
+    ).update({"despesa_cooperado_id": None}, synchronize_session=False)
     DespesaCooperado.query.filter(DespesaCooperado.id.in_(ids_int)).delete(synchronize_session=False)
     db.session.commit()
     flash(f"{len(ids_int)} despesa(s) excluída(s).", "success")
