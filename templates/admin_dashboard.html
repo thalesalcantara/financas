@@ -450,7 +450,7 @@
 {% set can_documentos_ver = admin_is_master or _perms.get('documentos', {}).get('ver', False) %}
 {% set can_tabelas_ver = admin_is_master or _perms.get('tabelas', {}).get('ver', False) %}
 {% set can_avaliacoes_ver = admin_is_master or _perms.get('avaliacoes', {}).get('ver', False) %}
-{% set can_sistemas_ver = False %}
+{% set can_sistemas_ver = admin_is_master or _perms.get('sistemas', {}).get('ver', False) %}
 {% set can_config_ver = admin_is_master or _perms.get('config', {}).get('ver', False) %}
 {% set can_config_criar = admin_is_master or _perms.get('config', {}).get('criar', False) %}
 {% set can_config_editar = admin_is_master or _perms.get('config', {}).get('editar', False) %}
@@ -676,6 +676,18 @@
 
       <!-- Config (TAB) e Sair (rota) ---------------------------------------->
       <div class="sidebar-footer">
+        {% if can_sistemas_ver %}<a class="nav-link-main {{ 'active' if _tab=='sistemas' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#sistemas"
+           href="#sistemas"
+           role="tab"
+           aria-controls="sistemas"
+           aria-selected="{{ 'true' if _tab=='sistemas' else 'false' }}">
+          <div class="nav-link-left">
+            <span class="nav-link-icon"><i class="bi bi-diagram-3"></i></span>
+            <span class="nav-link-label">Sistemas</span>
+          </div>
+        </a>{% endif %}
 
         {% if can_config_ver %}<a class="nav-link-main {{ 'active' if _tab=='config' else '' }}"
            data-bs-toggle="tab"
@@ -1177,6 +1189,54 @@
           </div>
         </div>
 
+        <!-- Gráficos -->
+        <div class="row g-2 mt-3">
+          <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3">
+              <h6 class="mb-2 d-flex align-items-center gap-1">
+                <span class="resumo-pill-label"><i class="bi bi-graph-up-arrow"></i></span>
+                <span>Evolução Mensal — Cooperativa</span>
+              </h6>
+              <canvas id="chartCoop"></canvas>
+            </div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3">
+              <h6 class="mb-2 d-flex align-items-center gap-1">
+                <span class="resumo-pill-label"><i class="bi bi-graph-up-arrow"></i></span>
+                <span>Evolução Mensal — Cooperados</span>
+              </h6>
+              <canvas id="chartCooperados"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-2 mt-3">
+          <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-4 p-3">
+              <h6 class="mb-2 d-flex align-items-center gap-1">
+                <span class="resumo-pill-label"><i class="bi bi-shop"></i></span>
+                <span>Top Estabelecimentos (Produções no período)</span>
+              </h6>
+              <canvas id="chartEstabs"></canvas>
+              <div class="table-responsive mt-3">
+                <table class="table table-sm table-bordered table-hover align-middle" id="tblTopEstabsResumo">
+                  <thead class="table-light">
+                    <tr>
+                      <th style="width:72px">#</th>
+                      <th>Estabelecimento</th>
+                      <th class="text-end">Produção real</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td colspan="3" class="text-center text-muted">Carregando…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div> <!-- /resumo-shell -->
 
       <style>
@@ -1285,6 +1345,10 @@
         #resumo .card.p-3 > h6 {
           font-size: 0.9rem;
           font-weight: 600;
+        }
+
+        #resumo canvas {
+          max-height: 280px;
         }
 
         @media (max-width: 576px) {
@@ -1576,6 +1640,15 @@
         const pendEl = document.getElementById('kpiTicketMedioPeriodo');
         if (pendEl) pendEl.textContent = fmtBR(tPend);
       })();
+
+      // ---- Gráficos (Chart.js via CDN) ----
+      const ensureChart = () => new Promise(res => {
+        if (window.Chart) return res();
+        const s = document.createElement('script');
+        s.src = "https://cdn.jsdelivr.net/npm/chart.js";
+        s.onload = () => res();
+        document.head.appendChild(s);
+      });
 
       ensureChart().then(() => {
         const moneyTick = (value) => 'R$ ' + Number(value || 0).toLocaleString('pt-BR', {
@@ -4365,10 +4438,7 @@
   </script>
 </section>
 
-          <!-- ESCALAS -->
-<!--AJAX_ESCALAS_START-->
-{% if _tab=='escalas' or request.args.get('ajax_partial')=='escalas' %}
-
+     <!-- ESCALAS -->
 <section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
   <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 align-items-lg-center mb-3">
     <div>
@@ -5263,23 +5333,46 @@
   </div>
 </section>
 
-    
-{% else %}
-<section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
-  <div id="escalasAjaxWrap" data-lazy-tab="escalas">
-    <div class="card p-4 border-0 shadow-sm">
-      <div class="d-flex align-items-center gap-2 mb-2">
-        <i class="bi bi-hourglass-split"></i>
-        <h5 class="mb-0 section-title">Gestão de Escalas</h5>
+    <!-- === CONFIGURAÇÕES === -->
+
+<section class="tab-pane fade {{ 'show active' if _tab=='sistemas' else '' }}" id="sistemas" role="tabpanel">
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+          <h4 class="mb-1">Sistemas</h4>
+          <div class="text-secondary small">Acesso rápido entre os sistemas sem novo login.</div>
+        </div>
       </div>
-      <div class="text-muted">A aba será carregada somente quando for aberta.</div>
+    </div>
+  </div>
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+            <h5 class="mb-0">Supervisão</h5>
+            <i class="bi bi-broadcast-pin fs-4"></i>
+          </div>
+          <p class="text-secondary mb-3">Abrir o painel de Supervisão com acesso integrado.</p>
+          <a class="btn btn-royal" href="{{ url_for('admin_sistemas_abrir', sistema='sistema1') }}">Abrir Supervisão</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+            <h5 class="mb-0">Parceria</h5>
+            <i class="bi bi-people fs-4"></i>
+          </div>
+          <p class="text-secondary mb-3">Abrir o painel de Parceria com acesso integrado.</p>
+          <a class="btn btn-royal" href="{{ url_for('admin_sistemas_abrir', sistema='sistema2') }}">Abrir Parceria</a>
+        </div>
+      </div>
     </div>
   </div>
 </section>
-{% endif %}
-<!--AJAX_ESCALAS_END-->
-
-<!-- === CONFIGURAÇÕES === -->
 
 <section class="tab-pane fade {{ 'show active' if _tab=='config' else '' }}" id="config" role="tabpanel">
   <div class="content-shell">
@@ -6082,6 +6175,7 @@
 
   <!-- JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
 <script>
   // Confirmar exclusão
@@ -6168,37 +6262,41 @@
       const params = new URLSearchParams(new FormData(form));
       params.set('tab', tabName);
       params.set('ajax_partial', partial);
-      params.set('fast_mode', '1');
       const baseAction = form.getAttribute('action') || window.location.pathname;
       const url = `${baseAction}?${params.toString()}`;
       wrap.style.opacity = '.65';
       wrap.style.pointerEvents = 'none';
       try{
-        const resp = await fetch(url, {
-          headers:{
-            'X-Requested-With':'XMLHttpRequest',
-            'Accept':'text/html,application/xhtml+xml'
-          },
-          credentials:'same-origin'
-        });
+        const resp = await fetch(url, { headers:{ 'X-Requested-With':'XMLHttpRequest' }});
         const html = await resp.text();
-        const msg = (html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-        if (!resp.ok) throw new Error(msg || `Falha ao filtrar (${resp.status}).`);
-        if (!html.trim()) throw new Error('Filtro retornou vazio.');
-        wrap.outerHTML = html;
+        if (!resp.ok || !html.trim()) throw new Error('Falha ao filtrar.');
+
+        const holder = document.createElement('div');
+        holder.innerHTML = html;
+        const nodes = Array.from(holder.childNodes);
+        const execScripts = (root) => {
+          if (!root) return;
+          root.querySelectorAll?.('script').forEach(oldScript => {
+            const s = document.createElement('script');
+            if (oldScript.src) s.src = oldScript.src;
+            if (oldScript.type) s.type = oldScript.type;
+            s.textContent = oldScript.textContent;
+            oldScript.replaceWith(s);
+          });
+        };
+        const firstEl = nodes.find(n => n.nodeType === 1);
+        wrap.replaceWith(...nodes);
+        execScripts(firstEl);
+
         if (window.history && window.history.replaceState){
           const cleanUrl = `${window.location.pathname}?${params.toString()}`;
           window.history.replaceState({}, '', cleanUrl);
         }
         initAjaxFilters();
-        initLazyTabs();
       }catch(err){
-        const currentWrap = document.getElementById(wrapId);
-        if (currentWrap) {
-          currentWrap.style.opacity = '1';
-          currentWrap.style.pointerEvents = '';
-        }
         alert(err.message || 'Falha ao filtrar.');
+        wrap.style.opacity = '1';
+        wrap.style.pointerEvents = '';
       }
     }
 
@@ -6214,7 +6312,7 @@
 
     bindings.forEach(([formId, partial, wrapId, tabName]) => {
       const form = document.getElementById(formId);
-      if (!form || form.dataset.ajaxBound === '1') return;
+      if (!form || form.dataset.ajaxBound) return;
       form.dataset.ajaxBound = '1';
       form.addEventListener('submit', function(e){
         e.preventDefault();
@@ -6223,45 +6321,7 @@
     });
   }
 
-  function initLazyTabs(){
-    const tabLink = document.querySelector('[data-bs-target="#escalas"]');
-    const wrap = document.getElementById('escalasAjaxWrap');
-    if (!tabLink || !wrap || wrap.dataset.loaded === '1' || wrap.dataset.loading === '1') return;
-    const load = async () => {
-      if (wrap.dataset.loaded === '1' || wrap.dataset.loading === '1') return;
-      wrap.dataset.loading = '1';
-      wrap.style.opacity = '.65';
-      try{
-        const params = new URLSearchParams(window.location.search);
-        params.set('tab', 'escalas');
-        params.set('ajax_partial', 'escalas');
-        params.set('fast_mode', '1');
-        const resp = await fetch(`${window.location.pathname}?${params.toString()}`, {
-          headers:{ 'X-Requested-With':'XMLHttpRequest', 'Accept':'text/html,application/xhtml+xml' },
-          credentials:'same-origin'
-        });
-        const html = await resp.text();
-        const msg = (html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-        if (!resp.ok || !html.trim()) throw new Error(msg || 'Falha ao carregar escalas.');
-        wrap.outerHTML = html;
-        initAjaxFilters();
-        initLazyTabs();
-      }catch(err){
-        wrap.style.opacity = '1';
-        wrap.innerHTML = `<div class="alert alert-danger mb-0">${err.message || 'Falha ao carregar escalas.'}</div>`;
-      } finally {
-        wrap.dataset.loading = '0';
-        wrap.dataset.loaded = '1';
-      }
-    };
-    tabLink.addEventListener('shown.bs.tab', load, { once:true });
-    if (document.getElementById('escalas')?.classList.contains('show')) load();
-  }
-
-  document.addEventListener('DOMContentLoaded', function(){
-    initAjaxFilters();
-    initLazyTabs();
-  });
+  document.addEventListener('DOMContentLoaded', initAjaxFilters);
   function updateLancamentoRow(form){
     const id = form.querySelector('[name="id"]')?.value;
     const row = document.querySelector(`#lancamentosTableBody tr[data-row-id="${id}"]`);
@@ -6503,6 +6563,59 @@
   });
 
   // ===== Gráficos =====
+  const rawLancCoop   = {{ (chart_data_lancamentos_coop or {'labels':[], 'values':[]}) | tojson }};
+  const rawLancCooper = {{ (chart_data_lancamentos_cooperados or {'labels':[], 'values':[]}) | tojson }};
+
+  const totalProducoesFallback = parseFloat('{{ total_producoes|default(0) }}') || 0;
+
+  const fallbackLancCoop   = { labels: ['Total'], values: [totalProducoesFallback] };
+  const fallbackLancCooper = { labels: ['Total'], values: [totalProducoesFallback] };
+
+  const dataLancCoop = (rawLancCoop?.labels?.length && rawLancCoop?.values?.length) ? rawLancCoop : fallbackLancCoop;
+  const dataLancCooperados = (rawLancCooper?.labels?.length && rawLancCooper?.values?.length) ? rawLancCooper : fallbackLancCooper;
+
+  function buildLineChart(canvasId, labels, values, label) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: label,
+          data: values,
+          tension: .25,
+          borderWidth: 2,
+          pointRadius: 3,
+          fill: false
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: (v) => 'R$ ' + Number(v).toLocaleString('pt-BR')
+            }
+          }
+        },
+        plugins: {
+          legend: { display: true },
+          tooltip: {
+            callbacks: {
+              label: (c) => 'R$ ' + Number(c.parsed.y).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+            }
+          }
+        }
+      }
+    });
+  }
+
+  buildLineChart('chartLancCoop', dataLancCoop.labels, dataLancCoop.values, 'Lançamentos/Produções');
+  buildLineChart('chartLancCooperados', dataLancCooperados.labels, dataLancCooperados.values, 'Lançamentos/Produções');
 
   // ===== Preservar aba ativa via ?tab= =====
   document.addEventListener('DOMContentLoaded', () => {
