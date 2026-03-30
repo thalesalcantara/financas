@@ -3596,8 +3596,13 @@ def admin_dashboard():
     if active_tab not in ADMIN_ABAS:
         active_tab = "lancamentos"
 
-    if active_tab == "escalas":
-        return redirect(url_for("admin_escalas"))
+    scales_page = (args.get("scales_page") == "1")
+    if active_tab == "escalas" and not scales_page:
+        redir_args = request.args.to_dict(flat=True)
+        redir_args.pop("tab", None)
+        redir_args.pop("ajax_partial", None)
+        redir_args.pop("scales_page", None)
+        return redirect(url_for("admin_escalas", **redir_args))
 
     # monta o mapa de permissões logo no início
     if getattr(admin_logado, "is_master", False):
@@ -3866,80 +3871,89 @@ def admin_dashboard():
     # =========================
     # Escalas
     # =========================
-    escalas_all = (
-        db.session.query(Escala)
-        .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
-        .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
-        .filter(
-            or_(
-                Escala.cooperado_id.is_(None),
-                Usuario.ativo.is_(True)
-            )
-        )
-        .order_by(Escala.id.asc())
-        .all()
-    )
-
     esc_by_int = defaultdict(list)
     esc_by_str = defaultdict(list)
-
-    for e in escalas_all:
-        k_int = e.cooperado_id if e.cooperado_id is not None else 0
-        esc_item = {
-            "data": e.data,
-            "turno": e.turno,
-            "horario": e.horario,
-            "contrato": e.contrato,
-            "cor": getattr(e, "cor", None),
-            "nome_planilha": getattr(e, "cooperado_nome", None),
-        }
-        esc_by_int[k_int].append(esc_item)
-        esc_by_str[str(k_int)].append(esc_item)
-
-    cont_rows = dict(
-        db.session.query(Escala.cooperado_id, func.count(Escala.id))
-        .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
-        .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
-        .filter(
-            or_(
-                Escala.cooperado_id.is_(None),
-                Usuario.ativo.is_(True)
-            )
-        )
-        .group_by(Escala.cooperado_id)
-        .all()
-    )
-
-    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
-    qtd_sem_cadastro = int(cont_rows.get(None, 0))
-
-    contratos_set = {((e.contrato or "").strip()) for e in escalas_all if (e.contrato or "").strip()}
-    contratos_set.update({((r.nome or "").strip()) for r in restaurantes if (r.nome or "").strip()})
-    contratos_escala_opcoes = sorted(contratos_set, key=lambda s: s.lower())
-
+    qtd_escalas_map = {}
+    qtd_sem_cadastro = 0
+    contratos_escala_opcoes = []
     escala_editor_rows = []
-    for e in sorted(escalas_all, key=_escala_sort_key):
-        coop_obj = None
-        if e.cooperado_id:
-            coop_obj = cooperados_map.get(e.cooperado_id)
+    escala_alertas_1h = []
 
-        nome_atual = (coop_obj.nome if coop_obj else (e.cooperado_nome or "").strip())
-        escala_editor_rows.append({
-            "id": e.id,
-            "data": e.data or "",
-            "weekday_num": _escala_weekday_num(e.data),
-            "weekday_label": _escala_weekday_label(e.data),
-            "turno": e.turno or "",
-            "horario": e.horario or "",
-            "contrato": e.contrato or "",
-            "cooperado_id": e.cooperado_id,
-            "cooperado_nome": nome_atual or "",
-            "cooperado_nome_livre": (e.cooperado_nome or "") if not coop_obj else "",
-            "restaurante_id": e.restaurante_id,
-            "cor": getattr(e, "cor", None),
-        })
+    if active_tab == "escalas" or scales_page:
+        escalas_all = (
+            db.session.query(Escala)
+            .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
+            .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
+            .filter(
+                or_(
+                    Escala.cooperado_id.is_(None),
+                    Usuario.ativo.is_(True)
+                )
+            )
+            .order_by(Escala.id.asc())
+            .all()
+        )
 
-    escala_alertas_1h = _build_escala_alertas_1h(escalas_all, cooperados_map)
+        esc_by_int = defaultdict(list)
+        esc_by_str = defaultdict(list)
+
+        for e in escalas_all:
+            k_int = e.cooperado_id if e.cooperado_id is not None else 0
+            esc_item = {
+                "data": e.data,
+                "turno": e.turno,
+                "horario": e.horario,
+                "contrato": e.contrato,
+                "cor": getattr(e, "cor", None),
+                "nome_planilha": getattr(e, "cooperado_nome", None),
+            }
+            esc_by_int[k_int].append(esc_item)
+            esc_by_str[str(k_int)].append(esc_item)
+
+        cont_rows = dict(
+            db.session.query(Escala.cooperado_id, func.count(Escala.id))
+            .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
+            .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
+            .filter(
+                or_(
+                    Escala.cooperado_id.is_(None),
+                    Usuario.ativo.is_(True)
+                )
+            )
+            .group_by(Escala.cooperado_id)
+            .all()
+        )
+
+        qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
+        qtd_sem_cadastro = int(cont_rows.get(None, 0))
+
+        contratos_set = {((e.contrato or "").strip()) for e in escalas_all if (e.contrato or "").strip()}
+        contratos_set.update({((r.nome or "").strip()) for r in restaurantes if (r.nome or "").strip()})
+        contratos_escala_opcoes = sorted(contratos_set, key=lambda s: s.lower())
+
+        escala_editor_rows = []
+        for e in sorted(escalas_all, key=_escala_sort_key):
+            coop_obj = None
+            if e.cooperado_id:
+                coop_obj = cooperados_map.get(e.cooperado_id)
+
+            nome_atual = (coop_obj.nome if coop_obj else (e.cooperado_nome or "").strip())
+            escala_editor_rows.append({
+                "id": e.id,
+                "data": e.data or "",
+                "weekday_num": _escala_weekday_num(e.data),
+                "weekday_label": _escala_weekday_label(e.data),
+                "turno": e.turno or "",
+                "horario": e.horario or "",
+                "contrato": e.contrato or "",
+                "cooperado_id": e.cooperado_id,
+                "cooperado_nome": nome_atual or "",
+                "cooperado_nome_livre": (e.cooperado_nome or "") if not coop_obj else "",
+                "restaurante_id": e.restaurante_id,
+                "cor": getattr(e, "cor", None),
+            })
+
+        escala_alertas_1h = _build_escala_alertas_1h(escalas_all, cooperados_map)
 
     # =========================
     # Gráficos
@@ -4441,7 +4455,7 @@ def admin_dashboard():
     trocas_historico_export = []
     contagem_contrato_turno = []
 
-    if active_tab == "escalas":
+    if active_tab == "escalas" or scales_page:
         if not escala_hist_inicio and not escala_hist_fim:
             escala_hist_fim = current_date
             escala_hist_inicio = current_date - timedelta(days=30)
@@ -4623,231 +4637,24 @@ def admin_dashboard():
                 return m.group(1)
     return _rendered_html
     
-
-
-def _build_admin_escalas_context(args=None):
-    args = args or request.args
-
-    admin_logado = _usuario_logado()
-    if admin_logado and getattr(admin_logado, "is_master", False):
-        admin_perms = {
-            aba: {"ver": True, "criar": True, "editar": True, "excluir": True}
-            for aba in ADMIN_ABAS.keys()
-        }
-    else:
-        admin_perms = get_admin_permissions_map(admin_logado.id) if admin_logado else {}
-
-    current_date = date.today()
-    data_limite = date(current_date.year, 12, 31)
-
-    cooperados = Cooperado.query.order_by(Cooperado.nome.asc()).all()
-    restaurantes = Restaurante.query.order_by(Restaurante.nome.asc()).all()
-    cooperados_map = {c.id: c for c in cooperados}
-
-    docinfo_map = {c.id: _build_docinfo(c) for c in cooperados}
-    status_doc_por_coop = {
-        c.id: {
-            "cnh_ok": docinfo_map[c.id]["cnh"]["ok"],
-            "placa_ok": docinfo_map[c.id]["placa"]["ok"],
-        }
-        for c in cooperados
-    }
-
-    escalas_all = (
-        db.session.query(Escala)
-        .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
-        .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
-        .filter(or_(Escala.cooperado_id.is_(None), Usuario.ativo.is_(True)))
-        .order_by(Escala.id.asc())
-        .all()
-    )
-
-    esc_by_int = defaultdict(list)
-    esc_by_str = defaultdict(list)
-    for e in escalas_all:
-        k_int = e.cooperado_id if e.cooperado_id is not None else 0
-        esc_item = {
-            "data": e.data,
-            "turno": e.turno,
-            "horario": e.horario,
-            "contrato": e.contrato,
-            "cor": getattr(e, "cor", None),
-            "nome_planilha": getattr(e, "cooperado_nome", None),
-        }
-        esc_by_int[k_int].append(esc_item)
-        esc_by_str[str(k_int)].append(esc_item)
-
-    cont_rows = dict(
-        db.session.query(Escala.cooperado_id, func.count(Escala.id))
-        .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
-        .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
-        .filter(or_(Escala.cooperado_id.is_(None), Usuario.ativo.is_(True)))
-        .group_by(Escala.cooperado_id)
-        .all()
-    )
-    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
-    qtd_sem_cadastro = int(cont_rows.get(None, 0))
-
-    contratos_set = {((e.contrato or "").strip()) for e in escalas_all if (e.contrato or "").strip()}
-    contratos_set.update({((r.nome or "").strip()) for r in restaurantes if (r.nome or "").strip()})
-    contratos_escala_opcoes = sorted(contratos_set, key=lambda s: s.lower())
-
-    escala_editor_rows = []
-    for e in sorted(escalas_all, key=_escala_sort_key):
-        coop_obj = cooperados_map.get(e.cooperado_id) if e.cooperado_id else None
-        nome_atual = (coop_obj.nome if coop_obj else (e.cooperado_nome or "").strip())
-        escala_editor_rows.append({
-            "id": e.id,
-            "data": e.data or "",
-            "weekday_num": _escala_weekday_num(e.data),
-            "weekday_label": _escala_weekday_label(e.data),
-            "turno": e.turno or "",
-            "horario": e.horario or "",
-            "contrato": e.contrato or "",
-            "cooperado_id": e.cooperado_id,
-            "cooperado_nome": nome_atual or "",
-            "cooperado_nome_livre": (e.cooperado_nome or "") if not coop_obj else "",
-            "restaurante_id": e.restaurante_id,
-            "cor": getattr(e, "cor", None),
-        })
-
-    escala_alertas_1h = _build_escala_alertas_1h(escalas_all, cooperados_map)
-
-    trocas_db = (
-        TrocaSolicitacao.query
-        .order_by(TrocaSolicitacao.criada_em.desc(), TrocaSolicitacao.id.desc())
-        .all()
-    )
-    trocas_pendentes = []
-    trocas_historico = []
-    trocas_historico_flat = []
-
-    for t in trocas_db:
-        origem = Escala.query.get(t.origem_escala_id) if t.origem_escala_id else None
-        solicitante = Cooperado.query.get(t.solicitante_id) if t.solicitante_id else None
-        destinatario = Cooperado.query.get(t.destino_id) if t.destino_id else None
-        item = {
-            "id": t.id,
-            "status": t.status,
-            "mensagem": t.mensagem,
-            "aplicada_em": t.aplicada_em,
-            "origem": origem,
-            "solicitante": solicitante,
-            "destinatario": destinatario,
-            "solicitante_nome": getattr(solicitante, "nome", None),
-            "solicitante_id": getattr(solicitante, "id", None),
-            "destinatario_nome": getattr(destinatario, "nome", None),
-            "destinatario_id": getattr(destinatario, "id", None),
-            "itens": [],
-        }
-        if t.status == "pendente":
-            trocas_pendentes.append(item)
-        else:
-            trocas_historico.append(item)
-
-    escala_hist_inicio = _parse_ymd_date(args.get("escala_hist_inicio"))
-    escala_hist_fim = _parse_ymd_date(args.get("escala_hist_fim"))
-    trocas_hist_inicio = _parse_ymd_date(args.get("trocas_hist_inicio"))
-    trocas_hist_fim = _parse_ymd_date(args.get("trocas_hist_fim"))
-
-    if not escala_hist_inicio and not escala_hist_fim:
-        escala_hist_fim = current_date
-        escala_hist_inicio = current_date - timedelta(days=30)
-    elif escala_hist_inicio and not escala_hist_fim:
-        escala_hist_fim = escala_hist_inicio
-    elif escala_hist_fim and not escala_hist_inicio:
-        escala_hist_inicio = escala_hist_fim
-
-    escala_historico_rows = []
-    escala_hist_q = _history_rows_between(EscalaHistorico.query, EscalaHistorico.snapshot_em, escala_hist_inicio, escala_hist_fim)
-    escala_hist_rows_db = escala_hist_q.order_by(EscalaHistorico.snapshot_em.desc(), EscalaHistorico.id.desc()).all()
-    for h in escala_hist_rows_db:
-        escala_historico_rows.append({
-            "snapshot_em": h.snapshot_em,
-            "data": h.data or "",
-            "turno": h.turno or "",
-            "horario": h.horario or "",
-            "contrato": h.contrato or "",
-            "cooperado_nome": h.cooperado_nome or "",
-            "saiu_nome": h.saiu_nome or "",
-            "entrou_nome": h.entrou_nome or "",
-            "origem": h.origem or "",
-            "acao": h.acao or "",
-        })
-
-    hist_rows_for_current = _history_rows_between(EscalaHistorico.query.filter(EscalaHistorico.saiu_nome.isnot(None)), EscalaHistorico.snapshot_em, escala_hist_inicio, escala_hist_fim).all()
-    escala_editor_rows_export = _resolve_change_columns(escala_editor_rows, hist_rows_for_current)
-
-    if not trocas_hist_inicio and not trocas_hist_fim:
-        trocas_hist_fim = current_date
-        trocas_hist_inicio = current_date - timedelta(days=30)
-    elif trocas_hist_inicio and not trocas_hist_fim:
-        trocas_hist_fim = trocas_hist_inicio
-    elif trocas_hist_fim and not trocas_hist_inicio:
-        trocas_hist_inicio = trocas_hist_fim
-
-    trocas_hist_q = _history_rows_between(TrocaHistorico.query, TrocaHistorico.aplicada_em, trocas_hist_inicio, trocas_hist_fim)
-    trocas_historico_export = trocas_hist_q.order_by(TrocaHistorico.aplicada_em.desc(), TrocaHistorico.id.desc()).all()
-
-    admins = (
-        Usuario.query
-        .filter_by(tipo="admin", is_master=False)
-        .order_by(Usuario.id.asc())
-        .all()
-    )
-    admin_permissions_map = {adm.id: get_admin_permissions_map(adm.id) for adm in admins}
-
-    admin_user = (
-        Usuario.query.filter_by(tipo="admin", is_master=True).order_by(Usuario.id.asc()).first()
-        or Usuario.query.filter_by(tipo="admin").order_by(Usuario.id.asc()).first()
-    )
-
-    return dict(
-        tab="escalas",
-        admin=admin_user,
-        admin_user=admin_user,
-        admin_perms=admin_perms,
-        admin_is_master=is_admin_master(),
-        ADMIN_ABAS=ADMIN_ABAS,
-        cooperados=cooperados,
-        restaurantes=restaurantes,
-        docinfo_map=docinfo_map,
-        status_doc_por_coop=status_doc_por_coop,
-        escalas_por_coop=esc_by_int,
-        escalas_por_coop_json=esc_by_str,
-        qtd_escalas_map=qtd_escalas_map,
-        qtd_escalas_sem_cadastro=qtd_sem_cadastro,
-        escala_editor_rows=escala_editor_rows,
-        escala_editor_rows_export=escala_editor_rows_export,
-        contratos_escala_opcoes=contratos_escala_opcoes,
-        escala_alertas_1h=escala_alertas_1h,
-        trocas_pendentes=trocas_pendentes,
-        trocas_historico=trocas_historico,
-        trocas_historico_flat=trocas_historico_flat,
-        escala_hist_inicio=escala_hist_inicio,
-        escala_hist_fim=escala_hist_fim,
-        trocas_hist_inicio=trocas_hist_inicio,
-        trocas_hist_fim=trocas_hist_fim,
-        escala_historico_rows=escala_historico_rows,
-        trocas_historico_export=trocas_historico_export,
-        admins=admins,
-        admin_permissions_map=admin_permissions_map,
-        admins_secundarios=admins,
-        admins_permissoes=admin_permissions_map,
-        current_date=current_date,
-        data_limite=data_limite,
-        contagem_contrato_turno=[],
-    )
-
+# =========================
+# Navegação/Export util
+# =========================
 
 @app.route("/admin/escalas", methods=["GET"])
 @admin_perm_required("escalas", "ver")
 def admin_escalas():
-    return render_template("admin_escalas.html", **_build_admin_escalas_context(request.args))
+    qs = request.args.to_dict(flat=False)
+    qs["tab"] = "escalas"
+    qs["scales_page"] = "1"
+    outer_session = dict(session)
+    with app.test_request_context("/admin", method="GET", query_string=qs):
+        session.clear()
+        for k, v in outer_session.items():
+            session[k] = v
+        session["user_tipo"] = "admin"
+        return admin_dashboard()
 
-# =========================
-# Navegação/Export util
-# =========================
 @app.route("/filtrar_lancamentos")
 @admin_required
 def filtrar_lancamentos():
