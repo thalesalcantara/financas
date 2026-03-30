@@ -2048,7 +2048,7 @@
         </button>
       </div>
 
-      <form id="formFiltroLancamentos" method="GET" action="{{ url_for('filtrar_lancamentos') }}" class="row g-2 align-items-end">
+      <form id="formFiltroLancamentos" method="GET" action="{{ url_for('admin_dashboard') }}" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="lancamentos">
 
         <div class="col-md-3">
@@ -4456,7 +4456,7 @@
     </div>
   </div>
 
-  <div class="card p-3 mb-3 border-0 shadow-sm escala-alerta-card escala-alerta-top" id="escalaAlertasCard">
+  <div class="card p-3 mb-3 border-0 shadow-sm escala-alerta-card escala-alerta-top d-none" id="escalaAlertasCard">
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-2">
       <div>
         <h6 class="mb-1 section-title">Aviso de contratos sem cooperado</h6>
@@ -4475,8 +4475,8 @@
     </audio>
 
     <div id="escalaAlertasWrap"
-         data-initial='{{ escala_alertas_1h|default([])|tojson|safe }}'
-         data-endpoint='{{ url_for("admin_api_escala_alertas_1h") }}'>
+         data-initial='[]'
+         data-endpoint=''>
       {% if escala_alertas_1h %}
         <div class="alert alert-warning border-0 shadow-sm mb-2">
           <strong>Atenção:</strong> existem {{ escala_alertas_1h|length }} contrato(s) sem cooperado começando em até 1 hora.
@@ -6262,7 +6262,8 @@
       const params = new URLSearchParams(new FormData(form));
       params.set('tab', tabName);
       params.set('ajax_partial', partial);
-      const baseAction = form.getAttribute('action') || window.location.pathname;
+      params.set('fast_mode', '1');
+      const baseAction = window.location.pathname || '/admin';
       const url = `${baseAction}?${params.toString()}`;
       wrap.style.opacity = '.65';
       wrap.style.pointerEvents = 'none';
@@ -6294,9 +6295,15 @@
         }
         initAjaxFilters();
       }catch(err){
-        alert(err.message || 'Falha ao filtrar.');
         wrap.style.opacity = '1';
         wrap.style.pointerEvents = '';
+        try {
+          const fallback = form.getAttribute('action') || window.location.pathname || '/admin';
+          const go = `${fallback}?${params.toString()}`;
+          window.location.href = go;
+          return;
+        } catch(_) {}
+        alert(err.message || 'Falha ao filtrar.');
       }
     }
 
@@ -6354,7 +6361,6 @@
     tds[7].textContent = brMoney(inss);
     tds[8].textContent = brMoney(sest);
     tds[9].textContent = brMoney(liq);
-    if (ehAd) tds[5].innerHTML = '<span class="badge bg-success">Aprovado</span>'; else tds[5].textContent = '—';
     const editBtn = row.querySelector('[data-bs-target="#modalEditLancamento"]');
     if (editBtn){
       editBtn.dataset.restaurante = restaurante?.value || '';
