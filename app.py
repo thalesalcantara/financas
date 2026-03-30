@@ -7191,11 +7191,15 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
         else:
             status = 'a_descontar'
 
-        if vencida:
+        # No resumo do período filtrado, as colunas de Despesas / Adiantamento
+        # devem mostrar somente o que foi abatido dentro do período visível,
+        # não o acumulado histórico até a data final.
+        pago_auto_periodo = money(it['pago_auto_periodo'])
+        if pago_auto_periodo > Decimal("0.00"):
             if it['eh_adiantamento']:
-                total_descontado_adiant += money(pago_auto_total)
+                total_descontado_adiant += pago_auto_periodo
             else:
-                total_descontado_despesa += money(pago_auto_total)
+                total_descontado_despesa += pago_auto_periodo
 
         if restante > 0:
             if vencida:
