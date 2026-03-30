@@ -6379,13 +6379,12 @@
     const competencia = form.querySelector('[name="competencia_desconto"]')?.value || 'esta_semana';
     const ehAd = !!form.querySelector('[name="eh_adiantamento"]')?.checked;
     const tds = row.querySelectorAll('td');
-    if (tds.length < 12) return false;
+    if (tds.length < 11) return false;
     tds[1].textContent = brDate(data);
     tds[2].textContent = cooperado?.selectedOptions?.[0]?.textContent || 'Todos';
     tds[3].textContent = descricao;
     tds[4].innerHTML = ehAd ? '<span class="badge bg-warning text-dark">Adiantamento</span>' : '<span class="badge bg-light text-dark border">Despesa</span>';
-    tds[5].innerHTML = ehAd ? '<span class="badge bg-success">Aprovado</span>' : '—';
-    tds[6].textContent = competencia === 'semana_passada' ? 'Semana passada' : (competencia === 'proxima_semana' ? 'Próxima semana' : ((competencia === 'semana_da_data' || competencia === 'semana_data' || competencia === 'data_escolhida') ? 'Semana da data escolhida' : 'Esta semana'));
+    tds[6].textContent = competencia === 'semana_passada' ? 'Semana passada' : (competencia === 'proxima_semana' ? 'Próxima semana' : (competencia === 'semana_da_data' ? 'Semana da data escolhida' : 'Esta semana'));
     tds[7].textContent = brMoney(valor);
     tds[8].textContent = brMoney(0);
     tds[9].textContent = brMoney(valor);
@@ -7392,9 +7391,6 @@ document.addEventListener('DOMContentLoaded', function(){
 document.addEventListener('DOMContentLoaded', function(){ const cAll=document.getElementById('checkAllDespesas'); cAll?.addEventListener('change', ()=> document.querySelectorAll('#tblDespesasCoop tbody input[type="checkbox"]').forEach(ch=> ch.checked=cAll.checked)); const el=document.getElementById('modalAbatimentoDespesaCoop'); el?.addEventListener('show.bs.modal', (ev)=>{ const btn=ev.relatedTarget; const form=el.querySelector('form'); if(form && btn?.dataset?.url) form.action=btn.dataset.url; });});
 </script>
 
-</body>
-</html>
-
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   const modal = document.getElementById('modalEditRestaurante');
@@ -7416,3 +7412,6 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 });
 </script>
+
+</body>
+</html>
