@@ -3784,7 +3784,7 @@ def admin_dashboard():
 
         if somente_pendentes and cooperado_id:
             snap_pend = _compute_coop_debt_snapshot(cooperado_id, data_inicio, data_fim)
-            pend_ids = {item['id'] for item in snap_pend['itens'] if item['status'] in ('pendente', 'parcial', 'a_descontar') and item['restante'] > 0}
+            pend_ids = {item['id'] for item in snap_pend['itens'] if item['status'] in ('aberta', 'parcial', 'a_descontar') and item['restante'] > 0}
             despesas_coop = [d for d in despesas_coop if d.id in pend_ids]
 
         total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
@@ -3798,16 +3798,20 @@ def admin_dashboard():
         )
 
         despesa_snapshot_map = {}
-        for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
-            _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
-            for _it in _snap["itens"]:
-                despesa_snapshot_map[_it["id"]] = _it
+        if active_tab in {'resumo', 'coop_despesas'}:
+            for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
+                _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
+                for _it in _snap["itens"]:
+                    despesa_snapshot_map[_it["id"]] = _it
 
-    adiantamentos_q = SolicitacaoAdiantamento.query.join(Cooperado, SolicitacaoAdiantamento.cooperado_id == Cooperado.id)
-    if cooperado_id:
-        adiantamentos_q = adiantamentos_q.filter(SolicitacaoAdiantamento.cooperado_id == cooperado_id)
-    solicitacoes_adiantamento = adiantamentos_q.order_by(SolicitacaoAdiantamento.pedido_em.desc(), SolicitacaoAdiantamento.id.desc()).all()
-    adiantamento_status_map = {s.despesa_cooperado_id: s for s in solicitacoes_adiantamento if s.despesa_cooperado_id}
+    solicitacoes_adiantamento = []
+    adiantamento_status_map = {}
+    if active_tab in {'resumo', 'coop_despesas'}:
+        adiantamentos_q = SolicitacaoAdiantamento.query.join(Cooperado, SolicitacaoAdiantamento.cooperado_id == Cooperado.id)
+        if cooperado_id:
+            adiantamentos_q = adiantamentos_q.filter(SolicitacaoAdiantamento.cooperado_id == cooperado_id)
+        solicitacoes_adiantamento = adiantamentos_q.order_by(SolicitacaoAdiantamento.pedido_em.desc(), SolicitacaoAdiantamento.id.desc()).all()
+        adiantamento_status_map = {s.despesa_cooperado_id: s for s in solicitacoes_adiantamento if s.despesa_cooperado_id}
 
     cfg = get_config()
 
@@ -6975,6 +6979,7 @@ def _adiantamento_disponivel_cooperado(coop_id: int, di: date | None, df: date |
     coop = Cooperado.query.get(coop_id)
     if not coop:
         return 0.0
+
     ql = Lancamento.query.filter_by(cooperado_id=coop.id)
     qr = ReceitaCooperado.query.filter_by(cooperado_id=coop.id)
     if di:
@@ -6983,12 +6988,19 @@ def _adiantamento_disponivel_cooperado(coop_id: int, di: date | None, df: date |
     if df:
         ql = ql.filter(Lancamento.data <= df)
         qr = qr.filter(ReceitaCooperado.data <= df)
+
     producoes = ql.all()
     receitas = qr.all()
-    total_bruto = sum((l.valor or 0.0) for l in producoes) + sum((r.valor or 0.0) for r in receitas)
-    encargos = sum((l.valor or 0.0) * INSS_ALIQ for l in producoes) + sum((l.valor or 0.0) * SEST_ALIQ for l in producoes)
+
+    total_bruto_lanc = sum((l.valor or 0.0) for l in producoes)
+    total_receitas = sum((r.valor or 0.0) for r in receitas)
+    total_bruto = total_bruto_lanc + total_receitas
+
+    encargos = round((total_bruto_lanc * INSS_ALIQ) + (total_bruto_lanc * SEST_ALIQ), 2)
+
     snap = _compute_coop_debt_snapshot(coop.id, di, df)
     descontos = sum((it['pago_manual'] + it['pago_auto']) for it in snap['itens'])
+
     pendente_analise = (
         db.session.query(func.coalesce(func.sum(SolicitacaoAdiantamento.valor_solicitado), 0.0))
         .filter(
@@ -6998,7 +7010,9 @@ def _adiantamento_disponivel_cooperado(coop_id: int, di: date | None, df: date |
         .scalar()
         or 0.0
     )
-    return round(max(0.0, total_bruto - encargos - descontos - pendente_analise), 2)
+
+    liquido_disponivel = total_bruto - encargos - descontos - pendente_analise
+    return round(max(0.0, liquido_disponivel), 2)
 
 
 def _wants_json_response() -> bool:
@@ -7049,23 +7063,36 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
 
     end_date = df or date.today()
 
-    # Produção exibida no filtro atual
+    # Produção/receitas exibidas no filtro atual: o abatimento sempre parte do líquido a receber.
     q_prod_view = Lancamento.query.filter(Lancamento.cooperado_id == coop_id)
+    q_rec_view = ReceitaCooperado.query.filter(ReceitaCooperado.cooperado_id == coop_id)
     if di:
         q_prod_view = q_prod_view.filter(Lancamento.data >= di)
+        q_rec_view = q_rec_view.filter(ReceitaCooperado.data >= di)
     if df:
         q_prod_view = q_prod_view.filter(Lancamento.data <= df)
+        q_rec_view = q_rec_view.filter(ReceitaCooperado.data <= df)
+
     prods_view = q_prod_view.all()
+    recs_view = q_rec_view.all()
+
     bruto_prod_view = sum((D(p.valor) for p in prods_view), Decimal("0.00"))
+    bruto_rec_view = sum((D(r.valor) for r in recs_view), Decimal("0.00"))
+    bruto_view = money(bruto_prod_view + bruto_rec_view)
     inss_view = up(bruto_prod_view * D(INSS_ALIQ)) if bruto_prod_view > 0 else Decimal("0.00")
     sest_view = up(bruto_prod_view * D(SEST_ALIQ)) if bruto_prod_view > 0 else Decimal("0.00")
 
-    # Produções históricas até o fim do filtro: usadas para carregar dívida adiante por semana.
+    # Histórico até o fim do filtro: carrega o saldo corretamente por semana.
     q_prod_hist = Lancamento.query.filter(
         Lancamento.cooperado_id == coop_id,
         Lancamento.data <= end_date,
     )
+    q_rec_hist = ReceitaCooperado.query.filter(
+        ReceitaCooperado.cooperado_id == coop_id,
+        ReceitaCooperado.data <= end_date,
+    )
     prods_hist = q_prod_hist.order_by(Lancamento.data.asc(), Lancamento.id.asc()).all()
+    recs_hist = q_rec_hist.order_by(ReceitaCooperado.data.asc(), ReceitaCooperado.id.asc()).all()
 
     despesas = (
         DespesaCooperado.query
@@ -7077,7 +7104,7 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
     def week_start(d):
         return d - timedelta(days=d.weekday())
 
-    # Agrupa produção líquida por semana (sem carregar crédito positivo para semana futura).
+    # Agrupa líquido por semana. Produção sofre encargos; receita do cooperado entra líquida.
     prod_liq_by_week = defaultdict(lambda: Decimal("0.00"))
     for p in prods_hist:
         bruto = money(D(p.valor))
@@ -7087,6 +7114,12 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
         sest = up(bruto * D(SEST_ALIQ))
         liq = money(max(Decimal("0.00"), bruto - inss - sest))
         prod_liq_by_week[week_start(p.data)] += liq
+
+    for r in recs_hist:
+        bruto = money(D(r.valor))
+        if bruto <= 0:
+            continue
+        prod_liq_by_week[week_start(r.data)] += bruto
 
     debt_items = []
     first_week = week_start(end_date)
@@ -7217,7 +7250,7 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
     disponivel_auto_restante = money(max(Decimal("0.00"), disponivel_periodo - pago_no_periodo))
 
     return {
-        'bruto': float(money(bruto_prod_view)),
+        'bruto': float(money(bruto_view)),
         'inss': float(money(inss_view)),
         'sest': float(money(sest_view)),
         'disponivel_auto_restante': float(money(disponivel_auto_restante)),
