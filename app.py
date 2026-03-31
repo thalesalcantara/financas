@@ -3789,7 +3789,7 @@ def admin_dashboard():
 
         if somente_pendentes and cooperado_id:
             snap_pend = _compute_coop_debt_snapshot(cooperado_id, data_inicio, data_fim)
-            pend_ids = {item['id'] for item in snap_pend['itens'] if item['restante'] > 0 and item['status'] in ('aberta', 'parcial', 'a_descontar')}
+            pend_ids = {item['id'] for item in snap_pend['itens'] if item['status'] in ('pendente', 'parcial', 'a_descontar') and item['restante'] > 0}
             despesas_coop = [d for d in despesas_coop if d.id in pend_ids]
 
         total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
@@ -4176,14 +4176,65 @@ def admin_dashboard():
         chart_data_lancamentos_cooperados = {"labels": [], "values": []}
 
         if ajax_partial == "resumo":
-            resumo_coop_rows, resumo_totais = _build_resumo_cooperados(
-                cooperados=cooperados,
-                lancamentos=lancamentos,
-                receitas_coop=receitas_coop,
-                data_inicio=data_inicio,
-                data_fim=data_fim,
-                cooperado_id=cooperado_id,
-            )
+            cooperados_resumo = [c for c in cooperados if (not cooperado_id or c.id == cooperado_id)]
+
+            lanc_por_coop = defaultdict(list)
+            for l in lancamentos:
+                cid = getattr(l, "cooperado_id", None)
+                if cid:
+                    lanc_por_coop[cid].append(l)
+
+            rec_por_coop = defaultdict(list)
+            for r in receitas_coop:
+                cid = getattr(r, "cooperado_id", None)
+                if cid:
+                    rec_por_coop[cid].append(r)
+
+            for coop in cooperados_resumo:
+                lancs_coop = lanc_por_coop.get(coop.id, [])
+                recs_coop = rec_por_coop.get(coop.id, [])
+                snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
+
+                prod = round(sum((l.valor or 0.0) for l in lancs_coop), 2)
+                rec = round(sum((r.valor or 0.0) for r in recs_coop), 2)
+                inss4 = round(sum((l.valor or 0.0) * INSS_ALIQ for l in lancs_coop), 2)
+                sest05 = round(sum((l.valor or 0.0) * SEST_ALIQ for l in lancs_coop), 2)
+                des = round(float(snap.get("descontado_despesa", 0.0) or 0.0), 2)
+                adiant = round(float(snap.get("descontado_adiant", 0.0) or 0.0), 2)
+                a_receber = round(max(0.0, float(snap.get("disponivel_auto_restante", 0.0) or 0.0)), 2)
+                saldo_pendente = round(float(snap.get("saldo_devedor", 0.0) or 0.0), 2)
+                pend_programado = round(float(snap.get("a_descontar", 0.0) or 0.0), 2)
+
+                if prod or rec or des or adiant or saldo_pendente or pend_programado:
+                    resumo_coop_rows.append({
+                        "id": coop.id,
+                        "nome": coop.nome,
+                        "prod": prod,
+                        "inss4": inss4,
+                        "sest05": sest05,
+                        "rec": rec,
+                        "des": des,
+                        "adiant": adiant,
+                        "a_receber": a_receber,
+                        "aReceber": a_receber,
+                        "saldo_pendente": saldo_pendente,
+                        "saldoPendente": saldo_pendente,
+                        "pend_programado": pend_programado,
+                        "pendProgramado": pend_programado,
+                    })
+                    resumo_totais["prod"] += prod
+                    resumo_totais["inss4"] += inss4
+                    resumo_totais["sest05"] += sest05
+                    resumo_totais["rec"] += rec
+                    resumo_totais["des"] += des
+                    resumo_totais["adiant"] += adiant
+                    resumo_totais["a_receber"] += a_receber
+                    resumo_totais["saldo_pendente"] += saldo_pendente
+                    resumo_totais["pend_programado"] += pend_programado
+
+            resumo_coop_rows.sort(key=lambda x: (x.get("nome") or "").strip().lower())
+            for k in resumo_totais:
+                resumo_totais[k] = round(float(resumo_totais[k] or 0.0), 2)
 
         partial_context = dict(
             tab=ajax_partial,
@@ -4452,7 +4503,7 @@ def admin_dashboard():
         trocas_hist_inicio = trocas_hist_inicio or (current_date - timedelta(days=30))
 
 
-    # resumo por cooperado calculado no backend
+    # resumo por cooperado calculado no backend para evitar travar no JS
     resumo_coop_rows = []
     resumo_totais = {
         "prod": 0.0, "inss4": 0.0, "sest05": 0.0, "rec": 0.0,
@@ -4460,14 +4511,65 @@ def admin_dashboard():
         "pend_programado": 0.0
     }
     if need_resumo:
-        resumo_coop_rows, resumo_totais = _build_resumo_cooperados(
-            cooperados=cooperados,
-            lancamentos=lancamentos,
-            receitas_coop=receitas_coop,
-            data_inicio=data_inicio,
-            data_fim=data_fim,
-            cooperado_id=cooperado_id,
-        )
+        cooperados_resumo = [c for c in cooperados if (not cooperado_id or c.id == cooperado_id)]
+
+        lanc_por_coop = defaultdict(list)
+        for l in lancamentos:
+            cid = getattr(l, "cooperado_id", None)
+            if cid:
+                lanc_por_coop[cid].append(l)
+
+        rec_por_coop = defaultdict(list)
+        for r in receitas_coop:
+            cid = getattr(r, "cooperado_id", None)
+            if cid:
+                rec_por_coop[cid].append(r)
+
+        for coop in cooperados_resumo:
+            lancs_coop = lanc_por_coop.get(coop.id, [])
+            recs_coop = rec_por_coop.get(coop.id, [])
+            snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
+
+            prod = round(sum((l.valor or 0.0) for l in lancs_coop), 2)
+            rec = round(sum((r.valor or 0.0) for r in recs_coop), 2)
+            inss4 = round(sum((l.valor or 0.0) * INSS_ALIQ for l in lancs_coop), 2)
+            sest05 = round(sum((l.valor or 0.0) * SEST_ALIQ for l in lancs_coop), 2)
+            des = round(float(snap.get("descontado_despesa", 0.0) or 0.0), 2)
+            adiant = round(float(snap.get("descontado_adiant", 0.0) or 0.0), 2)
+            _a_receber = round(max(0.0, float(snap.get("disponivel_auto_restante", 0.0) or 0.0)), 2)
+            _saldo_pendente = round(float(snap.get("saldo_devedor", 0.0) or 0.0), 2)
+            _pend_programado = round(float(snap.get("a_descontar", 0.0) or 0.0), 2)
+
+            if prod or rec or des or adiant or _saldo_pendente or _pend_programado:
+                resumo_coop_rows.append({
+                    "id": coop.id,
+                    "nome": coop.nome,
+                    "prod": prod,
+                    "inss4": inss4,
+                    "sest05": sest05,
+                    "rec": rec,
+                    "des": des,
+                    "adiant": adiant,
+                    "a_receber": _a_receber,
+                    "aReceber": _a_receber,
+                    "saldo_pendente": _saldo_pendente,
+                    "saldoPendente": _saldo_pendente,
+                    "pend_programado": _pend_programado,
+                    "pendProgramado": _pend_programado,
+                })
+                resumo_totais["prod"] += prod
+                resumo_totais["inss4"] += inss4
+                resumo_totais["sest05"] += sest05
+                resumo_totais["rec"] += rec
+                resumo_totais["des"] += des
+                resumo_totais["adiant"] += adiant
+                resumo_totais["a_receber"] += _a_receber
+                resumo_totais["saldo_pendente"] += _saldo_pendente
+                resumo_totais["pend_programado"] += _pend_programado
+
+        resumo_coop_rows.sort(key=lambda x: (x.get("nome") or "").strip().lower())
+        for k in resumo_totais:
+            resumo_totais[k] = round(float(resumo_totais[k] or 0.0), 2)
 
     _rendered_html = render_template(
         "admin_dashboard.html",
@@ -6879,84 +6981,6 @@ def _despesa_due_date(dc):
         return base + timedelta(days=7)
     return base
 
-
-
-def _build_resumo_cooperados(cooperados, lancamentos, receitas_coop, data_inicio, data_fim, cooperado_id=None):
-    resumo_coop_rows = []
-    resumo_totais = {
-        "prod": 0.0,
-        "inss4": 0.0,
-        "sest05": 0.0,
-        "rec": 0.0,
-        "des": 0.0,
-        "adiant": 0.0,
-        "a_receber": 0.0,
-        "saldo_pendente": 0.0,
-        "pend_programado": 0.0,
-    }
-
-    cooperados_resumo = [c for c in cooperados if (not cooperado_id or c.id == cooperado_id)]
-
-    lanc_por_coop = defaultdict(list)
-    for l in lancamentos:
-        cid = getattr(l, "cooperado_id", None)
-        if cid:
-            lanc_por_coop[cid].append(l)
-
-    rec_por_coop = defaultdict(list)
-    for r in receitas_coop:
-        cid = getattr(r, "cooperado_id", None)
-        if cid:
-            rec_por_coop[cid].append(r)
-
-    for coop in cooperados_resumo:
-        snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
-
-        prod = round(sum((l.valor or 0.0) for l in lanc_por_coop.get(coop.id, [])), 2)
-        rec = round(sum((r.valor or 0.0) for r in rec_por_coop.get(coop.id, [])), 2)
-        inss4 = round(sum((l.valor or 0.0) * INSS_ALIQ for l in lanc_por_coop.get(coop.id, [])), 2)
-        sest05 = round(sum((l.valor or 0.0) * SEST_ALIQ for l in lanc_por_coop.get(coop.id, [])), 2)
-
-        des = round(float(snap.get("descontado_despesa", 0.0) or 0.0), 2)
-        adiant = round(float(snap.get("descontado_adiant", 0.0) or 0.0), 2)
-        a_receber = round(max(0.0, float(snap.get("disponivel_auto_restante", 0.0) or 0.0)), 2)
-        saldo_pendente = round(float(snap.get("saldo_devedor", 0.0) or 0.0), 2)
-        pend_programado = round(float(snap.get("a_descontar", 0.0) or 0.0), 2)
-
-        if prod or rec or des or adiant or saldo_pendente or pend_programado:
-            resumo_coop_rows.append({
-                "id": coop.id,
-                "nome": coop.nome,
-                "prod": prod,
-                "inss4": inss4,
-                "sest05": sest05,
-                "rec": rec,
-                "des": des,
-                "adiant": adiant,
-                "a_receber": a_receber,
-                "aReceber": a_receber,
-                "saldo_pendente": saldo_pendente,
-                "saldoPendente": saldo_pendente,
-                "pend_programado": pend_programado,
-                "pendProgramado": pend_programado,
-            })
-
-            resumo_totais["prod"] += prod
-            resumo_totais["inss4"] += inss4
-            resumo_totais["sest05"] += sest05
-            resumo_totais["rec"] += rec
-            resumo_totais["des"] += des
-            resumo_totais["adiant"] += adiant
-            resumo_totais["a_receber"] += a_receber
-            resumo_totais["saldo_pendente"] += saldo_pendente
-            resumo_totais["pend_programado"] += pend_programado
-
-    resumo_coop_rows.sort(key=lambda x: (x.get("nome") or "").strip().lower())
-
-    for k in resumo_totais:
-        resumo_totais[k] = round(float(resumo_totais[k] or 0.0), 2)
-
-    return resumo_coop_rows, resumo_totais
 
 
 def _status_adiantamento_label(status: str | None) -> str:
