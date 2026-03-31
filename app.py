@@ -3784,37 +3784,45 @@ def admin_dashboard():
 
         if somente_pendentes and cooperado_id:
             snap_pend = _compute_coop_debt_snapshot(cooperado_id, data_inicio, data_fim)
-            pend_ids = {
-                item['id']
-                for item in snap_pend['itens']
-                if item['status'] in ('aberta', 'parcial', 'a_descontar') and item['restante'] > 0
-            }
+            pend_ids = {item['id'] for item in snap_pend['itens'] if item['status'] in ('aberta', 'parcial', 'a_descontar') and item['restante'] > 0}
             despesas_coop = [d for d in despesas_coop if d.id in pend_ids]
 
+        total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
+
+        # cartões de despesas/adiantamentos devem refletir o saldo remanescente,
+        # inclusive valores de semanas passadas ainda não quitados
+        if cooperado_id:
+            _snapshot_coop_ids = [cooperado_id]
+        else:
+            _snapshot_coop_ids = [
+                row[0]
+                for row in (
+                    db.session.query(Cooperado.id)
+                    .join(Usuario, Cooperado.usuario_id == Usuario.id)
+                    .filter(Usuario.ativo.is_(True))
+                    .order_by(Cooperado.nome.asc())
+                    .all()
+                )
+            ]
+
         despesa_snapshot_map = {}
-        for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
+        total_despesas_coop = 0.0
+        total_adiantamentos_coop = 0.0
+
+        for _cid in _snapshot_coop_ids:
             _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
             for _it in _snap["itens"]:
                 despesa_snapshot_map[_it["id"]] = _it
+                _rest = float(_it.get("restante", 0.0) or 0.0)
+                if _rest <= 0:
+                    continue
+                if _it.get("eh_adiantamento"):
+                    total_adiantamentos_coop += _rest
+                else:
+                    total_despesas_coop += _rest
 
-        # Na tabela de despesas do cooperado, exibe apenas o saldo pendente real.
-        # Se a despesa já estiver quitada, ela deixa de aparecer.
-        despesas_coop = [
-            d for d in despesas_coop
-            if float((despesa_snapshot_map.get(d.id) or {}).get("restante", 0.0) or 0.0) > 0.0
-        ]
-
-        total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
-        total_despesas_coop = sum(
-            float((despesa_snapshot_map.get(d.id) or {}).get("restante", 0.0) or 0.0)
-            for d in despesas_coop
-            if not getattr(d, "eh_adiantamento", False)
-        )
-        total_adiantamentos_coop = sum(
-            float((despesa_snapshot_map.get(d.id) or {}).get("restante", 0.0) or 0.0)
-            for d in despesas_coop
-            if getattr(d, "eh_adiantamento", False)
-        )
+        total_despesas_coop = round(total_despesas_coop, 2)
+        total_adiantamentos_coop = round(total_adiantamentos_coop, 2)
 
     adiantamentos_q = SolicitacaoAdiantamento.query.join(Cooperado, SolicitacaoAdiantamento.cooperado_id == Cooperado.id)
     if cooperado_id:
@@ -4203,8 +4211,8 @@ def admin_dashboard():
                 adiant = round(snap.get("descontado_adiant", 0.0), 2)
                 if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
                     a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
-                    saldo_pendente = round(snap["saldo_devedor"], 2)
                     pend_programado = round(snap["a_descontar"], 2)
+                    saldo_pendente = round(snap["saldo_devedor"] + snap["a_descontar"], 2)
                     resumo_coop_rows.append({
                         "id": coop.id,
                         "nome": coop.nome,
@@ -4228,7 +4236,7 @@ def admin_dashboard():
                     resumo_totais["des"] += des
                     resumo_totais["adiant"] += adiant
                     resumo_totais["a_receber"] += max(0.0, snap["disponivel_auto_restante"])
-                    resumo_totais["saldo_pendente"] += snap["saldo_devedor"]
+                    resumo_totais["saldo_pendente"] += (snap["saldo_devedor"] + snap["a_descontar"])
                     resumo_totais["pend_programado"] += snap["a_descontar"]
 
         partial_context = dict(
@@ -4515,8 +4523,8 @@ def admin_dashboard():
         adiant = round(snap.get("descontado_adiant", 0.0), 2)
         if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
             _a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
-            _saldo_pendente = round(snap["saldo_devedor"], 2)
             _pend_programado = round(snap["a_descontar"], 2)
+            _saldo_pendente = round(snap["saldo_devedor"] + snap["a_descontar"], 2)
             resumo_coop_rows.append({
                 "id": coop.id,
                 "nome": coop.nome,
@@ -4540,7 +4548,7 @@ def admin_dashboard():
             resumo_totais["des"] += des
             resumo_totais["adiant"] += adiant
             resumo_totais["a_receber"] += max(0.0, snap["disponivel_auto_restante"])
-            resumo_totais["saldo_pendente"] += snap["saldo_devedor"]
+            resumo_totais["saldo_pendente"] += (snap["saldo_devedor"] + snap["a_descontar"])
             resumo_totais["pend_programado"] += snap["a_descontar"]
 
     _rendered_html = render_template(
