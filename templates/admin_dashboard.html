@@ -1168,7 +1168,23 @@
                 </thead>
 
                 <tbody>
-                  <tr><td colspan="9" class="text-center text-muted">Carregando…</td></tr>
+                  {% if resumo_coop_rows %}
+                    {% for r in resumo_coop_rows %}
+                    <tr>
+                      <td>{{ r.nome }}</td>
+                      <td class="text-end">R$ {{ '%.2f'|format(r.prod|default(0)) }}</td>
+                      <td class="text-end">R$ {{ '%.2f'|format(r.inss4|default(0)) }}</td>
+                      <td class="text-end">R$ {{ '%.2f'|format(r.sest05|default(0)) }}</td>
+                      <td class="text-end text-success">R$ {{ '%.2f'|format(r.rec|default(0)) }}</td>
+                      <td class="text-end text-danger">R$ {{ '%.2f'|format(r.des|default(0)) }}</td>
+                      <td class="text-end text-danger">R$ {{ '%.2f'|format(r.adiant|default(0)) }}</td>
+                      <td class="text-end">R$ {{ '%.2f'|format(r.a_receber|default(0)) }}</td>
+                      <td class="text-end text-warning">R$ {{ '%.2f'|format((r.saldo_pendente|default(0)) + (r.pend_programado|default(0))) }}</td>
+                    </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr><td colspan="9" class="text-center text-muted">Nenhum dado no período.</td></tr>
+                  {% endif %}
                 </tbody>
 
                 <tfoot>
@@ -1185,31 +1201,6 @@
                   </tr>
                 </tfoot>
               </table>
-            </div>
-          </div>
-        </div>
-
-        <div class="row g-2 mt-3">
-          <div class="col-12">
-            <div class="card border-0 shadow-sm rounded-4 p-3">
-              <h6 class="mb-2 d-flex align-items-center gap-1">
-                <span class="resumo-pill-label"><i class="bi bi-shop"></i></span>
-                <span>Top Estabelecimentos (Produções no período)</span>
-              </h6>
-              <div class="table-responsive mt-3">
-                <table class="table table-sm table-bordered table-hover align-middle" id="tblTopEstabsResumo">
-                  <thead class="table-light">
-                    <tr>
-                      <th style="width:72px">#</th>
-                      <th>Estabelecimento</th>
-                      <th class="text-end">Produção real</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr><td colspan="3" class="text-center text-muted">Carregando…</td></tr>
-                  </tbody>
-                </table>
-              </div>
             </div>
           </div>
         </div>
@@ -1324,9 +1315,6 @@
           font-weight: 600;
         }
 
-        #resumo canvas {
-          max-height: 280px;
-        }
 
         @media (max-width: 576px) {
           #resumo .resumo-shell{
@@ -1543,263 +1531,8 @@
         if (nome && nome.trim()) return `nome:${nome.trim().toUpperCase()}`;
         return 'nome:—';
       };
-
-      // ---- Função de resumo (usada na tabela e no XLSX) ----
       const RESUMO_COOP_ROWS = {{ resumo_coop_rows|default([])|tojson|safe }};
-      // ---- Tabela Resumo por Cooperado (render backend) ----
-      (function renderResumoCoopTable() {
-        const rows  = Array.isArray(RESUMO_COOP_ROWS) ? RESUMO_COOP_ROWS : [];
-        const tbody = document.querySelector('#tblResumoCoop tbody');
-        if (!tbody) return;
-
-        tbody.innerHTML = rows.length
-          ? ''
-          : '<tr><td colspan="9" class="text-center text-muted">Sem dados no filtro.</td></tr>';
-
-        let tProd = 0, tINSS4 = 0, tSEST05 = 0, tRec = 0, tDes = 0, tAdiant = 0, tReceber = 0, tPend = 0;
-
-        rows.forEach(r => {
-          const prod = Number(r.prod || 0);
-          const inss4 = Number(r.inss4 || 0);
-          const sest05 = Number(r.sest05 || 0);
-          const rec = Number(r.rec || 0);
-          const des = Number(r.des || 0);
-          const adiant = Number(r.adiant || 0);
-          const aReceber = Number(r.a_receber ?? r.aReceber ?? 0);
-          const saldoPend = Number(r.saldo_pendente ?? r.saldoPendente ?? 0);
-
-          tProd += prod;
-          tINSS4 += inss4;
-          tSEST05 += sest05;
-          tRec += rec;
-          tDes += des;
-          tAdiant += adiant;
-          tReceber += aReceber;
-          tPend += saldoPend;
-
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td class="text-break">${r.nome || '—'}</td>
-            <td class="text-end">${fmtBR(prod)}</td>
-            <td class="text-end">${fmtBR(inss4)}</td>
-            <td class="text-end">${fmtBR(sest05)}</td>
-            <td class="text-end text-success">${fmtBR(rec)}</td>
-            <td class="text-end text-danger">${fmtBR(des)}</td>
-            <td class="text-end text-danger">${fmtBR(adiant)}</td>
-            <td class="text-end fw-bold">${fmtBR(aReceber)}</td>
-            <td class="text-end fw-bold text-warning">${fmtBR(saldoPend)}</td>`;
-          tbody.appendChild(tr);
-        });
-
-        const setText = (id, value) => {
-          const el = document.getElementById(id);
-          if (el) el.textContent = fmtBR(value);
-        };
-
-        setText('tProd', tProd);
-        setText('tINSS4', tINSS4);
-        setText('tSEST05', tSEST05);
-        setText('tRec', tRec);
-        setText('tDes', tDes);
-
-        const tAdEl = document.getElementById('tAdiant');
-        if (tAdEl) tAdEl.textContent = fmtBR(tAdiant);
-
-        const tLiqEl = document.getElementById('tLiq');
-        if (tLiqEl) tLiqEl.textContent = fmtBR(tReceber);
-
-        const tPendEl = document.getElementById('tPend');
-        if (tPendEl) tPendEl.textContent = fmtBR(tPend);
-
-        const adiantEl = document.getElementById('kpiQtdEntregasPeriodo');
-        if (adiantEl) adiantEl.textContent = fmtBR(tAdiant);
-
-        const pendEl = document.getElementById('kpiTicketMedioPeriodo');
-        if (pendEl) pendEl.textContent = fmtBR(tPend);
-      })();
-
-      // ---- Gráficos (Chart.js via CDN) ----
-      const ensureChart = () => new Promise(res => {
-        if (window.Chart) return res();
-        const s = document.createElement('script');
-        s.src = "https://cdn.jsdelivr.net/npm/chart.js";
-        s.onload = () => res();
-        document.head.appendChild(s);
-      });
-
-      ensureChart().then(() => {
-        const moneyTick = (value) => 'R$ ' + Number(value || 0).toLocaleString('pt-BR', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        });
-
-        const baseChartOptions = {
-          responsive: true,
-          plugins: {
-            legend: {
-              position: 'bottom',
-              labels: { usePointStyle: true, padding: 18, boxWidth: 10, boxHeight: 10 }
-            },
-            tooltip: {
-              mode: 'index',
-              intersect: false,
-              callbacks: {
-                label: (ctx) => {
-                  const label = ctx.dataset.label || '';
-                  const v = ctx.parsed.y ?? ctx.parsed.x ?? 0;
-                  return `${label}: ${moneyTick(v)}`;
-                }
-              }
-            }
-          },
-          scales: {
-            x: { grid: { display: false } },
-            y: {
-              beginAtZero: true,
-              grid: { color: 'rgba(148,163,184,0.25)' },
-              ticks: { callback: (v) => moneyTick(v) }
-            }
-          }
-        };
-
-        // Cooperativa: Receitas vs Despesas por mês
-        (function () {
-          const byM = {};
-          filteredRECc.forEach(r => {
-            const k = byMonthKey(r.data) || '—';
-            (byM[k] ??= { r: 0, d: 0 }).r += r.valor;
-          });
-          filteredDESc.forEach(d => {
-            const k = byMonthKey(d.data) || '—';
-            (byM[k] ??= { r: 0, d: 0 }).d += d.valor;
-          });
-
-          const labels = Object.keys(byM).sort();
-          const rec    = labels.map(k => byM[k].r);
-          const des    = labels.map(k => byM[k].d);
-
-          const ctx = document.getElementById('chartCoop');
-          if (!ctx) return;
-
-          new Chart(ctx, {
-            type: 'bar',
-            data: {
-              labels,
-              datasets: [
-                { label: 'Receitas', data: rec, backgroundColor: 'rgba(37, 99, 235, 0.75)', borderRadius: 6 },
-                { label: 'Despesas', data: des, backgroundColor: 'rgba(239, 68, 68, 0.75)', borderRadius: 6 }
-              ]
-            },
-            options: baseChartOptions
-          });
-        })();
-
-        // Cooperados: Produções + INSS 4% + SEST 0,5% por mês
-        (function () {
-          const byM = {};
-          filteredPROD.forEach(p => {
-            const k = byMonthKey(p.data) || '—';
-            (byM[k] ??= { prod: 0, inss4: 0, sest05: 0 }).prod += p.valor;
-            byM[k].inss4  += p.valor * 0.04;
-            byM[k].sest05 += p.valor * 0.005;
-          });
-
-          const labels = Object.keys(byM).sort();
-          const prod   = labels.map(k => byM[k].prod);
-          const inss4  = labels.map(k => byM[k].inss4);
-          const sest05 = labels.map(k => byM[k].sest05);
-
-          const ctx = document.getElementById('chartCooperados');
-          if (!ctx) return;
-
-          new Chart(ctx, {
-            type: 'line',
-            data: {
-              labels,
-              datasets: [
-                {
-                  label: 'Produções (bruto)',
-                  data: prod,
-                  borderColor: 'rgba(37, 99, 235, 1)',
-                  backgroundColor: 'rgba(37, 99, 235, 0.18)',
-                  borderWidth: 2,
-                  tension: 0.3,
-                  fill: true,
-                  pointRadius: 3,
-                  pointHoverRadius: 4
-                },
-                {
-                  label: 'INSS (4,0%)',
-                  data: inss4,
-                  borderColor: 'rgba(56, 189, 248, 1)',
-                  backgroundColor: 'rgba(56, 189, 248, 0.12)',
-                  borderWidth: 2,
-                  tension: 0.3,
-                  fill: true,
-                  pointRadius: 3,
-                  pointHoverRadius: 4
-                },
-                {
-                  label: 'SEST/SENAT (0,5%)',
-                  data: sest05,
-                  borderColor: 'rgba(2, 132, 199, 1)',
-                  backgroundColor: 'rgba(2, 132, 199, 0.10)',
-                  borderWidth: 2,
-                  tension: 0.3,
-                  fill: true,
-                  pointRadius: 3,
-                  pointHoverRadius: 4
-                }
-              ]
-            },
-            options: baseChartOptions
-          });
-        })();
-
-        // Estabelecimentos — barra horizontal + tabela real
-        (function () {
-          const byR = {};
-          filteredPROD.forEach(p => {
-            if (p.restaurante_id == null && !p.restaurante_nome) return;
-            const nome = (p.restaurante_nome || '—').trim() || '—';
-            byR[nome] = (byR[nome] || 0) + (+p.valor || 0);
-          });
-
-          const entries = Object.entries(byR)
-            .map(([nome, valor]) => ({ nome, valor: +(valor || 0) }))
-            .sort((a, b) => b.valor - a.valor)
-            .slice(0, 20);
-
-          const labels = entries.map(e => e.nome);
-          const vals   = entries.map(e => Number(e.valor.toFixed(2)));
-
-          const tbody = document.querySelector('#tblTopEstabsResumo tbody');
-          if (tbody) {
-            tbody.innerHTML = entries.length ? '' : '<tr><td colspan="3" class="text-center text-muted">Sem dados no período.</td></tr>';
-            entries.forEach((item, idx) => {
-              const tr = document.createElement('tr');
-              tr.innerHTML = `
-                <td>${idx + 1}</td>
-                <td class="text-break">${item.nome}</td>
-                <td class="text-end fw-semibold">${fmtBR(item.valor)}</td>
-              `;
-              tbody.appendChild(tr);
-            });
-          }
-
-          const ctx = document.getElementById('chartEstabs');
-          if (!ctx) return;
-
-          new Chart(ctx, {
-            type: 'bar',
-            data: {
-              labels,
-              datasets: [{ label: 'Produções por Estabelecimento', data: vals, backgroundColor: 'rgba(16, 185, 129, 0.8)', borderRadius: 6 }]
-            },
-            options: { ...baseChartOptions, plugins: { ...baseChartOptions.plugins, legend: { display: false } }, indexAxis: 'y' }
-          });
-        })();
-      });
+      // Gráficos do resumo removidos para reduzir peso.
 
       // ---- Atalhos de filtro mensal / anual ----
       (function(){
@@ -2025,7 +1758,7 @@
         </button>
       </div>
 
-      <form id="formFiltroLancamentos" method="GET" action="{{ url_for('admin_dashboard') }}" class="row g-2 align-items-end">
+      <form id="formFiltroLancamentos" method="GET" action="{{ url_for('filtrar_lancamentos') }}" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="lancamentos">
 
         <div class="col-md-3">
@@ -6154,6 +5887,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
+
 <script>
   // Confirmar exclusão
   document.addEventListener('click', function (e) {
@@ -6266,39 +6000,24 @@
         execScripts(firstEl);
 
         if (window.history && window.history.replaceState){
-          const cleanParams = new URLSearchParams(params);
-          cleanParams.delete('ajax_partial');
-          const cleanUrl = `${window.location.pathname}?${cleanParams.toString()}`;
+          const cleanUrl = `${window.location.pathname}?${params.toString()}`;
           window.history.replaceState({}, '', cleanUrl);
         }
         initAjaxFilters();
       }catch(err){
-        alert(err.message || 'Falha ao filtrar.');
-        wrap.style.opacity = '1';
-        wrap.style.pointerEvents = '';
+        const fallbackUrl = `${baseAction}?${params.toString()}`;
+        window.location.href = fallbackUrl;
       }
     }
 
     const bindings = [
+      
       ['formFiltroReceitas', 'receitas', 'receitasAjaxWrap', 'receitas'],
       ['formFiltroDespesas', 'despesas', 'despesasAjaxWrap', 'despesas'],
       ['formFiltroCoopReceitas', 'coop_receitas', 'coopReceitasAjaxWrap', 'coop_receitas'],
       ['formFiltroCoopDespesas', 'coop_despesas', 'coopDespesasAjaxWrap', 'coop_despesas'],
       ['formFiltroBeneficios', 'beneficios', 'beneficiosAjaxWrap', 'beneficios'],
     ];
-
-    ['formFiltroResumo', 'formFiltroLancamentos'].forEach((formId) => {
-      const form = document.getElementById(formId);
-      if (!form || form.dataset.ajaxBound) return;
-      form.dataset.ajaxBound = '1';
-      form.addEventListener('submit', function(){
-        const params = new URLSearchParams(new FormData(form));
-        params.delete('ajax_partial');
-        const baseAction = form.getAttribute('action') || window.location.pathname;
-        form.setAttribute('action', `${baseAction.split('?')[0]}?${params.toString()}`);
-        form.method = 'GET';
-      });
-    });
 
     bindings.forEach(([formId, partial, wrapId, tabName]) => {
       const form = document.getElementById(formId);
@@ -6307,6 +6026,20 @@
       form.addEventListener('submit', function(e){
         e.preventDefault();
         fetchPartial(form, partial, wrapId, tabName);
+      });
+    });
+
+    ['formFiltroResumo','formFiltroLancamentos'].forEach((formId) => {
+      const form = document.getElementById(formId);
+      if (!form || form.dataset.normalBound) return;
+      form.dataset.normalBound = '1';
+      form.addEventListener('submit', function(){
+        const params = new URLSearchParams(new FormData(form));
+        params.delete('ajax_partial');
+        params.delete('ajax');
+        const action = form.getAttribute('action') || window.location.pathname;
+        form.setAttribute('action', action.split('?')[0] + '?' + params.toString());
+        form.method = 'GET';
       });
     });
   }
@@ -6617,14 +6350,16 @@
       if (link) new bootstrap.Tab(link).show();
     }
 
-    document.querySelectorAll('.sidebar .nav-link[data-bs-toggle="tab"]').forEach(a => {
-      a.addEventListener('shown.bs.tab', (e) => {
-        const id = e.target.getAttribute('href')?.slice(1) || '';
+    document.querySelectorAll('.sidebar .nav-link[data-bs-toggle="tab"], .sidebar .nav-sublink[data-bs-toggle="tab"]').forEach(a => {
+      a.addEventListener('click', (e) => {
+        const href = a.getAttribute('href') || '';
+        const id = href.startsWith('#') ? href.slice(1) : '';
         if (!id) return;
-
+        e.preventDefault();
         const p = new URLSearchParams(location.search);
         p.set('tab', id);
-        history.replaceState(null, '', location.pathname + '?' + p.toString() + e.target.getAttribute('href'));
+        p.delete('ajax_partial');
+        location.href = location.pathname + '?' + p.toString();
       });
     });
 
@@ -7370,13 +7105,8 @@ document.addEventListener('DOMContentLoaded', function(){
     knownAlertIds = new Set((initial || []).map(a => String(a.id)));
     renderAlertas(initial || []);
   } catch(_) {}
-  const escalasPane = document.getElementById('escalas');
-  const shouldPollAlertas = () => !!(escalasPane && escalasPane.classList.contains('show') && escalasPane.classList.contains('active'));
-  if (shouldPollAlertas()) pollAlertas();
-  setInterval(() => { if (shouldPollAlertas()) pollAlertas(); }, 60000);
-  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(btn => {
-    btn.addEventListener('shown.bs.tab', () => { if (shouldPollAlertas()) pollAlertas(); });
-  });
+  pollAlertas();
+  setInterval(pollAlertas, 60000);
 });
 </script>
 
@@ -7410,3 +7140,4 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 });
 </script>
+ 
