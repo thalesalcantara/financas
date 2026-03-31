@@ -3784,24 +3784,36 @@ def admin_dashboard():
 
         if somente_pendentes and cooperado_id:
             snap_pend = _compute_coop_debt_snapshot(cooperado_id, data_inicio, data_fim)
-            pend_ids = {item['id'] for item in snap_pend['itens'] if item['status'] in ('pendente', 'parcial', 'a_descontar') and item['restante'] > 0}
+            pend_ids = {
+                item['id']
+                for item in snap_pend['itens']
+                if item['status'] in ('aberta', 'parcial', 'a_descontar') and float(item.get('restante') or 0.0) > 0
+            }
             despesas_coop = [d for d in despesas_coop if d.id in pend_ids]
 
         total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
-        total_despesas_coop = sum(
-            (d.valor or 0.0) for d in despesas_coop
-            if not getattr(d, "eh_adiantamento", False)
-        )
-        total_adiantamentos_coop = sum(
-            (d.valor or 0.0) for d in despesas_coop
-            if getattr(d, "eh_adiantamento", False)
-        )
 
         despesa_snapshot_map = {}
         for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
             _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
             for _it in _snap["itens"]:
                 despesa_snapshot_map[_it["id"]] = _it
+
+        despesas_coop = [
+            d for d in despesas_coop
+            if float((despesa_snapshot_map.get(d.id) or {}).get('restante') or 0.0) > 0
+        ]
+
+        total_despesas_coop = sum(
+            float((despesa_snapshot_map.get(d.id) or {}).get('restante') or 0.0)
+            for d in despesas_coop
+            if not getattr(d, "eh_adiantamento", False)
+        )
+        total_adiantamentos_coop = sum(
+            float((despesa_snapshot_map.get(d.id) or {}).get('restante') or 0.0)
+            for d in despesas_coop
+            if getattr(d, "eh_adiantamento", False)
+        )
 
     adiantamentos_q = SolicitacaoAdiantamento.query.join(Cooperado, SolicitacaoAdiantamento.cooperado_id == Cooperado.id)
     if cooperado_id:
@@ -4186,8 +4198,8 @@ def admin_dashboard():
                 rec = sum((r.valor or 0.0) for r in receitas_coop if getattr(r, "cooperado_id", None) == coop.id)
                 inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
                 sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-                des = round(snap.get("restante_despesa", 0.0), 2)
-                adiant = round(snap.get("restante_adiant", 0.0), 2)
+                des = round(snap.get("descontado_despesa", 0.0), 2)
+                adiant = round(snap.get("descontado_adiant", 0.0), 2)
                 if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
                     a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
                     saldo_pendente = round(snap["saldo_devedor"], 2)
@@ -4498,8 +4510,8 @@ def admin_dashboard():
         rec = sum((r.valor or 0.0) for r in receitas_coop if getattr(r, "cooperado_id", None) == coop.id)
         inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
         sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-        des = round(snap.get("restante_despesa", 0.0), 2)
-        adiant = round(snap.get("restante_adiant", 0.0), 2)
+        des = round(snap.get("descontado_despesa", 0.0), 2)
+        adiant = round(snap.get("descontado_adiant", 0.0), 2)
         if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
             _a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
             _saldo_pendente = round(snap["saldo_devedor"], 2)
@@ -7151,8 +7163,6 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
     total_programado = Decimal("0.00")
     total_descontado_despesa = Decimal("0.00")
     total_descontado_adiant = Decimal("0.00")
-    total_restante_despesa = Decimal("0.00")
-    total_restante_adiant = Decimal("0.00")
     itens = []
     for it in sorted(debt_items, key=lambda x: (x['due_date'], x['id'])):
         due_date = it['due_date']
@@ -7178,11 +7188,6 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
                 total_descontado_despesa += money(pago_auto_total)
 
         if restante > 0:
-            if it['eh_adiantamento']:
-                total_restante_adiant += restante
-            else:
-                total_restante_despesa += restante
-
             if vencida:
                 total_vencido_pendente += restante
             else:
@@ -7233,8 +7238,6 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
         'a_descontar': float(money(total_programado)),
         'descontado_despesa': float(money(total_descontado_despesa)),
         'descontado_adiant': float(money(total_descontado_adiant)),
-        'restante_despesa': float(money(total_restante_despesa)),
-        'restante_adiant': float(money(total_restante_adiant)),
     }
 
 
