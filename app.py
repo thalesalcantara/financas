@@ -3662,11 +3662,6 @@ def admin_dashboard():
     cooperado_id = args.get("cooperado_id", type=int)
     considerar_periodo = bool(args.get("considerar_periodo"))
     dows = set(args.getlist("dow"))
-    ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
-    wants_finance_partial = ajax_partial in {"resumo", "lancamentos", "receitas", "despesas", "coop_receitas", "coop_despesas", "beneficios"}
-    need_resumo = active_tab == "resumo" or ajax_partial == "resumo"
-    need_escalas = active_tab == "escalas"
-    need_receitas_auto = active_tab in {"receitas", "resumo"} or ajax_partial in {"receitas", "resumo"}
 
     # =========================
     # Lançamentos
@@ -3792,25 +3787,34 @@ def admin_dashboard():
             pend_ids = {
                 item['id']
                 for item in snap_pend['itens']
-                if item['restante'] > 0 and item['status'] in ('aberta', 'parcial', 'a_descontar')
+                if item['status'] in ('aberta', 'parcial', 'a_descontar') and item['restante'] > 0
             }
             despesas_coop = [d for d in despesas_coop if d.id in pend_ids]
-
-        total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
-        total_despesas_coop = sum(
-            (d.valor or 0.0) for d in despesas_coop
-            if not getattr(d, "eh_adiantamento", False)
-        )
-        total_adiantamentos_coop = sum(
-            (d.valor or 0.0) for d in despesas_coop
-            if getattr(d, "eh_adiantamento", False)
-        )
 
         despesa_snapshot_map = {}
         for _cid in {getattr(d, "cooperado_id", None) for d in despesas_coop if getattr(d, "cooperado_id", None)}:
             _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
             for _it in _snap["itens"]:
                 despesa_snapshot_map[_it["id"]] = _it
+
+        # Na tabela de despesas do cooperado, exibe apenas o saldo pendente real.
+        # Se a despesa já estiver quitada, ela deixa de aparecer.
+        despesas_coop = [
+            d for d in despesas_coop
+            if float((despesa_snapshot_map.get(d.id) or {}).get("restante", 0.0) or 0.0) > 0.0
+        ]
+
+        total_receitas_coop = sum((r.valor or 0.0) for r in receitas_coop)
+        total_despesas_coop = sum(
+            float((despesa_snapshot_map.get(d.id) or {}).get("restante", 0.0) or 0.0)
+            for d in despesas_coop
+            if not getattr(d, "eh_adiantamento", False)
+        )
+        total_adiantamentos_coop = sum(
+            float((despesa_snapshot_map.get(d.id) or {}).get("restante", 0.0) or 0.0)
+            for d in despesas_coop
+            if getattr(d, "eh_adiantamento", False)
+        )
 
     adiantamentos_q = SolicitacaoAdiantamento.query.join(Cooperado, SolicitacaoAdiantamento.cooperado_id == Cooperado.id)
     if cooperado_id:
@@ -3829,10 +3833,9 @@ def admin_dashboard():
     )
 
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
-    if need_receitas_auto:
-        _ensure_taxas_admin_receitas(restaurantes, months_back=0)
+    _ensure_taxas_admin_receitas(restaurantes, months_back=0)
 
-    # Recarrega receitas/despesas somente após gerar taxas automáticas quando necessário.
+    # Recarrega SEMPRE as receitas/despesas após gerar taxas automáticas.
     # Assim, sem filtro manual, a aba de receitas já abre mostrando o mês atual,
     # e com filtro continua respeitando o período informado.
     rq = ReceitaCooperativa.query
@@ -3873,114 +3876,104 @@ def admin_dashboard():
     # =========================
     # Escalas
     # =========================
-    escalas_all = []
+    escalas_all = (
+        db.session.query(Escala)
+        .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
+        .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(
+            or_(
+                Escala.cooperado_id.is_(None),
+                Usuario.ativo.is_(True)
+            )
+        )
+        .order_by(Escala.id.asc())
+        .all()
+    )
+
     esc_by_int = defaultdict(list)
     esc_by_str = defaultdict(list)
-    qtd_escalas_map = {c.id: 0 for c in cooperados}
-    qtd_sem_cadastro = 0
-    contratos_escala_opcoes = []
+
+    for e in escalas_all:
+        k_int = e.cooperado_id if e.cooperado_id is not None else 0
+        esc_item = {
+            "data": e.data,
+            "turno": e.turno,
+            "horario": e.horario,
+            "contrato": e.contrato,
+            "cor": getattr(e, "cor", None),
+            "nome_planilha": getattr(e, "cooperado_nome", None),
+        }
+        esc_by_int[k_int].append(esc_item)
+        esc_by_str[str(k_int)].append(esc_item)
+
+    cont_rows = dict(
+        db.session.query(Escala.cooperado_id, func.count(Escala.id))
+        .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
+        .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(
+            or_(
+                Escala.cooperado_id.is_(None),
+                Usuario.ativo.is_(True)
+            )
+        )
+        .group_by(Escala.cooperado_id)
+        .all()
+    )
+
+    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
+    qtd_sem_cadastro = int(cont_rows.get(None, 0))
+
+    contratos_set = {((e.contrato or "").strip()) for e in escalas_all if (e.contrato or "").strip()}
+    contratos_set.update({((r.nome or "").strip()) for r in restaurantes if (r.nome or "").strip()})
+    contratos_escala_opcoes = sorted(contratos_set, key=lambda s: s.lower())
+
     escala_editor_rows = []
-    escala_alertas_1h = []
+    for e in sorted(escalas_all, key=_escala_sort_key):
+        coop_obj = None
+        if e.cooperado_id:
+            coop_obj = cooperados_map.get(e.cooperado_id)
 
-    if need_escalas:
-        escalas_all = (
-            db.session.query(Escala)
-            .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
-            .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
-            .filter(
-                or_(
-                    Escala.cooperado_id.is_(None),
-                    Usuario.ativo.is_(True)
-                )
-            )
-            .order_by(Escala.id.asc())
-            .all()
-        )
+        nome_atual = (coop_obj.nome if coop_obj else (e.cooperado_nome or "").strip())
+        escala_editor_rows.append({
+            "id": e.id,
+            "data": e.data or "",
+            "weekday_num": _escala_weekday_num(e.data),
+            "weekday_label": _escala_weekday_label(e.data),
+            "turno": e.turno or "",
+            "horario": e.horario or "",
+            "contrato": e.contrato or "",
+            "cooperado_id": e.cooperado_id,
+            "cooperado_nome": nome_atual or "",
+            "cooperado_nome_livre": (e.cooperado_nome or "") if not coop_obj else "",
+            "restaurante_id": e.restaurante_id,
+            "cor": getattr(e, "cor", None),
+        })
 
-        for e in escalas_all:
-            k_int = e.cooperado_id if e.cooperado_id is not None else 0
-            esc_item = {
-                "data": e.data,
-                "turno": e.turno,
-                "horario": e.horario,
-                "contrato": e.contrato,
-                "cor": getattr(e, "cor", None),
-                "nome_planilha": getattr(e, "cooperado_nome", None),
-            }
-            esc_by_int[k_int].append(esc_item)
-            esc_by_str[str(k_int)].append(esc_item)
-
-        cont_rows = dict(
-            db.session.query(Escala.cooperado_id, func.count(Escala.id))
-            .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
-            .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
-            .filter(
-                or_(
-                    Escala.cooperado_id.is_(None),
-                    Usuario.ativo.is_(True)
-                )
-            )
-            .group_by(Escala.cooperado_id)
-            .all()
-        )
-
-        qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
-        qtd_sem_cadastro = int(cont_rows.get(None, 0))
-
-        contratos_set = {((e.contrato or "").strip()) for e in escalas_all if (e.contrato or "").strip()}
-        contratos_set.update({((r.nome or "").strip()) for r in restaurantes if (r.nome or "").strip()})
-        contratos_escala_opcoes = sorted(contratos_set, key=lambda s: s.lower())
-
-        escala_editor_rows = []
-        for e in sorted(escalas_all, key=_escala_sort_key):
-            coop_obj = None
-            if e.cooperado_id:
-                coop_obj = cooperados_map.get(e.cooperado_id)
-
-            nome_atual = (coop_obj.nome if coop_obj else (e.cooperado_nome or "").strip())
-            escala_editor_rows.append({
-                "id": e.id,
-                "data": e.data or "",
-                "weekday_num": _escala_weekday_num(e.data),
-                "weekday_label": _escala_weekday_label(e.data),
-                "turno": e.turno or "",
-                "horario": e.horario or "",
-                "contrato": e.contrato or "",
-                "cooperado_id": e.cooperado_id,
-                "cooperado_nome": nome_atual or "",
-                "cooperado_nome_livre": (e.cooperado_nome or "") if not coop_obj else "",
-                "restaurante_id": e.restaurante_id,
-                "cor": getattr(e, "cor", None),
-            })
-
-        escala_alertas_1h = _build_escala_alertas_1h(escalas_all, cooperados_map)
+    escala_alertas_1h = _build_escala_alertas_1h(escalas_all, cooperados_map)
 
     # =========================
-    # Gráficos (somente resumo)
+    # Gráficos
     # =========================
-    chart_data_lancamentos_coop = {"labels": [], "values": []}
-    chart_data_lancamentos_cooperados = {"labels": [], "values": []}
-    if need_resumo:
-        sums = {}
-        for l in lancamentos:
-            if not l.data:
-                continue
-            key = l.data.strftime("%Y-%m")
-            sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
+    sums = {}
+    for l in lancamentos:
+        if not l.data:
+            continue
+        key = l.data.strftime("%Y-%m")
+        sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
 
-        labels_ord = sorted(sums.keys())
+    labels_ord = sorted(sums.keys())
 
-        def _fmt_label(k: str) -> str:
-            parts = k.split("-")
-            if len(parts) == 2 and parts[0] and parts[1]:
-                year, month = parts[0], parts[1]
-                return f"{month}/{year[-2:]}"
-            return k
+    def _fmt_label(k: str) -> str:
+        parts = k.split("-")
+        if len(parts) == 2 and parts[0] and parts[1]:
+            year, month = parts[0], parts[1]
+            return f"{month}/{year[-2:]}"
+        return k
 
-        labels_fmt = [_fmt_label(k) for k in labels_ord]
-        values = [round(sums[k], 2) for k in labels_ord]
-        chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
-        chart_data_lancamentos_cooperados = {"labels": labels_fmt, "values": values}
+    labels_fmt = [_fmt_label(k) for k in labels_ord]
+    values = [round(sums[k], 2) for k in labels_ord]
+    chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
+    chart_data_lancamentos_cooperados = {"labels": labels_fmt, "values": values}
 
     # =========================
     # Admin master / principal
@@ -4180,30 +4173,38 @@ def admin_dashboard():
         chart_data_lancamentos_cooperados = {"labels": [], "values": []}
 
         if ajax_partial == "resumo":
-            cooperados_resumo = [c for c in cooperados if (not cooperado_id or c.id == cooperado_id)]
-            lanc_por_coop = defaultdict(list)
+            sums = {}
             for l in lancamentos:
-                if getattr(l, "cooperado_id", None):
-                    lanc_por_coop[l.cooperado_id].append(l)
-            rec_por_coop = defaultdict(list)
-            for r in receitas_coop:
-                if getattr(r, "cooperado_id", None):
-                    rec_por_coop[r.cooperado_id].append(r)
+                if not l.data:
+                    continue
+                key = l.data.strftime("%Y-%m")
+                sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
 
-            for coop in cooperados_resumo:
-                lancs_coop = lanc_por_coop.get(coop.id, [])
-                recs_coop = rec_por_coop.get(coop.id, [])
+            labels_ord = sorted(sums.keys())
+            labels_fmt = []
+            for k in labels_ord:
+                parts = k.split("-")
+                if len(parts) == 2 and parts[0] and parts[1]:
+                    year, month = parts[0], parts[1]
+                    labels_fmt.append(f"{month}/{year[-2:]}")
+                else:
+                    labels_fmt.append(k)
+            values = [round(sums[k], 2) for k in labels_ord]
+            chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
+            chart_data_lancamentos_cooperados = {"labels": labels_fmt, "values": values}
+
+            for coop in cooperados:
                 snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
-                prod = sum((l.valor or 0.0) for l in lancs_coop)
-                rec = sum((r.valor or 0.0) for r in recs_coop)
-                inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancs_coop)
-                sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancs_coop)
+                prod = sum((l.valor or 0.0) for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
+                rec = sum((r.valor or 0.0) for r in receitas_coop if getattr(r, "cooperado_id", None) == coop.id)
+                inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
+                sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
                 des = round(snap.get("descontado_despesa", 0.0), 2)
                 adiant = round(snap.get("descontado_adiant", 0.0), 2)
-                saldo_pendente = round(float(snap.get("saldo_devedor", 0.0) or 0.0), 2)
-                pend_programado = round(float(snap.get("a_descontar", 0.0) or 0.0), 2)
-                if prod or rec or des or adiant or saldo_pendente or pend_programado:
-                    a_receber = round(max(0.0, float(snap.get("disponivel_auto_restante", 0.0) or 0.0)), 2)
+                if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
+                    a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
+                    saldo_pendente = round(snap["saldo_devedor"], 2)
+                    pend_programado = round(snap["a_descontar"], 2)
                     resumo_coop_rows.append({
                         "id": coop.id,
                         "nome": coop.nome,
@@ -4226,10 +4227,9 @@ def admin_dashboard():
                     resumo_totais["rec"] += rec
                     resumo_totais["des"] += des
                     resumo_totais["adiant"] += adiant
-                    resumo_totais["a_receber"] += a_receber
-                    resumo_totais["saldo_pendente"] += saldo_pendente
-                    resumo_totais["pend_programado"] += pend_programado
-            resumo_coop_rows.sort(key=lambda x: (x.get("nome") or "").strip().lower())
+                    resumo_totais["a_receber"] += max(0.0, snap["disponivel_auto_restante"])
+                    resumo_totais["saldo_pendente"] += snap["saldo_devedor"]
+                    resumo_totais["pend_programado"] += snap["a_descontar"]
 
         partial_context = dict(
             tab=ajax_partial,
@@ -4505,57 +4505,43 @@ def admin_dashboard():
         "des": 0.0, "adiant": 0.0, "a_receber": 0.0, "saldo_pendente": 0.0,
         "pend_programado": 0.0
     }
-    if need_resumo:
-        cooperados_resumo = [c for c in cooperados if (not cooperado_id or c.id == cooperado_id)]
-        lanc_por_coop = defaultdict(list)
-        for l in lancamentos:
-            if getattr(l, "cooperado_id", None):
-                lanc_por_coop[l.cooperado_id].append(l)
-        rec_por_coop = defaultdict(list)
-        for r in receitas_coop:
-            if getattr(r, "cooperado_id", None):
-                rec_por_coop[r.cooperado_id].append(r)
-
-        for coop in cooperados_resumo:
-            lancs_coop = lanc_por_coop.get(coop.id, [])
-            recs_coop = rec_por_coop.get(coop.id, [])
-            snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
-            prod = sum((l.valor or 0.0) for l in lancs_coop)
-            rec = sum((r.valor or 0.0) for r in recs_coop)
-            inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancs_coop)
-            sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancs_coop)
-            des = round(snap.get("descontado_despesa", 0.0), 2)
-            adiant = round(snap.get("descontado_adiant", 0.0), 2)
-            _saldo_pendente = round(float(snap.get("saldo_devedor", 0.0) or 0.0), 2)
-            _pend_programado = round(float(snap.get("a_descontar", 0.0) or 0.0), 2)
-            if prod or rec or des or adiant or _saldo_pendente or _pend_programado:
-                _a_receber = round(max(0.0, float(snap.get("disponivel_auto_restante", 0.0) or 0.0)), 2)
-                resumo_coop_rows.append({
-                    "id": coop.id,
-                    "nome": coop.nome,
-                    "prod": round(prod,2),
-                    "inss4": round(inss4,2),
-                    "sest05": round(sest05,2),
-                    "rec": round(rec,2),
-                    "des": round(des,2),
-                    "adiant": round(adiant,2),
-                    "a_receber": _a_receber,
-                    "aReceber": _a_receber,
-                    "saldo_pendente": _saldo_pendente,
-                    "saldoPendente": _saldo_pendente,
-                    "pend_programado": _pend_programado,
-                    "pendProgramado": _pend_programado,
-                })
-                resumo_totais["prod"] += prod
-                resumo_totais["inss4"] += inss4
-                resumo_totais["sest05"] += sest05
-                resumo_totais["rec"] += rec
-                resumo_totais["des"] += des
-                resumo_totais["adiant"] += adiant
-                resumo_totais["a_receber"] += _a_receber
-                resumo_totais["saldo_pendente"] += _saldo_pendente
-                resumo_totais["pend_programado"] += _pend_programado
-        resumo_coop_rows.sort(key=lambda x: (x.get("nome") or "").strip().lower())
+    for coop in cooperados:
+        snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
+        prod = sum((l.valor or 0.0) for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
+        rec = sum((r.valor or 0.0) for r in receitas_coop if getattr(r, "cooperado_id", None) == coop.id)
+        inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
+        sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
+        des = round(snap.get("descontado_despesa", 0.0), 2)
+        adiant = round(snap.get("descontado_adiant", 0.0), 2)
+        if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
+            _a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
+            _saldo_pendente = round(snap["saldo_devedor"], 2)
+            _pend_programado = round(snap["a_descontar"], 2)
+            resumo_coop_rows.append({
+                "id": coop.id,
+                "nome": coop.nome,
+                "prod": round(prod,2),
+                "inss4": round(inss4,2),
+                "sest05": round(sest05,2),
+                "rec": round(rec,2),
+                "des": round(des,2),
+                "adiant": round(adiant,2),
+                "a_receber": _a_receber,
+                "aReceber": _a_receber,
+                "saldo_pendente": _saldo_pendente,
+                "saldoPendente": _saldo_pendente,
+                "pend_programado": _pend_programado,
+                "pendProgramado": _pend_programado,
+            })
+            resumo_totais["prod"] += prod
+            resumo_totais["inss4"] += inss4
+            resumo_totais["sest05"] += sest05
+            resumo_totais["rec"] += rec
+            resumo_totais["des"] += des
+            resumo_totais["adiant"] += adiant
+            resumo_totais["a_receber"] += max(0.0, snap["disponivel_auto_restante"])
+            resumo_totais["saldo_pendente"] += snap["saldo_devedor"]
+            resumo_totais["pend_programado"] += snap["a_descontar"]
 
     _rendered_html = render_template(
         "admin_dashboard.html",
@@ -7197,11 +7183,10 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
             status = 'a_descontar'
 
         if vencida:
-            pago_auto_periodo = money(it['pago_auto_periodo'])
             if it['eh_adiantamento']:
-                total_descontado_adiant += money(pago_auto_periodo)
+                total_descontado_adiant += money(pago_auto_total)
             else:
-                total_descontado_despesa += money(pago_auto_periodo)
+                total_descontado_despesa += money(pago_auto_total)
 
         if restante > 0:
             if vencida:
@@ -8257,11 +8242,38 @@ def admin_escala_salvar(escala_id):
 @app.get("/admin/api/escalas/alertas_1h")
 @admin_perm_required("escalas", "ver")
 def admin_api_escala_alertas_1h():
+    admin_logado = _usuario_logado()
+    if not admin_logado or (admin_logado.tipo or "").strip().lower() != "admin":
+        return jsonify({"ok": False, "message": "Não autorizado."}), 403
+
+    escalas_all = (
+        db.session.query(Escala)
+        .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
+        .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(
+            or_(
+                Escala.cooperado_id.is_(None),
+                Usuario.ativo.is_(True)
+            )
+        )
+        .order_by(Escala.id.asc())
+        .all()
+    )
+
+    cooperados = (
+        Cooperado.query
+        .join(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(Usuario.ativo.is_(True))
+        .order_by(Cooperado.nome)
+        .all()
+    )
+    cooperados_map = {c.id: c for c in cooperados}
+    alertas = _build_escala_alertas_1h(escalas_all, cooperados_map)
     return jsonify({
         "ok": True,
         "now": _brasil_now().strftime("%Y-%m-%dT%H:%M:%S"),
-        "total": 0,
-        "alertas": [],
+        "total": len(alertas),
+        "alertas": alertas,
     })
 
 
