@@ -474,7 +474,7 @@
                style="cursor:pointer;background:linear-gradient(180deg,#fffdf4 0%,#ffffff 100%);border-color:rgba(245,158,11,.18)">
             <div class="kpi-title">Ver pendências</div>
             <div class="kpi-value mono" style="font-size:1.1rem;color:var(--warning)">
-              {% set _pend_total = (saldo_devedor|default(0)) + (total_a_descontar|default(0)) %}
+              {% set _pend_total = (saldo_devedor|default(0)|float) + (total_a_descontar|default(0)|float) %}
               {% if _pend_total > 0 %}
                 R$ {{ '%.2f'|format(_pend_total) }}
               {% else %}
@@ -689,7 +689,7 @@
             <h2 class="section-title">Extrato de pendências</h2>
             <div class="item-small mt-1">Aqui mostra de onde veio cada pendência e quanto ainda falta pagar.</div>
           </div>
-          <span class="section-chip mono">R$ {{ '%.2f'|format((saldo_devedor|default(0)) + (total_a_descontar|default(0))) }}</span>
+          <span class="section-chip mono">R$ {{ '%.2f'|format((saldo_devedor|default(0)|float) + (total_a_descontar|default(0)|float)) }}</span>
         </div>
 
         <div class="list-stack">
@@ -719,7 +719,7 @@
                 <div class="item-meta mt-1">
                   Valor original: <b>R$ {{ '%.2f'|format(d.valor_total|default(0)) }}</b>
                   &nbsp;·&nbsp;
-                  Descontado automaticamente: <b>R$ {{ '%.2f'|format(d.pago_auto|default(0)) }}</b>
+                  Descontado no período: <b>R$ {{ '%.2f'|format(d.desconto_no_periodo|default(d.pago_auto_periodo|default(0))) }}</b>
                   &nbsp;·&nbsp;
                   Faltou pagar: <b>R$ {{ '%.2f'|format(d.restante|default(0)) }}</b>
                 </div>
