@@ -6988,7 +6988,10 @@ def _adiantamento_disponivel_cooperado(coop_id: int, di: date | None, df: date |
     total_bruto = sum((l.valor or 0.0) for l in producoes) + sum((r.valor or 0.0) for r in receitas)
     encargos = sum((l.valor or 0.0) * INSS_ALIQ for l in producoes) + sum((l.valor or 0.0) * SEST_ALIQ for l in producoes)
     snap = _compute_coop_debt_snapshot(coop.id, di, df)
-    descontos = sum((it['pago_manual'] + it['pago_auto']) for it in snap['itens'])
+    descontos = (
+        float(snap.get('descontado_periodo_despesa', 0.0) or 0.0)
+        + float(snap.get('descontado_periodo_adiant', 0.0) or 0.0)
+    )
     pendente_analise = (
         db.session.query(func.coalesce(func.sum(SolicitacaoAdiantamento.valor_solicitado), 0.0))
         .filter(
@@ -7208,6 +7211,7 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
             'pago_manual': float(money(pago_manual)),
             'pago_auto': float(money(pago_auto_total)),
             'pago_auto_periodo': float(money(pago_auto_periodo)),
+            'desconto_no_periodo': float(money(pago_auto_periodo)),
             'pago_total': float(money(pago_total)),
             'restante': float(money(restante)),
             'eh_adiantamento': it['eh_adiantamento'],
@@ -8708,12 +8712,15 @@ def portal_cooperado():
 
     debt_snapshot = _compute_coop_debt_snapshot(coop.id, di, df)
 
-    # só o que venceu entra automaticamente no período; o futuro fica em "a descontar"
-    total_descontos = sum((it['pago_manual'] + it['pago_auto']) for it in debt_snapshot['itens'])
+    # desconta do líquido somente o que foi abatido no período filtrado
+    total_descontos = (
+        float(debt_snapshot.get('descontado_periodo_despesa', 0.0) or 0.0)
+        + float(debt_snapshot.get('descontado_periodo_adiant', 0.0) or 0.0)
+    )
     total_liquido = max(0.0, total_bruto - encargos_valor - total_descontos)
-    saldo_devedor = debt_snapshot['saldo_devedor']
-    total_a_descontar = debt_snapshot['a_descontar']
-    despesas_detalhadas = debt_snapshot['itens']
+    saldo_devedor = float(debt_snapshot.get('saldo_devedor', 0.0) or 0.0)
+    total_a_descontar = float(debt_snapshot.get('a_descontar', 0.0) or 0.0)
+    despesas_detalhadas = debt_snapshot.get('itens', [])
     adiantamento_disponivel = _adiantamento_disponivel_cooperado(coop.id, di, df)
 
 
