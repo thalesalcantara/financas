@@ -1737,7 +1737,7 @@ def admin_perm_required(aba: str, acao: str = "ver"):
                 flash("Você não tem permissão para essa ação.", "danger")
 
                 if getattr(u, "is_master", False):
-                    return redirect(url_for("admin_dashboard", tab="lancamentos"))
+                    return redirect(url_for("admin_dashboard", tab="resumo"))
 
                 abas_liberadas = [
                     nome_aba
@@ -1746,7 +1746,7 @@ def admin_perm_required(aba: str, acao: str = "ver"):
                 ]
 
                 if abas_liberadas:
-                    return redirect(url_for("admin_dashboard", tab=("resumo" if "resumo" in abas_liberadas else abas_liberadas[0])))
+                    return redirect(url_for("admin_dashboard", tab=abas_liberadas[0]))
 
                 session.clear()
                 flash("Seu usuário admin está sem permissões liberadas.", "warning")
@@ -3581,8 +3581,6 @@ def admin_sistemas_abrir(sistema):
 def admin_dashboard():
     args = request.args
     active_tab = (args.get("tab") or "resumo").strip().lower()
-    ajax_partial = (args.get("ajax_partial") or "").strip().lower()
-    shell_mode = request.method == "GET" and not ajax_partial and (args.get("render_full") != "1")
 
     admin_logado = _usuario_logado()
     if not admin_logado:
@@ -3596,7 +3594,7 @@ def admin_dashboard():
         return redirect(url_for("login"))
 
     if active_tab not in ADMIN_ABAS:
-        active_tab = "resumo"
+        active_tab = "lancamentos"
 
     # monta o mapa de permissões logo no início
     if getattr(admin_logado, "is_master", False):
@@ -3626,30 +3624,12 @@ def admin_dashboard():
         # config sempre restrita ao master
         if active_tab == "config":
             flash("A aba de configurações é restrita ao administrador master.", "danger")
-            return redirect(url_for("admin_dashboard", tab=("resumo" if "resumo" in abas_liberadas else abas_liberadas[0])))
+            return redirect(url_for("admin_dashboard", tab=abas_liberadas[0]))
 
         # se tentar abrir aba sem permissão, redireciona
         if active_tab not in abas_liberadas:
             flash("Você não tem permissão para acessar essa aba.", "warning")
-            return redirect(url_for("admin_dashboard", tab=("resumo" if "resumo" in abas_liberadas else abas_liberadas[0])))
-
-    if shell_mode:
-        return render_template(
-            "admin_dashboard.html",
-            shell_mode=True,
-            tab=active_tab,
-            admin_perms=admin_perms,
-            admin_is_master=is_admin_master(),
-        )
-
-    if shell_mode:
-        return render_template(
-            "admin_dashboard.html",
-            shell_mode=True,
-            tab=active_tab,
-            admin_perms=admin_perms,
-            admin_is_master=is_admin_master(),
-        )
+            return redirect(url_for("admin_dashboard", tab=abas_liberadas[0]))
 
     def _pick_date(*keys):
         for k in keys:
@@ -3867,120 +3847,6 @@ def admin_dashboard():
     taxa_admin_rows, taxa_admin_totais = _build_taxa_admin_rows(receitas)
     juros_arrecadados_total = round(sum((r['valor_multa'] + r['valor_juros']) for r in taxa_admin_rows if r['status'] == 'pago'), 2)
     cooperados_map = {c.id: c for c in cooperados}
-
-    ajax_financeiros = {"resumo", "lancamentos", "receitas", "despesas", "coop_receitas", "coop_despesas", "beneficios"}
-    if ajax_partial in ajax_financeiros:
-        resumo_coop_rows = []
-        resumo_totais = {
-            "prod": 0.0, "inss4": 0.0, "sest05": 0.0, "rec": 0.0,
-            "des": 0.0, "adiant": 0.0, "a_receber": 0.0, "saldo_pendente": 0.0,
-            "pend_programado": 0.0
-        }
-        chart_data_lancamentos_coop = {"labels": [], "values": []}
-        chart_data_lancamentos_cooperados = {"labels": [], "values": []}
-
-        if ajax_partial == "resumo":
-            sums = {}
-            for l in lancamentos:
-                if not l.data:
-                    continue
-                key = l.data.strftime("%Y-%m")
-                sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
-
-            labels_ord = sorted(sums.keys())
-            labels_fmt = []
-            for k in labels_ord:
-                parts = k.split("-")
-                if len(parts) == 2 and parts[0] and parts[1]:
-                    year, month = parts[0], parts[1]
-                    labels_fmt.append(f"{month}/{year[-2:]}")
-                else:
-                    labels_fmt.append(k)
-            values = [round(sums[k], 2) for k in labels_ord]
-            chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
-            chart_data_lancamentos_cooperados = {"labels": labels_fmt, "values": values}
-
-            for coop in cooperados:
-                snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
-                prod = sum((l.valor or 0.0) for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-                rec = sum((r.valor or 0.0) for r in receitas_coop if getattr(r, "cooperado_id", None) == coop.id)
-                inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-                sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-                des = round(snap.get("descontado_periodo_despesa", 0.0), 2)
-                adiant = round(snap.get("descontado_periodo_adiant", 0.0), 2)
-                if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
-                    a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
-                    saldo_pendente = round(snap["saldo_devedor"], 2)
-                    pend_programado = round(snap["a_descontar"], 2)
-                    resumo_coop_rows.append({
-                        "id": coop.id,
-                        "nome": coop.nome,
-                        "prod": round(prod,2),
-                        "inss4": round(inss4,2),
-                        "sest05": round(sest05,2),
-                        "rec": round(rec,2),
-                        "des": round(des,2),
-                        "adiant": round(adiant,2),
-                        "a_receber": a_receber,
-                        "aReceber": a_receber,
-                        "saldo_pendente": saldo_pendente,
-                        "saldoPendente": saldo_pendente,
-                        "pend_programado": pend_programado,
-                        "pendProgramado": pend_programado,
-                    })
-                    resumo_totais["prod"] += prod
-                    resumo_totais["inss4"] += inss4
-                    resumo_totais["sest05"] += sest05
-                    resumo_totais["rec"] += rec
-                    resumo_totais["des"] += des
-                    resumo_totais["adiant"] += adiant
-                    resumo_totais["a_receber"] += max(0.0, snap["disponivel_auto_restante"])
-                    resumo_totais["saldo_pendente"] += snap["saldo_devedor"]
-                    resumo_totais["pend_programado"] += snap["a_descontar"]
-
-        partial_context = dict(
-            tab=ajax_partial,
-            fast_mode=False,
-            total_producoes=total_producoes,
-            total_inss=total_inss,
-            total_sest=total_sest,
-            total_encargos=total_encargos,
-            total_receitas=total_receitas,
-            total_despesas=total_despesas,
-            total_receitas_coop=total_receitas_coop,
-            total_despesas_coop=total_despesas_coop,
-            total_adiantamentos_coop=total_adiantamentos_coop,
-            salario_minimo=(cfg.salario_minimo or 0.0) if cfg else 0.0,
-            bloquear_adiantamento=bool(getattr(cfg, "bloquear_adiantamento", False)) if cfg else False,
-            lancamentos=lancamentos,
-            receitas=receitas,
-            despesas=despesas,
-            receitas_coop=receitas_coop,
-            despesas_coop=despesas_coop,
-            cooperados=cooperados,
-            restaurantes=restaurantes,
-            beneficios_view=beneficios_view,
-            historico_beneficios=historico_beneficios,
-            admin_perms=admin_perms,
-            admin_is_master=is_admin_master(),
-            taxa_admin_rows=taxa_admin_rows,
-            taxa_admin_totais=taxa_admin_totais,
-            juros_arrecadados_total=juros_arrecadados_total,
-            resumo_coop_rows=resumo_coop_rows,
-            resumo_totais=resumo_totais,
-            chart_data_lancamentos_coop=chart_data_lancamentos_coop,
-            chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
-            despesa_snapshot_map=despesa_snapshot_map if 'despesa_snapshot_map' in locals() else {},
-            solicitacoes_adiantamento=solicitacoes_adiantamento if 'solicitacoes_adiantamento' in locals() else [],
-            adiantamento_status_map=adiantamento_status_map if 'adiantamento_status_map' in locals() else {},
-            status_adiantamento_label=_status_adiantamento_label,
-            status_adiantamento_badge=_status_adiantamento_badge,
-            competencia_humana=_competencia_humana,
-            current_date=date.today(),
-            data_limite=date(date.today().year, 12, 31),
-            filtro_periodo_aplicado=filtro_periodo_aplicado,
-        )
-        return _render_admin_dashboard_partial(ajax_partial, **partial_context)
 
     # =========================
     # Documentos / status
@@ -4761,7 +4627,7 @@ def admin_dashboard():
 @admin_required
 def filtrar_lancamentos():
     qs = request.query_string.decode("utf-8")
-    base = url_for("admin_dashboard", tab="lancamentos")
+    base = url_for("admin_dashboard", tab="resumo")
     joiner = "&" if qs else ""
     return redirect(f"{base}{joiner}{qs}")
 
