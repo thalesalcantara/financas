@@ -3580,7 +3580,7 @@ def admin_sistemas_abrir(sistema):
 @admin_required
 def admin_dashboard():
     args = request.args
-    active_tab = (args.get("tab") or "lancamentos").strip().lower()
+    active_tab = (args.get("tab") or "resumo").strip().lower()
 
     admin_logado = _usuario_logado()
     if not admin_logado:
