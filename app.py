@@ -8627,7 +8627,7 @@ def portal_cooperado():
     except Exception:
         coop.usuario = ""
 
-    # ---------- FILTRO POR DATA (padrão = HOJE) ----------
+    # ---------- FILTRO POR DATA (padrão = semana atual seg-dom) ----------
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
 
@@ -8637,8 +8637,8 @@ def portal_cooperado():
         di = df
     elif not di and not df:
         hoje = date.today()
-        di = hoje - timedelta(days=hoje.weekday())   # segunda
-        df = di + timedelta(days=6)                  # domingo
+        di = hoje - timedelta(days=hoje.weekday())
+        df = di + timedelta(days=6)
 
     def in_range(qs, col):
         return qs.filter(col >= di, col <= df)
@@ -8646,21 +8646,26 @@ def portal_cooperado():
     # =========================
     # Produções (Lançamentos)
     # =========================
-    ql = in_range(Lancamento.query.filter_by(cooperado_id=coop.id), Lancamento.data)
-    producoes = ql.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
+    producoes = (
+        in_range(
+            Lancamento.query.options(selectinload(Lancamento.restaurante)).filter_by(cooperado_id=coop.id),
+            Lancamento.data,
+        )
+        .order_by(Lancamento.data.desc(), Lancamento.id.desc())
+        .all()
+    )
 
     ids = [l.id for l in producoes]
     minhas = {}
-
     if ids:
         rows = (
             db.session.query(
                 AvaliacaoRestaurante.lancamento_id,
-                AvaliacaoRestaurante.estrelas_geral
+                AvaliacaoRestaurante.estrelas_geral,
             )
             .filter(
                 AvaliacaoRestaurante.lancamento_id.in_(ids),
-                AvaliacaoRestaurante.cooperado_id == coop.id
+                AvaliacaoRestaurante.cooperado_id == coop.id,
             )
             .all()
         )
@@ -8672,11 +8677,16 @@ def portal_cooperado():
     # =========================
     # Receitas / Despesas
     # =========================
-    qr = in_range(ReceitaCooperado.query.filter_by(cooperado_id=coop.id), ReceitaCooperado.data)
-    receitas_coop = qr.order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc()).all()
+    receitas_coop = (
+        in_range(
+            ReceitaCooperado.query.filter_by(cooperado_id=coop.id),
+            ReceitaCooperado.data,
+        )
+        .order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc())
+        .all()
+    )
 
     qd = DespesaCooperado.query.filter_by(cooperado_id=coop.id)
-
     if di and df:
         qd = qd.filter(
             DespesaCooperado.data_inicio <= df,
@@ -8689,7 +8699,7 @@ def portal_cooperado():
 
     despesas_coop = qd.order_by(
         DespesaCooperado.data_fim.desc().nullslast(),
-        DespesaCooperado.id.desc()
+        DespesaCooperado.id.desc(),
     ).all()
 
     solicitacoes_adiantamento = (
@@ -8706,15 +8716,11 @@ def portal_cooperado():
         sum((l.valor or 0.0) for l in producoes)
         + sum((r.valor or 0.0) for r in receitas_coop)
     )
-
     inss_valor = sum((l.valor or 0.0) * 0.04 for l in producoes)
     sest_valor = sum((l.valor or 0.0) * 0.005 for l in producoes)
-
     encargos_valor = inss_valor + sest_valor
 
     debt_snapshot = _compute_coop_debt_snapshot(coop.id, di, df)
-
-    # desconta do líquido somente o que foi abatido no período filtrado
     total_descontos = (
         float(debt_snapshot.get('descontado_periodo_despesa', 0.0) or 0.0)
         + float(debt_snapshot.get('descontado_periodo_adiant', 0.0) or 0.0)
@@ -8725,34 +8731,21 @@ def portal_cooperado():
     despesas_detalhadas = debt_snapshot.get('itens', [])
     adiantamento_disponivel = _adiantamento_disponivel_cooperado(coop.id, di, df)
 
-
-       # =====================================================
-    # MÉTRICAS DA VIDA (NÃO DEPENDE DO FILTRO DE DATA)
-    # =====================================================
-
+    # =========================
+    # Métricas da vida
+    # =========================
     total_entregas_vida = (
         db.session.query(func.count(Lancamento.id))
         .filter(Lancamento.cooperado_id == coop.id)
         .scalar()
         or 0
     )
-
     nota_vida = (
         db.session.query(func.avg(AvaliacaoCooperado.estrelas_geral))
         .filter(AvaliacaoCooperado.cooperado_id == coop.id)
         .scalar()
     )
-
     nota_vida = float(nota_vida or 5.0)
-
-# =====================================================
-# TOTAL DE ENTREGAS DA VIDA (SEM FILTRO DE DATA)
-# =====================================================
-
-    total_entregas_vida = db.session.query(func.count(Lancamento.id))\
-        .filter(Lancamento.cooperado_id == coop.id)\
-        .scalar() or 0
-
 
     # =========================
     # Config / Complemento
@@ -8783,12 +8776,14 @@ def portal_cooperado():
     }
 
     # ---------- ESCALA (dedupe + ordenação cronológica robusta) ----------
-    raw_escala = (Escala.query
-                 .filter_by(cooperado_id=coop.id)
-                 .order_by(Escala.id.asc())
-                 .all())
+    raw_escala = (
+        Escala.query.filter_by(cooperado_id=coop.id)
+        .order_by(Escala.id.asc())
+        .all()
+    )
 
     import unicodedata as _u, re as _re
+
     def _norm_c(s: str) -> str:
         s = _u.normalize("NFD", str(s or "").lower())
         s = "".join(ch for ch in s if _u.category(ch) != "Mn")
@@ -8813,9 +8808,9 @@ def portal_cooperado():
     def _mins(h):
         m = _re.search(r'(\d{1,2}):(\d{2})', str(h or ''))
         if not m:
-            return 24*60 + 59
+            return 24 * 60 + 59
         hh, mm = map(int, m.groups())
-        return hh*60 + mm
+        return hh * 60 + mm
 
     def _bucket_idx(turno, horario):
         b = (_turno_bucket(turno, horario) or "").lower()
@@ -8824,7 +8819,7 @@ def portal_cooperado():
         if "noite" in b:
             return 2
         mins = _mins(horario)
-        return 2 if (mins >= 17*60 or mins <= 6*60) else 1
+        return 2 if (mins >= 17 * 60 or mins <= 6 * 60) else 1
 
     best = {}
     for e in raw_escala:
@@ -8846,15 +8841,14 @@ def portal_cooperado():
         dt = _to_date_from_str(e.data)
         if dt is None:
             status = 'unknown'
+        elif dt < today:
+            status = 'past'
+        elif dt == today:
+            status = 'today'
+        elif dt == today + timedelta(days=1):
+            status = 'tomorrow'
         else:
-            if dt < today:
-                status = 'past'
-            elif dt == today:
-                status = 'today'
-            elif dt == today + timedelta(days=1):
-                status = 'tomorrow'
-            else:
-                status = 'future'
+            status = 'future'
         e.status = status
         e.status_color = (
             '#ef4444' if status == 'past' else
@@ -8863,9 +8857,44 @@ def portal_cooperado():
             'transparent'
         )
 
-    minha_escala_json = []
-    for e in minha_escala:
-        minha_escala_json.append({
+    minha_escala_json = [
+        {
+            "id": e.id,
+            "data": e.data or "",
+            "turno": e.turno or "",
+            "horario": e.horario or "",
+            "contrato": e.contrato or "",
+            "weekday": _weekday_from_data_str(e.data),
+            "turno_bucket": _turno_bucket(e.turno, e.horario),
+        }
+        for e in minha_escala
+    ]
+
+    # ---------- Trocas / Cooperados / Escalas (sem N+1) ----------
+    coops = (
+        Cooperado.query
+        .filter(Cooperado.id != coop.id)
+        .order_by(Cooperado.nome.asc())
+        .all()
+    )
+    cooperados_json = [
+        {"id": c.id, "nome": c.nome, "foto_url": (c.foto_url or "")}
+        for c in coops
+    ]
+
+    coop_ids = [c.id for c in coops]
+    escalas_outros = []
+    if coop_ids:
+        escalas_outros = (
+            Escala.query
+            .filter(Escala.cooperado_id.in_(coop_ids))
+            .order_by(Escala.cooperado_id.asc(), Escala.data.asc(), Escala.id.asc())
+            .all()
+        )
+
+    cooperados_escalas_map = {str(c.id): [] for c in coops}
+    for e in escalas_outros:
+        cooperados_escalas_map.setdefault(str(e.cooperado_id), []).append({
             "id": e.id,
             "data": e.data or "",
             "turno": e.turno or "",
@@ -8875,48 +8904,56 @@ def portal_cooperado():
             "turno_bucket": _turno_bucket(e.turno, e.horario),
         })
 
-    # ---------- Trocas ----------
-    coops = (Cooperado.query
-             .filter(Cooperado.id != coop.id)
-             .order_by(Cooperado.nome.asc())
-             .all())
-    cooperados_json = [
-        {"id": c.id, "nome": c.nome, "foto_url": (c.foto_url or "")}
-        for c in coops
-    ]
-    cooperados_escalas_map = {}
-    for c in coops:
-        escalas_c = (Escala.query.filter_by(cooperado_id=c.id).order_by(Escala.data.asc(), Escala.id.asc()).all())
-        cooperados_escalas_map[str(c.id)] = [
-            {
-                "id": e.id,
-                "data": e.data or "",
-                "turno": e.turno or "",
-                "horario": e.horario or "",
-                "contrato": e.contrato or "",
-                "weekday": _weekday_from_data_str(e.data),
-                "turno_bucket": _turno_bucket(e.turno, e.horario),
-            }
-            for e in escalas_c
-        ]
-
     def _escala_desc(e: Escala | None) -> str:
         return _escala_label(e)
 
-    rx = (TrocaSolicitacao.query
-          .filter(TrocaSolicitacao.destino_id == coop.id)
-          .order_by(TrocaSolicitacao.id.desc())
-          .all())
+    rx = (
+        TrocaSolicitacao.query
+        .filter(TrocaSolicitacao.destino_id == coop.id)
+        .order_by(TrocaSolicitacao.id.desc())
+        .all()
+    )
+    ex = (
+        TrocaSolicitacao.query
+        .filter(TrocaSolicitacao.solicitante_id == coop.id)
+        .order_by(TrocaSolicitacao.id.desc())
+        .all()
+    )
+
+    troca_coop_ids = set()
+    troca_escala_ids = set()
+    for t in rx:
+        if t.solicitante_id:
+            troca_coop_ids.add(t.solicitante_id)
+        if t.origem_escala_id:
+            troca_escala_ids.add(t.origem_escala_id)
+    for t in ex:
+        if t.destino_id:
+            troca_coop_ids.add(t.destino_id)
+        if t.origem_escala_id:
+            troca_escala_ids.add(t.origem_escala_id)
+
+    troca_coops_map = {}
+    if troca_coop_ids:
+        troca_coops_map = {
+            c.id: c
+            for c in Cooperado.query.filter(Cooperado.id.in_(list(troca_coop_ids))).all()
+        }
+
+    troca_escalas_map = {}
+    if troca_escala_ids:
+        troca_escalas_map = {
+            e.id: e
+            for e in Escala.query.filter(Escala.id.in_(list(troca_escala_ids))).all()
+        }
 
     trocas_recebidas_pendentes = []
     trocas_recebidas_historico = []
     for t in rx:
-        solicitante = Cooperado.query.get(t.solicitante_id)
-        orig = Escala.query.get(t.origem_escala_id)
-
+        solicitante = troca_coops_map.get(t.solicitante_id)
+        orig = troca_escalas_map.get(t.origem_escala_id)
         mensagem_limpa = _strip_afetacao_blob(t.mensagem)
         linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
-
         item = {
             "id": t.id,
             "status": t.status,
@@ -8928,20 +8965,15 @@ def portal_cooperado():
             "origem_desc": _escala_desc(orig),
             "linhas_afetadas": linhas_afetadas,
             "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
+            "origem_turno": (orig.turno if orig else None),
             "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
         }
-
         (trocas_recebidas_pendentes if t.status == "pendente" else trocas_recebidas_historico).append(item)
-
-    ex = (TrocaSolicitacao.query
-          .filter(TrocaSolicitacao.solicitante_id == coop.id)
-          .order_by(TrocaSolicitacao.id.desc())
-          .all())
 
     trocas_enviadas = []
     for t in ex:
-        destino = Cooperado.query.get(t.destino_id)
-        orig = Escala.query.get(t.origem_escala_id)
+        destino = troca_coops_map.get(t.destino_id)
+        orig = troca_escalas_map.get(t.origem_escala_id)
         mensagem_limpa = _strip_afetacao_blob(t.mensagem)
         linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
         trocas_enviadas.append({
@@ -8956,8 +8988,6 @@ def portal_cooperado():
             "linhas_afetadas": linhas_afetadas,
         })
 
-
-    # return TEM que ficar aqui (fora do for)
     return render_template(
         "painel_cooperado.html",
         cooperado=coop,
@@ -8981,8 +9011,6 @@ def portal_cooperado():
         trocas_recebidas_pendentes=trocas_recebidas_pendentes,
         trocas_recebidas_historico=trocas_recebidas_historico,
         trocas_enviadas=trocas_enviadas,
-        
-        # MÉTRICAS DA VIDA
         nota_vida=nota_vida,
         total_entregas_vida=total_entregas_vida,
         data_inicio=di,
