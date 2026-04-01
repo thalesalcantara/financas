@@ -1737,7 +1737,7 @@ def admin_perm_required(aba: str, acao: str = "ver"):
                 flash("Você não tem permissão para essa ação.", "danger")
 
                 if getattr(u, "is_master", False):
-                    return redirect(url_for("admin_dashboard", tab="lancamentos"))
+                    return redirect(url_for("admin_dashboard", tab="resumo"))
 
                 abas_liberadas = [
                     nome_aba
@@ -1746,7 +1746,8 @@ def admin_perm_required(aba: str, acao: str = "ver"):
                 ]
 
                 if abas_liberadas:
-                    return redirect(url_for("admin_dashboard", tab=abas_liberadas[0]))
+                    aba_preferida = "resumo" if "resumo" in abas_liberadas else abas_liberadas[0]
+                    return redirect(url_for("admin_dashboard", tab=aba_preferida))
 
                 session.clear()
                 flash("Seu usuário admin está sem permissões liberadas.", "warning")
@@ -3155,7 +3156,7 @@ def index():
     if not u:
         return redirect(url_for("login"))
     if u.tipo == "admin":
-        return redirect(url_for("admin_dashboard"))
+        return redirect(url_for("admin_dashboard", tab="resumo"))
     if u.tipo == "cooperado":
         return redirect(url_for("portal_cooperado"))
     if u.tipo == "restaurante":
@@ -3201,7 +3202,7 @@ def login():
             session["user_tipo"] = u.tipo
 
             if u.tipo == "admin":
-                return redirect(url_for("admin_dashboard"))
+                return redirect(url_for("admin_dashboard", tab="resumo"))
             elif u.tipo == "cooperado":
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
@@ -3594,7 +3595,7 @@ def admin_dashboard():
         return redirect(url_for("login"))
 
     if active_tab not in ADMIN_ABAS:
-        active_tab = "lancamentos"
+        active_tab = "resumo"
 
     # monta o mapa de permissões logo no início
     if getattr(admin_logado, "is_master", False):
@@ -3615,6 +3616,7 @@ def admin_dashboard():
             for aba in ADMIN_ABAS.keys()
             if admin_perms.get(aba, {}).get("ver", False)
         ]
+        aba_preferida = "resumo" if "resumo" in abas_liberadas else abas_liberadas[0] if abas_liberadas else "resumo"
 
         if not abas_liberadas:
             session.clear()
@@ -3624,12 +3626,12 @@ def admin_dashboard():
         # config sempre restrita ao master
         if active_tab == "config":
             flash("A aba de configurações é restrita ao administrador master.", "danger")
-            return redirect(url_for("admin_dashboard", tab=abas_liberadas[0]))
+            return redirect(url_for("admin_dashboard", tab=aba_preferida))
 
         # se tentar abrir aba sem permissão, redireciona
         if active_tab not in abas_liberadas:
             flash("Você não tem permissão para acessar essa aba.", "warning")
-            return redirect(url_for("admin_dashboard", tab=abas_liberadas[0]))
+            return redirect(url_for("admin_dashboard", tab=aba_preferida))
 
     def _pick_date(*keys):
         for k in keys:
