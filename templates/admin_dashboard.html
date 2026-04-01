@@ -7120,52 +7120,52 @@ document.addEventListener('DOMContentLoaded', function(){ const cAll=document.ge
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   function getActiveTabName() {
-    const activeLink = document.querySelector('[data-bs-toggle="tab"].active[href^="#"], [data-bs-toggle="tab"].active[data-bs-target^="#"]');
-    if (!activeLink) {
-      const u = new URL(window.location.href);
-      return u.searchParams.get('tab') || 'resumo';
+    const activePane = document.querySelector('.tab-pane.active.show[id]');
+    if (activePane && activePane.id) return activePane.id;
+    const activeLink = document.querySelector('[data-bs-toggle="tab"].active[href^="#"]');
+    if (activeLink) {
+      const href = activeLink.getAttribute('href') || '';
+      if (href.startsWith('#')) return href.slice(1).trim();
     }
-    const raw = activeLink.getAttribute('href') || activeLink.getAttribute('data-bs-target') || '';
-    return raw.replace('#', '').trim() || 'resumo';
+    const url = new URL(window.location.href);
+    return (url.searchParams.get('tab') || 'resumo').trim() || 'resumo';
   }
 
-  function syncUrlTab(tab) {
-    const u = new URL(window.location.href);
-    u.searchParams.set('tab', tab || 'resumo');
-    history.replaceState({}, '', u.toString());
+  function syncUrlWithTab(tabName) {
+    if (!tabName) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tabName);
+    history.replaceState({}, '', url.toString());
   }
 
-  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(function (link) {
+  function ensureTabInput(form, tabName) {
+    if (!form || !tabName) return;
+    let input = form.querySelector('input[name="tab"]');
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'tab';
+      form.appendChild(input);
+    }
+    input.value = tabName;
+  }
+
+  document.querySelectorAll('[data-bs-toggle="tab"][href^="#"]').forEach(function (link) {
     link.addEventListener('shown.bs.tab', function (e) {
-      const raw = e.target.getAttribute('href') || e.target.getAttribute('data-bs-target') || '';
-      const tab = raw.replace('#', '').trim() || 'resumo';
-      syncUrlTab(tab);
+      const href = e.target.getAttribute('href') || '';
+      const tabName = href.startsWith('#') ? href.slice(1).trim() : '';
+      if (tabName) syncUrlWithTab(tabName);
     });
   });
 
   document.querySelectorAll('form').forEach(function (form) {
     form.addEventListener('submit', function () {
-      const method = (form.getAttribute('method') || 'get').toLowerCase();
-      const action = form.getAttribute('action') || '';
-      const isAdminTarget = !action || action.includes('/admin') || action.includes('admin_dashboard');
-      if (!isAdminTarget) return;
-
-      let hidden = form.querySelector('input[name="tab"]');
-      if (!hidden) {
-        hidden = document.createElement('input');
-        hidden.type = 'hidden';
-        hidden.name = 'tab';
-        form.appendChild(hidden);
-      }
-      hidden.value = getActiveTabName();
-
-      if (method === 'get') {
-        syncUrlTab(hidden.value);
-      }
-    }, true);
+      const tabName = getActiveTabName();
+      ensureTabInput(form, tabName || 'resumo');
+    });
   });
 
-  syncUrlTab(getActiveTabName());
+  syncUrlWithTab(getActiveTabName());
 });
 </script>
 
