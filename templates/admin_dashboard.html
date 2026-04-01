@@ -7116,6 +7116,59 @@ document.addEventListener('DOMContentLoaded', function(){
 document.addEventListener('DOMContentLoaded', function(){ const cAll=document.getElementById('checkAllDespesas'); cAll?.addEventListener('change', ()=> document.querySelectorAll('#tblDespesasCoop tbody input[type="checkbox"]').forEach(ch=> ch.checked=cAll.checked)); const el=document.getElementById('modalAbatimentoDespesaCoop'); el?.addEventListener('show.bs.modal', (ev)=>{ const btn=ev.relatedTarget; const form=el.querySelector('form'); if(form && btn?.dataset?.url) form.action=btn.dataset.url; });});
 </script>
 
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  function getActiveTabName() {
+    const activePane = document.querySelector('.tab-pane.active.show[id]');
+    if (activePane && activePane.id) return activePane.id;
+    const activeLink = document.querySelector('[data-bs-toggle="tab"].active[href^="#"]');
+    if (activeLink) {
+      const href = activeLink.getAttribute('href') || '';
+      if (href.startsWith('#')) return href.slice(1).trim();
+    }
+    const url = new URL(window.location.href);
+    return (url.searchParams.get('tab') || 'resumo').trim() || 'resumo';
+  }
+
+  function syncUrlWithTab(tabName) {
+    if (!tabName) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tabName);
+    history.replaceState({}, '', url.toString());
+  }
+
+  function ensureTabInput(form, tabName) {
+    if (!form || !tabName) return;
+    let input = form.querySelector('input[name="tab"]');
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'tab';
+      form.appendChild(input);
+    }
+    input.value = tabName;
+  }
+
+  document.querySelectorAll('[data-bs-toggle="tab"][href^="#"]').forEach(function (link) {
+    link.addEventListener('shown.bs.tab', function (e) {
+      const href = e.target.getAttribute('href') || '';
+      const tabName = href.startsWith('#') ? href.slice(1).trim() : '';
+      if (tabName) syncUrlWithTab(tabName);
+    });
+  });
+
+  document.querySelectorAll('form').forEach(function (form) {
+    form.addEventListener('submit', function () {
+      const tabName = getActiveTabName();
+      ensureTabInput(form, tabName || 'resumo');
+    });
+  });
+
+  syncUrlWithTab(getActiveTabName());
+});
+</script>
+
 </body>
 </html>
 
