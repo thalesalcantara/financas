@@ -1943,6 +1943,9 @@
                 <td class="lanc-col-coop">{{ l.cooperado.nome }}</td>
                 <td class="lanc-col-desc">{{ l.descricao or "—" }}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(l.valor) }}</td>
+                <td class="text-nowrap">
+                  {% if r.eh_farmacia %}<span class="badge bg-primary">Farmácia</span>{% else %}<span class="badge bg-light text-dark">Normal</span>{% endif %}
+                </td>
                 <td class="text-center">
                   <span class="badge bg-soft-count">{{ l.qtd_entregas if l.qtd_entregas is not none else '—' }}</span>
                 </td>
@@ -3961,6 +3964,14 @@
         </div>
 
         <div class="col-md-2">
+          <label class="form-label d-block">Tipo</label>
+          <div class="form-check form-switch mt-2">
+            <input class="form-check-input" type="checkbox" role="switch" id="novoRestEhFarmacia" name="eh_farmacia" value="1">
+            <label class="form-check-label" for="novoRestEhFarmacia">É farmácia</label>
+          </div>
+        </div>
+
+        <div class="col-md-2">
           <label class="form-label">Logo (opcional)</label>
           <input type="file" class="form-control form-control-sm" name="foto" id="restFoto" accept="image/*">
           <div class="d-flex align-items-center gap-2 mt-2">
@@ -4004,12 +4015,13 @@
               <th style="width:140px;">Taxa adm.</th>
               <th style="width:130px;">Data base</th>
               <th style="width:120px;">Status</th>
+              <th style="width:120px;">Tipo</th>
               <th class="text-center" style="width:200px;">Ações</th>
             </tr>
           </thead>
           <tbody id="tbodyRestaurantes">
             {% for r in restaurantes %}
-              <tr data-nome="{{ r.nome|lower }}" data-user="{{ r.usuario_ref.usuario|lower }}" data-periodo="{{ r.periodo|lower }}">
+              <tr data-nome="{{ r.nome|lower }}" data-user="{{ r.usuario_ref.usuario|lower }}" data-periodo="{{ r.periodo|lower }}" data-tipo="{{ 'farmacia' if r.eh_farmacia else 'estabelecimento' }}">
                 <td class="text-center">
                   <img src="{{ r.foto_url or url_for('static', filename='img/default.png') }}"
                        class="avatar border" alt="{{ r.nome }}"
@@ -4036,6 +4048,7 @@
                     {% if can_restaurantes_editar %}<button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalEditRestaurante"
                             data-id="{{ r.id }}" data-nome="{{ r.nome }}" data-usuario="{{ r.usuario_ref.usuario }}" data-periodo="{{ r.periodo }}" data-taxa-admin-valor="{{ '%.2f'|format(r.taxa_admin_valor|default(0)) }}" data-taxa-admin-data-base="{{ r.taxa_admin_data_base.strftime('%Y-%m-%d') if r.taxa_admin_data_base else '' }}" data-taxa-admin-multa="{{ '%.2f'|format(r.taxa_admin_multa_percentual|default(2)) }}" data-taxa-admin-juros-dia="{{ '%.2f'|format(r.taxa_admin_juros_dia_percentual|default(0.03)) }}"
                             data-ativo="{{ '1' if ((r.usuario_ref.ativo if (r.usuario_ref is defined and r.usuario_ref and r.usuario_ref.ativo is not none) else r.ativo)|default(true)) else '0' }}"
+                            data-eh-farmacia="{{ '1' if r.eh_farmacia else '0' }}"
                             data-url="{{ url_for('edit_restaurante', id=r.id) }}" title="Editar">
                       <i class="bi bi-pencil"></i>
                     </button>
@@ -5862,6 +5875,13 @@
           <div class="col-md-6"><label class="form-label">Multa (%)</label><input type="number" step="0.01" class="form-control" name="taxa_admin_multa_percentual"></div>
           <div class="col-md-6"><label class="form-label">Juros ao dia (%)</label><input type="number" step="0.01" class="form-control" name="taxa_admin_juros_dia_percentual"></div>
           <div class="col-md-6"><label class="form-label">Status</label><select class="form-select" name="ativo" id="editRestAtivo"><option value="1">Ativo</option><option value="0">Inativo</option></select></div>
+          <div class="col-md-6">
+            <label class="form-label d-block">Tipo</label>
+            <div class="form-check form-switch mt-2">
+              <input class="form-check-input" type="checkbox" role="switch" id="editRestEhFarmacia" name="eh_farmacia" value="1">
+              <label class="form-check-label" for="editRestEhFarmacia">É farmácia</label>
+            </div>
+          </div>
           <div class="col-md-6"><label class="form-label">Logo</label><input type="file" class="form-control" name="foto"></div>
         </div>
         <div class="modal-footer"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
@@ -5931,6 +5951,17 @@
   bindModal('modalEditCooperado',    { id:'id', nome:'nome', usuario:'usuario' });
   bindModal('modalResetSenhaCooperado', { id:'id' });
   bindModal('modalEditRestaurante',  { id:'id', nome:'nome', periodo:'periodo', usuario:'usuario' });
+
+  (function(){
+    const modal = document.getElementById('modalEditRestaurante');
+    if (!modal) return;
+    modal.addEventListener('show.bs.modal', (ev) => {
+      const btn = ev.relatedTarget;
+      const form = modal.querySelector('form');
+      const chk = form?.querySelector('[name="eh_farmacia"]');
+      if (chk) chk.checked = String(btn?.dataset?.ehFarmacia || '0') === '1';
+    });
+  })();
   bindModal('modalResetSenhaRestaurante', { id:'id' });
 
   (function(){
@@ -7190,6 +7221,7 @@ document.addEventListener('DOMContentLoaded', function(){
     const f3=form.querySelector('[name="taxa_admin_multa_percentual"]'); if (f3) f3.value = (btn.getAttribute('data-taxa-admin-multa') || '2').replace(',', '.');
     const f4=form.querySelector('[name="taxa_admin_juros_dia_percentual"]'); if (f4) f4.value = (btn.getAttribute('data-taxa-admin-juros-dia') || '0.03').replace(',', '.');
     const f5=form.querySelector('[name="ativo"]'); if (f5) f5.value = btn.getAttribute('data-ativo') || '1';
+    const f6=form.querySelector('[name="eh_farmacia"]'); if (f6) f6.checked = (btn.getAttribute('data-eh-farmacia') || '0') === '1';
   });
 });
 </script>
