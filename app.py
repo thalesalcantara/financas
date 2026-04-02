@@ -11644,9 +11644,24 @@ def farmacia_add_pedido():
     pago = (f.get("pago") or "").strip().lower() in {"1", "true", "on", "sim", "pago"}
     forma = (f.get("forma_pagamento") or "").strip() or None
     parcelas = f.get("parcelas", type=int)
-    valor_entrega = round(float((f.get("valor_entrega") or 0).replace(',', '.')) if isinstance(f.get('valor_entrega'), str) else float(f.get('valor_entrega') or 0), 2)
-    valor_pedido_in = f.get('valor_pedido')
-    valor_pedido = round(float((valor_pedido_in or 0).replace(',', '.')) if isinstance(valor_pedido_in, str) else float(valor_pedido_in or 0), 2)
+
+    def _to_money(v):
+        if v is None:
+            return 0.0
+        if isinstance(v, (int, float)):
+            return round(float(v), 2)
+        s = str(v).strip()
+        if not s:
+            return 0.0
+        s = s.replace("R$", "").replace(" ", "")
+        if "," in s and "." in s:
+            s = s.replace(".", "").replace(",", ".")
+        else:
+            s = s.replace(",", ".")
+        return round(float(s), 2)
+
+    valor_entrega = _to_money(f.get("valor_entrega"))
+    valor_pedido = _to_money(f.get("valor_pedido"))
     itens = _farmacia_items_from_form()
     valor_pedido = _farmacia_total_pedido_por_itens(itens, valor_pedido)
 
@@ -11696,8 +11711,23 @@ def farmacia_edit_pedido(pedido_id):
     ent.endereco = ent.cliente_endereco = (f.get("endereco") or ent.cliente_endereco or ent.endereco or "").strip()
     ent.telefone = ent.cliente_telefone = (f.get("telefone") or ent.cliente_telefone or ent.telefone or "").strip() or None
     ent.cpf = ent.cliente_cpf = (f.get("cpf") or ent.cliente_cpf or ent.cpf or "").strip() or None
-    ent.valor_pedido = round(float((request.form.get('valor_pedido') or ent.valor_pedido or 0)), 2)
-    ent.valor_entrega = round(float((request.form.get('valor_entrega') or ent.valor_entrega or 0)), 2)
+    def _to_money(v, default=0.0):
+        if v is None:
+            return round(float(default or 0.0), 2)
+        if isinstance(v, (int, float)):
+            return round(float(v), 2)
+        s = str(v).strip()
+        if not s:
+            return round(float(default or 0.0), 2)
+        s = s.replace("R$", "").replace(" ", "")
+        if "," in s and "." in s:
+            s = s.replace(".", "").replace(",", ".")
+        else:
+            s = s.replace(",", ".")
+        return round(float(s), 2)
+
+    ent.valor_pedido = _to_money(request.form.get('valor_pedido'), ent.valor_pedido or 0)
+    ent.valor_entrega = _to_money(request.form.get('valor_entrega'), ent.valor_entrega or 0)
     ent.observacao = (f.get("observacao") or "").strip() or None
     ent.pago = (f.get("pago") or "").strip().lower() in {"1","true","on","sim","pago"}
     ent.forma_pagamento = None if ent.pago else ((f.get("forma_pagamento") or "").strip() or None)
