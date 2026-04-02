@@ -4,39 +4,268 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rastreio da entrega</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <style>
-    body{font-family:Arial,sans-serif;background:#f4f7fc;margin:0}
-    .wrap{max-width:700px;margin:0 auto;padding:24px}.hero{background:linear-gradient(135deg,#2747d9,#3358f0);color:#fff;border-radius:24px;padding:24px;margin-bottom:16px}
-    .card{background:#fff;border:1px solid #e7ecf7;border-radius:20px;padding:20px;margin-bottom:16px}.label{font-size:.8rem;color:#6f7b96;font-weight:700;text-transform:uppercase}.value{font-size:1.2rem;font-weight:800;color:#182033}
+    :root{
+      --royal:#2f52e0;
+      --royal2:#3b61f3;
+      --bg:#f3f6fb;
+      --card:#ffffff;
+      --text:#182033;
+      --muted:#7b859f;
+      --border:#e6ebf5;
+      --green:#16a34a;
+      --green-soft:#ecfdf3;
+      --blue-soft:#eef3ff;
+      --blue:#3156e0;
+      --danger:#dc2626;
+      --danger-soft:#fef2f2;
+      --shadow:0 10px 24px rgba(15,23,42,.08);
+      --radius:22px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter,Arial,sans-serif;
+      color:var(--text);
+      background:linear-gradient(180deg,#f8faff 0%, var(--bg) 100%);
+    }
+    .wrap{
+      max-width:720px;
+      margin:0 auto;
+      padding:18px 14px 28px;
+    }
+    .hero{
+      background:linear-gradient(135deg,var(--royal),var(--royal2));
+      color:#fff;
+      border-radius:0 0 34px 34px;
+      padding:20px 18px 26px;
+      box-shadow:0 16px 32px rgba(49,86,224,.22);
+      margin:-1px 0 18px;
+    }
+    .hero small{
+      display:block;
+      opacity:.88;
+      font-size:.9rem;
+      margin-bottom:8px;
+    }
+    .hero h1{
+      margin:0 0 6px;
+      font-size:1.35rem;
+      font-weight:800;
+    }
+    .hero .sub{
+      font-size:1rem;
+      line-height:1.35;
+      opacity:.95;
+    }
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:18px;
+      margin-bottom:14px;
+    }
+    .label{
+      color:var(--muted);
+      font-size:.8rem;
+      font-weight:800;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+      margin-bottom:10px;
+    }
+    .value{
+      font-size:1.05rem;
+      font-weight:800;
+      line-height:1.35;
+    }
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:9px 14px;
+      border-radius:999px;
+      font-weight:800;
+      font-size:.95rem;
+      background:var(--blue-soft);
+      color:var(--blue);
+    }
+    .timeline{
+      margin-top:4px;
+    }
+    .step{
+      display:grid;
+      grid-template-columns:22px 1fr;
+      gap:12px;
+      align-items:flex-start;
+      position:relative;
+      padding-bottom:18px;
+    }
+    .step:last-child{padding-bottom:0}
+    .step:last-child .dot-wrap::after{display:none}
+    .dot-wrap{
+      position:relative;
+      min-height:54px;
+    }
+    .dot-wrap::after{
+      content:"";
+      position:absolute;
+      left:10px;
+      top:22px;
+      width:2px;
+      height:calc(100% - 6px);
+      background:#dfe6f6;
+    }
+    .dot{
+      width:22px;
+      height:22px;
+      border-radius:50%;
+      background:#dfe6f6;
+      border:4px solid #edf2ff;
+      position:relative;
+      z-index:1;
+    }
+    .step.done .dot,
+    .step.current .dot{
+      background:var(--green);
+      border-color:var(--green-soft);
+    }
+    .step.danger .dot{
+      background:var(--danger);
+      border-color:var(--danger-soft);
+    }
+    .step-body h3{
+      margin:0 0 4px;
+      font-size:1rem;
+      font-weight:800;
+    }
+    .step-body p{
+      margin:0;
+      color:#6b7280;
+      line-height:1.35;
+      font-size:.98rem;
+    }
+    .muted{
+      color:#6b7280;
+      font-size:.95rem;
+      line-height:1.4;
+    }
+    .alert{
+      background:#fff7ed;
+      border:1px solid #fed7aa;
+      color:#9a3412;
+      border-radius:18px;
+      padding:14px 16px;
+      font-weight:700;
+    }
+    .ok{
+      background:var(--green-soft);
+      border:1px solid #bbf7d0;
+      color:#166534;
+      border-radius:18px;
+      padding:14px 16px;
+      font-weight:700;
+    }
+    @media (min-width: 721px){
+      .wrap{padding-top:24px}
+      .hero{border-radius:30px}
+    }
   </style>
 </head>
 <body>
-  {% set p = pedido if pedido is defined and pedido else entrega %}
+  {% set p = pedido if pedido is defined and pedido else entrega if entrega is defined else none %}
+  {% set status = (p.status if p else '') %}
+  {% set entregador_nome = (
+      p.cooperado_nome if p and p.cooperado_nome is defined and p.cooperado_nome
+      else p.cooperado.nome if p and p.cooperado is defined and p.cooperado
+      else 'Aguardando definição'
+  ) %}
+  {% set titulo_status = status_publico if status_publico is defined and status_publico else farmacia_status_label(status) if farmacia_status_label is defined else status %}
   <div class="wrap">
-    <div class="hero">
-      <h2 style="margin:0;">Acompanhe sua entrega</h2>
-      <div style="margin-top:8px;">{{ farmacia_status_label(status_publico) if farmacia_status_label is defined and status_publico else (farmacia_status_label(p.status) if farmacia_status_label is defined and p else 'Aguardando atualização') }}</div>
+    <section class="hero">
+      <small>Rastreio da sua entrega</small>
+      <h1>Pedido #{{ p.id if p else '-' }}</h1>
+      <div class="sub">
+        {{ p.cliente_nome if p and p.cliente_nome is defined and p.cliente_nome else p.nome_cliente if p and p.nome_cliente is defined else '' }}
+      </div>
+    </section>
+
+    <div class="card">
+      <div class="label">Status</div>
+      <span class="chip">{{ titulo_status or 'Aguardando atualização' }}</span>
     </div>
 
     <div class="card">
       <div class="label">Entregador</div>
-      <div class="value">{{ p.cooperado.nome if p and p.cooperado is defined and p.cooperado else 'Aguardando definição' }}</div>
+      <div class="value">{{ entregador_nome }}</div>
     </div>
 
-    {% if p and p.status in ['em_rota', 'indo_ate_voce'] %}
+    {% if p and (p.cliente_endereco is defined and p.cliente_endereco or p.endereco is defined and p.endereco) %}
     <div class="card">
-      <div class="label">Andamento</div>
-      <div class="value">{% if ahead and ahead > 0 %}Há {{ ahead }} entrega(s) antes da sua{% else %}O entregador está indo até você{% endif %}</div>
+      <div class="label">Endereço</div>
+      <div class="value">{{ p.cliente_endereco if p.cliente_endereco is defined and p.cliente_endereco else p.endereco if p.endereco is defined else '-' }}</div>
     </div>
     {% endif %}
 
-    {% if p and p.status == 'entregue' %}
-    <div class="card"><div class="label">Situação</div><div class="value">Entrega concluída</div></div>
-    {% endif %}
+    <div class="card">
+      <div class="label" style="margin-bottom:14px;">Andamento</div>
+      <div class="timeline">
+        <div class="step {{ 'current' if status == 'preparacao' else 'done' if status in ['aguardando_motoboy','em_rota','indo_ate_voce','entregue'] else 'danger' if status == 'nao_entregue' else '' }}">
+          <div class="dot-wrap"><div class="dot"></div></div>
+          <div class="step-body">
+            <h3>Em preparação</h3>
+            <p>O pedido foi lançado pela farmácia.</p>
+          </div>
+        </div>
 
-    {% if p and p.status == 'nao_entregue' %}
-    <div class="card"><div class="label">Situação</div><div class="value">Não foi possível concluir a entrega</div></div>
+        <div class="step {{ 'current' if status == 'aguardando_motoboy' else 'done' if status in ['em_rota','indo_ate_voce','entregue'] else 'danger' if status == 'nao_entregue' else '' }}">
+          <div class="dot-wrap"><div class="dot"></div></div>
+          <div class="step-body">
+            <h3>Aguardando motoboy</h3>
+            <p>Separando a saída para entrega.</p>
+          </div>
+        </div>
+
+        <div class="step {{ 'current' if status == 'em_rota' else 'done' if status in ['indo_ate_voce','entregue'] else 'danger' if status == 'nao_entregue' else '' }}">
+          <div class="dot-wrap"><div class="dot"></div></div>
+          <div class="step-body">
+            <h3>Em rota</h3>
+            <p>Seu pedido saiu para entrega.</p>
+          </div>
+        </div>
+
+        <div class="step {{ 'current' if status == 'indo_ate_voce' else 'done' if status == 'entregue' else 'danger' if status == 'nao_entregue' else '' }}">
+          <div class="dot-wrap"><div class="dot"></div></div>
+          <div class="step-body">
+            <h3>Entregador está indo até você</h3>
+            <p>Seu pedido está próximo de ser entregue.</p>
+          </div>
+        </div>
+
+        <div class="step {{ 'done' if status == 'entregue' else 'danger' if status == 'nao_entregue' else '' }}">
+          <div class="dot-wrap"><div class="dot"></div></div>
+          <div class="step-body">
+            <h3>Entregue</h3>
+            <p>Entrega concluída.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if status == 'nao_entregue' %}
+      <div class="alert">
+        Não foi possível concluir a entrega.
+        {% if p and p.nao_entregue_motivo is defined and p.nao_entregue_motivo %}
+          Motivo: {{ p.nao_entregue_motivo }}
+        {% endif %}
+      </div>
+    {% elif status == 'entregue' %}
+      <div class="ok">
+        Entrega concluída com sucesso.
+        {% if p and p.entregue_a is defined and p.entregue_a %}
+          Recebido por {{ p.entregue_a }}.
+        {% endif %}
+      </div>
     {% endif %}
   </div>
 </body>
