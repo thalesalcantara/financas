@@ -7,70 +7,25 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <style>
-    :root{
-      --royal:#2747d9;
-      --royal-2:#3358f0;
-      --dark:#16258a;
-      --soft:#eef3ff;
-      --bg:#f4f7fc;
-      --card:#ffffff;
-      --text:#182033;
-      --muted:#6f7b96;
-      --border:#e7ecf7;
-      --success:#16a34a;
-      --warning:#f59e0b;
-      --danger:#ef4444;
-      --radius:20px;
-      --shadow:0 12px 28px rgba(15,23,42,.08);
-      --sidebar:275px;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:Inter,Arial,sans-serif;background:linear-gradient(180deg,#f8faff 0%,#f2f6fc 100%);color:var(--text)}
-    .layout{display:flex;min-height:100vh}
-    .sidebar{width:var(--sidebar);position:fixed;left:0;top:0;bottom:0;background:linear-gradient(180deg,var(--royal-2),var(--royal),var(--dark));padding:18px 14px;color:#fff;overflow-y:auto}
-    .brand{padding:18px;border-radius:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);margin-bottom:14px}
-    .brand h1{font-size:1.05rem;margin:0 0 6px;font-weight:800;letter-spacing:.04em}
-    .brand small{opacity:.85}
-    .menu a{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff;padding:11px 12px;border-radius:14px;margin:6px 0}
-    .menu a:hover,.menu a.active{background:rgba(255,255,255,.14)}
-    .main{margin-left:var(--sidebar);flex:1;padding:22px}
-    .hero{background:linear-gradient(135deg,var(--royal),var(--royal-2));color:#fff;border-radius:28px;padding:22px;box-shadow:0 18px 40px rgba(39,71,217,.2);margin-bottom:18px}
-    .hero h2{margin:0;font-size:1.5rem;font-weight:800}
-    .hero p{margin:6px 0 0;color:rgba(255,255,255,.86)}
-    .cardx{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
-    .cardx .body{padding:18px}
-    .kpi{padding:18px;border-radius:18px;background:#fff;border:1px solid var(--border);box-shadow:var(--shadow);height:100%}
-    .kpi .label{font-size:.8rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
-    .kpi .val{font-size:1.65rem;font-weight:800;margin-top:6px}
-    .soft{background:var(--soft)}
-    .table-wrap{overflow:auto;border-radius:18px;border:1px solid var(--border)}
-    .table thead th{position:sticky;top:0;background:#f8fbff;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em}
-    .form-control,.form-select{border-radius:14px;min-height:42px;border:1px solid var(--border)}
-    .btn-royal{background:linear-gradient(135deg,var(--royal),var(--royal-2));color:#fff;border:0;border-radius:14px;padding:10px 14px;font-weight:700}
-    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
-    .chip.success{background:#ecfdf3;color:#15803d}
-    .chip.warning{background:#fff7ed;color:#c2410c}
-    .chip.info{background:#eef3ff;color:#2747d9}
-    .chip.gray{background:#f3f4f6;color:#475569}
-    .form-check-input:checked{background-color:var(--royal);border-color:var(--royal)}
-    @media(max-width:992px){.sidebar{position:static;width:100%}.main{margin-left:0}.layout{display:block}}
+    :root{--royal:#2747d9;--royal2:#3358f0;--dark:#16258a;--soft:#eef3ff;--bg:#f4f7fc;--card:#fff;--text:#182033;--muted:#6f7b96;--border:#e7ecf7;--success:#16a34a;--warning:#f59e0b;--danger:#ef4444;--radius:20px;--shadow:0 12px 28px rgba(15,23,42,.08);--sidebar:285px}
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,Arial,sans-serif;background:linear-gradient(180deg,#f8faff 0%,#f2f6fc 100%);color:var(--text)}
+    .layout{display:flex;min-height:100vh}.sidebar{width:var(--sidebar);position:fixed;left:0;top:0;bottom:0;background:linear-gradient(180deg,var(--royal2),var(--royal),var(--dark));padding:18px 14px;color:#fff;overflow-y:auto}
+    .brand{padding:18px;border-radius:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);margin-bottom:14px}.brand h1{font-size:1.05rem;margin:0 0 6px;font-weight:800}.brand small{opacity:.85}
+    .menu a{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff;padding:11px 12px;border-radius:14px;margin:6px 0}.menu a:hover,.menu a.active{background:rgba(255,255,255,.14)}
+    .main{margin-left:var(--sidebar);flex:1;padding:22px}.hero{background:linear-gradient(135deg,var(--royal),var(--royal2));color:#fff;border-radius:28px;padding:22px;box-shadow:0 18px 40px rgba(39,71,217,.2);margin-bottom:18px}.hero h2{margin:0;font-size:1.5rem;font-weight:800}.hero p{margin:6px 0 0;color:rgba(255,255,255,.86)}
+    .cardx{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}.cardx .body{padding:18px}.kpi{padding:18px;border-radius:18px;background:#fff;border:1px solid var(--border);box-shadow:var(--shadow);height:100%}
+    .kpi .label{font-size:.8rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}.kpi .val{font-size:1.5rem;font-weight:800;margin-top:6px}.soft{background:var(--soft)}
+    .table-wrap{overflow:auto;border-radius:18px;border:1px solid var(--border)} .table thead th{position:sticky;top:0;background:#f8fbff;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+    .form-control,.form-select{border-radius:14px;min-height:42px;border:1px solid var(--border)} .btn-royal{background:linear-gradient(135deg,var(--royal),var(--royal2));color:#fff;border:0;border-radius:14px;padding:10px 14px;font-weight:700}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:.78rem;font-weight:700}.chip.success{background:#ecfdf3;color:#15803d}.chip.warning{background:#fff7ed;color:#c2410c}.chip.info{background:#eef3ff;color:#2747d9}.chip.gray{background:#f3f4f6;color:#475569}.chip.danger{background:#fef2f2;color:#b91c1c}
+    .item-row{display:grid;grid-template-columns:2fr .7fr .8fr auto;gap:10px;margin-bottom:8px}.item-row:last-child{margin-bottom:0}.med-list{font-size:.9rem}.med-list div{padding:4px 0;border-bottom:1px dashed #e6ebf5}.med-list div:last-child{border-bottom:0}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap}.muted{color:var(--muted)} @media(max-width:992px){.sidebar{position:static;width:100%}.main{margin-left:0}.layout{display:block}.item-row{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
-{% set rest = rest if rest is defined else None %}
-{% set view = view if view is defined and view else (request.args.get('view','clientes') if request is defined else 'clientes') %}
-{% set clientes = clientes if clientes is defined and clientes is not none else [] %}
-{% set pedidos = pedidos if pedidos is defined and pedidos is not none else [] %}
-{% set cooperados = cooperados if cooperados is defined and cooperados is not none else [] %}
-{% set filtro_status = filtro_status if filtro_status is defined and filtro_status is not none else '' %}
-{% set filtro_cooperado_id = filtro_cooperado_id if filtro_cooperado_id is defined else None %}
-{% set total_gasto_periodo = total_gasto_periodo if total_gasto_periodo is defined and total_gasto_periodo is not none else 0 %}
-{% set total_producao_periodo = total_producao_periodo if total_producao_periodo is defined and total_producao_periodo is not none else 0 %}
-{% set total_pendentes = total_pendentes if total_pendentes is defined and total_pendentes is not none else 0 %}
-{% set now = now if now is defined and now else none %}
-{% set data_inicio_fmt = data_inicio.strftime('%Y-%m-%d') if data_inicio is defined and data_inicio else '' %}
-{% set data_fim_fmt = data_fim.strftime('%Y-%m-%d') if data_fim is defined and data_fim else '' %}
-
+{% set v = view|default('clientes') %}
+{% set di = data_inicio.strftime('%Y-%m-%d') if data_inicio else '' %}
+{% set df = data_fim.strftime('%Y-%m-%d') if data_fim else '' %}
 <div class="layout">
   <aside class="sidebar">
     <div class="brand">
@@ -78,9 +33,10 @@
       <small>Painel da Farmácia • Coopex</small>
     </div>
     <nav class="menu">
-      <a href="{{ url_for('farmacia_dashboard', view='clientes') }}" class="{{ 'active' if view=='clientes' else '' }}"><i class="bi bi-people"></i> Cadastro de clientes</a>
-      <a href="{{ url_for('farmacia_dashboard', view='pedidos') }}" class="{{ 'active' if view=='pedidos' else '' }}"><i class="bi bi-box-seam"></i> Envio de pedidos</a>
-      <a href="{{ url_for('farmacia_dashboard', view='historico', data_inicio=data_inicio_fmt, data_fim=data_fim_fmt, status=filtro_status, cooperado_id=filtro_cooperado_id or '') }}" class="{{ 'active' if view=='historico' else '' }}"><i class="bi bi-clock-history"></i> Histórico</a>
+      <a href="{{ url_for('farmacia_dashboard', view='clientes') }}" class="{{ 'active' if v=='clientes' else '' }}"><i class="bi bi-people"></i> Cadastro de clientes</a>
+      <a href="{{ url_for('farmacia_dashboard', view='pedidos') }}" class="{{ 'active' if v=='pedidos' else '' }}"><i class="bi bi-bag-plus"></i> Pedidos</a>
+      <a href="{{ url_for('farmacia_dashboard', view='lotes') }}" class="{{ 'active' if v=='lotes' else '' }}"><i class="bi bi-boxes"></i> Montar lote</a>
+      <a href="{{ url_for('farmacia_dashboard', view='historico', data_inicio=di, data_fim=df, status=filtro_status|default(''), cooperado_id=filtro_cooperado_id or '') }}" class="{{ 'active' if v=='historico' else '' }}"><i class="bi bi-clock-history"></i> Histórico</a>
       <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a>
     </nav>
   </aside>
@@ -88,16 +44,16 @@
   <main class="main">
     <section class="hero">
       <h2>Operação da farmácia</h2>
-      <p>Cadastro de clientes, lançamento de pedidos, histórico filtrável e geração de produção normal para o cooperado quando a entrega tiver valor maior que R$ 0,00.</p>
+      <p>Cadastre clientes, lance pedidos com medicamento e valor, monte o lote depois e acompanhe o retorno do motoboy.</p>
     </section>
 
     <div class="row g-3 mb-3">
       <div class="col-md-4"><div class="kpi"><div class="label">Pedidos no período</div><div class="val">{{ pedidos|length }}</div></div></div>
-      <div class="col-md-4"><div class="kpi"><div class="label">Valor gasto no período</div><div class="val">R$ {{ '%.2f'|format(total_gasto_periodo|default(0)) }}</div></div></div>
+      <div class="col-md-4"><div class="kpi"><div class="label">Valor total no período</div><div class="val">R$ {{ '%.2f'|format(total_gasto_periodo|default(0)) }}</div></div></div>
       <div class="col-md-4"><div class="kpi"><div class="label">Pendentes</div><div class="val">{{ total_pendentes|default(0) }}</div></div></div>
     </div>
 
-    {% if view == 'clientes' %}
+    {% if v == 'clientes' %}
     <div class="cardx mb-3"><div class="body">
       <h5 class="mb-3"><i class="bi bi-person-plus"></i> Novo cliente</h5>
       <form method="post" action="{{ url_for('farmacia_add_cliente') }}" class="row g-3">
@@ -108,283 +64,99 @@
         <div class="col-12"><button class="btn btn-royal"><i class="bi bi-save"></i> Cadastrar cliente</button></div>
       </form>
     </div></div>
-
     <div class="cardx"><div class="body">
-      <div class="d-flex justify-content-between align-items-center gap-2 mb-3 flex-wrap">
-        <h5 class="m-0"><i class="bi bi-card-list"></i> Clientes cadastrados</h5>
-        <form class="d-flex gap-2" method="get">
-          <input type="hidden" name="view" value="clientes">
-          <input class="form-control" name="q" value="{{ request.args.get('q','') }}" placeholder="Buscar cliente">
-          <button class="btn btn-outline-secondary">Filtrar</button>
-        </form>
-      </div>
-      <div class="table-wrap">
-        <table class="table table-sm table-hover align-middle mb-0">
-          <thead><tr><th>Nome</th><th>Telefone</th><th>Endereço</th><th>CPF</th><th style="width:110px">Ação</th></tr></thead>
-          <tbody>
-            {% for c in clientes %}
-            <tr>
-              <td>{{ c.nome }}</td>
-              <td>{{ c.telefone or '-' }}</td>
-              <td>{{ c.endereco }}</td>
-              <td>{{ c.cpf or '-' }}</td>
-              <td>
-                <form method="post" action="{{ url_for('farmacia_delete_cliente', cliente_id=c.id) }}" onsubmit="return confirm('Excluir cliente?');">
-                  <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                </form>
-              </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="5" class="text-center text-muted py-4">Nenhum cliente cadastrado.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+      <div class="table-wrap"><table class="table table-sm table-hover align-middle mb-0"><thead><tr><th>Nome</th><th>Telefone</th><th>Endereço</th><th>CPF</th><th>Ações</th></tr></thead><tbody>
+      {% for c in clientes %}
+      <tr>
+        <td>{{ c.nome }}</td><td>{{ c.telefone or '-' }}</td><td>{{ c.endereco }}</td><td>{{ c.cpf or '-' }}</td>
+        <td>
+          <div class="toolbar">
+            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCliente{{ c.id }}"><i class="bi bi-pencil"></i></button>
+            <form method="post" action="{{ url_for('farmacia_delete_cliente', cliente_id=c.id) }}" onsubmit="return confirm('Excluir cliente?');"><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
+          </div>
+          <div class="modal fade" id="editCliente{{ c.id }}" tabindex="-1"><div class="modal-dialog"><form method="post" action="{{ url_for('farmacia_edit_cliente', cliente_id=c.id) }}" class="modal-content"><div class="modal-header"><h5 class="modal-title">Editar cliente</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body row g-3"><div class="col-12"><label class="form-label">Nome</label><input class="form-control" name="nome" value="{{ c.nome }}"></div><div class="col-md-6"><label class="form-label">Telefone</label><input class="form-control" name="telefone" value="{{ c.telefone or '' }}"></div><div class="col-md-6"><label class="form-label">CPF</label><input class="form-control" name="cpf" value="{{ c.cpf or '' }}"></div><div class="col-12"><label class="form-label">Endereço</label><input class="form-control" name="endereco" value="{{ c.endereco }}"></div></div><div class="modal-footer"><button class="btn btn-royal">Salvar</button></div></form></div></div>
+        </td>
+      </tr>
+      {% else %}<tr><td colspan="5" class="text-center text-muted py-4">Nenhum cliente cadastrado.</td></tr>{% endfor %}
+      </tbody></table></div>
     </div></div>
     {% endif %}
 
-    {% if view == 'pedidos' %}
+    {% if v == 'pedidos' %}
     <div class="cardx mb-3"><div class="body">
       <h5 class="mb-3"><i class="bi bi-bag-plus"></i> Novo pedido</h5>
       <form method="post" action="{{ url_for('farmacia_add_pedido') }}" class="row g-3" id="formPedidoFarmacia">
-        <div class="col-md-3">
-          <label class="form-label">Cliente cadastrado</label>
-          <select class="form-select" name="cliente_id" id="clienteSelect">
-            <option value="">Selecionar</option>
-            {% for c in clientes %}
-            <option value="{{ c.id }}" data-nome="{{ c.nome }}" data-telefone="{{ c.telefone or '' }}" data-endereco="{{ c.endereco }}" data-cpf="{{ c.cpf or '' }}">{{ c.nome }}</option>
-            {% endfor %}
-          </select>
-        </div>
+        <div class="col-md-3"><label class="form-label">Cliente cadastrado</label><select class="form-select" name="cliente_id" id="clienteSelect"><option value="">Selecionar</option>{% for c in clientes %}<option value="{{ c.id }}" data-nome="{{ c.nome }}" data-telefone="{{ c.telefone or '' }}" data-endereco="{{ c.endereco }}" data-cpf="{{ c.cpf or '' }}">{{ c.nome }}</option>{% endfor %}</select></div>
         <div class="col-md-3"><label class="form-label">Nome do cliente</label><input class="form-control" name="cliente_nome" id="clienteNome" required></div>
         <div class="col-md-2"><label class="form-label">Telefone</label><input class="form-control" name="telefone" id="clienteTelefone"></div>
         <div class="col-md-4"><label class="form-label">Endereço</label><input class="form-control" name="endereco" id="clienteEndereco" required></div>
-        <div class="col-md-2"><label class="form-label">CPF opcional</label><input class="form-control" name="cpf" id="clienteCpf"></div>
-        <div class="col-md-2"><label class="form-label">Data da entrega</label><input type="date" class="form-control" name="data_entrega" value="{{ now.strftime('%Y-%m-%d') if now else '' }}"></div>
+        <div class="col-md-2"><label class="form-label">CPF</label><input class="form-control" name="cpf" id="clienteCpf"></div>
+        <div class="col-md-2"><label class="form-label">Valor do pedido</label><input type="number" step="0.01" class="form-control" name="valor_pedido" placeholder="0,00"></div>
         <div class="col-md-2"><label class="form-label">Valor da entrega</label><input type="number" step="0.01" class="form-control" name="valor_entrega" placeholder="0,00"></div>
-        <div class="col-md-3"><label class="form-label">Cooperado</label>
-          <select class="form-select" name="cooperado_id">
-            <option value="">Selecionar cooperado</option>
-            {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="col-md-3"><label class="form-label">Lote</label><input class="form-control" name="lote" placeholder="Ex.: TARDE-01"></div>
-        <div class="col-md-2 d-flex align-items-end">
-          <div class="form-check form-switch ms-2">
-            <input class="form-check-input" type="checkbox" role="switch" id="pedidoPago" name="pago" value="1">
-            <label class="form-check-label" for="pedidoPago">Já está pago</label>
-          </div>
-        </div>
-        <div class="col-md-2 payment-fields"><label class="form-label">Forma de pagamento</label>
-          <select class="form-select" name="forma_pagamento" id="formaPagamento">
-            <option value="">Selecionar</option>
-            <option value="debito">Débito</option>
-            <option value="credito">Crédito</option>
-            <option value="especie">Espécie</option>
-            <option value="pix">Pix</option>
-          </select>
-        </div>
-        <div class="col-md-2 payment-fields" id="parcelasWrap" style="display:none;"><label class="form-label">Parcelas</label><input type="number" class="form-control" name="parcelas" min="1" max="24"></div>
+        <div class="col-md-2 d-flex align-items-end"><div class="form-check form-switch ms-2"><input class="form-check-input" type="checkbox" role="switch" id="pedidoPago" name="pago" value="1"><label class="form-check-label" for="pedidoPago">Já está pago</label></div></div>
+        <div class="col-md-3 payment-fields"><label class="form-label">Forma de pagamento</label><select class="form-select" name="forma_pagamento" id="formaPagamento"><option value="">Selecionar</option><option value="debito">Débito</option><option value="credito">Crédito</option><option value="especie">Espécie</option><option value="pix">Pix</option></select></div>
+        <div class="col-md-1 payment-fields" id="parcelasWrap" style="display:none;"><label class="form-label">Parcelas</label><input type="number" class="form-control" name="parcelas" min="1" max="24"></div>
         <div class="col-md-12"><label class="form-label">Observação</label><textarea class="form-control" rows="2" name="observacao"></textarea></div>
+        <div class="col-12"><label class="form-label">Medicamentos / itens</label><div id="itensWrap"><div class="item-row"><input class="form-control" name="item_nome[]" placeholder="Medicamento / material"><input class="form-control" name="item_qtd[]" placeholder="Qtd."><input class="form-control" type="number" step="0.01" name="item_valor[]" placeholder="Valor"><button class="btn btn-outline-danger" type="button" onclick="removeItemRow(this)"><i class="bi bi-trash"></i></button></div></div><button class="btn btn-sm btn-outline-primary mt-2" type="button" onclick="addItemRow()"><i class="bi bi-plus-circle"></i> Adicionar item</button></div>
         <div class="col-12"><button class="btn btn-royal"><i class="bi bi-send"></i> Lançar pedido</button></div>
       </form>
     </div></div>
 
     <div class="cardx"><div class="body">
-      <h5 class="mb-3"><i class="bi bi-boxes"></i> Pedidos do período</h5>
-      <div class="table-wrap">
-        <table class="table table-sm table-hover align-middle mb-0">
-          <thead><tr><th>#</th><th>Cliente</th><th>Endereço</th><th>Cooperado</th><th>Valor</th><th>Pagamento</th><th>Status</th><th>Rastreio</th></tr></thead>
-          <tbody>
-            {% for p in pedidos %}
-            <tr>
-              <td>{{ p.id }}</td>
-              <td>{{ p.cliente_nome }}</td>
-              <td>{{ p.endereco }}</td>
-              <td>{{ p.cooperado_nome }}</td>
-              <td>R$ {{ '%.2f'|format(p.valor_entrega or 0) }}</td>
-              <td>
-                {% if p.pago %}<span class="chip success">Pago</span>
-                {% else %}<span class="chip warning">{{ (p.forma_pagamento or 'Não informado')|capitalize }}</span>{% endif %}
-              </td>
-              <td><span class="chip info">{{ p.status_label }}</span></td>
-              <td><input class="form-control form-control-sm" value="{{ p.tracking_url }}" readonly onclick="this.select()"></td>
-            </tr>
-            {% else %}
-            <tr><td colspan="8" class="text-center text-muted py-4">Nenhum pedido no período.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+      <h5 class="mb-3"><i class="bi bi-boxes"></i> Pedidos cadastrados</h5>
+      <div class="table-wrap"><table class="table table-sm table-hover align-middle mb-0"><thead><tr><th>#</th><th>Cliente</th><th>Itens</th><th>Valor pedido</th><th>Entrega</th><th>Pagamento</th><th>Status</th><th>Ações</th></tr></thead><tbody>
+      {% for p in pedidos %}
+      <tr>
+        <td>{{ p.id }}</td><td>{{ p.cliente_nome }}</td><td class="small">{{ p.itens_resumo }}</td><td>R$ {{ '%.2f'|format(p.valor_pedido|default(0)) }}</td><td>R$ {{ '%.2f'|format(p.valor_entrega|default(0)) }}</td>
+        <td>{% if p.pago %}<span class="chip success">Pago</span>{% else %}<span class="chip warning">{{ (p.forma_pagamento or 'Não informado')|capitalize }}</span>{% endif %}</td>
+        <td><span class="chip {{ farmacia_status_badge(p.status) if farmacia_status_badge is defined else 'info' }}">{{ p.status_label }}</span></td>
+        <td><div class="toolbar"><button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editPedido{{ p.id }}"><i class="bi bi-pencil"></i></button><form method="post" action="{{ url_for('farmacia_delete_pedido', pedido_id=p.id) }}" onsubmit="return confirm('Excluir pedido?');"><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form></div></td>
+      </tr>
+      <div class="modal fade" id="editPedido{{ p.id }}" tabindex="-1"><div class="modal-dialog modal-lg"><form method="post" action="{{ url_for('farmacia_edit_pedido', pedido_id=p.id) }}" class="modal-content"><div class="modal-header"><h5 class="modal-title">Editar pedido #{{ p.id }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body row g-3"><div class="col-md-4"><label class="form-label">Nome do cliente</label><input class="form-control" name="cliente_nome" value="{{ p.cliente_nome }}"></div><div class="col-md-3"><label class="form-label">Telefone</label><input class="form-control" name="telefone" value="{{ p.telefone }}"></div><div class="col-md-5"><label class="form-label">Endereço</label><input class="form-control" name="endereco" value="{{ p.endereco }}"></div><div class="col-md-2"><label class="form-label">CPF</label><input class="form-control" name="cpf" value="{{ p.cpf }}"></div><div class="col-md-2"><label class="form-label">Valor do pedido</label><input type="number" step="0.01" class="form-control" name="valor_pedido" value="{{ '%.2f'|format(p.valor_pedido|default(0)) }}"></div><div class="col-md-2"><label class="form-label">Valor da entrega</label><input type="number" step="0.01" class="form-control" name="valor_entrega" value="{{ '%.2f'|format(p.valor_entrega|default(0)) }}"></div><div class="col-md-2 d-flex align-items-end"><div class="form-check form-switch"><input class="form-check-input pedido-pago-edit" type="checkbox" name="pago" value="1" {{ 'checked' if p.pago else '' }}><label class="form-check-label">Pago</label></div></div><div class="col-md-2"><label class="form-label">Forma</label><select class="form-select" name="forma_pagamento"><option value="">Selecionar</option><option value="debito" {{ 'selected' if p.forma_pagamento=='debito' else '' }}>Débito</option><option value="credito" {{ 'selected' if p.forma_pagamento=='credito' else '' }}>Crédito</option><option value="especie" {{ 'selected' if p.forma_pagamento=='especie' else '' }}>Espécie</option><option value="pix" {{ 'selected' if p.forma_pagamento=='pix' else '' }}>Pix</option></select></div><div class="col-md-2"><label class="form-label">Parcelas</label><input type="number" class="form-control" name="parcelas" value="{{ p.parcelas or '' }}"></div><div class="col-12"><label class="form-label">Observação</label><textarea class="form-control" name="observacao" rows="2">{{ p.observacao }}</textarea></div><div class="col-12"><label class="form-label">Itens</label><div>{% for item in p.itens %}<div class="item-row"><input class="form-control" name="item_nome[]" value="{{ item.descricao }}"><input class="form-control" name="item_qtd[]" value="{{ item.quantidade }}"><input type="number" step="0.01" class="form-control" name="item_valor[]" value="{{ '%.2f'|format(item.valor_item|default(0)) }}"><button class="btn btn-outline-danger" type="button" onclick="removeItemRow(this)"><i class="bi bi-trash"></i></button></div>{% endfor %}{% if not p.itens %}<div class="item-row"><input class="form-control" name="item_nome[]" placeholder="Medicamento / material"><input class="form-control" name="item_qtd[]" placeholder="Qtd."><input type="number" step="0.01" class="form-control" name="item_valor[]" placeholder="Valor"><button class="btn btn-outline-danger" type="button" onclick="removeItemRow(this)"><i class="bi bi-trash"></i></button></div>{% endif %}</div><button class="btn btn-sm btn-outline-primary mt-2" type="button" onclick="addItemRow(this.closest('.modal-content').querySelector('.modal-body'))"><i class="bi bi-plus-circle"></i> Adicionar item</button></div></div><div class="modal-footer"><button class="btn btn-royal">Salvar</button></div></form></div></div>
+      {% else %}<tr><td colspan="8" class="text-center text-muted py-4">Nenhum pedido cadastrado.</td></tr>{% endfor %}
+      </tbody></table></div>
     </div></div>
     {% endif %}
 
-    {% if view == 'historico' %}
-    <div class="cardx mb-3"><div class="body">
-      <form method="get" class="row g-3 align-items-end">
-        <input type="hidden" name="view" value="historico">
-        <div class="col-md-2"><label class="form-label">Data inicial</label><input type="date" class="form-control" name="data_inicio" value="{{ data_inicio_fmt }}"></div>
-        <div class="col-md-2"><label class="form-label">Data final</label><input type="date" class="form-control" name="data_fim" value="{{ data_fim_fmt }}"></div>
-        <div class="col-md-3"><label class="form-label">Status</label>
-          <select class="form-select" name="status">
-            <option value="" {{ '' == filtro_status and 'selected' or '' }}>Todos</option>
-            <option value="pendentes" {{ 'pendentes' == filtro_status and 'selected' or '' }}>Somente pendentes</option>
-            <option value="preparacao" {{ 'preparacao' == filtro_status and 'selected' or '' }}>Em preparação</option>
-            <option value="aguardando_motoboy" {{ 'aguardando_motoboy' == filtro_status and 'selected' or '' }}>Aguardando motoboy</option>
-            <option value="em_rota" {{ 'em_rota' == filtro_status and 'selected' or '' }}>Em rota</option>
-            <option value="indo_ate_voce" {{ 'indo_ate_voce' == filtro_status and 'selected' or '' }}>Indo até você</option>
-            <option value="entregue" {{ 'entregue' == filtro_status and 'selected' or '' }}>Entregue</option>
-            <option value="nao_entregue" {{ 'nao_entregue' == filtro_status and 'selected' or '' }}>Não entregue</option>
-          </select>
-        </div>
-        <div class="col-md-3"><label class="form-label">Cooperado</label>
-          <select class="form-select" name="cooperado_id">
-            <option value="">Todos</option>
-            {% for coop in cooperados %}<option value="{{ coop.id }}" {{ 'selected' if filtro_cooperado_id == coop.id else '' }}>{{ coop.nome }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="col-md-2"><button class="btn btn-royal w-100"><i class="bi bi-funnel"></i> Filtrar</button></div>
+    {% if v == 'lotes' %}
+    <div class="cardx"><div class="body">
+      <h5 class="mb-3"><i class="bi bi-boxes"></i> Montar lote</h5>
+      <form method="post" action="{{ url_for('farmacia_salvar_lote') }}">
+        <div class="row g-3 mb-3"><div class="col-md-4"><label class="form-label">Motoboy</label><select class="form-select" name="cooperado_id" required><option value="">Selecionar</option>{% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}</select></div><div class="col-md-4"><label class="form-label">Nome do lote</label><input class="form-control" name="lote" placeholder="Ex.: TARDE-01"></div><div class="col-md-4 d-flex align-items-end"><button class="btn btn-royal w-100"><i class="bi bi-send-check"></i> Enviar lote</button></div></div>
+        <div class="table-wrap"><table class="table table-sm table-hover align-middle mb-0"><thead><tr><th></th><th>Cliente</th><th>Itens</th><th>Produto</th><th>Entrega</th><th>Pagamento</th><th>Status</th></tr></thead><tbody>
+        {% for p in pedidos_sem_lote %}
+          <tr><td><input type="checkbox" class="form-check-input" name="entrega_ids" value="{{ p.id }}"></td><td>{{ p.cliente_nome }}</td><td class="small">{{ p.itens_resumo }}</td><td>R$ {{ '%.2f'|format(p.valor_pedido|default(0)) }}</td><td>R$ {{ '%.2f'|format(p.valor_entrega|default(0)) }}</td><td>{% if p.pago %}<span class="chip success">Pago</span>{% else %}<span class="chip warning">{{ (p.forma_pagamento or 'Não informado')|capitalize }}</span>{% endif %}</td><td><span class="chip gray">{{ p.status_label }}</span></td></tr>
+        {% else %}<tr><td colspan="7" class="text-center text-muted py-4">Nenhum pedido aguardando lote.</td></tr>{% endfor %}
+        </tbody></table></div>
       </form>
     </div></div>
+    {% endif %}
 
-    <div class="cardx mb-3"><div class="body soft">
-      <div class="row g-3">
-        <div class="col-md-4"><strong>Total gasto em entregas:</strong> R$ {{ '%.2f'|format(total_gasto_periodo|default(0)) }}</div>
-        <div class="col-md-4"><strong>Produção gerada:</strong> R$ {{ '%.2f'|format(total_producao_periodo|default(0)) }}</div>
-        <div class="col-md-4"><strong>Pedidos pendentes:</strong> {{ total_pendentes|default(0) }}</div>
-      </div>
+    {% if v == 'historico' %}
+    <div class="cardx mb-3"><div class="body">
+      <form method="get" class="row g-3 align-items-end"><input type="hidden" name="view" value="historico"><div class="col-md-2"><label class="form-label">Data inicial</label><input type="date" class="form-control" name="data_inicio" value="{{ di }}"></div><div class="col-md-2"><label class="form-label">Data final</label><input type="date" class="form-control" name="data_fim" value="{{ df }}"></div><div class="col-md-3"><label class="form-label">Status</label><select class="form-select" name="status"><option value="" {{ '' == filtro_status and 'selected' or '' }}>Todos</option><option value="pendentes" {{ 'pendentes' == filtro_status and 'selected' or '' }}>Somente pendentes</option><option value="aguardando" {{ 'aguardando' == filtro_status and 'selected' or '' }}>Aguardando lote</option><option value="aguardando_motoboy" {{ 'aguardando_motoboy' == filtro_status and 'selected' or '' }}>Aguardando motoboy</option><option value="em_rota" {{ 'em_rota' == filtro_status and 'selected' or '' }}>Em rota</option><option value="indo_ate_voce" {{ 'indo_ate_voce' == filtro_status and 'selected' or '' }}>Indo até você</option><option value="entregue" {{ 'entregue' == filtro_status and 'selected' or '' }}>Entregue</option><option value="nao_entregue" {{ 'nao_entregue' == filtro_status and 'selected' or '' }}>Não entregue</option></select></div><div class="col-md-3"><label class="form-label">Cooperado</label><select class="form-select" name="cooperado_id"><option value="">Todos</option>{% for coop in cooperados %}<option value="{{ coop.id }}" {{ 'selected' if filtro_cooperado_id == coop.id else '' }}>{{ coop.nome }}</option>{% endfor %}</select></div><div class="col-md-2"><button class="btn btn-royal w-100"><i class="bi bi-funnel"></i> Filtrar</button></div></form>
     </div></div>
-
-    <div class="cardx"><div class="body">
-      <div class="table-wrap">
-        <table class="table table-sm table-hover align-middle mb-0">
-          <thead>
-            <tr>
-              <th>Data</th><th>Lote</th><th>Rota</th><th>Cliente</th><th>Endereço</th><th>Cooperado</th><th>Valor</th><th>Status</th><th>Entrega</th><th>Rastreio</th><th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for p in pedidos %}
-            <tr>
-              <td>{{ p.data_entrega.strftime('%d/%m/%Y') if p.data_entrega else '-' }}</td>
-              <td>{{ p.lote or '-' }}</td>
-              <td>#{{ p.ordem_rota or 0 }}</td>
-              <td>{{ p.cliente_nome }}</td>
-              <td>{{ p.endereco }}</td>
-              <td>{{ p.cooperado_nome }}</td>
-              <td>R$ {{ '%.2f'|format(p.valor_entrega or 0) }}</td>
-              <td><span class="chip info">{{ p.status_label }}</span></td>
-              <td>
-                {% if p.status == 'entregue' %}
-                  {{ p.entregue_a or 'Entregue' }}
-                {% elif p.status == 'nao_entregue' %}
-                  {{ p.motivo_nao_entrega or 'Não informado' }}
-                {% else %}-{% endif %}
-              </td>
-              <td><a href="{{ p.tracking_url }}" target="_blank" class="btn btn-sm btn-outline-primary">Abrir</a></td>
-              <td>
-                <div class="d-flex gap-1 flex-wrap">
-                  <form method="post" action="{{ url_for('farmacia_reordenar_pedido', pedido_id=p.id) }}">
-                    <input type="hidden" name="acao" value="subir">
-                    <input type="hidden" name="view" value="historico">
-                    <input type="hidden" name="data_inicio" value="{{ data_inicio_fmt }}">
-                    <input type="hidden" name="data_fim" value="{{ data_fim_fmt }}">
-                    <input type="hidden" name="status_filtro" value="{{ filtro_status }}">
-                    <input type="hidden" name="cooperado_id_filtro" value="{{ filtro_cooperado_id or '' }}">
-                    <button class="btn btn-sm btn-outline-secondary" title="Subir"><i class="bi bi-arrow-up"></i></button>
-                  </form>
-                  <form method="post" action="{{ url_for('farmacia_reordenar_pedido', pedido_id=p.id) }}">
-                    <input type="hidden" name="acao" value="descer">
-                    <input type="hidden" name="view" value="historico">
-                    <input type="hidden" name="data_inicio" value="{{ data_inicio_fmt }}">
-                    <input type="hidden" name="data_fim" value="{{ data_fim_fmt }}">
-                    <input type="hidden" name="status_filtro" value="{{ filtro_status }}">
-                    <input type="hidden" name="cooperado_id_filtro" value="{{ filtro_cooperado_id or '' }}">
-                    <button class="btn btn-sm btn-outline-secondary" title="Descer"><i class="bi bi-arrow-down"></i></button>
-                  </form>
-                  <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#statusModal{{ p.id }}"><i class="bi bi-pencil-square"></i></button>
-                </div>
-
-                <div class="modal fade" id="statusModal{{ p.id }}" tabindex="-1">
-                  <div class="modal-dialog modal-dialog-centered">
-                    <form method="post" action="{{ url_for('farmacia_update_pedido_status', pedido_id=p.id) }}" enctype="multipart/form-data" class="modal-content">
-                      <div class="modal-header"><h5 class="modal-title">Atualizar pedido #{{ p.id }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                      <div class="modal-body row g-3">
-                        <input type="hidden" name="data_inicio" value="{{ data_inicio_fmt }}">
-                        <input type="hidden" name="data_fim" value="{{ data_fim_fmt }}">
-                        <input type="hidden" name="status_filtro" value="{{ filtro_status }}">
-                        <input type="hidden" name="cooperado_id_filtro" value="{{ filtro_cooperado_id or '' }}">
-                        <div class="col-12"><label class="form-label">Status</label>
-                          <select class="form-select status-select" name="status">
-                            <option value="preparacao" {{ 'selected' if p.status=='preparacao' else '' }}>Em preparação</option>
-                            <option value="aguardando_motoboy" {{ 'selected' if p.status=='aguardando_motoboy' else '' }}>Aguardando motoboy</option>
-                            <option value="em_rota" {{ 'selected' if p.status=='em_rota' else '' }}>Em rota</option>
-                            <option value="indo_ate_voce" {{ 'selected' if p.status=='indo_ate_voce' else '' }}>Indo até você</option>
-                            <option value="entregue" {{ 'selected' if p.status=='entregue' else '' }}>Entregue</option>
-                            <option value="nao_entregue" {{ 'selected' if p.status=='nao_entregue' else '' }}>Não entregue</option>
-                          </select>
-                        </div>
-                        <div class="col-12 entregue-wrap" style="display:none;"><label class="form-label">Entregue a</label><input class="form-control" name="entregue_a" value="{{ p.entregue_a or '' }}"></div>
-                        <div class="col-12 entregue-wrap" style="display:none;"><label class="form-label">Foto do comprovante</label><input type="file" class="form-control" name="foto_comprovante" accept="image/*"></div>
-                        <div class="col-12 nao-entregue-wrap" style="display:none;"><label class="form-label">Motivo da não entrega</label><textarea class="form-control" name="motivo_nao_entrega" rows="2">{{ p.motivo_nao_entrega or '' }}</textarea></div>
-                      </div>
-                      <div class="modal-footer"><button class="btn btn-royal">Salvar</button></div>
-                    </form>
-                  </div>
-                </div>
-              </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="11" class="text-center text-muted py-4">Nenhum pedido encontrado para o filtro informado.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div></div>
+    <div class="cardx"><div class="body"><div class="table-wrap"><table class="table table-sm table-hover align-middle mb-0"><thead><tr><th>Data</th><th>Lote</th><th>Rota</th><th>Cliente</th><th>Itens</th><th>Produto</th><th>Entrega</th><th>Motoboy</th><th>Status</th><th>Foto</th><th>Rastreio</th><th>Ações</th></tr></thead><tbody>
+      {% for p in pedidos %}
+      <tr>
+        <td>{{ p.data_entrega.strftime('%d/%m/%Y') if p.data_entrega else '-' }}</td><td>{{ p.lote or '-' }}</td><td>#{{ p.ordem_rota or 0 }}</td><td>{{ p.cliente_nome }}</td><td class="small">{{ p.itens_resumo }}</td><td>R$ {{ '%.2f'|format(p.valor_pedido|default(0)) }}</td><td>R$ {{ '%.2f'|format(p.valor_entrega|default(0)) }}</td><td>{{ p.cooperado_nome }}</td><td><span class="chip {{ farmacia_status_badge(p.status) if farmacia_status_badge is defined else 'info' }}">{{ p.status_label }}</span></td><td>{% if p.foto_url %}<a href="{{ p.foto_url }}" class="btn btn-sm btn-outline-primary">Baixar</a>{% else %}-{% endif %}</td><td>{% if p.tracking_url %}<a href="{{ p.tracking_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir</a>{% else %}-{% endif %}</td><td><div class="toolbar">{% if p.cooperado_id %}<form method="post" action="{{ url_for('farmacia_reordenar_pedido', entrega_id=p.id) }}"><input type="hidden" name="acao" value="subir"><input type="hidden" name="view" value="historico"><input type="hidden" name="data_inicio" value="{{ di }}"><input type="hidden" name="data_fim" value="{{ df }}"><input type="hidden" name="status_filtro" value="{{ filtro_status }}"><input type="hidden" name="cooperado_id_filtro" value="{{ filtro_cooperado_id or '' }}"><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-up"></i></button></form><form method="post" action="{{ url_for('farmacia_reordenar_pedido', entrega_id=p.id) }}"><input type="hidden" name="acao" value="descer"><input type="hidden" name="view" value="historico"><input type="hidden" name="data_inicio" value="{{ di }}"><input type="hidden" name="data_fim" value="{{ df }}"><input type="hidden" name="status_filtro" value="{{ filtro_status }}"><input type="hidden" name="cooperado_id_filtro" value="{{ filtro_cooperado_id or '' }}"><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-down"></i></button></form>{% endif %}<button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#statusModal{{ p.id }}"><i class="bi bi-pencil-square"></i></button></div>
+        <div class="modal fade" id="statusModal{{ p.id }}" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form method="post" action="{{ url_for('farmacia_update_pedido_status', pedido_id=p.id) }}" enctype="multipart/form-data" class="modal-content"><div class="modal-header"><h5 class="modal-title">Atualizar pedido #{{ p.id }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body row g-3"><input type="hidden" name="data_inicio" value="{{ di }}"><input type="hidden" name="data_fim" value="{{ df }}"><input type="hidden" name="status_filtro" value="{{ filtro_status }}"><input type="hidden" name="cooperado_id_filtro" value="{{ filtro_cooperado_id or '' }}"><div class="col-12"><label class="form-label">Status</label><select class="form-select status-select" name="status"><option value="aguardando" {{ 'selected' if p.status=='aguardando' else '' }}>Aguardando lote</option><option value="aguardando_motoboy" {{ 'selected' if p.status=='aguardando_motoboy' else '' }}>Aguardando motoboy</option><option value="em_rota" {{ 'selected' if p.status=='em_rota' else '' }}>Em rota</option><option value="indo_ate_voce" {{ 'selected' if p.status=='indo_ate_voce' else '' }}>Indo até você</option><option value="entregue" {{ 'selected' if p.status=='entregue' else '' }}>Entregue</option><option value="nao_entregue" {{ 'selected' if p.status=='nao_entregue' else '' }}>Não entregue</option></select></div><div class="col-12 entregue-wrap" style="display:none;"><label class="form-label">Entregue a</label><input class="form-control" name="entregue_a" value="{{ p.entregue_a or '' }}"></div><div class="col-12 entregue-wrap" style="display:none;"><label class="form-label">Foto do comprovante</label><input type="file" class="form-control" name="foto_comprovante" accept="image/*"></div><div class="col-12 nao-entregue-wrap" style="display:none;"><label class="form-label">Motivo da não entrega</label><textarea class="form-control" name="motivo_nao_entrega" rows="2">{{ p.motivo_nao_entrega or '' }}</textarea></div></div><div class="modal-footer"><button class="btn btn-royal">Salvar</button></div></form></div></div>
+        </td>
+      </tr>
+      {% else %}<tr><td colspan="12" class="text-center text-muted py-4">Nenhum pedido encontrado.</td></tr>{% endfor %}
+    </tbody></table></div></div></div>
     {% endif %}
   </main>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  const clienteSelect = document.getElementById('clienteSelect');
-  clienteSelect?.addEventListener('change', function(){
-    const opt = this.options[this.selectedIndex];
-    document.getElementById('clienteNome').value = opt?.dataset?.nome || '';
-    document.getElementById('clienteTelefone').value = opt?.dataset?.telefone || '';
-    document.getElementById('clienteEndereco').value = opt?.dataset?.endereco || '';
-    document.getElementById('clienteCpf').value = opt?.dataset?.cpf || '';
-  });
-
-  const pedidoPago = document.getElementById('pedidoPago');
-  const paymentFields = document.querySelectorAll('.payment-fields');
-  function refreshPagamento(){
-    const pago = !!pedidoPago?.checked;
-    paymentFields.forEach(el => el.style.display = pago ? 'none' : 'block');
-  }
-  pedidoPago?.addEventListener('change', refreshPagamento);
-  refreshPagamento();
-
-  const forma = document.getElementById('formaPagamento');
-  const parcelasWrap = document.getElementById('parcelasWrap');
-  function refreshParcelas(){
-    parcelasWrap.style.display = (forma && forma.value === 'credito' && !(pedidoPago && pedidoPago.checked)) ? 'block' : 'none';
-  }
-  forma?.addEventListener('change', refreshParcelas);
-  refreshParcelas();
-
-  document.querySelectorAll('.modal').forEach(modal => {
-    const sel = modal.querySelector('.status-select');
-    const ent = modal.querySelectorAll('.entregue-wrap');
-    const nao = modal.querySelectorAll('.nao-entregue-wrap');
-    function sync(){
-      const v = sel?.value || '';
-      ent.forEach(x => x.style.display = v === 'entregue' ? 'block' : 'none');
-      nao.forEach(x => x.style.display = v === 'nao_entregue' ? 'block' : 'none');
-    }
-    sel?.addEventListener('change', sync);
-    modal.addEventListener('shown.bs.modal', sync);
-  });
+function rowHtml(){return `<div class="item-row"><input class="form-control" name="item_nome[]" placeholder="Medicamento / material"><input class="form-control" name="item_qtd[]" placeholder="Qtd."><input type="number" step="0.01" class="form-control" name="item_valor[]" placeholder="Valor"><button class="btn btn-outline-danger" type="button" onclick="removeItemRow(this)"><i class="bi bi-trash"></i></button></div>`;}
+function addItemRow(scope){const wrap=(scope&&scope.querySelector? scope.querySelector('#itensWrap, .modal-body .col-12 div'):null) || document.getElementById('itensWrap'); if(wrap) wrap.insertAdjacentHTML('beforeend', rowHtml());}
+function removeItemRow(btn){const row=btn.closest('.item-row'); const container=row.parentElement; if(container.querySelectorAll('.item-row').length>1){row.remove();} else {row.querySelectorAll('input').forEach(i=>i.value='');}}
+const clienteSelect=document.getElementById('clienteSelect'); clienteSelect?.addEventListener('change', function(){const opt=this.options[this.selectedIndex]; document.getElementById('clienteNome').value=opt?.dataset?.nome||''; document.getElementById('clienteTelefone').value=opt?.dataset?.telefone||''; document.getElementById('clienteEndereco').value=opt?.dataset?.endereco||''; document.getElementById('clienteCpf').value=opt?.dataset?.cpf||'';});
+const pedidoPago=document.getElementById('pedidoPago'); const paymentFields=document.querySelectorAll('.payment-fields'); function refreshPagamento(){const pago=!!pedidoPago?.checked; paymentFields.forEach(el=>el.style.display=pago?'none':'block');} pedidoPago?.addEventListener('change', refreshPagamento); refreshPagamento();
+const forma=document.getElementById('formaPagamento'); const parcelasWrap=document.getElementById('parcelasWrap'); function refreshParcelas(){ if(parcelasWrap) parcelasWrap.style.display=(forma && forma.value==='credito' && !(pedidoPago && pedidoPago.checked))?'block':'none'; } forma?.addEventListener('change', refreshParcelas); refreshParcelas();
+document.querySelectorAll('.modal').forEach(modal=>{const sel=modal.querySelector('.status-select'); const ent=modal.querySelectorAll('.entregue-wrap'); const nao=modal.querySelectorAll('.nao-entregue-wrap'); function sync(){const v=sel?.value||''; ent.forEach(x=>x.style.display=v==='entregue'?'block':'none'); nao.forEach(x=>x.style.display=v==='nao_entregue'?'block':'none');} sel?.addEventListener('change', sync); modal.addEventListener('shown.bs.modal', sync);});
 </script>
 </body>
 </html>
