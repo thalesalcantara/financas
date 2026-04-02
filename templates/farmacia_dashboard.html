@@ -66,7 +66,7 @@
     <nav class="menu">
       <a href="{{ url_for('farmacia_dashboard', view='clientes') }}" class="{{ 'active' if view=='clientes' else '' }}"><i class="bi bi-people"></i> Cadastro de clientes</a>
       <a href="{{ url_for('farmacia_dashboard', view='pedidos') }}" class="{{ 'active' if view=='pedidos' else '' }}"><i class="bi bi-box-seam"></i> Envio de pedidos</a>
-      <a href="{{ url_for('farmacia_dashboard', view='historico', data_inicio=(data_inicio.strftime('%Y-%m-%d') if data_inicio else ''), data_fim=(data_fim.strftime('%Y-%m-%d') if data_fim else ''), status=filtro_status or '', cooperado_id=filtro_cooperado_id or '') }}" class="{{ 'active' if view=='historico' else '' }}"><i class="bi bi-clock-history"></i> Histórico</a>
+      <a href="{{ url_for('farmacia_dashboard', view='historico', data_inicio=(data_inicio.strftime('%Y-%m-%d') if data_inicio else ''), data_fim=(data_fim.strftime('%Y-%m-%d') if data_fim else ''), status=filtro_status, cooperado_id=filtro_cooperado_id or '') }}" class="{{ 'active' if view=='historico' else '' }}"><i class="bi bi-clock-history"></i> Histórico</a>
       <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a>
     </nav>
   </aside>
@@ -79,8 +79,8 @@
 
     <div class="row g-3 mb-3">
       <div class="col-md-4"><div class="kpi"><div class="label">Pedidos no período</div><div class="val">{{ pedidos|length }}</div></div></div>
-      <div class="col-md-4"><div class="kpi"><div class="label">Valor gasto no período</div><div class="val">R$ {{ '%.2f'|format(total_gasto_periodo) }}</div></div></div>
-      <div class="col-md-4"><div class="kpi"><div class="label">Pendentes</div><div class="val">{{ total_pendentes }}</div></div></div>
+      <div class="col-md-4"><div class="kpi"><div class="label">Valor gasto no período</div><div class="val">R$ {{ '%.2f'|format(total_gasto_periodo|default(0)) }}</div></div></div>
+      <div class="col-md-4"><div class="kpi"><div class="label">Pendentes</div><div class="val">{{ total_pendentes|default(0) }}</div></div></div>
     </div>
 
     {% if view == 'clientes' %}
@@ -235,9 +235,9 @@
 
     <div class="cardx mb-3"><div class="body soft">
       <div class="row g-3">
-        <div class="col-md-4"><strong>Total gasto em entregas:</strong> R$ {{ '%.2f'|format(total_gasto_periodo) }}</div>
-        <div class="col-md-4"><strong>Produção gerada:</strong> R$ {{ '%.2f'|format(total_producao_periodo) }}</div>
-        <div class="col-md-4"><strong>Pedidos pendentes:</strong> {{ total_pendentes }}</div>
+        <div class="col-md-4"><strong>Total gasto em entregas:</strong> R$ {{ '%.2f'|format(total_gasto_periodo|default(0)) }}</div>
+        <div class="col-md-4"><strong>Produção gerada:</strong> R$ {{ '%.2f'|format(total_producao_periodo|default(0)) }}</div>
+        <div class="col-md-4"><strong>Pedidos pendentes:</strong> {{ total_pendentes|default(0) }}</div>
       </div>
     </div></div>
 
