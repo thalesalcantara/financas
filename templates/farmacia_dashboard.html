@@ -237,7 +237,7 @@
                           data-forma_pagamento="{{ p.forma_pagamento or '' }}"
                           data-parcelas="{{ p.parcelas or '' }}"
                           data-observacao="{{ p.observacao or '' }}"
-                          data-itens='{{ p.itens|tojson if p.itens is defined else []|tojson }}'>
+                          data-itens='[{% if p.itens is defined and p.itens %}{% for item in p.itens %}{"descricao":"{{ (item.descricao if item.descricao is defined else item.nome if item.nome is defined else '')|replace('\\','\\\\')|replace('"','\\"') }}","quantidade":"{{ (item.quantidade if item.quantidade is defined else item.qtd if item.qtd is defined else '')|replace('\\','\\\\')|replace('"','\\"') }}","valor_item":"{{ (item.valor_item if item.valor_item is defined else item.valor if item.valor is defined else 0) }}"}{% if not loop.last %},{% endif %}{% endfor %}{% endif %}]'>
                     <i class="bi bi-pencil"></i>
                   </button>
                   <form method="post" action="{{ url_for('farmacia_delete_pedido', pedido_id=p.id) }}" onsubmit="return confirm('Excluir pedido?');">
