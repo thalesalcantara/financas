@@ -1943,9 +1943,6 @@
                 <td class="lanc-col-coop">{{ l.cooperado.nome }}</td>
                 <td class="lanc-col-desc">{{ l.descricao or "—" }}</td>
                 <td class="text-end">R$ {{ "%.2f"|format(l.valor) }}</td>
-                <td class="text-nowrap">
-                  {% if r.eh_farmacia %}<span class="badge bg-primary">Farmácia</span>{% else %}<span class="badge bg-light text-dark">Normal</span>{% endif %}
-                </td>
                 <td class="text-center">
                   <span class="badge bg-soft-count">{{ l.qtd_entregas if l.qtd_entregas is not none else '—' }}</span>
                 </td>
