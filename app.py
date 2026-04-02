@@ -11787,6 +11787,22 @@ def farmacia_salvar_lote():
     return redirect(url_for("farmacia_dashboard", view="historico"))
 
 
+@app.post("/farmacia/pedidos/<int:entrega_id>/retirar-lote")
+@role_required("restaurante")
+def farmacia_retirar_lote(entrega_id):
+    rest = _farmacia_rest_or_403()
+    ent = FarmaciaEntrega.query.filter_by(id=entrega_id, restaurante_id=rest.id).first_or_404()
+    ent.cooperado_id = None
+    ent.lote = None
+    ent.ordem_rota = 0
+    if ent.status in {"aguardando_motoboy", "em_rota", "indo_ate_voce"}:
+        ent.status = "aguardando"
+    ent.atualizado_em = datetime.utcnow()
+    db.session.commit()
+    flash("Entrega retirada do lote com sucesso.", "success")
+    return redirect(url_for("farmacia_dashboard", view="historico"))
+
+
 @app.get("/farmacia/pedidos/<int:entrega_id>/foto")
 @role_required("restaurante")
 def farmacia_download_foto(entrega_id):
