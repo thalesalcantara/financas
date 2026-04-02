@@ -358,6 +358,11 @@
                     <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-down"></i></button>
                   </form>
                   {% endif %}
+                  {% if p.cooperado_id or p.lote %}
+                  <form method="post" action="{{ url_for('farmacia_retirar_lote', entrega_id=p.id) }}" onsubmit="return confirm('Retirar esta entrega do lote?');">
+                    <button class="btn btn-sm btn-outline-warning" title="Retirar do lote"><i class="bi bi-x-circle"></i></button>
+                  </form>
+                  {% endif %}
                   <button class="btn btn-sm btn-outline-success status-btn"
                           type="button"
                           data-bs-toggle="modal"
