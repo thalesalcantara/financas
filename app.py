@@ -11385,6 +11385,16 @@ def _farmacia_media_display_url(entrega: FarmaciaEntrega) -> str | None:
 def _sync_farmacia_lancamento(entrega: FarmaciaEntrega) -> None:
     valor = round(float(entrega.valor_entrega or 0.0), 2)
     nome_cliente = getattr(entrega, "cliente_nome", None) or getattr(entrega, "nome_cliente", None) or "Cliente"
+    extra_text = f"Farmácia - {nome_cliente}"
+
+    def _apply_extra_fields(lanc):
+        lanc.descricao = extra_text
+        lanc.qtd_entregas = 1
+        if hasattr(lanc, "observacao"):
+            base_obs = getattr(entrega, "observacao", None) or ""
+            obs_final = f"{extra_text}" if not base_obs else f"{extra_text} | {base_obs}"
+            setattr(lanc, "observacao", obs_final)
+
     if valor > 0 and entrega.cooperado_id and entrega.status == "entregue":
         if entrega.lancamento_id:
             lanc = Lancamento.query.get(entrega.lancamento_id)
@@ -11392,13 +11402,14 @@ def _sync_farmacia_lancamento(entrega: FarmaciaEntrega) -> None:
                 lanc.cooperado_id = entrega.cooperado_id
                 lanc.valor = valor
                 lanc.data = (entrega.entregue_em.date() if entrega.entregue_em else date.today())
-                lanc.descricao = f"Farmácia - {nome_cliente}"
-                lanc.qtd_entregas = 1
+                lanc.hora_inicio = ((entrega.saiu_em or entrega.saida_em).strftime("%H:%M") if (entrega.saiu_em or entrega.saida_em) else None)
+                lanc.hora_fim = (entrega.entregue_em.strftime("%H:%M") if entrega.entregue_em else None)
+                _apply_extra_fields(lanc)
                 return
         lanc = Lancamento(
             restaurante_id=entrega.restaurante_id,
             cooperado_id=entrega.cooperado_id,
-            descricao=f"Farmácia - {nome_cliente}",
+            descricao=extra_text,
             valor=valor,
             data=(entrega.entregue_em.date() if entrega.entregue_em else date.today()),
             hora_inicio=((entrega.saiu_em or entrega.saida_em).strftime("%H:%M") if (entrega.saiu_em or entrega.saida_em) else None),
@@ -11407,6 +11418,7 @@ def _sync_farmacia_lancamento(entrega: FarmaciaEntrega) -> None:
         )
         db.session.add(lanc)
         db.session.flush()
+        _apply_extra_fields(lanc)
         entrega.lancamento_id = lanc.id
     else:
         if entrega.lancamento_id:
@@ -11972,6 +11984,77 @@ def cooperado_farmacia_nao_entregue(entrega_id):
     _sync_farmacia_lancamento(ent)
     db.session.commit()
     flash("Entrega marcada como não entregue.", "warning")
+    return redirect(url_for("portal_cooperado", active_tab="farmacia"))
+
+
+
+@app.post("/farmacia/cooperado/reordenar/<int:entrega_id>")
+@role_required("cooperado")
+def farmacia_cooperado_reordenar(entrega_id):
+    coop = Cooperado.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+    ent = FarmaciaEntrega.query.filter_by(id=entrega_id, cooperado_id=coop.id).first_or_404()
+    acao = (request.form.get("acao") or "").strip().lower()
+
+    vizinhas = (FarmaciaEntrega.query
+                .filter(FarmaciaEntrega.cooperado_id == coop.id,
+                        FarmaciaEntrega.status.in_(["aguardando", "aguardando_motoboy", "em_rota", "indo_ate_voce", "entregue", "nao_entregue"]))
+                .order_by(FarmaciaEntrega.ordem_rota.asc(), FarmaciaEntrega.id.asc())
+                .all())
+
+    ids = [x.id for x in vizinhas]
+    if ent.id not in ids:
+        return redirect(url_for("portal_cooperado", active_tab="farmacia"))
+
+    idx = ids.index(ent.id)
+    if acao == "subir" and idx > 0:
+        ids[idx-1], ids[idx] = ids[idx], ids[idx-1]
+    elif acao == "descer" and idx < len(ids)-1:
+        ids[idx+1], ids[idx] = ids[idx], ids[idx+1]
+
+    ordem_map = {eid: i+1 for i, eid in enumerate(ids)}
+    for x in vizinhas:
+        x.ordem_rota = ordem_map.get(x.id, x.ordem_rota or 1)
+
+    db.session.commit()
+    flash("Sequência das entregas atualizada.", "success")
+    return redirect(url_for("portal_cooperado", active_tab="farmacia"))
+
+
+@app.post("/farmacia/cooperado/status/<int:entrega_id>")
+@role_required("cooperado")
+def farmacia_cooperado_status(entrega_id):
+    coop = Cooperado.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+    ent = FarmaciaEntrega.query.filter_by(id=entrega_id, cooperado_id=coop.id).first_or_404()
+
+    status = (request.form.get("status") or "").strip().lower()
+    if status not in {"aguardando_motoboy", "em_rota", "indo_ate_voce", "entregue", "nao_entregue"}:
+        flash("Status inválido.", "warning")
+        return redirect(url_for("portal_cooperado", active_tab="farmacia"))
+
+    ent.status = status
+
+    if status == "em_rota" and not (ent.saiu_em or ent.saida_em):
+        ent.saiu_em = ent.saida_em = datetime.utcnow()
+
+    if status == "indo_ate_voce" and not (ent.saiu_em or ent.saida_em):
+        ent.saiu_em = ent.saida_em = datetime.utcnow()
+
+    if status == "entregue":
+        ent.entregue_em = datetime.utcnow()
+        ent.entregue_a = (request.form.get("entregue_a") or "").strip() or None
+        ent.nao_entregue_motivo = None
+        foto = request.files.get("foto_comprovante")
+        if foto and foto.filename:
+            _save_farmacia_foto(ent, foto)
+
+    elif status == "nao_entregue":
+        ent.nao_entregue_motivo = (request.form.get("motivo_nao_entrega") or "").strip() or None
+        ent.entregue_a = None
+        ent.entregue_em = None
+
+    _sync_farmacia_lancamento(ent)
+    db.session.commit()
+    flash("Entrega da farmácia atualizada.", "success")
     return redirect(url_for("portal_cooperado", active_tab="farmacia"))
 
 
