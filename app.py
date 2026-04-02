@@ -11507,6 +11507,27 @@ def farmacia_add_cliente():
     return redirect(url_for("farmacia_dashboard"))
 
 
+
+
+@app.post("/farmacia/clientes/<int:cliente_id>/delete")
+@role_required("restaurante")
+def farmacia_delete_cliente(cliente_id):
+    rest = _farmacia_rest_or_403()
+    cliente = FarmaciaCliente.query.filter_by(id=cliente_id, restaurante_id=rest.id).first()
+    if not cliente:
+        flash("Cliente não encontrado.", "warning")
+        return redirect(url_for("farmacia_dashboard", view="clientes"))
+
+    try:
+        FarmaciaEntrega.query.filter_by(restaurante_id=rest.id, cliente_id=cliente.id).delete(synchronize_session=False)
+        db.session.delete(cliente)
+        db.session.commit()
+        flash("Cliente excluído com sucesso.", "success")
+    except Exception:
+        db.session.rollback()
+        flash("Não foi possível excluir o cliente.", "danger")
+
+    return redirect(url_for("farmacia_dashboard", view="clientes"))
 @app.post("/farmacia/pedidos/add")
 @role_required("restaurante")
 def farmacia_add_pedido():
