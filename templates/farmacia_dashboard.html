@@ -216,8 +216,7 @@
               <td>
                 {% if p.tracking_url %}
                   <div class="toolbar">
-                    <a href="{{ p.tracking_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir</a>
-                    <button class="btn btn-sm btn-outline-primary" type="button" onclick="copyText('{{ p.tracking_url }}')">Copiar</button>
+                    <button class="btn btn-sm btn-outline-primary" type="button" onclick="copyText('{{ p.tracking_url }}')">Copiar link</button>
                   </div>
                 {% else %}-{% endif %}
               </td>
@@ -336,7 +335,7 @@
               <td>{{ p.cooperado_nome }}</td>
               <td><span class="chip {{ farmacia_status_badge(p.status) if farmacia_status_badge is defined else 'info' }}">{{ p.status_label }}</span></td>
               <td>{% if p.foto_url %}<a href="{{ p.foto_url }}" class="btn btn-sm btn-outline-primary">Baixar</a>{% else %}-{% endif %}</td>
-              <td>{% if p.tracking_url %}<a href="{{ p.tracking_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir</a>{% else %}-{% endif %}</td>
+              <td>{% if p.tracking_url %}<button class="btn btn-sm btn-outline-primary" type="button" onclick="copyText('{{ p.tracking_url }}')">Copiar link</button>{% else %}-{% endif %}</td>
               <td>
                 <div class="toolbar">
                   {% if p.cooperado_id %}
@@ -502,7 +501,11 @@ function escapeHtml(str){
   return str.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;");
 }
 function copyText(txt){
-  navigator.clipboard.writeText(txt || '');
+  navigator.clipboard.writeText(txt || '').then(() => {
+    alert('Link de rastreio copiado');
+  }).catch(() => {
+    alert('Não foi possível copiar o link');
+  });
 }
 
 const clienteSelect = document.getElementById('clienteSelect');
