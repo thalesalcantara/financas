@@ -57,6 +57,20 @@
   </style>
 </head>
 <body>
+{% set rest = rest if rest is defined else None %}
+{% set view = view if view is defined and view else (request.args.get('view','clientes') if request is defined else 'clientes') %}
+{% set clientes = clientes if clientes is defined and clientes is not none else [] %}
+{% set pedidos = pedidos if pedidos is defined and pedidos is not none else [] %}
+{% set cooperados = cooperados if cooperados is defined and cooperados is not none else [] %}
+{% set filtro_status = filtro_status if filtro_status is defined and filtro_status is not none else '' %}
+{% set filtro_cooperado_id = filtro_cooperado_id if filtro_cooperado_id is defined else None %}
+{% set total_gasto_periodo = total_gasto_periodo if total_gasto_periodo is defined and total_gasto_periodo is not none else 0 %}
+{% set total_producao_periodo = total_producao_periodo if total_producao_periodo is defined and total_producao_periodo is not none else 0 %}
+{% set total_pendentes = total_pendentes if total_pendentes is defined and total_pendentes is not none else 0 %}
+{% set now = now if now is defined and now else none %}
+{% set data_inicio_fmt = data_inicio.strftime('%Y-%m-%d') if data_inicio is defined and data_inicio else '' %}
+{% set data_fim_fmt = data_fim.strftime('%Y-%m-%d') if data_fim is defined and data_fim else '' %}
+
 <div class="layout">
   <aside class="sidebar">
     <div class="brand">
@@ -66,7 +80,7 @@
     <nav class="menu">
       <a href="{{ url_for('farmacia_dashboard', view='clientes') }}" class="{{ 'active' if view=='clientes' else '' }}"><i class="bi bi-people"></i> Cadastro de clientes</a>
       <a href="{{ url_for('farmacia_dashboard', view='pedidos') }}" class="{{ 'active' if view=='pedidos' else '' }}"><i class="bi bi-box-seam"></i> Envio de pedidos</a>
-      <a href="{{ url_for('farmacia_dashboard', view='historico', data_inicio=(data_inicio.strftime('%Y-%m-%d') if data_inicio else ''), data_fim=(data_fim.strftime('%Y-%m-%d') if data_fim else ''), status=filtro_status, cooperado_id=filtro_cooperado_id or '') }}" class="{{ 'active' if view=='historico' else '' }}"><i class="bi bi-clock-history"></i> Histórico</a>
+      <a href="{{ url_for('farmacia_dashboard', view='historico', data_inicio=data_inicio_fmt, data_fim=data_fim_fmt, status=filtro_status, cooperado_id=filtro_cooperado_id or '') }}" class="{{ 'active' if view=='historico' else '' }}"><i class="bi bi-clock-history"></i> Histórico</a>
       <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a>
     </nav>
   </aside>
@@ -209,8 +223,8 @@
     <div class="cardx mb-3"><div class="body">
       <form method="get" class="row g-3 align-items-end">
         <input type="hidden" name="view" value="historico">
-        <div class="col-md-2"><label class="form-label">Data inicial</label><input type="date" class="form-control" name="data_inicio" value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '' }}"></div>
-        <div class="col-md-2"><label class="form-label">Data final</label><input type="date" class="form-control" name="data_fim" value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '' }}"></div>
+        <div class="col-md-2"><label class="form-label">Data inicial</label><input type="date" class="form-control" name="data_inicio" value="{{ data_inicio_fmt }}"></div>
+        <div class="col-md-2"><label class="form-label">Data final</label><input type="date" class="form-control" name="data_fim" value="{{ data_fim_fmt }}"></div>
         <div class="col-md-3"><label class="form-label">Status</label>
           <select class="form-select" name="status">
             <option value="" {{ '' == filtro_status and 'selected' or '' }}>Todos</option>
@@ -273,8 +287,8 @@
                   <form method="post" action="{{ url_for('farmacia_reordenar_pedido', pedido_id=p.id) }}">
                     <input type="hidden" name="acao" value="subir">
                     <input type="hidden" name="view" value="historico">
-                    <input type="hidden" name="data_inicio" value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '' }}">
-                    <input type="hidden" name="data_fim" value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '' }}">
+                    <input type="hidden" name="data_inicio" value="{{ data_inicio_fmt }}">
+                    <input type="hidden" name="data_fim" value="{{ data_fim_fmt }}">
                     <input type="hidden" name="status_filtro" value="{{ filtro_status }}">
                     <input type="hidden" name="cooperado_id_filtro" value="{{ filtro_cooperado_id or '' }}">
                     <button class="btn btn-sm btn-outline-secondary" title="Subir"><i class="bi bi-arrow-up"></i></button>
@@ -282,8 +296,8 @@
                   <form method="post" action="{{ url_for('farmacia_reordenar_pedido', pedido_id=p.id) }}">
                     <input type="hidden" name="acao" value="descer">
                     <input type="hidden" name="view" value="historico">
-                    <input type="hidden" name="data_inicio" value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '' }}">
-                    <input type="hidden" name="data_fim" value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '' }}">
+                    <input type="hidden" name="data_inicio" value="{{ data_inicio_fmt }}">
+                    <input type="hidden" name="data_fim" value="{{ data_fim_fmt }}">
                     <input type="hidden" name="status_filtro" value="{{ filtro_status }}">
                     <input type="hidden" name="cooperado_id_filtro" value="{{ filtro_cooperado_id or '' }}">
                     <button class="btn btn-sm btn-outline-secondary" title="Descer"><i class="bi bi-arrow-down"></i></button>
@@ -296,8 +310,8 @@
                     <form method="post" action="{{ url_for('farmacia_update_pedido_status', pedido_id=p.id) }}" enctype="multipart/form-data" class="modal-content">
                       <div class="modal-header"><h5 class="modal-title">Atualizar pedido #{{ p.id }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                       <div class="modal-body row g-3">
-                        <input type="hidden" name="data_inicio" value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '' }}">
-                        <input type="hidden" name="data_fim" value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '' }}">
+                        <input type="hidden" name="data_inicio" value="{{ data_inicio_fmt }}">
+                        <input type="hidden" name="data_fim" value="{{ data_fim_fmt }}">
                         <input type="hidden" name="status_filtro" value="{{ filtro_status }}">
                         <input type="hidden" name="cooperado_id_filtro" value="{{ filtro_cooperado_id or '' }}">
                         <div class="col-12"><label class="form-label">Status</label>
