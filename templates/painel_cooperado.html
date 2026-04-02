@@ -155,7 +155,7 @@
 
     .tab-shell{padding:10px 12px 0}
     .tabs-rail{
-      display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;
+      display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;
       background:rgba(255,255,255,.86);border:1px solid rgba(15,23,42,.06);backdrop-filter:blur(10px);
       padding:6px;border-radius:18px;box-shadow:var(--shadow)
     }
@@ -412,6 +412,7 @@
       <button class="tab-btn" type="button" data-tab="ajustes"><i class="bi bi-sliders2"></i><span>Ajust. Coop</span></button>
       <button class="tab-btn" type="button" data-tab="escalas"><i class="bi bi-calendar3"></i><span>Escalas</span></button>
       <button class="tab-btn" type="button" data-tab="trocas"><i class="bi bi-arrow-left-right"></i><span>Trocas</span></button>
+      <button class="tab-btn" type="button" data-tab="farmacia"><i class="bi bi-capsule-pill"></i><span>Farmácia</span></button>
     </div>
   </section>
 
@@ -917,6 +918,156 @@
         {% endif %}
       </div>
     </section>
+
+    <section class="tab-pane-custom" id="tab-farmacia">
+      <div class="section-card" style="background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);border-color:rgba(39,71,217,.10)">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title"><i class="bi bi-capsule-pill me-1"></i> Entregas da farmácia</h2>
+            <div class="item-small mt-1">Veja o lote, reorganize a sequência e finalize cada entrega com nome de quem recebeu, foto opcional ou motivo da não entrega.</div>
+          </div>
+          <span class="section-chip">{{ farmacia_entregas|default([])|length }} no painel</span>
+        </div>
+
+        <div class="kpi-grid mb-3">
+          <div class="kpi-card">
+            <div class="kpi-title">Em lote</div>
+            <div class="kpi-value mono">{{ farmacia_entregas|selectattr('lote')|list|length if farmacia_entregas is defined else 0 }}</div>
+            <div class="kpi-sub">Pedidos já agrupados</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Valor de entrega</div>
+            <div class="kpi-value mono">
+              R$ {{ '%.2f'|format((farmacia_entregas|sum(attribute='valor_entrega')) if farmacia_entregas is defined else 0) }}
+            </div>
+            <div class="kpi-sub">Somente valor da entrega</div>
+          </div>
+        </div>
+
+        <div class="list-stack">
+          {% for ent in farmacia_entregas|default([]) %}
+          {% set _ent_status = ent.status|default('aguardando') %}
+          <div class="item-card" style="border-color:{% if _ent_status == 'entregue' %}rgba(22,163,74,.16){% elif _ent_status == 'nao_entregue' %}rgba(220,38,38,.16){% else %}rgba(39,71,217,.10){% endif %}">
+            <div class="item-row">
+              <div class="flex-grow-1 min-w-0">
+                <div class="item-title d-flex flex-wrap align-items-center gap-2">
+                  <span>{{ ent.cliente_nome|default(ent.nome_cliente|default('Cliente')) }}</span>
+                  {% if ent.lote %}<span class="esc-badge">Lote {{ ent.lote }}</span>{% endif %}
+                  <span class="esc-badge">Rota #{{ ent.ordem_rota|default(0) }}</span>
+                </div>
+                <div class="item-meta mt-1">
+                  <i class="bi bi-geo-alt me-1"></i>{{ ent.endereco|default(ent.cliente_endereco|default('-')) }}
+                </div>
+                <div class="item-meta mt-1">
+                  <i class="bi bi-telephone me-1"></i>{{ ent.telefone|default(ent.cliente_telefone|default('-')) }}
+                  &nbsp;·&nbsp;
+                  <i class="bi bi-wallet2 me-1"></i>
+                  {% if ent.pago %}Pago{% else %}{{ ent.forma_pagamento|default('Pagamento na entrega')|capitalize }}{% endif %}
+                </div>
+                <div class="item-meta mt-1">
+                  <b>Produto:</b> R$ {{ '%.2f'|format(ent.valor_pedido|default(0)) }}
+                  &nbsp;·&nbsp;
+                  <b>Entrega:</b> R$ {{ '%.2f'|format(ent.valor_entrega|default(0)) }}
+                </div>
+
+                {% set _itens = ent.itens if ent.itens is defined else [] %}
+                <div class="soft-card mt-2 p-2" style="background:#f8fbff">
+                  <div class="title-muted mb-1">Medicamentos / itens</div>
+                  <div class="med-list">
+                    {% if _itens %}
+                      {% for item in _itens %}
+                        <div>
+                          {{ item.descricao|default(item.nome|default('Item')) }}
+                          {% if item.quantidade %} • {{ item.quantidade }}{% endif %}
+                          {% if item.valor_item is defined %} • R$ {{ '%.2f'|format(item.valor_item|default(0)) }}{% endif %}
+                        </div>
+                      {% endfor %}
+                    {% else %}
+                      <div>{{ ent.itens_resumo|default('Sem itens detalhados') }}</div>
+                    {% endif %}
+                  </div>
+                </div>
+
+                {% if ent.observacao %}
+                  <div class="item-small mt-2"><b>Obs.:</b> {{ ent.observacao }}</div>
+                {% endif %}
+              </div>
+
+              <div class="text-end">
+                <div class="item-amount mono {% if _ent_status == 'entregue' %}success{% elif _ent_status == 'nao_entregue' %}danger{% endif %}">
+                  {% if ent.status_label is defined and ent.status_label %}{{ ent.status_label }}{% else %}{{ _ent_status|replace('_',' ')|capitalize }}{% endif %}
+                </div>
+                <div class="item-small mt-1">Status atual</div>
+              </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mt-3">
+              <form method="post" action="{{ url_for('farmacia_cooperado_reordenar', entrega_id=ent.id) if false else '/farmacia/cooperado/reordenar/' ~ ent.id }}">
+                <input type="hidden" name="acao" value="subir">
+                <input type="hidden" name="active_tab" value="farmacia">
+                <button class="btn btn-outline-secondary btn-xs"><i class="bi bi-arrow-up"></i> Subir</button>
+              </form>
+              <form method="post" action="{{ url_for('farmacia_cooperado_reordenar', entrega_id=ent.id) if false else '/farmacia/cooperado/reordenar/' ~ ent.id }}">
+                <input type="hidden" name="acao" value="descer">
+                <input type="hidden" name="active_tab" value="farmacia">
+                <button class="btn btn-outline-secondary btn-xs"><i class="bi bi-arrow-down"></i> Descer</button>
+              </form>
+            </div>
+
+            <form method="post"
+                  action="{{ url_for('farmacia_cooperado_status', entrega_id=ent.id) if false else '/farmacia/cooperado/status/' ~ ent.id }}"
+                  enctype="multipart/form-data"
+                  class="mt-3 farmacia-status-form">
+              <input type="hidden" name="active_tab" value="farmacia">
+              <div class="row g-2">
+                <div class="col-12">
+                  <label class="form-label">Atualizar status</label>
+                  <select class="form-select farmacia-status-select" name="status">
+                    <option value="aguardando_motoboy" {{ 'selected' if _ent_status == 'aguardando_motoboy' else '' }}>Aguardando motoboy</option>
+                    <option value="em_rota" {{ 'selected' if _ent_status == 'em_rota' else '' }}>Em rota</option>
+                    <option value="indo_ate_voce" {{ 'selected' if _ent_status == 'indo_ate_voce' else '' }}>Indo até você</option>
+                    <option value="entregue" {{ 'selected' if _ent_status == 'entregue' else '' }}>Entregue</option>
+                    <option value="nao_entregue" {{ 'selected' if _ent_status == 'nao_entregue' else '' }}>Não entregue</option>
+                  </select>
+                </div>
+
+                <div class="col-12 farmacia-entregue-wrap" style="display:none;">
+                  <label class="form-label">Entregue a</label>
+                  <input class="form-control" name="entregue_a" value="{{ ent.entregue_a|default('') }}" placeholder="Nome de quem recebeu">
+                </div>
+
+                <div class="col-12 farmacia-entregue-wrap" style="display:none;">
+                  <label class="form-label">Foto do comprovante (opcional)</label>
+                  <input type="file" class="form-control" name="foto_comprovante" accept="image/*">
+                </div>
+
+                <div class="col-12 farmacia-nao-entregue-wrap" style="display:none;">
+                  <label class="form-label">Motivo da não entrega</label>
+                  <textarea class="form-control" rows="2" name="motivo_nao_entrega" placeholder="Descreva o motivo">{{ ent.motivo_nao_entrega|default(ent.nao_entregue_motivo|default('')) }}</textarea>
+                </div>
+
+                {% if ent.foto_url is defined and ent.foto_url %}
+                <div class="col-12">
+                  <div class="soft-card p-2 d-flex align-items-center justify-content-between flex-wrap gap-2" style="background:#f8fbff">
+                    <div class="item-small"><i class="bi bi-image me-1"></i> Já existe um comprovante enviado</div>
+                    <a class="btn btn-xs btn-outline-primary" href="{{ ent.foto_url }}" target="_blank">Ver foto</a>
+                  </div>
+                </div>
+                {% endif %}
+
+                <div class="col-12 d-grid mt-2">
+                  <button class="btn btn-royal"><i class="bi bi-check2-circle me-1"></i> Salvar atualização</button>
+                </div>
+              </div>
+            </form>
+          </div>
+          {% else %}
+          <div class="item-card text-center muted">Nenhuma entrega da farmácia atribuída a você no momento.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <div class="text-center py-2 muted"><small>© {{ current_year|default('') }} Coopex</small></div>
@@ -1261,7 +1412,7 @@ const MY_ESCALA   = {{ minha_escala_json | default([]) | tojson }};
   const activeInput=document.getElementById('activeTabInput');
   const panel=document.getElementById('painelTabsContent');
   const params=new URLSearchParams(window.location.search);
-  const valid=['resumo','producoes','ajustes','escalas','trocas'];
+  const valid=['resumo','producoes','ajustes','escalas','trocas','farmacia'];
   let current=params.get('active_tab') || localStorage.getItem('coopex_active_tab') || (activeInput?.value || 'resumo');
   if (!valid.includes(current)) current='resumo';
 
@@ -1629,6 +1780,25 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       alert(err.message || 'Falha ao solicitar.');
     }
+  });
+})();
+</script>
+
+
+<script>
+(function(){
+  function syncFarmaciaForm(form){
+    const sel = form.querySelector('.farmacia-status-select');
+    const entregue = form.querySelectorAll('.farmacia-entregue-wrap');
+    const naoEntregue = form.querySelectorAll('.farmacia-nao-entregue-wrap');
+    const v = sel ? (sel.value || '') : '';
+    entregue.forEach(el => el.style.display = (v === 'entregue') ? 'block' : 'none');
+    naoEntregue.forEach(el => el.style.display = (v === 'nao_entregue') ? 'block' : 'none');
+  }
+  document.querySelectorAll('.farmacia-status-form').forEach(form => {
+    const sel = form.querySelector('.farmacia-status-select');
+    sel?.addEventListener('change', () => syncFarmaciaForm(form));
+    syncFarmaciaForm(form);
   });
 })();
 </script>
