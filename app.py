@@ -489,6 +489,7 @@ class FarmaciaCliente(db.Model):
     endereco = db.Column(db.String(255), nullable=False)
     cpf = db.Column(db.String(20))
     criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     restaurante = db.relationship("Restaurante", backref=db.backref("farmacia_clientes", lazy=True, cascade="all, delete-orphan"))
 
@@ -4684,7 +4685,7 @@ def admin_dashboard():
         status_adiantamento_label=_status_adiantamento_label,
         status_adiantamento_badge=_status_adiantamento_badge,
         competencia_humana=_competencia_humana,
-        farmacia_entregas=farmacia_entregas,
+        farmacia_entregas=(farmacia_entregas if 'farmacia_entregas' in locals() else []),
     )
 
     ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
@@ -11382,44 +11383,100 @@ def _sync_farmacia_lancamento(entrega: FarmaciaEntrega) -> None:
 @role_required("restaurante")
 def farmacia_dashboard():
     rest = _farmacia_rest_or_403()
-    di = _parse_date(request.args.get("data_inicio"))
-    df = _parse_date(request.args.get("data_fim"))
-    status = (request.args.get("status") or "").strip().lower()
-    cooperado_id = request.args.get("cooperado_id", type=int)
+    view = (request.args.get("view") or "clientes").strip().lower()
+    if view not in {"clientes", "pedidos", "historico"}:
+        view = "clientes"
 
-    clientes = FarmaciaCliente.query.filter_by(restaurante_id=rest.id).order_by(FarmaciaCliente.nome.asc()).all()
+    q = (request.args.get("q") or "").strip()
+    data_inicio = _parse_date(request.args.get("data_inicio"))
+    data_fim = _parse_date(request.args.get("data_fim"))
+    filtro_status = (request.args.get("status") or "").strip().lower()
+    filtro_cooperado_id = request.args.get("cooperado_id", type=int)
+
+    clientes_q = FarmaciaCliente.query.filter_by(restaurante_id=rest.id)
+    if q:
+        like = f"%{q}%"
+        clientes_q = clientes_q.filter(or_(
+            FarmaciaCliente.nome.ilike(like),
+            FarmaciaCliente.telefone.ilike(like),
+            FarmaciaCliente.endereco.ilike(like),
+            FarmaciaCliente.cpf.ilike(like),
+        ))
+    clientes = clientes_q.order_by(FarmaciaCliente.nome.asc()).all()
     cooperados = Cooperado.query.order_by(Cooperado.nome.asc()).all()
+    coop_map = {c.id: c.nome for c in cooperados}
 
-    q = FarmaciaEntrega.query.filter_by(restaurante_id=rest.id)
-    if di:
-        q = q.filter(func.date(FarmaciaEntrega.criado_em) >= di)
-    if df:
-        q = q.filter(func.date(FarmaciaEntrega.criado_em) <= df)
-    if status:
-        if status == "pendentes":
-            q = q.filter(FarmaciaEntrega.status.notin_(["entregue", "nao_entregue"]))
+    pedidos_q = FarmaciaEntrega.query.filter_by(restaurante_id=rest.id)
+    if data_inicio:
+        pedidos_q = pedidos_q.filter(func.date(FarmaciaEntrega.criado_em) >= data_inicio)
+    if data_fim:
+        pedidos_q = pedidos_q.filter(func.date(FarmaciaEntrega.criado_em) <= data_fim)
+    if filtro_status:
+        if filtro_status == "pendentes":
+            pedidos_q = pedidos_q.filter(FarmaciaEntrega.status.notin_(["entregue", "nao_entregue"]))
         else:
-            q = q.filter(FarmaciaEntrega.status == status)
-    if cooperado_id:
-        q = q.filter(FarmaciaEntrega.cooperado_id == cooperado_id)
+            pedidos_q = pedidos_q.filter(FarmaciaEntrega.status == filtro_status)
+    if filtro_cooperado_id:
+        pedidos_q = pedidos_q.filter(FarmaciaEntrega.cooperado_id == filtro_cooperado_id)
 
-    entregas = q.order_by(FarmaciaEntrega.criado_em.desc(), FarmaciaEntrega.ordem_rota.asc(), FarmaciaEntrega.id.desc()).all()
-    total_gasto = sum(float(e.valor_entrega or 0.0) for e in entregas)
+    entregas = pedidos_q.order_by(FarmaciaEntrega.criado_em.desc(), FarmaciaEntrega.ordem_rota.asc(), FarmaciaEntrega.id.desc()).all()
+
+    pedidos = []
+    total_gasto_periodo = 0.0
+    total_producao_periodo = 0.0
+    total_pendentes = 0
+
+    for e in entregas:
+        status = (e.status or "preparacao").strip()
+        valor = float(e.valor_entrega or 0.0)
+        item = SimpleNamespace(
+            id=e.id,
+            data_entrega=(e.criado_em.date() if e.criado_em else None),
+            lote=getattr(e, "lote", None),
+            ordem_rota=int(getattr(e, "ordem_rota", 0) or 0),
+            cliente_nome=(getattr(e, "cliente_nome", None) or getattr(e, "nome_cliente", None) or ""),
+            telefone=(getattr(e, "cliente_telefone", None) or getattr(e, "telefone", None) or ""),
+            endereco=(getattr(e, "cliente_endereco", None) or getattr(e, "endereco", None) or ""),
+            cpf=(getattr(e, "cliente_cpf", None) or getattr(e, "cpf", None) or ""),
+            observacao=e.observacao or "",
+            valor_entrega=valor,
+            pago=bool(e.pago),
+            forma_pagamento=e.forma_pagamento or "",
+            parcelas=(getattr(e, "parcelas", None) or getattr(e, "parcelas_credito", None)),
+            status=status,
+            status_label=_farmacia_status_label(status),
+            tracking_url=(url_for("farmacia_rastreio", codigo=e.codigo_rastreio, _external=True) if e.codigo_rastreio else ""),
+            cooperado_id=e.cooperado_id,
+            cooperado_nome=coop_map.get(e.cooperado_id, "-"),
+            entregue_a=e.entregue_a,
+            motivo_nao_entrega=(getattr(e, "nao_entregue_motivo", None) or ""),
+        )
+        pedidos.append(item)
+        total_gasto_periodo += valor
+        if valor > 0:
+            total_producao_periodo += valor
+        if status not in {"entregue", "nao_entregue"}:
+            total_pendentes += 1
 
     return render_template(
         "farmacia_dashboard.html",
         rest=rest,
         restaurante=rest,
-        clientes=clientes,
-        entregas=entregas,
-        cooperados=cooperados,
-        total_gasto=total_gasto,
-        data_inicio=di,
-        data_fim=df,
-        status=status,
-        cooperado_id=cooperado_id,
+        view=view,
+        q=q,
+        clientes=clientes or [],
+        pedidos=pedidos or [],
+        cooperados=cooperados or [],
+        total_gasto_periodo=round(total_gasto_periodo, 2),
+        total_producao_periodo=round(total_producao_periodo, 2),
+        total_pendentes=int(total_pendentes),
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        filtro_status=filtro_status or "",
+        filtro_cooperado_id=filtro_cooperado_id,
         farmacia_status_label=_farmacia_status_label,
         farmacia_status_badge=_farmacia_status_badge,
+        now=datetime.utcnow(),
         current_year=datetime.utcnow().year,
     )
 
@@ -11441,6 +11498,8 @@ def farmacia_add_cliente():
         telefone=(f.get("telefone") or "").strip() or None,
         endereco=endereco,
         cpf=(f.get("cpf") or "").strip() or None,
+        criado_em=datetime.utcnow(),
+        atualizado_em=datetime.utcnow(),
     )
     db.session.add(c)
     db.session.commit()
@@ -11457,9 +11516,9 @@ def farmacia_add_pedido():
     cliente = FarmaciaCliente.query.filter_by(id=cliente_id, restaurante_id=rest.id).first() if cliente_id else None
 
     nome = (f.get("cliente_nome") or (cliente.nome if cliente else "") or "").strip()
-    endereco = (f.get("cliente_endereco") or (cliente.endereco if cliente else "") or "").strip()
-    telefone = (f.get("cliente_telefone") or (cliente.telefone if cliente else "") or "").strip()
-    cpf = (f.get("cliente_cpf") or (cliente.cpf if cliente else "") or "").strip()
+    endereco = (f.get("endereco") or f.get("cliente_endereco") or (cliente.endereco if cliente else "") or "").strip()
+    telefone = (f.get("telefone") or f.get("cliente_telefone") or (cliente.telefone if cliente else "") or "").strip()
+    cpf = (f.get("cpf") or f.get("cliente_cpf") or (cliente.cpf if cliente else "") or "").strip()
 
     if not nome or not endereco:
         flash("Informe nome e endereço do pedido.", "warning")
@@ -11494,7 +11553,7 @@ def farmacia_add_pedido():
     db.session.add(ent)
     db.session.commit()
     flash("Pedido lançado na farmácia.", "success")
-    return redirect(url_for("farmacia_dashboard"))
+    return redirect(url_for("farmacia_dashboard", view="pedidos"))
 
 
 @app.post("/farmacia/pedidos/<int:entrega_id>/reordenar")
@@ -11502,10 +11561,29 @@ def farmacia_add_pedido():
 def farmacia_reordenar_pedido(entrega_id):
     rest = _farmacia_rest_or_403()
     ent = FarmaciaEntrega.query.filter_by(id=entrega_id, restaurante_id=rest.id).first_or_404()
-    ent.ordem_rota = max(1, int(request.form.get("ordem_rota") or ent.ordem_rota or 1))
+    acao = (request.form.get("acao") or "").strip().lower()
+    view = (request.form.get("view") or "historico").strip().lower()
+    data_inicio = (request.form.get("data_inicio") or "").strip()
+    data_fim = (request.form.get("data_fim") or "").strip()
+    status_filtro = (request.form.get("status_filtro") or "").strip()
+    cooperado_id_filtro = (request.form.get("cooperado_id_filtro") or "").strip()
+
+    if acao in {"subir", "descer"}:
+        viz_q = FarmaciaEntrega.query.filter_by(restaurante_id=rest.id, cooperado_id=ent.cooperado_id)
+        if acao == "subir":
+            viz = viz_q.filter(FarmaciaEntrega.ordem_rota < (ent.ordem_rota or 0)).order_by(FarmaciaEntrega.ordem_rota.desc(), FarmaciaEntrega.id.desc()).first()
+        else:
+            viz = viz_q.filter(FarmaciaEntrega.ordem_rota > (ent.ordem_rota or 0)).order_by(FarmaciaEntrega.ordem_rota.asc(), FarmaciaEntrega.id.asc()).first()
+        if viz:
+            ent_ord = ent.ordem_rota or 0
+            ent.ordem_rota = viz.ordem_rota or ent_ord
+            viz.ordem_rota = ent_ord
+    else:
+        ent.ordem_rota = max(1, int(request.form.get("ordem_rota") or ent.ordem_rota or 1))
+
     db.session.commit()
     flash("Ordem da rota atualizada.", "success")
-    return redirect(url_for("farmacia_dashboard"))
+    return redirect(url_for("farmacia_dashboard", view=view, data_inicio=data_inicio, data_fim=data_fim, status=status_filtro, cooperado_id=cooperado_id_filtro))
 
 
 @app.get("/farmacia/rastreio/<codigo>")
@@ -11523,6 +11601,30 @@ def farmacia_rastreio(codigo):
     else:
         label = ent.status
     return render_template("farmacia_rastreio.html", entrega=ent, ahead=ahead, status_publico=label, farmacia_status_label=_farmacia_status_label)
+
+
+@app.post("/farmacia/pedidos/<int:pedido_id>/status")
+@role_required("restaurante")
+def farmacia_update_pedido_status(pedido_id):
+    rest = _farmacia_rest_or_403()
+    p = FarmaciaEntrega.query.filter_by(id=pedido_id, restaurante_id=rest.id).first_or_404()
+    status = (request.form.get("status") or "preparacao").strip()
+    p.status = status
+    if status == "em_rota" and not p.saiu_em:
+        p.saiu_em = datetime.utcnow()
+    if status == "entregue":
+        p.entregue_em = datetime.utcnow()
+        p.entregue_a = (request.form.get("entregue_a") or "").strip() or None
+        foto = request.files.get("foto_comprovante")
+        if foto and foto.filename:
+            _save_farmacia_foto(p, foto)
+    elif status == "nao_entregue":
+        p.nao_entregue_motivo = (request.form.get("motivo_nao_entrega") or "").strip() or None
+        p.entregue_a = None
+    _sync_farmacia_lancamento(p)
+    db.session.commit()
+    flash("Pedido atualizado.", "success")
+    return redirect(url_for("farmacia_dashboard", view="historico", data_inicio=(request.form.get("data_inicio") or ""), data_fim=(request.form.get("data_fim") or ""), status=(request.form.get("status_filtro") or ""), cooperado_id=(request.form.get("cooperado_id_filtro") or "")))
 
 
 @app.post("/cooperado/farmacia/ordem")
