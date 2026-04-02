@@ -452,67 +452,7 @@ class Restaurante(db.Model):
     # compatibilidade
     foto_url = db.Column(db.String(255))
 
-    # NOVO: identifica estabelecimentos do tipo farmácia
-    eh_farmacia = db.Column(
-        db.Boolean,
-        nullable=False,
-        default=False,
-        server_default=text("false"),
-    )
-
-
-class FarmaciaCliente(db.Model):
-    __tablename__ = "farmacia_clientes"
-
-    id = db.Column(db.Integer, primary_key=True)
-    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id", ondelete="CASCADE"), nullable=False, index=True)
-    nome = db.Column(db.String(120), nullable=False)
-    telefone = db.Column(db.String(30))
-    endereco = db.Column(db.String(255), nullable=False)
-    cpf = db.Column(db.String(20))
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-    restaurante = db.relationship("Restaurante", backref=db.backref("farmacia_clientes", cascade="all, delete-orphan"))
-
-
-class FarmaciaEntrega(db.Model):
-    __tablename__ = "farmacia_entregas"
-
-    id = db.Column(db.Integer, primary_key=True)
-    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id", ondelete="CASCADE"), nullable=False, index=True)
-    cliente_id = db.Column(db.Integer, db.ForeignKey("farmacia_clientes.id", ondelete="SET NULL"), nullable=True, index=True)
-    cooperado_id = db.Column(db.Integer, db.ForeignKey("cooperados.id", ondelete="SET NULL"), nullable=True, index=True)
-    lancamento_id = db.Column(db.Integer, db.ForeignKey("lancamentos.id", ondelete="SET NULL"), nullable=True, index=True)
-
-    nome_cliente = db.Column(db.String(120), nullable=False)
-    telefone = db.Column(db.String(30))
-    endereco = db.Column(db.String(255), nullable=False)
-    cpf = db.Column(db.String(20))
-    observacao = db.Column(db.Text)
-
-    valor_entrega = db.Column(db.Float, default=0.0)
-    pago = db.Column(db.Boolean, nullable=False, default=False, server_default=text("false"))
-    forma_pagamento = db.Column(db.String(20))
-    parcelas_credito = db.Column(db.Integer)
-
-    status = db.Column(db.String(30), nullable=False, default="preparacao", index=True)
-    ordem_rota = db.Column(db.Integer, nullable=False, default=0, server_default=text("0"))
-    codigo_rastreio = db.Column(db.String(64), unique=True, index=True)
-
-    saida_em = db.Column(db.DateTime)
-    entregue_em = db.Column(db.DateTime)
-    entregue_a = db.Column(db.String(120))
-    nao_entregue_motivo = db.Column(db.Text)
-    foto_comprovante_url = db.Column(db.String(255))
-
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
-    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-    restaurante = db.relationship("Restaurante", backref=db.backref("farmacia_entregas", cascade="all, delete-orphan"))
-    cliente = db.relationship("FarmaciaCliente", backref=db.backref("entregas", lazy=True))
-    cooperado = db.relationship("Cooperado", backref=db.backref("farmacia_entregas", lazy=True))
-    lancamento = db.relationship("Lancamento", backref=db.backref("farmacia_entrega", uselist=False))
+    eh_farmacia = db.Column(db.Boolean, nullable=False, default=False, server_default=text("false"))
 
 
 class Lancamento(db.Model):
@@ -537,6 +477,63 @@ class Lancamento(db.Model):
 
     # opcional: quantidade de entregas
     qtd_entregas = db.Column(db.Integer)
+
+
+class FarmaciaCliente(db.Model):
+    __tablename__ = "farmacia_clientes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id", ondelete="CASCADE"), nullable=False, index=True)
+    nome = db.Column(db.String(120), nullable=False)
+    telefone = db.Column(db.String(30))
+    endereco = db.Column(db.String(255), nullable=False)
+    cpf = db.Column(db.String(20))
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    restaurante = db.relationship("Restaurante", backref=db.backref("farmacia_clientes", lazy=True, cascade="all, delete-orphan"))
+
+
+class FarmaciaEntrega(db.Model):
+    __tablename__ = "farmacia_entregas"
+
+    id = db.Column(db.Integer, primary_key=True)
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id", ondelete="CASCADE"), nullable=False, index=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey("farmacia_clientes.id", ondelete="SET NULL"), nullable=True, index=True)
+    cooperado_id = db.Column(db.Integer, db.ForeignKey("cooperados.id", ondelete="SET NULL"), nullable=True, index=True)
+    lancamento_id = db.Column(db.Integer, db.ForeignKey("lancamentos.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    codigo_rastreio = db.Column(db.String(40), unique=True, index=True, nullable=False, default=lambda: uuid.uuid4().hex[:12])
+    lote = db.Column(db.String(40), index=True)
+    ordem_rota = db.Column(db.Integer, default=0, nullable=False)
+
+    cliente_nome = db.Column(db.String(120), nullable=False)
+    cliente_telefone = db.Column(db.String(30))
+    cliente_endereco = db.Column(db.String(255), nullable=False)
+    cliente_cpf = db.Column(db.String(20))
+
+    valor_entrega = db.Column(db.Float, default=0.0, nullable=False)
+    observacao = db.Column(db.Text)
+    pago = db.Column(db.Boolean, default=False, nullable=False)
+    forma_pagamento = db.Column(db.String(20))
+    parcelas = db.Column(db.Integer)
+
+    status = db.Column(db.String(30), default="preparacao", nullable=False, index=True)
+    saiu_em = db.Column(db.DateTime)
+    entregue_em = db.Column(db.DateTime)
+    entregue_a = db.Column(db.String(120))
+    nao_entregue_motivo = db.Column(db.Text)
+
+    foto_bytes = db.Column(db.LargeBinary)
+    foto_mime = db.Column(db.String(100))
+    foto_filename = db.Column(db.String(255))
+
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    restaurante = db.relationship("Restaurante", backref=db.backref("farmacia_entregas", lazy=True, cascade="all, delete-orphan"))
+    cliente = db.relationship("FarmaciaCliente", backref=db.backref("entregas", lazy=True))
+    cooperado = db.relationship("Cooperado", backref=db.backref("farmacia_entregas", lazy=True))
+    lancamento = db.relationship("Lancamento", backref=db.backref("farmacia_origem", uselist=False))
 
 
 # === AVALIAÇÕES DE COOPERADO (NOVO) =========================================
@@ -1389,6 +1386,23 @@ def init_db():
                 "CREATE INDEX IF NOT EXISTS ix_av_rest_rest ON avaliacoes_restaurante(restaurante_id, criado_em)"))
             db.session.execute(sa_text(
                 "CREATE INDEX IF NOT EXISTS ix_av_rest_coop ON avaliacoes_restaurante(cooperado_id)"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # 4.4.z) eh_farmacia em restaurantes
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "eh_farmacia" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN eh_farmacia BOOLEAN DEFAULT 0"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("""
+                ALTER TABLE IF EXISTS public.restaurantes
+                ADD COLUMN IF NOT EXISTS eh_farmacia BOOLEAN DEFAULT FALSE
+            """))
             db.session.commit()
     except Exception:
         db.session.rollback()
@@ -3209,13 +3223,6 @@ def media_rest(rest_id: int):
 # =========================
 # Rota raiz
 # =========================
-def _restaurante_home_endpoint(usuario_id: int) -> str:
-    rest = Restaurante.query.filter_by(usuario_id=usuario_id).first()
-    if rest and bool(getattr(rest, "eh_farmacia", False)):
-        return "farmacia_dashboard"
-    return "portal_restaurante"
-
-
 @app.route("/")
 def index():
     uid = session.get("user_id")
@@ -3229,7 +3236,10 @@ def index():
     if u.tipo == "cooperado":
         return redirect(url_for("portal_cooperado"))
     if u.tipo == "restaurante":
-        return redirect(url_for(_restaurante_home_endpoint(u.id)))
+        rest = Restaurante.query.filter_by(usuario_id=u.id).first()
+        if rest and getattr(rest, "eh_farmacia", False):
+            return redirect(url_for("farmacia_dashboard"))
+        return redirect(url_for("portal_restaurante"))
     return redirect(url_for("login"))
 
 # =========================
@@ -3275,7 +3285,10 @@ def login():
             elif u.tipo == "cooperado":
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
-                return redirect(url_for(_restaurante_home_endpoint(u.id)))
+                rest = Restaurante.query.filter_by(usuario_id=u.id).first()
+                if rest and getattr(rest, "eh_farmacia", False):
+                    return redirect(url_for("farmacia_dashboard"))
+                return redirect(url_for("portal_restaurante"))
 
             session.clear()
             flash("Tipo de usuário inválido.", "danger")
@@ -4671,6 +4684,7 @@ def admin_dashboard():
         status_adiantamento_label=_status_adiantamento_label,
         status_adiantamento_badge=_status_adiantamento_badge,
         competencia_humana=_competencia_humana,
+        farmacia_entregas=farmacia_entregas,
     )
 
     ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
@@ -6267,7 +6281,7 @@ def add_restaurante():
     taxa_admin_juros_dia_percentual = f.get("taxa_admin_juros_dia_percentual", type=float) or 0.03
     status_raw = (f.get("ativo") or "1").strip().lower()
     ativo_rest = status_raw in ("1", "true", "ativo", "on", "sim")
-    eh_farmacia = (f.get("eh_farmacia") or "").strip().lower() in ("1", "true", "on", "sim", "farmacia")
+    eh_farmacia = (f.get("eh_farmacia") or "").strip().lower() in ("1", "true", "on", "sim")
 
     if Usuario.query.filter_by(usuario=usuario_login).first():
         flash("Usuário já existente.", "warning")
@@ -6316,11 +6330,11 @@ def edit_restaurante(id):
     r.taxa_admin_juros_dia_percentual = f.get("taxa_admin_juros_dia_percentual", type=float) or 0.03
     status_raw = (f.get('ativo') or '1').strip().lower()
     ativo_rest = status_raw in ('1','true','ativo','on','sim')
+    r.eh_farmacia = (f.get("eh_farmacia") or "").strip().lower() in ("1", "true", "on", "sim")
     if hasattr(r, 'ativo'):
         r.ativo = ativo_rest
     if getattr(r, 'usuario_ref', None) is not None and hasattr(r.usuario_ref, 'ativo'):
         r.usuario_ref.ativo = ativo_rest
-    r.eh_farmacia = (f.get("eh_farmacia") or "").strip().lower() in ("1", "true", "on", "sim", "farmacia")
 
     foto = request.files.get("foto")
     if foto and foto.filename:
@@ -9060,6 +9074,21 @@ def portal_cooperado():
             "linhas_afetadas": linhas_afetadas,
         })
 
+    farmacia_entregas = (
+        FarmaciaEntrega.query
+        .options(selectinload(FarmaciaEntrega.restaurante))
+        .filter(FarmaciaEntrega.cooperado_id == coop.id)
+    )
+    if di:
+        farmacia_entregas = farmacia_entregas.filter(func.date(FarmaciaEntrega.criado_em) >= di)
+    if df:
+        farmacia_entregas = farmacia_entregas.filter(func.date(FarmaciaEntrega.criado_em) <= df)
+    farmacia_entregas = farmacia_entregas.order_by(
+        FarmaciaEntrega.status.asc(),
+        FarmaciaEntrega.ordem_rota.asc(),
+        FarmaciaEntrega.id.asc(),
+    ).all()
+
     return render_template(
         "painel_cooperado.html",
         cooperado=coop,
@@ -9752,72 +9781,6 @@ def recusar_troca(troca_id):
 # =========================
 # PORTAL RESTAURANTE
 # =========================
-@app.route("/farmacia")
-@role_required("restaurante")
-def farmacia_dashboard():
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-    if not bool(getattr(rest, "eh_farmacia", False)):
-        return redirect(url_for("portal_restaurante"))
-
-    di = _parse_date(request.args.get("data_inicio"))
-    df = _parse_date(request.args.get("data_fim"))
-    somente_pendentes = (request.args.get("somente_pendentes") or "").strip().lower() in ("1", "true", "on", "sim")
-    cooperado_id = request.args.get("cooperado_id", type=int)
-
-    q_clientes = FarmaciaCliente.query.filter_by(restaurante_id=rest.id).order_by(FarmaciaCliente.nome.asc())
-    clientes = q_clientes.all()
-
-    q_entregas = FarmaciaEntrega.query.options(
-        selectinload(FarmaciaEntrega.cooperado),
-        selectinload(FarmaciaEntrega.cliente),
-    ).filter(FarmaciaEntrega.restaurante_id == rest.id)
-
-    if di:
-        q_entregas = q_entregas.filter(func.date(FarmaciaEntrega.criado_em) >= di)
-    if df:
-        q_entregas = q_entregas.filter(func.date(FarmaciaEntrega.criado_em) <= df)
-    if somente_pendentes:
-        q_entregas = q_entregas.filter(FarmaciaEntrega.status.in_(["preparacao", "atribuida", "em_rota"]))
-    if cooperado_id:
-        q_entregas = q_entregas.filter(FarmaciaEntrega.cooperado_id == cooperado_id)
-
-    entregas = q_entregas.order_by(
-        FarmaciaEntrega.criado_em.desc(),
-        FarmaciaEntrega.id.desc(),
-    ).all()
-
-    total_gasto_periodo = float(sum((e.valor_entrega or 0.0) for e in entregas))
-    cooperados = Cooperado.query.order_by(Cooperado.nome.asc()).all()
-
-    tpl = os.path.join(app.template_folder or "templates", "farmacia_dashboard.html")
-    if os.path.exists(tpl):
-        return render_template(
-            "farmacia_dashboard.html",
-            restaurante=rest,
-            clientes=clientes,
-            entregas=entregas,
-            cooperados=cooperados,
-            total_gasto_periodo=total_gasto_periodo,
-            data_inicio=di,
-            data_fim=df,
-            somente_pendentes=somente_pendentes,
-            cooperado_id=cooperado_id,
-        )
-
-    return render_template_string(
-        """
-        <html><body style='font-family:Arial;padding:24px'>
-          <h2>Farmácia - {{ restaurante.nome }}</h2>
-          <p>Clientes cadastrados: <b>{{ clientes|length }}</b></p>
-          <p>Entregas no filtro: <b>{{ entregas|length }}</b></p>
-          <p>Total gasto no período: <b>R$ {{ '%.2f'|format(total_gasto_periodo) }}</b></p>
-        </body></html>
-        """,
-        restaurante=rest, clientes=clientes, entregas=entregas, total_gasto_periodo=total_gasto_periodo
-    )
-
-
 @app.route("/portal/restaurante")
 @role_required("restaurante")
 def portal_restaurante():
@@ -9833,6 +9796,8 @@ def portal_restaurante():
             "Seu usuário não está vinculado a um estabelecimento. Avise o administrador."
             "</p>"
         )
+    if getattr(rest, "eh_farmacia", False):
+        return redirect(url_for("farmacia_dashboard"))
 
     # Abas/visões
     view = (request.args.get("view", "lancar") or "lancar").strip().lower()
@@ -11335,6 +11300,290 @@ def avisos_unread_count():
         except Exception:
             pass
         return _nocache_json({"ok": False, "unread": 0, "count": 0, "error": str(e)}, 500)
+
+
+# =========================
+# FARMÁCIA
+# =========================
+def _farmacia_rest_or_403() -> Restaurante:
+    if session.get("user_tipo") != "restaurante":
+        abort(403)
+    rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+    if not getattr(rest, "eh_farmacia", False):
+        abort(403)
+    return rest
+
+
+def _farmacia_status_label(status: str | None) -> str:
+    mp = {
+        "preparacao": "Em preparação",
+        "aguardando": "Aguardando",
+        "em_rota": "Em rota",
+        "indo_ate_voce": "Indo até você",
+        "entregue": "Entregue",
+        "nao_entregue": "Não entregue",
+    }
+    return mp.get((status or "").lower(), status or "-")
+
+
+def _farmacia_status_badge(status: str | None) -> str:
+    s = (status or "").lower()
+    if s == "entregue":
+        return "success"
+    if s == "nao_entregue":
+        return "danger"
+    if s in {"em_rota", "indo_ate_voce"}:
+        return "primary"
+    return "warning"
+
+
+def _save_farmacia_foto(entrega: FarmaciaEntrega, file_storage) -> None:
+    if not file_storage or not getattr(file_storage, "filename", None):
+        return
+    entrega.foto_bytes = file_storage.read()
+    entrega.foto_mime = getattr(file_storage, "mimetype", None) or "application/octet-stream"
+    entrega.foto_filename = secure_filename(file_storage.filename or f"entrega_{entrega.id}.jpg")
+
+
+def _sync_farmacia_lancamento(entrega: FarmaciaEntrega) -> None:
+    valor = round(float(entrega.valor_entrega or 0.0), 2)
+    if valor > 0 and entrega.cooperado_id and entrega.status == "entregue":
+        if entrega.lancamento_id:
+            lanc = Lancamento.query.get(entrega.lancamento_id)
+            if lanc:
+                lanc.cooperado_id = entrega.cooperado_id
+                lanc.valor = valor
+                lanc.data = (entrega.entregue_em.date() if entrega.entregue_em else date.today())
+                lanc.descricao = f"Farmácia - {entrega.cliente_nome}"
+                lanc.qtd_entregas = 1
+                return
+        lanc = Lancamento(
+            restaurante_id=entrega.restaurante_id,
+            cooperado_id=entrega.cooperado_id,
+            descricao=f"Farmácia - {entrega.cliente_nome}",
+            valor=valor,
+            data=(entrega.entregue_em.date() if entrega.entregue_em else date.today()),
+            hora_inicio=(entrega.saiu_em.strftime("%H:%M") if entrega.saiu_em else None),
+            hora_fim=(entrega.entregue_em.strftime("%H:%M") if entrega.entregue_em else None),
+            qtd_entregas=1,
+        )
+        db.session.add(lanc)
+        db.session.flush()
+        entrega.lancamento_id = lanc.id
+    else:
+        if entrega.lancamento_id:
+            lanc = Lancamento.query.get(entrega.lancamento_id)
+            if lanc:
+                db.session.delete(lanc)
+            entrega.lancamento_id = None
+
+
+@app.get("/farmacia")
+@role_required("restaurante")
+def farmacia_dashboard():
+    rest = _farmacia_rest_or_403()
+    di = _parse_date(request.args.get("data_inicio"))
+    df = _parse_date(request.args.get("data_fim"))
+    status = (request.args.get("status") or "").strip().lower()
+    cooperado_id = request.args.get("cooperado_id", type=int)
+
+    clientes = FarmaciaCliente.query.filter_by(restaurante_id=rest.id).order_by(FarmaciaCliente.nome.asc()).all()
+    cooperados = Cooperado.query.order_by(Cooperado.nome.asc()).all()
+
+    q = FarmaciaEntrega.query.filter_by(restaurante_id=rest.id)
+    if di:
+        q = q.filter(func.date(FarmaciaEntrega.criado_em) >= di)
+    if df:
+        q = q.filter(func.date(FarmaciaEntrega.criado_em) <= df)
+    if status:
+        if status == "pendentes":
+            q = q.filter(FarmaciaEntrega.status.notin_(["entregue", "nao_entregue"]))
+        else:
+            q = q.filter(FarmaciaEntrega.status == status)
+    if cooperado_id:
+        q = q.filter(FarmaciaEntrega.cooperado_id == cooperado_id)
+
+    entregas = q.order_by(FarmaciaEntrega.criado_em.desc(), FarmaciaEntrega.ordem_rota.asc(), FarmaciaEntrega.id.desc()).all()
+    total_gasto = sum(float(e.valor_entrega or 0.0) for e in entregas)
+
+    return render_template(
+        "farmacia_dashboard.html",
+        rest=rest,
+        restaurante=rest,
+        clientes=clientes,
+        entregas=entregas,
+        cooperados=cooperados,
+        total_gasto=total_gasto,
+        data_inicio=di,
+        data_fim=df,
+        status=status,
+        cooperado_id=cooperado_id,
+        farmacia_status_label=_farmacia_status_label,
+        farmacia_status_badge=_farmacia_status_badge,
+        current_year=datetime.utcnow().year,
+    )
+
+
+@app.post("/farmacia/clientes/add")
+@role_required("restaurante")
+def farmacia_add_cliente():
+    rest = _farmacia_rest_or_403()
+    f = request.form
+    nome = (f.get("nome") or "").strip()
+    endereco = (f.get("endereco") or "").strip()
+    if not nome or not endereco:
+        flash("Informe nome e endereço do cliente.", "warning")
+        return redirect(url_for("farmacia_dashboard"))
+
+    c = FarmaciaCliente(
+        restaurante_id=rest.id,
+        nome=nome,
+        telefone=(f.get("telefone") or "").strip() or None,
+        endereco=endereco,
+        cpf=(f.get("cpf") or "").strip() or None,
+    )
+    db.session.add(c)
+    db.session.commit()
+    flash("Cliente cadastrado.", "success")
+    return redirect(url_for("farmacia_dashboard"))
+
+
+@app.post("/farmacia/pedidos/add")
+@role_required("restaurante")
+def farmacia_add_pedido():
+    rest = _farmacia_rest_or_403()
+    f = request.form
+    cliente_id = f.get("cliente_id", type=int)
+    cliente = FarmaciaCliente.query.filter_by(id=cliente_id, restaurante_id=rest.id).first() if cliente_id else None
+
+    nome = (f.get("cliente_nome") or (cliente.nome if cliente else "") or "").strip()
+    endereco = (f.get("cliente_endereco") or (cliente.endereco if cliente else "") or "").strip()
+    telefone = (f.get("cliente_telefone") or (cliente.telefone if cliente else "") or "").strip()
+    cpf = (f.get("cliente_cpf") or (cliente.cpf if cliente else "") or "").strip()
+
+    if not nome or not endereco:
+        flash("Informe nome e endereço do pedido.", "warning")
+        return redirect(url_for("farmacia_dashboard"))
+
+    pago = (f.get("pago") or "").strip().lower() in {"1", "true", "on", "sim", "pago"}
+    forma = (f.get("forma_pagamento") or "").strip() or None
+    parcelas = f.get("parcelas", type=int)
+    valor_entrega = round(float(f.get("valor_entrega") or 0.0), 2)
+    cooperado_id = f.get("cooperado_id", type=int)
+    lote = (f.get("lote") or "").strip() or None
+
+    proxima_ordem = (db.session.query(func.max(FarmaciaEntrega.ordem_rota)).filter(FarmaciaEntrega.restaurante_id == rest.id, FarmaciaEntrega.cooperado_id == cooperado_id).scalar() or 0) + 1
+
+    ent = FarmaciaEntrega(
+        restaurante_id=rest.id,
+        cliente_id=(cliente.id if cliente else None),
+        cooperado_id=cooperado_id,
+        lote=lote,
+        ordem_rota=proxima_ordem,
+        cliente_nome=nome,
+        cliente_endereco=endereco,
+        cliente_telefone=telefone or None,
+        cliente_cpf=cpf or None,
+        valor_entrega=valor_entrega,
+        observacao=(f.get("observacao") or "").strip() or None,
+        pago=pago,
+        forma_pagamento=(None if pago else forma),
+        parcelas=(parcelas if (forma or "").lower() == "credito" else None),
+        status="preparacao",
+    )
+    db.session.add(ent)
+    db.session.commit()
+    flash("Pedido lançado na farmácia.", "success")
+    return redirect(url_for("farmacia_dashboard"))
+
+
+@app.post("/farmacia/pedidos/<int:entrega_id>/reordenar")
+@role_required("restaurante")
+def farmacia_reordenar_pedido(entrega_id):
+    rest = _farmacia_rest_or_403()
+    ent = FarmaciaEntrega.query.filter_by(id=entrega_id, restaurante_id=rest.id).first_or_404()
+    ent.ordem_rota = max(1, int(request.form.get("ordem_rota") or ent.ordem_rota or 1))
+    db.session.commit()
+    flash("Ordem da rota atualizada.", "success")
+    return redirect(url_for("farmacia_dashboard"))
+
+
+@app.get("/farmacia/rastreio/<codigo>")
+def farmacia_rastreio(codigo):
+    ent = FarmaciaEntrega.query.filter_by(codigo_rastreio=codigo).first_or_404()
+    ahead = 0
+    if ent.cooperado_id and ent.status not in {"entregue", "nao_entregue"}:
+        ahead = (FarmaciaEntrega.query
+                 .filter(FarmaciaEntrega.cooperado_id == ent.cooperado_id,
+                         FarmaciaEntrega.status.in_(["preparacao", "aguardando", "em_rota", "indo_ate_voce"]),
+                         FarmaciaEntrega.ordem_rota < ent.ordem_rota)
+                 .count())
+    if ahead == 0 and ent.status == "em_rota":
+        label = "indo_ate_voce"
+    else:
+        label = ent.status
+    return render_template("farmacia_rastreio.html", entrega=ent, ahead=ahead, status_publico=label, farmacia_status_label=_farmacia_status_label)
+
+
+@app.post("/cooperado/farmacia/ordem")
+@role_required("cooperado")
+def cooperado_farmacia_ordem():
+    coop = Cooperado.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+    ids_raw = (request.form.get("ids") or "").strip()
+    ids = [int(x) for x in ids_raw.split(",") if x.strip().isdigit()]
+    if not ids:
+        flash("Nenhuma entrega informada para reorganizar.", "warning")
+        return redirect(url_for("portal_cooperado", active_tab="farmacia"))
+
+    entregas = FarmaciaEntrega.query.filter(FarmaciaEntrega.id.in_(ids), FarmaciaEntrega.cooperado_id == coop.id).all()
+    ordem_map = {eid: i+1 for i, eid in enumerate(ids)}
+    for ent in entregas:
+        ent.ordem_rota = ordem_map.get(ent.id, ent.ordem_rota or 1)
+    db.session.commit()
+    flash("Rota reorganizada.", "success")
+    return redirect(url_for("portal_cooperado", active_tab="farmacia"))
+
+
+@app.post("/cooperado/farmacia/<int:entrega_id>/saida")
+@role_required("cooperado")
+def cooperado_farmacia_saida(entrega_id):
+    coop = Cooperado.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+    ent = FarmaciaEntrega.query.filter_by(id=entrega_id, cooperado_id=coop.id).first_or_404()
+    ent.status = "em_rota"
+    ent.saiu_em = ent.saiu_em or datetime.utcnow()
+    db.session.commit()
+    flash("Saída registrada.", "success")
+    return redirect(url_for("portal_cooperado", active_tab="farmacia"))
+
+
+@app.post("/cooperado/farmacia/<int:entrega_id>/entregue")
+@role_required("cooperado")
+def cooperado_farmacia_entregue(entrega_id):
+    coop = Cooperado.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+    ent = FarmaciaEntrega.query.filter_by(id=entrega_id, cooperado_id=coop.id).first_or_404()
+    ent.status = "entregue"
+    ent.entregue_em = datetime.utcnow()
+    ent.entregue_a = (request.form.get("entregue_a") or "").strip() or None
+    foto = request.files.get("foto")
+    if foto and foto.filename:
+        _save_farmacia_foto(ent, foto)
+    _sync_farmacia_lancamento(ent)
+    db.session.commit()
+    flash("Entrega concluída.", "success")
+    return redirect(url_for("portal_cooperado", active_tab="farmacia"))
+
+
+@app.post("/cooperado/farmacia/<int:entrega_id>/nao_entregue")
+@role_required("cooperado")
+def cooperado_farmacia_nao_entregue(entrega_id):
+    coop = Cooperado.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+    ent = FarmaciaEntrega.query.filter_by(id=entrega_id, cooperado_id=coop.id).first_or_404()
+    ent.status = "nao_entregue"
+    ent.nao_entregue_motivo = (request.form.get("motivo") or "").strip() or None
+    _sync_farmacia_lancamento(ent)
+    db.session.commit()
+    flash("Entrega marcada como não entregue.", "warning")
+    return redirect(url_for("portal_cooperado", active_tab="farmacia"))
 
 import click
 
