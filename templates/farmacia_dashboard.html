@@ -7,22 +7,61 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <style>
-    :root{--royal:#2747d9;--royal2:#3358f0;--dark:#16258a;--soft:#eef3ff;--bg:#f4f7fc;--card:#fff;--text:#182033;--muted:#6f7b96;--border:#e7ecf7;--success:#16a34a;--warning:#f59e0b;--danger:#ef4444;--radius:20px;--shadow:0 12px 28px rgba(15,23,42,.08);--sidebar:285px}
-    *{box-sizing:border-box} body{margin:0;font-family:Inter,Arial,sans-serif;background:linear-gradient(180deg,#f8faff 0%,#f2f6fc 100%);color:var(--text)}
-    .layout{display:flex;min-height:100vh}.sidebar{width:var(--sidebar);position:fixed;left:0;top:0;bottom:0;background:linear-gradient(180deg,var(--royal2),var(--royal),var(--dark));padding:18px 14px;color:#fff;overflow-y:auto}
-    .brand{padding:18px;border-radius:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);margin-bottom:14px}.brand h1{font-size:1.05rem;margin:0 0 6px;font-weight:800}.brand small{opacity:.85}
-    .menu a{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff;padding:11px 12px;border-radius:14px;margin:6px 0}.menu a:hover,.menu a.active{background:rgba(255,255,255,.14)}
-    .main{margin-left:var(--sidebar);flex:1;padding:22px}.hero{background:linear-gradient(135deg,var(--royal),var(--royal2));color:#fff;border-radius:28px;padding:22px;box-shadow:0 18px 40px rgba(39,71,217,.2);margin-bottom:18px}.hero h2{margin:0;font-size:1.5rem;font-weight:800}.hero p{margin:6px 0 0;color:rgba(255,255,255,.86)}
-    .cardx{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}.cardx .body{padding:18px}.kpi{padding:18px;border-radius:18px;background:#fff;border:1px solid var(--border);box-shadow:var(--shadow);height:100%}
-    .kpi .label{font-size:.8rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}.kpi .val{font-size:1.5rem;font-weight:800;margin-top:6px}.soft{background:var(--soft)}
-    .table-wrap{overflow:auto;border-radius:18px;border:1px solid var(--border)} .table thead th{position:sticky;top:0;background:#f8fbff;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
-    .form-control,.form-select{border-radius:14px;min-height:42px;border:1px solid var(--border)} .btn-royal{background:linear-gradient(135deg,var(--royal),var(--royal2));color:#fff;border:0;border-radius:14px;padding:10px 14px;font-weight:700}
-    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:.78rem;font-weight:700}.chip.success{background:#ecfdf3;color:#15803d}.chip.warning{background:#fff7ed;color:#c2410c}.chip.info{background:#eef3ff;color:#2747d9}.chip.gray{background:#f3f4f6;color:#475569}.chip.danger{background:#fef2f2;color:#b91c1c}
-    .item-row{display:grid;grid-template-columns:2fr .7fr .8fr auto;gap:10px;margin-bottom:8px}.item-row:last-child{margin-bottom:0}.med-list{font-size:.9rem}.med-list div{padding:4px 0;border-bottom:1px dashed #e6ebf5}.med-list div:last-child{border-bottom:0}
-    .toolbar{display:flex;gap:10px;flex-wrap:wrap}.muted{color:var(--muted)}
-    .modal-content{background:#fff;border:1px solid var(--border);border-radius:18px;box-shadow:0 20px 50px rgba(15,23,42,.20)}
-    .modal-backdrop.show{opacity:.5}
- @media(max-width:992px){.sidebar{position:static;width:100%}.main{margin-left:0}.layout{display:block}.item-row{grid-template-columns:1fr}}
+    :root{
+      --royal:#2747d9; --royal2:#3358f0; --dark:#16258a; --soft:#eef3ff; --bg:#f4f7fc;
+      --card:#fff; --text:#182033; --muted:#6f7b96; --border:#e7ecf7; --success:#16a34a;
+      --warning:#f59e0b; --danger:#ef4444; --radius:18px; --shadow:0 10px 22px rgba(15,23,42,.07);
+      --sidebar:270px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,Arial,sans-serif;background:linear-gradient(180deg,#f8faff 0%,#f2f6fc 100%);color:var(--text)}
+    .layout{display:flex;min-height:100vh}
+    .sidebar{width:var(--sidebar);position:fixed;left:0;top:0;bottom:0;background:linear-gradient(180deg,var(--royal2),var(--royal),var(--dark));padding:16px 12px;color:#fff;overflow-y:auto}
+    .brand{padding:16px;border-radius:16px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.10);margin-bottom:12px}
+    .brand h1{font-size:1rem;margin:0 0 4px;font-weight:800}
+    .brand small{opacity:.86}
+    .menu a{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff;padding:10px 12px;border-radius:12px;margin:5px 0}
+    .menu a:hover,.menu a.active{background:rgba(255,255,255,.14)}
+    .main{margin-left:var(--sidebar);flex:1;padding:18px}
+    .hero{background:linear-gradient(135deg,var(--royal),var(--royal2));color:#fff;border-radius:24px;padding:18px;box-shadow:0 14px 30px rgba(39,71,217,.18);margin-bottom:14px}
+    .hero h2{margin:0;font-size:1.35rem;font-weight:800}
+    .hero p{margin:6px 0 0;color:rgba(255,255,255,.88)}
+    .cardx{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .bodyx{padding:16px}
+    .kpi{padding:16px;border-radius:16px;background:#fff;border:1px solid var(--border);box-shadow:var(--shadow);height:100%}
+    .kpi .label{font-size:.78rem;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+    .kpi .val{font-size:1.35rem;font-weight:800;margin-top:6px}
+    .table-wrap{overflow:auto;border-radius:16px;border:1px solid var(--border);background:#fff}
+    .table{margin-bottom:0}
+    .table thead th{position:sticky;top:0;background:#f8fbff;font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+    .table td{vertical-align:middle}
+    .form-control,.form-select{border-radius:12px;min-height:40px;border:1px solid var(--border)}
+    textarea.form-control{min-height:84px}
+    .btn-royal{background:linear-gradient(135deg,var(--royal),var(--royal2));color:#fff;border:0;border-radius:12px;padding:10px 14px;font-weight:700}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:.78rem;font-weight:800}
+    .chip.success{background:#ecfdf3;color:#15803d}.chip.warning{background:#fff7ed;color:#c2410c}
+    .chip.info{background:#eef3ff;color:#2747d9}.chip.gray{background:#f3f4f6;color:#475569}.chip.danger{background:#fef2f2;color:#b91c1c}
+    .toolbar{display:flex;gap:6px;flex-wrap:wrap}
+    .item-row{display:grid;grid-template-columns:2fr .7fr .8fr auto;gap:8px;margin-bottom:8px}
+    .item-row:last-child{margin-bottom:0}
+    .small-muted{color:var(--muted);font-size:.88rem}
+    .med-list{font-size:.88rem;line-height:1.35}
+    .med-list div{padding:3px 0;border-bottom:1px dashed #edf1fa}
+    .med-list div:last-child{border-bottom:0}
+    .sticky-actions{display:flex;gap:8px;justify-content:flex-end}
+    .modal-content{border-radius:18px;border:1px solid var(--border);box-shadow:0 24px 60px rgba(15,23,42,.18);background:#fff}
+    .modal-header,.modal-footer{border-color:#edf1fa}
+    .offcanvas{max-width:680px}
+    @media(max-width:992px){
+      .sidebar{position:static;width:100%}
+      .main{margin-left:0}
+      .layout{display:block}
+    }
+    @media(max-width:768px){
+      .item-row{grid-template-columns:1fr}
+      .hero h2{font-size:1.15rem}
+      .kpi .val{font-size:1.15rem}
+    }
   </style>
 </head>
 <body>
@@ -36,7 +75,7 @@
       <small>Painel da Farmácia • Coopex</small>
     </div>
     <nav class="menu">
-      <a href="{{ url_for('farmacia_dashboard', view='clientes') }}" class="{{ 'active' if v=='clientes' else '' }}"><i class="bi bi-people"></i> Cadastro de clientes</a>
+      <a href="{{ url_for('farmacia_dashboard', view='clientes') }}" class="{{ 'active' if v=='clientes' else '' }}"><i class="bi bi-people"></i> Clientes</a>
       <a href="{{ url_for('farmacia_dashboard', view='pedidos') }}" class="{{ 'active' if v=='pedidos' else '' }}"><i class="bi bi-bag-plus"></i> Pedidos</a>
       <a href="{{ url_for('farmacia_dashboard', view='lotes') }}" class="{{ 'active' if v=='lotes' else '' }}"><i class="bi bi-boxes"></i> Montar lote</a>
       <a href="{{ url_for('farmacia_dashboard', view='historico', data_inicio=di, data_fim=df, status=filtro_status|default(''), cooperado_id=filtro_cooperado_id or '') }}" class="{{ 'active' if v=='historico' else '' }}"><i class="bi bi-clock-history"></i> Histórico</a>
@@ -47,7 +86,7 @@
   <main class="main">
     <section class="hero">
       <h2>Operação da farmácia</h2>
-      <p>Cadastre clientes, lance pedidos com medicamento e valor, monte o lote depois e acompanhe o retorno do motoboy.</p>
+      <p>Estrutura mais leve: um único modal para editar cliente, um único modal para editar pedido e um único modal para atualizar status.</p>
     </section>
 
     <div class="row g-3 mb-3">
@@ -57,7 +96,7 @@
     </div>
 
     {% if v == 'clientes' %}
-    <div class="cardx mb-3"><div class="body">
+    <div class="cardx mb-3"><div class="bodyx">
       <h5 class="mb-3"><i class="bi bi-person-plus"></i> Novo cliente</h5>
       <form method="post" action="{{ url_for('farmacia_add_cliente') }}" class="row g-3">
         <div class="col-md-4"><label class="form-label">Nome</label><input class="form-control" name="nome" required></div>
@@ -67,100 +106,486 @@
         <div class="col-12"><button class="btn btn-royal"><i class="bi bi-save"></i> Cadastrar cliente</button></div>
       </form>
     </div></div>
-    <div class="cardx"><div class="body">
-      <div class="table-wrap"><table class="table table-sm table-hover align-middle mb-0"><thead><tr><th>Nome</th><th>Telefone</th><th>Endereço</th><th>CPF</th><th>Ações</th></tr></thead><tbody>
-      {% for c in clientes %}
-      <tr>
-        <td>{{ c.nome }}</td><td>{{ c.telefone or '-' }}</td><td>{{ c.endereco }}</td><td>{{ c.cpf or '-' }}</td>
-        <td>
-          <div class="toolbar">
-            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCliente{{ c.id }}"><i class="bi bi-pencil"></i></button>
-            <form method="post" action="{{ url_for('farmacia_delete_cliente', cliente_id=c.id) }}" onsubmit="return confirm('Excluir cliente?');"><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
-          </div>
-          <div class="modal fade" id="editCliente{{ c.id }}" tabindex="-1"><div class="modal-dialog"><form method="post" action="{{ url_for('farmacia_edit_cliente', cliente_id=c.id) }}" class="modal-content"><div class="modal-header"><h5 class="modal-title">Editar cliente</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body row g-3"><div class="col-12"><label class="form-label">Nome</label><input class="form-control" name="nome" value="{{ c.nome }}"></div><div class="col-md-6"><label class="form-label">Telefone</label><input class="form-control" name="telefone" value="{{ c.telefone or '' }}"></div><div class="col-md-6"><label class="form-label">CPF</label><input class="form-control" name="cpf" value="{{ c.cpf or '' }}"></div><div class="col-12"><label class="form-label">Endereço</label><input class="form-control" name="endereco" value="{{ c.endereco }}"></div></div><div class="modal-footer"><button class="btn btn-royal">Salvar</button></div></form></div></div>
-        </td>
-      </tr>
-      {% else %}<tr><td colspan="5" class="text-center text-muted py-4">Nenhum cliente cadastrado.</td></tr>{% endfor %}
-      </tbody></table></div>
+
+    <div class="cardx"><div class="bodyx">
+      <div class="table-wrap">
+        <table class="table table-sm table-hover align-middle">
+          <thead><tr><th>Nome</th><th>Telefone</th><th>Endereço</th><th>CPF</th><th style="width:140px">Ações</th></tr></thead>
+          <tbody>
+            {% for c in clientes %}
+            <tr>
+              <td>{{ c.nome }}</td>
+              <td>{{ c.telefone or '-' }}</td>
+              <td>{{ c.endereco }}</td>
+              <td>{{ c.cpf or '-' }}</td>
+              <td>
+                <div class="toolbar">
+                  <button class="btn btn-sm btn-outline-primary edit-cliente-btn"
+                          type="button"
+                          data-bs-toggle="modal"
+                          data-bs-target="#editClienteModal"
+                          data-id="{{ c.id }}"
+                          data-nome="{{ c.nome }}"
+                          data-telefone="{{ c.telefone or '' }}"
+                          data-endereco="{{ c.endereco }}"
+                          data-cpf="{{ c.cpf or '' }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <form method="post" action="{{ url_for('farmacia_delete_cliente', cliente_id=c.id) }}" onsubmit="return confirm('Excluir cliente?');">
+                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-4">Nenhum cliente cadastrado.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div></div>
     {% endif %}
 
     {% if v == 'pedidos' %}
-    <div class="cardx mb-3"><div class="body">
+    <div class="cardx mb-3"><div class="bodyx">
       <h5 class="mb-3"><i class="bi bi-bag-plus"></i> Novo pedido</h5>
       <form method="post" action="{{ url_for('farmacia_add_pedido') }}" class="row g-3" id="formPedidoFarmacia">
-        <div class="col-md-3"><label class="form-label">Cliente cadastrado</label><select class="form-select" name="cliente_id" id="clienteSelect"><option value="">Selecionar</option>{% for c in clientes %}<option value="{{ c.id }}" data-nome="{{ c.nome }}" data-telefone="{{ c.telefone or '' }}" data-endereco="{{ c.endereco }}" data-cpf="{{ c.cpf or '' }}">{{ c.nome }}</option>{% endfor %}</select></div>
+        <div class="col-md-3">
+          <label class="form-label">Cliente cadastrado</label>
+          <select class="form-select" name="cliente_id" id="clienteSelect">
+            <option value="">Selecionar</option>
+            {% for c in clientes %}
+            <option value="{{ c.id }}" data-nome="{{ c.nome }}" data-telefone="{{ c.telefone or '' }}" data-endereco="{{ c.endereco }}" data-cpf="{{ c.cpf or '' }}">{{ c.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
         <div class="col-md-3"><label class="form-label">Nome do cliente</label><input class="form-control" name="cliente_nome" id="clienteNome" required></div>
         <div class="col-md-2"><label class="form-label">Telefone</label><input class="form-control" name="telefone" id="clienteTelefone"></div>
         <div class="col-md-4"><label class="form-label">Endereço</label><input class="form-control" name="endereco" id="clienteEndereco" required></div>
         <div class="col-md-2"><label class="form-label">CPF</label><input class="form-control" name="cpf" id="clienteCpf"></div>
         <div class="col-md-2"><label class="form-label">Valor do pedido</label><input type="number" step="0.01" class="form-control" name="valor_pedido" placeholder="0,00"></div>
         <div class="col-md-2"><label class="form-label">Valor da entrega</label><input type="number" step="0.01" class="form-control" name="valor_entrega" placeholder="0,00"></div>
-        <div class="col-md-2 d-flex align-items-end"><div class="form-check form-switch ms-2"><input class="form-check-input" type="checkbox" role="switch" id="pedidoPago" name="pago" value="1"><label class="form-check-label" for="pedidoPago">Já está pago</label></div></div>
+        <div class="col-md-2 d-flex align-items-end">
+          <div class="form-check form-switch ms-2">
+            <input class="form-check-input" type="checkbox" role="switch" id="pedidoPago" name="pago" value="1">
+            <label class="form-check-label" for="pedidoPago">Já está pago</label>
+          </div>
+        </div>
         <div class="col-md-3 payment-fields"><label class="form-label">Forma de pagamento</label><select class="form-select" name="forma_pagamento" id="formaPagamento"><option value="">Selecionar</option><option value="debito">Débito</option><option value="credito">Crédito</option><option value="especie">Espécie</option><option value="pix">Pix</option></select></div>
         <div class="col-md-1 payment-fields" id="parcelasWrap" style="display:none;"><label class="form-label">Parcelas</label><input type="number" class="form-control" name="parcelas" min="1" max="24"></div>
         <div class="col-md-12"><label class="form-label">Observação</label><textarea class="form-control" rows="2" name="observacao"></textarea></div>
-        <div class="col-12"><label class="form-label">Medicamentos / itens</label><div id="itensWrap"><div class="item-row"><input class="form-control" name="item_nome[]" placeholder="Medicamento / material"><input class="form-control" name="item_qtd[]" placeholder="Qtd."><input class="form-control" type="number" step="0.01" name="item_valor[]" placeholder="Valor"><button class="btn btn-outline-danger" type="button" onclick="removeItemRow(this)"><i class="bi bi-trash"></i></button></div></div><button class="btn btn-sm btn-outline-primary mt-2" type="button" onclick="addItemRow()"><i class="bi bi-plus-circle"></i> Adicionar item</button></div>
+        <div class="col-12">
+          <label class="form-label">Medicamentos / itens</label>
+          <div id="itensWrap">
+            <div class="item-row">
+              <input class="form-control" name="item_nome[]" placeholder="Medicamento / material">
+              <input class="form-control" name="item_qtd[]" placeholder="Qtd.">
+              <input type="number" step="0.01" class="form-control" name="item_valor[]" placeholder="Valor">
+              <button class="btn btn-outline-danger" type="button" onclick="removeItemRow(this)"><i class="bi bi-trash"></i></button>
+            </div>
+          </div>
+          <button class="btn btn-sm btn-outline-primary mt-2" type="button" onclick="addItemRow(document.getElementById('itensWrap'))"><i class="bi bi-plus-circle"></i> Adicionar item</button>
+        </div>
         <div class="col-12"><button class="btn btn-royal"><i class="bi bi-send"></i> Lançar pedido</button></div>
       </form>
     </div></div>
 
-    <div class="cardx"><div class="body">
+    <div class="cardx"><div class="bodyx">
       <h5 class="mb-3"><i class="bi bi-boxes"></i> Pedidos cadastrados</h5>
-      <div class="table-wrap"><table class="table table-sm table-hover align-middle mb-0"><thead><tr><th>#</th><th>Cliente</th><th>Itens</th><th>Valor pedido</th><th>Entrega</th><th>Pagamento</th><th>Status</th><th>Ações</th></tr></thead><tbody>
-      {% for p in pedidos %}
-      <tr>
-        <td>{{ p.id }}</td><td>{{ p.cliente_nome }}</td><td class="small">{{ p.itens_resumo }}</td><td>R$ {{ '%.2f'|format(p.valor_pedido|default(0)) }}</td><td>R$ {{ '%.2f'|format(p.valor_entrega|default(0)) }}</td>
-        <td>{% if p.pago %}<span class="chip success">Pago</span>{% else %}<span class="chip warning">{{ (p.forma_pagamento or 'Não informado')|capitalize }}</span>{% endif %}</td>
-        <td><span class="chip {{ farmacia_status_badge(p.status) if farmacia_status_badge is defined else 'info' }}">{{ p.status_label }}</span></td>
-        <td>
-          <div class="toolbar"><button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editPedido{{ p.id }}"><i class="bi bi-pencil"></i></button><form method="post" action="{{ url_for('farmacia_delete_pedido', pedido_id=p.id) }}" onsubmit="return confirm('Excluir pedido?');"><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form></div>
-          <div class="modal fade" id="editPedido{{ p.id }}" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg"><form method="post" action="{{ url_for('farmacia_edit_pedido', pedido_id=p.id) }}" class="modal-content"><div class="modal-header"><h5 class="modal-title">Editar pedido #{{ p.id }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body row g-3"><div class="col-md-4"><label class="form-label">Nome do cliente</label><input class="form-control" name="cliente_nome" value="{{ p.cliente_nome }}"></div><div class="col-md-3"><label class="form-label">Telefone</label><input class="form-control" name="telefone" value="{{ p.telefone }}"></div><div class="col-md-5"><label class="form-label">Endereço</label><input class="form-control" name="endereco" value="{{ p.endereco }}"></div><div class="col-md-2"><label class="form-label">CPF</label><input class="form-control" name="cpf" value="{{ p.cpf }}"></div><div class="col-md-2"><label class="form-label">Valor do pedido</label><input type="number" step="0.01" class="form-control" name="valor_pedido" value="{{ '%.2f'|format(p.valor_pedido|default(0)) }}"></div><div class="col-md-2"><label class="form-label">Valor da entrega</label><input type="number" step="0.01" class="form-control" name="valor_entrega" value="{{ '%.2f'|format(p.valor_entrega|default(0)) }}"></div><div class="col-md-2 d-flex align-items-end"><div class="form-check form-switch"><input class="form-check-input pedido-pago-edit" type="checkbox" name="pago" value="1" {{ 'checked' if p.pago else '' }}><label class="form-check-label">Pago</label></div></div><div class="col-md-2"><label class="form-label">Forma</label><select class="form-select" name="forma_pagamento"><option value="">Selecionar</option><option value="debito" {{ 'selected' if p.forma_pagamento=='debito' else '' }}>Débito</option><option value="credito" {{ 'selected' if p.forma_pagamento=='credito' else '' }}>Crédito</option><option value="especie" {{ 'selected' if p.forma_pagamento=='especie' else '' }}>Espécie</option><option value="pix" {{ 'selected' if p.forma_pagamento=='pix' else '' }}>Pix</option></select></div><div class="col-md-2"><label class="form-label">Parcelas</label><input type="number" class="form-control" name="parcelas" value="{{ p.parcelas or '' }}"></div><div class="col-12"><label class="form-label">Observação</label><textarea class="form-control" name="observacao" rows="2">{{ p.observacao }}</textarea></div><div class="col-12"><label class="form-label">Itens</label><div>{% for item in p.itens %}<div class="item-row"><input class="form-control" name="item_nome[]" value="{{ item.descricao }}"><input class="form-control" name="item_qtd[]" value="{{ item.quantidade }}"><input type="number" step="0.01" class="form-control" name="item_valor[]" value="{{ '%.2f'|format(item.valor_item|default(0)) }}"><button class="btn btn-outline-danger" type="button" onclick="removeItemRow(this)"><i class="bi bi-trash"></i></button></div>{% endfor %}{% if not p.itens %}<div class="item-row"><input class="form-control" name="item_nome[]" placeholder="Medicamento / material"><input class="form-control" name="item_qtd[]" placeholder="Qtd."><input type="number" step="0.01" class="form-control" name="item_valor[]" placeholder="Valor"><button class="btn btn-outline-danger" type="button" onclick="removeItemRow(this)"><i class="bi bi-trash"></i></button></div>{% endif %}</div><button class="btn btn-sm btn-outline-primary mt-2" type="button" onclick="addItemRow(this.closest('.modal-content').querySelector('.modal-body'))"><i class="bi bi-plus-circle"></i> Adicionar item</button></div></div><div class="modal-footer"><button class="btn btn-royal">Salvar</button></div></form></div></div></td>
-      </tr>
-      {% else %}<tr><td colspan="8" class="text-center text-muted py-4">Nenhum pedido cadastrado.</td></tr>{% endfor %}
-      </tbody></table></div>
+      <div class="table-wrap">
+        <table class="table table-sm table-hover align-middle">
+          <thead><tr><th>#</th><th>Cliente</th><th>Itens</th><th>Produto</th><th>Entrega</th><th>Pagamento</th><th>Status</th><th>Rastreio</th><th style="width:150px">Ações</th></tr></thead>
+          <tbody>
+            {% for p in pedidos %}
+            <tr>
+              <td>{{ p.id }}</td>
+              <td>{{ p.cliente_nome }}</td>
+              <td class="med-list">
+                {% if p.itens %}
+                  {% for item in p.itens %}
+                    <div>{{ item.descricao }}{% if item.quantidade %} • {{ item.quantidade }}{% endif %}</div>
+                  {% endfor %}
+                {% else %}
+                  {{ p.itens_resumo or '-' }}
+                {% endif %}
+              </td>
+              <td>R$ {{ '%.2f'|format(p.valor_pedido|default(0)) }}</td>
+              <td>R$ {{ '%.2f'|format(p.valor_entrega|default(0)) }}</td>
+              <td>{% if p.pago %}<span class="chip success">Pago</span>{% else %}<span class="chip warning">{{ (p.forma_pagamento or 'Não informado')|capitalize }}</span>{% endif %}</td>
+              <td><span class="chip {{ farmacia_status_badge(p.status) if farmacia_status_badge is defined else 'info' }}">{{ p.status_label }}</span></td>
+              <td>
+                {% if p.tracking_url %}
+                  <div class="toolbar">
+                    <a href="{{ p.tracking_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir</a>
+                    <button class="btn btn-sm btn-outline-primary" type="button" onclick="copyText('{{ p.tracking_url }}')">Copiar</button>
+                  </div>
+                {% else %}-{% endif %}
+              </td>
+              <td>
+                <div class="toolbar">
+                  <button class="btn btn-sm btn-outline-primary edit-pedido-btn"
+                          type="button"
+                          data-bs-toggle="modal"
+                          data-bs-target="#editPedidoModal"
+                          data-id="{{ p.id }}"
+                          data-cliente_nome="{{ p.cliente_nome }}"
+                          data-telefone="{{ p.telefone or '' }}"
+                          data-endereco="{{ p.endereco or '' }}"
+                          data-cpf="{{ p.cpf or '' }}"
+                          data-valor_pedido="{{ '%.2f'|format(p.valor_pedido|default(0)) }}"
+                          data-valor_entrega="{{ '%.2f'|format(p.valor_entrega|default(0)) }}"
+                          data-pago="{{ '1' if p.pago else '0' }}"
+                          data-forma_pagamento="{{ p.forma_pagamento or '' }}"
+                          data-parcelas="{{ p.parcelas or '' }}"
+                          data-observacao="{{ p.observacao or '' }}"
+                          data-itens='{{ p.itens|tojson if p.itens is defined else []|tojson }}'>
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <form method="post" action="{{ url_for('farmacia_delete_pedido', pedido_id=p.id) }}" onsubmit="return confirm('Excluir pedido?');">
+                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9" class="text-center text-muted py-4">Nenhum pedido cadastrado.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div></div>
     {% endif %}
 
     {% if v == 'lotes' %}
-    <div class="cardx"><div class="body">
+    <div class="cardx"><div class="bodyx">
       <h5 class="mb-3"><i class="bi bi-boxes"></i> Montar lote</h5>
       <form method="post" action="{{ url_for('farmacia_salvar_lote') }}">
-        <div class="row g-3 mb-3"><div class="col-md-4"><label class="form-label">Motoboy</label><select class="form-select" name="cooperado_id" required><option value="">Selecionar</option>{% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}</select></div><div class="col-md-4"><label class="form-label">Nome do lote</label><input class="form-control" name="lote" placeholder="Ex.: TARDE-01"></div><div class="col-md-4 d-flex align-items-end"><button class="btn btn-royal w-100"><i class="bi bi-send-check"></i> Enviar lote</button></div></div>
-        <div class="table-wrap"><table class="table table-sm table-hover align-middle mb-0"><thead><tr><th></th><th>Cliente</th><th>Itens</th><th>Produto</th><th>Entrega</th><th>Pagamento</th><th>Status</th></tr></thead><tbody>
-        {% for p in pedidos_sem_lote %}
-          <tr><td><input type="checkbox" class="form-check-input" name="entrega_ids" value="{{ p.id }}"></td><td>{{ p.cliente_nome }}</td><td class="small">{{ p.itens_resumo }}</td><td>R$ {{ '%.2f'|format(p.valor_pedido|default(0)) }}</td><td>R$ {{ '%.2f'|format(p.valor_entrega|default(0)) }}</td><td>{% if p.pago %}<span class="chip success">Pago</span>{% else %}<span class="chip warning">{{ (p.forma_pagamento or 'Não informado')|capitalize }}</span>{% endif %}</td><td><span class="chip gray">{{ p.status_label }}</span></td></tr>
-        {% else %}<tr><td colspan="7" class="text-center text-muted py-4">Nenhum pedido aguardando lote.</td></tr>{% endfor %}
-        </tbody></table></div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4"><label class="form-label">Motoboy</label><select class="form-select" name="cooperado_id" required><option value="">Selecionar</option>{% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}</select></div>
+          <div class="col-md-4"><label class="form-label">Nome do lote</label><input class="form-control" name="lote" placeholder="Ex.: TARDE-01"></div>
+          <div class="col-md-4 d-flex align-items-end"><button class="btn btn-royal w-100"><i class="bi bi-send-check"></i> Enviar lote</button></div>
+        </div>
+        <div class="table-wrap">
+          <table class="table table-sm table-hover align-middle">
+            <thead><tr><th></th><th>Cliente</th><th>Itens</th><th>Produto</th><th>Entrega</th><th>Pagamento</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for p in pedidos_sem_lote %}
+              <tr>
+                <td><input type="checkbox" class="form-check-input" name="entrega_ids" value="{{ p.id }}"></td>
+                <td>{{ p.cliente_nome }}</td>
+                <td class="small">{{ p.itens_resumo }}</td>
+                <td>R$ {{ '%.2f'|format(p.valor_pedido|default(0)) }}</td>
+                <td>R$ {{ '%.2f'|format(p.valor_entrega|default(0)) }}</td>
+                <td>{% if p.pago %}<span class="chip success">Pago</span>{% else %}<span class="chip warning">{{ (p.forma_pagamento or 'Não informado')|capitalize }}</span>{% endif %}</td>
+                <td><span class="chip gray">{{ p.status_label }}</span></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="7" class="text-center text-muted py-4">Nenhum pedido aguardando lote.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </form>
     </div></div>
     {% endif %}
 
     {% if v == 'historico' %}
-    <div class="cardx mb-3"><div class="body">
-      <form method="get" class="row g-3 align-items-end"><input type="hidden" name="view" value="historico"><div class="col-md-2"><label class="form-label">Data inicial</label><input type="date" class="form-control" name="data_inicio" value="{{ di }}"></div><div class="col-md-2"><label class="form-label">Data final</label><input type="date" class="form-control" name="data_fim" value="{{ df }}"></div><div class="col-md-3"><label class="form-label">Status</label><select class="form-select" name="status"><option value="" {{ '' == filtro_status and 'selected' or '' }}>Todos</option><option value="pendentes" {{ 'pendentes' == filtro_status and 'selected' or '' }}>Somente pendentes</option><option value="aguardando" {{ 'aguardando' == filtro_status and 'selected' or '' }}>Aguardando lote</option><option value="aguardando_motoboy" {{ 'aguardando_motoboy' == filtro_status and 'selected' or '' }}>Aguardando motoboy</option><option value="em_rota" {{ 'em_rota' == filtro_status and 'selected' or '' }}>Em rota</option><option value="indo_ate_voce" {{ 'indo_ate_voce' == filtro_status and 'selected' or '' }}>Indo até você</option><option value="entregue" {{ 'entregue' == filtro_status and 'selected' or '' }}>Entregue</option><option value="nao_entregue" {{ 'nao_entregue' == filtro_status and 'selected' or '' }}>Não entregue</option></select></div><div class="col-md-3"><label class="form-label">Cooperado</label><select class="form-select" name="cooperado_id"><option value="">Todos</option>{% for coop in cooperados %}<option value="{{ coop.id }}" {{ 'selected' if filtro_cooperado_id == coop.id else '' }}>{{ coop.nome }}</option>{% endfor %}</select></div><div class="col-md-2"><button class="btn btn-royal w-100"><i class="bi bi-funnel"></i> Filtrar</button></div></form>
+    <div class="cardx mb-3"><div class="bodyx">
+      <form method="get" class="row g-3 align-items-end">
+        <input type="hidden" name="view" value="historico">
+        <div class="col-md-2"><label class="form-label">Data inicial</label><input type="date" class="form-control" name="data_inicio" value="{{ di }}"></div>
+        <div class="col-md-2"><label class="form-label">Data final</label><input type="date" class="form-control" name="data_fim" value="{{ df }}"></div>
+        <div class="col-md-3"><label class="form-label">Status</label>
+          <select class="form-select" name="status">
+            <option value="" {{ '' == filtro_status and 'selected' or '' }}>Todos</option>
+            <option value="pendentes" {{ 'pendentes' == filtro_status and 'selected' or '' }}>Somente pendentes</option>
+            <option value="aguardando" {{ 'aguardando' == filtro_status and 'selected' or '' }}>Aguardando lote</option>
+            <option value="aguardando_motoboy" {{ 'aguardando_motoboy' == filtro_status and 'selected' or '' }}>Aguardando motoboy</option>
+            <option value="em_rota" {{ 'em_rota' == filtro_status and 'selected' or '' }}>Em rota</option>
+            <option value="indo_ate_voce" {{ 'indo_ate_voce' == filtro_status and 'selected' or '' }}>Indo até você</option>
+            <option value="entregue" {{ 'entregue' == filtro_status and 'selected' or '' }}>Entregue</option>
+            <option value="nao_entregue" {{ 'nao_entregue' == filtro_status and 'selected' or '' }}>Não entregue</option>
+          </select>
+        </div>
+        <div class="col-md-3"><label class="form-label">Cooperado</label>
+          <select class="form-select" name="cooperado_id">
+            <option value="">Todos</option>
+            {% for coop in cooperados %}
+            <option value="{{ coop.id }}" {{ 'selected' if filtro_cooperado_id == coop.id else '' }}>{{ coop.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2"><button class="btn btn-royal w-100"><i class="bi bi-funnel"></i> Filtrar</button></div>
+      </form>
     </div></div>
-    <div class="cardx"><div class="body"><div class="table-wrap"><table class="table table-sm table-hover align-middle mb-0"><thead><tr><th>Data</th><th>Lote</th><th>Rota</th><th>Cliente</th><th>Itens</th><th>Produto</th><th>Entrega</th><th>Motoboy</th><th>Status</th><th>Foto</th><th>Rastreio</th><th>Ações</th></tr></thead><tbody>
-      {% for p in pedidos %}
-      <tr>
-        <td>{{ p.data_entrega.strftime('%d/%m/%Y') if p.data_entrega else '-' }}</td><td>{{ p.lote or '-' }}</td><td>#{{ p.ordem_rota or 0 }}</td><td>{{ p.cliente_nome }}</td><td class="small">{{ p.itens_resumo }}</td><td>R$ {{ '%.2f'|format(p.valor_pedido|default(0)) }}</td><td>R$ {{ '%.2f'|format(p.valor_entrega|default(0)) }}</td><td>{{ p.cooperado_nome }}</td><td><span class="chip {{ farmacia_status_badge(p.status) if farmacia_status_badge is defined else 'info' }}">{{ p.status_label }}</span></td><td>{% if p.foto_url %}<a href="{{ p.foto_url }}" class="btn btn-sm btn-outline-primary">Baixar</a>{% else %}-{% endif %}</td><td>{% if p.tracking_url %}<a href="{{ p.tracking_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir</a>{% else %}-{% endif %}</td><td><div class="toolbar">{% if p.cooperado_id %}<form method="post" action="{{ url_for('farmacia_reordenar_pedido', entrega_id=p.id) }}"><input type="hidden" name="acao" value="subir"><input type="hidden" name="view" value="historico"><input type="hidden" name="data_inicio" value="{{ di }}"><input type="hidden" name="data_fim" value="{{ df }}"><input type="hidden" name="status_filtro" value="{{ filtro_status }}"><input type="hidden" name="cooperado_id_filtro" value="{{ filtro_cooperado_id or '' }}"><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-up"></i></button></form><form method="post" action="{{ url_for('farmacia_reordenar_pedido', entrega_id=p.id) }}"><input type="hidden" name="acao" value="descer"><input type="hidden" name="view" value="historico"><input type="hidden" name="data_inicio" value="{{ di }}"><input type="hidden" name="data_fim" value="{{ df }}"><input type="hidden" name="status_filtro" value="{{ filtro_status }}"><input type="hidden" name="cooperado_id_filtro" value="{{ filtro_cooperado_id or '' }}"><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-down"></i></button></form>{% endif %}<button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#statusModal{{ p.id }}"><i class="bi bi-pencil-square"></i></button></div>
-        <div class="modal fade" id="statusModal{{ p.id }}" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form method="post" action="{{ url_for('farmacia_update_pedido_status', pedido_id=p.id) }}" enctype="multipart/form-data" class="modal-content"><div class="modal-header"><h5 class="modal-title">Atualizar pedido #{{ p.id }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body row g-3"><input type="hidden" name="data_inicio" value="{{ di }}"><input type="hidden" name="data_fim" value="{{ df }}"><input type="hidden" name="status_filtro" value="{{ filtro_status }}"><input type="hidden" name="cooperado_id_filtro" value="{{ filtro_cooperado_id or '' }}"><div class="col-12"><label class="form-label">Status</label><select class="form-select status-select" name="status"><option value="aguardando" {{ 'selected' if p.status=='aguardando' else '' }}>Aguardando lote</option><option value="aguardando_motoboy" {{ 'selected' if p.status=='aguardando_motoboy' else '' }}>Aguardando motoboy</option><option value="em_rota" {{ 'selected' if p.status=='em_rota' else '' }}>Em rota</option><option value="indo_ate_voce" {{ 'selected' if p.status=='indo_ate_voce' else '' }}>Indo até você</option><option value="entregue" {{ 'selected' if p.status=='entregue' else '' }}>Entregue</option><option value="nao_entregue" {{ 'selected' if p.status=='nao_entregue' else '' }}>Não entregue</option></select></div><div class="col-12 entregue-wrap" style="display:none;"><label class="form-label">Entregue a</label><input class="form-control" name="entregue_a" value="{{ p.entregue_a or '' }}"></div><div class="col-12 entregue-wrap" style="display:none;"><label class="form-label">Foto do comprovante</label><input type="file" class="form-control" name="foto_comprovante" accept="image/*"></div><div class="col-12 nao-entregue-wrap" style="display:none;"><label class="form-label">Motivo da não entrega</label><textarea class="form-control" name="motivo_nao_entrega" rows="2">{{ p.motivo_nao_entrega or '' }}</textarea></div></div><div class="modal-footer"><button class="btn btn-royal">Salvar</button></div></form></div></div>
-        </td>
-      </tr>
-      {% else %}<tr><td colspan="12" class="text-center text-muted py-4">Nenhum pedido encontrado.</td></tr>{% endfor %}
-    </tbody></table></div></div></div>
+
+    <div class="cardx"><div class="bodyx">
+      <div class="table-wrap">
+        <table class="table table-sm table-hover align-middle">
+          <thead><tr><th>Data</th><th>Lote</th><th>Rota</th><th>Cliente</th><th>Itens</th><th>Produto</th><th>Entrega</th><th>Motoboy</th><th>Status</th><th>Foto</th><th>Rastreio</th><th style="width:160px">Ações</th></tr></thead>
+          <tbody>
+            {% for p in pedidos %}
+            <tr>
+              <td>{{ p.data_entrega.strftime('%d/%m/%Y') if p.data_entrega else '-' }}</td>
+              <td>{{ p.lote or '-' }}</td>
+              <td>#{{ p.ordem_rota or 0 }}</td>
+              <td>{{ p.cliente_nome }}</td>
+              <td class="small">{{ p.itens_resumo }}</td>
+              <td>R$ {{ '%.2f'|format(p.valor_pedido|default(0)) }}</td>
+              <td>R$ {{ '%.2f'|format(p.valor_entrega|default(0)) }}</td>
+              <td>{{ p.cooperado_nome }}</td>
+              <td><span class="chip {{ farmacia_status_badge(p.status) if farmacia_status_badge is defined else 'info' }}">{{ p.status_label }}</span></td>
+              <td>{% if p.foto_url %}<a href="{{ p.foto_url }}" class="btn btn-sm btn-outline-primary">Baixar</a>{% else %}-{% endif %}</td>
+              <td>{% if p.tracking_url %}<a href="{{ p.tracking_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir</a>{% else %}-{% endif %}</td>
+              <td>
+                <div class="toolbar">
+                  {% if p.cooperado_id %}
+                  <form method="post" action="{{ url_for('farmacia_reordenar_pedido', entrega_id=p.id) }}">
+                    <input type="hidden" name="acao" value="subir">
+                    <input type="hidden" name="view" value="historico">
+                    <input type="hidden" name="data_inicio" value="{{ di }}">
+                    <input type="hidden" name="data_fim" value="{{ df }}">
+                    <input type="hidden" name="status_filtro" value="{{ filtro_status }}">
+                    <input type="hidden" name="cooperado_id_filtro" value="{{ filtro_cooperado_id or '' }}">
+                    <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-up"></i></button>
+                  </form>
+                  <form method="post" action="{{ url_for('farmacia_reordenar_pedido', entrega_id=p.id) }}">
+                    <input type="hidden" name="acao" value="descer">
+                    <input type="hidden" name="view" value="historico">
+                    <input type="hidden" name="data_inicio" value="{{ di }}">
+                    <input type="hidden" name="data_fim" value="{{ df }}">
+                    <input type="hidden" name="status_filtro" value="{{ filtro_status }}">
+                    <input type="hidden" name="cooperado_id_filtro" value="{{ filtro_cooperado_id or '' }}">
+                    <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-down"></i></button>
+                  </form>
+                  {% endif %}
+                  <button class="btn btn-sm btn-outline-success status-btn"
+                          type="button"
+                          data-bs-toggle="modal"
+                          data-bs-target="#statusPedidoModal"
+                          data-id="{{ p.id }}"
+                          data-status="{{ p.status }}"
+                          data-entregue_a="{{ p.entregue_a or '' }}"
+                          data-motivo="{{ p.motivo_nao_entrega or '' }}"
+                          data-data_inicio="{{ di }}"
+                          data-data_fim="{{ df }}"
+                          data-status_filtro="{{ filtro_status }}"
+                          data-cooperado_id_filtro="{{ filtro_cooperado_id or '' }}">
+                    <i class="bi bi-pencil-square"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="12" class="text-center text-muted py-4">Nenhum pedido encontrado.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div></div>
     {% endif %}
   </main>
 </div>
+
+<!-- modal único editar cliente -->
+<div class="modal fade" id="editClienteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="post" id="editClienteForm" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Editar cliente</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-12"><label class="form-label">Nome</label><input class="form-control" name="nome" id="ec_nome"></div>
+        <div class="col-md-6"><label class="form-label">Telefone</label><input class="form-control" name="telefone" id="ec_telefone"></div>
+        <div class="col-md-6"><label class="form-label">CPF</label><input class="form-control" name="cpf" id="ec_cpf"></div>
+        <div class="col-12"><label class="form-label">Endereço</label><input class="form-control" name="endereco" id="ec_endereco"></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-royal">Salvar</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- modal único editar pedido -->
+<div class="modal fade" id="editPedidoModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <form method="post" id="editPedidoForm" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Editar pedido</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-md-4"><label class="form-label">Nome do cliente</label><input class="form-control" name="cliente_nome" id="ep_cliente_nome"></div>
+        <div class="col-md-3"><label class="form-label">Telefone</label><input class="form-control" name="telefone" id="ep_telefone"></div>
+        <div class="col-md-5"><label class="form-label">Endereço</label><input class="form-control" name="endereco" id="ep_endereco"></div>
+        <div class="col-md-2"><label class="form-label">CPF</label><input class="form-control" name="cpf" id="ep_cpf"></div>
+        <div class="col-md-2"><label class="form-label">Valor do pedido</label><input type="number" step="0.01" class="form-control" name="valor_pedido" id="ep_valor_pedido"></div>
+        <div class="col-md-2"><label class="form-label">Valor da entrega</label><input type="number" step="0.01" class="form-control" name="valor_entrega" id="ep_valor_entrega"></div>
+        <div class="col-md-2 d-flex align-items-end"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="pago" value="1" id="ep_pago"><label class="form-check-label">Pago</label></div></div>
+        <div class="col-md-2"><label class="form-label">Forma</label><select class="form-select" name="forma_pagamento" id="ep_forma_pagamento"><option value="">Selecionar</option><option value="debito">Débito</option><option value="credito">Crédito</option><option value="especie">Espécie</option><option value="pix">Pix</option></select></div>
+        <div class="col-md-2"><label class="form-label">Parcelas</label><input type="number" class="form-control" name="parcelas" id="ep_parcelas"></div>
+        <div class="col-12"><label class="form-label">Observação</label><textarea class="form-control" name="observacao" id="ep_observacao" rows="2"></textarea></div>
+        <div class="col-12">
+          <label class="form-label">Itens</label>
+          <div id="editItensWrap"></div>
+          <button class="btn btn-sm btn-outline-primary mt-2" type="button" onclick="addItemRow(document.getElementById('editItensWrap'))"><i class="bi bi-plus-circle"></i> Adicionar item</button>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-royal">Salvar</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- modal único status -->
+<div class="modal fade" id="statusPedidoModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="post" id="statusPedidoForm" enctype="multipart/form-data" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Atualizar pedido</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <input type="hidden" name="data_inicio" id="sp_data_inicio">
+        <input type="hidden" name="data_fim" id="sp_data_fim">
+        <input type="hidden" name="status_filtro" id="sp_status_filtro">
+        <input type="hidden" name="cooperado_id_filtro" id="sp_cooperado_id_filtro">
+        <div class="col-12">
+          <label class="form-label">Status</label>
+          <select class="form-select" name="status" id="sp_status">
+            <option value="aguardando">Aguardando lote</option>
+            <option value="aguardando_motoboy">Aguardando motoboy</option>
+            <option value="em_rota">Em rota</option>
+            <option value="indo_ate_voce">Indo até você</option>
+            <option value="entregue">Entregue</option>
+            <option value="nao_entregue">Não entregue</option>
+          </select>
+        </div>
+        <div class="col-12 entregue-wrap" style="display:none;">
+          <label class="form-label">Entregue a</label>
+          <input class="form-control" name="entregue_a" id="sp_entregue_a">
+        </div>
+        <div class="col-12 entregue-wrap" style="display:none;">
+          <label class="form-label">Foto do comprovante</label>
+          <input type="file" class="form-control" name="foto_comprovante" accept="image/*">
+        </div>
+        <div class="col-12 nao-entregue-wrap" style="display:none;">
+          <label class="form-label">Motivo da não entrega</label>
+          <textarea class="form-control" name="motivo_nao_entrega" id="sp_motivo" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-royal">Salvar</button></div>
+    </form>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-function rowHtml(){return `<div class="item-row"><input class="form-control" name="item_nome[]" placeholder="Medicamento / material"><input class="form-control" name="item_qtd[]" placeholder="Qtd."><input type="number" step="0.01" class="form-control" name="item_valor[]" placeholder="Valor"><button class="btn btn-outline-danger" type="button" onclick="removeItemRow(this)"><i class="bi bi-trash"></i></button></div>`;}
-function addItemRow(scope){const wrap=(scope&&scope.querySelector? scope.querySelector('#itensWrap, .modal-body .col-12 div'):null) || document.getElementById('itensWrap'); if(wrap) wrap.insertAdjacentHTML('beforeend', rowHtml());}
-function removeItemRow(btn){const row=btn.closest('.item-row'); const container=row.parentElement; if(container.querySelectorAll('.item-row').length>1){row.remove();} else {row.querySelectorAll('input').forEach(i=>i.value='');}}
-const clienteSelect=document.getElementById('clienteSelect'); clienteSelect?.addEventListener('change', function(){const opt=this.options[this.selectedIndex]; document.getElementById('clienteNome').value=opt?.dataset?.nome||''; document.getElementById('clienteTelefone').value=opt?.dataset?.telefone||''; document.getElementById('clienteEndereco').value=opt?.dataset?.endereco||''; document.getElementById('clienteCpf').value=opt?.dataset?.cpf||'';});
-const pedidoPago=document.getElementById('pedidoPago'); const paymentFields=document.querySelectorAll('.payment-fields'); function refreshPagamento(){const pago=!!pedidoPago?.checked; paymentFields.forEach(el=>el.style.display=pago?'none':'block');} pedidoPago?.addEventListener('change', refreshPagamento); refreshPagamento();
-const forma=document.getElementById('formaPagamento'); const parcelasWrap=document.getElementById('parcelasWrap'); function refreshParcelas(){ if(parcelasWrap) parcelasWrap.style.display=(forma && forma.value==='credito' && !(pedidoPago && pedidoPago.checked))?'block':'none'; } forma?.addEventListener('change', refreshParcelas); refreshParcelas();
-document.querySelectorAll('.modal').forEach(modal=>{const sel=modal.querySelector('.status-select'); const ent=modal.querySelectorAll('.entregue-wrap'); const nao=modal.querySelectorAll('.nao-entregue-wrap'); function sync(){const v=sel?.value||''; ent.forEach(x=>x.style.display=v==='entregue'?'block':'none'); nao.forEach(x=>x.style.display=v==='nao_entregue'?'block':'none');} sel?.addEventListener('change', sync); modal.addEventListener('shown.bs.modal', sync);});
+function rowHtml(item = {}) {
+  const nome = item.descricao || item.nome || '';
+  const qtd = item.quantidade || item.qtd || '';
+  const valor = item.valor_item ?? item.valor ?? '';
+  return `<div class="item-row">
+    <input class="form-control" name="item_nome[]" placeholder="Medicamento / material" value="${escapeHtml(String(nome))}">
+    <input class="form-control" name="item_qtd[]" placeholder="Qtd." value="${escapeHtml(String(qtd))}">
+    <input type="number" step="0.01" class="form-control" name="item_valor[]" placeholder="Valor" value="${escapeHtml(String(valor))}">
+    <button class="btn btn-outline-danger" type="button" onclick="removeItemRow(this)"><i class="bi bi-trash"></i></button>
+  </div>`;
+}
+function addItemRow(container){ if(container) container.insertAdjacentHTML('beforeend', rowHtml()); }
+function removeItemRow(btn){
+  const row = btn.closest('.item-row');
+  const container = row.parentElement;
+  if(container.querySelectorAll('.item-row').length > 1){ row.remove(); }
+  else { row.querySelectorAll('input').forEach(i => i.value = ''); }
+}
+function escapeHtml(str){
+  return str.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;");
+}
+function copyText(txt){
+  navigator.clipboard.writeText(txt || '');
+}
+
+const clienteSelect = document.getElementById('clienteSelect');
+clienteSelect?.addEventListener('change', function(){
+  const opt = this.options[this.selectedIndex];
+  document.getElementById('clienteNome').value = opt?.dataset?.nome || '';
+  document.getElementById('clienteTelefone').value = opt?.dataset?.telefone || '';
+  document.getElementById('clienteEndereco').value = opt?.dataset?.endereco || '';
+  document.getElementById('clienteCpf').value = opt?.dataset?.cpf || '';
+});
+
+const pedidoPago = document.getElementById('pedidoPago');
+const paymentFields = document.querySelectorAll('.payment-fields');
+function refreshPagamento(){
+  const pago = !!pedidoPago?.checked;
+  paymentFields.forEach(el => el.style.display = pago ? 'none' : 'block');
+}
+pedidoPago?.addEventListener('change', refreshPagamento);
+refreshPagamento();
+
+const forma = document.getElementById('formaPagamento');
+const parcelasWrap = document.getElementById('parcelasWrap');
+function refreshParcelas(){
+  if(parcelasWrap) parcelasWrap.style.display = (forma && forma.value === 'credito' && !(pedidoPago && pedidoPago.checked)) ? 'block' : 'none';
+}
+forma?.addEventListener('change', refreshParcelas);
+refreshParcelas();
+
+document.querySelectorAll('.edit-cliente-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('editClienteForm').action = `/farmacia/clientes/${btn.dataset.id}/edit`;
+    document.getElementById('ec_nome').value = btn.dataset.nome || '';
+    document.getElementById('ec_telefone').value = btn.dataset.telefone || '';
+    document.getElementById('ec_endereco').value = btn.dataset.endereco || '';
+    document.getElementById('ec_cpf').value = btn.dataset.cpf || '';
+  });
+});
+
+document.querySelectorAll('.edit-pedido-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('editPedidoForm').action = `/farmacia/pedidos/${btn.dataset.id}/edit`;
+    document.getElementById('ep_cliente_nome').value = btn.dataset.cliente_nome || '';
+    document.getElementById('ep_telefone').value = btn.dataset.telefone || '';
+    document.getElementById('ep_endereco').value = btn.dataset.endereco || '';
+    document.getElementById('ep_cpf').value = btn.dataset.cpf || '';
+    document.getElementById('ep_valor_pedido').value = btn.dataset.valor_pedido || '';
+    document.getElementById('ep_valor_entrega').value = btn.dataset.valor_entrega || '';
+    document.getElementById('ep_pago').checked = (btn.dataset.pago === '1');
+    document.getElementById('ep_forma_pagamento').value = btn.dataset.forma_pagamento || '';
+    document.getElementById('ep_parcelas').value = btn.dataset.parcelas || '';
+    document.getElementById('ep_observacao').value = btn.dataset.observacao || '';
+
+    const wrap = document.getElementById('editItensWrap');
+    wrap.innerHTML = '';
+    let itens = [];
+    try { itens = JSON.parse(btn.dataset.itens || '[]'); } catch(e){ itens = []; }
+    if(!Array.isArray(itens) || !itens.length){
+      wrap.insertAdjacentHTML('beforeend', rowHtml());
+    } else {
+      itens.forEach(item => wrap.insertAdjacentHTML('beforeend', rowHtml(item)));
+    }
+  });
+});
+
+function syncStatusModal(){
+  const status = document.getElementById('sp_status').value || '';
+  document.querySelectorAll('#statusPedidoModal .entregue-wrap').forEach(el => el.style.display = status === 'entregue' ? 'block' : 'none');
+  document.querySelectorAll('#statusPedidoModal .nao-entregue-wrap').forEach(el => el.style.display = status === 'nao_entregue' ? 'block' : 'none');
+}
+document.getElementById('sp_status')?.addEventListener('change', syncStatusModal);
+document.querySelectorAll('.status-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('statusPedidoForm').action = `/farmacia/pedidos/${btn.dataset.id}/status`;
+    document.getElementById('sp_status').value = btn.dataset.status || 'aguardando';
+    document.getElementById('sp_entregue_a').value = btn.dataset.entregue_a || '';
+    document.getElementById('sp_motivo').value = btn.dataset.motivo || '';
+    document.getElementById('sp_data_inicio').value = btn.dataset.data_inicio || '';
+    document.getElementById('sp_data_fim').value = btn.dataset.data_fim || '';
+    document.getElementById('sp_status_filtro').value = btn.dataset.status_filtro || '';
+    document.getElementById('sp_cooperado_id_filtro').value = btn.dataset.cooperado_id_filtro || '';
+    syncStatusModal();
+  });
+});
 </script>
 </body>
 </html>
