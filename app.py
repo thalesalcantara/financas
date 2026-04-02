@@ -453,6 +453,61 @@ class Restaurante(db.Model):
     foto_url = db.Column(db.String(255))
 
 
+
+class FarmaciaCliente(db.Model):
+    __tablename__ = "farmacia_clientes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id", ondelete="CASCADE"), nullable=False, index=True)
+    nome = db.Column(db.String(120), nullable=False, index=True)
+    telefone = db.Column(db.String(30))
+    endereco = db.Column(db.String(255), nullable=False)
+    cpf = db.Column(db.String(20))
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    restaurante = db.relationship("Restaurante", backref=db.backref("farmacia_clientes", lazy=True, cascade="all, delete-orphan"))
+
+
+class FarmaciaPedido(db.Model):
+    __tablename__ = "farmacia_pedidos"
+
+    id = db.Column(db.Integer, primary_key=True)
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id", ondelete="CASCADE"), nullable=False, index=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey("farmacia_clientes.id", ondelete="SET NULL"), nullable=True, index=True)
+    cooperado_id = db.Column(db.Integer, db.ForeignKey("cooperados.id", ondelete="SET NULL"), nullable=True, index=True)
+    lancamento_id = db.Column(db.Integer, db.ForeignKey("lancamentos.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    lote = db.Column(db.String(40), index=True)
+    ordem_rota = db.Column(db.Integer, default=0, index=True)
+
+    cliente_nome = db.Column(db.String(120), nullable=False)
+    telefone = db.Column(db.String(30))
+    endereco = db.Column(db.String(255), nullable=False)
+    cpf = db.Column(db.String(20))
+
+    valor_entrega = db.Column(db.Float, default=0.0)
+    observacao = db.Column(db.Text)
+    pago = db.Column(db.Boolean, default=False, nullable=False)
+    forma_pagamento = db.Column(db.String(20))
+    parcelas = db.Column(db.Integer)
+
+    status = db.Column(db.String(30), default="preparacao", nullable=False, index=True)
+    entregue_a = db.Column(db.String(120))
+    motivo_nao_entrega = db.Column(db.String(255))
+    foto_comprovante = db.Column(db.String(255))
+
+    data_entrega = db.Column(db.Date, default=date.today, nullable=False, index=True)
+    data_saida = db.Column(db.DateTime)
+    data_entregue = db.Column(db.DateTime)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    restaurante = db.relationship("Restaurante", backref=db.backref("farmacia_pedidos", lazy=True, cascade="all, delete-orphan"))
+    cliente = db.relationship("FarmaciaCliente", backref=db.backref("pedidos", lazy=True))
+    cooperado = db.relationship("Cooperado", backref=db.backref("farmacia_pedidos", lazy=True))
+    lancamento = db.relationship("Lancamento", foreign_keys=[lancamento_id])
+
 class Lancamento(db.Model):
     __tablename__ = "lancamentos"
 
@@ -1482,6 +1537,11 @@ def init_db():
             if not Config.query.get(1):  # type: ignore[name-defined]
                 db.session.add(Config(id=1, salario_minimo=0.0, bloquear_adiantamento=False))  # type: ignore[name-defined]
                 db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    try:
+        init_farmacia_schema()
     except Exception:
         db.session.rollback()
 
@@ -3160,7 +3220,7 @@ def index():
     if u.tipo == "cooperado":
         return redirect(url_for("portal_cooperado"))
     if u.tipo == "restaurante":
-        return redirect(url_for("portal_restaurante"))
+        return redirect(_restaurante_destino_dashboard(u.id))
     return redirect(url_for("login"))
 
 # =========================
@@ -3206,7 +3266,7 @@ def login():
             elif u.tipo == "cooperado":
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
-                return redirect(url_for("portal_restaurante"))
+                return redirect(_restaurante_destino_dashboard(u.id))
 
             session.clear()
             flash("Tipo de usuário inválido.", "danger")
@@ -6198,6 +6258,7 @@ def add_restaurante():
     taxa_admin_juros_dia_percentual = f.get("taxa_admin_juros_dia_percentual", type=float) or 0.03
     status_raw = (f.get("ativo") or "1").strip().lower()
     ativo_rest = status_raw in ("1", "true", "ativo", "on", "sim")
+    eh_farmacia = bool(f.get("eh_farmacia"))
 
     if Usuario.query.filter_by(usuario=usuario_login).first():
         flash("Usuário já existente.", "warning")
@@ -6217,6 +6278,7 @@ def add_restaurante():
         taxa_admin_multa_percentual=taxa_admin_multa_percentual,
         taxa_admin_juros_dia_percentual=taxa_admin_juros_dia_percentual,
         ativo=ativo_rest,
+        eh_farmacia=eh_farmacia,
     )
     db.session.add(r)
     db.session.flush()
@@ -6245,6 +6307,7 @@ def edit_restaurante(id):
     r.taxa_admin_juros_dia_percentual = f.get("taxa_admin_juros_dia_percentual", type=float) or 0.03
     status_raw = (f.get('ativo') or '1').strip().lower()
     ativo_rest = status_raw in ('1','true','ativo','on','sim')
+    r.eh_farmacia = bool(f.get("eh_farmacia"))
     if hasattr(r, 'ativo'):
         r.ativo = ativo_rest
     if getattr(r, 'usuario_ref', None) is not None and hasattr(r.usuario_ref, 'ativo'):
@@ -9696,6 +9759,9 @@ def portal_restaurante():
             "</p>"
         )
 
+    if bool(getattr(rest, "eh_farmacia", False)):
+        return redirect(url_for("farmacia_dashboard"))
+
     # Abas/visões
     view = (request.args.get("view", "lancar") or "lancar").strip().lower()
 
@@ -11197,6 +11263,296 @@ def avisos_unread_count():
         except Exception:
             pass
         return _nocache_json({"ok": False, "unread": 0, "count": 0, "error": str(e)}, 500)
+
+
+# =========================
+# Farmácia
+# =========================
+def init_farmacia_schema():
+    try:
+        db.create_all()
+    except Exception:
+        db.session.rollback()
+
+    # restaurantes.eh_farmacia
+    try:
+        if _is_sqlite():
+            cols = db.session.execute(sa_text("PRAGMA table_info(restaurantes);")).fetchall()
+            colnames = {row[1] for row in cols}
+            if "eh_farmacia" not in colnames:
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN eh_farmacia BOOLEAN DEFAULT 0"))
+            db.session.commit()
+        else:
+            db.session.execute(sa_text("ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS eh_farmacia BOOLEAN DEFAULT FALSE"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    stmts = []
+    if _is_sqlite():
+        stmts = [
+            "CREATE INDEX IF NOT EXISTS ix_farmacia_clientes_rest_nome ON farmacia_clientes(restaurante_id, nome)",
+            "CREATE INDEX IF NOT EXISTS ix_farmacia_pedidos_rest_status_data ON farmacia_pedidos(restaurante_id, status, data_entrega)",
+            "CREATE INDEX IF NOT EXISTS ix_farmacia_pedidos_coop_status ON farmacia_pedidos(cooperado_id, status)",
+            "CREATE INDEX IF NOT EXISTS ix_farmacia_pedidos_lote_ordem ON farmacia_pedidos(lote, ordem_rota)",
+        ]
+    else:
+        stmts = [
+            "CREATE INDEX IF NOT EXISTS ix_farmacia_clientes_rest_nome ON public.farmacia_clientes(restaurante_id, nome)",
+            "CREATE INDEX IF NOT EXISTS ix_farmacia_pedidos_rest_status_data ON public.farmacia_pedidos(restaurante_id, status, data_entrega)",
+            "CREATE INDEX IF NOT EXISTS ix_farmacia_pedidos_coop_status ON public.farmacia_pedidos(cooperado_id, status)",
+            "CREATE INDEX IF NOT EXISTS ix_farmacia_pedidos_lote_ordem ON public.farmacia_pedidos(lote, ordem_rota)",
+        ]
+    try:
+        for sql in stmts:
+            db.session.execute(sa_text(sql))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
+def _farmacia_restaurante_logado():
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+    if not bool(getattr(rest, "eh_farmacia", False)):
+        abort(403)
+    return rest
+
+
+def _farmacia_filtro_datas(prefix: str = ""):
+    di = _parse_date(request.args.get(f"{prefix}data_inicio") or request.args.get("data_inicio"))
+    df = _parse_date(request.args.get(f"{prefix}data_fim") or request.args.get("data_fim"))
+    if di and not df:
+        df = di
+    elif df and not di:
+        di = df
+    if not di and not df:
+        hoje = date.today()
+        di = hoje - timedelta(days=hoje.weekday())
+        df = di + timedelta(days=6)
+    return di, df
+
+
+@app.route("/farmacia")
+@role_required("restaurante")
+def farmacia_dashboard():
+    rest = _farmacia_restaurante_logado()
+    view = (request.args.get("view") or "clientes").strip().lower()
+    di, df = _farmacia_filtro_datas()
+    status = (request.args.get("status") or "").strip().lower()
+    cooperado_id = request.args.get("cooperado_id", type=int)
+    cliente_q = (request.args.get("q") or "").strip()
+
+    clientes_q = FarmaciaCliente.query.filter(FarmaciaCliente.restaurante_id == rest.id)
+    if cliente_q:
+        like = f"%{cliente_q}%"
+        clientes_q = clientes_q.filter(or_(FarmaciaCliente.nome.ilike(like), FarmaciaCliente.endereco.ilike(like), FarmaciaCliente.telefone.ilike(like)))
+    clientes = clientes_q.order_by(FarmaciaCliente.nome.asc()).all()
+
+    cooperados = (
+        Cooperado.query
+        .join(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(Usuario.ativo.is_(True))
+        .order_by(Cooperado.nome.asc())
+        .all()
+    )
+
+    pedidos_q = (
+        FarmaciaPedido.query
+        .filter(FarmaciaPedido.restaurante_id == rest.id)
+        .filter(FarmaciaPedido.data_entrega >= di, FarmaciaPedido.data_entrega <= df)
+    )
+    if status:
+        if status == "pendentes":
+            pedidos_q = pedidos_q.filter(FarmaciaPedido.status.in_(["preparacao", "aguardando_motoboy", "em_rota", "indo_ate_voce"]))
+        else:
+            pedidos_q = pedidos_q.filter(FarmaciaPedido.status == status)
+    if cooperado_id:
+        pedidos_q = pedidos_q.filter(FarmaciaPedido.cooperado_id == cooperado_id)
+    pedidos = pedidos_q.order_by(FarmaciaPedido.data_entrega.desc(), FarmaciaPedido.lote.asc().nullslast(), FarmaciaPedido.ordem_rota.asc(), FarmaciaPedido.id.desc()).all()
+
+    total_gasto_periodo = round(sum(float(p.valor_entrega or 0) for p in pedidos), 2)
+    total_producao_periodo = round(sum(float(p.valor_entrega or 0) for p in pedidos if float(p.valor_entrega or 0) > 0), 2)
+    total_pendentes = sum(1 for p in pedidos if p.status in ("preparacao", "aguardando_motoboy", "em_rota", "indo_ate_voce"))
+
+    for p in pedidos:
+        p.status_label = _pedido_status_label(p.status)
+        p.tracking_token = _farmacia_tracking_token(p.id)
+        p.tracking_url = url_for("farmacia_rastreio", token=p.tracking_token, _external=True)
+        p.cooperado_nome = p.cooperado.nome if p.cooperado else "—"
+
+    return render_template(
+        "farmacia_dashboard.html",
+        rest=rest,
+        view=view,
+        clientes=clientes,
+        cooperados=cooperados,
+        pedidos=pedidos,
+        data_inicio=di,
+        data_fim=df,
+        filtro_status=status,
+        filtro_cooperado_id=cooperado_id,
+        total_gasto_periodo=total_gasto_periodo,
+        total_producao_periodo=total_producao_periodo,
+        total_pendentes=total_pendentes,
+        now=datetime.utcnow(),
+    )
+
+
+@app.post("/farmacia/clientes/add")
+@role_required("restaurante")
+def farmacia_add_cliente():
+    rest = _farmacia_restaurante_logado()
+    f = request.form
+    c = FarmaciaCliente(
+        restaurante_id=rest.id,
+        nome=(f.get("nome") or "").strip(),
+        telefone=(f.get("telefone") or "").strip(),
+        endereco=(f.get("endereco") or "").strip(),
+        cpf=(f.get("cpf") or "").strip() or None,
+    )
+    if not c.nome or not c.endereco:
+        flash("Informe nome e endereço do cliente.", "warning")
+        return redirect(url_for("farmacia_dashboard", view="clientes"))
+    db.session.add(c)
+    db.session.commit()
+    flash("Cliente cadastrado.", "success")
+    return redirect(url_for("farmacia_dashboard", view="clientes"))
+
+
+@app.post("/farmacia/clientes/<int:cliente_id>/delete")
+@role_required("restaurante")
+def farmacia_delete_cliente(cliente_id):
+    rest = _farmacia_restaurante_logado()
+    c = FarmaciaCliente.query.get_or_404(cliente_id)
+    if c.restaurante_id != rest.id:
+        abort(403)
+    db.session.delete(c)
+    db.session.commit()
+    flash("Cliente removido.", "success")
+    return redirect(url_for("farmacia_dashboard", view="clientes"))
+
+
+@app.post("/farmacia/pedidos/add")
+@role_required("restaurante")
+def farmacia_add_pedido():
+    rest = _farmacia_restaurante_logado()
+    f = request.form
+    cliente_id = f.get("cliente_id", type=int)
+    cliente = FarmaciaCliente.query.get(cliente_id) if cliente_id else None
+    if cliente and cliente.restaurante_id != rest.id:
+        abort(403)
+
+    pago = bool(f.get("pago"))
+    forma_pagamento = None if pago else ((f.get("forma_pagamento") or "").strip() or None)
+    parcelas = f.get("parcelas", type=int) if (forma_pagamento == "credito") else None
+    lote = (f.get("lote") or "").strip() or f"LOTE-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+
+    ultimo = db.session.query(func.max(FarmaciaPedido.ordem_rota)).filter(FarmaciaPedido.restaurante_id == rest.id, FarmaciaPedido.lote == lote).scalar() or 0
+    pedido = FarmaciaPedido(
+        restaurante_id=rest.id,
+        cliente_id=cliente.id if cliente else None,
+        cooperado_id=f.get("cooperado_id", type=int),
+        lote=lote,
+        ordem_rota=int(ultimo) + 1,
+        cliente_nome=(f.get("cliente_nome") or (cliente.nome if cliente else "")).strip(),
+        telefone=(f.get("telefone") or (cliente.telefone if cliente else "")).strip() or None,
+        endereco=(f.get("endereco") or (cliente.endereco if cliente else "")).strip(),
+        cpf=(f.get("cpf") or (cliente.cpf if cliente else "")).strip() or None,
+        valor_entrega=f.get("valor_entrega", type=float) or 0.0,
+        observacao=(f.get("observacao") or "").strip() or None,
+        pago=pago,
+        forma_pagamento=forma_pagamento,
+        parcelas=parcelas,
+        status="aguardando_motoboy" if f.get("cooperado_id", type=int) else "preparacao",
+        data_entrega=_parse_date(f.get("data_entrega")) or date.today(),
+    )
+    if not pedido.cliente_nome or not pedido.endereco:
+        flash("Pedido precisa de nome do cliente e endereço.", "warning")
+        return redirect(url_for("farmacia_dashboard", view="pedidos"))
+
+    db.session.add(pedido)
+    db.session.flush()
+    _sync_farmacia_pedido_lancamento(pedido)
+    db.session.commit()
+    flash("Pedido lançado.", "success")
+    return redirect(url_for("farmacia_dashboard", view="pedidos"))
+
+
+@app.post("/farmacia/pedidos/<int:pedido_id>/status")
+@role_required("restaurante")
+def farmacia_update_pedido_status(pedido_id):
+    rest = _farmacia_restaurante_logado()
+    p = FarmaciaPedido.query.get_or_404(pedido_id)
+    if p.restaurante_id != rest.id:
+        abort(403)
+    novo = (request.form.get("status") or p.status or "preparacao").strip().lower()
+    p.status = novo
+    if novo in ("em_rota", "indo_ate_voce") and not p.data_saida:
+        p.data_saida = datetime.utcnow()
+    if novo == "entregue":
+        p.data_entregue = datetime.utcnow()
+        p.entregue_a = (request.form.get("entregue_a") or p.entregue_a or "").strip() or None
+        foto = request.files.get("foto_comprovante")
+        caminho = _farmacia_save_upload(foto)
+        if caminho:
+            p.foto_comprovante = caminho
+    elif novo == "nao_entregue":
+        p.motivo_nao_entrega = (request.form.get("motivo_nao_entrega") or "").strip() or None
+    _sync_farmacia_pedido_lancamento(p)
+    db.session.commit()
+    flash("Pedido atualizado.", "success")
+    return redirect(url_for("farmacia_dashboard", view="historico", data_inicio=(request.form.get("data_inicio") or ""), data_fim=(request.form.get("data_fim") or ""), status=(request.form.get("status_filtro") or ""), cooperado_id=(request.form.get("cooperado_id_filtro") or "")))
+
+
+@app.post("/farmacia/pedidos/<int:pedido_id>/rota")
+@role_required("restaurante")
+def farmacia_reordenar_pedido(pedido_id):
+    rest = _farmacia_restaurante_logado()
+    p = FarmaciaPedido.query.get_or_404(pedido_id)
+    if p.restaurante_id != rest.id:
+        abort(403)
+    acao = (request.form.get("acao") or "").strip().lower()
+    q = FarmaciaPedido.query.filter(FarmaciaPedido.restaurante_id == rest.id, FarmaciaPedido.lote == p.lote).order_by(FarmaciaPedido.ordem_rota.asc(), FarmaciaPedido.id.asc()).all()
+    ids = [x.id for x in q]
+    if p.id not in ids:
+        return redirect(url_for("farmacia_dashboard", view="historico"))
+    idx = ids.index(p.id)
+    if acao == "subir" and idx > 0:
+        ids[idx - 1], ids[idx] = ids[idx], ids[idx - 1]
+    elif acao == "descer" and idx < len(ids) - 1:
+        ids[idx + 1], ids[idx] = ids[idx], ids[idx + 1]
+    mapa = {x.id: x for x in q}
+    for ordem, pid in enumerate(ids, start=1):
+        mapa[pid].ordem_rota = ordem
+    db.session.commit()
+    return redirect(url_for("farmacia_dashboard", view=request.form.get("view") or "historico", data_inicio=(request.form.get("data_inicio") or ""), data_fim=(request.form.get("data_fim") or ""), status=(request.form.get("status_filtro") or ""), cooperado_id=(request.form.get("cooperado_id_filtro") or "")))
+
+
+@app.get("/rastreio/<token>")
+def farmacia_rastreio(token):
+    try:
+        payload = _farmacia_tracking_load(token)
+    except Exception:
+        abort(404)
+    pedido = FarmaciaPedido.query.get_or_404(int(payload.get("pedido_id")))
+    posicao = 0
+    pendentes_antes = 0
+    if pedido.lote:
+        rota = FarmaciaPedido.query.filter(FarmaciaPedido.restaurante_id == pedido.restaurante_id, FarmaciaPedido.lote == pedido.lote).order_by(FarmaciaPedido.ordem_rota.asc(), FarmaciaPedido.id.asc()).all()
+        for idx, item in enumerate(rota, start=1):
+            if item.id == pedido.id:
+                posicao = idx
+                break
+        pendentes_antes = sum(1 for item in rota if (item.ordem_rota or 0) < (pedido.ordem_rota or 0) and item.status != "entregue")
+        if pedido.status == "em_rota" and pendentes_antes <= 1:
+            pedido.status_label = "Entregador está indo até você"
+        else:
+            pedido.status_label = _pedido_status_label(pedido.status)
+    else:
+        pedido.status_label = _pedido_status_label(pedido.status)
+    return render_template("farmacia_rastreio.html", pedido=pedido, pendentes_antes=pendentes_antes, posicao=posicao)
+
 
 import click
 
