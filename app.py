@@ -11846,8 +11846,32 @@ def farmacia_rastreio(codigo):
                          FarmaciaEntrega.status.in_(["preparacao", "aguardando", "aguardando_motoboy", "em_rota", "indo_ate_voce"]),
                          FarmaciaEntrega.ordem_rota < ent.ordem_rota)
                  .count())
+
+    cooperado_username = "Aguardando definição"
+    if ent.cooperado_id:
+        coop = Cooperado.query.get(ent.cooperado_id)
+        if coop:
+            # nome público no rastreio: prioriza usuário/apelido; se não houver, usa o primeiro nome
+            for attr in ("usuario", "username", "login", "apelido", "nome_usuario"):
+                val = getattr(coop, attr, None)
+                if val:
+                    cooperado_username = str(val).strip()
+                    break
+            else:
+                nome_full = getattr(coop, "nome", None)
+                if nome_full:
+                    cooperado_username = str(nome_full).strip().split()[0]
+
     label = "indo_ate_voce" if ahead == 0 and ent.status == "em_rota" else ent.status
-    return render_template("farmacia_rastreio.html", pedido=ent, entrega=ent, ahead=ahead, status_publico=label, farmacia_status_label=_farmacia_status_label)
+    return render_template(
+        "farmacia_rastreio.html",
+        pedido=ent,
+        entrega=ent,
+        ahead=ahead,
+        status_publico=label,
+        farmacia_status_label=_farmacia_status_label,
+        cooperado_username=cooperado_username,
+    )
 
 
 @app.post("/farmacia/pedidos/<int:pedido_id>/status")
