@@ -6025,7 +6025,7 @@
         };
         const firstEl = nodes.find(n => n.nodeType === 1);
         wrap.replaceWith(...nodes);
-        execScripts(firstEl);
+        execScripts(document.body);
 
         if (window.history && window.history.replaceState){
           const cleanUrl = `${window.location.pathname}?${params.toString()}`;
@@ -6039,7 +6039,8 @@
     }
 
     const bindings = [
-      
+      ['formFiltroResumo', 'resumo', 'resumo', 'resumo'],
+      ['formFiltroLancamentos', 'lancamentos', 'lancamentosAjaxWrap', 'lancamentos'],
       ['formFiltroReceitas', 'receitas', 'receitasAjaxWrap', 'receitas'],
       ['formFiltroDespesas', 'despesas', 'despesasAjaxWrap', 'despesas'],
       ['formFiltroCoopReceitas', 'coop_receitas', 'coopReceitasAjaxWrap', 'coop_receitas'],
@@ -6056,19 +6057,6 @@
         fetchPartial(form, partial, wrapId, tabName);
       });
     });
-
-    ['formFiltroResumo','formFiltroLancamentos'].forEach((formId) => {
-      const form = document.getElementById(formId);
-      if (!form || form.dataset.normalBound) return;
-      form.dataset.normalBound = '1';
-      form.addEventListener('submit', function(){
-        const params = new URLSearchParams(new FormData(form));
-        params.delete('ajax_partial');
-        params.delete('ajax');
-        const action = form.getAttribute('action') || window.location.pathname;
-        form.setAttribute('action', action.split('?')[0] + '?' + params.toString());
-        form.method = 'GET';
-      });
     });
   }
 
@@ -6378,16 +6366,68 @@
       if (link) new bootstrap.Tab(link).show();
     }
 
+    const financeTabs = {
+      resumo: {partial:'resumo', wrapId:'resumo'},
+      lancamentos: {partial:'lancamentos', wrapId:'lancamentosAjaxWrap'},
+      receitas: {partial:'receitas', wrapId:'receitasAjaxWrap'},
+      despesas: {partial:'despesas', wrapId:'despesasAjaxWrap'},
+      coop_receitas: {partial:'coop_receitas', wrapId:'coopReceitasAjaxWrap'},
+      coop_despesas: {partial:'coop_despesas', wrapId:'coopDespesasAjaxWrap'},
+      beneficios: {partial:'beneficios', wrapId:'beneficiosAjaxWrap'}
+    };
+
     document.querySelectorAll('.sidebar .nav-link[data-bs-toggle="tab"], .sidebar .nav-sublink[data-bs-toggle="tab"]').forEach(a => {
-      a.addEventListener('click', (e) => {
+      a.addEventListener('click', async (e) => {
         const href = a.getAttribute('href') || '';
         const id = href.startsWith('#') ? href.slice(1) : '';
         if (!id) return;
+        const fin = financeTabs[id];
+        if (!fin) {
+          e.preventDefault();
+          const p = new URLSearchParams(location.search);
+          p.set('tab', id);
+          p.delete('ajax_partial');
+          location.href = location.pathname + '?' + p.toString();
+          return;
+        }
+
         e.preventDefault();
-        const p = new URLSearchParams(location.search);
-        p.set('tab', id);
-        p.delete('ajax_partial');
-        location.href = location.pathname + '?' + p.toString();
+        const form = document.getElementById('formFiltro' + (id === 'resumo' ? 'Resumo' : id === 'lancamentos' ? 'Lancamentos' : id === 'receitas' ? 'Receitas' : id === 'despesas' ? 'Despesas' : id === 'coop_receitas' ? 'CoopReceitas' : id === 'coop_despesas' ? 'CoopDespesas' : 'Beneficios'));
+        const params = form ? new URLSearchParams(new FormData(form)) : new URLSearchParams(location.search);
+        params.set('tab', id);
+        params.set('ajax_partial', fin.partial);
+        try {
+          const resp = await fetch(location.pathname + '?' + params.toString(), { headers:{ 'X-Requested-With':'XMLHttpRequest' }});
+          const html = await resp.text();
+          if (!resp.ok || !html.trim()) throw new Error('Falha ao carregar aba');
+          const holder = document.createElement('div');
+          holder.innerHTML = html;
+          const incoming = fin.wrapId === 'resumo' ? holder.querySelector('#resumo') || holder.firstElementChild : holder.querySelector('#' + fin.wrapId) || holder.firstElementChild;
+          const current = document.getElementById(fin.wrapId);
+          if (incoming && current) current.replaceWith(incoming);
+          else if (fin.wrapId === 'resumo') {
+            const curResumo = document.getElementById('resumo');
+            if (curResumo && holder.firstElementChild) curResumo.replaceWith(holder.firstElementChild);
+          }
+          holder.querySelectorAll('script').forEach(oldScript => {
+            const s = document.createElement('script');
+            if (oldScript.src) s.src = oldScript.src;
+            if (oldScript.type) s.type = oldScript.type;
+            s.textContent = oldScript.textContent;
+            oldScript.replaceWith(s);
+          });
+          const trigger = document.querySelector(`.sidebar [href="#${id}"]`);
+          if (trigger) new bootstrap.Tab(trigger).show();
+          const p = new URLSearchParams(location.search);
+          params.delete('ajax_partial');
+          history.replaceState({}, '', location.pathname + '?' + params.toString());
+          initAjaxFilters();
+        } catch(err) {
+          const p = new URLSearchParams(location.search);
+          p.set('tab', id);
+          p.delete('ajax_partial');
+          location.href = location.pathname + '?' + p.toString();
+        }
       });
     });
 
