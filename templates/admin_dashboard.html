@@ -721,7 +721,7 @@
     <!-- === RESUMO (Dashboard Financeiro Completo) === -->
     
       <!--AJAX_RESUMO_START--><section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
-      <div class="resumo-shell">
+      <div id="resumoAjaxWrap"><div class="resumo-shell">
 
         {# ---------- Helpers de data ---------- #}
         {% macro ymd(x) -%}
@@ -1686,7 +1686,7 @@
       document.getElementById('btnExportXLSX')?.addEventListener('click', exportXLSX);
     })();
     </script>
-</section><!--AJAX_RESUMO_END-->
+</div></section><!--AJAX_RESUMO_END-->
 
 <!-- LANÇAMENTOS (versão moderna/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='lancamentos' else '' }}" id="lancamentos" role="tabpanel">
@@ -3464,7 +3464,7 @@
 </script>
       
 <!-- COOPERADOS (versão profissional / drop-in) -->
-<section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
+<!--AJAX_COOPERADOS_START--><section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
   {% set qtd_coops = cooperados|length %}
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
     <h5 class="m-0 d-flex align-items-center gap-2">
@@ -3869,7 +3869,7 @@
 </section>
 
       <!-- RESTAURANTES (versão profissional / drop-in) -->
-<section class="tab-pane fade {{ 'show active' if _tab=='restaurantes' else '' }}" id="restaurantes" role="tabpanel">
+<!--AJAX_RESTAURANTES_START--><!--AJAX_COOPERADOS_END--><section class="tab-pane fade {{ 'show active' if _tab=='restaurantes' else '' }}" id="restaurantes" role="tabpanel">
   {% set rest_list = restaurantes_todos|default(restaurantes) %}
   {% set qtd_rest = rest_list|length %}
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
@@ -4159,7 +4159,7 @@
 </section>
 
      <!-- ESCALAS -->
-<section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
+<!--AJAX_ESCALAS_START--><!--AJAX_RESTAURANTES_END--><section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
   <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 align-items-lg-center mb-3">
     <div>
       <h5 class="mb-0 section-title">Gestão de Escalas</h5>
@@ -5055,7 +5055,7 @@
 
     <!-- === CONFIGURAÇÕES === -->
 
-<section class="tab-pane fade {{ 'show active' if _tab=='sistemas' else '' }}" id="sistemas" role="tabpanel">
+<!--AJAX_SISTEMAS_START--><!--AJAX_ESCALAS_END--><section class="tab-pane fade {{ 'show active' if _tab=='sistemas' else '' }}" id="sistemas" role="tabpanel">
   <div class="card border-0 shadow-sm mb-3">
     <div class="card-body">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
@@ -5094,7 +5094,7 @@
   </div>
 </section>
 
-<section class="tab-pane fade {{ 'show active' if _tab=='config' else '' }}" id="config" role="tabpanel">
+<!--AJAX_CONFIG_START--><!--AJAX_SISTEMAS_END--><section class="tab-pane fade {{ 'show active' if _tab=='config' else '' }}" id="config" role="tabpanel">
   <div class="content-shell">
     <div class="page-header">
       <h3><i class="bi bi-gear"></i> Configurações</h3>
@@ -6039,7 +6039,8 @@
     }
 
     const bindings = [
-      
+      ['formFiltroResumo', 'resumo', 'resumoAjaxWrap', 'resumo'],
+      ['formFiltroLancamentos', 'lancamentos', 'lancamentosAjaxWrap', 'lancamentos'],
       ['formFiltroReceitas', 'receitas', 'receitasAjaxWrap', 'receitas'],
       ['formFiltroDespesas', 'despesas', 'despesasAjaxWrap', 'despesas'],
       ['formFiltroCoopReceitas', 'coop_receitas', 'coopReceitasAjaxWrap', 'coop_receitas'],
@@ -6056,19 +6057,6 @@
         fetchPartial(form, partial, wrapId, tabName);
       });
     });
-
-    ['formFiltroResumo','formFiltroLancamentos'].forEach((formId) => {
-      const form = document.getElementById(formId);
-      if (!form || form.dataset.normalBound) return;
-      form.dataset.normalBound = '1';
-      form.addEventListener('submit', function(){
-        const params = new URLSearchParams(new FormData(form));
-        params.delete('ajax_partial');
-        params.delete('ajax');
-        const action = form.getAttribute('action') || window.location.pathname;
-        form.setAttribute('action', action.split('?')[0] + '?' + params.toString());
-        form.method = 'GET';
-      });
     });
   }
 
