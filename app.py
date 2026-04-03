@@ -1713,6 +1713,7 @@ ADMIN_ABAS = {
     "tabelas": "Tabelas",
     "avaliacoes": "Avaliações",
     "config": "Configurações",
+    "folha": "Folha",
     "sistemas": "Sistemas",
 }
 
@@ -3955,122 +3956,6 @@ def admin_dashboard():
     juros_arrecadados_total = round(sum((r['valor_multa'] + r['valor_juros']) for r in taxa_admin_rows if r['status'] == 'pago'), 2)
     cooperados_map = {c.id: c for c in cooperados}
 
-    ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
-    ajax_financeiros_fast = {"resumo", "lancamentos", "receitas", "despesas", "coop_receitas", "coop_despesas"}
-
-    if ajax_partial in ajax_financeiros_fast:
-        resumo_coop_rows = []
-        resumo_totais = {
-            "prod": 0.0, "inss4": 0.0, "sest05": 0.0, "rec": 0.0,
-            "des": 0.0, "adiant": 0.0, "a_receber": 0.0, "saldo_pendente": 0.0,
-            "pend_programado": 0.0
-        }
-        chart_data_lancamentos_coop = {"labels": [], "values": []}
-        chart_data_lancamentos_cooperados = {"labels": [], "values": []}
-
-        if ajax_partial == "resumo":
-            sums = {}
-            for l in lancamentos:
-                if not l.data:
-                    continue
-                key = l.data.strftime("%Y-%m")
-                sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
-
-            labels_ord = sorted(sums.keys())
-
-            def _fmt_label_fast(k: str) -> str:
-                parts = k.split("-")
-                if len(parts) == 2 and parts[0] and parts[1]:
-                    year, month = parts[0], parts[1]
-                    return f"{month}/{year[-2:]}"
-                return k
-
-            labels_fmt = [_fmt_label_fast(k) for k in labels_ord]
-            values = [round(sums[k], 2) for k in labels_ord]
-            chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
-            chart_data_lancamentos_cooperados = {"labels": labels_fmt, "values": values}
-
-            for coop in cooperados:
-                snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
-                prod = sum((l.valor or 0.0) for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-                rec = sum((r.valor or 0.0) for r in receitas_coop if getattr(r, "cooperado_id", None) == coop.id)
-                inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-                sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-                des = round(snap.get("descontado_periodo_despesa", 0.0), 2)
-                adiant = round(snap.get("descontado_periodo_adiant", 0.0), 2)
-                if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
-                    a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
-                    saldo_pendente = round(snap["saldo_devedor"], 2)
-                    pend_programado = round(snap["a_descontar"], 2)
-                    resumo_coop_rows.append({
-                        "id": coop.id,
-                        "nome": coop.nome,
-                        "prod": round(prod, 2),
-                        "inss4": round(inss4, 2),
-                        "sest05": round(sest05, 2),
-                        "rec": round(rec, 2),
-                        "des": round(des, 2),
-                        "adiant": round(adiant, 2),
-                        "a_receber": a_receber,
-                        "aReceber": a_receber,
-                        "saldo_pendente": saldo_pendente,
-                        "saldoPendente": saldo_pendente,
-                        "pend_programado": pend_programado,
-                        "pendProgramado": pend_programado,
-                    })
-                    resumo_totais["prod"] += prod
-                    resumo_totais["inss4"] += inss4
-                    resumo_totais["sest05"] += sest05
-                    resumo_totais["rec"] += rec
-                    resumo_totais["des"] += des
-                    resumo_totais["adiant"] += adiant
-                    resumo_totais["a_receber"] += max(0.0, snap["disponivel_auto_restante"])
-                    resumo_totais["saldo_pendente"] += snap["saldo_devedor"]
-                    resumo_totais["pend_programado"] += snap["a_descontar"]
-
-        partial_context = dict(
-            tab=ajax_partial,
-            total_producoes=total_producoes,
-            total_inss=total_inss,
-            total_sest=total_sest,
-            total_encargos=total_encargos,
-            total_receitas=total_receitas,
-            total_despesas=total_despesas,
-            total_receitas_coop=total_receitas_coop,
-            total_despesas_coop=total_despesas_coop,
-            total_adiantamentos_coop=total_adiantamentos_coop,
-            salario_minimo=(cfg.salario_minimo or 0.0) if cfg else 0.0,
-            bloquear_adiantamento=bool(getattr(cfg, "bloquear_adiantamento", False)) if cfg else False,
-            lancamentos=lancamentos,
-            receitas=receitas,
-            despesas=despesas,
-            receitas_coop=receitas_coop,
-            despesas_coop=despesas_coop,
-            cooperados=cooperados,
-            restaurantes=restaurantes,
-            beneficios_view=[],
-            historico_beneficios=[],
-            admin_perms=admin_perms,
-            admin_is_master=is_admin_master(),
-            taxa_admin_rows=taxa_admin_rows,
-            taxa_admin_totais=taxa_admin_totais,
-            juros_arrecadados_total=juros_arrecadados_total,
-            resumo_coop_rows=resumo_coop_rows,
-            resumo_totais=resumo_totais,
-            chart_data_lancamentos_coop=chart_data_lancamentos_coop,
-            chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
-            despesa_snapshot_map=despesa_snapshot_map if 'despesa_snapshot_map' in locals() else {},
-            solicitacoes_adiantamento=solicitacoes_adiantamento if 'solicitacoes_adiantamento' in locals() else [],
-            adiantamento_status_map=adiantamento_status_map if 'adiantamento_status_map' in locals() else {},
-            status_adiantamento_label=_status_adiantamento_label,
-            status_adiantamento_badge=_status_adiantamento_badge,
-            competencia_humana=_competencia_humana,
-            current_date=date.today(),
-            data_limite=date(date.today().year, 12, 31),
-            filtro_periodo_aplicado=filtro_periodo_aplicado,
-        )
-        return _render_admin_dashboard_partial(ajax_partial, **partial_context)
-
     # =========================
     # Documentos / status
     # =========================
@@ -4202,6 +4087,96 @@ def admin_dashboard():
             .order_by(Usuario.id.asc())
             .first()
         )
+
+    # =========================
+    # Folha
+    # =========================
+    folha_por_coop = []
+    folha_inicio = None
+    folha_fim = None
+
+    if active_tab == "folha":
+        folha_inicio = _parse_date(args.get("folha_inicio"))
+        folha_fim = _parse_date(args.get("folha_fim"))
+
+        if folha_inicio and not folha_fim:
+            folha_fim = folha_inicio
+        elif folha_fim and not folha_inicio:
+            folha_inicio = folha_fim
+        elif not folha_inicio and not folha_fim:
+            hoje_ref = date.today()
+            folha_inicio = hoje_ref - timedelta(days=hoje_ref.weekday())
+            folha_fim = folha_inicio + timedelta(days=6)
+
+        INSS_ALIQ_FOLHA = 0.04
+        SEST_ALIQ_FOLHA = 0.005
+
+        FolhaItem = namedtuple(
+            "FolhaItem",
+            "cooperado lancamentos receitas despesas bruto inss sest encargos outras_desp liquido"
+        )
+
+        for c in cooperados:
+            l = (
+                Lancamento.query.filter(
+                    Lancamento.cooperado_id == c.id,
+                    Lancamento.data >= folha_inicio,
+                    Lancamento.data <= folha_fim,
+                )
+                .order_by(Lancamento.data.asc(), Lancamento.id.asc())
+                .all()
+            )
+
+            r = (
+                ReceitaCooperado.query.filter(
+                    ReceitaCooperado.cooperado_id == c.id,
+                    ReceitaCooperado.data >= folha_inicio,
+                    ReceitaCooperado.data <= folha_fim,
+                )
+                .order_by(ReceitaCooperado.data.asc(), ReceitaCooperado.id.asc())
+                .all()
+            )
+
+            d = (
+                DespesaCooperado.query.filter(
+                    (DespesaCooperado.cooperado_id == c.id) | (DespesaCooperado.cooperado_id.is_(None)),
+                    DespesaCooperado.data_inicio <= folha_fim,
+                    DespesaCooperado.data_fim >= folha_inicio,
+                )
+                .order_by(DespesaCooperado.data_inicio.asc(), DespesaCooperado.id.asc())
+                .all()
+            )
+
+            bruto_lanc = sum((x.valor or 0) for x in l)
+            inss = round(bruto_lanc * INSS_ALIQ_FOLHA, 2)
+            sest = round(bruto_lanc * SEST_ALIQ_FOLHA, 2)
+            encargos = round(inss + sest, 2)
+            outras_desp = sum((x.valor or 0) for x in d)
+            bruto_total = bruto_lanc + sum((x.valor or 0) for x in r)
+            liquido = round(bruto_total - encargos - outras_desp, 2)
+
+            for x in l:
+                x.conta_inss = True
+                x.isento_benef = False
+                x.inss = round((x.valor or 0) * INSS_ALIQ_FOLHA, 2)
+                x.sest = round((x.valor or 0) * SEST_ALIQ_FOLHA, 2)
+                x.encargos = round((x.inss or 0) + (x.sest or 0), 2)
+
+            folha_por_coop.append(
+                FolhaItem(
+                    cooperado=c,
+                    lancamentos=l,
+                    receitas=r,
+                    despesas=d,
+                    bruto=round(bruto_total, 2),
+                    inss=inss,
+                    sest=sest,
+                    encargos=encargos,
+                    outras_desp=round(outras_desp, 2),
+                    liquido=liquido,
+                )
+            )
+
     # =========================
     # Benefícios
     # =========================
@@ -4281,7 +4256,7 @@ def admin_dashboard():
             })
 
     ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
-    ajax_financeiros = {"beneficios"}
+    ajax_financeiros = {"resumo", "lancamentos", "receitas", "despesas", "coop_receitas", "coop_despesas", "beneficios"}
     if ajax_partial in ajax_financeiros:
         resumo_coop_rows = []
         resumo_totais = {
@@ -4698,6 +4673,9 @@ def admin_dashboard():
         status_doc_por_coop=status_doc_por_coop,
         chart_data_lancamentos_coop=chart_data_lancamentos_coop,
         chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
+        folha_inicio=folha_inicio,
+        folha_fim=folha_fim,
+        folha_por_coop=folha_por_coop,
         trocas_pendentes=trocas_pendentes,
         trocas_historico=trocas_historico,
         trocas_historico_flat=trocas_historico_flat,
