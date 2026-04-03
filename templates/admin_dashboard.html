@@ -6039,8 +6039,7 @@
     }
 
     const bindings = [
-      ['formFiltroResumo', 'resumo', 'resumo', 'resumo'],
-      ['formFiltroLancamentos', 'lancamentos', 'lancamentosAjaxWrap', 'lancamentos'],
+      
       ['formFiltroReceitas', 'receitas', 'receitasAjaxWrap', 'receitas'],
       ['formFiltroDespesas', 'despesas', 'despesasAjaxWrap', 'despesas'],
       ['formFiltroCoopReceitas', 'coop_receitas', 'coopReceitasAjaxWrap', 'coop_receitas'],
@@ -6058,6 +6057,19 @@
       });
     });
 
+    ['formFiltroResumo','formFiltroLancamentos'].forEach((formId) => {
+      const form = document.getElementById(formId);
+      if (!form || form.dataset.normalBound) return;
+      form.dataset.normalBound = '1';
+      form.addEventListener('submit', function(){
+        const params = new URLSearchParams(new FormData(form));
+        params.delete('ajax_partial');
+        params.delete('ajax');
+        const action = form.getAttribute('action') || window.location.pathname;
+        form.setAttribute('action', action.split('?')[0] + '?' + params.toString());
+        form.method = 'GET';
+      });
+    });
   }
 
   document.addEventListener('DOMContentLoaded', initAjaxFilters);
