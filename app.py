@@ -3683,6 +3683,111 @@ def admin_sistemas_abrir(sistema):
     flash("Sistema inválido.", "warning")
     return redirect(url_for("admin_dashboard", tab="sistemas"))
 
+
+
+def _build_beneficios_admin_context(coop_filter=None):
+    historico_beneficios = []
+    beneficios_view = []
+    try:
+        q_benef = BeneficioRegistro.query
+        historico_beneficios = q_benef.order_by(BeneficioRegistro.id.desc()).all()
+        for b in historico_beneficios:
+            nomes = [x.strip() for x in (b.recebedores_nomes or "").split(";") if x and x.strip()]
+            ids = [x.strip() for x in (b.recebedores_ids or "").split(";") if x and x.strip()]
+            recs = []
+            for i, nome in enumerate(nomes):
+                rid = None
+                if i < len(ids) and str(ids[i]).isdigit():
+                    try:
+                        rid = int(ids[i])
+                    except Exception:
+                        rid = None
+                if coop_filter and (rid is not None) and (rid != coop_filter):
+                    continue
+                recs.append({"id": rid, "nome": nome})
+            if coop_filter and not recs:
+                continue
+            beneficios_view.append({
+                "id": b.id,
+                "data_inicial": b.data_inicial,
+                "data_final": b.data_final,
+                "data_lancamento": b.data_lancamento,
+                "tipo": b.tipo,
+                "valor_total": b.valor_total or 0.0,
+                "recebedores": recs,
+            })
+    except Exception:
+        historico_beneficios = []
+        beneficios_view = []
+    return historico_beneficios, beneficios_view
+
+
+def _build_resumo_backend_context(cooperados, lancamentos, receitas_coop, data_inicio, data_fim):
+    resumo_coop_rows = []
+    resumo_totais = {
+        "prod": 0.0, "inss4": 0.0, "sest05": 0.0, "rec": 0.0,
+        "des": 0.0, "adiant": 0.0, "a_receber": 0.0, "saldo_pendente": 0.0,
+        "pend_programado": 0.0
+    }
+    sums = {}
+    for l in lancamentos:
+        if not getattr(l, "data", None):
+            continue
+        key = l.data.strftime("%Y-%m")
+        sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
+    labels_ord = sorted(sums.keys())
+    labels_fmt = []
+    for k in labels_ord:
+        parts = k.split("-")
+        if len(parts) == 2 and parts[0] and parts[1]:
+            year, month = parts[0], parts[1]
+            labels_fmt.append(f"{month}/{year[-2:]}")
+        else:
+            labels_fmt.append(k)
+    values = [round(sums[k], 2) for k in labels_ord]
+    chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
+    chart_data_lancamentos_cooperados = {"labels": labels_fmt, "values": values}
+
+    for coop in cooperados:
+        snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
+        prod = sum((l.valor or 0.0) for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
+        rec = sum((r.valor or 0.0) for r in receitas_coop if getattr(r, "cooperado_id", None) == coop.id)
+        inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
+        sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
+        des = round(snap.get("descontado_periodo_despesa", 0.0), 2)
+        adiant = round(snap.get("descontado_periodo_adiant", 0.0), 2)
+        if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
+            _a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
+            _saldo_pendente = round(snap["saldo_devedor"], 2)
+            _pend_programado = round(snap["a_descontar"], 2)
+            resumo_coop_rows.append({
+                "id": coop.id,
+                "nome": coop.nome,
+                "prod": round(prod,2),
+                "inss4": round(inss4,2),
+                "sest05": round(sest05,2),
+                "rec": round(rec,2),
+                "des": round(des,2),
+                "adiant": round(adiant,2),
+                "a_receber": _a_receber,
+                "aReceber": _a_receber,
+                "saldo_pendente": _saldo_pendente,
+                "saldoPendente": _saldo_pendente,
+                "pend_programado": _pend_programado,
+                "pendProgramado": _pend_programado,
+            })
+            resumo_totais["prod"] += prod
+            resumo_totais["inss4"] += inss4
+            resumo_totais["sest05"] += sest05
+            resumo_totais["rec"] += rec
+            resumo_totais["des"] += des
+            resumo_totais["adiant"] += adiant
+            resumo_totais["a_receber"] += max(0.0, snap["disponivel_auto_restante"])
+            resumo_totais["saldo_pendente"] += snap["saldo_devedor"]
+            resumo_totais["pend_programado"] += snap["a_descontar"]
+
+    return resumo_coop_rows, resumo_totais, chart_data_lancamentos_coop, chart_data_lancamentos_cooperados
+
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_dashboard():
@@ -3955,6 +4060,113 @@ def admin_dashboard():
     taxa_admin_rows, taxa_admin_totais = _build_taxa_admin_rows(receitas)
     juros_arrecadados_total = round(sum((r['valor_multa'] + r['valor_juros']) for r in taxa_admin_rows if r['status'] == 'pago'), 2)
     cooperados_map = {c.id: c for c in cooperados}
+
+
+    ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
+    finance_tabs = {"resumo", "lancamentos", "receitas", "despesas", "coop_receitas", "coop_despesas", "beneficios"}
+    requested_finance_tab = ajax_partial if ajax_partial in finance_tabs else (active_tab if active_tab in finance_tabs else "")
+
+    if requested_finance_tab:
+        fast_mode = True
+        historico_beneficios = []
+        beneficios_view = []
+        current_date = date.today()
+        data_limite = date(current_date.year, 12, 31)
+
+        if requested_finance_tab in {"resumo", "beneficios"}:
+            historico_beneficios, beneficios_view = _build_beneficios_admin_context(cooperado_id)
+
+        resumo_coop_rows = []
+        resumo_totais = {
+            "prod": 0.0, "inss4": 0.0, "sest05": 0.0, "rec": 0.0,
+            "des": 0.0, "adiant": 0.0, "a_receber": 0.0, "saldo_pendente": 0.0,
+            "pend_programado": 0.0
+        }
+        chart_data_lancamentos_coop = {"labels": [], "values": []}
+        chart_data_lancamentos_cooperados = {"labels": [], "values": []}
+
+        if requested_finance_tab == "resumo":
+            resumo_coop_rows, resumo_totais, chart_data_lancamentos_coop, chart_data_lancamentos_cooperados = _build_resumo_backend_context(
+                cooperados, lancamentos, receitas_coop, data_inicio, data_fim
+            )
+
+        partial_context = dict(
+            tab=(requested_finance_tab if ajax_partial else active_tab),
+            fast_mode=fast_mode,
+            total_producoes=total_producoes,
+            total_inss=total_inss,
+            total_sest=total_sest,
+            total_encargos=total_encargos,
+            total_receitas=total_receitas,
+            total_despesas=total_despesas,
+            total_receitas_coop=total_receitas_coop,
+            total_despesas_coop=total_despesas_coop,
+            total_adiantamentos_coop=total_adiantamentos_coop,
+            salario_minimo=(cfg.salario_minimo or 0.0) if cfg else 0.0,
+            bloquear_adiantamento=bool(getattr(cfg, "bloquear_adiantamento", False)) if cfg else False,
+            lancamentos=lancamentos,
+            receitas=receitas,
+            despesas=despesas,
+            receitas_coop=receitas_coop,
+            despesas_coop=despesas_coop,
+            cooperados=cooperados,
+            restaurantes=restaurantes,
+            beneficios_view=beneficios_view,
+            historico_beneficios=historico_beneficios,
+            current_date=current_date,
+            data_limite=data_limite,
+            admin=None,
+            admin_user=None,
+            docinfo_map={},
+            escalas_por_coop={},
+            escalas_por_coop_json={},
+            qtd_escalas_map={},
+            qtd_escalas_sem_cadastro=0,
+            status_doc_por_coop={},
+            chart_data_lancamentos_coop=chart_data_lancamentos_coop,
+            chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
+            folha_inicio=None,
+            folha_fim=None,
+            folha_por_coop=[],
+            trocas_pendentes=[],
+            trocas_historico=[],
+            trocas_historico_flat=[],
+            admin_perms=admin_perms,
+            admin_is_master=is_admin_master(),
+            ADMIN_ABAS=ADMIN_ABAS,
+            admins=[],
+            admin_permissions_map={},
+            admins_secundarios=[],
+            admins_permissoes={},
+            filtro_periodo_aplicado=filtro_periodo_aplicado,
+            escala_editor_rows=[],
+            escala_editor_rows_export=[],
+            contratos_escala_opcoes=[],
+            escala_hist_inicio=None,
+            escala_hist_fim=None,
+            trocas_hist_inicio=None,
+            trocas_hist_fim=None,
+            escala_historico_rows=[],
+            trocas_historico_export=[],
+            contagem_contrato_turno=[],
+            resumo_coop_rows=resumo_coop_rows,
+            resumo_totais=resumo_totais,
+            despesa_snapshot_map=despesa_snapshot_map if 'despesa_snapshot_map' in locals() else {},
+            taxa_admin_rows=taxa_admin_rows,
+            taxa_admin_totais=taxa_admin_totais,
+            juros_arrecadados_total=juros_arrecadados_total,
+            solicitacoes_adiantamento=solicitacoes_adiantamento if 'solicitacoes_adiantamento' in locals() else [],
+            adiantamento_status_map=adiantamento_status_map if 'adiantamento_status_map' in locals() else {},
+            status_adiantamento_label=_status_adiantamento_label,
+            status_adiantamento_badge=_status_adiantamento_badge,
+            competencia_humana=_competencia_humana,
+            farmacia_entregas=[],
+        )
+
+        if ajax_partial in finance_tabs:
+            return _render_admin_dashboard_partial(ajax_partial, **partial_context)
+        return render_template("admin_dashboard.html", **partial_context)
+
 
     # =========================
     # Documentos / status
@@ -4732,6 +4944,23 @@ def admin_dashboard():
 # =========================
 # Navegação/Export util
 # =========================
+
+@app.route("/admin/aba/<string:partial_name>", methods=["GET"])
+@admin_required
+def admin_financeiro_aba(partial_name):
+    allowed = {"resumo", "lancamentos", "receitas", "despesas", "coop_receitas", "coop_despesas", "beneficios"}
+    partial_name = (partial_name or "").strip().lower()
+    if partial_name not in allowed:
+        abort(404)
+    args = request.args.to_dict(flat=False)
+    flat = []
+    for k, vals in args.items():
+        for v in vals:
+            flat.append((k, v))
+    flat.append(("tab", partial_name))
+    flat.append(("ajax_partial", partial_name))
+    return redirect(url_for("admin_dashboard") + "?" + urlencode(flat, doseq=True))
+
 @app.route("/filtrar_lancamentos")
 @admin_required
 def filtrar_lancamentos():
