@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Painel Admin - Coopex</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <style>
+    :root{--royal-blue:#2747d9;--royal-blue-2:#3358f0;--royal-dark:#16258a;--bg:#f4f7fc;--card:#ffffff;--text:#182033;--muted:#7b879f;--border:#e6ebf5;--shadow:0 10px 30px rgba(17,24,39,.08);--sidebar-w:278px;--radius:20px}
+    *{box-sizing:border-box} body{margin:0;font-family:'Inter',sans-serif;background:radial-gradient(circle at top right, rgba(39,71,217,.10), transparent 28%),linear-gradient(180deg,#f7f9fe 0%,#f2f5fb 100%);color:var(--text);overflow-x:hidden}
+    .layout{display:flex;min-height:100vh}.sidebar{position:fixed;top:0;left:0;width:var(--sidebar-w);height:100vh;padding:18px 14px;background:linear-gradient(180deg, rgba(51,88,240,1) 0%, rgba(39,71,217,1) 38%, rgba(22,37,138,1) 100%);color:#fff;box-shadow:0 0 26px rgba(0,0,0,.22);z-index:1020;overflow-y:auto;display:flex;flex-direction:column}.main{flex:1;margin-left:var(--sidebar-w);padding:20px 20px 30px;width:calc(100% - var(--sidebar-w))}
+    .brand{padding:16px;margin-bottom:14px;border-radius:18px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.12)} .brand-title{margin:0;font-family:'Orbitron',sans-serif;font-size:1.08rem;letter-spacing:.9px;text-transform:uppercase}.brand-sub{display:block;margin-top:6px;font-size:.74rem;opacity:.82}
+    .nav-section-label{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.60);margin:14px 8px 8px}.sidebar-divider{border-color:rgba(255,255,255,.08);margin:12px 0 8px}
+    .nav-link-main,.nav-link-group-toggle,.nav-sublink{display:flex;align-items:center;color:#fff;text-decoration:none;border-radius:14px;transition:all .18s ease}.nav-link-main,.nav-link-group-toggle{justify-content:space-between;width:100%;border:0;padding:10px 12px;margin:4px 0;background:transparent;font-size:.92rem;cursor:pointer}.nav-sublinks{padding-left:16px;margin-bottom:6px}.nav-sublink{gap:8px;padding:8px 10px;margin:4px 0;font-size:.84rem;color:rgba(255,255,255,.84)} .nav-link-main:hover,.nav-link-group-toggle:hover,.nav-sublink:hover{background:rgba(255,255,255,.10);color:#fff}.nav-link-main.active,.nav-sublink.active{background:rgba(255,255,255,.16)!important;border:1px solid rgba(255,255,255,.18);box-shadow:0 8px 18px rgba(0,0,0,.10);color:#fff!important}.nav-link-left{display:flex;align-items:center;gap:10px}.nav-link-icon{width:22px;display:flex;justify-content:center;align-items:center;font-size:1rem;flex-shrink:0}.nav-caret{font-size:.82rem;opacity:.72}.sidebar-footer{margin-top:auto;padding-top:10px}
+    .panel-head{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px 20px;border-radius:28px;background:linear-gradient(135deg, rgba(39,71,217,1) 0%, rgba(51,88,240,1) 52%, rgba(22,37,138,1) 100%);color:#fff;box-shadow:0 18px 40px rgba(39,71,217,.22);margin-bottom:18px}.panel-head-title{margin:0;font-size:1.55rem;font-weight:800}.panel-head-sub{margin-top:6px;color:rgba(255,255,255,.86);font-size:.95rem}
+    .card{background:var(--card);border:1px solid var(--border)!important;border-radius:var(--radius)!important;box-shadow:var(--shadow)!important;overflow:hidden}.card-body{padding:18px!important}
+    #dynamicTabContainer.loading{opacity:.65;pointer-events:none}.loader-card{min-height:220px;display:flex;align-items:center;justify-content:center}
+    @media (max-width:991.98px){:root{--sidebar-w:74px}.sidebar{padding:18px 8px}.brand-title,.brand-sub,.nav-section-label,.nav-link-label{display:none}.nav-sublinks{padding-left:10px}.main{margin-left:var(--sidebar-w);width:calc(100% - var(--sidebar-w));padding:16px 10px}}
+  </style>
+</head>
+<body>
+{% set _tab = tab if tab is defined else 'resumo' %}
+{% set _perms = admin_perms if admin_perms is defined else {} %}
+{% set can_lanc_ver = admin_is_master or _perms.get('lancamentos', {}).get('ver', False) %}
+{% set can_receitas_ver = admin_is_master or _perms.get('receitas', {}).get('ver', False) %}
+{% set can_despesas_ver = admin_is_master or _perms.get('despesas', {}).get('ver', False) %}
+{% set can_coop_receitas_ver = admin_is_master or _perms.get('coop_receitas', {}).get('ver', False) %}
+{% set can_coop_despesas_ver = admin_is_master or _perms.get('coop_despesas', {}).get('ver', False) %}
+{% set can_beneficios_ver = admin_is_master or _perms.get('beneficios', {}).get('ver', False) %}
+{% set can_cooperados_ver = admin_is_master or _perms.get('cooperados', {}).get('ver', False) %}
+{% set can_restaurantes_ver = admin_is_master or _perms.get('restaurantes', {}).get('ver', False) %}
+{% set can_escalas_ver = admin_is_master or _perms.get('escalas', {}).get('ver', False) %}
+{% set can_avisos_ver = admin_is_master or _perms.get('avisos', {}).get('ver', False) %}
+{% set can_documentos_ver = admin_is_master or _perms.get('documentos', {}).get('ver', False) %}
+{% set can_tabelas_ver = admin_is_master or _perms.get('tabelas', {}).get('ver', False) %}
+{% set can_avaliacoes_ver = admin_is_master or _perms.get('avaliacoes', {}).get('ver', False) %}
+{% set can_sistemas_ver = admin_is_master or _perms.get('sistemas', {}).get('ver', False) %}
+{% set can_config_ver = admin_is_master or _perms.get('config', {}).get('ver', False) %}
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><h1 class="brand-title">PAINEL COOPEX</h1><span class="brand-sub">Administração Central</span></div>
+    <nav class="sidebar-nav nav flex-column">
+      <div class="nav-section-label">Visão Geral</div>
+      {% if can_lanc_ver or can_receitas_ver or can_despesas_ver or can_coop_receitas_ver or can_coop_despesas_ver or can_beneficios_ver %}
+      <a class="nav-link-main js-admin-tab {{ 'active' if _tab=='resumo' else '' }}" href="#" data-admin-tab="resumo"><div class="nav-link-left"><span class="nav-link-icon"><i class="bi bi-graph-up"></i></span><span class="nav-link-label">Resumo</span></div></a>{% endif %}
+      {% if can_avaliacoes_ver %}<a class="nav-link-main" href="{{ url_for('admin_avaliacoes') }}"><div class="nav-link-left"><span class="nav-link-icon"><i class="bi bi-stars"></i></span><span class="nav-link-label">Avaliações</span></div></a>{% endif %}
+      <hr class="sidebar-divider">
+      <button class="nav-link-group-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuFinanceiro" aria-expanded="true"><div class="nav-link-left"><span class="nav-link-icon"><i class="bi bi-currency-exchange"></i></span><span class="nav-link-label">Financeiro</span></div><span class="nav-caret"><i class="bi bi-chevron-down"></i></span></button>
+      <div id="menuFinanceiro" class="collapse show nav-sublinks">
+        {% if can_lanc_ver %}<a class="nav-sublink js-admin-tab {{ 'active' if _tab=='lancamentos' else '' }}" href="#" data-admin-tab="lancamentos"><i class="bi bi-journal-text"></i><span class="nav-link-label">Lançamentos</span></a>{% endif %}
+        {% if can_receitas_ver %}<a class="nav-sublink js-admin-tab {{ 'active' if _tab=='receitas' else '' }}" href="#" data-admin-tab="receitas"><i class="bi bi-credit-card"></i><span class="nav-link-label">Receitas Coop</span></a>{% endif %}
+        {% if can_despesas_ver %}<a class="nav-sublink js-admin-tab {{ 'active' if _tab=='despesas' else '' }}" href="#" data-admin-tab="despesas"><i class="bi bi-cart-dash"></i><span class="nav-link-label">Despesas Coop</span></a>{% endif %}
+        {% if can_coop_receitas_ver %}<a class="nav-sublink js-admin-tab {{ 'active' if _tab=='coop_receitas' else '' }}" href="#" data-admin-tab="coop_receitas"><i class="bi bi-wallet2"></i><span class="nav-link-label">Receitas Cooperados</span></a>{% endif %}
+        {% if can_coop_despesas_ver %}<a class="nav-sublink js-admin-tab {{ 'active' if _tab=='coop_despesas' else '' }}" href="#" data-admin-tab="coop_despesas"><i class="bi bi-bag-dash"></i><span class="nav-link-label">Despesas Cooperados</span></a>{% endif %}
+        {% if can_beneficios_ver %}<a class="nav-sublink js-admin-tab {{ 'active' if _tab=='beneficios' else '' }}" href="#" data-admin-tab="beneficios"><i class="bi bi-heart-pulse"></i><span class="nav-link-label">Benefícios</span></a>{% endif %}
+      </div>
+      <button class="nav-link-group-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuCadastros" aria-expanded="true"><div class="nav-link-left"><span class="nav-link-icon"><i class="bi bi-people"></i></span><span class="nav-link-label">Cadastros</span></div><span class="nav-caret"><i class="bi bi-chevron-down"></i></span></button>
+      <div id="menuCadastros" class="collapse show nav-sublinks">
+        {% if can_cooperados_ver %}<a class="nav-sublink js-admin-tab {{ 'active' if _tab=='cooperados' else '' }}" href="#" data-admin-tab="cooperados"><i class="bi bi-person-badge"></i><span class="nav-link-label">Cooperados</span></a>{% endif %}
+        {% if can_restaurantes_ver %}<a class="nav-sublink js-admin-tab {{ 'active' if _tab=='restaurantes' else '' }}" href="#" data-admin-tab="restaurantes"><i class="bi bi-shop-window"></i><span class="nav-link-label">Estabelecimentos</span></a>{% endif %}
+        {% if can_documentos_ver %}<a class="nav-sublink" href="{{ url_for('admin_documentos') }}"><i class="bi bi-folder2"></i><span class="nav-link-label">Documentos</span></a>{% endif %}
+        {% if can_tabelas_ver %}<a class="nav-sublink" href="{{ url_for('admin_tabelas') }}"><i class="bi bi-table"></i><span class="nav-link-label">Tabelas</span></a>{% endif %}
+      </div>
+      <button class="nav-link-group-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuOperacao" aria-expanded="true"><div class="nav-link-left"><span class="nav-link-icon"><i class="bi bi-broadcast-pin"></i></span><span class="nav-link-label">Operação</span></div><span class="nav-caret"><i class="bi bi-chevron-down"></i></span></button>
+      <div id="menuOperacao" class="collapse show nav-sublinks">
+        {% if can_escalas_ver %}<a class="nav-sublink js-admin-tab {{ 'active' if _tab=='escalas' else '' }}" href="#" data-admin-tab="escalas"><i class="bi bi-calendar-week"></i><span class="nav-link-label">Escalas</span></a>{% endif %}
+        {% if can_avisos_ver %}<a class="nav-sublink" href="{{ url_for('admin_avisos') }}"><i class="bi bi-megaphone"></i><span class="nav-link-label">Avisos</span></a>{% endif %}
+      </div>
+      <hr class="sidebar-divider">
+      <div class="sidebar-footer">
+        {% if can_sistemas_ver %}<a class="nav-link-main js-admin-tab {{ 'active' if _tab=='sistemas' else '' }}" href="#" data-admin-tab="sistemas"><div class="nav-link-left"><span class="nav-link-icon"><i class="bi bi-diagram-3"></i></span><span class="nav-link-label">Sistemas</span></div></a>{% endif %}
+        {% if can_config_ver %}<a class="nav-link-main js-admin-tab {{ 'active' if _tab=='config' else '' }}" href="#" data-admin-tab="config"><div class="nav-link-left"><span class="nav-link-icon"><i class="bi bi-gear"></i></span><span class="nav-link-label">Configurações</span></div></a>{% endif %}
+        <a class="nav-link-main" href="{{ url_for('logout') }}"><div class="nav-link-left"><span class="nav-link-icon"><i class="bi bi-box-arrow-right"></i></span><span class="nav-link-label">Sair</span></div></a>
+      </div>
+    </nav>
+  </aside>
+  <main class="main">
+    <div class="panel-head"><div><h1 class="panel-head-title">Painel Administrativo</h1><div class="panel-head-sub">Carregamento leve com abas independentes.</div></div></div>
+    <div id="dynamicTabContainer" class="card"><div class="card-body loader-card"><div class="text-center"><div class="spinner-border text-primary mb-3" role="status"></div><div>Carregando aba...</div></div></div></div>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function(){
+  const container = document.getElementById('dynamicTabContainer');
+  const links = Array.from(document.querySelectorAll('.js-admin-tab'));
+  function setActive(tab){ links.forEach(a => a.classList.toggle('active', a.dataset.adminTab === tab)); }
+  function execScripts(root){ if(!root) return; root.querySelectorAll('script').forEach(oldScript => { const s = document.createElement('script'); if (oldScript.src) s.src = oldScript.src; if (oldScript.type) s.type = oldScript.type; s.textContent = oldScript.textContent; oldScript.replaceWith(s); }); }
+  async function loadTab(tab, pushState=true){
+    setActive(tab);
+    container.classList.add('loading');
+    container.innerHTML = '<div class="card-body loader-card"><div class="text-center"><div class="spinner-border text-primary mb-3" role="status"></div><div>Carregando aba...</div></div></div>';
+    const p = new URLSearchParams(location.search);
+    p.set('tab', tab); p.set('ajax_partial', tab); p.delete('full');
+    const resp = await fetch(location.pathname + '?' + p.toString(), {headers:{'X-Requested-With':'XMLHttpRequest'}});
+    const html = await resp.text();
+    if (!resp.ok || !html.trim()) throw new Error('Falha ao carregar a aba.');
+    const holder = document.createElement('div'); holder.innerHTML = html;
+    container.innerHTML = html; execScripts(container);
+    container.classList.remove('loading');
+    if (pushState && window.history && window.history.replaceState){ p.delete('ajax_partial'); history.replaceState({}, '', location.pathname + '?' + p.toString()); }
+  }
+  links.forEach(a => a.addEventListener('click', async (e)=>{ e.preventDefault(); try{ await loadTab(a.dataset.adminTab, true); }catch(err){ const p = new URLSearchParams(location.search); p.set('tab', a.dataset.adminTab); p.set('full','1'); location.href = location.pathname + '?' + p.toString(); } }));
+  window.addEventListener('popstate', ()=>{ const p = new URLSearchParams(location.search); loadTab(p.get('tab') || 'resumo', false).catch(()=>{}); });
+  const initial = new URLSearchParams(location.search).get('tab') || '{{ _tab }}';
+  loadTab(initial, false).catch(()=>{ const p = new URLSearchParams(location.search); p.set('tab', initial); p.set('full','1'); location.href = location.pathname + '?' + p.toString(); });
+})();
+</script>
+</body></html>
