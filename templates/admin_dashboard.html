@@ -895,7 +895,7 @@
               {% endif %}
             </div>
 
-            <form method="GET" class="row g-2 align-items-end">
+            <form id="formFiltroResumo" method="GET" action="{{ url_for('admin_financeiro_aba', partial_name='resumo') }}" class="row g-2 align-items-end">
               <input type="hidden" name="tab" value="resumo">
               <div class="col-md-2">
                 <label class="form-label">De</label>
@@ -1758,7 +1758,7 @@
         </button>
       </div>
 
-      <form id="formFiltroLancamentos" method="GET" action="{{ url_for('filtrar_lancamentos') }}" class="row g-2 align-items-end">
+      <form id="formFiltroLancamentos" method="GET" action="{{ url_for('admin_financeiro_aba', partial_name='lancamentos') }}" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="lancamentos">
 
         <div class="col-md-3">
@@ -6057,19 +6057,7 @@
       });
     });
 
-    ['formFiltroResumo','formFiltroLancamentos'].forEach((formId) => {
-      const form = document.getElementById(formId);
-      if (!form || form.dataset.normalBound) return;
-      form.dataset.normalBound = '1';
-      form.addEventListener('submit', function(){
-        const params = new URLSearchParams(new FormData(form));
-        params.delete('ajax_partial');
-        params.delete('ajax');
-        const action = form.getAttribute('action') || window.location.pathname;
-        form.setAttribute('action', action.split('?')[0] + '?' + params.toString());
-        form.method = 'GET';
-      });
-    });
+
   }
 
   document.addEventListener('DOMContentLoaded', initAjaxFilters);
