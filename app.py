@@ -3739,16 +3739,6 @@ def admin_dashboard():
             flash("Você não tem permissão para acessar essa aba.", "warning")
             return redirect(url_for("admin_dashboard", tab=aba_preferida))
 
-    ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
-    shell_mode = (not ajax_partial) and (request.args.get("full") != "1")
-    if shell_mode:
-        return render_template(
-            "admin_dashboard_shell.html",
-            tab=active_tab,
-            admin_perms=admin_perms,
-            admin_is_master=is_admin_master(),
-        )
-
     def _pick_date(*keys):
         for k in keys:
             v = args.get(k)
@@ -4265,6 +4255,7 @@ def admin_dashboard():
                 "recebedores": recs,
             })
 
+    ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
     ajax_financeiros = {"resumo", "lancamentos", "receitas", "despesas", "coop_receitas", "coop_despesas", "beneficios"}
     if ajax_partial in ajax_financeiros:
         resumo_coop_rows = []
@@ -4730,11 +4721,6 @@ def admin_dashboard():
             "coop_receitas": "COOP_RECEITAS",
             "coop_despesas": "COOP_DESPESAS",
             "beneficios": "BENEFICIOS",
-            "cooperados": "COOPERADOS",
-            "restaurantes": "RESTAURANTES",
-            "escalas": "ESCALAS",
-            "sistemas": "SISTEMAS",
-            "config": "CONFIG",
         }
         marker = marker_map.get(ajax_partial)
         if marker:
