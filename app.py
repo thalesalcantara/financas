@@ -3385,7 +3385,10 @@ def _safe_float(v, default=0.0):
 
 def _receita_total_real(r: ReceitaCooperativa) -> float:
     if getattr(r, 'auto_taxa_adm', False):
-        return round(_safe_float(getattr(r, 'valor_pago', 0.0)) + _safe_float(getattr(r, 'valor_multa', 0.0)) + _safe_float(getattr(r, 'valor_juros', 0.0)), 2)
+        total = _safe_float(getattr(r, 'valor_total', 0.0))
+        if total > 0:
+            return round(total, 2)
+        return round(_safe_float(getattr(r, 'valor_pago', 0.0)), 2)
     return round(_safe_float(getattr(r, 'valor_total', 0.0)), 2)
 
 
@@ -3517,10 +3520,11 @@ def _build_taxa_admin_rows(receitas: list[ReceitaCooperativa]):
         if status == 'pago':
             multa = _safe_float(getattr(r, 'valor_multa', 0.0))
             juros = _safe_float(getattr(r, 'valor_juros', 0.0))
+            total = round(_safe_float(getattr(r, 'valor_total', 0.0)) or pago, 2)
         else:
             multa = calc['valor_multa']
             juros = calc['valor_juros']
-        total = round(pago + ( _safe_float(getattr(r, 'valor_multa', 0.0)) if status == 'pago' else 0.0) + (_safe_float(getattr(r, 'valor_juros', 0.0)) if status == 'pago' else 0.0), 2)
+            total = round(pago, 2)
         aberto = max(0.0, round(calc['valor_total'] - total, 2)) if status != 'pago' else 0.0
         rows.append({
             'obj': r,
@@ -3952,7 +3956,17 @@ def admin_dashboard():
     ).all()
     total_receitas = sum(_receita_total_real(r) for r in receitas)
     total_despesas = sum((d.valor or 0.0) for d in despesas)
-    taxa_admin_rows, taxa_admin_totais = _build_taxa_admin_rows(receitas)
+
+    taxas_q = ReceitaCooperativa.query.filter(ReceitaCooperativa.auto_taxa_adm.is_(True))
+    if data_inicio:
+        taxas_q = taxas_q.filter(func.coalesce(ReceitaCooperativa.data_vencimento, ReceitaCooperativa.data) >= data_inicio)
+    if data_fim:
+        taxas_q = taxas_q.filter(func.coalesce(ReceitaCooperativa.data_vencimento, ReceitaCooperativa.data) <= data_fim)
+    taxa_admin_receitas = taxas_q.order_by(
+        ReceitaCooperativa.data_vencimento.desc().nullslast(),
+        ReceitaCooperativa.id.desc(),
+    ).all()
+    taxa_admin_rows, taxa_admin_totais = _build_taxa_admin_rows(taxa_admin_receitas)
     juros_arrecadados_total = round(sum((r['valor_multa'] + r['valor_juros']) for r in taxa_admin_rows if r['status'] == 'pago'), 2)
     cooperados_map = {c.id: c for c in cooperados}
 
@@ -5725,8 +5739,16 @@ def atualizar_taxa_admin_status(id):
     if status == 'pago':
         r.valor_multa = calc['valor_multa']
         r.valor_juros = calc['valor_juros']
-        r.valor_total = round(r.valor_pago + r.valor_multa + r.valor_juros, 2)
-        r.data = data_pagamento or r.data_vencimento or r.data
+        # valor_pago é o total efetivamente pago no banco/boleto.
+        # valor_total acompanha o total financeiro da receita no mês do pagamento.
+        r.valor_total = round(r.valor_pago, 2)
+        r.data = data_pagamento or r.data
+    elif status == 'parcial':
+        r.valor_multa = 0.0
+        r.valor_juros = 0.0
+        r.valor_total = round(r.valor_pago, 2)
+        # mantém a taxa vinculada ao mês de competência/vencimento
+        r.data = getattr(r, 'data_vencimento', None) or r.data
     else:
         r.valor_multa = 0.0
         r.valor_juros = 0.0
@@ -5762,10 +5784,11 @@ def atualizar_taxa_admin_lote():
             r.data_pagamento = hoje
             r.valor_previsto = valor_previsto
             r.valor_principal = valor_previsto
-            r.valor_pago = valor_previsto
             r.valor_multa = calc['valor_multa']
             r.valor_juros = calc['valor_juros']
-            r.valor_total = round(valor_previsto + r.valor_multa + r.valor_juros, 2)
+            r.valor_pago = round(calc['valor_total'], 2)
+            r.valor_total = round(calc['valor_total'], 2)
+            # financeiro entra no mês do pagamento; a listagem da taxa usa o vencimento.
             r.data = hoje
         elif acao == 'nao_pago':
             r.status_pagamento = 'nao_pago'
