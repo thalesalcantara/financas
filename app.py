@@ -4196,7 +4196,7 @@ def admin_dashboard():
             "cor": getattr(e, "cor", None),
         })
 
-    escala_alertas_1h = _build_escala_alertas_1h(escalas_all, cooperados_map)
+    escala_alertas_1h = _build_escala_alertas_1h(escalas_all, cooperados_map) if active_tab == "escalas" else []
 
     # =========================
     # Gráficos
@@ -4547,10 +4547,14 @@ def admin_dashboard():
             "entrou": entrou,
         }
 
-    trocas_all = TrocaSolicitacao.query.order_by(TrocaSolicitacao.id.desc()).all()
     trocas_pendentes = []
     trocas_historico = []
     trocas_historico_flat = []
+
+    if active_tab == "escalas":
+        trocas_all = TrocaSolicitacao.query.order_by(TrocaSolicitacao.id.desc()).all()
+    else:
+        trocas_all = []
 
     for t in trocas_all:
         solicitante = Cooperado.query.get(t.solicitante_id)
@@ -6456,7 +6460,7 @@ def reset_senha_cooperado(id):
 def add_restaurante():
     f = request.form
     nome = (f.get("nome") or "").strip()
-    periodo = f.get("periodo", "seg-dom")
+    periodo = "seg-dom"
     usuario_login = (f.get("usuario") or "").strip()
     senha = f.get("senha", "")
     foto = request.files.get("foto")
@@ -6508,7 +6512,7 @@ def edit_restaurante(id):
     f = request.form
 
     r.nome = (f.get("nome") or "").strip()
-    r.periodo = f.get("periodo", "seg-dom")
+    r.periodo = "seg-dom"
     r.usuario_ref.usuario = (f.get("usuario") or "").strip()
     r.taxa_admin_valor = f.get("taxa_admin_valor", type=float) or 0.0
     r.taxa_admin_data_base = _parse_date(f.get("taxa_admin_data_base"))
