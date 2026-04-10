@@ -3413,6 +3413,53 @@ def _calc_taxa_admin_encargos(valor_principal: float, data_vencimento: date | No
     }
 
 
+def _expand_receitas_coop_para_exibicao(receitas_db: list[ReceitaCooperativa]):
+    itens = []
+    for r in (receitas_db or []):
+        if getattr(r, 'auto_taxa_adm', False):
+            data_comp = _competencia_to_date(
+                getattr(r, 'competencia', None),
+                getattr(r, 'data_vencimento', None) or getattr(r, 'data', None)
+            )
+            if data_comp:
+                try:
+                    r.data = data_comp
+                except Exception:
+                    pass
+            r.valor_total = round(_safe_float(getattr(r, 'valor_pago', 0.0)), 2) if (getattr(r, 'status_pagamento', '') or '').lower() == 'pago' else 0.0
+            itens.append(r)
+
+            encargos = round(_safe_float(getattr(r, 'valor_multa', 0.0)) + _safe_float(getattr(r, 'valor_juros', 0.0)), 2)
+            data_pag = getattr(r, 'data_pagamento', None)
+            if encargos > 0 and data_pag:
+                desc_base = getattr(r, 'descricao', '') or 'Taxa administrativa'
+                desc_extra = f"Juros/Multa - {desc_base}"
+                extra = SimpleNamespace(
+                    id=f"taxa-extra-{getattr(r, 'id', '')}",
+                    descricao=desc_extra,
+                    valor_total=encargos,
+                    valor=encargos,
+                    data=data_pag,
+                    restaurante=getattr(r, 'restaurante', None),
+                    restaurante_id=getattr(r, 'restaurante_id', None),
+                    auto_taxa_adm=False,
+                    competencia=getattr(r, 'competencia', None),
+                    valor_previsto=0.0,
+                    valor_principal=0.0,
+                    valor_pago=0.0,
+                    valor_multa=_safe_float(getattr(r, 'valor_multa', 0.0)),
+                    valor_juros=_safe_float(getattr(r, 'valor_juros', 0.0)),
+                    data_vencimento=getattr(r, 'data_vencimento', None),
+                    data_pagamento=data_pag,
+                    status_pagamento='pago',
+                )
+                itens.append(extra)
+        else:
+            itens.append(r)
+
+    itens.sort(key=lambda x: ((getattr(x, 'data', None) or date.min), str(getattr(x, 'id', ''))), reverse=True)
+    return itens
+
 def _taxa_competencia_iter(data_base: date | None, months_back: int = 0):
     if not data_base:
         return []
@@ -3465,7 +3512,10 @@ def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], months_back: i
             if existente:
                 if getattr(existente, 'data_vencimento', None) != venc:
                     existente.data_vencimento = venc
-                    existente.data = venc
+                    changed = True
+                nova_data_comp = _competencia_to_date(competencia, venc)
+                if getattr(existente, 'data', None) != nova_data_comp:
+                    existente.data = nova_data_comp
                     changed = True
                 if (getattr(existente, 'descricao', None) or '') != f'Taxa administrativa - {rest.nome} - {competencia}':
                     existente.descricao = f'Taxa administrativa - {rest.nome} - {competencia}'
@@ -3481,7 +3531,7 @@ def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], months_back: i
             novo = ReceitaCooperativa(
                 descricao=f'Taxa administrativa - {rest.nome} - {competencia}',
                 valor_total=0.0,
-                data=venc,
+                data=_competencia_to_date(competencia, venc),
                 restaurante_id=rest.id,
                 auto_taxa_adm=True,
                 competencia=competencia,
@@ -3833,17 +3883,18 @@ def admin_dashboard():
             rq = rq.filter(ReceitaCooperativa.data <= data_fim)
             dq = dq.filter(DespesaCooperativa.data <= data_fim)
 
-        receitas = rq.order_by(
+        receitas_db = rq.order_by(
             ReceitaCooperativa.data.desc().nullslast(),
             ReceitaCooperativa.id.desc()
         ).all()
+        receitas = _expand_receitas_coop_para_exibicao(receitas_db)
 
         despesas = dq.order_by(
             DespesaCooperativa.data.desc(),
             DespesaCooperativa.id.desc()
         ).all()
 
-        total_receitas = sum(_receita_total_real(r) for r in receitas)
+        total_receitas = sum((_safe_float(getattr(r, 'valor_total', None) if getattr(r, 'valor_total', None) is not None else getattr(r, 'valor', 0.0))) for r in receitas)
         total_despesas = sum((d.valor or 0.0) for d in despesas)
 
     # =========================
@@ -3942,15 +3993,16 @@ def admin_dashboard():
         rq = rq.filter(ReceitaCooperativa.data <= data_fim)
         dq = dq.filter(DespesaCooperativa.data <= data_fim)
 
-    receitas = rq.order_by(
+    receitas_db = rq.order_by(
         ReceitaCooperativa.data.desc().nullslast(),
         ReceitaCooperativa.id.desc(),
     ).all()
+    receitas = _expand_receitas_coop_para_exibicao(receitas_db)
     despesas = dq.order_by(
         DespesaCooperativa.data.desc(),
         DespesaCooperativa.id.desc(),
     ).all()
-    total_receitas = sum(_receita_total_real(r) for r in receitas)
+    total_receitas = sum((_safe_float(getattr(r, 'valor_total', None) if getattr(r, 'valor_total', None) is not None else getattr(r, 'valor', 0.0))) for r in receitas)
     total_despesas = sum((d.valor or 0.0) for d in despesas)
     taxa_admin_rows, taxa_admin_totais = _build_taxa_admin_rows(receitas)
     juros_arrecadados_total = round(sum((r['valor_multa'] + r['valor_juros']) for r in taxa_admin_rows if r['status'] == 'pago'), 2)
@@ -5722,16 +5774,15 @@ def atualizar_taxa_admin_status(id):
     r.valor_principal = valor_previsto
     r.valor_pago = round(valor_pago, 2)
     r.data_pagamento = data_pagamento
+    r.data = _competencia_to_date(getattr(r, 'competencia', None), getattr(r, 'data_vencimento', None) or getattr(r, 'data', None))
     if status == 'pago':
         r.valor_multa = calc['valor_multa']
         r.valor_juros = calc['valor_juros']
-        r.valor_total = round(r.valor_pago + r.valor_multa + r.valor_juros, 2)
-        r.data = data_pagamento or r.data_vencimento or r.data
+        r.valor_total = round(r.valor_pago, 2)
     else:
         r.valor_multa = 0.0
         r.valor_juros = 0.0
         r.valor_total = 0.0
-        r.data = getattr(r, 'data_vencimento', None) or r.data
 
     db.session.commit()
     flash("Taxa administrativa atualizada.", "success")
@@ -5765,8 +5816,8 @@ def atualizar_taxa_admin_lote():
             r.valor_pago = valor_previsto
             r.valor_multa = calc['valor_multa']
             r.valor_juros = calc['valor_juros']
-            r.valor_total = round(valor_previsto + r.valor_multa + r.valor_juros, 2)
-            r.data = hoje
+            r.valor_total = round(valor_previsto, 2)
+            r.data = _competencia_to_date(getattr(r, 'competencia', None), getattr(r, 'data_vencimento', None) or getattr(r, 'data', None))
         elif acao == 'nao_pago':
             r.status_pagamento = 'nao_pago'
             r.data_pagamento = None
@@ -5776,7 +5827,7 @@ def atualizar_taxa_admin_lote():
             r.valor_multa = 0.0
             r.valor_juros = 0.0
             r.valor_total = 0.0
-            r.data = getattr(r, 'data_vencimento', None) or r.data
+            r.data = _competencia_to_date(getattr(r, 'competencia', None), getattr(r, 'data_vencimento', None) or getattr(r, 'data', None))
     db.session.commit()
     flash("Taxas administrativas atualizadas em lote.", "success")
     return redirect(url_for("admin_dashboard", tab="receitas"))
@@ -7042,6 +7093,16 @@ def _competencia_label(comp):
     if comp in ('proxima', 'proxima_semana'):
         return 'proxima_semana'
     return 'esta_semana'
+
+def _competencia_to_date(competencia: str | None, fallback: date | None = None) -> date | None:
+    comp = (competencia or '').strip()
+    if not comp:
+        return fallback
+    try:
+        ano, mes = comp.split('-', 1)
+        return date(int(ano), int(mes), 1)
+    except Exception:
+        return fallback
 
 def _despesa_due_date(dc):
     base = dc.data_fim or dc.data or date.today()
