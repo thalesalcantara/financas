@@ -3844,9 +3844,6 @@ def admin_sistemas_abrir(sistema):
 def admin_dashboard():
     args = request.args
     active_tab = (args.get("tab") or "resumo").strip().lower()
-    ajax_partial_req = (args.get("ajax_partial") or "").strip().lower()
-    if ajax_partial_req in ADMIN_ABAS:
-        active_tab = ajax_partial_req
 
     admin_logado = _usuario_logado()
     if not admin_logado:
@@ -3930,15 +3927,6 @@ def admin_dashboard():
     considerar_periodo = bool(args.get("considerar_periodo"))
     dows = set(args.getlist("dow"))
 
-    load_lancamentos = active_tab in {"resumo", "lancamentos"}
-    load_receitas = active_tab in {"resumo", "receitas", "despesas"}
-    load_receitas_coop = active_tab in {"resumo", "coop_receitas", "coop_despesas", "beneficios"}
-    load_adiantamentos = active_tab in {"resumo", "coop_despesas"}
-    load_cooperados = active_tab in {"resumo", "cooperados", "coop_receitas", "coop_despesas", "beneficios", "escalas", "receitas", "restaurantes", "despesas", "config", "sistemas"}
-    load_restaurantes = active_tab in {"resumo", "restaurantes", "lancamentos", "receitas", "escalas", "config", "sistemas"}
-    load_escalas = active_tab in {"escalas"}
-    load_resumo_backend = active_tab == "resumo"
-
     # =========================
     # Lançamentos
     # =========================
@@ -3948,40 +3936,39 @@ def admin_dashboard():
     total_sest = 0.0
     total_encargos = 0.0
 
-    if load_lancamentos:
-        q = Lancamento.query
+    q = Lancamento.query
 
-        if restaurante_id:
-            q = q.filter(Lancamento.restaurante_id == restaurante_id)
-        if cooperado_id:
-            q = q.filter(Lancamento.cooperado_id == cooperado_id)
-        if data_inicio:
-            q = q.filter(Lancamento.data >= data_inicio)
-        if data_fim:
-            q = q.filter(Lancamento.data <= data_fim)
+    if restaurante_id:
+        q = q.filter(Lancamento.restaurante_id == restaurante_id)
+    if cooperado_id:
+        q = q.filter(Lancamento.cooperado_id == cooperado_id)
+    if data_inicio:
+        q = q.filter(Lancamento.data >= data_inicio)
+    if data_fim:
+        q = q.filter(Lancamento.data <= data_fim)
 
-        lanc_base = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
+    lanc_base = q.order_by(Lancamento.data.desc(), Lancamento.id.desc()).all()
 
-        if dows:
-            lancamentos = [l for l in lanc_base if l.data and _dow(l.data) in dows]
-        else:
-            lancamentos = lanc_base
+    if dows:
+        lancamentos = [l for l in lanc_base if l.data and _dow(l.data) in dows]
+    else:
+        lancamentos = lanc_base
 
-        if considerar_periodo and restaurante_id:
-            rest = Restaurante.query.get(restaurante_id)
-            if rest:
-                mapa = {
-                    "seg-dom": {"1", "2", "3", "4", "5", "6", "7"},
-                    "sab-sex": {"6", "7", "1", "2", "3", "4", "5"},
-                    "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
-                }
-                permitidos = mapa.get(rest.periodo, {"1", "2", "3", "4", "5", "6", "7"})
-                lancamentos = [l for l in lancamentos if l.data and _dow(l.data) in permitidos]
+    if considerar_periodo and restaurante_id:
+        rest = Restaurante.query.get(restaurante_id)
+        if rest:
+            mapa = {
+                "seg-dom": {"1", "2", "3", "4", "5", "6", "7"},
+                "sab-sex": {"6", "7", "1", "2", "3", "4", "5"},
+                "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
+            }
+            permitidos = mapa.get(rest.periodo, {"1", "2", "3", "4", "5", "6", "7"})
+            lancamentos = [l for l in lancamentos if l.data and _dow(l.data) in permitidos]
 
-        total_producoes = sum((l.valor or 0.0) for l in lancamentos)
-        total_inss = round(total_producoes * INSS_ALIQ, 2)
-        total_sest = round(total_producoes * SEST_ALIQ, 2)
-        total_encargos = round(total_inss + total_sest, 2)
+    total_producoes = sum((l.valor or 0.0) for l in lancamentos)
+    total_inss = round(total_producoes * INSS_ALIQ, 2)
+    total_sest = round(total_producoes * SEST_ALIQ, 2)
+    total_encargos = round(total_inss + total_sest, 2)
 
     # =========================
     # Receitas / Despesas Coop
@@ -3991,7 +3978,7 @@ def admin_dashboard():
     total_receitas = 0.0
     total_despesas = 0.0
 
-    if load_receitas:
+    if True:
         rq = ReceitaCooperativa.query
         dq = DespesaCooperativa.query
 
@@ -4023,11 +4010,8 @@ def admin_dashboard():
     total_receitas_coop = 0.0
     total_despesas_coop = 0.0
     total_adiantamentos_coop = 0.0
-    despesa_snapshot_map = {}
-    solicitacoes_adiantamento = []
-    adiantamento_status_map = {}
 
-    if load_receitas_coop:
+    if True:
         rq2 = ReceitaCooperado.query
         dq2 = DespesaCooperado.query
 
@@ -4083,34 +4067,31 @@ def admin_dashboard():
             for _it in _snap["itens"]:
                 despesa_snapshot_map[_it["id"]] = _it
 
-    if load_adiantamentos:
-        adiantamentos_q = SolicitacaoAdiantamento.query.join(Cooperado, SolicitacaoAdiantamento.cooperado_id == Cooperado.id)
-        if cooperado_id:
-            adiantamentos_q = adiantamentos_q.filter(SolicitacaoAdiantamento.cooperado_id == cooperado_id)
-        solicitacoes_adiantamento = adiantamentos_q.order_by(SolicitacaoAdiantamento.pedido_em.desc(), SolicitacaoAdiantamento.id.desc()).all()
-        adiantamento_status_map = {s.despesa_cooperado_id: s for s in solicitacoes_adiantamento if s.despesa_cooperado_id}
+    adiantamentos_q = SolicitacaoAdiantamento.query.join(Cooperado, SolicitacaoAdiantamento.cooperado_id == Cooperado.id)
+    if cooperado_id:
+        adiantamentos_q = adiantamentos_q.filter(SolicitacaoAdiantamento.cooperado_id == cooperado_id)
+    solicitacoes_adiantamento = adiantamentos_q.order_by(SolicitacaoAdiantamento.pedido_em.desc(), SolicitacaoAdiantamento.id.desc()).all()
+    adiantamento_status_map = {s.despesa_cooperado_id: s for s in solicitacoes_adiantamento if s.despesa_cooperado_id}
 
     cfg = get_config()
 
-    cooperados = []
-    if load_cooperados:
-        cooperados = (
-            Cooperado.query
+    cooperados = (
+        Cooperado.query
         .join(Usuario, Cooperado.usuario_id == Usuario.id)
         .filter(Usuario.ativo.is_(True))
         .order_by(Cooperado.nome)
         .all()
     )
 
-    restaurantes = []
-    if load_restaurantes or load_receitas:
-        restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
-    if load_restaurantes:
-        _sync_taxa_admin_defaults()
-        restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
-    if load_receitas and restaurantes:
-        _ensure_taxas_admin_receitas(restaurantes, months_back=0)
-        receitas, total_receitas = _build_receitas_periodo(data_inicio, data_fim)
+    restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
+    _sync_taxa_admin_defaults()
+    restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
+    _ensure_taxas_admin_receitas(restaurantes, months_back=0)
+
+    # Recarrega SEMPRE as receitas/despesas após gerar taxas automáticas.
+    # Assim, sem filtro manual, a aba de receitas já abre mostrando o mês atual,
+    # e com filtro continua respeitando o período informado.
+    receitas, total_receitas = _build_receitas_periodo(data_inicio, data_fim)
 
     dq = DespesaCooperativa.query
     if data_inicio:
@@ -4459,7 +4440,7 @@ def admin_dashboard():
             chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
             chart_data_lancamentos_cooperados = {"labels": labels_fmt, "values": values}
 
-            for coop in (cooperados if load_resumo_backend else []):
+            for coop in cooperados:
                 snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
                 prod = sum((l.valor or 0.0) for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
                 rec = sum((r.valor or 0.0) for r in receitas_coop if getattr(r, "cooperado_id", None) == coop.id)
@@ -4566,7 +4547,7 @@ def admin_dashboard():
             "entrou": entrou,
         }
 
-    trocas_all = TrocaSolicitacao.query.order_by(TrocaSolicitacao.id.desc()).all() if load_escalas else []
+    trocas_all = TrocaSolicitacao.query.order_by(TrocaSolicitacao.id.desc()).all()
     trocas_pendentes = []
     trocas_historico = []
     trocas_historico_flat = []
