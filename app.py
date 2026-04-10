@@ -171,9 +171,6 @@ app.config.update(
 
 db = SQLAlchemy(app)
 
-DEFAULT_TAXA_ADMIN_MULTA_PERCENTUAL = 2.0
-DEFAULT_TAXA_ADMIN_JUROS_DIA_PERCENTUAL = 0.033185
-
 def _sso_serializer():
     secret = os.environ.get("SSO_SHARED_SECRET") or "COOPEX_SSO_SHARED_2026_FIXED"
     return URLSafeTimedSerializer(secret_key=secret, salt="coopex-sso-v1")
@@ -444,7 +441,7 @@ class Restaurante(db.Model):
     taxa_admin_valor = db.Column(db.Float, default=0.0)
     taxa_admin_data_base = db.Column(db.Date)
     taxa_admin_multa_percentual = db.Column(db.Float, default=2.0)
-    taxa_admin_juros_dia_percentual = db.Column(db.Float, default=DEFAULT_TAXA_ADMIN_JUROS_DIA_PERCENTUAL)
+    taxa_admin_juros_dia_percentual = db.Column(db.Float, default=0.03)
     ativo = db.Column(db.Boolean, default=True)
 
     # Foto no banco (bytea)
@@ -618,7 +615,7 @@ class ReceitaCooperativa(db.Model):
     data_pagamento = db.Column(db.Date)
     status_pagamento = db.Column(db.String(20), default="nao_pago")
     multa_percentual = db.Column(db.Float, default=2.0)
-    juros_dia_percentual = db.Column(db.Float, default=DEFAULT_TAXA_ADMIN_JUROS_DIA_PERCENTUAL)
+    juros_dia_percentual = db.Column(db.Float, default=0.03)
 
 
 class DespesaCooperativa(db.Model):
@@ -1473,7 +1470,7 @@ def init_db():
             if "taxa_admin_multa_percentual" not in colnames:
                 db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN taxa_admin_multa_percentual FLOAT DEFAULT 2.0"))
             if "taxa_admin_juros_dia_percentual" not in colnames:
-                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN taxa_admin_juros_dia_percentual FLOAT DEFAULT 0.033185"))
+                db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN taxa_admin_juros_dia_percentual FLOAT DEFAULT 0.03"))
             if "ativo" not in colnames:
                 db.session.execute(sa_text("ALTER TABLE restaurantes ADD COLUMN ativo BOOLEAN DEFAULT 1"))
             db.session.commit()
@@ -1493,7 +1490,7 @@ def init_db():
                 "data_pagamento": "DATE",
                 "status_pagamento": "VARCHAR(20) DEFAULT 'nao_pago'",
                 "multa_percentual": "FLOAT DEFAULT 2.0",
-                "juros_dia_percentual": "FLOAT DEFAULT 0.033185",
+                "juros_dia_percentual": "FLOAT DEFAULT 0.03",
             }
             for col, ddl in adds.items():
                 if col not in colnames:
@@ -1504,7 +1501,7 @@ def init_db():
                 ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS taxa_admin_valor DOUBLE PRECISION DEFAULT 0;
                 ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS taxa_admin_data_base DATE;
                 ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS taxa_admin_multa_percentual DOUBLE PRECISION DEFAULT 2.0;
-                ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS taxa_admin_juros_dia_percentual DOUBLE PRECISION DEFAULT 0.033185;
+                ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS taxa_admin_juros_dia_percentual DOUBLE PRECISION DEFAULT 0.03;
                 ALTER TABLE IF EXISTS public.restaurantes ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT TRUE;
                 ALTER TABLE IF EXISTS public.receitas_coop ADD COLUMN IF NOT EXISTS restaurante_id INTEGER;
                 ALTER TABLE IF EXISTS public.receitas_coop ADD COLUMN IF NOT EXISTS auto_taxa_adm BOOLEAN DEFAULT FALSE;
@@ -1518,7 +1515,7 @@ def init_db():
                 ALTER TABLE IF EXISTS public.receitas_coop ADD COLUMN IF NOT EXISTS data_pagamento DATE;
                 ALTER TABLE IF EXISTS public.receitas_coop ADD COLUMN IF NOT EXISTS status_pagamento VARCHAR(20) DEFAULT 'nao_pago';
                 ALTER TABLE IF EXISTS public.receitas_coop ADD COLUMN IF NOT EXISTS multa_percentual DOUBLE PRECISION DEFAULT 2.0;
-                ALTER TABLE IF EXISTS public.receitas_coop ADD COLUMN IF NOT EXISTS juros_dia_percentual DOUBLE PRECISION DEFAULT 0.033185;
+                ALTER TABLE IF EXISTS public.receitas_coop ADD COLUMN IF NOT EXISTS juros_dia_percentual DOUBLE PRECISION DEFAULT 0.03;
             """))
             db.session.commit()
         try:
@@ -3386,15 +3383,6 @@ def _safe_float(v, default=0.0):
         return float(default)
 
 
-def _taxa_admin_juros_defaultizado(v):
-    j = _safe_float(v, DEFAULT_TAXA_ADMIN_JUROS_DIA_PERCENTUAL)
-    if j <= 0:
-        return DEFAULT_TAXA_ADMIN_JUROS_DIA_PERCENTUAL
-    if abs(j - 0.03) < 1e-9:
-        return DEFAULT_TAXA_ADMIN_JUROS_DIA_PERCENTUAL
-    return j
-
-
 def _receita_total_real(r: ReceitaCooperativa) -> float:
     if getattr(r, 'auto_taxa_adm', False):
         return round(_safe_float(getattr(r, 'valor_pago', 0.0)) + _safe_float(getattr(r, 'valor_multa', 0.0)) + _safe_float(getattr(r, 'valor_juros', 0.0)), 2)
@@ -3473,10 +3461,10 @@ def _taxa_admin_redirect_args_from_form(form) -> dict:
     return data
 
 
-def _calc_taxa_admin_encargos(valor_principal: float, data_vencimento: date | None, data_pagamento: date | None = None, multa_percentual: float = 2.0, juros_dia_percentual: float = DEFAULT_TAXA_ADMIN_JUROS_DIA_PERCENTUAL):
+def _calc_taxa_admin_encargos(valor_principal: float, data_vencimento: date | None, data_pagamento: date | None = None, multa_percentual: float = 2.0, juros_dia_percentual: float = 0.03):
     valor_principal = round(_safe_float(valor_principal), 2)
     multa_percentual = _safe_float(multa_percentual, 2.0)
-    juros_dia_percentual = _taxa_admin_juros_defaultizado(juros_dia_percentual)
+    juros_dia_percentual = _safe_float(juros_dia_percentual, 0.03)
     ref = data_pagamento or date.today()
     if not data_vencimento:
         return {
@@ -3514,54 +3502,6 @@ def _taxa_competencia_iter(data_base: date | None, months_back: int = 0):
     return items
 
 
-def _sync_taxa_admin_defaults():
-    try:
-        default_j = DEFAULT_TAXA_ADMIN_JUROS_DIA_PERCENTUAL
-        # Só aplica o padrão aos contratos que realmente possuem taxa administrativa configurada.
-        # Contratos com taxa_admin_valor zerada devem permanecer zerados, pois isso significa sem taxa.
-        db.session.execute(sa_text("""
-            UPDATE restaurantes
-               SET taxa_admin_multa_percentual = COALESCE(taxa_admin_multa_percentual, :multa)
-             WHERE taxa_admin_valor > 0
-               AND taxa_admin_multa_percentual IS NULL
-        """), {"multa": DEFAULT_TAXA_ADMIN_MULTA_PERCENTUAL})
-        db.session.execute(sa_text("""
-            UPDATE restaurantes
-               SET taxa_admin_juros_dia_percentual = :novo
-             WHERE taxa_admin_valor > 0
-               AND (
-                    taxa_admin_juros_dia_percentual IS NULL
-                    OR ABS(taxa_admin_juros_dia_percentual) < 0.0000005
-                    OR ABS(taxa_admin_juros_dia_percentual - 0.03) < 0.0000005
-               )
-        """), {"novo": default_j})
-        db.session.execute(sa_text("""
-            UPDATE receitas_coop rc
-               SET multa_percentual = COALESCE(rc.multa_percentual, :multa)
-              FROM restaurantes r
-             WHERE rc.auto_taxa_adm = TRUE
-               AND rc.restaurante_id = r.id
-               AND r.taxa_admin_valor > 0
-               AND rc.multa_percentual IS NULL
-        """), {"multa": DEFAULT_TAXA_ADMIN_MULTA_PERCENTUAL})
-        db.session.execute(sa_text("""
-            UPDATE receitas_coop rc
-               SET juros_dia_percentual = :novo
-              FROM restaurantes r
-             WHERE rc.auto_taxa_adm = TRUE
-               AND rc.restaurante_id = r.id
-               AND r.taxa_admin_valor > 0
-               AND (
-                    rc.juros_dia_percentual IS NULL
-                    OR ABS(rc.juros_dia_percentual) < 0.0000005
-                    OR ABS(rc.juros_dia_percentual - 0.03) < 0.0000005
-               )
-        """), {"novo": default_j})
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-
-
 def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], months_back: int = 0):
     restaurantes_validos = []
     wanted = set()
@@ -3591,7 +3531,7 @@ def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], months_back: i
     changed = False
     for rest, valor, data_base, comps in restaurantes_validos:
         multa_p = _safe_float(getattr(rest, 'taxa_admin_multa_percentual', 2.0), 2.0)
-        juros_p = _taxa_admin_juros_defaultizado(getattr(rest, 'taxa_admin_juros_dia_percentual', DEFAULT_TAXA_ADMIN_JUROS_DIA_PERCENTUAL))
+        juros_p = _safe_float(getattr(rest, 'taxa_admin_juros_dia_percentual', 0.03), 0.03)
         for competencia, venc in comps:
             existente = existing.get((rest.id, competencia))
             if existente:
@@ -3646,7 +3586,7 @@ def _build_taxa_admin_rows(receitas: list[ReceitaCooperativa], data_inicio: date
         status = (getattr(r, 'status_pagamento', None) or 'nao_pago').strip().lower()
         data_pag = getattr(r, 'data_pagamento', None)
         venc = getattr(r, 'data_vencimento', None) or getattr(r, 'data', None)
-        calc = _calc_taxa_admin_encargos(previsto, venc, data_pag if status == 'pago' else None, _safe_float(getattr(r, 'multa_percentual', 2.0), 2.0), _taxa_admin_juros_defaultizado(getattr(r, 'juros_dia_percentual', DEFAULT_TAXA_ADMIN_JUROS_DIA_PERCENTUAL)))
+        calc = _calc_taxa_admin_encargos(previsto, venc, data_pag if status == 'pago' else None, _safe_float(getattr(r, 'multa_percentual', 2.0), 2.0), _safe_float(getattr(r, 'juros_dia_percentual', 0.03), 0.03))
         if status == 'pago':
             multa_real = _safe_float(getattr(r, 'valor_multa', 0.0))
             juros_real = _safe_float(getattr(r, 'valor_juros', 0.0))
@@ -3692,7 +3632,7 @@ def _build_taxa_admin_rows(receitas: list[ReceitaCooperativa], data_inicio: date
             'valor_em_aberto': round(aberto, 2),
             'dias_atraso': calc['dias_atraso'],
             'multa_percentual': _safe_float(getattr(r, 'multa_percentual', 2.0), 2.0),
-            'juros_dia_percentual': _taxa_admin_juros_defaultizado(getattr(r, 'juros_dia_percentual', DEFAULT_TAXA_ADMIN_JUROS_DIA_PERCENTUAL)),
+            'juros_dia_percentual': _safe_float(getattr(r, 'juros_dia_percentual', 0.03), 0.03),
             'principal_periodo': round(principal_periodo, 2),
             'valor_multa_periodo': round(multa_periodo, 2),
             'valor_juros_periodo': round(juros_periodo, 2),
@@ -4084,8 +4024,6 @@ def admin_dashboard():
     )
 
     restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
-    _sync_taxa_admin_defaults()
-    restaurantes = Restaurante.query.order_by(Restaurante.nome).all()
     _ensure_taxas_admin_receitas(restaurantes, months_back=0)
 
     # Recarrega SEMPRE as receitas/despesas após gerar taxas automáticas.
@@ -4107,143 +4045,6 @@ def admin_dashboard():
     taxa_admin_rows, taxa_admin_totais = _build_taxa_admin_rows(receitas, data_inicio, data_fim)
     juros_arrecadados_total = round(sum((r['valor_juros_periodo'] + r['valor_multa_periodo']) for r in taxa_admin_rows), 2)
     cooperados_map = {c.id: c for c in cooperados}
-
-    ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
-    ajax_financeiros = {"resumo", "lancamentos", "receitas", "despesas", "coop_receitas", "coop_despesas", "beneficios"}
-    if False and ajax_partial in ajax_financeiros:
-        resumo_coop_rows = []
-        resumo_totais = {
-            "prod": 0.0, "inss4": 0.0, "sest05": 0.0, "rec": 0.0,
-            "des": 0.0, "adiant": 0.0, "a_receber": 0.0, "saldo_pendente": 0.0,
-            "pend_programado": 0.0
-        }
-        chart_data_lancamentos_coop = {"labels": [], "values": []}
-        chart_data_lancamentos_cooperados = {"labels": [], "values": []}
-        beneficios_view = []
-        historico_beneficios = []
-
-        if ajax_partial == "resumo":
-            sums = {}
-            for l in lancamentos:
-                if not l.data:
-                    continue
-                key = l.data.strftime("%Y-%m")
-                sums[key] = sums.get(key, 0.0) + (l.valor or 0.0)
-            labels_ord = sorted(sums.keys())
-            labels_fmt = []
-            for k in labels_ord:
-                parts = k.split("-")
-                if len(parts) == 2 and parts[0] and parts[1]:
-                    year, month = parts[0], parts[1]
-                    labels_fmt.append(f"{month}/{year[-2:]}")
-                else:
-                    labels_fmt.append(k)
-            values = [round(sums[k], 2) for k in labels_ord]
-            chart_data_lancamentos_coop = {"labels": labels_fmt, "values": values}
-            chart_data_lancamentos_cooperados = {"labels": labels_fmt, "values": values}
-            for coop in cooperados:
-                snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
-                prod = sum((l.valor or 0.0) for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-                rec = sum((r.valor or 0.0) for r in receitas_coop if getattr(r, "cooperado_id", None) == coop.id)
-                inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-                sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-                des = round(snap.get("descontado_periodo_despesa", 0.0), 2)
-                adiant = round(snap.get("descontado_periodo_adiant", 0.0), 2)
-                if prod or rec or des or adiant or snap["saldo_devedor"] or snap["a_descontar"]:
-                    a_receber = round(max(0.0, snap["disponivel_auto_restante"]), 2)
-                    saldo_pendente = round(snap["saldo_devedor"], 2)
-                    pend_programado = round(snap["a_descontar"], 2)
-                    resumo_coop_rows.append({
-                        "id": coop.id, "nome": coop.nome, "prod": round(prod,2),
-                        "inss4": round(inss4,2), "sest05": round(sest05,2), "rec": round(rec,2),
-                        "des": round(des,2), "adiant": round(adiant,2),
-                        "a_receber": a_receber, "aReceber": a_receber,
-                        "saldo_pendente": saldo_pendente, "saldoPendente": saldo_pendente,
-                        "pend_programado": pend_programado, "pendProgramado": pend_programado,
-                    })
-                    resumo_totais["prod"] += prod
-                    resumo_totais["inss4"] += inss4
-                    resumo_totais["sest05"] += sest05
-                    resumo_totais["rec"] += rec
-                    resumo_totais["des"] += des
-                    resumo_totais["adiant"] += adiant
-                    resumo_totais["a_receber"] += max(0.0, snap["disponivel_auto_restante"])
-                    resumo_totais["saldo_pendente"] += snap["saldo_devedor"]
-                    resumo_totais["pend_programado"] += snap["a_descontar"]
-
-        if ajax_partial == "beneficios":
-            def _tokenize(s: str):
-                return [x.strip() for x in re.split(r"[;,]", s or "") if x.strip()]
-            def _d(s):
-                if not s:
-                    return None
-                s = s.strip()
-                try:
-                    if "/" in s:
-                        d_, m_, y_ = s.split("/")
-                        return date(int(y_), int(m_), int(d_))
-                    y_, m_, d_ = s.split("-")
-                    return date(int(y_), int(m_), int(d_))
-                except Exception:
-                    return None
-            b_ini = _d(request.args.get("b_ini"))
-            b_fim = _d(request.args.get("b_fim"))
-            coop_filter = request.args.get("coop_benef_id", type=int)
-            if b_ini and not b_fim:
-                b_fim = b_ini
-            elif b_fim and not b_ini:
-                b_ini = b_fim
-            elif not b_ini and not b_fim:
-                hoje_ref = date.today()
-                b_ini = hoje_ref - timedelta(days=hoje_ref.weekday())
-                b_fim = b_ini + timedelta(days=6)
-            q_benef = BeneficioRegistro.query.filter(BeneficioRegistro.data_inicial <= b_fim, BeneficioRegistro.data_final >= b_ini)
-            historico_beneficios = q_benef.order_by(BeneficioRegistro.id.desc()).all()
-            for b in historico_beneficios:
-                nomes = _tokenize(b.recebedores_nomes or "")
-                ids = _tokenize(b.recebedores_ids or "")
-                recs = []
-                for i, nome in enumerate(nomes):
-                    rid = None
-                    if i < len(ids) and str(ids[i]).isdigit():
-                        try:
-                            rid = int(ids[i])
-                        except Exception:
-                            rid = None
-                    if coop_filter and (rid is not None) and (rid != coop_filter):
-                        continue
-                    recs.append({"id": rid, "nome": nome})
-                if coop_filter and not recs:
-                    continue
-                beneficios_view.append({
-                    "id": b.id, "data_inicial": b.data_inicial, "data_final": b.data_final,
-                    "data_lancamento": b.data_lancamento, "tipo": b.tipo,
-                    "valor_total": b.valor_total or 0.0, "recebedores": recs,
-                })
-
-        partial_context = dict(
-            tab=ajax_partial, fast_mode=False, total_producoes=total_producoes,
-            total_inss=total_inss, total_sest=total_sest, total_encargos=total_encargos,
-            total_receitas=total_receitas, total_despesas=total_despesas,
-            total_receitas_coop=total_receitas_coop, total_despesas_coop=total_despesas_coop,
-            total_adiantamentos_coop=total_adiantamentos_coop,
-            salario_minimo=(cfg.salario_minimo or 0.0) if cfg else 0.0,
-            bloquear_adiantamento=bool(getattr(cfg, "bloquear_adiantamento", False)) if cfg else False,
-            lancamentos=lancamentos, receitas=receitas, despesas=despesas,
-            receitas_coop=receitas_coop, despesas_coop=despesas_coop, cooperados=cooperados,
-            restaurantes=restaurantes, beneficios_view=beneficios_view, historico_beneficios=historico_beneficios,
-            admin_perms=admin_perms, admin_is_master=is_admin_master(),
-            taxa_admin_rows=taxa_admin_rows, taxa_admin_totais=taxa_admin_totais,
-            juros_arrecadados_total=juros_arrecadados_total, resumo_coop_rows=resumo_coop_rows,
-            resumo_totais=resumo_totais, chart_data_lancamentos_coop=chart_data_lancamentos_coop,
-            chart_data_lancamentos_cooperados=chart_data_lancamentos_cooperados,
-            despesa_snapshot_map=despesa_snapshot_map, solicitacoes_adiantamento=solicitacoes_adiantamento,
-            adiantamento_status_map=adiantamento_status_map, status_adiantamento_label=_status_adiantamento_label,
-            status_adiantamento_badge=_status_adiantamento_badge, competencia_humana=_competencia_humana,
-            current_date=date.today(), data_limite=date(date.today().year, 12, 31),
-            filtro_periodo_aplicado=filtro_periodo_aplicado,
-        )
-        return _render_admin_dashboard_partial(ajax_partial, **partial_context)
 
     # =========================
     # Documentos / status
@@ -5001,7 +4802,7 @@ def admin_dashboard():
     )
 
     ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
-    if ajax_partial:
+    if ajax_partial and not request.headers.get("X-Requested-With"):
         marker_map = {
             "resumo": "RESUMO",
             "lancamentos": "LANC",
@@ -5952,8 +5753,7 @@ def add_receita():
 
     db.session.add(r)
     db.session.commit()
-    flash("Receita adicionada.", "success")
-    return redirect(url_for("admin_dashboard", tab="receitas"))
+    return _json_or_redirect_success("Receita adicionada.", "receitas", {"id": r.id})
 
 
 @app.route("/receitas/<int:id>/edit", methods=["POST"])
@@ -6005,29 +5805,22 @@ def atualizar_taxa_admin_status(id):
         valor_pago = 0.0
         data_pagamento = None
 
-    calc = _calc_taxa_admin_encargos(valor_previsto, getattr(r, 'data_vencimento', None) or getattr(r, 'data', None), data_pagamento if status == 'pago' else None, _safe_float(getattr(r, 'multa_percentual', DEFAULT_TAXA_ADMIN_MULTA_PERCENTUAL), DEFAULT_TAXA_ADMIN_MULTA_PERCENTUAL), _taxa_admin_juros_defaultizado(getattr(r, 'juros_dia_percentual', DEFAULT_TAXA_ADMIN_JUROS_DIA_PERCENTUAL)))
+    calc = _calc_taxa_admin_encargos(valor_previsto, getattr(r, 'data_vencimento', None) or getattr(r, 'data', None), data_pagamento if status == 'pago' else None, _safe_float(getattr(r, 'multa_percentual', 2.0), 2.0), _safe_float(getattr(r, 'juros_dia_percentual', 0.03), 0.03))
     r.status_pagamento = status
     r.valor_previsto = valor_previsto
     r.valor_principal = valor_previsto
+    r.valor_pago = round(valor_pago, 2)
     r.data_pagamento = data_pagamento
     r.data = getattr(r, 'data_vencimento', None) or r.data
     if status == 'pago':
-        valor_final_pago = round(valor_pago, 2)
-        encargos = round(calc['valor_multa'] + calc['valor_juros'], 2)
-        principal_baixado = round(max(0.0, valor_final_pago - encargos), 2)
-        if principal_baixado > round(valor_previsto, 2):
-            principal_baixado = round(valor_previsto, 2)
-        r.valor_pago = principal_baixado
         r.valor_multa = calc['valor_multa']
         r.valor_juros = calc['valor_juros']
-        r.valor_total = valor_final_pago
+        r.valor_total = round(r.valor_pago, 2)
     elif status == 'parcial':
-        r.valor_pago = round(min(valor_pago, valor_previsto), 2)
         r.valor_multa = 0.0
         r.valor_juros = 0.0
         r.valor_total = round(r.valor_pago, 2)
     else:
-        r.valor_pago = 0.0
         r.valor_multa = 0.0
         r.valor_juros = 0.0
         r.valor_total = 0.0
@@ -6056,7 +5849,7 @@ def atualizar_taxa_admin_lote():
     for r in regs:
         valor_previsto = _safe_float(getattr(r, 'valor_previsto', None) or getattr(r, 'valor_principal', None) or 0.0)
         if acao == 'pago':
-            calc = _calc_taxa_admin_encargos(valor_previsto, getattr(r, 'data_vencimento', None) or getattr(r, 'data', None), hoje, _safe_float(getattr(r, 'multa_percentual', DEFAULT_TAXA_ADMIN_MULTA_PERCENTUAL), DEFAULT_TAXA_ADMIN_MULTA_PERCENTUAL), _taxa_admin_juros_defaultizado(getattr(r, 'juros_dia_percentual', DEFAULT_TAXA_ADMIN_JUROS_DIA_PERCENTUAL)))
+            calc = _calc_taxa_admin_encargos(valor_previsto, getattr(r, 'data_vencimento', None) or getattr(r, 'data', None), hoje, _safe_float(getattr(r, 'multa_percentual', 2.0), 2.0), _safe_float(getattr(r, 'juros_dia_percentual', 0.03), 0.03))
             r.status_pagamento = 'pago'
             r.data_pagamento = hoje
             r.valor_previsto = valor_previsto
@@ -6094,8 +5887,7 @@ def add_despesa():
 
     db.session.add(d)
     db.session.commit()
-    flash("Despesa adicionada.", "success")
-    return redirect(url_for("admin_dashboard", tab="despesas"))
+    return _json_or_redirect_success("Despesa adicionada.", "despesas", {"id": d.id})
 
 
 @app.route("/despesas/<int:id>/edit", methods=["POST"])
@@ -6458,7 +6250,7 @@ def add_cooperado():
     taxa_admin_valor = f.get("taxa_admin_valor", type=float) or 0.0
     taxa_admin_data_base = _parse_date(f.get("taxa_admin_data_base"))
     taxa_admin_multa_percentual = f.get("taxa_admin_multa_percentual", type=float) or 2.0
-    taxa_admin_juros_dia_percentual = _taxa_admin_juros_defaultizado((f.get("taxa_admin_juros_dia_percentual") or '').replace(',', '.'))
+    taxa_admin_juros_dia_percentual = _safe_float((f.get("taxa_admin_juros_dia_percentual") or '').replace(',', '.'), 0.03)
 
     if Usuario.query.filter_by(usuario=usuario_login).first():
         flash("Usuário já existente.", "warning")
@@ -6601,7 +6393,7 @@ def add_restaurante():
     taxa_admin_valor = f.get("taxa_admin_valor", type=float) or 0.0
     taxa_admin_data_base = _parse_date(f.get("taxa_admin_data_base"))
     taxa_admin_multa_percentual = f.get("taxa_admin_multa_percentual", type=float) or 2.0
-    taxa_admin_juros_dia_percentual = _taxa_admin_juros_defaultizado((f.get("taxa_admin_juros_dia_percentual") or '').replace(',', '.'))
+    taxa_admin_juros_dia_percentual = _safe_float((f.get("taxa_admin_juros_dia_percentual") or '').replace(',', '.'), 0.03)
     status_raw = (f.get("ativo") or "1").strip().lower()
     ativo_rest = status_raw in ("1", "true", "ativo", "on", "sim")
     eh_farmacia = (f.get("eh_farmacia") or "").strip().lower() in ("1", "true", "on", "sim")
@@ -6650,7 +6442,7 @@ def edit_restaurante(id):
     r.taxa_admin_valor = f.get("taxa_admin_valor", type=float) or 0.0
     r.taxa_admin_data_base = _parse_date(f.get("taxa_admin_data_base"))
     r.taxa_admin_multa_percentual = f.get("taxa_admin_multa_percentual", type=float) or 2.0
-    r.taxa_admin_juros_dia_percentual = _taxa_admin_juros_defaultizado((f.get("taxa_admin_juros_dia_percentual") or '').replace(',', '.'))
+    r.taxa_admin_juros_dia_percentual = _safe_float((f.get("taxa_admin_juros_dia_percentual") or '').replace(',', '.'), 0.03)
     status_raw = (f.get('ativo') or '1').strip().lower()
     ativo_rest = status_raw in ('1','true','ativo','on','sim')
     r.eh_farmacia = (f.get("eh_farmacia") or "").strip().lower() in ("1", "true", "on", "sim")
@@ -7295,8 +7087,7 @@ def add_receita_coop():
 
     db.session.add(rc)
     db.session.commit()
-    flash("Receita do cooperado adicionada.", "success")
-    return redirect(url_for("admin_dashboard", tab="coop_receitas"))
+    return _json_or_redirect_success("Receita do cooperado adicionada.", "coop_receitas", {"id": rc.id})
 
 
 @app.route("/coop/receitas/<int:id>/edit", methods=["POST"])
@@ -7311,8 +7102,7 @@ def edit_receita_coop(id):
     rc.data = _parse_date(f.get("data"))
 
     db.session.commit()
-    flash("Receita do cooperado atualizada.", "success")
-    return redirect(url_for("admin_dashboard", tab="coop_receitas"))
+    return _json_or_redirect_success("Receita do cooperado atualizada.", "coop_receitas", {"id": rc.id})
 
 
 @app.route("/coop/receitas/<int:id>/delete", methods=["GET", "POST"])
@@ -7321,8 +7111,7 @@ def delete_receita_coop(id):
     rc = ReceitaCooperado.query.get_or_404(id)
     db.session.delete(rc)
     db.session.commit()
-    flash("Receita do cooperado excluída.", "success")
-    return redirect(url_for("admin_dashboard", tab="coop_receitas"))
+    return _json_or_redirect_success("Receita do cooperado excluída.", "coop_receitas", {"deleted_id": id})
 
 
 def _competencia_ref(data_base, competencia_semana):
