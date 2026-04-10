@@ -5785,13 +5785,19 @@ def atualizar_taxa_admin_status(id):
     r.data = data_competencia
 
     if status == 'pago':
-        r.valor_multa = calc['valor_multa']
-        r.valor_juros = calc['valor_juros']
-        r.valor_total = round(r.valor_pago + r.valor_multa + r.valor_juros, 2)
-    else:
-        r.valor_multa = 0.0
-        r.valor_juros = 0.0
-        r.valor_total = 0.0
+    r.valor_multa = calc['valor_multa']
+    r.valor_juros = calc['valor_juros']
+    r.valor_total = round(r.valor_pago, 2)  # só principal
+else:
+    r.valor_multa = 0.0
+    r.valor_juros = 0.0
+    r.valor_total = 0.0
+
+# a data da taxa continua na competência, nunca no pagamento
+r.data = _competencia_to_date(
+    getattr(r, 'competencia', None),
+    getattr(r, 'data_vencimento', None) or r.data
+)
 
     db.session.commit()
     flash("Taxa administrativa atualizada.", "success")
