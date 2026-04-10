@@ -2019,45 +2019,6 @@ def _build_escala_alertas_1h(escalas_all: list[Escala], cooperados_map: dict[int
     out.sort(key=lambda item: (item.get("inicio_iso", ""), (item.get("contrato", "") or "").lower(), item.get("id", 0)))
     return out
 
-
-
-def _build_escala_alertas_agenda(escalas_all: list[Escala], cooperados_map: dict[int, Cooperado] | None = None, horizon_days: int = 7) -> list[dict]:
-    agora = _brasil_now()
-    limite = agora + timedelta(days=max(1, int(horizon_days or 7)))
-    out = []
-    cooperados_map = cooperados_map or {}
-
-    for e in escalas_all:
-        sem_cooperado = not getattr(e, "cooperado_id", None) and not (getattr(e, "cooperado_nome", None) or "").strip()
-        if not sem_cooperado:
-            continue
-
-        inicio = _escala_inicio_datetime(e)
-        if not inicio:
-            continue
-        if inicio < agora or inicio > limite:
-            continue
-
-        contrato = (getattr(e, "contrato", None) or "Sem contrato").strip() or "Sem contrato"
-        coop = cooperados_map.get(getattr(e, "cooperado_id", 0) or 0)
-        trigger = inicio - timedelta(hours=1)
-
-        out.append({
-            "id": int(getattr(e, "id", 0) or 0),
-            "data": getattr(e, "data", "") or "",
-            "turno": getattr(e, "turno", "") or "",
-            "horario": getattr(e, "horario", "") or "",
-            "contrato": contrato,
-            "cooperado_nome": (coop.nome if coop else (getattr(e, "cooperado_nome", None) or "").strip()),
-            "inicio_iso": inicio.strftime("%Y-%m-%dT%H:%M:%S"),
-            "trigger_iso": trigger.strftime("%Y-%m-%dT%H:%M:%S"),
-            "weekday_label": _escala_weekday_label(getattr(e, "data", None)),
-            "mensagem": f"Cobrir contrato {contrato} às {(getattr(e, 'horario', '') or '').strip() or '—'}",
-        })
-
-    out.sort(key=lambda item: (item.get("inicio_iso", ""), (item.get("contrato", "") or "").lower(), item.get("id", 0)))
-    return out
-
 def _match_cooperado_by_name(nome_planilha: str, cooperados: list[Cooperado]) -> Cooperado | None:
     def norm_join(s: str) -> str:
         return " ".join(_normalize_name(s))
@@ -3881,12 +3842,8 @@ def admin_sistemas_abrir(sistema):
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_dashboard():
-    return _admin_dashboard_impl()
-
-
-def _admin_dashboard_impl(forced_tab=None):
     args = request.args
-    active_tab = (forced_tab or args.get("tab") or "resumo").strip().lower()
+    active_tab = (args.get("tab") or "resumo").strip().lower()
 
     admin_logado = _usuario_logado()
     if not admin_logado:
@@ -4240,7 +4197,6 @@ def _admin_dashboard_impl(forced_tab=None):
         })
 
     escala_alertas_1h = _build_escala_alertas_1h(escalas_all, cooperados_map)
-    escala_alertas_agenda = _build_escala_alertas_agenda(escalas_all, cooperados_map)
 
     # =========================
     # Gráficos
@@ -4891,8 +4847,6 @@ def _admin_dashboard_impl(forced_tab=None):
         trocas_hist_inicio=trocas_hist_inicio,
         trocas_hist_fim=trocas_hist_fim,
         escala_historico_rows=escala_historico_rows,
-        escala_alertas_1h=escala_alertas_1h,
-        escala_alertas_agenda=escala_alertas_agenda,
         trocas_historico_export=trocas_historico_export,
         contagem_contrato_turno=contagem_contrato_turno,
         resumo_coop_rows=resumo_coop_rows,
@@ -4926,61 +4880,7 @@ def _admin_dashboard_impl(forced_tab=None):
             if m:
                 return m.group(1)
     return _rendered_html
-
-
-@app.route("/admin/resumo", methods=["GET"], endpoint="admin_resumo")
-@admin_required
-def admin_resumo_route():
-    return _admin_dashboard_impl("resumo")
-
-
-@app.route("/admin/financeiro", methods=["GET"], endpoint="admin_financeiro")
-@admin_required
-def admin_financeiro_route():
-    secao = (request.args.get("secao") or request.args.get("tab") or "resumo").strip().lower()
-    mapa = {
-        "resumo": "resumo",
-        "lancamentos": "lancamentos",
-        "receitas": "receitas",
-        "despesas": "despesas",
-        "coop_receitas": "coop_receitas",
-        "receitas_cooperados": "coop_receitas",
-        "coop_despesas": "coop_despesas",
-        "despesas_cooperados": "coop_despesas",
-        "beneficios": "beneficios",
-    }
-    return _admin_dashboard_impl(mapa.get(secao, "resumo"))
-
-
-@app.route("/admin/cooperados", methods=["GET"], endpoint="admin_cooperados")
-@admin_required
-def admin_cooperados_route():
-    return _admin_dashboard_impl("cooperados")
-
-
-@app.route("/admin/restaurantes", methods=["GET"], endpoint="admin_restaurantes")
-@admin_required
-def admin_restaurantes_route():
-    return _admin_dashboard_impl("restaurantes")
-
-
-@app.route("/admin/escalas", methods=["GET"], endpoint="admin_escalas")
-@admin_required
-def admin_escalas_route():
-    return _admin_dashboard_impl("escalas")
-
-
-@app.route("/admin/sistemas", methods=["GET"], endpoint="admin_sistemas")
-@admin_required
-def admin_sistemas_route():
-    return _admin_dashboard_impl("sistemas")
-
-
-@app.route("/admin/configuracoes", methods=["GET"], endpoint="admin_configuracoes")
-@admin_required
-def admin_configuracoes_route():
-    return _admin_dashboard_impl("config")
-
+    
 # =========================
 # Navegação/Export util
 # =========================
