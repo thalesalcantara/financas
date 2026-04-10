@@ -1858,7 +1858,7 @@
           <label class="form-label lanc-label">Restaurante</label>
           <select class="form-select form-select-sm" name="restaurante_id" required>
             {% for rr in restaurantes %}
-              <option value="{{ rr.id }}">{{ rr.nome }}</option>
+              <option value="{{ rr.id }}">{{ rr.nome }} ({{ rr.periodo }})</option>
             {% endfor %}
           </select>
         </div>
@@ -3907,7 +3907,16 @@
           <label class="form-label">Nome</label>
           <input type="text" class="form-control form-control-sm" name="nome" placeholder="Ex.: Restaurante Centro" required>
         </div>
-        <input type="hidden" name="periodo" value="seg-dom">
+
+        <div class="col-md-3">
+          <label class="form-label">Período</label>
+          <select class="form-select form-select-sm" name="periodo" required>
+            <option value="seg-dom">Seg a Dom</option>
+            <option value="sab-sex">Sáb a Sex</option>
+            <option value="sex-qui">Sex a Qui</option>
+          </select>
+          <small class="text-muted">Usado na competência de lançamentos.</small>
+        </div>
 
         <div class="col-md-2">
           <label class="form-label">Usuário</label>
@@ -3946,7 +3955,7 @@
           <div class="input-group input-group-sm">
             <input type="number" step="0.01" class="form-control" name="taxa_admin_multa_percentual" value="2">
             <span class="input-group-text">% +</span>
-            <input type="number" class="form-control" name="taxa_admin_juros_dia_percentual" value="0.033185" min="0" step="0.000001" inputmode="decimal">
+            <input type="number" class="form-control" name="taxa_admin_juros_dia_percentual" value="0.03" min="0" step="0.000001" inputmode="decimal">
           </div>
         </div>
 
@@ -3996,7 +4005,7 @@
         </h6>
         <div class="input-group input-group-sm" style="max-width:360px;">
           <span class="input-group-text"><i class="bi bi-search"></i></span>
-          <input type="text" class="form-control" id="buscaRestaurantes" placeholder="Filtrar por nome ou usuário...">
+          <input type="text" class="form-control" id="buscaRestaurantes" placeholder="Filtrar por nome, usuário ou período...">
         </div>
       </div>
 
@@ -4007,7 +4016,8 @@
               <th style="width:60px;">Logo</th>
               <th>Nome</th>
               <th>Usuário</th>
-                            <th style="width:140px;">Taxa adm.</th>
+              <th style="width:140px;">Período</th>
+              <th style="width:140px;">Taxa adm.</th>
               <th style="width:130px;">Data base</th>
               <th style="width:120px;">Status</th>
               <th style="width:120px;">Tipo</th>
@@ -4016,7 +4026,7 @@
           </thead>
           <tbody id="tbodyRestaurantes">
             {% for r in restaurantes %}
-              <tr data-nome="{{ r.nome|lower }}" data-user="{{ r.usuario_ref.usuario|lower }}" data-tipo="{{ 'farmacia' if r.eh_farmacia else 'estabelecimento' }}">
+              <tr data-nome="{{ r.nome|lower }}" data-user="{{ r.usuario_ref.usuario|lower }}" data-periodo="{{ r.periodo|lower }}" data-tipo="{{ 'farmacia' if r.eh_farmacia else 'estabelecimento' }}">
                 <td class="text-center">
                   <img src="{{ r.foto_url or url_for('static', filename='img/default.png') }}"
                        class="avatar border" alt="{{ r.nome }}"
@@ -4024,6 +4034,14 @@
                 </td>
                 <td class="fw-medium">{{ r.nome }}</td>
                 <td class="text-muted">{{ r.usuario_ref.usuario }}</td>
+                <td class="text-nowrap">
+                  <span class="badge bg-light text-dark">
+                    {% if r.periodo == 'seg-dom' %}Seg–Dom
+                    {% elif r.periodo == 'sab-sex' %}Sáb–Sex
+                    {% elif r.periodo == 'sex-qui' %}Sex–Qui
+                    {% else %}{{ r.periodo }}{% endif %}
+                  </span>
+                </td>
                 <td class="text-nowrap">R$ {{ "%.2f"|format(r.taxa_admin_valor|default(0)) }}</td>
                 <td class="text-nowrap">{{ r.taxa_admin_data_base.strftime('%d/%m/%Y') if r.taxa_admin_data_base else '-' }}</td>
                 <td class="text-nowrap">
@@ -4033,7 +4051,7 @@
                 <td class="text-center">
                   <div class="btn-group btn-group-sm" role="group">
                     {% if can_restaurantes_editar %}<button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalEditRestaurante"
-                            data-id="{{ r.id }}" data-nome="{{ r.nome }}" data-usuario="{{ r.usuario_ref.usuario }}" data-taxa-admin-valor="{{ '%.2f'|format(r.taxa_admin_valor|default(0)) }}" data-taxa-admin-data-base="{{ r.taxa_admin_data_base.strftime('%Y-%m-%d') if r.taxa_admin_data_base else '' }}" data-taxa-admin-multa="{{ '%.2f'|format(r.taxa_admin_multa_percentual|default(2)) }}" data-taxa-admin-juros-dia="{{ '%.6f'|format(r.taxa_admin_juros_dia_percentual|default(0.033185)) }}"
+                            data-id="{{ r.id }}" data-nome="{{ r.nome }}" data-usuario="{{ r.usuario_ref.usuario }}" data-periodo="{{ r.periodo }}" data-taxa-admin-valor="{{ '%.2f'|format(r.taxa_admin_valor|default(0)) }}" data-taxa-admin-data-base="{{ r.taxa_admin_data_base.strftime('%Y-%m-%d') if r.taxa_admin_data_base else '' }}" data-taxa-admin-multa="{{ '%.2f'|format(r.taxa_admin_multa_percentual|default(2)) }}" data-taxa-admin-juros-dia="{{ '%.6f'|format(r.taxa_admin_juros_dia_percentual|default(0.03)) }}"
                             data-ativo="{{ '1' if ((r.usuario_ref.ativo if (r.usuario_ref is defined and r.usuario_ref and r.usuario_ref.ativo is not none) else r.ativo)|default(true)) else '0' }}"
                             data-eh-farmacia="{{ '1' if r.eh_farmacia else '0' }}"
                             data-url="{{ url_for('edit_restaurante', id=r.id) }}" title="Editar">
@@ -4121,6 +4139,7 @@
         const set = (id, v) => { const el = document.getElementById(id); if(el) el.value = v || ''; };
         set('editRestNome', btn.dataset.nome);
         set('editRestUsuario', btn.dataset.usuario);
+        set('editRestPeriodo', btn.dataset.periodo);
         set('editRestTaxaAdminValor', btn.dataset.taxaAdminValor);
         set('editRestTaxaAdminDataBase', btn.dataset.taxaAdminDataBase);
         set('editRestTaxaAdminMulta', btn.dataset.taxaAdminMulta);
@@ -4175,12 +4194,11 @@
       </div>
       <div class="d-flex gap-2 align-items-center flex-wrap">
         <span class="badge-soft" id="escalaAlertasCount">{{ escala_alertas_1h|length if escala_alertas_1h is defined else 0 }} alerta(s)</span>
-        <span class="badge-soft" id="escalaAlertasClock">Manual</span>
-        <button type="button" class="btn btn-outline-primary btn-sm" id="btnRefreshEscalaAlertas"><i class="bi bi-arrow-clockwise"></i> Atualizar</button>
+        <span class="badge-soft" id="escalaAlertasClock">Atualizando…</span>
       </div>
     </div>
 
-    <audio id="audioAlertaEscala" preload="none">
+    <audio id="audioAlertaEscala" preload="auto">
       <source src="{{ url_for('static', filename='escala.mp3') }}" type="audio/mpeg">
     </audio>
 
@@ -5686,7 +5704,7 @@
           <div class="col-md-4">
             <label class="form-label">Restaurante</label>
             <select class="form-select" name="restaurante_id" required>
-              {% for r in restaurantes %}<option value="{{ r.id }}">{{ r.nome }}</option>{% endfor %}
+              {% for r in restaurantes %}<option value="{{ r.id }}">{{ r.nome }} ({{ r.periodo }})</option>{% endfor %}
             </select>
           </div>
           <div class="col-md-4">
@@ -5848,7 +5866,14 @@
         <div class="modal-body row g-2 px-3">
           <input type="hidden" name="id">
           <div class="col-12"><label class="form-label">Nome</label><input type="text" class="form-control" name="nome" required></div>
-          <input type="hidden" name="periodo" value="seg-dom">
+          <div class="col-md-6">
+            <label class="form-label">Período</label>
+            <select class="form-select" name="periodo" required>
+              <option value="seg-dom">Seg a Dom</option>
+              <option value="sab-sex">Sáb a Sex</option>
+              <option value="sex-qui">Sex a Qui</option>
+            </select>
+          </div>
           <div class="col-md-6"><label class="form-label">Usuário</label><input type="text" class="form-control" name="usuario" required></div>
           <div class="col-md-6"><label class="form-label">Taxa administrativa (R$)</label><input type="number" step="0.01" class="form-control" name="taxa_admin_valor"></div>
           <div class="col-md-6"><label class="form-label">Data base da taxa</label><input type="date" class="form-control" name="taxa_admin_data_base"></div>
@@ -6011,7 +6036,7 @@
         execScripts(firstEl);
 
         if (window.history && window.history.replaceState){
-          const cleanParams = new URLSearchParams(params); cleanParams.delete('ajax_partial'); const cleanUrl = `${window.location.pathname}?${cleanParams.toString()}`;
+          const cleanUrl = `${window.location.pathname}?${params.toString()}`;
           window.history.replaceState({}, '', cleanUrl);
         }
         initAjaxFilters();
@@ -6795,7 +6820,6 @@ document.addEventListener('DOMContentLoaded', function(){
   const countAlertas = document.getElementById('escalaAlertasCount');
   const clockAlertas = document.getElementById('escalaAlertasClock');
   const audioAlerta = document.getElementById('audioAlertaEscala');
-  const btnRefreshAlertas = document.getElementById('btnRefreshEscalaAlertas');
   const toggleBtn = document.getElementById('btnToggleEscalaSemanal');
   const panel = document.getElementById('escalaWeeklyPanel');
   const mount = document.getElementById('escalaEditorMount');
@@ -7117,9 +7141,8 @@ document.addEventListener('DOMContentLoaded', function(){
     knownAlertIds = new Set((initial || []).map(a => String(a.id)));
     renderAlertas(initial || []);
   } catch(_) {}
-  btnRefreshAlertas?.addEventListener('click', function(){ pollAlertas(); });
-  // atualização manual para evitar timeout do worker
-
+  pollAlertas();
+  setInterval(pollAlertas, 60000);
 });
 </script>
 
@@ -7197,10 +7220,11 @@ document.addEventListener('DOMContentLoaded', function(){
     form.querySelector('[name="id"]').value = btn.getAttribute('data-id') || '';
     form.querySelector('[name="nome"]').value = btn.getAttribute('data-nome') || '';
     form.querySelector('[name="usuario"]').value = btn.getAttribute('data-usuario') || '';
+    form.querySelector('[name="periodo"]').value = btn.getAttribute('data-periodo') || 'seg-dom';
     const f1=form.querySelector('[name="taxa_admin_valor"]'); if (f1) f1.value = (btn.getAttribute('data-taxa-admin-valor') || '').replace(',', '.');
     const f2=form.querySelector('[name="taxa_admin_data_base"]'); if (f2) f2.value = btn.getAttribute('data-taxa-admin-data-base') || '';
     const f3=form.querySelector('[name="taxa_admin_multa_percentual"]'); if (f3) f3.value = (btn.getAttribute('data-taxa-admin-multa') || '2').replace(',', '.');
-    const f4=form.querySelector('[name="taxa_admin_juros_dia_percentual"]'); if (f4) f4.value = (btn.getAttribute('data-taxa-admin-juros-dia') || '0.033185').replace(',', '.');
+    const f4=form.querySelector('[name="taxa_admin_juros_dia_percentual"]'); if (f4) f4.value = (btn.getAttribute('data-taxa-admin-juros-dia') || '0.03').replace(',', '.');
     const f5=form.querySelector('[name="ativo"]'); if (f5) f5.value = btn.getAttribute('data-ativo') || '1';
     const f6=form.querySelector('[name="eh_farmacia"]'); if (f6) f6.checked = (btn.getAttribute('data-eh-farmacia') || '0') === '1';
   });
