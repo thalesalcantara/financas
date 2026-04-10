@@ -376,22 +376,6 @@
       border:none !important;
     }
 
-
-    .avatar-placeholder{
-      width:40px;
-      height:40px;
-      border-radius:50%;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      background:#eef3ff;
-      color:#2747d9;
-      font-weight:800;
-      font-size:.82rem;
-      border:1px solid var(--border);
-      text-transform:uppercase;
-    }
-
     .tab-pane{ animation:fadePane .2s ease; }
     @keyframes fadePane{
       from{ opacity:.35; transform:translateY(3px); }
@@ -3591,7 +3575,9 @@
                   data-user="{{ coop.usuario_ref.usuario|lower }}"
                   data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','')|lower }}">
                 <td class="text-center">
-                  <span class="avatar-placeholder" title="{{ coop.nome }}">{{ (coop.nome or '?')[:1] }}</span>
+                  <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
+                       class="avatar border" alt="{{ coop.nome }}"
+                       style="width:40px;height:40px;object-fit:cover;">
                 </td>
 
                 <td class="fw-medium">{{ coop.nome }}</td>
@@ -4042,7 +4028,9 @@
             {% for r in restaurantes %}
               <tr data-nome="{{ r.nome|lower }}" data-user="{{ r.usuario_ref.usuario|lower }}" data-periodo="{{ r.periodo|lower }}" data-tipo="{{ 'farmacia' if r.eh_farmacia else 'estabelecimento' }}">
                 <td class="text-center">
-                  <span class="avatar-placeholder" title="{{ r.nome }}">{{ (r.nome or '?')[:1] }}</span>
+                  <img src="{{ r.foto_url or url_for('static', filename='img/default.png') }}"
+                       class="avatar border" alt="{{ r.nome }}"
+                       style="width:40px;height:40px;object-fit:cover;">
                 </td>
                 <td class="fw-medium">{{ r.nome }}</td>
                 <td class="text-muted">{{ r.usuario_ref.usuario }}</td>
@@ -6048,12 +6036,18 @@
         execScripts(firstEl);
 
         if (window.history && window.history.replaceState){
-          const cleanUrl = `${window.location.pathname}?${params.toString()}`;
+          const cleanParams = new URLSearchParams(params.toString());
+          cleanParams.delete('ajax_partial');
+          cleanParams.delete('ajax');
+          const cleanUrl = `${window.location.pathname}?${cleanParams.toString()}`;
           window.history.replaceState({}, '', cleanUrl);
         }
         initAjaxFilters();
       }catch(err){
-        const fallbackUrl = `${baseAction}?${params.toString()}`;
+        const fallbackParams = new URLSearchParams(params.toString());
+        fallbackParams.delete('ajax_partial');
+        fallbackParams.delete('ajax');
+        const fallbackUrl = `${baseAction}?${fallbackParams.toString()}`;
         window.location.href = fallbackUrl;
       }
     }
@@ -7153,8 +7147,9 @@ document.addEventListener('DOMContentLoaded', function(){
     knownAlertIds = new Set((initial || []).map(a => String(a.id)));
     renderAlertas(initial || []);
   } catch(_) {}
-  pollAlertas();
-  setInterval(pollAlertas, 60000);
+  // polling desativado para não sobrecarregar o admin
+  // pollAlertas();
+  // setInterval(pollAlertas, 60000);
 });
 </script>
 
