@@ -4023,6 +4023,9 @@ def admin_dashboard():
     total_receitas_coop = 0.0
     total_despesas_coop = 0.0
     total_adiantamentos_coop = 0.0
+    despesa_snapshot_map = {}
+    solicitacoes_adiantamento = []
+    adiantamento_status_map = {}
 
     if load_receitas_coop:
         rq2 = ReceitaCooperado.query
@@ -4080,8 +4083,6 @@ def admin_dashboard():
             for _it in _snap["itens"]:
                 despesa_snapshot_map[_it["id"]] = _it
 
-    solicitacoes_adiantamento = []
-    adiantamento_status_map = {}
     if load_adiantamentos:
         adiantamentos_q = SolicitacaoAdiantamento.query.join(Cooperado, SolicitacaoAdiantamento.cooperado_id == Cooperado.id)
         if cooperado_id:
