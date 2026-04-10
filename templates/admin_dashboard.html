@@ -376,22 +376,6 @@
       border:none !important;
     }
 
-
-    .avatar-placeholder{
-      width:40px;
-      height:40px;
-      border-radius:50%;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      background:#eef3ff;
-      color:#2747d9;
-      font-weight:800;
-      font-size:.82rem;
-      border:1px solid var(--border);
-      text-transform:uppercase;
-    }
-
     .tab-pane{ animation:fadePane .2s ease; }
     @keyframes fadePane{
       from{ opacity:.35; transform:translateY(3px); }
@@ -1348,7 +1332,6 @@
       </style>
     </section>
 
-{% if _tab == 'resumo' %}
     <!-- Dados (seguros p/ JS) + Scripts (Chart.js + XLSX) -->
     <script>
     (function(){
@@ -1709,8 +1692,6 @@
 <section class="tab-pane fade {{ 'show active' if _tab=='lancamentos' else '' }}" id="lancamentos" role="tabpanel">
   {# ====== TOTAIS DO FILTRO (já vem filtrado do backend) ====== #}
   {% set soma_valor    = (lancamentos|sum(attribute='valor')) if lancamentos else 0 %}
-{% endif %}
-
 <!--AJAX_LANC_START--><div id="lancamentosAjaxWrap">
   {% set soma_inss_4   = (soma_valor * 0.04) %}
   {% set soma_sest_05  = (soma_valor * 0.005) %}
@@ -3594,7 +3575,9 @@
                   data-user="{{ coop.usuario_ref.usuario|lower }}"
                   data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','')|lower }}">
                 <td class="text-center">
-                  <span class="avatar-placeholder" title="{{ coop.nome }}">{{ (coop.nome or '?')[:1] }}</span>
+                  <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
+                       class="avatar border" alt="{{ coop.nome }}"
+                       style="width:40px;height:40px;object-fit:cover;">
                 </td>
 
                 <td class="fw-medium">{{ coop.nome }}</td>
@@ -4045,7 +4028,9 @@
             {% for r in restaurantes %}
               <tr data-nome="{{ r.nome|lower }}" data-user="{{ r.usuario_ref.usuario|lower }}" data-periodo="{{ r.periodo|lower }}" data-tipo="{{ 'farmacia' if r.eh_farmacia else 'estabelecimento' }}">
                 <td class="text-center">
-                  <span class="avatar-placeholder" title="{{ r.nome }}">{{ (r.nome or '?')[:1] }}</span>
+                  <img src="{{ r.foto_url or url_for('static', filename='img/default.png') }}"
+                       class="avatar border" alt="{{ r.nome }}"
+                       style="width:40px;height:40px;object-fit:cover;">
                 </td>
                 <td class="fw-medium">{{ r.nome }}</td>
                 <td class="text-muted">{{ r.usuario_ref.usuario }}</td>
@@ -4213,7 +4198,7 @@
       </div>
     </div>
 
-    <audio id="audioAlertaEscala" preload="none">
+    <audio id="audioAlertaEscala" preload="auto">
       <source src="{{ url_for('static', filename='escala.mp3') }}" type="audio/mpeg">
     </audio>
 
@@ -6062,43 +6047,13 @@
     }
 
     const bindings = [
+      
       ['formFiltroReceitas', 'receitas', 'receitasAjaxWrap', 'receitas'],
       ['formFiltroDespesas', 'despesas', 'despesasAjaxWrap', 'despesas'],
       ['formFiltroCoopReceitas', 'coop_receitas', 'coopReceitasAjaxWrap', 'coop_receitas'],
       ['formFiltroCoopDespesas', 'coop_despesas', 'coopDespesasAjaxWrap', 'coop_despesas'],
       ['formFiltroBeneficios', 'beneficios', 'beneficiosAjaxWrap', 'beneficios'],
     ];
-
-    async function submitCrudAndRefresh(form, partial, wrapId, tabName, filterFormId){
-      const action = form.getAttribute('action') || window.location.pathname;
-      const method = (form.getAttribute('method') || 'POST').toUpperCase();
-      const fd = new FormData(form);
-      fd.set('ajax', '1');
-      const resp = await fetch(action, {
-        method,
-        body: fd,
-        headers: {
-          'X-Requested-With': 'fetch',
-          'Accept': 'application/json'
-        }
-      });
-      let data = {};
-      try { data = await resp.json(); } catch(_) {}
-      if (!resp.ok || data.ok === false) throw new Error(data.message || 'Falha ao salvar.');
-
-      const modalEl = form.closest('.modal');
-      if (modalEl && window.bootstrap?.Modal) {
-        const instance = window.bootstrap.Modal.getInstance(modalEl);
-        if (instance) instance.hide();
-      }
-
-      const filterForm = document.getElementById(filterFormId);
-      if (filterForm) {
-        await fetchPartial(filterForm, partial, wrapId, tabName);
-      } else {
-        window.location.reload();
-      }
-    }
 
     bindings.forEach(([formId, partial, wrapId, tabName]) => {
       const form = document.getElementById(formId);
@@ -6108,24 +6063,6 @@
         e.preventDefault();
         fetchPartial(form, partial, wrapId, tabName);
       });
-
-      const wrap = document.getElementById(wrapId);
-      if (wrap && wrap.dataset.ajaxCrudInit !== '1') {
-        wrap.dataset.ajaxCrudInit = '1';
-        wrap.querySelectorAll('form').forEach(innerForm => {
-          if (innerForm.id === formId) return;
-          innerForm.addEventListener('submit', async function(ev){
-            if (innerForm.dataset.noAjax === '1') return;
-            ev.preventDefault();
-            try {
-              await submitCrudAndRefresh(innerForm, partial, wrapId, tabName, formId);
-            } catch (err) {
-              console.error(err);
-              alert(err.message || 'Falha ao salvar.');
-            }
-          });
-        });
-      }
     });
 
     ['formFiltroResumo','formFiltroLancamentos'].forEach((formId) => {
@@ -7199,17 +7136,13 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   }
 
-  if (String('{{ _tab }}') === 'escalas') {
-    try {
-      const initial = JSON.parse(wrapAlertas?.dataset?.initial || '[]');
-      knownAlertIds = new Set((initial || []).map(a => String(a.id)));
-      renderAlertas(initial || []);
-    } catch(_) {}
-    pollAlertas();
-    setInterval(pollAlertas, 60000);
-  } else {
-    if (clockAlertas) clockAlertas.textContent = 'Em espera';
-  }
+  try {
+    const initial = JSON.parse(wrapAlertas?.dataset?.initial || '[]');
+    knownAlertIds = new Set((initial || []).map(a => String(a.id)));
+    renderAlertas(initial || []);
+  } catch(_) {}
+  pollAlertas();
+  setInterval(pollAlertas, 60000);
 });
 </script>
 
