@@ -3384,6 +3384,8 @@ def _safe_float(v, default=0.0):
 
 
 def _receita_total_real(r: ReceitaCooperativa) -> float:
+    if getattr(r, 'auto_taxa_adm', False):
+        return round(_safe_float(getattr(r, 'valor_pago', 0.0)) + _safe_float(getattr(r, 'valor_multa', 0.0)) + _safe_float(getattr(r, 'valor_juros', 0.0)), 2)
     return round(_safe_float(getattr(r, 'valor_total', 0.0)), 2)
 
 
@@ -3428,19 +3430,6 @@ def _taxa_competencia_iter(data_base: date | None, months_back: int = 0):
     return items
 
 
-
-
-def _competencia_to_date(competencia: str | None, fallback: date | None = None) -> date | None:
-    comp = (competencia or "").strip()
-    if not comp:
-        return fallback
-    try:
-        ano, mes = comp.split("-", 1)
-        return date(int(ano), int(mes), 1)
-    except Exception:
-        return fallback
-
-
 def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], months_back: int = 0):
     restaurantes_validos = []
     wanted = set()
@@ -3472,14 +3461,11 @@ def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], months_back: i
         multa_p = _safe_float(getattr(rest, 'taxa_admin_multa_percentual', 2.0), 2.0)
         juros_p = _safe_float(getattr(rest, 'taxa_admin_juros_dia_percentual', 0.03), 0.03)
         for competencia, venc in comps:
-            data_comp = _competencia_to_date(competencia, venc)
             existente = existing.get((rest.id, competencia))
             if existente:
                 if getattr(existente, 'data_vencimento', None) != venc:
                     existente.data_vencimento = venc
-                    changed = True
-                if getattr(existente, 'data', None) != data_comp:
-                    existente.data = data_comp
+                    existente.data = venc
                     changed = True
                 if (getattr(existente, 'descricao', None) or '') != f'Taxa administrativa - {rest.nome} - {competencia}':
                     existente.descricao = f'Taxa administrativa - {rest.nome} - {competencia}'
@@ -3487,8 +3473,6 @@ def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], months_back: i
                 if abs(_safe_float(getattr(existente, 'valor_previsto', 0.0)) - valor) > 0.009:
                     existente.valor_previsto = valor
                     existente.valor_principal = valor
-                    if (getattr(existente, 'status_pagamento', '') or '').strip().lower() == 'pago':
-                        existente.valor_total = round(_safe_float(getattr(existente, 'valor_pago', 0.0)), 2)
                     changed = True
                 existente.multa_percentual = multa_p
                 existente.juros_dia_percentual = juros_p
@@ -3497,7 +3481,7 @@ def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], months_back: i
             novo = ReceitaCooperativa(
                 descricao=f'Taxa administrativa - {rest.nome} - {competencia}',
                 valor_total=0.0,
-                data=data_comp,
+                data=venc,
                 restaurante_id=rest.id,
                 auto_taxa_adm=True,
                 competencia=competencia,
@@ -3570,39 +3554,6 @@ def _build_taxa_admin_rows(receitas: list[ReceitaCooperativa]):
         'juros': round(total_juros, 2),
         'em_aberto': round(total_em_aberto, 2),
     }
-
-
-def _append_taxa_admin_encargos_recebidos(receitas: list):
-    extras = []
-    for r in list(receitas or []):
-        if not getattr(r, "auto_taxa_adm", False):
-            continue
-
-        total_encargos = round(
-            _safe_float(getattr(r, "valor_multa", 0.0)) +
-            _safe_float(getattr(r, "valor_juros", 0.0)),
-            2
-        )
-        data_pagamento = getattr(r, "data_pagamento", None)
-        status = (getattr(r, "status_pagamento", None) or "").strip().lower()
-
-        if status == "pago" and total_encargos > 0 and data_pagamento:
-            restaurante = getattr(r, "restaurante", None)
-            rest_nome = getattr(restaurante, "nome", "") if restaurante else ""
-            extras.append(SimpleNamespace(
-                id=f"taxa-encargos-{r.id}",
-                descricao=f"Juros/Multa taxa administrativa - {rest_nome} - {getattr(r, 'competencia', '')}",
-                valor_total=total_encargos,
-                valor=total_encargos,
-                data=data_pagamento,
-                auto_taxa_adm=False,
-                restaurante=restaurante,
-                competencia=getattr(r, "competencia", None),
-                status_pagamento="pago",
-            ))
-
-    receitas.extend(extras)
-    return receitas
 
 # =========================
 # Admin Dashboard
@@ -3999,11 +3950,9 @@ def admin_dashboard():
         DespesaCooperativa.data.desc(),
         DespesaCooperativa.id.desc(),
     ).all()
-    taxa_admin_rows, taxa_admin_totais = _build_taxa_admin_rows(receitas)
-    receitas = _append_taxa_admin_encargos_recebidos(list(receitas))
-    receitas.sort(key=lambda x: ((getattr(x, "data", None) or date.min), str(getattr(x, "id", 0))), reverse=True)
     total_receitas = sum(_receita_total_real(r) for r in receitas)
     total_despesas = sum((d.valor or 0.0) for d in despesas)
+    taxa_admin_rows, taxa_admin_totais = _build_taxa_admin_rows(receitas)
     juros_arrecadados_total = round(sum((r['valor_multa'] + r['valor_juros']) for r in taxa_admin_rows if r['status'] == 'pago'), 2)
     cooperados_map = {c.id: c for c in cooperados}
 
@@ -4763,8 +4712,7 @@ def admin_dashboard():
     )
 
     ajax_partial = (request.args.get("ajax_partial") or "").strip().lower()
-    is_ajax_request = request.headers.get("X-Requested-With") == "XMLHttpRequest"
-    if ajax_partial and is_ajax_request:
+    if ajax_partial:
         marker_map = {
             "resumo": "RESUMO",
             "lancamentos": "LANC",
@@ -5748,59 +5696,7 @@ def atualizar_taxa_admin_status(id):
     r = ReceitaCooperativa.query.get_or_404(id)
     if not getattr(r, 'auto_taxa_adm', False):
         flash("Registro não é taxa administrativa automática.", "warning")
-        return _admin_redirect_with_filters("receitas")
-
-    f = request.form
-    status = (f.get("status_pagamento") or "nao_pago").strip().lower()
-    if status not in ("nao_pago", "parcial", "pago"):
-        status = "nao_pago"
-
-    data_pagamento = _parse_date(f.get("data_pagamento"))
-    if status == 'pago' and not data_pagamento:
-        data_pagamento = date.today()
-
-    valor_previsto = _safe_float(
-        getattr(r, 'valor_previsto', None) or getattr(r, 'valor_principal', None) or 0.0
-    )
-    valor_pago = f.get("valor_pago", type=float)
-    if valor_pago is None:
-        valor_pago = valor_previsto if status == 'pago' else 0.0
-    valor_pago = max(0.0, _safe_float(valor_pago))
-
-    if status == 'nao_pago':
-        valor_pago = 0.0
-        data_pagamento = None
-
-    calc = _calc_taxa_admin_encargos(
-        valor_previsto,
-        getattr(r, 'data_vencimento', None) or getattr(r, 'data', None),
-        data_pagamento if status == 'pago' else None,
-        _safe_float(getattr(r, 'multa_percentual', 2.0), 2.0),
-        _safe_float(getattr(r, 'juros_dia_percentual', 0.03), 0.03)
-    )
-
-    r.status_pagamento = status
-    r.valor_previsto = valor_previsto
-    r.valor_principal = valor_previsto
-    r.valor_pago = round(valor_pago, 2)
-    r.data_pagamento = data_pagamento
-    r.data = _competencia_to_date(
-        getattr(r, 'competencia', None),
-        getattr(r, 'data_vencimento', None) or getattr(r, 'data', None)
-    )
-
-    if status == 'pago':
-        r.valor_multa = calc['valor_multa']
-        r.valor_juros = calc['valor_juros']
-        r.valor_total = round(r.valor_pago, 2)
-    else:
-        r.valor_multa = 0.0
-        r.valor_juros = 0.0
-        r.valor_total = 0.0
-
-    db.session.commit()
-    flash("Taxa administrativa atualizada.", "success")
-    return _admin_redirect_with_filters("receitas")
+        return redirect(url_for("admin_dashboard", tab="receitas"))
 
     f = request.form
     status = (f.get("status_pagamento") or "nao_pago").strip().lower()
@@ -5847,38 +5743,21 @@ def atualizar_taxa_admin_status(id):
 def atualizar_taxa_admin_lote():
     ids = request.form.getlist("ids[]") or request.form.getlist("ids")
     acao = (request.form.get("acao") or '').strip().lower()
-
     ids_int = []
     for v in ids:
         try:
             ids_int.append(int(v))
         except Exception:
             pass
-
     if not ids_int:
         flash("Selecione pelo menos uma taxa administrativa.", "warning")
-        return _admin_redirect_with_filters("receitas")
-
-    regs = ReceitaCooperativa.query.filter(
-        ReceitaCooperativa.id.in_(ids_int),
-        ReceitaCooperativa.auto_taxa_adm.is_(True)
-    ).all()
-
+        return redirect(url_for("admin_dashboard", tab="receitas"))
+    regs = ReceitaCooperativa.query.filter(ReceitaCooperativa.id.in_(ids_int), ReceitaCooperativa.auto_taxa_adm.is_(True)).all()
     hoje = date.today()
-
     for r in regs:
-        valor_previsto = _safe_float(
-            getattr(r, 'valor_previsto', None) or getattr(r, 'valor_principal', None) or 0.0
-        )
-
+        valor_previsto = _safe_float(getattr(r, 'valor_previsto', None) or getattr(r, 'valor_principal', None) or 0.0)
         if acao == 'pago':
-            calc = _calc_taxa_admin_encargos(
-                valor_previsto,
-                getattr(r, 'data_vencimento', None) or getattr(r, 'data', None),
-                hoje,
-                _safe_float(getattr(r, 'multa_percentual', 2.0), 2.0),
-                _safe_float(getattr(r, 'juros_dia_percentual', 0.03), 0.03)
-            )
+            calc = _calc_taxa_admin_encargos(valor_previsto, getattr(r, 'data_vencimento', None) or getattr(r, 'data', None), hoje, _safe_float(getattr(r, 'multa_percentual', 2.0), 2.0), _safe_float(getattr(r, 'juros_dia_percentual', 0.03), 0.03))
             r.status_pagamento = 'pago'
             r.data_pagamento = hoje
             r.valor_previsto = valor_previsto
@@ -5886,12 +5765,8 @@ def atualizar_taxa_admin_lote():
             r.valor_pago = valor_previsto
             r.valor_multa = calc['valor_multa']
             r.valor_juros = calc['valor_juros']
-            r.valor_total = round(valor_previsto, 2)
-            r.data = _competencia_to_date(
-                getattr(r, 'competencia', None),
-                getattr(r, 'data_vencimento', None) or getattr(r, 'data', None)
-            )
-
+            r.valor_total = round(valor_previsto + r.valor_multa + r.valor_juros, 2)
+            r.data = hoje
         elif acao == 'nao_pago':
             r.status_pagamento = 'nao_pago'
             r.data_pagamento = None
@@ -5901,14 +5776,10 @@ def atualizar_taxa_admin_lote():
             r.valor_multa = 0.0
             r.valor_juros = 0.0
             r.valor_total = 0.0
-            r.data = _competencia_to_date(
-                getattr(r, 'competencia', None),
-                getattr(r, 'data_vencimento', None) or getattr(r, 'data', None)
-            )
-
+            r.data = getattr(r, 'data_vencimento', None) or r.data
     db.session.commit()
     flash("Taxas administrativas atualizadas em lote.", "success")
-    return _admin_redirect_with_filters("receitas")
+    return redirect(url_for("admin_dashboard", tab="receitas"))
 
 
 @app.route("/despesas/add", methods=["POST"])
@@ -7266,7 +7137,6 @@ def _admin_redirect_with_filters(default_tab="coop_despesas"):
         args["somente_pendentes"] = "1"
     if request.args.get("fast_mode") or request.form.get("fast_mode"):
         args["fast_mode"] = "1"
-    args.pop("ajax_partial", None)
     return redirect(url_for("admin_dashboard", **args))
 
 
