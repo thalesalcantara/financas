@@ -1585,6 +1585,11 @@ def init_db():
     except Exception:
         db.session.rollback()
 
+    try:
+        _fix_taxa_admin_competencia_dates()
+    except Exception:
+        db.session.rollback()
+
 # === Bootstrap do banco no start (Render/Gunicorn) ===
 try:
     if os.environ.get("INIT_DB_ON_START", "1") == "1":
@@ -3430,15 +3435,46 @@ def _taxa_competencia_iter(data_base: date | None, months_back: int = 0):
     return items
 
 
+
 def _competencia_to_date(competencia: str | None, fallback: date | None = None) -> date | None:
-    comp = (competencia or '').strip()
+    """
+    Converte 'YYYY-MM' para uma data fixa do mês da competência.
+    Para filtros mensais, a taxa precisa permanecer no mês da competência,
+    enquanto juros/multa continuam vinculados à data_pagamento.
+    """
+    comp = (competencia or "").strip()
     if not comp:
         return fallback
     try:
-        ano, mes = comp.split('-', 1)
+        ano, mes = comp.split("-", 1)
         return date(int(ano), int(mes), 1)
     except Exception:
         return fallback
+
+
+def _fix_taxa_admin_competencia_dates():
+    """
+    Corrige registros antigos de taxa administrativa automática para manter
+    ReceitaCooperativa.data no mês da competência, nunca na data do pagamento.
+    É idempotente e leve: só atualiza linhas que realmente estiverem erradas.
+    """
+    try:
+        regs = ReceitaCooperativa.query.filter(
+            ReceitaCooperativa.auto_taxa_adm.is_(True)
+        ).all()
+        changed = False
+        for r in regs:
+            nova_data = _competencia_to_date(
+                getattr(r, 'competencia', None),
+                getattr(r, 'data_vencimento', None) or getattr(r, 'data', None)
+            )
+            if nova_data and getattr(r, 'data', None) != nova_data:
+                r.data = nova_data
+                changed = True
+        if changed:
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], months_back: int = 0):
@@ -3478,16 +3514,15 @@ def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], months_back: i
                 if getattr(existente, 'data_vencimento', None) != venc:
                     existente.data_vencimento = venc
                     changed = True
+                if getattr(existente, 'data', None) != data_competencia:
+                    existente.data = data_competencia
+                    changed = True
                 if (getattr(existente, 'descricao', None) or '') != f'Taxa administrativa - {rest.nome} - {competencia}':
                     existente.descricao = f'Taxa administrativa - {rest.nome} - {competencia}'
                     changed = True
                 if abs(_safe_float(getattr(existente, 'valor_previsto', 0.0)) - valor) > 0.009:
                     existente.valor_previsto = valor
                     existente.valor_principal = valor
-                    changed = True
-                nova_data_base = data_competencia or venc
-                if getattr(existente, 'data', None) != nova_data_base:
-                    existente.data = nova_data_base
                     changed = True
                 existente.competencia = competencia
                 existente.multa_percentual = multa_p
@@ -3497,7 +3532,7 @@ def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], months_back: i
             novo = ReceitaCooperativa(
                 descricao=f'Taxa administrativa - {rest.nome} - {competencia}',
                 valor_total=0.0,
-                data=data_competencia or venc,
+                data=data_competencia,
                 restaurante_id=rest.id,
                 auto_taxa_adm=True,
                 competencia=competencia,
@@ -5732,14 +5767,23 @@ def atualizar_taxa_admin_status(id):
         valor_pago = 0.0
         data_pagamento = None
 
-    venc_base = getattr(r, 'data_vencimento', None) or getattr(r, 'data', None)
-    calc = _calc_taxa_admin_encargos(valor_previsto, venc_base, data_pagamento if status == 'pago' else None, _safe_float(getattr(r, 'multa_percentual', 2.0), 2.0), _safe_float(getattr(r, 'juros_dia_percentual', 0.03), 0.03))
+    venc_ref = getattr(r, 'data_vencimento', None) or getattr(r, 'data', None)
+    data_competencia = _competencia_to_date(getattr(r, 'competencia', None), venc_ref)
+    calc = _calc_taxa_admin_encargos(
+        valor_previsto,
+        venc_ref,
+        data_pagamento if status == 'pago' else None,
+        _safe_float(getattr(r, 'multa_percentual', 2.0), 2.0),
+        _safe_float(getattr(r, 'juros_dia_percentual', 0.03), 0.03)
+    )
+
     r.status_pagamento = status
     r.valor_previsto = valor_previsto
     r.valor_principal = valor_previsto
     r.valor_pago = round(valor_pago, 2)
     r.data_pagamento = data_pagamento
-    r.data = _competencia_to_date(getattr(r, 'competencia', None), getattr(r, 'data_vencimento', None) or getattr(r, 'data', None))
+    r.data = data_competencia
+
     if status == 'pago':
         r.valor_multa = calc['valor_multa']
         r.valor_juros = calc['valor_juros']
@@ -5772,9 +5816,16 @@ def atualizar_taxa_admin_lote():
     hoje = date.today()
     for r in regs:
         valor_previsto = _safe_float(getattr(r, 'valor_previsto', None) or getattr(r, 'valor_principal', None) or 0.0)
-        data_competencia = _competencia_to_date(getattr(r, 'competencia', None), getattr(r, 'data_vencimento', None) or getattr(r, 'data', None))
+        venc_ref = getattr(r, 'data_vencimento', None) or getattr(r, 'data', None)
+        data_competencia = _competencia_to_date(getattr(r, 'competencia', None), venc_ref)
         if acao == 'pago':
-            calc = _calc_taxa_admin_encargos(valor_previsto, getattr(r, 'data_vencimento', None) or getattr(r, 'data', None), hoje, _safe_float(getattr(r, 'multa_percentual', 2.0), 2.0), _safe_float(getattr(r, 'juros_dia_percentual', 0.03), 0.03))
+            calc = _calc_taxa_admin_encargos(
+                valor_previsto,
+                venc_ref,
+                hoje,
+                _safe_float(getattr(r, 'multa_percentual', 2.0), 2.0),
+                _safe_float(getattr(r, 'juros_dia_percentual', 0.03), 0.03)
+            )
             r.status_pagamento = 'pago'
             r.data_pagamento = hoje
             r.valor_previsto = valor_previsto
