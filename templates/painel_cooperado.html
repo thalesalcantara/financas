@@ -224,21 +224,7 @@
     .rating-stars .bi-star{color:#cbd5e1}
 
     .soft-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
-    .title-muted{font-size:.76rem;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.08em}
-
-    .calc-wrap{background:#0f172a;border-radius:24px;overflow:hidden;box-shadow:0 14px 34px rgba(15,23,42,.34)}
-    .calc-status{color:#94a3b8;text-align:right;padding:10px 16px;font-size:.9rem;min-height:24px}
-    .calc-display{color:#fff;text-align:right;font-weight:300;padding:0 16px 18px 16px;font-size:2.3rem;min-height:64px}
-    .calc-keys{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px}
-    .calc-btn{border:0;border-radius:32px;padding:16px 0;font-size:1.25rem;font-weight:700}
-    .k-gray{background:#cbd5e1;color:#0f172a}.k-dark{background:#1e293b;color:#fff}.k-orange{background:var(--royal-2);color:#fff}.k-zero{grid-column:span 2;text-align:left;padding-left:24px}
-
-    .notes-wrap{display:flex;gap:.6rem;height:60vh;min-height:420px}
-    .notes-list{width:38%;max-width:260px;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:auto}
-    .notes-editor{flex:1;background:#fff;border:1px solid var(--line);border-radius:16px;display:flex;flex-direction:column;overflow:hidden}
-    .notes-toolbar{display:flex;gap:.4rem;flex-wrap:wrap;padding:.6rem;border-bottom:1px solid var(--line);background:#f8faff;align-items:center}
-    .note-card{padding:.55rem .65rem;border-bottom:1px solid rgba(15,23,42,.06)}
-    .note-card.active{background:#eef3ff}
+    .title-muted{font-size:.76rem;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.08em}.k-dark{background:#1e293b;color:#fff}.k-orange{background:var(--royal-2);color:#fff}.k-zero{grid-column:span 2;text-align:left;padding-left:24px}
 
     .offcanvas{border-top-left-radius:22px;border-top-right-radius:22px}
 
@@ -257,9 +243,6 @@
     }
 
     @media (max-width:575px){
-      .notes-wrap{flex-direction:column;height:auto;min-height:0}
-      .notes-list{width:100%;max-width:none;height:180px}
-      .notes-editor{height:calc(60vh - 190px)}
     }
 
     @media print{
@@ -328,10 +311,6 @@
     <a href="{{ url_for('documentos_publicos') }}" class="menu-link"><i class="bi bi-folder2-open"></i><span>Documentos</span></a>
     <a href="{{ url_for('tabelas_publicas') }}" class="menu-link"><i class="bi bi-table"></i><span>Tabelas</span></a>
     <a href="{{ url_for('portal_cooperado_avisos') }}" class="menu-link"><i class="bi bi-megaphone"></i><span>Avisos</span>{% if unread>0 %}<span class="badge rounded-pill bg-danger ms-auto">{{ unread }}</span>{% endif %}</a>
-    <button class="menu-link" type="button" data-bs-toggle="modal" data-bs-target="#calcModal"><i class="bi bi-calculator"></i><span>Calculadora</span></button>
-    <button class="menu-link" type="button" data-bs-toggle="offcanvas" data-bs-target="#financasSheet"><i class="bi bi-wallet2"></i><span>Finanças pessoais</span></button>
-    <button class="menu-link" type="button" data-bs-toggle="modal" data-bs-target="#cxbModal"><i class="bi bi-cash-coin"></i><span>Custo x benefício</span></button>
-    <button class="menu-link" type="button" data-bs-toggle="modal" data-bs-target="#notesModal"><i class="bi bi-sticky"></i><span>Bloco de notas</span></button>
   </div>
 </div>
 <div id="fundoMenu" class="menu-backdrop" aria-hidden="true"></div>
@@ -1145,230 +1124,6 @@
   </div>
 </div>
 
-<div class="modal fade modal-narrow" id="calcModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content p-2" style="border:0;background:transparent">
-      <div class="calc-wrap">
-        <div class="calc-status" id="calcStatus">&nbsp;</div>
-        <div class="calc-display" id="calcDisplay">0</div>
-        <div class="calc-keys">
-          <button class="calc-btn k-gray" data-act="ac">AC</button>
-          <button class="calc-btn k-gray" data-act="back"><i class="bi bi-backspace"></i></button>
-          <button class="calc-btn k-gray" data-act="percent">%</button>
-          <button class="calc-btn k-orange" data-op="divide">÷</button>
-          <button class="calc-btn k-dark" data-num="7">7</button>
-          <button class="calc-btn k-dark" data-num="8">8</button>
-          <button class="calc-btn k-dark" data-num="9">9</button>
-          <button class="calc-btn k-orange" data-op="multiply">×</button>
-          <button class="calc-btn k-dark" data-num="4">4</button>
-          <button class="calc-btn k-dark" data-num="5">5</button>
-          <button class="calc-btn k-dark" data-num="6">6</button>
-          <button class="calc-btn k-orange" data-op="minus">−</button>
-          <button class="calc-btn k-dark" data-num="1">1</button>
-          <button class="calc-btn k-dark" data-num="2">2</button>
-          <button class="calc-btn k-dark" data-num="3">3</button>
-          <button class="calc-btn k-orange" data-op="plus">+</button>
-          <button class="calc-btn k-dark k-zero" data-num="0">0</button>
-          <button class="calc-btn k-dark" data-dot=".">.</button>
-          <button class="calc-btn k-orange" data-act="equal">=</button>
-        </div>
-      </div>
-      <div class="soft-card mt-2 p-2">
-        <div class="d-flex justify-content-between">
-          <div class="title-muted">Histórico</div>
-          <button class="btn btn-sm btn-outline-danger" id="calcTapeClear"><i class="bi bi-trash"></i> Limpar</button>
-        </div>
-        <div id="calcTape" class="calc-tape mt-2"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="cxbModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content soft-card p-2">
-      <div class="modal-header border-0">
-        <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal"><i class="bi bi-arrow-left"></i> Voltar</button>
-        <h5 class="modal-title ms-2"><i class="bi bi-cash-coin"></i> Custo x Benefício</h5>
-        <button class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-      </div>
-      <div class="card p-3 mb-2">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <h6 class="mb-0">Calculadora</h6>
-          <div class="d-flex gap-1">
-            <button class="btn btn-sm btn-outline-secondary" id="cxExportCSV"><i class="bi bi-filetype-csv"></i> CSV</button>
-            <button class="btn btn-sm btn-outline-secondary" id="cxShareSum"><i class="bi bi-share"></i> Compartilhar</button>
-          </div>
-        </div>
-        <div class="row g-2">
-          <div class="col-6"><label class="form-label">Preço gasolina (R$/L)</label><input type="number" step="0.01" min="0" id="cxPreco" class="form-control" placeholder="5,99"></div>
-          <div class="col-6"><label class="form-label">Consumo (km/L)</label><input type="number" step="0.1" min="0" id="cxKmPorLitro" class="form-control" placeholder="35"></div>
-          <div class="col-6"><label class="form-label">Km rodados</label><input type="number" step="0.1" min="0" id="cxKmFeitos" class="form-control" placeholder="120"></div>
-          <div class="col-6"><label class="form-label">Quanto ganhou (R$)</label><input type="number" step="0.01" min="0" id="cxGanho" class="form-control" placeholder="180,00"></div>
-        </div>
-        <hr class="my-2">
-        <div class="row g-2">
-          <div class="col-6"><div class="small muted">Custo com combustível</div><div class="section-chip mono" id="cxCusto">R$ 0,00</div></div>
-          <div class="col-6"><div class="small muted">Custo por km</div><div class="section-chip mono" id="cxCustoKm">R$ 0,00/km</div></div>
-          <div class="col-6"><div class="small muted">Lucro</div><div class="section-chip mono" id="cxLucro">R$ 0,00</div></div>
-          <div class="col-6"><div class="small muted">Lucro por km</div><div class="section-chip mono" id="cxLucroKm">R$ 0,00/km</div></div>
-          <div class="col-12"><div class="small muted">Margem</div><div class="section-chip mono" id="cxMargem">0%</div></div>
-        </div>
-        <div class="d-grid mt-3"><button class="btn btn-royal" id="cxSalvar"><i class="bi bi-save"></i> Salvar resultado</button></div>
-      </div>
-      <div class="card p-3">
-        <div class="d-flex align-items-center justify-content-between">
-          <h6 class="mb-0"><i class="bi bi-clock-history"></i> Histórico</h6>
-          <button class="btn btn-sm btn-outline-danger" id="cxLimpar"><i class="bi bi-trash"></i> Limpar</button>
-        </div>
-        <div id="cxHistorico" class="mt-2"></div>
-        <hr class="my-2">
-        <div class="row g-2">
-          <div class="col-6"><div class="small muted">Total km</div><div class="section-chip mono" id="cxTotKm">0</div></div>
-          <div class="col-6"><div class="small muted">Total ganho</div><div class="section-chip mono" id="cxTotGanho">R$ 0,00</div></div>
-          <div class="col-6"><div class="small muted">Total custo</div><div class="section-chip mono" id="cxTotCusto">R$ 0,00</div></div>
-          <div class="col-6"><div class="small muted">Total lucro</div><div class="section-chip mono" id="cxTotLucro">R$ 0,00</div></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="notesModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
-    <div class="modal-content soft-card p-2">
-      <div class="modal-header border-0">
-        <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal"><i class="bi bi-arrow-left"></i> Voltar</button>
-        <h5 class="modal-title ms-2">Bloco de Notas</h5>
-        <button class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-      </div>
-      <div class="notes-wrap">
-        <div class="notes-list" id="notesList"></div>
-        <div class="notes-editor">
-          <div class="notes-toolbar">
-            <button class="btn btn-sm btn-outline-primary" id="ntNew"><i class="bi bi-file-earmark-plus"></i> Nova</button>
-            <button class="btn btn-sm btn-outline-secondary" id="ntDuplicate"><i class="bi bi-files"></i></button>
-            <button class="btn btn-sm btn-outline-warning" id="ntPin"><i class="bi bi-pin-angle"></i></button>
-            <button class="btn btn-sm btn-outline-danger" id="ntDelete"><i class="bi bi-trash"></i></button>
-            <span class="vr"></span>
-            <button class="btn btn-sm btn-outline-secondary" data-cmd="bold"><i class="bi bi-type-bold"></i></button>
-            <button class="btn btn-sm btn-outline-secondary" data-cmd="italic"><i class="bi bi-type-italic"></i></button>
-            <button class="btn btn-sm btn-outline-secondary" data-cmd="underline"><i class="bi bi-type-underline"></i></button>
-            <button class="btn btn-sm btn-outline-secondary" id="ntH1"><i class="bi bi-type-h1"></i></button>
-            <button class="btn btn-sm btn-outline-secondary" id="ntBullets"><i class="bi bi-list-ul"></i></button>
-            <button class="btn btn-sm btn-outline-secondary" id="ntChecklist"><i class="bi bi-square-check"></i></button>
-            <span class="vr"></span>
-            <button class="btn btn-sm btn-outline-secondary" id="ntShare"><i class="bi bi-share"></i></button>
-            <button class="btn btn-sm btn-outline-secondary" id="ntExport"><i class="bi bi-download"></i></button>
-            <label class="btn btn-sm btn-outline-secondary mb-0"><i class="bi bi-upload"></i><input type="file" id="ntImport" accept="application/json" hidden></label>
-            <button class="btn btn-sm btn-outline-secondary" id="ntPrint"><i class="bi bi-printer"></i></button>
-          </div>
-          <input class="form-control border-0 border-bottom rounded-0 fw-bold" id="ntTitle" placeholder="Título">
-          <div class="notes-content" id="ntContent" contenteditable="true" spellcheck="true" style="flex:1;padding:.8rem"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="offcanvas offcanvas-bottom" tabindex="-1" id="financasSheet" aria-labelledby="financasSheetLabel" style="height:92vh">
-  <div class="offcanvas-header">
-    <button class="btn btn-link text-muted me-2" data-bs-dismiss="offcanvas"><i class="bi bi-arrow-left"></i> Voltar</button>
-    <h5 class="offcanvas-title" id="financasSheetLabel"><i class="bi bi-wallet2 me-1"></i> Finanças pessoais</h5>
-    <div class="d-flex gap-2">
-      <button class="btn btn-sm btn-outline-secondary" id="finExport"><i class="bi bi-filetype-csv"></i> CSV</button>
-      <button class="btn btn-sm btn-outline-secondary" id="finDicasBtn"><i class="bi bi-lightbulb"></i> Dicas</button>
-      <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="offcanvas"><i class="bi bi-x-lg"></i></button>
-    </div>
-  </div>
-  <div class="offcanvas-body" style="background:#f7f9fc;overflow:auto">
-    <div class="container">
-      <section class="soft-card p-3 mb-3">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-          <div>
-            <div class="title-muted mb-1">Mês de referência</div>
-            <input type="month" id="finMes" class="form-control form-control-sm" style="width:160px">
-          </div>
-          <div class="text-end"><div class="small muted">Receitas</div><div class="fw-bold mono" id="finRecSum">R$ 0,00</div></div>
-          <div class="text-end"><div class="small muted">Despesas</div><div class="fw-bold mono" id="finDespSum">R$ 0,00</div></div>
-          <div class="text-end"><div class="small muted">Saldo</div><div class="fw-bold mono" id="finSaldo">R$ 0,00</div></div>
-        </div>
-        <hr class="my-3">
-        <div class="row g-2 align-items-end">
-          <div class="col-6"><label class="form-label mb-1">Meta (valor)</label><input type="number" min="0" step="0.01" id="finMetaValor" class="form-control" placeholder="500,00"></div>
-          <div class="col-6"><label class="form-label mb-1">Meta (% do ganho)</label><div class="input-group"><input type="number" min="0" step="1" id="finMetaPct" class="form-control" placeholder="10"><span class="input-group-text">%</span></div></div>
-          <div class="col-12">
-            <div class="small text-muted">Alvo do mês: <b id="finMetaAlvo">R$ 0,00</b> · Guardado: <b id="finGuardado">R$ 0,00</b></div>
-            <div class="progress mt-1" style="height:10px"><div id="finMetaProg" class="progress-bar" style="width:0%"></div></div>
-          </div>
-        </div>
-      </section>
-      <section class="soft-card p-3 mb-3">
-        <h6 class="mb-2">Novo lançamento</h6>
-        <div class="row g-2">
-          <div class="col-6"><label class="form-label mb-1">Tipo</label><select id="finTipo" class="form-select"><option value="receita">Receita</option><option value="despesa" selected>Despesa</option><option value="poupanca">Guardar (poupança)</option></select></div>
-          <div class="col-6"><label class="form-label mb-1">Data</label><input type="date" id="finData" class="form-control"></div>
-          <div class="col-7"><label class="form-label mb-1">Categoria</label><input type="text" id="finCat" class="form-control" placeholder="Combustível, Alimentação..."></div>
-          <div class="col-5"><label class="form-label mb-1">Valor</label><input type="number" step="0.01" min="0" id="finValor" class="form-control" placeholder="0,00"></div>
-          <div class="col-12"><label class="form-label mb-1">Descrição (opcional)</label><input type="text" id="finDesc" class="form-control" placeholder="Observações"></div>
-          <div class="col-12"><div class="form-check form-switch mt-2"><input class="form-check-input" type="checkbox" id="finParcSw"><label class="form-check-label" for="finParcSw">Parcelar</label></div></div>
-          <div class="col-12" id="finParcWrap" style="display:none">
-            <div class="soft-card p-2">
-              <div class="row g-2">
-                <div class="col-12">
-                  <label class="form-label mb-1">Modo do parcelamento</label>
-                  <div class="d-grid gap-2">
-                    <div class="form-check"><input class="form-check-input" type="radio" name="finParcModo" id="finParcModoValor" value="valor" checked><label class="form-check-label" for="finParcModoValor">Informar <b>valor da parcela</b> e repetir por N meses</label></div>
-                    <div class="form-check"><input class="form-check-input" type="radio" name="finParcModo" id="finParcModoTotal" value="total"><label class="form-check-label" for="finParcModoTotal">Informar <b>valor total</b> e dividir em N parcelas iguais</label></div>
-                  </div>
-                </div>
-                <div class="col-4"><label class="form-label mb-1">Nº parcelas</label><input type="number" id="finParcN" class="form-control" min="2" max="120" value="10"></div>
-                <div class="col-8"><label class="form-label mb-1">Início</label><input type="month" id="finParcIni" class="form-control"></div>
-                <div class="col-12"><div class="small text-muted" id="finParcPreview">—</div></div>
-              </div>
-            </div>
-          </div>
-          <div class="col-12 d-grid mt-2"><button class="btn btn-royal" id="finAdd"><i class="bi bi-plus-circle"></i> Salvar lançamento</button></div>
-        </div>
-      </section>
-      <section class="soft-card p-3 mb-3">
-        <div class="d-flex align-items-center justify-content-between">
-          <h6 class="mb-2">Lançamentos do mês</h6>
-          <button class="btn btn-sm btn-outline-danger" id="finClearMes"><i class="bi bi-trash"></i> Limpar mês</button>
-        </div>
-        <div id="finLista"></div>
-      </section>
-      <section class="soft-card p-3">
-        <h6 class="mb-2">Onde você gasta mais</h6>
-        <div id="finTopCats" class="small"></div>
-      </section>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="finDicasModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-narrow">
-    <div class="modal-content soft-card p-2">
-      <div class="modal-header border-0">
-        <h6 class="m-0"><i class="bi bi-lightbulb me-1"></i> Dicas de economia</h6>
-        <button class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <ul class="m-0 ps-3">
-          <li>Cancele o que quase não usa.</li>
-          <li>Calibre pneus e economize combustível.</li>
-          <li>Separe automaticamente um valor por mês.</li>
-          <li>Use a regra das 24h antes de comprar.</li>
-          <li>Renegocie serviços e planos antigos.</li>
-        </ul>
-      </div>
-      <div class="modal-footer border-0">
-        <button class="btn btn-royal" data-bs-dismiss="modal">Ok</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1080;">
   <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false" data-unread-endpoint="/avisos/unread_count">
     <div class="toast-header">
@@ -1410,7 +1165,6 @@ const MY_ESCALA   = {{ minha_escala_json | default([]) | tojson }};
   const buttons=[...document.querySelectorAll('.tab-btn')];
   const panes=[...document.querySelectorAll('.tab-pane-custom')];
   const activeInput=document.getElementById('activeTabInput');
-  const panel=document.getElementById('painelTabsContent');
   const params=new URLSearchParams(window.location.search);
   const valid=['resumo','producoes','ajustes','escalas','trocas','farmacia'];
   let current=params.get('active_tab') || localStorage.getItem('coopex_active_tab') || (activeInput?.value || 'resumo');
@@ -1430,43 +1184,6 @@ const MY_ESCALA   = {{ minha_escala_json | default([]) | tojson }};
   }
 
   buttons.forEach(btn=>btn.addEventListener('click', ()=>showTab(btn.dataset.tab)));
-
-  let startX=0;
-  let startY=0;
-  let tracking=false;
-
-  panel?.addEventListener('touchstart', (e)=>{
-    if (!e.changedTouches || !e.changedTouches.length) return;
-    const t=e.changedTouches[0];
-    startX=t.clientX;
-    startY=t.clientY;
-    tracking=true;
-  }, {passive:true});
-
-  panel?.addEventListener('touchend', (e)=>{
-    if (!tracking || !e.changedTouches || !e.changedTouches.length) return;
-    tracking=false;
-
-    const target=e.target;
-    if (target && target.closest('input, textarea, select, button, a, .modal, .offcanvas, [contenteditable="true"]')) return;
-
-    const t=e.changedTouches[0];
-    const dx=t.clientX-startX;
-    const dy=t.clientY-startY;
-
-    if (Math.abs(dx) < 60) return;
-    if (Math.abs(dx) <= Math.abs(dy)) return;
-
-    const idx=valid.indexOf(current);
-    if (idx === -1) return;
-
-    if (dx < 0 && idx < valid.length-1){
-      showTab(valid[idx+1]);
-    } else if (dx > 0 && idx > 0){
-      showTab(valid[idx-1]);
-    }
-  }, {passive:true});
-
   showTab(current, false);
 })();
 </script>
@@ -1622,87 +1339,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
-<script>
-(function(){
-  const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
-  const LS_KEY = `COOPEX_FIN_${UID}`;
-  const el = id => document.getElementById(id);
-  const monthFmt = (d)=> d.toISOString().slice(0,7);
-  const money = n => 'R$ ' + (Number(n)||0).toFixed(2).replace('.',',');
-  const parseNum = v => { const n=parseFloat(String(v).replace(',', '.')); return Number.isFinite(n)?n:0; };
-  const mesEl = el('finMes'), recSumEl = el('finRecSum'), despSumEl = el('finDespSum'), saldoEl = el('finSaldo');
-  const metaValorEl = el('finMetaValor'), metaPctEl = el('finMetaPct'), metaAlvoEl = el('finMetaAlvo'), guardadoEl = el('finGuardado'), metaProgEl = el('finMetaProg');
-  const tipoEl = el('finTipo'), dataEl = el('finData'), catEl = el('finCat'), valEl = el('finValor'), descEl = el('finDesc');
-  const parcSw = el('finParcSw'), parcWrap = el('finParcWrap'), parcIniEl = el('finParcIni'), parcNEl = el('finParcN'), parcPrevEl = el('finParcPreview');
-  const btnAdd = el('finAdd'), listaEl = el('finLista'), topCatsEl = el('finTopCats');
-  const btnClearMes = el('finClearMes'), btnExport = el('finExport'), btnDicas = el('finDicasBtn');
-  let items = load(); let currentMonth = monthFmt(new Date());
-  function load(){ try{ const raw=localStorage.getItem(LS_KEY); const arr=raw?JSON.parse(raw):[]; return Array.isArray(arr)?arr:[]; }catch(_){ return []; } }
-  function save(){ localStorage.setItem(LS_KEY, JSON.stringify(items)); }
-  function nextMonth(ym, plus=1){ const [y,m]=ym.split('-').map(x=>parseInt(x,10)); const dt=new Date(y, m-1+plus, 1); return dt.toISOString().slice(0,7); }
-  function endOfMonth(ym){ const [y,m]=ym.split('-').map(x=>parseInt(x,10)); return new Date(y, m, 0).getDate(); }
-  function toDateStr(ym, day=1){ const [y,m]=ym.split('-').map(x=>parseInt(x,10)); const d=Math.min(day, endOfMonth(ym)); return new Date(y, m-1, d).toISOString().slice(0,10); }
-  function uid(){ return Math.random().toString(36).slice(2)+Date.now().toString(36); }
-  mesEl.value=currentMonth; dataEl.value=new Date().toISOString().slice(0,10); parcIniEl.value=currentMonth;
-  function renderParcPreview(){ const n=Math.max(2, parseInt(parcNEl.value||'10',10)); const modo=document.querySelector('input[name="finParcModo"]:checked')?.value || 'valor'; const baseVal=parseNum(valEl.value); const start=parcIniEl.value || currentMonth; if (modo==='valor') parcPrevEl.textContent=`Serão ${n} parcelas de ${money(baseVal)} de ${start} até ${nextMonth(start, n-1)}.`; else parcPrevEl.textContent=`Valor total ${money(baseVal)} dividido em ${n} parcelas iguais — primeira em ${start}, última em ${nextMonth(start, n-1)}.`; }
-  parcSw?.addEventListener('change', ()=>{ parcWrap.style.display=parcSw.checked? '' : 'none'; renderParcPreview(); });
-  ['input','change'].forEach(ev=>{ parcNEl?.addEventListener(ev, renderParcPreview); parcIniEl?.addEventListener(ev, renderParcPreview); valEl?.addEventListener(ev, renderParcPreview); document.querySelectorAll('input[name="finParcModo"]').forEach(r=> r.addEventListener(ev, renderParcPreview)); });
-  function addItem(obj){ items.push(obj); save(); refresh(); }
-  function removeItem(id){ items=items.filter(x=>x.id!==id); save(); refresh(); }
-  btnAdd?.addEventListener('click', ()=>{ const tipo=String(tipoEl.value||'despesa'); const data=String(dataEl.value||new Date().toISOString().slice(0,10)); const cat=(catEl.value||'Geral').trim(); const val=parseNum(valEl.value); const desc=(descEl.value||'').trim(); if (!val || val<=0){ alert('Informe um valor válido.'); return; } if (!parcSw.checked){ addItem({id:uid(), tipo, data, cat, val, desc, origem:'manual'}); clearForm(); return; } const n=Math.max(2, parseInt(parcNEl.value||'10',10)); const modo=document.querySelector('input[name="finParcModo"]:checked')?.value || 'valor'; const startMonth=parcIniEl.value || currentMonth; const day=parseInt(data.slice(-2),10) || 1; if (modo==='valor'){ const parcela=val; for (let i=0;i<n;i++){ const ym=nextMonth(startMonth,i); addItem({id:uid(), tipo, data:toDateStr(ym,day), cat, val:parcela, desc:`${desc} (parc ${i+1}/${n})`, origem:'parc_valor'}); } } else { const total=val; const base=Math.floor((total/n)*100)/100; const resto=+(total - base*n).toFixed(2); for (let i=0;i<n;i++){ const ym=nextMonth(startMonth,i); const parcVal=+(base + (i===n-1? resto:0)).toFixed(2); addItem({id:uid(), tipo, data:toDateStr(ym,day), cat, val:parcVal, desc:`${desc} (parc ${i+1}/${n})`, origem:'parc_total'}); } } clearForm(); });
-  function clearForm(){ valEl.value=''; descEl.value=''; parcSw.checked=false; parcWrap.style.display='none'; renderParcPreview(); }
-  mesEl?.addEventListener('change', ()=>{ currentMonth=mesEl.value || currentMonth; refresh(); });
-  btnClearMes?.addEventListener('click', ()=>{ if (!confirm('Remover todos os lançamentos deste mês?')) return; const prefix=currentMonth+'-'; items=items.filter(x=> !String(x.data||'').startsWith(prefix)); save(); refresh(); });
-  btnExport?.addEventListener('click', ()=>{ const header=['id','tipo','data','categoria','valor','descricao','origem']; const rows=items.map(x=>[x.id,x.tipo,x.data,(x.cat||''),(Number(x.val)||0).toFixed(2).replace('.',','),(x.desc||'').replace(/[\r\n]+/g,' '),x.origem||'']); const csv=[header.join(';'),...rows.map(r=>r.join(';'))].join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='financas_coopex.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); });
-  btnDicas?.addEventListener('click', ()=> new bootstrap.Modal(document.getElementById('finDicasModal')).show());
-  function refresh(){ const prefix=currentMonth+'-'; const mesItems=items.filter(x=> String(x.data||'').startsWith(prefix)).sort((a,b)=> a.data.localeCompare(b.data)); const sum=(arr,pred)=> arr.filter(pred).reduce((s,x)=> s + Number(x.val||0), 0); const rec=sum(mesItems,x=>x.tipo==='receita'); const desp=sum(mesItems,x=>x.tipo==='despesa'); const guardado=sum(mesItems,x=>x.tipo==='poupanca'); const saldo=rec - desp - guardado; recSumEl.textContent=money(rec); despSumEl.textContent=money(desp); saldoEl.textContent=money(saldo); const alvoByValor=parseNum(metaValorEl.value); const pct=Math.max(0, parseNum(metaPctEl.value)); const alvoByPct=rec*(pct/100); const alvo=Math.max(alvoByValor, alvoByPct); metaAlvoEl.textContent=money(alvo); guardadoEl.textContent=money(guardado); const prog=alvo>0 ? Math.min(100, Math.round((guardado/alvo)*100)) : 0; metaProgEl.style.width=prog+'%'; renderList(mesItems); const byCat={}; mesItems.filter(x=>x.tipo==='despesa').forEach(x=>{ const c=(x.cat||'Geral').trim()||'Geral'; byCat[c]=(byCat[c]||0)+Number(x.val||0); }); const totalDesp=Object.values(byCat).reduce((a,b)=>a+b,0); const top=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,6); if (!top.length){ topCatsEl.innerHTML='<div class="text-muted">Sem despesas neste mês.</div>'; } else { topCatsEl.innerHTML=top.map(([c,v])=>{ const p=totalDesp>0? Math.round((v/totalDesp)*100):0; return `<div class="mb-1"><div class="d-flex justify-content-between"><div>${c}</div><div class="mono">${money(v)} · ${p}%</div></div><div class="progress" style="height:8px"><div class="progress-bar" style="width:${p}%"></div></div></div>`; }).join(''); } }
-  function renderList(arr){ if (!arr.length){ listaEl.innerHTML='<div class="text-muted">Sem lançamentos neste mês.</div>'; return; } const groups={}; arr.forEach(x=>{ const d=x.data; (groups[d] ||= []).push(x); }); const days=Object.keys(groups).sort(); listaEl.innerHTML=''; days.forEach(d=>{ const items=groups[d]; const sumDia=items.reduce((s,x)=> s + (x.tipo==='receita'? x.val : -x.val), 0); const dayCard=document.createElement('div'); dayCard.className='border rounded p-2 mb-2'; dayCard.innerHTML=`<div class="d-flex justify-content-between align-items-center mb-1"><div class="fw-semibold">${d.split('-').reverse().join('/')}</div><div class="mono ${sumDia>=0?'text-success':'text-danger'}">${money(sumDia)}</div></div><div></div>`; const body=dayCard.children[1]; items.forEach(it=>{ const cls= it.tipo==='receita' ? 'text-success' : (it.tipo==='despesa' ? 'text-danger' : 'text-primary'); const sinal=it.tipo==='receita'? '+' : '−'; const row=document.createElement('div'); row.className='d-flex align-items-center justify-content-between py-1 border-bottom'; row.innerHTML=`<div class="me-2" style="min-width:0"><div class="fw-semibold" style="word-break:break-word;overflow-wrap:anywhere">${(it.cat||'Geral')}</div><div class="small text-muted">${(it.desc||'')}</div></div><div class="text-end"><div class="mono ${cls}">${sinal} ${money(it.val)}</div><button class="btn btn-sm btn-outline-danger mt-1"><i class="bi bi-trash"></i></button></div>`; row.querySelector('button').addEventListener('click', ()=> removeItem(it.id)); body.appendChild(row); }); listaEl.appendChild(dayCard); }); }
-  [metaValorEl, metaPctEl].forEach(inp => inp?.addEventListener('input', refresh)); refresh();
-})();
-</script>
-<script>
-(function(){
-  const UID = Number('{{ cooperado.id if cooperado and cooperado.id else 0 }}') || 0;
-  const LS_KEY = `COOPEX_CXB_${UID}`;
-  const el = id => document.getElementById(id);
-  const preco = el('cxPreco'), kpl = el('cxKmPorLitro'), km = el('cxKmFeitos'), ganho = el('cxGanho');
-  const outCusto = el('cxCusto'), outCustoKm = el('cxCustoKm'), outLucro = el('cxLucro'), outLucroKm = el('cxLucroKm'), outMargem = el('cxMargem');
-  const btnSalvar = el('cxSalvar'), btnLimpar = el('cxLimpar'), divHist = el('cxHistorico');
-  const totKm = el('cxTotKm'), totGanho = el('cxTotGanho'), totCusto = el('cxTotCusto'), totLucro = el('cxTotLucro');
-  const btnCSV = el('cxExportCSV'), btnShare = el('cxShareSum');
-  function parseNum(v){ const n=parseFloat(String(v).replace(',','.')); return Number.isFinite(n) ? n : 0; }
-  function fmtMoney(n){ return 'R$ ' + (Number(n)||0).toFixed(2).replace('.',','); }
-  function fmtKm(n){ return String(Number(n)||0); }
-  function calc(){ const p=parseNum(preco.value), c=parseNum(kpl.value), k=parseNum(km.value), g=parseNum(ganho.value); const litros = c>0 ? (k / c) : 0, custo = p * litros, custoKm = k>0 ? (custo / k) : 0; const lucro = g - custo, lucroKm = k>0 ? (lucro / k) : 0, margem = g>0 ? (lucro / g) * 100 : 0; outCusto.textContent=fmtMoney(custo); outCustoKm.textContent=fmtMoney(custoKm)+'/km'; outLucro.textContent=fmtMoney(lucro); outLucroKm.textContent=fmtMoney(lucroKm)+'/km'; outMargem.textContent=`${margem.toFixed(1).replace('.',',')}%`; return {p,c,k,g,litros,custo,custoKm,lucro,lucroKm,margem}; }
-  [preco,kpl,km,ganho].forEach(i=> i?.addEventListener('input', calc));
-  function loadHist(){ try{ const raw=localStorage.getItem(LS_KEY); const arr=raw ? JSON.parse(raw) : []; return Array.isArray(arr)?arr:[]; }catch(_){ return []; } }
-  function saveHist(arr){ localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
-  function setTotals(arr){ const sum=(a,f)=>a.reduce((s,x)=>s+Number(x[f]||0),0); totKm.textContent=fmtKm(sum(arr,'k')); totGanho.textContent=fmtMoney(sum(arr,'g')); totCusto.textContent=fmtMoney(sum(arr,'custo')); totLucro.textContent=fmtMoney(sum(arr,'lucro')); }
-  function renderHist(){ const arr=loadHist(); if (!arr.length){ divHist.innerHTML='<div class="text-muted">Sem registros salvos.</div>'; setTotals(arr); return; } divHist.innerHTML=''; arr.slice().reverse().forEach((it,idxRev)=>{ const idx=arr.length-1-idxRev; const card=document.createElement('div'); card.className='border rounded p-2 mb-2'; card.innerHTML=`<div class="d-flex justify-content-between align-items-center"><div><div class="fw-semibold">${new Date(it.ts).toLocaleString()}</div><div class="small text-muted">Gas: ${fmtMoney(it.p)} · Consumo: ${it.c} km/L · Km: ${it.k} · Ganhou: ${fmtMoney(it.g)}</div></div><div class="text-end"><div><span class="badge text-bg-light">Lucro</span> <b class="mono">${fmtMoney(it.lucro)}</b></div><div class="small text-muted">Custo: ${fmtMoney(it.custo)} · Margem: ${it.margem.toFixed(1).replace('.',',')}%</div><div class="mt-1"><button class="btn btn-sm btn-outline-secondary me-1" data-act="fill"><i class="bi bi-box-arrow-in-down-left"></i></button><button class="btn btn-sm btn-outline-danger" data-act="del"><i class="bi bi-trash"></i></button></div></div></div>`; card.addEventListener('click',(e)=>{ const act=e.target.closest('button')?.getAttribute('data-act'); if (act==='fill'){ preco.value=it.p;kpl.value=it.c;km.value=it.k;ganho.value=it.g; calc(); } else if (act==='del'){ const arr2=loadHist(); arr2.splice(idx,1); saveHist(arr2); renderHist(); } }); divHist.appendChild(card); }); setTotals(arr); }
-  btnSalvar?.addEventListener('click', ()=>{ const r=calc(); const item={ ts:Date.now(), p:r.p, c:r.c, k:r.k, g:r.g, litros:r.litros, custo:r.custo, custoKm:r.custoKm, lucro:r.lucro, lucroKm:r.lucroKm, margem:r.margem }; const arr=loadHist(); arr.push(item); saveHist(arr); renderHist(); });
-  btnLimpar?.addEventListener('click', ()=>{ if (confirm('Limpar todo o histórico?')){ saveHist([]); renderHist(); } });
-  btnCSV?.addEventListener('click', ()=>{ const arr=loadHist(); const header=['data','preco','consumo_km_l','km','ganho','litros','custo','custo_km','lucro','lucro_km','margem_%']; const rows=arr.map(x=>[new Date(x.ts).toISOString(), x.p, x.c, x.k, x.g, x.litros, x.custo, x.custoKm, x.lucro, x.lucroKm, x.margem]); const csv=[header.join(','), ...rows.map(r=>r.join(','))].join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='custo_beneficio.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); });
-  btnShare?.addEventListener('click', ()=>{ const arr=loadHist(); if (!navigator.share){ alert('Compartilhamento nativo não suportado.'); return; } const total=arr.reduce((acc,x)=>({km:acc.km+(x.k||0), ganho:acc.ganho+(x.g||0), lucro:acc.lucro+(x.lucro||0)}), {km:0,ganho:0,lucro:0}); navigator.share({ title:'Resumo CxB', text:`Km: ${total.km} | Ganhou: R$ ${total.ganho.toFixed(2)} | Lucro: R$ ${total.lucro.toFixed(2)}` }).catch(()=>{}); });
-  calc(); renderHist();
-})();
-</script>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  const disp=document.getElementById('calcDisplay'); const statusEl=document.getElementById('calcStatus'); const tapeEl=document.getElementById('calcTape'); const tapeClear=document.getElementById('calcTapeClear'); const keys=document.querySelectorAll('#calcModal .calc-btn');
-  let a=null,b=null,op=null,entering='a',justEvaluated=false;
-  const sym=o=>o==='divide'?'÷':o==='multiply'?'×':o==='minus'?'−':'+';
-  const setDisplay=t=> disp.textContent=(t ?? '0');
-  function appendDigit(d){ const target=entering==='a'?'a':'b'; let cur=((target==='a'?a:b) ?? '').toString(); if (d==='.' && cur.includes('.')) return; if (justEvaluated && entering==='a'){ a=null; cur=''; justEvaluated=false; } cur=(cur==='0' && d!=='.')? d : cur+d; if (target==='a') a=cur; else b=cur; setDisplay(cur); }
-  function setOp(next){ if (a==null) a='0'; if (op && b!=null) evalNow(false); op=next; entering='b'; justEvaluated=false; statusEl.textContent=`${a} ${sym(op)}`; }
-  function percent(){ if (entering==='b' && b!=null){ b=String(parseFloat(b)/100); setDisplay(b); } else if (a!=null){ a=String(parseFloat(a)/100); setDisplay(a); } }
-  function backspace(){ const target=entering==='b'?'b':'a'; if (justEvaluated && entering==='a'){ a=null; setDisplay('0'); justEvaluated=false; return; } let cur=(target==='b'?b:a); if (cur==null) return; cur=cur.toString().slice(0,-1); if (!cur || cur==='-') cur='0'; if (target==='b') b=cur; else a=cur; setDisplay(cur); }
-  function clearAll(){ a=b=op=null; entering='a'; justEvaluated=false; setDisplay('0'); statusEl.textContent='\u00A0'; }
-  function addTape(text){ const row=document.createElement('div'); row.className='item d-flex justify-content-between align-items-center border-bottom py-1'; row.innerHTML=`<span class="expr">${text}</span><button class="btn btn-sm btn-link text-danger" title="Remover">&times;</button>`; row.querySelector('button').addEventListener('click', ()=> row.remove()); tapeEl.prepend(row); }
-  function evalNow(addToTape=true){ if (a==null) return; const ax=parseFloat(a); const bx=parseFloat(b ?? a); if (!op){ setDisplay(String(ax)); return; } let res=0; if (op==='plus') res=ax+bx; else if (op==='minus') res=ax-bx; else if (op==='multiply') res=ax*bx; else if (op==='divide') res = bx===0 ? NaN : ax/bx; const expr=`${ax} ${sym(op)} ${bx} = ${res}`; setDisplay(isNaN(res)?'Erro':String(res)); statusEl.textContent=expr; if (addToTape) addTape(expr); a=String(res); b=null; entering='a'; op=null; justEvaluated=true; }
-  keys.forEach(btn=>{ btn.addEventListener('click', ()=>{ const num=btn.getAttribute('data-num'), dot=btn.getAttribute('data-dot'), act=btn.getAttribute('data-act'), opBtn=btn.getAttribute('data-op'); if (num) return appendDigit(num); if (dot) return appendDigit('.'); if (opBtn) return setOp(opBtn); if (act==='ac') return clearAll(); if (act==='percent') return percent(); if (act==='back') return backspace(); if (act==='equal') return evalNow(true); }); });
-  tapeClear?.addEventListener('click', ()=> tapeEl.innerHTML='');
-});
-</script>
+
 <script>
 (function(){
   const form = document.getElementById('formSolicitarAdiantamento');
@@ -1783,7 +1420,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 })();
 </script>
-
 
 <script>
 (function(){
