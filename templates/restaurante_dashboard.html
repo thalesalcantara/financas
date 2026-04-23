@@ -1665,7 +1665,7 @@
                       <span class="input-group-text">
                         <i class="bi bi-search"></i>
                       </span>
-                      <input id="buscaCoop" type="text" class="form-control" placeholder="Digite o nome do cooperado..." list="cooperadosList">
+                      <input id="buscaCoop" type="text" class="form-control" placeholder="Digite o nome do cooperado..." list="cooperadosList" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
                       <datalist id="cooperadosList">
                         {% for coop in _cooperados %}
                           <option value="{{ coop.nome }}"></option>
@@ -1673,7 +1673,7 @@
                       </datalist>
                     </div>
 
-                    <select id="selectCoop" class="form-select mt-2">
+                    <select id="selectCoop" class="form-select mt-2" autocomplete="off">
                       <option value="">Selecione pela lista...</option>
                       {% for coop in _cooperados %}
                         <option
@@ -1764,7 +1764,9 @@
                   </div>
                 </div>
 
-                <form id="formLancamento" method="POST" action="{{ _url_lancar_producao }}" class="row g-2 align-items-end mb-1" style="display:none;">
+                <form id="formLancamento" method="POST" action="{{ _url_lancar_producao }}" class="row g-2 align-items-end mb-1" style="display:none;" autocomplete="off" autocapitalize="off" spellcheck="false">
+                  <input type="text" name="fake_user" autocomplete="username" tabindex="-1" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;opacity:0;pointer-events:none;">
+                  <input type="password" name="fake_pass" autocomplete="new-password" tabindex="-1" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;opacity:0;pointer-events:none;">
                   <input type="hidden" name="cooperado_id" id="inputCooperadoId" value="">
 
                   <div class="col-12">
@@ -1772,32 +1774,32 @@
                       <div class="row g-2">
                         <div class="col-md-3">
                           <label class="form-label">Valor (R$)</label>
-                          <input type="number" class="form-control" name="valor" step="0.01" required>
+                          <input type="text" class="form-control" name="valor" inputmode="decimal" enterkeyhint="done" placeholder="0,00" required autocomplete="off" data-money-input="1">
                         </div>
 
                         <div class="col-md-3">
                           <label class="form-label">Data</label>
-                          <input type="date" class="form-control" name="data" required>
+                          <input type="date" class="form-control" name="data" required autocomplete="off">
                         </div>
 
                         <div class="col-md-3">
                           <label class="form-label">Hora Início</label>
-                          <input type="time" class="form-control" name="hora_inicio">
+                          <input type="time" class="form-control" name="hora_inicio" autocomplete="off">
                         </div>
 
                         <div class="col-md-3">
                           <label class="form-label">Hora Fim</label>
-                          <input type="time" class="form-control" name="hora_fim">
+                          <input type="time" class="form-control" name="hora_fim" autocomplete="off">
                         </div>
 
                         <div class="col-md-3">
                           <label class="form-label">Entregas</label>
-                          <input type="number" class="form-control" name="qtd_entregas" min="0" step="1">
+                          <input type="number" class="form-control" name="qtd_entregas" min="0" step="1" autocomplete="off">
                         </div>
 
                         <div class="col-12">
                           <label class="form-label">Descrição (opcional)</label>
-                          <textarea class="form-control" name="descricao" rows="2" placeholder="Ex.: motivo do valor, observações, contrato especial…"></textarea>
+                          <textarea class="form-control" name="descricao" rows="2" placeholder="Ex.: motivo do valor, observações, contrato especial…" autocomplete="off"></textarea>
                         </div>
                       </div>
                     </div>
@@ -2048,7 +2050,120 @@
       const listaCooperados = document.getElementById('listaCooperados');
       const cooperadoCards  = listaCooperados ? listaCooperados.querySelectorAll('.cooperado-item') : [];
 
-      function setPhone(digits) {
+      
+      function moneyToNumber(v){
+        if (v == null) return NaN;
+        let s = String(v).trim();
+        if (!s) return NaN;
+        s = s.replace(/\s+/g, '');
+        s = s.replace(/[R$r$\u00A0]/g, '');
+        if (s.includes(',') && s.includes('.')) {
+          s = s.replace(/\./g, '').replace(',', '.');
+        } else if (s.includes(',')) {
+          s = s.replace(',', '.');
+        }
+        s = s.replace(/[^0-9.\-]/g, '');
+        const n = Number(s);
+        return Number.isFinite(n) ? n : NaN;
+      }
+
+      function normalizeMoneyValue(v){
+        const n = moneyToNumber(v);
+        if (!Number.isFinite(n)) return '';
+        return n.toFixed(2);
+      }
+
+      function formatMoneyPtBr(v){
+        const n = moneyToNumber(v);
+        if (!Number.isFinite(n)) return '';
+        return n.toFixed(2).replace('.', ',');
+      }
+
+      function clearLaunchFields(opts){
+        const o = opts || {};
+        if (!form) return;
+        const valorEl = form.querySelector('input[name="valor"]');
+        const dataEl = form.querySelector('input[name="data"]');
+        const horaInicioEl = form.querySelector('input[name="hora_inicio"]');
+        const horaFimEl = form.querySelector('input[name="hora_fim"]');
+        const qtdEl = form.querySelector('input[name="qtd_entregas"]');
+        const descEl = form.querySelector('textarea[name="descricao"]');
+        const chkAvaliarEl = document.getElementById('chkAvaliar');
+        const inputAvaliarEl = document.getElementById('inputAvaliar');
+        const boxAvalEl = document.getElementById('boxAval');
+
+        if (valorEl) {
+          valorEl.value = '';
+          valorEl.setAttribute('value', '');
+          valorEl.autocomplete = 'off';
+          valorEl.readOnly = true;
+          setTimeout(() => { try { valorEl.readOnly = false; } catch(e){} }, 80);
+        }
+        if (qtdEl) {
+          qtdEl.value = '';
+          qtdEl.setAttribute('value', '');
+          qtdEl.autocomplete = 'off';
+        }
+        if (descEl) {
+          descEl.value = '';
+          descEl.textContent = '';
+          descEl.autocomplete = 'off';
+        }
+        if (!o.preserveDate && dataEl) {
+          dataEl.value = '';
+        }
+        if (!o.preserveHours) {
+          if (horaInicioEl) horaInicioEl.value = '';
+          if (horaFimEl) horaFimEl.value = '';
+        }
+
+        if (chkAvaliarEl) chkAvaliarEl.checked = false;
+        if (inputAvaliarEl) inputAvaliarEl.value = '0';
+        if (boxAvalEl) boxAvalEl.style.display = 'none';
+
+        if (dataEl && !dataEl.value) {
+          const hoje = new Date();
+          const yyyy = hoje.getFullYear();
+          const mm = String(hoje.getMonth() + 1).padStart(2, '0');
+          const dd = String(hoje.getDate()).padStart(2, '0');
+          dataEl.value = `${yyyy}-${mm}-${dd}`;
+        }
+      }
+
+      function wireMoneyInput(){
+        const valorEl = form ? form.querySelector('input[name="valor"]') : null;
+        if (!valorEl || valorEl.dataset.wiredMoney === '1') return;
+        valorEl.dataset.wiredMoney = '1';
+        valorEl.setAttribute('autocomplete', 'off');
+
+        valorEl.addEventListener('focus', function(){
+          this.readOnly = false;
+          if (this.value) {
+            const norm = normalizeMoneyValue(this.value);
+            if (norm) this.value = norm.replace('.', ',');
+          }
+        });
+
+        valorEl.addEventListener('input', function(){
+          let v = String(this.value || '');
+          v = v.replace(/[^\d,.\-]/g, '');
+          const firstComma = v.indexOf(',');
+          if (firstComma !== -1) {
+            v = v.slice(0, firstComma + 1) + v.slice(firstComma + 1).replace(/,/g, '');
+          }
+          const firstDot = v.indexOf('.');
+          if (firstDot !== -1) {
+            v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, '');
+          }
+          this.value = v;
+        });
+
+        valorEl.addEventListener('blur', function(){
+          const fmt = formatMoneyPtBr(this.value);
+          if (fmt) this.value = fmt;
+        });
+      }
+function setPhone(digits) {
         const d = (digits || '').replace(/\D/g,'');
         if (d) {
           phoneEl.textContent = formatPhoneBR(d);
@@ -2069,6 +2184,9 @@
       function selectCoop({id, nome, foto, total, foneDigits}) {
         if (!id) return;
 
+        const prevId = form?.dataset?.selectedCoopId || '';
+        const changed = String(prevId) !== String(id);
+
         if (header) header.style.display = '';
         if (form) form.style.display = '';
         if (hint) hint.style.display = 'none';
@@ -2079,6 +2197,14 @@
 
         setPhone(foneDigits);
         if (inputId) inputId.value = id || '';
+
+        if (changed) {
+          clearLaunchFields({ preserveDate:false, preserveHours:false });
+        } else {
+          wireMoneyInput();
+        }
+
+        if (form) form.dataset.selectedCoopId = String(id);
 
         document.querySelectorAll('.lancamentos-table').forEach(t => t.style.display = 'none');
         const table = document.getElementById('tabela-' + id);
@@ -2092,6 +2218,8 @@
           const dd = String(hoje.getDate()).padStart(2, '0');
           campoData.value = `${yyyy}-${mm}-${dd}`;
         }
+
+        wireMoneyInput();
       }
 
       listaCooperados?.addEventListener('click', (e) => {
@@ -2780,6 +2908,18 @@
       });
 
       form.addEventListener('submit', function(ev){
+        const valorEl = form.querySelector('input[name="valor"]');
+        if (valorEl) {
+          const normalized = normalizeMoneyValue(valorEl.value);
+          if (!normalized || Number(normalized) <= 0) {
+            ev.preventDefault();
+            alert('Informe um valor válido.');
+            valorEl.focus();
+            return;
+          }
+          valorEl.value = normalized;
+        }
+
         if(isSubmitting){
           ev.preventDefault();
           return;
