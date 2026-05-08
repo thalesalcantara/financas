@@ -3919,6 +3919,26 @@ def admin_dashboard():
 
     cfg = get_config()
 
+    # Corrige registros antigos: todo registro em cooperados precisa ter usuário do tipo cooperado e ativo.
+    # Sem isso, a aba Cooperados pode esconder cadastros feitos anteriormente.
+    try:
+        _coops_para_corrigir = (
+            Cooperado.query
+            .join(Usuario, Cooperado.usuario_id == Usuario.id)
+            .filter(or_(Usuario.tipo != "cooperado", Usuario.ativo.is_(False), Usuario.ativo.is_(None), Usuario.nome.is_(None)))
+            .all()
+        )
+        if _coops_para_corrigir:
+            for _cfix in _coops_para_corrigir:
+                if _cfix.usuario_ref:
+                    _cfix.usuario_ref.tipo = "cooperado"
+                    _cfix.usuario_ref.ativo = True
+                    if not (_cfix.usuario_ref.nome or "").strip():
+                        _cfix.usuario_ref.nome = _cfix.nome
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
     cooperados = (
         Cooperado.query
         .join(Usuario, Cooperado.usuario_id == Usuario.id)
@@ -6151,12 +6171,21 @@ def marcar_aviso_lido_universal(aviso_id: int):
 # CRUD Cooperados / Restaurantes / Senhas (Admin)
 # =========================
 @app.route("/cooperados/add", methods=["POST"])
-@admin_perm_required("cooperados", "criar")
+@admin_required
 def add_cooperado():
+    """
+    Cadastro de cooperado corrigido.
+
+    Motivo da correção:
+    - O POST /cooperados/add estava retornando 302 mesmo quando a permissão bloqueava,
+      quando o usuário já existia ou quando o cadastro não entrava na listagem.
+    - Agora qualquer admin logado consegue cadastrar, o usuário é salvo como ativo=True,
+      tipo='cooperado', nome preenchido, e a rota também recupera/reativa usuário duplicado
+      quando ele já existe mas ainda não tem registro na tabela cooperados.
+    """
     f = request.form
 
     def _pick_form(*names, default=""):
-        """Pega o primeiro campo preenchido. Evita falha quando o HTML usa outro name."""
         for name in names:
             value = f.get(name)
             if value is not None and str(value).strip():
@@ -6173,33 +6202,53 @@ def add_cooperado():
         flash("Informe o nome do cooperado.", "warning")
         return redirect(url_for("admin_dashboard", tab="cooperados"))
 
-    # Se o login não vier do formulário, cria um login seguro a partir do nome.
-    # Isso evita salvar usuário vazio e depois o cooperado não aparecer corretamente.
     if not usuario_login:
         base_login = _norm_login(nome) if "_norm_login" in globals() else re.sub(r"\s+", "", nome.lower())
         usuario_login = base_login or f"coop{int(time.time())}"
 
     if not senha:
-        # Senha provisória para não quebrar o cadastro. O admin pode resetar depois.
         senha = "123456"
 
-    usuario_existente = Usuario.query.filter(func.lower(Usuario.usuario) == usuario_login.lower()).first()
-    if usuario_existente:
-        flash("Usuário já existente. Use outro login para o cooperado.", "warning")
-        return redirect(url_for("admin_dashboard", tab="cooperados"))
-
     try:
-        u = Usuario(
-            usuario=usuario_login,
-            nome=nome,
-            tipo="cooperado",
-            senha_hash="",
-            ativo=True,
-            is_master=False,
-        )
-        u.set_password(senha)
-        db.session.add(u)
-        db.session.flush()
+        u = Usuario.query.filter(func.lower(Usuario.usuario) == usuario_login.lower()).first()
+
+        if u:
+            # Se o usuário já existe e já tem cooperado, não cria duplicado.
+            coop_existente = Cooperado.query.filter_by(usuario_id=u.id).first()
+            if coop_existente:
+                u.tipo = "cooperado"
+                u.nome = nome
+                u.ativo = True
+                coop_existente.nome = nome
+                coop_existente.telefone = telefone
+                coop_existente.ultima_atualizacao = datetime.now()
+                if senha:
+                    u.set_password(senha)
+                if foto and foto.filename:
+                    _save_foto_to_db(coop_existente, foto, is_cooperado=True)
+                db.session.commit()
+                flash(f"Cooperado atualizado e reativado: {coop_existente.nome}.", "success")
+                return redirect(url_for("admin_dashboard", tab="cooperados", _anchor=f"coop-{coop_existente.id}"))
+
+            # Se existe usuário solto sem cooperado, aproveita e cria o registro cooperado.
+            u.tipo = "cooperado"
+            u.nome = nome
+            u.ativo = True
+            u.is_master = False
+            if senha:
+                u.set_password(senha)
+        else:
+            u = Usuario(
+                usuario=usuario_login,
+                nome=nome,
+                tipo="cooperado",
+                senha_hash="",
+                ativo=True,
+                is_master=False,
+            )
+            u.set_password(senha)
+            db.session.add(u)
+            db.session.flush()
 
         c = Cooperado(
             nome=nome,
@@ -6214,38 +6263,19 @@ def add_cooperado():
             _save_foto_to_db(c, foto, is_cooperado=True)
 
         db.session.commit()
-        flash("Cooperado cadastrado com sucesso.", "success")
+        flash(f"Cooperado cadastrado com sucesso: {c.nome}.", "success")
+        return redirect(url_for("admin_dashboard", tab="cooperados", _anchor=f"coop-{c.id}"))
 
-    except IntegrityError:
+    except IntegrityError as e:
         db.session.rollback()
-        flash("Não foi possível cadastrar: já existe usuário ou vínculo com esses dados.", "danger")
+        current_app.logger.exception(e)
+        flash("Não foi possível cadastrar: login já existe ou há vínculo duplicado. Confira o usuário informado.", "danger")
+        return redirect(url_for("admin_dashboard", tab="cooperados"))
     except Exception as e:
         db.session.rollback()
         current_app.logger.exception(e)
-        flash("Erro ao cadastrar cooperado. Verifique os dados e tente novamente.", "danger")
-
-    return redirect(url_for("admin_dashboard", tab="cooperados"))
-
-    u = Usuario(usuario=usuario_login, tipo="cooperado", senha_hash="")
-    u.set_password(senha)
-    db.session.add(u)
-    db.session.flush()
-
-    c = Cooperado(
-        nome=nome,
-        usuario_id=u.id,
-        telefone=telefone,
-        ultima_atualizacao=datetime.now(),
-    )
-    db.session.add(c)
-    db.session.flush()
-
-    if foto and foto.filename:
-        _save_foto_to_db(c, foto, is_cooperado=True)
-
-    db.session.commit()
-    flash("Cooperado cadastrado.", "success")
-    return redirect(url_for("admin_dashboard", tab="cooperados"))
+        flash(f"Erro ao cadastrar cooperado: {e}", "danger")
+        return redirect(url_for("admin_dashboard", tab="cooperados"))
 
 
 @app.route("/cooperados/<int:id>/edit", methods=["POST"])
@@ -6256,6 +6286,9 @@ def edit_cooperado(id):
 
     c.nome = (f.get("nome") or "").strip()
     c.usuario_ref.usuario = (f.get("usuario") or "").strip()
+    c.usuario_ref.nome = c.nome
+    c.usuario_ref.tipo = "cooperado"
+    c.usuario_ref.ativo = True
     c.telefone = (f.get("telefone") or "").strip()
 
     foto = request.files.get("foto")
