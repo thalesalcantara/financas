@@ -3922,8 +3922,11 @@ def admin_dashboard():
     cooperados = (
         Cooperado.query
         .join(Usuario, Cooperado.usuario_id == Usuario.id)
-        .filter(Usuario.ativo.is_(True))
-        .order_by(Cooperado.nome)
+        .filter(
+            Usuario.tipo == "cooperado",
+            or_(Usuario.ativo.is_(True), Usuario.ativo.is_(None))
+        )
+        .order_by(Cooperado.nome.asc())
         .all()
     )
 
@@ -6151,19 +6154,77 @@ def marcar_aviso_lido_universal(aviso_id: int):
 @admin_perm_required("cooperados", "criar")
 def add_cooperado():
     f = request.form
-    nome = (f.get("nome") or "").strip()
-    usuario_login = (f.get("usuario") or "").strip()
-    senha = f.get("senha") or ""
-    telefone = (f.get("telefone") or "").strip()
-    foto = request.files.get("foto")
-    taxa_admin_valor = f.get("taxa_admin_valor", type=float) or 0.0
-    taxa_admin_data_base = _parse_date(f.get("taxa_admin_data_base"))
-    taxa_admin_multa_percentual = f.get("taxa_admin_multa_percentual", type=float) or 2.0
-    taxa_admin_juros_dia_percentual = f.get("taxa_admin_juros_dia_percentual", type=float) or 0.03
 
-    if Usuario.query.filter_by(usuario=usuario_login).first():
-        flash("Usuário já existente.", "warning")
+    def _pick_form(*names, default=""):
+        """Pega o primeiro campo preenchido. Evita falha quando o HTML usa outro name."""
+        for name in names:
+            value = f.get(name)
+            if value is not None and str(value).strip():
+                return str(value).strip()
+        return default
+
+    nome = _pick_form("nome", "nome_cooperado", "cooperado_nome", "name")
+    usuario_login = _pick_form("usuario", "login", "username", "user", "usuario_login")
+    senha = _pick_form("senha", "password", "nova_senha")
+    telefone = _pick_form("telefone", "celular", "whatsapp", "fone")
+    foto = request.files.get("foto") or request.files.get("foto_cooperado")
+
+    if not nome:
+        flash("Informe o nome do cooperado.", "warning")
         return redirect(url_for("admin_dashboard", tab="cooperados"))
+
+    # Se o login não vier do formulário, cria um login seguro a partir do nome.
+    # Isso evita salvar usuário vazio e depois o cooperado não aparecer corretamente.
+    if not usuario_login:
+        base_login = _norm_login(nome) if "_norm_login" in globals() else re.sub(r"\s+", "", nome.lower())
+        usuario_login = base_login or f"coop{int(time.time())}"
+
+    if not senha:
+        # Senha provisória para não quebrar o cadastro. O admin pode resetar depois.
+        senha = "123456"
+
+    usuario_existente = Usuario.query.filter(func.lower(Usuario.usuario) == usuario_login.lower()).first()
+    if usuario_existente:
+        flash("Usuário já existente. Use outro login para o cooperado.", "warning")
+        return redirect(url_for("admin_dashboard", tab="cooperados"))
+
+    try:
+        u = Usuario(
+            usuario=usuario_login,
+            nome=nome,
+            tipo="cooperado",
+            senha_hash="",
+            ativo=True,
+            is_master=False,
+        )
+        u.set_password(senha)
+        db.session.add(u)
+        db.session.flush()
+
+        c = Cooperado(
+            nome=nome,
+            usuario_id=u.id,
+            telefone=telefone,
+            ultima_atualizacao=datetime.now(),
+        )
+        db.session.add(c)
+        db.session.flush()
+
+        if foto and foto.filename:
+            _save_foto_to_db(c, foto, is_cooperado=True)
+
+        db.session.commit()
+        flash("Cooperado cadastrado com sucesso.", "success")
+
+    except IntegrityError:
+        db.session.rollback()
+        flash("Não foi possível cadastrar: já existe usuário ou vínculo com esses dados.", "danger")
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.exception(e)
+        flash("Erro ao cadastrar cooperado. Verifique os dados e tente novamente.", "danger")
+
+    return redirect(url_for("admin_dashboard", tab="cooperados"))
 
     u = Usuario(usuario=usuario_login, tipo="cooperado", senha_hash="")
     u.set_password(senha)
