@@ -2872,19 +2872,22 @@ function setPhone(digits) {
       if(!form) return;
 
       const modalEl = document.getElementById('modalAvaliar');
-      const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
+      const modal = modalEl ? new bootstrap.Modal(modalEl, {backdrop:'static', keyboard:false}) : null;
       const btnAvaliarAgora = document.getElementById('btnAvaliarAgora');
       const btnPularAval = document.getElementById('btnPularAval');
       const chkAvaliar = document.getElementById('chkAvaliar');
       const inputAvaliar = document.getElementById('inputAvaliar');
       const boxAval = document.getElementById('boxAval');
 
+      if(form.dataset.avaliacaoFlowWired === '1') return;
+      form.dataset.avaliacaoFlowWired = '1';
+
       let isSubmitting = false;
-      const submitBtn = form.querySelector('button.btn-royal[type="submit"], button.btn-royal');
+      const submitBtn = form.querySelector('button.btn-royal[type="submit"], button.btn-royal:not([type])');
+      const modalButtons = [btnAvaliarAgora, btnPularAval].filter(Boolean);
 
       function setSubmitting(on){
         isSubmitting = !!on;
-        form.dataset.submitting = on ? '1' : '0';
 
         if(submitBtn){
           submitBtn.disabled = on;
@@ -2894,45 +2897,18 @@ function setPhone(digits) {
             : submitBtn.dataset.origText;
         }
 
-        if(btnPularAval){
-          btnPularAval.disabled = on;
-          if(btnPularAval.dataset.origText == null) btnPularAval.dataset.origText = btnPularAval.innerHTML;
-          btnPularAval.innerHTML = on
-            ? '<span class="spinner-border spinner-border-sm me-1"></span> Lançando…'
-            : btnPularAval.dataset.origText;
-        }
-
-        if(btnAvaliarAgora){
-          btnAvaliarAgora.disabled = on;
-        }
-
-        form.style.pointerEvents = on ? 'none' : '';
-        form.classList.toggle('opacity-75', on);
-
-        if(on) showLancOverlay('launch'); else hideLancOverlay();
-      }
-
-      function submitLancamentoFinal(){
-        if(isSubmitting || form.dataset.submitting === '1') return false;
-
-        const valorEl = form.querySelector('input[name="valor"]');
-        if (valorEl) {
-          const numeroValor = moneyToNumber(valorEl.value);
-
-          if (!Number.isFinite(numeroValor) || numeroValor <= 0) {
-            alert('Informe um valor válido.');
-            valorEl.focus();
-            return false;
+        modalButtons.forEach(btn => {
+          btn.disabled = on;
+          if(btn.dataset.origText == null) btn.dataset.origText = btn.innerHTML;
+          if(on && btn === btnPularAval){
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Lançando…';
+          }else if(!on){
+            btn.innerHTML = btn.dataset.origText;
           }
+        });
 
-          // Envia para o Flask sempre em formato seguro: 12.00 / 15.50 / 1200.50
-          valorEl.value = numeroValor.toFixed(2);
-        }
-
-        ensureRequestId();
-        setSubmitting(true);
-        HTMLFormElement.prototype.submit.call(form);
-        return true;
+        form.classList.toggle('opacity-75', on);
+        if(on) showLancOverlay('launch'); else hideLancOverlay();
       }
 
       function ensureRequestId(){
@@ -2943,7 +2919,40 @@ function setPhone(digits) {
           inp.name = 'request_id';
           form.appendChild(inp);
         }
-        inp.value = Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+        if(!inp.value){
+          inp.value = Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+        }
+      }
+
+      function normalizarValorAntesDeEnviar(){
+        const valorEl = form.querySelector('input[name="valor"]');
+        if (!valorEl) return true;
+
+        const numeroValor = moneyToNumber(valorEl.value);
+
+        if (!Number.isFinite(numeroValor) || numeroValor <= 0) {
+          alert('Informe um valor válido.');
+          valorEl.focus();
+          return false;
+        }
+
+        valorEl.value = numeroValor.toFixed(2);
+        return true;
+      }
+
+      function prepararEnvioFinal(){
+        if(isSubmitting) return false;
+
+        if(!normalizarValorAntesDeEnviar()) return false;
+
+        if(!form.checkValidity()){
+          form.reportValidity?.();
+          return false;
+        }
+
+        ensureRequestId();
+        setSubmitting(true);
+        return true;
       }
 
       function scrollIntoViewSmooth(el){
@@ -2961,28 +2970,19 @@ function setPhone(digits) {
       });
 
       form.addEventListener('submit', function(ev){
-        if(isSubmitting || form.dataset.submitting === '1'){
+        if(isSubmitting){
           ev.preventDefault();
           return;
         }
 
-        const valorEl = form.querySelector('input[name="valor"]');
-        if (valorEl) {
-          const numeroValor = moneyToNumber(valorEl.value);
-
-          if (!Number.isFinite(numeroValor) || numeroValor <= 0) {
-            ev.preventDefault();
-            alert('Informe um valor válido.');
-            valorEl.focus();
-            return;
-          }
-
-          // Envia para o Flask sempre em formato seguro: 12.00 / 15.50 / 1200.50
-          valorEl.value = numeroValor.toFixed(2);
-        }
-        if(!form.checkValidity()){
-          form.reportValidity?.();
+        if(!normalizarValorAntesDeEnviar()){
           ev.preventDefault();
+          return;
+        }
+
+        if(!form.checkValidity()){
+          ev.preventDefault();
+          form.reportValidity?.();
           return;
         }
 
@@ -2998,37 +2998,45 @@ function setPhone(digits) {
           return;
         }
 
+        ev.preventDefault();
+
         if(modal){
-          ev.preventDefault();
           modal.show();
-        }else{
-          ev.preventDefault();
-          const querAvaliar = confirm('Deseja registrar uma avaliação agora antes de lançar?');
-          if(querAvaliar){
-            if(chkAvaliar) chkAvaliar.checked = true;
-            if(inputAvaliar) inputAvaliar.value = '1';
-            if(boxAval) boxAval.style.display = 'block';
-            setAvalInputsEnabled(true);
-            autoGeral();
-            submitLancamentoFinal();
-          }else{
-            if(chkAvaliar) chkAvaliar.checked = false;
-            if(inputAvaliar) inputAvaliar.value = '0';
-            if(boxAval) boxAval.style.display = 'none';
-            setAvalInputsEnabled(false);
-            submitLancamentoFinal();
-          }
+          return;
+        }
+
+        const querAvaliar = confirm('Deseja registrar uma avaliação agora antes de lançar?');
+        if(querAvaliar){
+          if(chkAvaliar) chkAvaliar.checked = true;
+          if(inputAvaliar) inputAvaliar.value = '1';
+          if(boxAval) boxAval.style.display = 'block';
+          setAvalInputsEnabled(true);
+          autoGeral();
+          scrollIntoViewSmooth(boxAval);
+          return;
+        }
+
+        if(chkAvaliar) chkAvaliar.checked = false;
+        if(inputAvaliar) inputAvaliar.value = '0';
+        if(boxAval) boxAval.style.display = 'none';
+        setAvalInputsEnabled(false);
+
+        if(prepararEnvioFinal()){
+          form.submit();
         }
       });
 
       btnAvaliarAgora?.addEventListener('click', ()=>{
-        if(isSubmitting || form.dataset.submitting === '1') return;
+        if(isSubmitting) return;
         if(!chkAvaliar || !inputAvaliar) return;
+
         chkAvaliar.checked = true;
         inputAvaliar.value = '1';
         if(boxAval) boxAval.style.display = 'block';
         setAvalInputsEnabled(true);
+        autoGeral();
         modal?.hide();
+
         setTimeout(()=>{
           scrollIntoViewSmooth(boxAval);
           boxAval?.querySelector('.rating-group .star')?.focus?.();
@@ -3036,16 +3044,17 @@ function setPhone(digits) {
       });
 
       btnPularAval?.addEventListener('click', ()=>{
-        if(isSubmitting || form.dataset.submitting === '1') return;
-        if(!inputAvaliar) return;
+        if(isSubmitting) return;
+
         if(chkAvaliar) chkAvaliar.checked = false;
-        inputAvaliar.value = '0';
+        if(inputAvaliar) inputAvaliar.value = '0';
         if(boxAval) boxAval.style.display = 'none';
         setAvalInputsEnabled(false);
-        modal?.hide();
-        setTimeout(()=>{
-          submitLancamentoFinal();
-        }, 80);
+
+        if(prepararEnvioFinal()){
+          modal?.hide();
+          setTimeout(()=>{ form.submit(); }, 80);
+        }
       });
 
       window.addEventListener('pageshow', (e)=>{
