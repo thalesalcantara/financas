@@ -2872,19 +2872,17 @@ function setPhone(digits) {
       if(!form) return;
 
       const modalEl = document.getElementById('modalAvaliar');
-      const modal = modalEl ? new bootstrap.Modal(modalEl, {backdrop:'static', keyboard:false}) : null;
+      const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
       const btnAvaliarAgora = document.getElementById('btnAvaliarAgora');
       const btnPularAval = document.getElementById('btnPularAval');
       const chkAvaliar = document.getElementById('chkAvaliar');
       const inputAvaliar = document.getElementById('inputAvaliar');
       const boxAval = document.getElementById('boxAval');
 
-      if(form.dataset.avaliacaoFlowWired === '1') return;
-      form.dataset.avaliacaoFlowWired = '1';
-
       let isSubmitting = false;
-      const submitBtn = form.querySelector('button.btn-royal[type="submit"], button.btn-royal:not([type])');
-      const modalButtons = [btnAvaliarAgora, btnPularAval].filter(Boolean);
+      let finalSubmitStarted = false;
+      let modalAbertoAguardandoEscolha = false;
+      const submitBtn = form.querySelector('button.btn-royal[type="submit"], button.btn-royal');
 
       function setSubmitting(on){
         isSubmitting = !!on;
@@ -2897,18 +2895,31 @@ function setPhone(digits) {
             : submitBtn.dataset.origText;
         }
 
-        modalButtons.forEach(btn => {
-          btn.disabled = on;
-          if(btn.dataset.origText == null) btn.dataset.origText = btn.innerHTML;
-          if(on && btn === btnPularAval){
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Lançando…';
-          }else if(!on){
-            btn.innerHTML = btn.dataset.origText;
-          }
-        });
+        if(btnPularAval){
+          btnPularAval.disabled = on;
+          if(btnPularAval.dataset.origText == null) btnPularAval.dataset.origText = btnPularAval.innerHTML;
+          btnPularAval.innerHTML = on
+            ? '<span class="spinner-border spinner-border-sm me-1"></span> Lançando…'
+            : btnPularAval.dataset.origText;
+        }
 
+        if(btnAvaliarAgora){
+          btnAvaliarAgora.disabled = on;
+        }
+
+        form.style.pointerEvents = on ? 'none' : '';
         form.classList.toggle('opacity-75', on);
+
         if(on) showLancOverlay('launch'); else hideLancOverlay();
+      }
+
+      function travarBotaoEnquantoModalAberto(on){
+        if(!submitBtn || finalSubmitStarted) return;
+        submitBtn.disabled = !!on;
+        if(submitBtn.dataset.origText == null) submitBtn.dataset.origText = submitBtn.innerHTML;
+        submitBtn.innerHTML = on
+          ? '<span class="spinner-border spinner-border-sm me-1"></span> Aguardando escolha…'
+          : submitBtn.dataset.origText;
       }
 
       function ensureRequestId(){
@@ -2924,7 +2935,7 @@ function setPhone(digits) {
         }
       }
 
-      function normalizarValorAntesDeEnviar(){
+      function validarValorAntesDeEnviar(){
         const valorEl = form.querySelector('input[name="valor"]');
         if (!valorEl) return true;
 
@@ -2936,22 +2947,35 @@ function setPhone(digits) {
           return false;
         }
 
+        // Envia para o Flask sempre em formato seguro: 12.00 / 15.50 / 1200.50
         valorEl.value = numeroValor.toFixed(2);
         return true;
       }
 
-      function prepararEnvioFinal(){
-        if(isSubmitting) return false;
+      function envioFinal(){
+        if(finalSubmitStarted || isSubmitting){
+          return false;
+        }
 
-        if(!normalizarValorAntesDeEnviar()) return false;
+        if(!validarValorAntesDeEnviar()){
+          return false;
+        }
 
         if(!form.checkValidity()){
           form.reportValidity?.();
           return false;
         }
 
+        finalSubmitStarted = true;
+        modalAbertoAguardandoEscolha = false;
         ensureRequestId();
         setSubmitting(true);
+
+        // Envia no próximo ciclo para o card "Lançando…" aparecer antes da troca de página.
+        setTimeout(()=>{
+          HTMLFormElement.prototype.submit.call(form);
+        }, 60);
+
         return true;
       }
 
@@ -2970,18 +2994,17 @@ function setPhone(digits) {
       });
 
       form.addEventListener('submit', function(ev){
-        if(isSubmitting){
-          ev.preventDefault();
+        ev.preventDefault();
+
+        if(finalSubmitStarted || isSubmitting || modalAbertoAguardandoEscolha){
           return;
         }
 
-        if(!normalizarValorAntesDeEnviar()){
-          ev.preventDefault();
+        if(!validarValorAntesDeEnviar()){
           return;
         }
 
         if(!form.checkValidity()){
-          ev.preventDefault();
           form.reportValidity?.();
           return;
         }
@@ -2993,72 +3016,77 @@ function setPhone(digits) {
         if(avaliando){
           setAvalInputsEnabled(true);
           autoGeral();
-          ensureRequestId();
-          setSubmitting(true);
+          envioFinal();
           return;
         }
-
-        ev.preventDefault();
 
         if(modal){
+          modalAbertoAguardandoEscolha = true;
+          travarBotaoEnquantoModalAberto(true);
           modal.show();
-          return;
+        }else{
+          const querAvaliar = confirm('Deseja registrar uma avaliação agora antes de lançar?');
+          if(querAvaliar){
+            if(chkAvaliar) chkAvaliar.checked = true;
+            if(inputAvaliar) inputAvaliar.value = '1';
+            if(boxAval) boxAval.style.display = 'block';
+            setAvalInputsEnabled(true);
+            autoGeral();
+            envioFinal();
+          }else{
+            if(chkAvaliar) chkAvaliar.checked = false;
+            if(inputAvaliar) inputAvaliar.value = '0';
+            if(boxAval) boxAval.style.display = 'none';
+            setAvalInputsEnabled(false);
+            envioFinal();
+          }
         }
+      });
 
-        const querAvaliar = confirm('Deseja registrar uma avaliação agora antes de lançar?');
-        if(querAvaliar){
-          if(chkAvaliar) chkAvaliar.checked = true;
-          if(inputAvaliar) inputAvaliar.value = '1';
-          if(boxAval) boxAval.style.display = 'block';
-          setAvalInputsEnabled(true);
-          autoGeral();
-          scrollIntoViewSmooth(boxAval);
-          return;
-        }
-
-        if(chkAvaliar) chkAvaliar.checked = false;
-        if(inputAvaliar) inputAvaliar.value = '0';
-        if(boxAval) boxAval.style.display = 'none';
-        setAvalInputsEnabled(false);
-
-        if(prepararEnvioFinal()){
-          form.submit();
+      modalEl?.addEventListener('hidden.bs.modal', ()=>{
+        if(!finalSubmitStarted){
+          modalAbertoAguardandoEscolha = false;
+          travarBotaoEnquantoModalAberto(false);
         }
       });
 
       btnAvaliarAgora?.addEventListener('click', ()=>{
-        if(isSubmitting) return;
+        if(finalSubmitStarted || isSubmitting) return;
         if(!chkAvaliar || !inputAvaliar) return;
-
+        modalAbertoAguardandoEscolha = false;
+        travarBotaoEnquantoModalAberto(false);
         chkAvaliar.checked = true;
         inputAvaliar.value = '1';
         if(boxAval) boxAval.style.display = 'block';
         setAvalInputsEnabled(true);
-        autoGeral();
         modal?.hide();
-
         setTimeout(()=>{
           scrollIntoViewSmooth(boxAval);
           boxAval?.querySelector('.rating-group .star')?.focus?.();
         }, 150);
       });
 
-      btnPularAval?.addEventListener('click', ()=>{
-        if(isSubmitting) return;
+      btnPularAval?.addEventListener('click', (ev)=>{
+        ev.preventDefault();
+        ev.stopPropagation();
+
+        if(finalSubmitStarted || isSubmitting) return;
+        if(!inputAvaliar) return;
 
         if(chkAvaliar) chkAvaliar.checked = false;
-        if(inputAvaliar) inputAvaliar.value = '0';
+        inputAvaliar.value = '0';
         if(boxAval) boxAval.style.display = 'none';
         setAvalInputsEnabled(false);
 
-        if(prepararEnvioFinal()){
-          modal?.hide();
-          setTimeout(()=>{ form.submit(); }, 80);
-        }
+        // Trava imediatamente antes de fechar o modal para impedir clique duplo.
+        envioFinal();
+        modal?.hide();
       });
 
       window.addEventListener('pageshow', (e)=>{
         if(e.persisted){
+          finalSubmitStarted = false;
+          modalAbertoAguardandoEscolha = false;
           setSubmitting(false);
           hideLancOverlay();
         }
