@@ -993,6 +993,46 @@ def calc_descontos(valor: float) -> dict:
     }
 
 
+def parse_valor_monetario(valor_raw, default=0.0) -> float:
+    """
+    Converte valor monetário vindo de formulário sem alterar as regras do sistema.
+    Aceita: 12, 12.00, 12,00, 1.200,50, R$ 1.200,50.
+    Retorna float com 2 casas para manter compatibilidade com os campos Float atuais.
+    """
+    if valor_raw is None:
+        return round(float(default or 0.0), 2)
+
+    if isinstance(valor_raw, (int, float)):
+        return round(float(valor_raw or 0.0), 2)
+
+    s = str(valor_raw).strip()
+    if not s:
+        return round(float(default or 0.0), 2)
+
+    s = (
+        s.replace("R$", "")
+         .replace("r$", "")
+         .replace(" ", "")
+         .replace("\xa0", "")
+    )
+
+    if "," in s and "." in s:
+        # Formato brasileiro com milhar: 1.200,50
+        s = s.replace(".", "").replace(",", ".")
+    elif "," in s:
+        # Formato brasileiro simples: 12,50
+        s = s.replace(",", ".")
+
+    s = re.sub(r"[^0-9.\-]", "", s)
+
+    try:
+        valor = Decimal(s)
+    except (InvalidOperation, ValueError):
+        return round(float(default or 0.0), 2)
+
+    return float(valor.quantize(Decimal("0.01")))
+
+
 # =========================
 # Init DB / Migração leve
 # =========================
@@ -2543,7 +2583,7 @@ def _gerar_feedback(pont, educ, efic, apres, comentario, sentimento):
     return txt[:1000]
 
 from datetime import datetime, date
-from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
+from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP, InvalidOperation
 from sqlalchemy import or_, and_
 
 # routes_avisos.py
@@ -10582,7 +10622,7 @@ def lancar_producao():
         restaurante_id=rest.id,
         cooperado_id=f.get("cooperado_id", type=int),
         descricao=desc_val,                            # <<< NOVO: salvar descrição
-        valor=f.get("valor", type=float),
+        valor=parse_valor_monetario(f.get("valor")),
         data=_parse_date(f.get("data")) or date.today(),
         hora_inicio=f.get("hora_inicio"),
         hora_fim=f.get("hora_fim"),
@@ -10642,7 +10682,7 @@ def editar_lancamento(id):
 
     if request.method == "POST":
         f = request.form
-        l.valor = f.get("valor", type=float)
+        l.valor = parse_valor_monetario(f.get("valor"), l.valor or 0.0)
         l.data = _parse_date(f.get("data")) or l.data
         l.hora_inicio = f.get("hora_inicio")
         l.hora_fim = f.get("hora_fim")
