@@ -2884,6 +2884,8 @@ function setPhone(digits) {
 
       function setSubmitting(on){
         isSubmitting = !!on;
+        form.dataset.submitting = on ? '1' : '0';
+
         if(submitBtn){
           submitBtn.disabled = on;
           if(submitBtn.dataset.origText == null) submitBtn.dataset.origText = submitBtn.innerHTML;
@@ -2891,10 +2893,46 @@ function setPhone(digits) {
             ? '<span class="spinner-border spinner-border-sm me-1"></span> Lançando…'
             : submitBtn.dataset.origText;
         }
+
+        if(btnPularAval){
+          btnPularAval.disabled = on;
+          if(btnPularAval.dataset.origText == null) btnPularAval.dataset.origText = btnPularAval.innerHTML;
+          btnPularAval.innerHTML = on
+            ? '<span class="spinner-border spinner-border-sm me-1"></span> Lançando…'
+            : btnPularAval.dataset.origText;
+        }
+
+        if(btnAvaliarAgora){
+          btnAvaliarAgora.disabled = on;
+        }
+
         form.style.pointerEvents = on ? 'none' : '';
         form.classList.toggle('opacity-75', on);
 
         if(on) showLancOverlay('launch'); else hideLancOverlay();
+      }
+
+      function submitLancamentoFinal(){
+        if(isSubmitting || form.dataset.submitting === '1') return false;
+
+        const valorEl = form.querySelector('input[name="valor"]');
+        if (valorEl) {
+          const numeroValor = moneyToNumber(valorEl.value);
+
+          if (!Number.isFinite(numeroValor) || numeroValor <= 0) {
+            alert('Informe um valor válido.');
+            valorEl.focus();
+            return false;
+          }
+
+          // Envia para o Flask sempre em formato seguro: 12.00 / 15.50 / 1200.50
+          valorEl.value = numeroValor.toFixed(2);
+        }
+
+        ensureRequestId();
+        setSubmitting(true);
+        HTMLFormElement.prototype.submit.call(form);
+        return true;
       }
 
       function ensureRequestId(){
@@ -2923,6 +2961,11 @@ function setPhone(digits) {
       });
 
       form.addEventListener('submit', function(ev){
+        if(isSubmitting || form.dataset.submitting === '1'){
+          ev.preventDefault();
+          return;
+        }
+
         const valorEl = form.querySelector('input[name="valor"]');
         if (valorEl) {
           const numeroValor = moneyToNumber(valorEl.value);
@@ -2936,11 +2979,6 @@ function setPhone(digits) {
 
           // Envia para o Flask sempre em formato seguro: 12.00 / 15.50 / 1200.50
           valorEl.value = numeroValor.toFixed(2);
-        }
-
-        if(isSubmitting){
-          ev.preventDefault();
-          return;
         }
         if(!form.checkValidity()){
           form.reportValidity?.();
@@ -2972,22 +3010,19 @@ function setPhone(digits) {
             if(boxAval) boxAval.style.display = 'block';
             setAvalInputsEnabled(true);
             autoGeral();
-            ensureRequestId();
-            setSubmitting(true);
-            form.submit();
+            submitLancamentoFinal();
           }else{
             if(chkAvaliar) chkAvaliar.checked = false;
             if(inputAvaliar) inputAvaliar.value = '0';
             if(boxAval) boxAval.style.display = 'none';
             setAvalInputsEnabled(false);
-            ensureRequestId();
-            setSubmitting(true);
-            form.submit();
+            submitLancamentoFinal();
           }
         }
       });
 
       btnAvaliarAgora?.addEventListener('click', ()=>{
+        if(isSubmitting || form.dataset.submitting === '1') return;
         if(!chkAvaliar || !inputAvaliar) return;
         chkAvaliar.checked = true;
         inputAvaliar.value = '1';
@@ -3001,6 +3036,7 @@ function setPhone(digits) {
       });
 
       btnPularAval?.addEventListener('click', ()=>{
+        if(isSubmitting || form.dataset.submitting === '1') return;
         if(!inputAvaliar) return;
         if(chkAvaliar) chkAvaliar.checked = false;
         inputAvaliar.value = '0';
@@ -3008,10 +3044,7 @@ function setPhone(digits) {
         setAvalInputsEnabled(false);
         modal?.hide();
         setTimeout(()=>{
-          if(isSubmitting) return;
-          ensureRequestId();
-          setSubmitting(true);
-          form.submit();
+          submitLancamentoFinal();
         }, 80);
       });
 
