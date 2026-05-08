@@ -2871,55 +2871,70 @@ function setPhone(digits) {
       const form = document.getElementById('formLancamento');
       if(!form) return;
 
+      if(form.dataset.avaliacaoFlowWired === '1') return;
+      form.dataset.avaliacaoFlowWired = '1';
+
       const modalEl = document.getElementById('modalAvaliar');
-      const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
+      const modal = modalEl ? new bootstrap.Modal(modalEl, {backdrop:'static', keyboard:false}) : null;
       const btnAvaliarAgora = document.getElementById('btnAvaliarAgora');
       const btnPularAval = document.getElementById('btnPularAval');
       const chkAvaliar = document.getElementById('chkAvaliar');
       const inputAvaliar = document.getElementById('inputAvaliar');
       const boxAval = document.getElementById('boxAval');
+      const submitBtn = form.querySelector('button[type="submit"], button.btn-royal:not([type])');
+      const modalButtons = [btnAvaliarAgora, btnPularAval].filter(Boolean);
 
-      let isSubmitting = false;
-      let finalSubmitStarted = false;
-      let modalAbertoAguardandoEscolha = false;
-      const submitBtn = form.querySelector('button.btn-royal[type="submit"], button.btn-royal');
+      function moneyToNumberSeguro(v){
+        if (v == null) return NaN;
+        let s = String(v).trim();
+        if (!s) return NaN;
+
+        s = s
+          .replace(/\s+/g, '')
+          .replace(/R\$/gi, '')
+          .replace(/\u00A0/g, '');
+
+        if (s.includes(',') && s.includes('.')) {
+          s = s.replace(/\./g, '').replace(',', '.');
+        } else if (s.includes(',')) {
+          s = s.replace(',', '.');
+        }
+
+        s = s.replace(/[^0-9.\-]/g, '');
+        const n = Number(s);
+        return Number.isFinite(n) ? n : NaN;
+      }
+
+      function jaEstaEnviando(){
+        return form.dataset.finalSubmitting === '1';
+      }
 
       function setSubmitting(on){
-        isSubmitting = !!on;
+        form.dataset.finalSubmitting = on ? '1' : '0';
 
         if(submitBtn){
-          submitBtn.disabled = on;
           if(submitBtn.dataset.origText == null) submitBtn.dataset.origText = submitBtn.innerHTML;
+          submitBtn.disabled = !!on;
           submitBtn.innerHTML = on
             ? '<span class="spinner-border spinner-border-sm me-1"></span> Lançando…'
             : submitBtn.dataset.origText;
         }
 
-        if(btnPularAval){
-          btnPularAval.disabled = on;
-          if(btnPularAval.dataset.origText == null) btnPularAval.dataset.origText = btnPularAval.innerHTML;
-          btnPularAval.innerHTML = on
-            ? '<span class="spinner-border spinner-border-sm me-1"></span> Lançando…'
-            : btnPularAval.dataset.origText;
-        }
+        modalButtons.forEach(btn => {
+          if(btn.dataset.origText == null) btn.dataset.origText = btn.innerHTML;
+          btn.disabled = !!on;
+          if(on && btn === btnPularAval){
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Lançando…';
+          }else if(!on){
+            btn.innerHTML = btn.dataset.origText;
+          }
+        });
 
-        if(btnAvaliarAgora){
-          btnAvaliarAgora.disabled = on;
+        if(form){
+          form.classList.toggle('opacity-75', !!on);
         }
-
-        form.style.pointerEvents = on ? 'none' : '';
-        form.classList.toggle('opacity-75', on);
 
         if(on) showLancOverlay('launch'); else hideLancOverlay();
-      }
-
-      function travarBotaoEnquantoModalAberto(on){
-        if(!submitBtn || finalSubmitStarted) return;
-        submitBtn.disabled = !!on;
-        if(submitBtn.dataset.origText == null) submitBtn.dataset.origText = submitBtn.innerHTML;
-        submitBtn.innerHTML = on
-          ? '<span class="spinner-border spinner-border-sm me-1"></span> Aguardando escolha…'
-          : submitBtn.dataset.origText;
       }
 
       function ensureRequestId(){
@@ -2935,11 +2950,11 @@ function setPhone(digits) {
         }
       }
 
-      function validarValorAntesDeEnviar(){
+      function normalizarValorAntesDeEnviar(){
         const valorEl = form.querySelector('input[name="valor"]');
         if (!valorEl) return true;
 
-        const numeroValor = moneyToNumber(valorEl.value);
+        const numeroValor = moneyToNumberSeguro(valorEl.value);
 
         if (!Number.isFinite(numeroValor) || numeroValor <= 0) {
           alert('Informe um valor válido.');
@@ -2947,36 +2962,31 @@ function setPhone(digits) {
           return false;
         }
 
-        // Envia para o Flask sempre em formato seguro: 12.00 / 15.50 / 1200.50
         valorEl.value = numeroValor.toFixed(2);
         return true;
       }
 
-      function envioFinal(){
-        if(finalSubmitStarted || isSubmitting){
-          return false;
-        }
+      function prepararEnvioFinal(){
+        if(jaEstaEnviando()) return false;
 
-        if(!validarValorAntesDeEnviar()){
-          return false;
-        }
+        if(!normalizarValorAntesDeEnviar()) return false;
 
         if(!form.checkValidity()){
           form.reportValidity?.();
           return false;
         }
 
-        finalSubmitStarted = true;
-        modalAbertoAguardandoEscolha = false;
         ensureRequestId();
         setSubmitting(true);
-
-        // Envia no próximo ciclo para o card "Lançando…" aparecer antes da troca de página.
-        setTimeout(()=>{
-          HTMLFormElement.prototype.submit.call(form);
-        }, 60);
-
         return true;
+      }
+
+      function enviarUmaVez(){
+        if(!prepararEnvioFinal()) return;
+
+        // Native submit não dispara novamente o listener. Como a trava já foi ligada,
+        // mesmo clique duplo rápido nos botões fica ignorado antes desta chamada.
+        form.submit();
       }
 
       function scrollIntoViewSmooth(el){
@@ -2984,8 +2994,10 @@ function setPhone(digits) {
       }
 
       setAvalInputsEnabled(false);
+      setSubmitting(false);
 
       chkAvaliar?.addEventListener('change', ()=>{
+        if(jaEstaEnviando()) return;
         const on = chkAvaliar.checked;
         if(inputAvaliar) inputAvaliar.value = on ? '1':'0';
         if(boxAval) boxAval.style.display = on ? 'block':'none';
@@ -2994,19 +3006,21 @@ function setPhone(digits) {
       });
 
       form.addEventListener('submit', function(ev){
-        ev.preventDefault();
-
-        if(finalSubmitStarted || isSubmitting || modalAbertoAguardandoEscolha){
-          return;
+        if(jaEstaEnviando()){
+          ev.preventDefault();
+          ev.stopImmediatePropagation();
+          return false;
         }
 
-        if(!validarValorAntesDeEnviar()){
-          return;
+        if(!normalizarValorAntesDeEnviar()){
+          ev.preventDefault();
+          return false;
         }
 
         if(!form.checkValidity()){
+          ev.preventDefault();
           form.reportValidity?.();
-          return;
+          return false;
         }
 
         const avaliando = (chkAvaliar && chkAvaliar.checked) ||
@@ -3016,50 +3030,49 @@ function setPhone(digits) {
         if(avaliando){
           setAvalInputsEnabled(true);
           autoGeral();
-          envioFinal();
-          return;
+          ensureRequestId();
+          setSubmitting(true);
+          return true;
         }
+
+        ev.preventDefault();
 
         if(modal){
-          modalAbertoAguardandoEscolha = true;
-          travarBotaoEnquantoModalAberto(true);
           modal.show();
-        }else{
-          const querAvaliar = confirm('Deseja registrar uma avaliação agora antes de lançar?');
-          if(querAvaliar){
-            if(chkAvaliar) chkAvaliar.checked = true;
-            if(inputAvaliar) inputAvaliar.value = '1';
-            if(boxAval) boxAval.style.display = 'block';
-            setAvalInputsEnabled(true);
-            autoGeral();
-            envioFinal();
-          }else{
-            if(chkAvaliar) chkAvaliar.checked = false;
-            if(inputAvaliar) inputAvaliar.value = '0';
-            if(boxAval) boxAval.style.display = 'none';
-            setAvalInputsEnabled(false);
-            envioFinal();
-          }
+          return false;
         }
+
+        const querAvaliar = confirm('Deseja registrar uma avaliação agora antes de lançar?');
+        if(querAvaliar){
+          if(chkAvaliar) chkAvaliar.checked = true;
+          if(inputAvaliar) inputAvaliar.value = '1';
+          if(boxAval) boxAval.style.display = 'block';
+          setAvalInputsEnabled(true);
+          autoGeral();
+          scrollIntoViewSmooth(boxAval);
+          return false;
+        }
+
+        if(chkAvaliar) chkAvaliar.checked = false;
+        if(inputAvaliar) inputAvaliar.value = '0';
+        if(boxAval) boxAval.style.display = 'none';
+        setAvalInputsEnabled(false);
+        enviarUmaVez();
+        return false;
       });
 
-      modalEl?.addEventListener('hidden.bs.modal', ()=>{
-        if(!finalSubmitStarted){
-          modalAbertoAguardandoEscolha = false;
-          travarBotaoEnquantoModalAberto(false);
-        }
-      });
-
-      btnAvaliarAgora?.addEventListener('click', ()=>{
-        if(finalSubmitStarted || isSubmitting) return;
+      btnAvaliarAgora?.addEventListener('click', (ev)=>{
+        ev.preventDefault();
+        if(jaEstaEnviando()) return;
         if(!chkAvaliar || !inputAvaliar) return;
-        modalAbertoAguardandoEscolha = false;
-        travarBotaoEnquantoModalAberto(false);
+
         chkAvaliar.checked = true;
         inputAvaliar.value = '1';
         if(boxAval) boxAval.style.display = 'block';
         setAvalInputsEnabled(true);
+        autoGeral();
         modal?.hide();
+
         setTimeout(()=>{
           scrollIntoViewSmooth(boxAval);
           boxAval?.querySelector('.rating-group .star')?.focus?.();
@@ -3070,23 +3083,36 @@ function setPhone(digits) {
         ev.preventDefault();
         ev.stopPropagation();
 
-        if(finalSubmitStarted || isSubmitting) return;
-        if(!inputAvaliar) return;
+        if(jaEstaEnviando()) return;
 
         if(chkAvaliar) chkAvaliar.checked = false;
-        inputAvaliar.value = '0';
+        if(inputAvaliar) inputAvaliar.value = '0';
         if(boxAval) boxAval.style.display = 'none';
         setAvalInputsEnabled(false);
 
-        // Trava imediatamente antes de fechar o modal para impedir clique duplo.
-        envioFinal();
-        modal?.hide();
+        if(prepararEnvioFinal()){
+          modal?.hide();
+          form.submit();
+        }
       });
+
+      // Trava também no início do clique para impedir duplo clique muito rápido.
+      btnPularAval?.addEventListener('pointerdown', (ev)=>{
+        if(jaEstaEnviando()){
+          ev.preventDefault();
+          ev.stopPropagation();
+        }
+      }, true);
+
+      submitBtn?.addEventListener('pointerdown', (ev)=>{
+        if(jaEstaEnviando()){
+          ev.preventDefault();
+          ev.stopPropagation();
+        }
+      }, true);
 
       window.addEventListener('pageshow', (e)=>{
         if(e.persisted){
-          finalSubmitStarted = false;
-          modalAbertoAguardandoEscolha = false;
           setSubmitting(false);
           hideLancOverlay();
         }
