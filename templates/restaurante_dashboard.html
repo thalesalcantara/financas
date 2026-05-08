@@ -1774,7 +1774,7 @@
                       <div class="row g-2">
                         <div class="col-md-3">
                           <label class="form-label">Valor (R$)</label>
-                          <input type="text" class="form-control" name="valor" inputmode="decimal" enterkeyhint="done" placeholder="0,00" required autocomplete="off" data-money-input="1">
+                          <input type="text" class="form-control" name="valor" inputmode="decimal" enterkeyhint="done" placeholder="0,00" required autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-money-input="1">
                         </div>
 
                         <div class="col-md-3">
@@ -2053,16 +2053,31 @@
       
       function moneyToNumber(v){
         if (v == null) return NaN;
+
         let s = String(v).trim();
         if (!s) return NaN;
-        s = s.replace(/\s+/g, '');
-        s = s.replace(/[R$r$\u00A0]/g, '');
+
+        s = s
+          .replace(/\s+/g, '')
+          .replace(/R\$/gi, '')
+          .replace(/ /g, '');
+
+        /*
+          Aceita corretamente:
+          12
+          12,00
+          12.00
+          1.200,50
+          1200.50
+        */
         if (s.includes(',') && s.includes('.')) {
           s = s.replace(/\./g, '').replace(',', '.');
         } else if (s.includes(',')) {
           s = s.replace(',', '.');
         }
+
         s = s.replace(/[^0-9.\-]/g, '');
+
         const n = Number(s);
         return Number.isFinite(n) ? n : NaN;
       }
@@ -2910,14 +2925,17 @@ function setPhone(digits) {
       form.addEventListener('submit', function(ev){
         const valorEl = form.querySelector('input[name="valor"]');
         if (valorEl) {
-          const normalized = normalizeMoneyValue(valorEl.value);
-          if (!normalized || Number(normalized) <= 0) {
+          const numeroValor = moneyToNumber(valorEl.value);
+
+          if (!Number.isFinite(numeroValor) || numeroValor <= 0) {
             ev.preventDefault();
             alert('Informe um valor válido.');
             valorEl.focus();
             return;
           }
-          valorEl.value = normalized;
+
+          // Envia para o Flask sempre em formato seguro: 12.00 / 15.50 / 1200.50
+          valorEl.value = numeroValor.toFixed(2);
         }
 
         if(isSubmitting){
