@@ -1428,7 +1428,7 @@
       ];
 
       const RESTS = [
-        {% for r in (rest_list if rest_list is defined else restaurantes) %}
+        {% for r in rest_list %}
           { id: {{ r.id }}, nome: "{{ r.nome|e }}" }{{ "," if not loop.last }}
         {% endfor %}
       ];
@@ -1506,27 +1506,23 @@
       const kpiTotalReceitasGeral = kpiRecCoopCorp + kpiRecCooperadosFull;
       const kpiBeneficiosRateados = sumBy(filteredBEN, x => x.valor_total);
 
-      // Aplica KPIs pelo JavaScript somente quando as bases detalhadas foram enviadas.
-      // No modo rápido, os cards já vêm corretos do backend; isso evita zerar os cards quando as listas não são carregadas.
-      const SHOULD_RECALC_KPIS = (PRODUCOES.length + REC_COOP.length + DESP_COOP.length + REC_COOP_CORP.length + DESP_COOP_CORP.length + BENEFICIOS_VIEW.length) > 0;
-      if (SHOULD_RECALC_KPIS) {
-        document.getElementById('kpiTotalProds').textContent         = fmtBR(kpiProd);
-        document.getElementById('kpiINSS4').textContent              = fmtBR(kpiINSS4);
-        document.getElementById('kpiSEST05').textContent             = fmtBR(kpiSEST05);
-        document.getElementById('kpiRecCoopCorp').textContent        = fmtBR(kpiRecCoopCorp);
-        document.getElementById('kpiDespCoopCorp').textContent       = fmtBR(kpiDespCoopCorp);
-        document.getElementById('kpiRecCooperadosFull').textContent  = fmtBR(kpiRecCooperadosFull);
-        document.getElementById('kpiDespCooperados').textContent     = fmtBR(kpiDespCooperados);
-        document.getElementById('kpiTotalReceitasGeral').textContent = fmtBR(kpiTotalReceitasGeral);
-        const benEl = document.getElementById('kpiBeneficiosRateados');
-        if (benEl) benEl.textContent = fmtBR(kpiBeneficiosRateados);
+      // aplica KPIs na tela
+      document.getElementById('kpiTotalProds').textContent         = fmtBR(kpiProd);
+      document.getElementById('kpiINSS4').textContent              = fmtBR(kpiINSS4);
+      document.getElementById('kpiSEST05').textContent             = fmtBR(kpiSEST05);
+      document.getElementById('kpiRecCoopCorp').textContent        = fmtBR(kpiRecCoopCorp);
+      document.getElementById('kpiDespCoopCorp').textContent       = fmtBR(kpiDespCoopCorp);
+      document.getElementById('kpiRecCooperadosFull').textContent  = fmtBR(kpiRecCooperadosFull);
+      document.getElementById('kpiDespCooperados').textContent     = fmtBR(kpiDespCooperados);
+      document.getElementById('kpiTotalReceitasGeral').textContent = fmtBR(kpiTotalReceitasGeral);
+      const benEl = document.getElementById('kpiBeneficiosRateados');
+      if (benEl) benEl.textContent = fmtBR(kpiBeneficiosRateados);
 
-        const resEl = document.getElementById('kpiResultadoCoop');
-        if (resEl) {
-          resEl.textContent = fmtBR(kpiResultadoCoop);
-          resEl.classList.remove('text-success', 'text-danger');
-          resEl.classList.add(kpiResultadoCoop < 0 ? 'text-danger' : 'text-success');
-        }
+      const resEl = document.getElementById('kpiResultadoCoop');
+      if (resEl) {
+        resEl.textContent = fmtBR(kpiResultadoCoop);
+        resEl.classList.remove('text-success', 'text-danger');
+        resEl.classList.add(kpiResultadoCoop < 0 ? 'text-danger' : 'text-success');
       }
 
       // ---- chave segura para agrupar cooperado mesmo sem id ----
@@ -4349,9 +4345,8 @@
             <input type="date" class="form-control form-control-sm" name="escala_hist_fim" form="formEscalaHist" value="{{ escala_hist_fim.strftime('%Y-%m-%d') if escala_hist_fim else '' }}">
           </div>
           <div class="col-lg-8 d-flex flex-wrap gap-2 justify-content-lg-end">
-            <form id="formEscalaHist" method="GET" action="{{ url_for('admin_dashboard') }}" class="d-flex gap-2 flex-wrap">
-              <input type="hidden" name="tab" value="escalas">
-              <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-clock-history me-1"></i>Ver histórico</button>
+            <form id="formEscalaHist" method="GET" action="{{ url_for('admin_escalas_historico') }}" target="_blank" class="d-flex gap-2 flex-wrap">
+              <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-clock-history me-1"></i>Abrir histórico em nova aba</button>
             </form>
             <a class="btn btn-outline-success btn-sm" href="{{ url_for('admin_exportar_escalas_atual', escala_hist_inicio=(escala_hist_inicio.strftime('%Y-%m-%d') if escala_hist_inicio else ''), escala_hist_fim=(escala_hist_fim.strftime('%Y-%m-%d') if escala_hist_fim else '')) }}"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Exportar escala atual + alterações</a>
             <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_exportar_escalas_historico', escala_hist_inicio=(escala_hist_inicio.strftime('%Y-%m-%d') if escala_hist_inicio else ''), escala_hist_fim=(escala_hist_fim.strftime('%Y-%m-%d') if escala_hist_fim else '')) }}"><i class="bi bi-download me-1"></i>Exportar histórico de escalas</a>
@@ -4382,46 +4377,16 @@
 
 
   <div class="card p-3 mb-3 border-0 shadow-sm">
-    <div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
       <div>
         <h6 class="mb-0 section-title">Histórico de escalas</h6>
-        <small class="section-subtitle">Últimos 31 dias das modificações e snapshots da escala.</small>
+        <small class="section-subtitle">Para a aba Escalas abrir mais rápido, o histórico completo abre separado.</small>
       </div>
-      <span class="badge-soft">{{ escala_historico_rows|length if escala_historico_rows else 0 }} registro(s)</span>
-    </div>
-    <div class="table-responsive">
-      <table class="table table-sm align-middle mb-0">
-        <thead>
-          <tr>
-            <th>Registrado em</th>
-            <th>Origem</th>
-            <th>Data</th>
-            <th>Turno</th>
-            <th>Horário</th>
-            <th>Contrato</th>
-            <th>Cooperado atual</th>
-            <th>Retirado</th>
-            <th>Entrou</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for h in escala_historico_rows or [] %}
-          <tr>
-            <td>{{ h.snapshot_em.strftime('%d/%m/%Y %H:%M') if h.snapshot_em else '—' }}</td>
-            <td>{{ h.origem or h.acao }}</td>
-            <td>{{ h.data }}</td>
-            <td>{{ h.turno or '—' }}</td>
-            <td>{{ h.horario or '—' }}</td>
-            <td>{{ h.contrato or '—' }}</td>
-            <td>{{ h.cooperado_nome or '—' }}</td>
-            <td>{{ h.saiu_nome or '—' }}</td>
-            <td>{{ h.entrou_nome or '—' }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="9" class="text-center text-muted">Sem histórico no período.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <form method="GET" action="{{ url_for('admin_escalas_historico') }}" target="_blank" class="d-flex gap-2 flex-wrap align-items-end">
+        <input type="hidden" name="escala_hist_inicio" value="{{ escala_hist_inicio.strftime('%Y-%m-%d') if escala_hist_inicio else '' }}">
+        <input type="hidden" name="escala_hist_fim" value="{{ escala_hist_fim.strftime('%Y-%m-%d') if escala_hist_fim else '' }}">
+        <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-box-arrow-up-right me-1"></i>Abrir histórico</button>
+      </form>
     </div>
   </div>
 
@@ -4595,6 +4560,7 @@
           <thead>
             <tr>
               <th style="width: 80px;">#</th>
+              <th>Resumo da troca</th>
               <th>Cooperado 1</th>
               <th>Escala 1</th>
               <th>Cooperado 2</th>
@@ -4693,6 +4659,13 @@
                       —
                     {% endif %}
                   </div>
+                </td>
+
+                <td>
+                  <div class="small fw-semibold text-primary">
+                    {{ t.resumo_texto if t.resumo_texto is defined and t.resumo_texto else 'Resumo da troca não disponível.' }}
+                  </div>
+                  <div class="extra-small text-muted mt-1">Resumo automático para facilitar a conferência.</div>
                 </td>
 
                 <td>
@@ -4841,6 +4814,7 @@
           <thead>
             <tr>
               <th style="width: 80px;">#</th>
+              <th>Resumo da troca</th>
               <th>Cooperado 1</th>
               <th>Escala 1</th>
               <th>Cooperado 2</th>
@@ -4931,6 +4905,13 @@
                       —
                     {% endif %}
                   </div>
+                </td>
+
+                <td>
+                  <div class="small fw-semibold text-primary">
+                    {{ t.resumo_texto if t.resumo_texto is defined and t.resumo_texto else 'Resumo da troca não disponível.' }}
+                  </div>
+                  <div class="extra-small text-muted mt-1">Resumo automático para facilitar a conferência.</div>
                 </td>
 
                 <td>
@@ -6412,6 +6393,7 @@
     }
 
     updatePrazo();
+    setInterval(updatePrazo, 60 * 1000);
   });
 </script>
 
@@ -7136,9 +7118,8 @@ document.addEventListener('DOMContentLoaded', function(){
     knownAlertIds = new Set((initial || []).map(a => String(a.id)));
     renderAlertas(initial || []);
   } catch(_) {}
-  // Sem atualização automática: mantém a aba Escalas parada e leve.
+  // Sem atualização automática para evitar consultas repetidas e deixar o painel parado.
   // Para atualizar os alertas, recarregue a aba Escalas manualmente.
-  // pollAlertas();
 });
 </script>
 
