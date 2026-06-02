@@ -1332,212 +1332,14 @@
       </style>
     </section>
 
-    <!-- Dados (seguros p/ JS) + Scripts (Chart.js + XLSX) -->
+    <!-- Dados do resumo já chegam prontos do backend. O HTML não recalcula financeiro. -->
     <script>
     (function(){
-      // ---- Filtros atuais (mais seguro com tojson) ----
       const FILTER = {{ {'ri': ri, 'rf': rf, 'rid': rid, 'cid': cid}|tojson }};
 
-      // ---- Bases compactas ----
-      const PRODUCOES = [
-        {% for l in _producoes %}
-          {
-            id: {{ l.id }},
-            data: "{{ ymd(l.data) }}",
-            valor: {{ (l.valor or 0)|float }},
-            cooperado_id: {{ l.cooperado.id if l.cooperado else 'null' }},
-            cooperado_nome: "{{ (l.cooperado.nome if l.cooperado else '')|e }}",
-            restaurante_id: {{ l.restaurante.id if l.restaurante else 'null' }},
-            restaurante_nome: "{{ (l.restaurante.nome if l.restaurante else '')|e }}"
-          }{{ "," if not loop.last }}
-        {% endfor %}
-      ];
-
-      const REC_COOP = [
-        {% for r in receitas_coop %}
-          {
-            id: {{ r.id }},
-            data: "{{ ymd(r.data) }}",
-            valor: {{ (r.valor or 0)|float }},
-            cooperado_id: {{ r.cooperado.id if r.cooperado else 'null' }},
-            cooperado_nome: "{{ (r.cooperado.nome if r.cooperado else '')|e }}",
-            descricao: "{{ (r.descricao or '')|e }}"
-          }{{ "," if not loop.last }}
-        {% endfor %}
-      ];
-
-      // Adiantamento deve aparecer na coluna própria do resumo e no total do rodapé.
-      const DESP_COOP = [
-        {% for d in despesas_coop %}
-          {% set _is_ad_js = 1 if (d.eh_adiantamento if d.eh_adiantamento is defined else (d.adiantamento in [True, 1, '1', 'true', 'True', 'on'])) else 0 %}
-          {% set _abat_manual = namespace(v=0) %}{% if d.abatimentos is defined %}{% for ab in d.abatimentos %}{% set _abat_manual.v = _abat_manual.v + (ab.valor or 0) %}{% endfor %}{% endif %}
-          {
-            id: {{ d.id }},
-            data: "{{ ymd(d.data) }}",
-            valor: {{ (d.valor or 0)|float }},
-            cooperado_id: {{ d.cooperado.id if d.cooperado else 'null' }},
-            cooperado_nome: "{{ (d.cooperado.nome if d.cooperado else (d.cooperado_nome if d.cooperado_nome is defined else ''))|e }}",
-            descricao: "{{ (d.descricao or '')|e }}",
-            adiantamento: {{ _is_ad_js }},
-            competencia_desconto: "{{ (d.competencia_desconto if d.competencia_desconto is defined else 'esta_semana')|e }}",
-            valor_pago_manual: {{ _abat_manual.v|float }}
-          }{{ "," if not loop.last }}
-        {% endfor %}
-      ];
-
-      // Receitas e Despesas da COOPERATIVA
-      const REC_COOP_CORP = [
-        {% for r in _rec_coop_corp %}
-          {
-            id: {{ r.id }},
-            data: "{{ ymd(r.data or r.data_lancamento) }}",
-            valor: {{ (r.valor|default(r.valor_total, true)|default(0, true))|float }},
-            descricao: "{{ (r.descricao or '')|e }}"
-          }{{ "," if not loop.last }}
-        {% endfor %}
-      ];
-
-      const DESP_COOP_CORP = [
-        {% for d in _desp_coop_corp %}
-          {
-            id: {{ d.id }},
-            data: "{{ ymd(d.data or d.data_lancamento) }}",
-            valor: {{ (d.valor|default(d.valor_total, true)|default(0, true))|float }},
-            descricao: "{{ (d.descricao or '')|e }}"
-          }{{ "," if not loop.last }}
-        {% endfor %}
-      ];
-
-      const BENEFICIOS_VIEW = [
-        {% for b in beneficios_view %}
-          {
-            id: {{ b.id }},
-            data_inicial: "{{ ymd(b.data_inicial) }}",
-            data_final: "{{ ymd(b.data_final) }}",
-            data_lancamento: "{{ ymd(b.data_lancamento) }}",
-            tipo: "{{ (b.tipo or '')|e }}",
-            valor_total: {{ (b.valor_total or 0)|float }}
-          }{{ "," if not loop.last }}
-        {% endfor %}
-      ];
-
-      const COOPS = [
-        {% for c in cooperados %}
-          { id: {{ c.id }}, nome: "{{ c.nome|e }}" }{{ "," if not loop.last }}
-        {% endfor %}
-      ];
-
-      const RESTS = [
-        {% for r in rest_list %}
-          { id: {{ r.id }}, nome: "{{ r.nome|e }}" }{{ "," if not loop.last }}
-        {% endfor %}
-      ];
-
-      // ---- Utils ----
-      const parseISO = s => (!s) ? null : new Date(s + 'T00:00:00');
-
-      const fmtBR = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      });
-
-      const inRange = (d) => {
-        const di = parseISO(FILTER.ri);
-        const df = parseISO(FILTER.rf);
-        const x  = parseISO(d);
-        if (!x) return true;
-        if (di && x < di) return false;
-        if (df && x > df) return false;
-        return true;
-      };
-
-      const byMonthKey = d => {
-        if (!d) return '';
-        const dt = parseISO(d);
-        if (!dt || isNaN(dt)) return '';
-        return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
-      };
-
-      const sumBy = (arr, fn) => arr.reduce((acc, cur) => acc + (+fn(cur) || 0), 0);
-
-      // ---- Filtro ----
-      const filteredPROD = PRODUCOES.filter(p =>
-        inRange(p.data) &&
-        (FILTER.cid == null || p.cooperado_id === FILTER.cid) &&
-        (FILTER.rid == null || p.restaurante_id === FILTER.rid)
-      );
-
-      const filteredRECp = REC_COOP.filter(r =>
-        inRange(r.data) &&
-        (FILTER.cid == null || r.cooperado_id === FILTER.cid)
-      );
-
-      const filteredDESp = DESP_COOP.filter(d => {
-        if (!inRange(d.data)) return false;
-        if (FILTER.cid == null) return true;
-
-        if (d.cooperado_id === FILTER.cid) return true;
-
-        const coop = COOPS.find(c => c.id === FILTER.cid);
-        if (coop && d.cooperado_nome) {
-          return d.cooperado_nome.trim().toUpperCase() === coop.nome.trim().toUpperCase();
-        }
-        return false;
-      });
-
-      const filteredRECc = REC_COOP_CORP.filter(r => inRange(r.data));
-      const filteredDESc = DESP_COOP_CORP.filter(d => inRange(d.data));
-      const filteredBEN  = BENEFICIOS_VIEW.filter(b => inRange(b.data_lancamento || b.data_final || b.data_inicial));
-
-      // ---- KPIs (front) ----
-      const qtdEntregasPeriodo   = filteredPROD.length;
-      const kpiProd         = sumBy(filteredPROD, x => x.valor);
-      const kpiINSS4        = kpiProd * 0.04;
-      const kpiSEST05       = kpiProd * 0.005;
-      const kpiEncargos45   = kpiINSS4 + kpiSEST05;
-
-      const kpiRecCoopCorp  = sumBy(filteredRECc, x => x.valor);
-      const kpiDespCoopCorp = sumBy(filteredDESc, x => x.valor);
-
-      const kpiRecCooperadosFull = kpiProd + sumBy(filteredRECp, x => x.valor);
-
-      const kpiDespCooperados = sumBy(filteredDESp.filter(x => !x.adiantamento), x => x.valor);
-      const kpiResultadoCoop      = kpiRecCoopCorp - kpiDespCoopCorp;
-      const kpiTotalReceitasGeral = kpiRecCoopCorp + kpiRecCooperadosFull;
-      const kpiBeneficiosRateados = sumBy(filteredBEN, x => x.valor_total);
-
-      // aplica KPIs na tela
-      document.getElementById('kpiTotalProds').textContent         = fmtBR(kpiProd);
-      document.getElementById('kpiINSS4').textContent              = fmtBR(kpiINSS4);
-      document.getElementById('kpiSEST05').textContent             = fmtBR(kpiSEST05);
-      document.getElementById('kpiRecCoopCorp').textContent        = fmtBR(kpiRecCoopCorp);
-      document.getElementById('kpiDespCoopCorp').textContent       = fmtBR(kpiDespCoopCorp);
-      document.getElementById('kpiRecCooperadosFull').textContent  = fmtBR(kpiRecCooperadosFull);
-      document.getElementById('kpiDespCooperados').textContent     = fmtBR(kpiDespCooperados);
-      document.getElementById('kpiTotalReceitasGeral').textContent = fmtBR(kpiTotalReceitasGeral);
-      const benEl = document.getElementById('kpiBeneficiosRateados');
-      if (benEl) benEl.textContent = fmtBR(kpiBeneficiosRateados);
-
-      const resEl = document.getElementById('kpiResultadoCoop');
-      if (resEl) {
-        resEl.textContent = fmtBR(kpiResultadoCoop);
-        resEl.classList.remove('text-success', 'text-danger');
-        resEl.classList.add(kpiResultadoCoop < 0 ? 'text-danger' : 'text-success');
-      }
-
-      // ---- chave segura para agrupar cooperado mesmo sem id ----
-      const coopKey = (id, nome) => {
-        if (id != null) return `id:${id}`;
-        if (nome && nome.trim()) return `nome:${nome.trim().toUpperCase()}`;
-        return 'nome:—';
-      };
-      const RESUMO_COOP_ROWS = {{ resumo_coop_rows|default([])|tojson|safe }};
-      // Gráficos do resumo removidos para reduzir peso.
-
-      // ---- Atalhos de filtro mensal / anual ----
-      (function(){
-        const form = document.querySelector('#resumo form[method="GET"]');
-        if (!form) return;
+      // Atalhos de filtro mensal / anual: apenas preenche datas e envia o formulário.
+      const form = document.querySelector('#resumo form[method="GET"]');
+      if (form) {
         const diInput = form.querySelector('input[name="data_inicio"]');
         const dfInput = form.querySelector('input[name="data_fim"]');
         const monthInput = document.getElementById('quickMonthResumo');
@@ -1570,120 +1372,33 @@
           dfInput.value = `${y}-12-31`;
           form.submit();
         });
-      })();
-
-      // ---- Exportação XLSX ----
-      const ensureXLSX = () => new Promise(res => {
-        if (window.XLSX) return res();
-        const s = document.createElement('script');
-        s.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
-        s.onload = () => res();
-        document.head.appendChild(s);
-      });
-
-      function aoaToSheet(title, aoa, wb) {
-        const ws = XLSX.utils.aoa_to_sheet(aoa);
-        XLSX.utils.book_append_sheet(wb, ws, title);
       }
 
-      function safeSheetName(s) {
-        const cleaned = String(s || '').replace(/[:\\/?*\[\]]/g, ' ').slice(0, 31).trim();
-        return cleaned || 'Planilha';
-      }
-
-      async function exportXLSX() {
-        await ensureXLSX();
-        const wb = XLSX.utils.book_new();
-
-        const k1 = [
-          ['Dashboard Financeiro — Filtro'],
-          ['Período', FILTER.ri || 'início', '→', FILTER.rf || 'hoje'],
-          ['Estabelecimento', FILTER.rid == null ? 'Todos' : (RESTS.find(r => r.id === FILTER.rid)?.nome || FILTER.rid)],
-          ['Cooperado', FILTER.cid == null ? 'Todos' : (COOPS.find(c => c.id === FILTER.cid)?.nome || FILTER.cid)],
-          [],
-          ['KPIs'],
-          ['Total Produções', kpiProd],
-          ['INSS (4,0%)', kpiINSS4],
-          ['SEST/SENAT (0,5%)', kpiSEST05],
-          ['Encargos (4,5%)', kpiEncargos45],
-          ['Receitas Coop (período)', kpiRecCoopCorp],
-          ['Despesas Coop (período)', kpiDespCoopCorp],
-          ['Receitas Cooperados (Prod + Rec)', kpiRecCooperadosFull],
-          ['Despesas Cooperados (período)', kpiDespCooperados],
-          ['Total de Receitas (Geral)', kpiTotalReceitasGeral],
-          ['Resultado Cooperativa', kpiResultadoCoop],
-        ];
-        aoaToSheet('KPIs', k1, wb);
-
-        const prodAOA = [['Data', 'Cooperado', 'Estabelecimento', 'Valor', 'INSS(4,0%)', 'SEST/SENAT(0,5%)', 'Encargos(4,5%)', 'Líquido']];
-        filteredPROD.forEach(p => {
-          const inss4  = p.valor * 0.04;
-          const sest05 = p.valor * 0.005;
-          const enc    = inss4 + sest05;
-          const liq    = p.valor - enc;
-          prodAOA.push([p.data, p.cooperado_nome || '', p.restaurante_nome || '', p.valor, inss4, sest05, enc, liq]);
-        });
-        aoaToSheet('Producoes', prodAOA, wb);
-
-        const recCAOA = [['Data', 'Descrição', 'Valor']];
-        filteredRECc.forEach(r => recCAOA.push([r.data, r.descricao || '', r.valor]));
-        aoaToSheet('Receitas_Coop', recCAOA, wb);
-
-        const desCAOA = [['Data', 'Descrição', 'Valor']];
-        filteredDESc.forEach(d => desCAOA.push([d.data, d.descricao || '', d.valor]));
-        aoaToSheet('Despesas_Coop', desCAOA, wb);
-
-        const byR = {};
-        filteredPROD.forEach(p => {
-          if (p.restaurante_nome)
-            byR[p.restaurante_nome] = (byR[p.restaurante_nome] || 0) + p.valor;
-        });
-        const estAOA = [['Estabelecimento', 'Total Produções (R$)']];
-        Object.entries(byR).sort((a, b) => b[1] - a[1]).forEach(([nome, v]) => estAOA.push([nome, v]));
-        aoaToSheet('Estabelecimentos', estAOA, wb);
-
-        // >>> COM ADIANTAMENTOS no XLSX também
-        const resumoAOA = [['Cooperado', 'Produções', 'INSS (4,0%)', 'SEST/SENAT (0,5%)', 'Receitas', 'Despesas', 'Adiantamento', 'A Receber', 'Saldo Pendente']];
-        let tProd = 0, tINSS4 = 0, tSEST05 = 0, tRec = 0, tDes = 0, tAdi = 0, tLiq = 0, tPend = 0;
-
-        RESUMO_COOP_ROWS.forEach(r => {
-          tProd += r.prod; tINSS4 += r.inss4; tSEST05 += r.sest05; tRec += r.rec; tDes += r.des; tAdi += r.adiant; tLiq += r.aReceber; tPend += r.saldoPendente;
-          resumoAOA.push([r.nome || '—', r.prod, r.inss4, r.sest05, r.rec, r.des, r.adiant, r.aReceber, r.saldoPendente]);
-        });
-
-        resumoAOA.push(['TOTAIS', tProd, tINSS4, tSEST05, tRec, tDes, tAdi, tLiq, tPend]);
-        aoaToSheet('Resumo_Cooperados', resumoAOA, wb);
-
-        const byC_rec = {};
-        filteredRECp.forEach(r => {
-          const k = r.cooperado_nome || `ID ${r.cooperado_id}`;
-          (byC_rec[k] ||= []).push(r);
-        });
-        Object.keys(byC_rec).forEach(nome => {
-          const aoa = [['Data', 'Descrição', 'Valor']];
-          byC_rec[nome].forEach(r => aoa.push([r.data, r.descricao || '', r.valor]));
-          aoaToSheet(safeSheetName('Receita - ' + nome), aoa, wb);
-        });
-
-        const byC_des = {};
-        filteredDESp.forEach(d => {
-          const k = d.cooperado_nome || `ID ${d.cooperado_id}`;
-          (byC_des[k] ||= []).push(d);
-        });
-        Object.keys(byC_des).forEach(nome => {
-          const aoa = [['Data', 'Descrição', 'Valor']];
-          byC_des[nome].forEach(d => {
-            aoa.push([d.data, d.descricao || '', d.valor]);
+      // Exporta somente o que já está visível na tela, sem recalcular regras financeiras no navegador.
+      document.getElementById('btnExportXLSX')?.addEventListener('click', async () => {
+        if (!window.XLSX) {
+          await new Promise(res => {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+            s.onload = res;
+            document.head.appendChild(s);
           });
-          aoaToSheet(safeSheetName('Despesa - ' + nome), aoa, wb);
+        }
+        const wb = XLSX.utils.book_new();
+        const aoa = [['Resumo financeiro COOPEX']];
+        document.querySelectorAll('#resumo .kpi-card').forEach(card => {
+          const label = card.querySelector('.kpi-label')?.textContent?.trim() || '';
+          const value = card.querySelector('.kpi-value, .fw-bold.fs-5')?.textContent?.trim() || '';
+          if (label || value) aoa.push([label, value]);
         });
-
-        const now = new Date();
-        const ymd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        XLSX.writeFile(wb, `Dashboard_Coopex_${ymd}.xlsx`);
-      }
-
-      document.getElementById('btnExportXLSX')?.addEventListener('click', exportXLSX);
+        aoa.push([]);
+        document.querySelectorAll('#resumo table tr').forEach(tr => {
+          const row = Array.from(tr.querySelectorAll('th,td')).map(td => td.textContent.trim());
+          if (row.length) aoa.push(row);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Resumo');
+        XLSX.writeFile(wb, 'Resumo_Coopex.xlsx');
+      });
     })();
     </script>
 </section><!--AJAX_RESUMO_END-->
@@ -1758,7 +1473,7 @@
         </button>
       </div>
 
-      <form id="formFiltroLancamentos" method="GET" action="{{ url_for('filtrar_lancamentos') }}" class="row g-2 align-items-end">
+      <form id="formFiltroLancamentos" method="GET" action="{{ url_for('admin_dashboard') }}" class="row g-2 align-items-end">
         <input type="hidden" name="tab" value="lancamentos">
 
         <div class="col-md-3">
@@ -4345,8 +4060,9 @@
             <input type="date" class="form-control form-control-sm" name="escala_hist_fim" form="formEscalaHist" value="{{ escala_hist_fim.strftime('%Y-%m-%d') if escala_hist_fim else '' }}">
           </div>
           <div class="col-lg-8 d-flex flex-wrap gap-2 justify-content-lg-end">
-            <form id="formEscalaHist" method="GET" action="{{ url_for('admin_escalas_historico') }}" target="_blank" class="d-flex gap-2 flex-wrap">
-              <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-clock-history me-1"></i>Abrir histórico em nova aba</button>
+            <form id="formEscalaHist" method="GET" action="{{ url_for('admin_dashboard') }}" class="d-flex gap-2 flex-wrap">
+              <input type="hidden" name="tab" value="escalas">
+              <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-clock-history me-1"></i>Ver histórico</button>
             </form>
             <a class="btn btn-outline-success btn-sm" href="{{ url_for('admin_exportar_escalas_atual', escala_hist_inicio=(escala_hist_inicio.strftime('%Y-%m-%d') if escala_hist_inicio else ''), escala_hist_fim=(escala_hist_fim.strftime('%Y-%m-%d') if escala_hist_fim else '')) }}"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Exportar escala atual + alterações</a>
             <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_exportar_escalas_historico', escala_hist_inicio=(escala_hist_inicio.strftime('%Y-%m-%d') if escala_hist_inicio else ''), escala_hist_fim=(escala_hist_fim.strftime('%Y-%m-%d') if escala_hist_fim else '')) }}"><i class="bi bi-download me-1"></i>Exportar histórico de escalas</a>
@@ -4377,16 +4093,46 @@
 
 
   <div class="card p-3 mb-3 border-0 shadow-sm">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="d-flex justify-content-between align-items-center mb-2">
       <div>
         <h6 class="mb-0 section-title">Histórico de escalas</h6>
-        <small class="section-subtitle">Para a aba Escalas abrir mais rápido, o histórico completo abre separado.</small>
+        <small class="section-subtitle">Últimos 31 dias das modificações e snapshots da escala.</small>
       </div>
-      <form method="GET" action="{{ url_for('admin_escalas_historico') }}" target="_blank" class="d-flex gap-2 flex-wrap align-items-end">
-        <input type="hidden" name="escala_hist_inicio" value="{{ escala_hist_inicio.strftime('%Y-%m-%d') if escala_hist_inicio else '' }}">
-        <input type="hidden" name="escala_hist_fim" value="{{ escala_hist_fim.strftime('%Y-%m-%d') if escala_hist_fim else '' }}">
-        <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-box-arrow-up-right me-1"></i>Abrir histórico</button>
-      </form>
+      <span class="badge-soft">{{ escala_historico_rows|length if escala_historico_rows else 0 }} registro(s)</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Registrado em</th>
+            <th>Origem</th>
+            <th>Data</th>
+            <th>Turno</th>
+            <th>Horário</th>
+            <th>Contrato</th>
+            <th>Cooperado atual</th>
+            <th>Retirado</th>
+            <th>Entrou</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in escala_historico_rows or [] %}
+          <tr>
+            <td>{{ h.snapshot_em.strftime('%d/%m/%Y %H:%M') if h.snapshot_em else '—' }}</td>
+            <td>{{ h.origem or h.acao }}</td>
+            <td>{{ h.data }}</td>
+            <td>{{ h.turno or '—' }}</td>
+            <td>{{ h.horario or '—' }}</td>
+            <td>{{ h.contrato or '—' }}</td>
+            <td>{{ h.cooperado_nome or '—' }}</td>
+            <td>{{ h.saiu_nome or '—' }}</td>
+            <td>{{ h.entrou_nome or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="text-center text-muted">Sem histórico no período.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -4560,7 +4306,6 @@
           <thead>
             <tr>
               <th style="width: 80px;">#</th>
-              <th>Resumo da troca</th>
               <th>Cooperado 1</th>
               <th>Escala 1</th>
               <th>Cooperado 2</th>
@@ -4659,13 +4404,6 @@
                       —
                     {% endif %}
                   </div>
-                </td>
-
-                <td>
-                  <div class="small fw-semibold text-primary">
-                    {{ t.resumo_texto if t.resumo_texto is defined and t.resumo_texto else 'Resumo da troca não disponível.' }}
-                  </div>
-                  <div class="extra-small text-muted mt-1">Resumo automático para facilitar a conferência.</div>
                 </td>
 
                 <td>
@@ -4814,7 +4552,6 @@
           <thead>
             <tr>
               <th style="width: 80px;">#</th>
-              <th>Resumo da troca</th>
               <th>Cooperado 1</th>
               <th>Escala 1</th>
               <th>Cooperado 2</th>
@@ -4905,13 +4642,6 @@
                       —
                     {% endif %}
                   </div>
-                </td>
-
-                <td>
-                  <div class="small fw-semibold text-primary">
-                    {{ t.resumo_texto if t.resumo_texto is defined and t.resumo_texto else 'Resumo da troca não disponível.' }}
-                  </div>
-                  <div class="extra-small text-muted mt-1">Resumo automático para facilitar a conferência.</div>
                 </td>
 
                 <td>
@@ -6024,7 +5754,7 @@
     }
 
     const bindings = [
-      
+      ['formFiltroLancamentos', 'lancamentos', 'lancamentosAjaxWrap', 'lancamentos'],
       ['formFiltroReceitas', 'receitas', 'receitasAjaxWrap', 'receitas'],
       ['formFiltroDespesas', 'despesas', 'despesasAjaxWrap', 'despesas'],
       ['formFiltroCoopReceitas', 'coop_receitas', 'coopReceitasAjaxWrap', 'coop_receitas'],
@@ -6042,7 +5772,7 @@
       });
     });
 
-    ['formFiltroResumo','formFiltroLancamentos'].forEach((formId) => {
+    ['formFiltroResumo'].forEach((formId) => {
       const form = document.getElementById(formId);
       if (!form || form.dataset.normalBound) return;
       form.dataset.normalBound = '1';
@@ -7118,8 +6848,8 @@ document.addEventListener('DOMContentLoaded', function(){
     knownAlertIds = new Set((initial || []).map(a => String(a.id)));
     renderAlertas(initial || []);
   } catch(_) {}
-  // Sem atualização automática para evitar consultas repetidas e deixar o painel parado.
-  // Para atualizar os alertas, recarregue a aba Escalas manualmente.
+  pollAlertas();
+  setInterval(pollAlertas, 60000);
 });
 </script>
 
