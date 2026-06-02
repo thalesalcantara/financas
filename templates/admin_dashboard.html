@@ -6408,7 +6408,8 @@
     }
 
     updatePrazo();
-    setInterval(updatePrazo, 60 * 1000);
+    // Removido para evitar atualização automática no painel.
+    // setInterval(updatePrazo, 60 * 1000);
   });
 </script>
 
@@ -7134,7 +7135,8 @@ document.addEventListener('DOMContentLoaded', function(){
     renderAlertas(initial || []);
   } catch(_) {}
   pollAlertas();
-  setInterval(pollAlertas, 60000);
+  // Removido para evitar atualização automática/requisições repetidas na aba Escalas.
+  // setInterval(pollAlertas, 60000);
 });
 </script>
 
