@@ -1428,7 +1428,7 @@
       ];
 
       const RESTS = [
-        {% for r in rest_list %}
+        {% for r in (rest_list if rest_list is defined else restaurantes) %}
           { id: {{ r.id }}, nome: "{{ r.nome|e }}" }{{ "," if not loop.last }}
         {% endfor %}
       ];
@@ -1506,23 +1506,27 @@
       const kpiTotalReceitasGeral = kpiRecCoopCorp + kpiRecCooperadosFull;
       const kpiBeneficiosRateados = sumBy(filteredBEN, x => x.valor_total);
 
-      // aplica KPIs na tela
-      document.getElementById('kpiTotalProds').textContent         = fmtBR(kpiProd);
-      document.getElementById('kpiINSS4').textContent              = fmtBR(kpiINSS4);
-      document.getElementById('kpiSEST05').textContent             = fmtBR(kpiSEST05);
-      document.getElementById('kpiRecCoopCorp').textContent        = fmtBR(kpiRecCoopCorp);
-      document.getElementById('kpiDespCoopCorp').textContent       = fmtBR(kpiDespCoopCorp);
-      document.getElementById('kpiRecCooperadosFull').textContent  = fmtBR(kpiRecCooperadosFull);
-      document.getElementById('kpiDespCooperados').textContent     = fmtBR(kpiDespCooperados);
-      document.getElementById('kpiTotalReceitasGeral').textContent = fmtBR(kpiTotalReceitasGeral);
-      const benEl = document.getElementById('kpiBeneficiosRateados');
-      if (benEl) benEl.textContent = fmtBR(kpiBeneficiosRateados);
+      // Aplica KPIs pelo JavaScript somente quando as bases detalhadas foram enviadas.
+      // No modo rápido, os cards já vêm corretos do backend; isso evita zerar os cards quando as listas não são carregadas.
+      const SHOULD_RECALC_KPIS = (PRODUCOES.length + REC_COOP.length + DESP_COOP.length + REC_COOP_CORP.length + DESP_COOP_CORP.length + BENEFICIOS_VIEW.length) > 0;
+      if (SHOULD_RECALC_KPIS) {
+        document.getElementById('kpiTotalProds').textContent         = fmtBR(kpiProd);
+        document.getElementById('kpiINSS4').textContent              = fmtBR(kpiINSS4);
+        document.getElementById('kpiSEST05').textContent             = fmtBR(kpiSEST05);
+        document.getElementById('kpiRecCoopCorp').textContent        = fmtBR(kpiRecCoopCorp);
+        document.getElementById('kpiDespCoopCorp').textContent       = fmtBR(kpiDespCoopCorp);
+        document.getElementById('kpiRecCooperadosFull').textContent  = fmtBR(kpiRecCooperadosFull);
+        document.getElementById('kpiDespCooperados').textContent     = fmtBR(kpiDespCooperados);
+        document.getElementById('kpiTotalReceitasGeral').textContent = fmtBR(kpiTotalReceitasGeral);
+        const benEl = document.getElementById('kpiBeneficiosRateados');
+        if (benEl) benEl.textContent = fmtBR(kpiBeneficiosRateados);
 
-      const resEl = document.getElementById('kpiResultadoCoop');
-      if (resEl) {
-        resEl.textContent = fmtBR(kpiResultadoCoop);
-        resEl.classList.remove('text-success', 'text-danger');
-        resEl.classList.add(kpiResultadoCoop < 0 ? 'text-danger' : 'text-success');
+        const resEl = document.getElementById('kpiResultadoCoop');
+        if (resEl) {
+          resEl.textContent = fmtBR(kpiResultadoCoop);
+          resEl.classList.remove('text-success', 'text-danger');
+          resEl.classList.add(kpiResultadoCoop < 0 ? 'text-danger' : 'text-success');
+        }
       }
 
       // ---- chave segura para agrupar cooperado mesmo sem id ----
@@ -6408,8 +6412,6 @@
     }
 
     updatePrazo();
-    // Removido para evitar atualização automática no painel.
-    // setInterval(updatePrazo, 60 * 1000);
   });
 </script>
 
@@ -7134,9 +7136,9 @@ document.addEventListener('DOMContentLoaded', function(){
     knownAlertIds = new Set((initial || []).map(a => String(a.id)));
     renderAlertas(initial || []);
   } catch(_) {}
-  pollAlertas();
-  // Removido para evitar atualização automática/requisições repetidas na aba Escalas.
-  // setInterval(pollAlertas, 60000);
+  // Sem atualização automática: mantém a aba Escalas parada e leve.
+  // Para atualizar os alertas, recarregue a aba Escalas manualmente.
+  // pollAlertas();
 });
 </script>
 
