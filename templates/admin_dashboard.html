@@ -415,27 +415,26 @@
 {% set can_lanc_criar = admin_is_master or _perms.get('lancamentos', {}).get('criar', False) %}
 {% set can_lanc_editar = admin_is_master or _perms.get('lancamentos', {}).get('editar', False) %}
 {% set can_lanc_excluir = admin_is_master or _perms.get('lancamentos', {}).get('excluir', False) %}
-{% set can_receitas_ver = false %}
-{% set can_receitas_criar = false %}
-{% set can_receitas_editar = false %}
-{% set can_receitas_excluir = false %}
-{% set can_despesas_ver = false %}
-{% set can_despesas_criar = false %}
-{% set can_despesas_editar = false %}
-{% set can_despesas_excluir = false %}
-{% set can_coop_receitas_ver = false %}
-{% set can_coop_receitas_criar = false %}
-{% set can_coop_receitas_editar = false %}
-{% set can_coop_receitas_excluir = false %}
-{% set can_beneficios_ver = false %}
-{% set can_beneficios_criar = false %}
-{% set can_beneficios_editar = false %}
-{% set can_beneficios_excluir = false %}
-{% set can_sistemas_ver = false %}
+{% set can_receitas_ver = admin_is_master or _perms.get('receitas', {}).get('ver', False) %}
+{% set can_receitas_criar = admin_is_master or _perms.get('receitas', {}).get('criar', False) %}
+{% set can_receitas_editar = admin_is_master or _perms.get('receitas', {}).get('editar', False) %}
+{% set can_receitas_excluir = admin_is_master or _perms.get('receitas', {}).get('excluir', False) %}
+{% set can_despesas_ver = admin_is_master or _perms.get('despesas', {}).get('ver', False) %}
+{% set can_despesas_criar = admin_is_master or _perms.get('despesas', {}).get('criar', False) %}
+{% set can_despesas_editar = admin_is_master or _perms.get('despesas', {}).get('editar', False) %}
+{% set can_despesas_excluir = admin_is_master or _perms.get('despesas', {}).get('excluir', False) %}
+{% set can_coop_receitas_ver = admin_is_master or _perms.get('coop_receitas', {}).get('ver', False) %}
+{% set can_coop_receitas_criar = admin_is_master or _perms.get('coop_receitas', {}).get('criar', False) %}
+{% set can_coop_receitas_editar = admin_is_master or _perms.get('coop_receitas', {}).get('editar', False) %}
+{% set can_coop_receitas_excluir = admin_is_master or _perms.get('coop_receitas', {}).get('excluir', False) %}
 {% set can_coop_despesas_ver = admin_is_master or _perms.get('coop_despesas', {}).get('ver', False) %}
 {% set can_coop_despesas_criar = admin_is_master or _perms.get('coop_despesas', {}).get('criar', False) %}
 {% set can_coop_despesas_editar = admin_is_master or _perms.get('coop_despesas', {}).get('editar', False) %}
 {% set can_coop_despesas_excluir = admin_is_master or _perms.get('coop_despesas', {}).get('excluir', False) %}
+{% set can_beneficios_ver = admin_is_master or _perms.get('beneficios', {}).get('ver', False) %}
+{% set can_beneficios_criar = admin_is_master or _perms.get('beneficios', {}).get('criar', False) %}
+{% set can_beneficios_editar = admin_is_master or _perms.get('beneficios', {}).get('editar', False) %}
+{% set can_beneficios_excluir = admin_is_master or _perms.get('beneficios', {}).get('excluir', False) %}
 {% set can_cooperados_ver = admin_is_master or _perms.get('cooperados', {}).get('ver', False) %}
 {% set can_cooperados_criar = admin_is_master or _perms.get('cooperados', {}).get('criar', False) %}
 {% set can_cooperados_editar = admin_is_master or _perms.get('cooperados', {}).get('editar', False) %}
@@ -450,6 +449,7 @@
 {% set can_documentos_ver = admin_is_master or _perms.get('documentos', {}).get('ver', False) %}
 {% set can_tabelas_ver = admin_is_master or _perms.get('tabelas', {}).get('ver', False) %}
 {% set can_avaliacoes_ver = admin_is_master or _perms.get('avaliacoes', {}).get('ver', False) %}
+{% set can_sistemas_ver = admin_is_master or _perms.get('sistemas', {}).get('ver', False) %}
 {% set can_config_ver = admin_is_master or _perms.get('config', {}).get('ver', False) %}
 {% set can_config_criar = admin_is_master or _perms.get('config', {}).get('criar', False) %}
 {% set can_config_editar = admin_is_master or _perms.get('config', {}).get('editar', False) %}
@@ -469,7 +469,7 @@
       <div class="nav-section-label">Visão Geral</div>
 
       <!-- Resumo (TAB, igual antes) -->
-      {% if can_lanc_ver or can_coop_despesas_ver %}
+      {% if can_lanc_ver or can_receitas_ver or can_despesas_ver or can_coop_receitas_ver or can_coop_despesas_ver or can_beneficios_ver %}
       <a class="nav-link-main {{ 'active' if _tab=='resumo' else '' }}"
          data-bs-toggle="tab"
          data-bs-target="#resumo"
@@ -523,13 +523,43 @@
           <span class="nav-link-label">Lançamentos</span>
         </a>{% endif %}
 
-        
+        <!-- Receitas Coop (tab) -->
+        {% if can_receitas_ver %}<a class="nav-sublink {{ 'active' if _tab=='receitas' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#receitas"
+           href="#receitas"
+           role="tab"
+           aria-controls="receitas"
+           aria-selected="{{ 'true' if _tab=='receitas' else 'false' }}">
+          <i class="bi bi-credit-card"></i>
+          <span class="nav-link-label">Receitas Coop</span>
+        </a>{% endif %}
 
-        
+        <!-- Despesas Coop (tab) -->
+        {% if can_despesas_ver %}<a class="nav-sublink {{ 'active' if _tab=='despesas' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#despesas"
+           href="#despesas"
+           role="tab"
+           aria-controls="despesas"
+           aria-selected="{{ 'true' if _tab=='despesas' else 'false' }}">
+          <i class="bi bi-cart-dash"></i>
+          <span class="nav-link-label">Despesas Coop</span>
+        </a>{% endif %}
 
-        
+        <!-- Receitas Cooperados (tab) -->
+        {% if can_coop_receitas_ver %}<a class="nav-sublink {{ 'active' if _tab=='coop_receitas' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#coop_receitas"
+           href="#coop_receitas"
+           role="tab"
+           aria-controls="coop_receitas"
+           aria-selected="{{ 'true' if _tab=='coop_receitas' else 'false' }}">
+          <i class="bi bi-wallet2"></i>
+          <span class="nav-link-label">Receitas Cooperados</span>
+        </a>{% endif %}
 
-        <!-- Adiantamentos/Pendências -->
+        <!-- Despesas Cooperados (tab) -->
         {% if can_coop_despesas_ver %}<a class="nav-sublink {{ 'active' if _tab=='coop_despesas' else '' }}"
            data-bs-toggle="tab"
            data-bs-target="#coop_despesas"
@@ -538,10 +568,20 @@
            aria-controls="coop_despesas"
            aria-selected="{{ 'true' if _tab=='coop_despesas' else 'false' }}">
           <i class="bi bi-bag-dash"></i>
-          <span class="nav-link-label">Adiantamentos/Pendências</span>
+          <span class="nav-link-label">Despesas Cooperados</span>
         </a>{% endif %}
 
-        
+        <!-- Benefícios (tab) -->
+        {% if can_beneficios_ver %}<a class="nav-sublink {{ 'active' if _tab=='beneficios' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#beneficios"
+           href="#beneficios"
+           role="tab"
+           aria-controls="beneficios"
+           aria-selected="{{ 'true' if _tab=='beneficios' else 'false' }}">
+          <i class="bi bi-heart-pulse"></i>
+          <span class="nav-link-label">Benefícios</span>
+        </a>{% endif %}
       </div>
 
       <!-- CADASTROS (tabs + rotas) ------------------------------------------>
@@ -628,6 +668,18 @@
 
       <!-- Config (TAB) e Sair (rota) ---------------------------------------->
       <div class="sidebar-footer">
+        {% if can_sistemas_ver %}<a class="nav-link-main {{ 'active' if _tab=='sistemas' else '' }}"
+           data-bs-toggle="tab"
+           data-bs-target="#sistemas"
+           href="#sistemas"
+           role="tab"
+           aria-controls="sistemas"
+           aria-selected="{{ 'true' if _tab=='sistemas' else 'false' }}">
+          <div class="nav-link-left">
+            <span class="nav-link-icon"><i class="bi bi-diagram-3"></i></span>
+            <span class="nav-link-label">Sistemas</span>
+          </div>
+        </a>{% endif %}
 
         {% if can_config_ver %}<a class="nav-link-main {{ 'active' if _tab=='config' else '' }}"
            data-bs-toggle="tab"
@@ -661,73 +713,686 @@
     <!-- === RESUMO (Dashboard Financeiro Completo) === -->
     
       <!--AJAX_RESUMO_START--><section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
-  <div class="content-shell">
-    <div class="panel-head">
-      <div>
-        <h2 class="panel-head-title"><i class="bi bi-speedometer2"></i> Resumo rápido</h2>
-        <div class="panel-head-sub">Painel leve com apenas os totais essenciais do período.</div>
-      </div>
-    </div>
+      <div class="resumo-shell">
 
-    <div class="card mb-3">
-      <div class="card-body">
-        <form id="formFiltroResumo" method="GET" action="{{ url_for('admin_dashboard') }}" class="row g-2 align-items-end">
-          <input type="hidden" name="tab" value="resumo">
-          <div class="col-md-3">
-            <label class="form-label">Data inicial</label>
-            <input type="date" class="form-control" name="data_inicio" value="{{ request.args.get('data_inicio') or request.args.get('resumo_inicio','') }}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Data final</label>
-            <input type="date" class="form-control" name="data_fim" value="{{ request.args.get('data_fim') or request.args.get('resumo_fim','') }}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Estabelecimento</label>
-            <select class="form-select" name="restaurante_id">
-              <option value="">Todos</option>
-              {% for r in restaurantes %}
-                <option value="{{ r.id }}" {{ 'selected' if request.args.get('restaurante_id', type=int)==r.id else '' }}>{{ r.nome }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Cooperado</label>
-            <select class="form-select" name="cooperado_id">
-              <option value="">Todos</option>
-              {% for c in cooperados %}
-                <option value="{{ c.id }}" {{ 'selected' if request.args.get('cooperado_id', type=int)==c.id else '' }}>{{ c.nome }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="col-12 d-flex gap-2 justify-content-end">
-            <a class="btn btn-outline-secondary" href="{{ url_for('admin_dashboard', tab='resumo') }}">Limpar</a>
-            <button class="btn btn-royal" type="submit"><i class="bi bi-funnel"></i> Filtrar</button>
-          </div>
-        </form>
-      </div>
-    </div>
+        {# ---------- Helpers de data ---------- #}
+        {% macro ymd(x) -%}
+          {%- if x and x.strftime is defined -%}
+            {{ x.strftime('%Y-%m-%d') }}
+          {%- elif x -%}
+            {{ x }}
+          {%- else -%}
+            {{ '' }}
+          {%- endif -%}
+        {%- endmacro %}
 
-    <div class="row g-3">
-      <div class="col-md-4 col-xl-2">
-        <div class="card h-100"><div class="card-body"><div class="text-uppercase text-muted small">Total Produções</div><div class="fw-bold fs-5 text-primary">R$ {{ '%.2f'|format(total_producoes|default(0)) }}</div></div></div>
-      </div>
-      <div class="col-md-4 col-xl-2">
-        <div class="card h-100"><div class="card-body"><div class="text-uppercase text-muted small">Total INSS</div><div class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_inss|default(0)) }}</div></div></div>
-      </div>
-      <div class="col-md-4 col-xl-2">
-        <div class="card h-100"><div class="card-body"><div class="text-uppercase text-muted small">Total SEST/SENAT</div><div class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_sest|default(0)) }}</div></div></div>
-      </div>
-      <div class="col-md-4 col-xl-2">
-        <div class="card h-100"><div class="card-body"><div class="text-uppercase text-muted small">Total de Adiantamento</div><div class="fw-bold fs-5 text-warning">R$ {{ '%.2f'|format(total_adiantamentos_geral|default(0)) }}</div></div></div>
-      </div>
-      <div class="col-md-4 col-xl-2">
-        <div class="card h-100"><div class="card-body"><div class="text-uppercase text-muted small">Adiantamentos no período</div><div class="fw-bold fs-5 text-warning">R$ {{ '%.2f'|format(total_adiantamentos_coop|default(0)) }}</div></div></div>
-      </div>
-      <div class="col-md-4 col-xl-2">
-        <div class="card h-100"><div class="card-body"><div class="text-uppercase text-muted small">Total de Pendências</div><div class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_despesas_coop|default(0)) }}</div></div></div>
-      </div>
-    </div>
-  </div>
+        {# ---------- Filtros atuais (querystring) ---------- #}
+        {% set ri  = request.args.get('data_inicio', request.args.get('resumo_inicio','')) %}
+        {% set rf  = request.args.get('data_fim', request.args.get('resumo_fim','')) %}
+        {% set rs  = request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) %}
+        {% set cs  = request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) %}
+        {% set rid = rs|int if rs else None %}
+        {% set cid = cs|int if cs else None %}
+
+        {# Nomes seguros para os badges (não quebra se não encontrar) #}
+        {% set _rest_sel = (restaurantes|selectattr('id','equalto',rid)|list|first) if rid else None %}
+        {% set _coop_sel = (cooperados|selectattr('id','equalto',cid)|list|first) if cid else None %}
+
+        {# ---------- Bases com fallback (NÃO sobrescrever 'receitas'/'despesas' originais) ---------- #}
+        {% set _producoes = (producoes | default([]) | list) %}
+        {% if _producoes|length == 0 %}
+          {% set _producoes = (lancamentos | default([]) | list) %}
+        {% endif %}
+
+        {# Cooperados (por pessoa) #}
+        {% set receitas_coop = (receitas_coop | default([]) | list) %}
+        {% set despesas_coop = (despesas_coop | default([]) | list) %}
+
+        {# Cooperativa (geral) — mesma fonte da aba de RECEITAS/ DESPESAS da coop #}
+        {% set _rec_coop_corp =
+             (receitas if receitas is defined else
+              (receitas_cooperativa if receitas_cooperativa is defined else
+               (receitas_corp if receitas_corp is defined else
+                []))) %}
+        {% set _desp_coop_corp =
+             (despesas if despesas is defined else
+              (despesas_cooperativa if despesas_cooperativa is defined else
+               (despesas_corp if despesas_corp is defined else
+                []))) %}
+
+        {% if not fast_mode %}
+{# ---------- Totais (lado servidor, para primeiro paint) ---------- #}
+        {# Produções (considera restaurante/cooperado) #}
+        {% set ns_prod = namespace(total=0) %}
+        {% for p in _producoes %}
+          {% set d   = ymd(p.data) %}
+          {% set okd = (not ri or d >= ri) and (not rf or d <= rf) %}
+          {% set okc = (not cid or (p.cooperado and p.cooperado.id==cid)) %}
+          {% set okr = (not rid or (p.restaurante and p.restaurante.id==rid)) %}
+          {% if okd and okc and okr %}
+            {% set ns_prod.total = ns_prod.total + (p.valor or 0) %}
+          {% endif %}
+        {% endfor %}
+        {% set total_producoes_f = ns_prod.total %}
+        {% set total_inss_4_f    = total_producoes_f * 0.04 %}
+        {% set total_sest_05_f   = total_producoes_f * 0.005 %}
+        {% set total_encargos_f  = total_inss_4_f + total_sest_05_f %}
+
+        {# Coop (geral) — mesma lógica da aba RECEITAS: valor|default(valor_total, true)|default(0, true) #}
+        {% set ns_rec_corp = namespace(total=0) %}
+        {% for r in _rec_coop_corp %}
+          {% set d = ymd(r.data or r.data_lancamento) %}
+          {% if (not ri or d >= ri) and (not rf or d <= rf) %}
+            {% set v = r.valor|default(r.valor_total, true)|default(0, true) %}
+            {% set ns_rec_corp.total = ns_rec_corp.total + (v or 0) %}
+          {% endif %}
+        {% endfor %}
+        {% set total_receitas_corp_f = ns_rec_corp.total %}
+
+        {% set ns_desp_corp = namespace(total=0) %}
+        {% for d in _desp_coop_corp %}
+          {% set dt = ymd(d.data or d.data_lancamento) %}
+          {% if (not ri or dt >= ri) and (not rf or dt <= rf) %}
+            {% set v = d.valor|default(d.valor_total, true)|default(0, true) %}
+            {% set ns_desp_corp.total = ns_desp_corp.total + (v or 0) %}
+          {% endif %}
+        {% endfor %}
+        {% set total_despesas_corp_f = ns_desp_corp.total %}
+
+        {# Cooperados (por pessoa) #}
+        {% set ns_rec_coop = namespace(total=0) %}
+        {% for r in receitas_coop %}
+          {% set d = ymd(r.data) %}
+          {% set okd = (not ri or d >= ri) and (not rf or d <= rf) %}
+          {% set okc = (not cid or (r.cooperado and r.cooperado.id==cid)) %}
+          {% if okd and okc %}
+            {% set ns_rec_coop.total = ns_rec_coop.total + (r.valor or 0) %}
+          {% endif %}
+        {% endfor %}
+        {% set total_receitas_coop_f = ns_rec_coop.total %}
+
+        {# Despesas Cooperados (SEM coluna de adiantamento: tudo soma em DESPESAS) #}
+        {% set ns_desp_coop = namespace(total=0) %}
+        {% for d in despesas_coop %}
+          {% set dt  = ymd(d.data) %}
+          {% set okd = (not ri or dt >= ri) and (not rf or dt <= rf) %}
+          {% set okc = (not cid or (d.cooperado and d.cooperado.id==cid)) %}
+          {% if okd and okc %}
+            {% set ns_desp_coop.total = ns_desp_coop.total + (d.valor or 0) %}
+          {% endif %}
+        {% endfor %}
+        {% set total_despesas_coop_f = ns_desp_coop.total %}
+
+        {# Ajuste: Receitas dos cooperados = Produções + Receitas individuais #}
+        {% set total_receitas_coop_full_f = (total_producoes_f|default(0)) + (total_receitas_coop_f|default(0)) %}
+
+        {# Resultado coop e Total de Receitas (Geral) #}
+        {% set _resultado_corp = (total_receitas_corp_f|default(0)) - (total_despesas_corp_f|default(0)) %}
+        {% set _total_receitas_geral = (total_receitas_corp_f|default(0)) + (total_receitas_coop_full_f|default(0)) %}
+
+        
+{% else %}
+        {# Totais já calculados no backend (fast_mode) #}
+        {% set total_producoes_f = total_producoes|default(0) %}
+        {% set total_inss_4_f    = total_inss|default(0) %}
+        {% set total_sest_05_f   = total_sest|default(0) %}
+        {% set total_encargos_f  = total_encargos|default(0) %}
+
+        {% set total_receitas_corp_f = total_receitas|default(0) %}
+        {% set total_despesas_corp_f = total_despesas|default(0) %}
+
+        {% set total_receitas_coop_f = total_receitas_coop|default(0) %}
+        {% set total_despesas_coop_f = total_despesas_coop|default(0) %}
+
+        {# Ajuste: Receitas dos cooperados = Produções + Receitas individuais #}
+        {% set total_receitas_coop_full_f = (total_producoes_f|default(0)) + (total_receitas_coop_f|default(0)) %}
+        {% set _resultado_corp = (total_receitas_corp_f|default(0)) - (total_despesas_corp_f|default(0)) %}
+        {% set _total_receitas_geral = (total_receitas_corp_f|default(0)) + (total_receitas_coop_full_f|default(0)) %}
+{% endif %}
+
+<!-- Filtros -->
+        <div class="card border-0 shadow-sm rounded-4 mb-3 resumo-filter-card">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+              <div class="d-flex align-items-center gap-2">
+                <div class="resumo-pill-label">
+                  <i class="bi bi-sliders"></i>
+                </div>
+                <div>
+                  <h5 class="mb-0 resumo-title">Resumo geral financeiro</h5>
+                </div>
+              </div>
+
+              {% if ri or rf or rid or cid %}
+                <div class="d-flex flex-wrap gap-1 small justify-content-end">
+                  {% if ri or rf %}
+                    <span class="badge rounded-pill bg-light text-dark border">
+                      <i class="bi bi-calendar-event"></i>
+                      {{ ri if ri else 'início' }} — {{ rf if rf else 'hoje' }}
+                    </span>
+                  {% endif %}
+                  {% if rid %}
+                    <span class="badge rounded-pill bg-light text-dark border">
+                      <i class="bi bi-shop"></i>
+                      Estab: {{ _rest_sel.nome if _rest_sel else rid }}
+                    </span>
+                  {% endif %}
+                  {% if cid %}
+                    <span class="badge rounded-pill bg-light text-dark border">
+                      <i class="bi bi-person"></i>
+                      Coop: {{ _coop_sel.nome if _coop_sel else cid }}
+                    </span>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </div>
+
+            <form method="GET" class="row g-2 align-items-end">
+              <input type="hidden" name="tab" value="resumo">
+              <div class="col-md-2">
+                <label class="form-label">De</label>
+                <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ ri }}">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Até</label>
+                <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ rf }}">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Estabelecimento</label>
+                <select class="form-select form-select-sm" name="restaurante_id">
+                  <option value="">Todos</option>
+                  {% for rr in restaurantes %}
+                    <option value="{{ rr.id }}" {{ 'selected' if rid and rid==rr.id else '' }}>{{ rr.nome }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Cooperado</label>
+                <select class="form-select form-select-sm" name="cooperado_id">
+                  <option value="">Todos</option>
+                  {% for cc in cooperados %}
+                    <option value="{{ cc.id }}" {{ 'selected' if cid and cid==cc.id else '' }}>{{ cc.nome }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-12 d-flex flex-wrap gap-2 mt-2 align-items-end resumo-filter-actions">
+                <button class="btn btn-royal btn-sm">
+                  <i class="bi bi-funnel"></i> Filtrar
+                </button>
+                {% if ri or rf or rid or cid %}
+                  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_dashboard', tab='resumo') }}">
+                    <i class="bi bi-x-circle"></i> Limpar
+                  </a>
+                {% endif %}
+                <button id="btnExportXLSX" type="button" class="btn btn-outline-success btn-sm">
+                  <i class="bi bi-file-earmark-excel"></i> Exportar XLSX (com filtros)
+                </button>
+                <div class="d-flex flex-wrap gap-2 align-items-end ms-lg-auto">
+                  <div>
+                    <label class="form-label mb-1">Filtro mensal</label>
+                    <input type="month" class="form-control form-control-sm" id="quickMonthResumo">
+                  </div>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnQuickMonthResumo">
+                    <i class="bi bi-calendar3"></i> Aplicar mês
+                  </button>
+                  <div>
+                    <label class="form-label mb-1">Filtro anual</label>
+                    <select class="form-select form-select-sm" id="quickYearResumo">
+                      <option value="">Ano</option>
+                      {% for ano in range(2025, 2101) %}
+                        <option value="{{ ano }}">{{ ano }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnQuickYearResumo">
+                    <i class="bi bi-calendar-range"></i> Aplicar ano
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="row g-2 resumo-kpi-row">
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-prod"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Total Produções</div>
+                  <div id="kpiTotalProds" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_producoes_f) }}</div>
+                  <div class="small text-muted">Bruto no período</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-graph-up"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- INSS 4% -->
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-inss"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Total INSS</div>
+                  <div id="kpiINSS4" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_inss_4_f) }}</div>
+                  <div class="small text-muted">4,0% s/ produções</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-shield-check"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SEST/SENAT 0,5% -->
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-sest"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Total SEST/SENAT</div>
+                  <div id="kpiSEST05" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_sest_05_f) }}</div>
+                  <div class="small text-muted">0,5% s/ produções</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-shield"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-rec-coop"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Receitas Cooperativa</div>
+                  <div id="kpiRecCoopCorp" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(total_receitas_corp_f) }}</div>
+                  <div class="small text-muted">Entradas da coop</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-cash-coin"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-desp-coop"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Despesas Cooperativa</div>
+                  <div id="kpiDespCoopCorp" class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_despesas_corp_f) }}</div>
+                  <div class="small text-muted">Saídas da coop</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-cart-dash"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-rec-coop2"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Receitas Cooperados</div>
+                  <div id="kpiRecCooperadosFull" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(total_receitas_coop_full_f) }}</div>
+                  <div class="small text-muted">Produções + Receitas</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-currency-exchange"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-desp-coop2"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Despesas Cooperados</div>
+                  <div id="kpiDespCooperados" class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_despesas_coop_f) }}</div>
+                  <div class="small text-muted">Débitos/benefícios</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-bank"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-res-coop"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Resultado Cooperativa</div>
+                  <div class="fw-bold fs-5">
+                    <span id="kpiResultadoCoop" class="{{ 'text-success' if _resultado_corp >= 0 else 'text-danger' }}">
+                      R$ {{ '%.2f'|format(_resultado_corp) }}
+                    </span>
+                  </div>
+                  <div class="small text-muted">Receitas − Despesas (coop)</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-pie-chart"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-total-rec"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Total de Receitas (Geral)</div>
+                  <div id="kpiTotalReceitasGeral" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(_total_receitas_geral) }}</div>
+                  <div class="small text-muted">Coop + (Prod + Rec Cooperados)</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-cash-stack"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-entregas-periodo"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Total de Adiantamento</div>
+                  <div id="kpiQtdEntregasPeriodo" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_adiantamentos_coop|default(0)) }}</div>
+                  <div class="small text-muted">Adiantamentos no período</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-bicycle"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-ticket-periodo"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Total de Pendências</div>
+                  <div id="kpiTicketMedioPeriodo" class="fw-bold fs-5">R$ {{ '%.2f'|format((resumo_totais.saldo_pendente|default(0)) + (resumo_totais.pend_programado|default(0))) }}</div>
+                  <div class="small text-muted">Valor ainda não pago</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-receipt"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
+              <div class="kpi-border kpi-benef-rateados"></div>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="text-uppercase text-muted small">Benefícios Rateados</div>
+                  <div id="kpiBeneficiosRateados" class="fw-bold fs-5">R$ 0,00</div>
+                  <div class="small text-muted">Total lançado no período</div>
+                </div>
+                <div class="kpi-icon"><i class="bi bi-heart-pulse"></i></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resumo por Cooperado -->
+        <div class="card border-0 shadow-sm rounded-4 mt-3">
+          <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+              <div class="d-flex align-items-center gap-2">
+                <div class="resumo-pill-label"><i class="bi bi-people"></i></div>
+                <div>
+                  <h6 class="m-0">Resumo por Cooperado (filtro aplicado)</h6>
+                </div>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table id="tblResumoCoop" class="table table-sm table-bordered table-hover align-middle table-resumo">
+                <thead class="table-light">
+                  <tr>
+                    <th>Cooperado</th>
+                    <th class="text-end">Produções</th>
+                    <th class="text-end">INSS (4,0%)</th>
+                    <th class="text-end">SEST/SENAT (0,5%)</th>
+                    <th class="text-end text-success">Receitas</th>
+                    <th class="text-end text-danger">Despesas</th>
+                    <th class="text-end text-danger">Adiantamento</th>
+                    <th class="text-end">A Receber</th>
+                    <th class="text-end text-warning">Saldo Pendente</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {% if resumo_coop_rows %}
+                    {% for r in resumo_coop_rows %}
+                    <tr>
+                      <td>{{ r.nome }}</td>
+                      <td class="text-end">R$ {{ '%.2f'|format(r.prod|default(0)) }}</td>
+                      <td class="text-end">R$ {{ '%.2f'|format(r.inss4|default(0)) }}</td>
+                      <td class="text-end">R$ {{ '%.2f'|format(r.sest05|default(0)) }}</td>
+                      <td class="text-end text-success">R$ {{ '%.2f'|format(r.rec|default(0)) }}</td>
+                      <td class="text-end text-danger">R$ {{ '%.2f'|format(r.des|default(0)) }}</td>
+                      <td class="text-end text-danger">R$ {{ '%.2f'|format(r.adiant|default(0)) }}</td>
+                      <td class="text-end">R$ {{ '%.2f'|format(r.a_receber|default(0)) }}</td>
+                      <td class="text-end text-warning">R$ {{ '%.2f'|format((r.saldo_pendente|default(0)) + (r.pend_programado|default(0))) }}</td>
+                    </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr><td colspan="9" class="text-center text-muted">Nenhum dado no período.</td></tr>
+                  {% endif %}
+                </tbody>
+
+                <tfoot>
+                  <tr class="table-light fw-bold">
+                    <td>Total</td>
+                    <td class="text-end" id="tProd">R$ {{ '%.2f'|format(resumo_totais.prod|default(0)) }}</td>
+                    <td class="text-end" id="tINSS4">R$ {{ '%.2f'|format(resumo_totais.inss4|default(0)) }}</td>
+                    <td class="text-end" id="tSEST05">R$ {{ '%.2f'|format(resumo_totais.sest05|default(0)) }}</td>
+                    <td class="text-end text-success" id="tRec">R$ {{ '%.2f'|format(resumo_totais.rec|default(0)) }}</td>
+                    <td class="text-end text-danger" id="tDes">R$ {{ '%.2f'|format(resumo_totais.des|default(0)) }}</td>
+                    <td class="text-end text-danger" id="tAdiant">R$ {{ '%.2f'|format(resumo_totais.adiant|default(0)) }}</td>
+                    <td class="text-end fw-bold" id="tLiq">R$ {{ '%.2f'|format(resumo_totais.a_receber|default(0)) }}</td>
+                    <td class="text-end fw-bold text-warning" id="tPend">R$ {{ '%.2f'|format((resumo_totais.saldo_pendente|default(0)) + (resumo_totais.pend_programado|default(0))) }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div> <!-- /resumo-shell -->
+
+      <style>
+        /* CONTAINER GERAL DA ABA RESUMO */
+        #resumo .resumo-shell{
+          background: radial-gradient(circle at top left, rgba(48,71,214,0.10), transparent 55%),
+                      radial-gradient(circle at bottom right, rgba(16,185,129,0.10), transparent 55%);
+          border-radius: 1.5rem;
+          padding: 0.85rem;
+        }
+
+        #resumo .resumo-filter-card {
+          background: rgba(255,255,255,0.96);
+          border: 1px solid rgba(148,163,184,0.35);
+        }
+
+        #resumo .resumo-title{
+          font-size: 1.05rem;
+          font-weight: 600;
+        }
+
+        #resumo .resumo-kpi-row .card.kpi-card {
+          position: relative;
+          overflow: hidden;
+          transition: transform 0.12s ease-out, box-shadow 0.12s ease-out, border-color 0.12s ease-out, background-color 0.12s ease-out;
+          border: 1px solid #e2e8f0;
+          background: #ffffff;
+        }
+
+        #resumo .resumo-kpi-row .card.kpi-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 26px rgba(15, 23, 42, 0.14);
+          border-color: rgba(48,71,214,0.55);
+          background: linear-gradient(135deg, #ffffff, #f5f7ff);
+        }
+
+        #resumo .kpi-border{
+          position:absolute;
+          inset:0;
+          border-radius:inherit;
+          border:2px solid transparent;
+          pointer-events:none;
+          opacity:0.85;
+        }
+        #resumo .kpi-prod{ border-color: rgba(37,99,235,0.55); }
+        #resumo .kpi-inss{ border-color: rgba(56,189,248,0.55); }
+        #resumo .kpi-sest{ border-color: rgba(2,132,199,0.55); }
+        #resumo .kpi-rec-coop{ border-color: rgba(16,185,129,0.55); }
+        #resumo .kpi-desp-coop{ border-color: rgba(239,68,68,0.55); }
+        #resumo .kpi-rec-coop2{ border-color: rgba(34,197,94,0.55); }
+        #resumo .kpi-desp-coop2{ border-color: rgba(248,113,113,0.65); }
+        #resumo .kpi-res-coop{ border-color: rgba(14,116,144,0.6); }
+        #resumo .kpi-total-rec{ border-color: rgba(99,102,241,0.7); }
+        #resumo .kpi-entregas-periodo{ border-color: rgba(245,158,11,0.65); }
+        #resumo .kpi-ticket-periodo{ border-color: rgba(168,85,247,0.65); }
+        #resumo .kpi-benef-rateados{ border-color: rgba(236,72,153,0.65); }
+
+        #resumo .resumo-kpi-row .card.kpi-card .text-muted.small {
+          font-size: 0.76rem;
+        }
+
+        #resumo .resumo-pill-label {
+          width: 32px;
+          height: 32px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(48,71,214,0.08);
+          color: #3047d6;
+          font-size: 0.9rem;
+        }
+
+        #resumo .kpi-icon {
+          width: 42px;
+          height: 42px;
+          border-radius: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(48,71,214,0.08);
+          color: #3047d6;
+          font-size: 1.1rem;
+        }
+
+        #resumo .table-resumo thead th {
+          font-size: 0.78rem;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          background: #f5f7fb;
+          border-bottom: 1px solid #e4e7f0;
+        }
+
+        #resumo .table-resumo tbody td {
+          font-size: 0.8rem;
+        }
+
+        #resumo .table-resumo tfoot td {
+          font-size: 0.82rem;
+        }
+
+        #resumo .table-resumo tbody tr:hover {
+          background-color: #f8f9ff;
+        }
+
+        #resumo .card.p-3 > h6 {
+          font-size: 0.9rem;
+          font-weight: 600;
+        }
+
+
+        @media (max-width: 576px) {
+          #resumo .resumo-shell{
+            border-radius: 1rem;
+            padding: 0.6rem;
+          }
+          #resumo .resumo-kpi-row .card.kpi-card {
+            padding: 0.75rem 0.85rem;
+          }
+
+          #resumo .resumo-filter-card .form-label {
+            font-size: 0.78rem;
+          }
+        }
+      </style>
+    </section>
+
+    <!-- Dados do resumo já chegam prontos do backend. O HTML não recalcula financeiro. -->
+    <script>
+    (function(){
+      const FILTER = {{ {'ri': ri, 'rf': rf, 'rid': rid, 'cid': cid}|tojson }};
+
+      // Atalhos de filtro mensal / anual: apenas preenche datas e envia o formulário.
+      const form = document.querySelector('#resumo form[method="GET"]');
+      if (form) {
+        const diInput = form.querySelector('input[name="data_inicio"]');
+        const dfInput = form.querySelector('input[name="data_fim"]');
+        const monthInput = document.getElementById('quickMonthResumo');
+        const yearSelect = document.getElementById('quickYearResumo');
+        const btnMonth = document.getElementById('btnQuickMonthResumo');
+        const btnYear = document.getElementById('btnQuickYearResumo');
+
+        if (monthInput && FILTER.ri && FILTER.rf && FILTER.ri.slice(0,7) === FILTER.rf.slice(0,7)) {
+          monthInput.value = FILTER.ri.slice(0,7);
+        }
+        if (yearSelect && FILTER.ri && FILTER.rf && FILTER.ri.slice(0,4) === FILTER.rf.slice(0,4)) {
+          yearSelect.value = FILTER.ri.slice(0,4);
+        }
+
+        btnMonth?.addEventListener('click', () => {
+          const ym = monthInput?.value || '';
+          if (!ym || !diInput || !dfInput) return;
+          const [y, m] = ym.split('-').map(Number);
+          if (!y || !m) return;
+          const lastDay = new Date(y, m, 0).getDate();
+          diInput.value = `${y}-${String(m).padStart(2,'0')}-01`;
+          dfInput.value = `${y}-${String(m).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+          form.submit();
+        });
+
+        btnYear?.addEventListener('click', () => {
+          const y = Number(yearSelect?.value || 0);
+          if (!y || !diInput || !dfInput) return;
+          diInput.value = `${y}-01-01`;
+          dfInput.value = `${y}-12-31`;
+          form.submit();
+        });
+      }
+
+      // Exporta somente o que já está visível na tela, sem recalcular regras financeiras no navegador.
+      document.getElementById('btnExportXLSX')?.addEventListener('click', async () => {
+        if (!window.XLSX) {
+          await new Promise(res => {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+            s.onload = res;
+            document.head.appendChild(s);
+          });
+        }
+        const wb = XLSX.utils.book_new();
+        const aoa = [['Resumo financeiro COOPEX']];
+        document.querySelectorAll('#resumo .kpi-card').forEach(card => {
+          const label = card.querySelector('.kpi-label')?.textContent?.trim() || '';
+          const value = card.querySelector('.kpi-value, .fw-bold.fs-5')?.textContent?.trim() || '';
+          if (label || value) aoa.push([label, value]);
+        });
+        aoa.push([]);
+        document.querySelectorAll('#resumo table tr').forEach(tr => {
+          const row = Array.from(tr.querySelectorAll('th,td')).map(td => td.textContent.trim());
+          if (row.length) aoa.push(row);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Resumo');
+        XLSX.writeFile(wb, 'Resumo_Coopex.xlsx');
+      });
+    })();
+    </script>
 </section><!--AJAX_RESUMO_END-->
 
 <!-- LANÇAMENTOS (versão moderna/compacta – drop-in) -->
@@ -1260,15 +1925,522 @@
 
 
 <!-- RECEITAS COOP (versão profissional/compacta – drop-in) -->
+<section class="tab-pane fade {{ 'show active' if _tab=='receitas' else '' }}" id="receitas" role="tabpanel">
+<!--AJAX_RECEITAS_START--><div id="receitasAjaxWrap">
+  {# total defensivo: aceita r.valor OU r.valor_total #}
+  {% set ns_total = namespace(v=0) %}
+  {% for r in receitas or [] %}
+    {% set v_item = (r.valor_pago|default(0,true) + r.valor_multa|default(0,true) + r.valor_juros|default(0,true)) if r.auto_taxa_adm else r.valor|default(r.valor_total, true)|default(0, true) %}
+    {% set ns_total.v = ns_total.v + (v_item or 0) %}
+  {% endfor %}
+  {% set total_receitas_coop_table = ns_total.v %}
+  {% set qtd_registros = receitas|length if receitas else 0 %}
 
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+    <h5 class="m-0 d-flex align-items-center gap-2">
+      <i class="bi bi-cash"></i> Receitas da Cooperativa
+    </h5>
+    <div class="d-flex flex-wrap gap-2">
+      <span class="badge bg-light text-dark border">Registros: <b>{{ qtd_registros }}</b></span>
+      <span class="badge bg-success-subtle text-success border">Total: <b>R$ {{ '%.2f'|format(total_receitas_coop_table) }}</b></span>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm rounded-3 mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <h6 class="m-0"><i class="bi bi-funnel"></i> Filtrar</h6>
+      </div>
+      <form id="formFiltroReceitas" method="GET" action="{{ url_for('admin_dashboard') }}" class="row g-2 align-items-end">
+        <input type="hidden" name="tab" value="receitas">
+        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+        <div class="col-md-3">
+          <label class="form-label">Data Início</label>
+          <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Data Fim</label>
+          <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+        </div>
+        <div class="col-md-3">
+          <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+        </div>
+        <div class="col-md-3 d-none d-md-block"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm rounded-3 mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h6 class="m-0"><i class="bi bi-plus-circle"></i> Adicionar Receita</h6>
+        <span class="text-muted small">Preencha os campos e clique em <b>Adicionar</b>.</span>
+      </div>
+
+      <form method="POST" action="{{ url_for('add_receita') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_receitas_criar">
+
+      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+        <div class="col-md-5">
+          <label class="form-label">Descrição</label>
+          <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Valor (R$)</label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text">R$</span>
+            <input type="number" step="0.01" class="form-control" name="valor" placeholder="0,00" required>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Data</label>
+          <input type="date" class="form-control form-control-sm" name="data" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label d-none d-md-block">&nbsp;</label>
+          <button class="btn btn-success btn-sm w-100">
+            <i class="bi bi-plus-circle"></i> Adicionar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm rounded-3 mb-3">
+    <div class="card-body">
+      <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <div>
+          <h6 class="m-0"><i class="bi bi-building-check"></i> Taxas administrativas</h6>
+          <div class="small text-muted">Multa fixa de 2% e juros de 0,03% ao dia sobre o valor principal. A receita entra no total da cooperativa somente quando estiver paga.</div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <span class="badge bg-light text-dark border">Previsto: <b>R$ {{ '%.2f'|format(taxa_admin_totais.previsto|default(0)) }}</b></span>
+          <span class="badge bg-success-subtle text-success border">Recebido: <b>R$ {{ '%.2f'|format(taxa_admin_totais.recebido|default(0)) }}</b></span>
+          <span class="badge bg-warning-subtle text-warning border">Juros/Multa arrec.: <b>R$ {{ '%.2f'|format(juros_arrecadados_total|default(0)) }}</b></span>
+          <span class="badge bg-danger-subtle text-danger border">Em aberto: <b>R$ {{ '%.2f'|format(taxa_admin_totais.em_aberto|default(0)) }}</b></span>
+        </div>
+      </div>
+
+      <form method="POST" action="{{ url_for('atualizar_taxa_admin_lote') }}" class="mb-3" data-perm-form="can_receitas_editar" id="taxaAdmLoteForm">
+        <div class="d-flex flex-wrap gap-2 align-items-end">
+          <div>
+            <label class="form-label">Ação em lote</label>
+            <select name="acao" class="form-select form-select-sm">
+              <option value="pago">Marcar selecionadas como pagas hoje</option>
+              <option value="nao_pago">Marcar selecionadas como não pagas</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label d-none d-md-block">&nbsp;</label>
+            <button class="btn btn-royal btn-sm" type="submit"><i class="bi bi-check2-square"></i> Aplicar</button>
+          </div>
+        </div>
+      </form>
+
+      <div class="table-responsive mt-3">
+        <table class="table table-sm table-bordered table-hover align-middle taxa-adm-table">
+          <thead class="table-light">
+            <tr>
+              <th style="width:38px"><input type="checkbox" id="taxaAdmToggleAll"></th>
+              <th>Estabelecimento</th>
+              <th>Competência</th>
+              <th>Vencimento</th>
+              <th class="text-end">Principal</th>
+              <th class="text-end">Juros calc.</th>
+              <th class="text-end">Multa calc.</th>
+              <th class="text-end">Recebido</th>
+              <th class="text-end">Em aberto</th>
+              <th>Status</th>
+              <th style="width:360px; min-width:360px;">Atualizar</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for tx in taxa_admin_rows %}
+            <tr>
+              <td><input type="checkbox" name="ids[]" value="{{ tx.id }}" class="taxaAdmItem" form="taxaAdmLoteForm"></td>
+              <td>{{ tx.restaurante_nome or '-' }}</td>
+              <td>{{ tx.competencia or '-' }}</td>
+              <td>{{ tx.data_vencimento.strftime('%d/%m/%Y') if tx.data_vencimento else '-' }}</td>
+              <td class="text-end">R$ {{ '%.2f'|format(tx.valor_previsto) }}</td>
+              <td class="text-end">R$ {{ '%.2f'|format(tx.valor_juros) }}</td>
+              <td class="text-end">R$ {{ '%.2f'|format(tx.valor_multa) }}</td>
+              <td class="text-end">R$ {{ '%.2f'|format(tx.valor_recebido) }}</td>
+              <td class="text-end">R$ {{ '%.2f'|format(tx.valor_em_aberto) }}</td>
+              <td>
+                {% if tx.status == 'pago' %}<span class="badge bg-success">Pago</span>
+                {% elif tx.status == 'parcial' %}<span class="badge bg-warning text-dark">Parcial</span>
+                {% else %}<span class="badge bg-secondary">Não pago</span>{% endif %}
+              </td>
+              <td class="taxa-adm-actions-cell">
+                <form method="POST" action="{{ url_for('atualizar_taxa_admin_status', id=tx.id) }}" class="taxa-adm-inline-form">
+                  <select name="status_pagamento" class="form-select form-select-sm taxa-adm-status">
+                    <option value="nao_pago" {{ 'selected' if tx.status == 'nao_pago' else '' }}>Não pago</option>
+                    <option value="parcial" {{ 'selected' if tx.status == 'parcial' else '' }}>Parcial</option>
+                    <option value="pago" {{ 'selected' if tx.status == 'pago' else '' }}>Pago</option>
+                  </select>
+                  <input type="number" step="0.01" name="valor_pago" class="form-control form-control-sm taxa-adm-valor" value="{{ '%.2f'|format(tx.valor_pago) }}" placeholder="Pago">
+                  <input type="date" name="data_pagamento" class="form-control form-control-sm taxa-adm-data" value="{{ tx.data_pagamento.strftime('%Y-%m-%d') if tx.data_pagamento else '' }}">
+                  <button class="btn btn-success btn-sm taxa-adm-save" type="submit"><i class="bi bi-save"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="11" class="text-center text-muted">Nenhuma taxa administrativa encontrada no período.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm rounded-3">
+    <div class="card-body p-2 p-md-3">
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th style="width:120px">Data</th>
+              <th>Descrição</th>
+              <th class="text-end" style="width:160px">Valor</th>
+              <th class="text-center" style="width:140px">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in receitas %}
+              {% set v_row = r.valor|default(r.valor_total, true)|default(0, true) %}
+              <tr>
+                <td>{{ r.data.strftime('%d/%m/%Y') if r.data else '-' }}</td>
+                <td class="text-break">{{ r.descricao }}{% if r.auto_taxa_adm %}<div class="small text-muted">{{ r.restaurante.nome if r.restaurante else '' }} • {{ r.competencia or '' }} • {{ r.status_pagamento or 'nao_pago' }}</div>{% endif %}</td>
+                <td class="text-end">R$ {{ '%.2f'|format(v_row) }}</td>
+                <td class="text-center lanc-col-acoes">
+                  {% if can_receitas_editar %}<button class="btn btn-warning btn-sm"
+                          data-bs-toggle="modal"
+                          data-bs-target="#modalEditReceita"
+                          data-id="{{ r.id }}"
+                          data-descricao="{{ r.descricao }}"
+                          data-valor="{{ v_row }}"
+                          data-data="{{ r.data.strftime('%Y-%m-%d') if r.data else '' }}"
+                          data-url="{{ url_for('edit_receita', id=r.id) }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  {% if can_receitas_excluir %}<a class="btn btn-danger btn-sm btn-del" href="{{ url_for('delete_receita', id=r.id) }}">
+                    <i class="bi bi-trash"></i>
+                  </a>{% endif %}
+                  {% endif %}
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4" class="text-center text-muted">Nenhuma receita</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-light">
+              <th colspan="2" class="text-end">Total</th>
+              <th class="text-end">R$ {{ '%.2f'|format(total_receitas_coop_table) }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function(){
+      const all = document.getElementById('taxaAdmToggleAll');
+      if(!all) return;
+      all.addEventListener('change', function(){
+        document.querySelectorAll('.taxaAdmItem').forEach(cb => cb.checked = all.checked);
+      });
+    })();
+  </script>
+
+</div><!--AJAX_RECEITAS_END--></section>
 
 
 <!-- DESPESAS COOP (versão profissional/compacta – drop-in) -->
+<section class="tab-pane fade {{ 'show active' if _tab=='despesas' else '' }}" id="despesas" role="tabpanel">
+<!--AJAX_DESPESAS_START--><div id="despesasAjaxWrap">
+  {% set total_despesas_coop_table = (despesas|sum(attribute='valor')) if despesas else 0 %}
+  {% set qtd_registros = despesas|length if despesas else 0 %}
 
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+    <h5 class="m-0 d-flex align-items-center gap-2">
+      <i class="bi bi-bag-dash"></i> Despesas da Cooperativa
+    </h5>
+    <div class="d-flex flex-wrap gap-2">
+      <span class="badge bg-light text-dark border">Registros: <b>{{ qtd_registros }}</b></span>
+      <span class="badge bg-danger-subtle text-danger border">Total: <b>R$ {{ '%.2f'|format(total_despesas_coop_table) }}</b></span>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm rounded-3 mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <h6 class="m-0"><i class="bi bi-funnel"></i> Filtrar</h6>
+      </div>
+      <form id="formFiltroDespesas" method="GET" action="{{ url_for('admin_dashboard') }}" class="row g-2 align-items-end">
+        <input type="hidden" name="tab" value="despesas">
+        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+        <div class="col-md-3">
+          <label class="form-label">Data Início</label>
+          <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Data Fim</label>
+          <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+        </div>
+        <div class="col-md-3">
+          <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+        </div>
+        <div class="col-md-3 d-none d-md-block"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm rounded-3 mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h6 class="m-0"><i class="bi bi-plus-circle"></i> Adicionar Despesa</h6>
+        <span class="text-muted small">Preencha os campos e clique em <b>Adicionar</b>.</span>
+      </div>
+
+      <form method="POST" action="{{ url_for('add_despesa') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_despesas_criar">
+
+      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+      <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id', request.args.get('resumo_cooperado_id','')) }}">
+        <div class="col-md-5">
+          <label class="form-label">Descrição</label>
+          <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Valor (R$)</label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text">R$</span>
+            <input type="number" step="0.01" class="form-control" name="valor" placeholder="0,00" required>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Data</label>
+          <input type="date" class="form-control form-control-sm" name="data" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label d-none d-md-block">&nbsp;</label>
+          <button class="btn btn-danger btn-sm w-100">
+            <i class="bi bi-plus-circle"></i> Adicionar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm rounded-3">
+    <div class="card-body p-2 p-md-3">
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th style="width:120px">Data</th>
+              <th>Descrição</th>
+              <th class="text-end" style="width:160px">Valor</th>
+              <th class="text-center" style="width:140px">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in despesas %}
+              <tr>
+                <td>{{ d.data.strftime('%d/%m/%Y') if d.data else '-' }}</td>
+                <td class="text-break">{{ d.descricao }}</td>
+                <td class="text-end">R$ {{ "%.2f"|format(d.valor) }}</td>
+                <td class="text-center lanc-col-acoes">
+                  {% if can_despesas_editar %}<button class="btn btn-warning btn-sm"
+                          data-bs-toggle="modal"
+                          data-bs-target="#modalEditDespesa"
+                          data-id="{{ d.id }}"
+                          data-descricao="{{ d.descricao }}"
+                          data-valor="{{ d.valor }}"
+                          data-data="{{ d.data.strftime('%Y-%m-%d') if d.data else '' }}"
+                          data-url="{{ url_for('edit_despesa', id=d.id) }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  {% if can_despesas_excluir %}<a class="btn btn-danger btn-sm btn-del" href="{{ url_for('delete_despesa', id=d.id) }}">
+                    <i class="bi bi-trash"></i>
+                  </a>{% endif %}
+                  {% endif %}
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4" class="text-center text-muted">Nenhuma despesa</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-light">
+              <th colspan="2" class="text-end">Total</th>
+              <th class="text-end">R$ {{ '%.2f'|format(total_despesas_coop_table) }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!--AJAX_DESPESAS_END--></section>
 
 
 <!-- RECEITAS COOPERADOS (versão profissional/compacta – drop-in) -->
+<section class="tab-pane fade {{ 'show active' if _tab=='coop_receitas' else '' }}" id="coop_receitas" role="tabpanel">
+<!--AJAX_COOP_RECEITAS_START--><div id="coopReceitasAjaxWrap">
+  {% set total_receitas_coop_table = (receitas_coop|sum(attribute='valor')) if receitas_coop else 0 %}
+  {% set qtd_registros = receitas_coop|length if receitas_coop else 0 %}
 
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+    <h5 class="m-0 d-flex align-items-center gap-2">
+      <i class="bi bi-cash-coin"></i> Receitas para Cooperados
+    </h5>
+    <div class="d-flex flex-wrap gap-2">
+      <span class="badge bg-light text-dark border">Registros: <b>{{ qtd_registros }}</b></span>
+      <span class="badge bg-success-subtle text-success border">Total: <b>R$ {{ '%.2f'|format(total_receitas_coop_table) }}</b></span>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm rounded-3 mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <h6 class="m-0"><i class="bi bi-funnel"></i> Filtrar</h6>
+      </div>
+      <form id="formFiltroCoopReceitas" method="GET" action="{{ url_for('admin_dashboard') }}" class="row g-2 align-items-end">
+        <input type="hidden" name="tab" value="coop_receitas">
+        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+        <div class="col-md-3">
+          <label class="form-label">Data Início</label>
+          <input type="date" class="form-control form-control-sm" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Data Fim</label>
+          <input type="date" class="form-control form-control-sm" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+        </div>
+        <div class="col-md-3">
+          <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+        </div>
+        <div class="col-md-3 d-none d-md-block"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm rounded-3 mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h6 class="m-0"><i class="bi bi-plus-circle"></i> Adicionar Receita</h6>
+        <span class="text-muted small">Selecione o cooperado e informe os dados.</span>
+      </div>
+
+      <form method="POST" action="{{ url_for('add_receita_coop') }}" class="row g-2 align-items-end mt-2" data-perm-form="can_coop_receitas_criar">
+
+      <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio', request.args.get('resumo_inicio','')) }}">
+      <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim', request.args.get('resumo_fim','')) }}">
+      <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id', request.args.get('resumo_restaurante_id','')) }}">
+        <div class="col-md-3">
+          <label class="form-label">Cooperado</label>
+          <select class="form-select form-select-sm" name="cooperado_id" required>
+            <option value="" selected disabled>Selecione o Cooperado</option>
+            {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Descrição</label>
+          <input type="text" class="form-control form-control-sm" name="descricao" placeholder="Descrição" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Competência</label>
+          <select class="form-select form-select-sm" name="competencia_desconto">
+            <option value="semana_da_data">Semana da data escolhida</option>
+            <option value="esta_semana" selected>Esta semana</option>
+            <option value="semana_passada">Semana passada</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Valor (R$)</label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text">R$</span>
+            <input type="number" step="0.01" class="form-control" name="valor" placeholder="0,00" required>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Data</label>
+          <input type="date" class="form-control form-control-sm" name="data" required>
+        </div>
+        <div class="col-md-1">
+          <label class="form-label d-none d-md-block">&nbsp;</label>
+          <button class="btn btn-success btn-sm w-100">
+            <i class="bi bi-plus-circle"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm rounded-3">
+    <div class="card-body p-2 p-md-3">
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th style="width:120px">Data</th>
+              <th style="width:260px">Cooperado</th>
+              <th>Descrição</th>
+              <th class="text-end" style="width:160px">Valor</th>
+              <th class="text-center" style="width:140px">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for rc in receitas_coop %}
+              <tr>
+                <td>{{ rc.data.strftime('%d/%m/%Y') if rc.data else '-' }}</td>
+                <td class="text-break">{{ rc.cooperado.nome }}</td>
+                <td class="text-break">{{ rc.descricao }}</td>
+                <td class="text-end">R$ {{ "%.2f"|format(rc.valor) }}</td>
+                <td class="text-center lanc-col-acoes">
+                  {% if can_coop_receitas_editar %}<button class="btn btn-warning btn-sm"
+                          data-bs-toggle="modal"
+                          data-bs-target="#modalEditReceitaCoop"
+                          data-id="{{ rc.id }}"
+                          data-cooperado="{{ rc.cooperado.id }}"
+                          data-descricao="{{ rc.descricao }}"
+                          data-valor="{{ rc.valor }}"
+                          data-data="{{ rc.data.strftime('%Y-%m-%d') if rc.data else '' }}"
+                          data-url="{{ url_for('edit_receita_coop', id=rc.id) }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  {% if can_coop_receitas_excluir %}<a class="btn btn-danger btn-sm btn-del" href="{{ url_for('delete_receita_coop', id=rc.id) }}">
+                    <i class="bi bi-trash"></i>
+                  </a>{% endif %}
+                  {% endif %}
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="5" class="text-center text-muted">Nenhuma receita</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-light">
+              <th colspan="6" class="text-end">Total</th>
+              <th class="text-end">R$ {{ '%.2f'|format(total_receitas_coop_table) }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!--AJAX_COOP_RECEITAS_END--></section>
 
 
 <!-- DESPESAS COOPERADOS (versão profissional/compacta – SEM ADIANTAMENTO + PESQUISA) -->
@@ -1613,6 +2785,391 @@
   </script>
 
 </div><!--AJAX_COOP_DESPESAS_END--></section>
+
+     <!-- BENEFÍCIOS (versão profissional / sem alterar backend) -->
+<section class="tab-pane fade {{ 'show active' if _tab=='beneficios' else '' }}" id="beneficios" role="tabpanel">
+<!--AJAX_BENEFICIOS_START--><div id="beneficiosAjaxWrap">
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+    <h5 class="m-0 d-flex align-items-center gap-2">
+      <i class="bi bi-heart-pulse"></i> Benefícios
+    </h5>
+    <span class="text-muted small">Rateio entre quem <u>não</u> recebe (isentos não pagam e não entram no divisor)</span>
+  </div>
+
+  <!-- Formulário de rateio -->
+  <div class="card border-0 shadow-sm rounded-3 mb-3">
+    <div class="card-body">
+
+      <form id="form-beneficios" method="POST" action="{{ url_for('ratear_beneficios') }}" class="row g-3" data-perm-form="can_beneficios_criar_or_editar">
+        <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+        <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+        <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+        <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+        <div class="col-12 col-md-3">
+          <label class="form-label">Data inicial</label>
+          <input type="date" class="form-control form-control-sm" name="data_inicial" required value="{{ request.args.get('data_inicio','') }}">
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label">Data final</label>
+          <input type="date" class="form-control form-control-sm" name="data_final" required value="{{ request.args.get('data_fim','') }}">
+          <small class="muted">Ex.: 18/05/2025 a 24/05/2025</small>
+        </div>
+
+        <!-- Hospitalar -->
+        <div class="col-12"><hr class="my-2"></div>
+        <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <h6 class="mb-0 d-flex align-items-center gap-2">
+            <i class="bi bi-heart-pulse"></i> Benefício Hospitalar
+          </h6>
+          <div class="d-flex flex-wrap gap-2">
+            <span class="badge-soft" id="hosp_badge">Prévia: —</span>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Valor por beneficiado (R$)</label>
+          <input type="number" step="0.01" class="form-control form-control-sm" name="hosp_valor_unit" id="hosp_valor_unit" placeholder="0,00">
+          <input type="hidden" name="hosp_valor" id="hosp_valor_total">
+        </div>
+        <div class="col-md-5">
+          <label class="form-label">Cooperados que <b>recebem</b></label>
+          <select class="form-select form-select-sm" name="hosp_beneficiarios[]" id="hosp_beneficiarios" multiple size="6">
+            {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+          </select>
+          <small class="muted">Os <u>não selecionados</u> (exceto isentos) pagam o rateio.</small>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Cooperados <b>isentos</b></label>
+          <select class="form-select form-select-sm" name="hosp_isencoes[]" id="hosp_isencoes" multiple size="6">
+            {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+          </select>
+          <small class="muted">Isentos não pagam e não entram no divisor.</small>
+        </div>
+
+        <!-- Farmacêutico -->
+        <div class="col-12"><hr class="my-2"></div>
+        <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <h6 class="mb-0 d-flex align-items-center gap-2">
+            <i class="bi bi-capsule"></i> Benefício Farmacêutico
+          </h6>
+          <div class="d-flex flex-wrap gap-2">
+            <span class="badge-soft" id="farm_badge">Prévia: —</span>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Valor por beneficiado (R$)</label>
+          <input type="number" step="0.01" class="form-control form-control-sm" name="farm_valor_unit" id="farm_valor_unit" placeholder="0,00">
+          <input type="hidden" name="farm_valor" id="farm_valor_total">
+        </div>
+        <div class="col-md-5">
+          <label class="form-label">Cooperados que <b>recebem</b></label>
+          <select class="form-select form-select-sm" name="farm_beneficiarios[]" id="farm_beneficiarios" multiple size="6">
+            {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Cooperados <b>isentos</b></label>
+          <select class="form-select form-select-sm" name="farm_isencoes[]" id="farm_isencoes" multiple size="6">
+            {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+          </select>
+        </div>
+
+        <!-- Alimentar -->
+        <div class="col-12"><hr class="my-2"></div>
+        <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <h6 class="mb-0 d-flex align-items-center gap-2">
+            <i class="bi bi-basket"></i> Benefício Alimentar
+          </h6>
+        <div class="d-flex flex-wrap gap-2">
+            <span class="badge-soft" id="alim_badge">Prévia: —</span>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Valor por beneficiado (R$)</label>
+          <input type="number" step="0.01" class="form-control form-control-sm" name="alim_valor_unit" id="alim_valor_unit" placeholder="0,00">
+          <input type="hidden" name="alim_valor" id="alim_valor_total">
+        </div>
+        <div class="col-md-5">
+          <label class="form-label">Cooperados que <b>recebem</b></label>
+          <select class="form-select form-select-sm" name="alim_beneficiarios[]" id="alim_beneficiarios" multiple size="6">
+            {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Cooperados <b>isentos</b></label>
+          <select class="form-select form-select-sm" name="alim_isencoes[]" id="alim_isencoes" multiple size="6">
+            {% for coop in cooperados %}<option value="{{ coop.id }}">{{ coop.nome }}</option>{% endfor %}
+          </select>
+        </div>
+
+        <div class="col-12">
+          <button class="btn btn-royal">
+            <i class="bi bi-scissors"></i> Aplicar rateios
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Registros de benefícios recebidos -->
+  <div class="card border-0 shadow-sm rounded-3">
+    <div class="card-body">
+
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h6 class="m-0 d-flex align-items-center gap-2">
+          <i class="bi bi-journal-medical"></i> Registros de Benefícios Recebidos
+        </h6>
+        <form id="formFiltroBeneficios" method="GET" action="{{ url_for('admin_dashboard') }}" class="row g-2 align-items-end">
+          <input type="hidden" name="tab" value="beneficios">
+          <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+          <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+          <input type="hidden" name="restaurante_id" value="{{ request.args.get('restaurante_id','') }}">
+          <input type="hidden" name="cooperado_id" value="{{ request.args.get('cooperado_id','') }}">
+          <div class="col-md-3">
+            <label class="form-label">De</label>
+            <input type="date" class="form-control form-control-sm" name="b_ini" value="{{ request.args.get('b_ini','') }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Até</label>
+            <input type="date" class="form-control form-control-sm" name="b_fim" value="{{ request.args.get('b_fim','') }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Cooperado</label>
+            <select class="form-select form-select-sm" name="coop_benef_id">
+              <option value="">Todos</option>
+              {% set coop_benef_id = request.args.get('coop_benef_id') %}
+              {% for coop in cooperados %}
+                                <option value="{{ coop.id }}" {{ 'selected' if coop_benef_id and coop_benef_id|int == coop.id else '' }}>{{ coop.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-royal btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+          </div>
+        </form>
+      </div>
+
+     <!-- Ações em massa -->
+<form id="form-bulk-beneficios" method="POST" action="{{ url_for('excluir_beneficio_bulk') }}" class="d-flex align-items-center gap-2 mt-2">
+  {# <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> #}
+  <input type="hidden" name="tab" value="beneficios">
+  <button type="submit" class="btn btn-outline-danger btn-sm" id="btn-bulk-delete" disabled>
+    <i class="bi bi-trash"></i> Excluir selecionados
+  </button>
+</form>
+
+<div class="table-responsive mt-3">
+  <table class="table table-sm table-bordered table-hover align-middle" id="tabela-beneficios">
+    <thead class="table-light">
+      <tr>
+        <th class="text-center" style="width:36px;">
+          <input type="checkbox" id="check_all">
+        </th>
+        <th>Referência</th>
+        <th>Data Lançamento</th>
+        <th>Tipo</th>
+        <th>Recebedor</th>
+        <th class="text-end">Valor p/ Recebedor</th>
+        <th class="text-center">Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% set _bini  = request.args.get('b_ini') %}
+      {% set _bfim  = request.args.get('b_fim') %}
+      {% set _coopf = request.args.get('coop_benef_id') %}
+
+      {% for b in beneficios_view %}
+        {% set qtd = b.recebedores|length %}
+        {% set vpb = ((b.valor_total or 0) / (qtd if qtd>0 else 1)) %}
+        {% for rec in b.recebedores %}
+          {% set mostrar = True %}
+          {% if _coopf and rec.id and (rec.id|int) != (_coopf|int) %}{% set mostrar = False %}{% endif %}
+          {% if _bini %}{% set mostrar = mostrar and (b.data_final.strftime('%Y-%m-%d') >= _bini) %}{% endif %}
+          {% if _bfim %}{% set mostrar = mostrar and (b.data_inicial.strftime('%Y-%m-%d') <= _bfim) %}{% endif %}
+
+          {% if mostrar %}
+            <tr data-bid="{{ b.id }}">
+              <td class="text-center">
+                {# Mostra 1 checkbox por benefício (na primeira linha daquele benefício) #}
+                {% if loop.first %}
+                  <input type="checkbox"
+                         class="chk-beneficio"
+                         name="ids[]"
+                         form="form-bulk-beneficios"
+                         value="{{ b.id }}">
+                {% endif %}
+              </td>
+              <td>{{ b.data_inicial.strftime('%d/%m/%Y') }} – {{ b.data_final.strftime('%d/%m/%Y') }}</td>
+              <td>{% if b.data_lancamento %}{{ b.data_lancamento.strftime('%d/%m/%Y') }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+              <td class="text-capitalize">{{ b.tipo }}</td>
+              <td class="text-break">{{ rec.nome }}</td>
+              <td class="text-end">R$ {{ '%.2f'|format(vpb) }}</td>
+              <td class="text-center">
+                <button
+                  type="button"
+                  class="btn btn-outline-danger btn-sm btn-del-one"
+                  data-bs-toggle="modal"
+                  data-bs-target="#modalExcluirBeneficio"
+                  data-beneficio-id="{{ b.id }}"
+                  data-beneficio-label="{{ b.tipo|capitalize }} ({{ b.data_inicial.strftime('%d/%m/%Y') }}–{{ b.data_final.strftime('%d/%m/%Y') }})">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="7" class="text-center text-muted">Sem registros</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Modal: Excluir benefício (único) -->
+<div class="modal fade" id="modalExcluirBeneficio" tabindex="-1" aria-labelledby="modalExcluirBeneficioLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="POST" class="modal-content" id="form-del-one" action="{{ url_for('excluir_beneficio_one') }}">
+      {# <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> #}
+      <input type="hidden" name="beneficio_id" id="beneficio_id_hidden">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalExcluirBeneficioLabel">
+          <i class="bi bi-exclamation-triangle text-danger"></i> Confirmar exclusão
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">
+          Tem certeza que deseja excluir o benefício: <b id="beneficio_label_preview">—</b>?
+        </p>
+        <small class="text-muted">Esta ação não pode ser desfeita.</small>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-danger">
+          <i class="bi bi-trash"></i> Excluir
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+</div><!--AJAX_BENEFICIOS_END--></section> <!-- FECHA A ABA BENEFÍCIOS -->
+
+<!-- ==== BENEFÍCIOS: prévia + total + seleção em massa (escopado) ==== -->
+<script>
+(function(){
+  const sec = document.getElementById('beneficios');
+  if (!sec) return;
+
+  // ===== Utils =====
+  const TOTAL_COOPS = {{ cooperados|length or 0 }};
+  const q = (sel) => sec.querySelector(sel);
+  function idsFromSelect(sel){ return Array.from(sel?.selectedOptions || []).map(o => String(o.value)); }
+  function valNum(inp){ const n = parseFloat(String(inp?.value ?? '').replace(',','.')); return isFinite(n)?n:0; }
+  function money(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+  // ===== Prévia por tipo =====
+  function calcPreview(prefix){
+    const unit    = q(`#${prefix}_valor_unit`);
+    const bensSel = q(`#${prefix}_beneficiarios`);
+    const isenSel = q(`#${prefix}_isencoes`);
+    const badge   = q(`#${prefix}_badge`);
+    if(!unit || !bensSel || !isenSel || !badge) return;
+
+    const vUnit = Math.max(0, valNum(unit));
+    const bens  = idsFromSelect(bensSel);
+    const isen  = idsFromSelect(isenSel);
+    const unique = new Set([...bens, ...isen]); // não pagam
+    const numBens = bens.length;
+    const numIsen = isen.length;
+    const pagantes = Math.max(0, TOTAL_COOPS - unique.size);
+    const total = vUnit * numBens;
+    const porPag = pagantes > 0 ? (total / pagantes) : 0;
+
+    badge.textContent =
+      `Recebem: ${numBens} · Isentos: ${numIsen} · Pagantes: ${pagantes} · ` +
+      `Total a ratear: ${money(total)} · Cobrança por pagante: ${money(porPag)}`;
+  }
+
+  ['hosp','farm','alim'].forEach(p=>{
+    q(`#${p}_valor_unit`)?.addEventListener('input', ()=>calcPreview(p));
+    q(`#${p}_beneficiarios`)?.addEventListener('change', ()=>calcPreview(p));
+    q(`#${p}_isencoes`)?.addEventListener('change', ()=>calcPreview(p));
+    calcPreview(p); // estado inicial
+  });
+
+  // ===== Garantir IDs dos hidden + calcular total no submit =====
+  const form = q('#form-beneficios');
+  if (form){
+    (function ensureHiddenIds(){
+      const map = { hosp:'hosp_valor_total', farm:'farm_valor_total', alim:'alim_valor_total' };
+      Object.entries(map).forEach(([p, id])=>{
+        if (!q('#'+id)) {
+          const i = q(`input[name="${p}_valor"]`);
+          if (i) i.id = id;
+        }
+      });
+    })();
+
+    function setTotal(prefix){
+      const unit = q(`#${prefix}_valor_unit`);
+      const bensSel = q(`#${prefix}_beneficiarios`);
+      const hidden = q(`#${prefix}_valor_total`) || q(`input[name="${prefix}_valor"]`);
+      const count = (bensSel?.selectedOptions?.length) || 0;
+      const total = Math.max(0, valNum(unit) * count);
+      if (hidden) hidden.value = total.toFixed(2);
+    }
+
+    form.addEventListener('submit', function(){
+      ['hosp','farm','alim'].forEach(setTotal);
+    });
+  }
+
+  // ===== Seleção em massa + modal de exclusão =====
+  const tbl      = q('#tabela-beneficios');
+  const checkAll = q('#check_all');
+  const bulkBtn  = document.getElementById('btn-bulk-delete'); // fora da sec
+  const modal    = document.getElementById('modalExcluirBeneficio'); // fora da sec
+
+  const allChecks = () => tbl ? tbl.querySelectorAll('tbody .chk-beneficio') : [];
+  const checkedCount = () => tbl ? tbl.querySelectorAll('tbody .chk-beneficio:checked').length : 0;
+
+  function toggleBulkBtn(){ if (bulkBtn) bulkBtn.disabled = (checkedCount() === 0); }
+  function updateHeaderState(){
+    if (!checkAll || !tbl) return;
+    const total   = allChecks().length;
+    const checked = checkedCount();
+    if (checked === 0){ checkAll.checked = false; checkAll.indeterminate = false; }
+    else if (checked === total){ checkAll.checked = true; checkAll.indeterminate = false; }
+    else { checkAll.checked = false; checkAll.indeterminate = true; }
+  }
+
+  checkAll?.addEventListener('change', ()=>{
+    allChecks().forEach(ch => { ch.checked = checkAll.checked; });
+    toggleBulkBtn(); updateHeaderState();
+  });
+
+  tbl?.addEventListener('change', (e)=>{
+    if (e.target && e.target.classList?.contains('chk-beneficio')){
+      toggleBulkBtn(); updateHeaderState();
+    }
+  });
+
+  toggleBulkBtn(); updateHeaderState();
+
+  if (modal) {
+    modal.addEventListener('show.bs.modal', function (ev) {
+      const btn   = ev.relatedTarget;
+      const id    = btn ? btn.getAttribute('data-beneficio-id') : '';
+      const label = btn ? (btn.getAttribute('data-beneficio-label') || '—') : '—';
+      const labelNode = modal.querySelector('#beneficio_label_preview');
+      if (labelNode) labelNode.textContent = label;
+      const hidden = modal.querySelector('#beneficio_id_hidden');
+      if (hidden) hidden.value = id || '';
+    });
+  }
+})();
+</script>
+      
 <!-- COOPERADOS (versão profissional / drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
   {% set qtd_coops = cooperados|length %}
@@ -3205,7 +4762,44 @@
 
     <!-- === CONFIGURAÇÕES === -->
 
-
+<section class="tab-pane fade {{ 'show active' if _tab=='sistemas' else '' }}" id="sistemas" role="tabpanel">
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+          <h4 class="mb-1">Sistemas</h4>
+          <div class="text-secondary small">Acesso rápido entre os sistemas sem novo login.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+            <h5 class="mb-0">Supervisão</h5>
+            <i class="bi bi-broadcast-pin fs-4"></i>
+          </div>
+          <p class="text-secondary mb-3">Abrir o painel de Supervisão com acesso integrado.</p>
+          <a class="btn btn-royal" href="{{ url_for('admin_sistemas_abrir', sistema='sistema1') }}">Abrir Supervisão</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+            <h5 class="mb-0">Parceria</h5>
+            <i class="bi bi-people fs-4"></i>
+          </div>
+          <p class="text-secondary mb-3">Abrir o painel de Parceria com acesso integrado.</p>
+          <a class="btn btn-royal" href="{{ url_for('admin_sistemas_abrir', sistema='sistema2') }}">Abrir Parceria</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
 <section class="tab-pane fade {{ 'show active' if _tab=='config' else '' }}" id="config" role="tabpanel">
   <div class="content-shell">
@@ -3219,7 +4813,11 @@
     {% set ADMIN_ABAS = ADMIN_ABAS if ADMIN_ABAS is defined else [
       'resumo',
       'lancamentos',
+      'receitas',
+      'despesas',
+      'coop_receitas',
       'coop_despesas',
+      'beneficios',
       'cooperados',
       'restaurantes',
       'escalas',
@@ -4148,7 +5746,11 @@
 
     const bindings = [
       ['formFiltroLancamentos', 'lancamentos', 'lancamentosAjaxWrap', 'lancamentos'],
+      ['formFiltroReceitas', 'receitas', 'receitasAjaxWrap', 'receitas'],
+      ['formFiltroDespesas', 'despesas', 'despesasAjaxWrap', 'despesas'],
+      ['formFiltroCoopReceitas', 'coop_receitas', 'coopReceitasAjaxWrap', 'coop_receitas'],
       ['formFiltroCoopDespesas', 'coop_despesas', 'coopDespesasAjaxWrap', 'coop_despesas'],
+      ['formFiltroBeneficios', 'beneficios', 'beneficiosAjaxWrap', 'beneficios'],
     ];
 
     bindings.forEach(([formId, partial, wrapId, tabName]) => {
@@ -4725,12 +6327,160 @@
     });
   }
 </script>
+
+<!-- ==== BENEFÍCIOS: prévia + cálculo do TOTAL antes de enviar ==== -->
+<script>
+  (function () {
+    const sec = document.getElementById('beneficios');
+    if (!sec) return; // só roda nesta aba
+
+    const TOTAL_COOPS = {{ cooperados|length or 0 }};
+
+    // ===== Utils =====
+    function valNum(inp) {
+      const n = parseFloat(String(inp?.value ?? '').replace(',', '.'));
+      return isFinite(n) ? n : 0;
+    }
+    function idsFromSelect(sel) {
+      return Array.from(sel?.selectedOptions || []).map(o => String(o.value));
+    }
+    function money(v) {
+      return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function setBadge(el, txt) { if (el) el.textContent = txt; }
+
+    // ===== Prévia por tipo (hosp/farm/alim) =====
+    function calcPreview(prefix) {
+      const unit = sec.querySelector(`#${prefix}_valor_unit`);
+      const bensSel = sec.querySelector(`#${prefix}_beneficiarios`);
+      const isenSel = sec.querySelector(`#${prefix}_isencoes`);
+      const badge = sec.querySelector(`#${prefix}_badge`);
+      if (!unit || !bensSel || !isenSel || !badge) return;
+
+      const vUnit = Math.max(0, valNum(unit));
+      const bens = idsFromSelect(bensSel);
+      const isen = idsFromSelect(isenSel);
+
+      // regra do seu texto: union(bens + isen) = "quem não paga"
+      const uniqueNaoPagam = new Set([...bens, ...isen]);
+      const numBens = bens.length;
+      const numIsen = isen.length;
+      const pagantes = Math.max(0, TOTAL_COOPS - uniqueNaoPagam.size);
+
+      const total = vUnit * numBens;
+      const porPag = pagantes > 0 ? (total / pagantes) : 0;
+
+      setBadge(
+        badge,
+        `Recebem: ${numBens} · Isentos: ${numIsen} · Pagantes: ${pagantes} · Total a ratear: ${money(total)} · Cobrança por pagante: ${money(porPag)}`
+      );
+    }
+
+    ['hosp', 'farm', 'alim'].forEach(p => {
+      sec.querySelector(`#${p}_valor_unit`)?.addEventListener('input', () => calcPreview(p));
+      sec.querySelector(`#${p}_beneficiarios`)?.addEventListener('change', () => calcPreview(p));
+      sec.querySelector(`#${p}_isencoes`)?.addEventListener('change', () => calcPreview(p));
+      calcPreview(p);
+    });
+
+    // ===== Cálculo dos totais no submit + garantir IDs dos hidden =====
+    const form = sec.querySelector('#form-beneficios');
+    if (form) {
+      // garante IDs dos hidden esperados (se existir só name="")
+      (function ensureHiddenIds() {
+        const map = { hosp: 'hosp_valor_total', farm: 'farm_valor_total', alim: 'alim_valor_total' };
+        Object.entries(map).forEach(([p, id]) => {
+          if (!sec.querySelector(`#${id}`)) {
+            const i = sec.querySelector(`input[name="${p}_valor"]`);
+            if (i) i.id = id;
+          }
+        });
+      })();
+
+      function setTotal(prefix) {
+        const unit = sec.querySelector(`#${prefix}_valor_unit`);
+        const bensSel = sec.querySelector(`#${prefix}_beneficiarios`);
+        const hidden = sec.querySelector(`#${prefix}_valor_total`) || sec.querySelector(`input[name="${prefix}_valor"]`);
+
+        const count = (bensSel?.selectedOptions?.length) ? bensSel.selectedOptions.length : 0;
+        const total = Math.max(0, valNum(unit) * count);
+
+        if (hidden) hidden.value = total.toFixed(2);
+      }
+
+      form.addEventListener('submit', function () {
+        ['hosp', 'farm', 'alim'].forEach(setTotal);
+      });
+    }
+
+    // ===== Seleção em massa + modal de exclusão (tabela) =====
+    try {
+      const tbl = sec.querySelector('#tabela-beneficios');
+      const checkAll = sec.querySelector('#check_all');
+      const bulkBtn = sec.querySelector('#btn-bulk-delete');
+      const modal = document.getElementById('modalExcluirBeneficio'); // modal pode ficar fora da aba
+
+      const allChecks = () => (tbl ? tbl.querySelectorAll('tbody .chk-beneficio') : []);
+      const checkedCount = () => (tbl ? tbl.querySelectorAll('tbody .chk-beneficio:checked').length : 0);
+
+      function toggleBulkBtn() { if (bulkBtn) bulkBtn.disabled = checkedCount() === 0; }
+      function updateHeaderState() {
+        if (!checkAll) return;
+        const items = allChecks();
+        const total = items.length;
+        const checked = checkedCount();
+
+        if (checked === 0) { checkAll.checked = false; checkAll.indeterminate = false; }
+        else if (checked === total) { checkAll.checked = true; checkAll.indeterminate = false; }
+        else { checkAll.checked = false; checkAll.indeterminate = true; }
+      }
+
+      checkAll?.addEventListener('change', () => {
+        allChecks().forEach(ch => { ch.checked = checkAll.checked; });
+        toggleBulkBtn();
+        updateHeaderState();
+      });
+
+      tbl?.addEventListener('change', (e) => {
+        if (e.target && e.target.classList?.contains('chk-beneficio')) {
+          toggleBulkBtn();
+          updateHeaderState();
+        }
+      });
+
+      toggleBulkBtn();
+      updateHeaderState();
+
+      // Modal individual (exclusão)
+      if (modal) {
+        modal.addEventListener('show.bs.modal', function (ev) {
+          const btn = ev.relatedTarget;
+          const id = btn ? btn.getAttribute('data-beneficio-id') : '';
+          const label = btn ? (btn.getAttribute('data-beneficio-label') || '—') : '—';
+
+          const labelNode = modal.querySelector('#beneficio_label_preview');
+          if (labelNode) labelNode.textContent = label;
+
+          const hidden = modal.querySelector('#beneficio_id_hidden');
+          if (hidden) hidden.value = id || '';
+        });
+      }
+    } catch (err) {
+      console.error('[beneficios-js]', err);
+    }
+  })();
+</script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   const isMaster = {{ 'true' if admin_is_master else 'false' }};
   const permMap = {
     can_lanc_criar: {{ 'true' if can_lanc_criar else 'false' }},
+    can_receitas_criar: {{ 'true' if can_receitas_criar else 'false' }},
+    can_despesas_criar: {{ 'true' if can_despesas_criar else 'false' }},
+    can_coop_receitas_criar: {{ 'true' if can_coop_receitas_criar else 'false' }},
     can_coop_despesas_criar: {{ 'true' if can_coop_despesas_criar else 'false' }},
+    can_beneficios_criar_or_editar: {{ 'true' if (can_beneficios_criar or can_beneficios_editar) else 'false' }},
     can_cooperados_criar: {{ 'true' if can_cooperados_criar else 'false' }},
     can_restaurantes_criar: {{ 'true' if can_restaurantes_criar else 'false' }},
     can_config_editar: {{ 'true' if can_config_editar else 'false' }},
