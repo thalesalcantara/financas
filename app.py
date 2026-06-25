@@ -10868,68 +10868,14 @@ def excluir_lancamento(id):
     return redirect(url_for("portal_restaurante", view="lancamentos"))
 
 # =========================
-# Compat: Restaurante Avisos
+# Compat: Restaurante Avisos - DESATIVADO PARA ALIVIAR O PAINEL
 # =========================
 @app.get("/api/rest/avisos/unread_count")
 @role_required("restaurante")
 def api_rest_avisos_unread_count():
-    def _nocache(resp):
-        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        return resp
-
-    try:
-        u_id = session.get("user_id")
-        rest = Restaurante.query.filter_by(usuario_id=u_id).first()
-
-        if not rest:
-            return _nocache(
-                jsonify(
-                    ok=False,
-                    unread=0,
-                    count=0,
-                    error="Restaurante não encontrado"
-                )
-            ), 404
-
-        avisos_rest = get_avisos_for_restaurante(rest)
-
-        lidos_ids_rest = {
-            row[0]
-            for row in db.session.query(AvisoLeitura.aviso_id)
-            .filter_by(restaurante_id=rest.id)
-            .all()
-        }
-
-        avisos_nao_lidos_count = sum(
-            1 for a in avisos_rest if a.id not in lidos_ids_rest
-        )
-
-        return _nocache(
-            jsonify(
-                ok=True,
-                unread=int(avisos_nao_lidos_count),
-                count=int(avisos_nao_lidos_count)
-            )
-        ), 200
-
-    except Exception as e:
-        db.session.rollback()
-
-        try:
-            current_app.logger.exception(
-                "Erro ao calcular /api/rest/avisos/unread_count"
-            )
-        except Exception:
-            pass
-
-        return _nocache(
-            jsonify(
-                ok=False,
-                unread=0,
-                count=0,
-                error=str(e)
-            )
-        ), 500
+    resp = jsonify(ok=True, unread=0, count=0, avisos_desativados=True)
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return resp, 200
 
 # =========================
 # Documentos (Admin + Público)
@@ -11471,78 +11417,13 @@ def marcar_todos_avisos_lidos():
 @app.get("/portal/restaurante/avisos")
 @role_required("restaurante")
 def portal_restaurante_avisos():
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-
-    # avisos aplicáveis
-    try:
-        avisos_db = get_avisos_for_restaurante(rest)
-    except NameError:
-        # fallback: global + restaurante (associados ou broadcast)
-        avisos_db = (Aviso.query
-                     .filter(Aviso.ativo.is_(True))
-                     .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
-                     .order_by(Aviso.fixado.desc(), Aviso.criado_em.desc())
-                     .all())
-
-    # ids já lidos
-    lidos_ids = {
-        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
-        .filter(AvisoLeitura.restaurante_id == rest.id).all()
-    }
-
-    def corpo_do_aviso(a: Aviso) -> str:
-        for k in ("corpo_html","html","conteudo_html","mensagem_html","descricao_html","texto_html",
-                  "corpo","conteudo","mensagem","descricao","texto","resumo","body","content"):
-            v = getattr(a, k, None)
-            if isinstance(v, str) and v.strip():
-                return v
-        return ""
-
-    avisos = [{
-        "id": a.id,
-        "titulo": a.titulo or "Aviso",
-        "criado_em": a.criado_em,
-        "lido": (a.id in lidos_ids),
-        "prioridade_alta": (str(a.prioridade or "").lower() == "alta"),
-        "corpo_html": corpo_do_aviso(a),
-    } for a in avisos_db]
-
-    avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
-    return render_template(
-        "portal_restaurante_avisos.html",   # crie/clone seu template
-        avisos=avisos,
-        avisos_nao_lidos_count=avisos_nao_lidos_count,
-        current_year=datetime.now().year,
-    )
+    flash("Avisos desativados temporariamente para melhorar o desempenho do painel.", "info")
+    return redirect(url_for("portal_restaurante"))
 
 @app.post("/avisos-restaurante/marcar-todos", endpoint="marcar_todos_avisos_lidos_restaurante")
 @role_required("restaurante")
 def marcar_todos_avisos_lidos_restaurante():
-    u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
-
-    try:
-        avisos = get_avisos_for_restaurante(rest)
-    except NameError:
-        avisos = (Aviso.query
-                  .filter(Aviso.ativo.is_(True))
-                  .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
-                  .all())
-
-    lidos_ids = {
-        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
-        .filter(AvisoLeitura.restaurante_id == rest.id).all()
-    }
-
-    now = datetime.utcnow()
-    for a in avisos:
-        if a.id not in lidos_ids:
-            db.session.add(AvisoLeitura(
-                restaurante_id=rest.id, aviso_id=a.id, lido_em=now
-            ))
-    db.session.commit()
-    return redirect(url_for("portal_restaurante_avisos"))
+    return redirect(url_for("portal_restaurante"))
 
 # =========================
 # Avisos: contagem de não lidos (Cooperado/Restaurante)
@@ -11559,60 +11440,8 @@ def _nocache_json(payload: dict, status: int = 200):
 @app.get("/avisos/unread_count/")
 @with_db_retry
 def avisos_unread_count():
-    """
-    Retorna a quantidade de avisos não lidos para o usuário logado.
-    Responde sempre em JSON e evita quebrar o painel quando houver sessão vazia,
-    usuário sem vínculo, ou qualquer falha na busca.
-    """
-    user_id = session.get("user_id")
-    user_tipo = (session.get("user_tipo") or "").strip().lower()
-
-    if not user_id:
-        return _nocache_json({"ok": False, "unread": 0, "count": 0, "error": "Sessão ausente"}, 401)
-
-    try:
-        count = 0
-
-        if user_tipo == "cooperado":
-            coop = Cooperado.query.filter_by(usuario_id=user_id).first()
-            if not coop:
-                return _nocache_json({"ok": False, "unread": 0, "count": 0, "error": "Cooperado não encontrado"}, 404)
-
-            avisos = get_avisos_for_cooperado(coop) or []
-            lidos_ids = {
-                aviso_id
-                for (aviso_id,) in db.session.query(AvisoLeitura.aviso_id)
-                .filter(AvisoLeitura.cooperado_id == coop.id)
-                .all()
-            }
-            count = sum(1 for a in avisos if a.id not in lidos_ids)
-
-        elif user_tipo == "restaurante":
-            rest = Restaurante.query.filter_by(usuario_id=user_id).first()
-            if not rest:
-                return _nocache_json({"ok": False, "unread": 0, "count": 0, "error": "Restaurante não encontrado"}, 404)
-
-            avisos = get_avisos_for_restaurante(rest) or []
-            lidos_ids = {
-                aviso_id
-                for (aviso_id,) in db.session.query(AvisoLeitura.aviso_id)
-                .filter(AvisoLeitura.restaurante_id == rest.id)
-                .all()
-            }
-            count = sum(1 for a in avisos if a.id not in lidos_ids)
-
-        else:
-            return _nocache_json({"ok": True, "unread": 0, "count": 0, "error": "Tipo de usuário sem avisos"}, 200)
-
-        return _nocache_json({"ok": True, "unread": int(count), "count": int(count)}, 200)
-
-    except Exception as e:
-        db.session.rollback()
-        try:
-            current_app.logger.exception("Erro ao calcular /avisos/unread_count")
-        except Exception:
-            pass
-        return _nocache_json({"ok": False, "unread": 0, "count": 0, "error": str(e)}, 500)
+    # Avisos desativados temporariamente para reduzir consultas ao banco e evitar timeout/502.
+    return _nocache_json({"ok": True, "unread": 0, "count": 0, "avisos_desativados": True}, 200)
 
 
 # =========================
