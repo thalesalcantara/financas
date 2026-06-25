@@ -446,7 +446,6 @@
 {% set can_escalas_ver = admin_is_master or _perms.get('escalas', {}).get('ver', False) %}
 {% set can_escalas_criar = admin_is_master or _perms.get('escalas', {}).get('criar', False) %}
 {% set can_escalas_editar = admin_is_master or _perms.get('escalas', {}).get('editar', False) %}
-{% set can_avisos_ver = admin_is_master or _perms.get('avisos', {}).get('ver', False) %}
 {% set can_documentos_ver = admin_is_master or _perms.get('documentos', {}).get('ver', False) %}
 {% set can_tabelas_ver = admin_is_master or _perms.get('tabelas', {}).get('ver', False) %}
 {% set can_avaliacoes_ver = admin_is_master or _perms.get('avaliacoes', {}).get('ver', False) %}
@@ -662,13 +661,6 @@
            aria-selected="{{ 'true' if _tab=='escalas' else 'false' }}">
           <i class="bi bi-calendar-week"></i>
           <span class="nav-link-label">Escalas</span>
-        </a>{% endif %}
-
-        <!-- Avisos (rota, como já era) -->
-        {% if can_avisos_ver %}<a class="nav-sublink {% if request.endpoint == 'admin_avisos' %}active{% endif %}"
-           href="{{ url_for('admin_avisos') }}">
-          <i class="bi bi-megaphone"></i>
-          <span class="nav-link-label">Avisos</span>
         </a>{% endif %}
       </div>
 
@@ -3894,9 +3886,9 @@
   <div class="card p-3 mb-3 border-0 shadow-sm escala-alerta-card escala-alerta-top" id="escalaAlertasCard">
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-2">
       <div>
-        <h6 class="mb-1 section-title">Aviso de contratos sem cooperado</h6>
+        <h6 class="mb-1 section-title">Alerta de contratos sem cooperado</h6>
         <small class="section-subtitle">
-          O aviso fica no topo para aparecer logo. O som usa <strong>static/escala.mp3</strong> e toca quando surgir alerta novo com a aba aberta.
+          O alerta fica no topo para aparecer logo. O som usa <strong>static/escala.mp3</strong> e toca quando surgir alerta novo com a aba aberta.
         </small>
       </div>
       <div class="d-flex gap-2 align-items-center flex-wrap">
@@ -4831,7 +4823,6 @@
       'escalas',
       'documentos',
       'tabelas',
-      'avisos',
       'avaliacoes',
       'config'
     ] %}
