@@ -304,19 +304,6 @@
       margin-left:auto;
     }
 
-    .aviso-card{
-      border-left:4px solid var(--royal);
-      border-radius:14px;
-    }
-
-    .aviso-card.lido{
-      border-left-color:#9ca3af;
-      opacity:.96;
-    }
-
-    .aviso-card.prioridade{
-      border-left-color:var(--danger);
-    }
 
     .form-label{
       font-size:.8rem;
@@ -996,7 +983,7 @@
       <button id="btnTheme" class="theme-toggle" type="button"><i class="bi bi-moon"></i><span id="lblTheme">Escuro</span></button>
 
       <nav class="navmenu" id="sideNav">
-        <a data-target="lancar" class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos','tabelas']) else '' }}" href="{{ url_for('portal_restaurante', view='lancar') }}">
+        <a data-target="lancar" class="{{ 'active' if (view|default('lancar') not in ['escalas','config','lancamentos','tabelas']) else '' }}" href="{{ url_for('portal_restaurante', view='lancar') }}">
           <i class="bi bi-person-lines-fill"></i><span>Lançar Produção</span>
         </a>
         <a data-target="lancamentos" class="{{ 'active' if view=='lancamentos' else '' }}" href="{{ url_for('portal_restaurante', view='lancamentos') }}">
@@ -1012,11 +999,6 @@
         {% endif %}
         <a data-target="config" class="{{ 'active' if view=='config' else '' }}" href="{{ url_for('portal_restaurante', view='config') }}">
           <i class="bi bi-gear"></i><span>Configuração</span>
-        </a>
-        <a id="linkAvisos" data-target="avisos" class="{{ 'active' if view=='avisos' else '' }}" href="{{ url_for('portal_restaurante_avisos') }}">
-          <i class="bi bi-megaphone"></i><span>Avisos</span>
-          {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
-          <span class="badge-dot" id="badgeAvisos" {% if _cntAvisos == 0 %}style="display:none"{% endif %}>{{ _cntAvisos }}</span>
         </a>
         <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
       </nav>
@@ -1345,86 +1327,6 @@
               <div class="escala-empty mt-3">Sem escala registrada para esta data.</div>
             {% endif %}
           </div>
-          {% endif %}
-        </div>
-      </section>
-
-      <section data-view="avisos">
-        {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
-        {% set _unread_from_list = (_avisos | selectattr('lido','equalto',False) | list | length) %}
-        {% set _unread_from_ctx = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
-        {% set _badgeN = (_unread_from_list if _unread_from_list>0 else _unread_from_ctx) %}
-        <div class="section-title">
-          <i class="bi bi-megaphone-fill"></i> Avisos
-          <span id="badgeTitulo" class="badge {{ 'text-bg-danger' if _badgeN>0 else 'text-bg-success' }} ms-2">
-            {{ _badgeN>0 and (_badgeN ~ ' não lido(s)') or 'Tudo lido' }}
-          </span>
-        </div>
-
-        <div class="card card-body">
-          <div class="d-flex align-items-center gap-2">
-            <form method="POST" action="{{ url_for('marcar_todos_avisos_lidos_restaurante') }}" class="m-0">
-              <button class="btn btn-royal" type="submit" {% if _badgeN == 0 %}disabled{% endif %}><i class="bi bi-check2-circle me-1"></i> Marcar todos como lidos</button>
-            </form>
-            <div class="form-check ms-auto">
-              <input class="form-check-input" type="checkbox" id="toggleNaoLidos">
-              <label class="form-check-label" for="toggleNaoLidos">Mostrar apenas não lidos</label>
-            </div>
-          </div>
-        </div>
-
-        <div id="avisosListContainer">
-          {% if _avisos and (_avisos | length) > 0 %}
-            {% for a in _avisos %}
-            <div id="aviso-{{ a.id }}" class="card card-body my-2 aviso-card {% if a.lido %}lido{% endif %} {% if a.prioridade_alta %}prioridade{% endif %}" data-lido="{{ '1' if a.lido else '0' }}">
-              <div class="d-flex justify-content-between align-items-start">
-                <div>
-                  <div class="fw-bold">
-                    {{ a.titulo or 'Aviso' }}
-                    {% if a.prioridade_alta %}
-                      <span class="badge text-bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Prioridade</span>
-                    {% endif %}
-                  </div>
-                  <div class="text-muted small">
-                    Publicado em {{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em }}
-                    {% if a.atualizado_em %} · Atualizado {{ a.atualizado_em.strftime('%d/%m/%Y %H:%M') }}{% endif %}
-                    {% if a.lido %} • <span class="text-success">Lido</span>{% else %} • <span class="text-danger">Não lido</span>{% endif %}
-                  </div>
-                </div>
-                <div class="ms-3">
-                  {% if not a.lido %}
-                  <button class="btn btn-outline-royal btn-sm" data-acao="marcar-lido" data-url="{{ url_for('marcar_aviso_lido_universal', aviso_id=a.id) }}">
-                    <i class="bi bi-check2"></i> Marcar como lido
-                  </button>
-                  {% endif %}
-                </div>
-              </div>
-
-              <hr class="my-2">
-
-              <div class="aviso-body">
-                {% set html = (
-                  a.corpo_html or a.conteudo_html or a.mensagem_html or a.descricao_html or a.body_html or a.recado_html
-                  or (a.dados and (a.dados.corpo_html or a.dados.conteudo_html or a.dados.mensagem_html or a.dados.descricao_html or a.dados.body_html or a.dados.recado_html))
-                ) %}
-                {% if html and html|trim %}
-                  {{ html|safe }}
-                {% else %}
-                  {% set txt = (
-                    a.corpo or a.conteudo or a.mensagem or a.texto or a.descricao or a.body or a.message or a.content or a.recado
-                    or (a.dados and (a.dados.corpo or a.dados.conteudo or a.dados.mensagem or a.dados.texto or a.dados.descricao or a.dados.body or a.dados.message or a.dados.content or a.dados.recado))
-                  ) %}
-                  {% if txt and txt|trim %}
-                    <p class="mb-0">{{ txt|e|replace('\r\n','\n')|replace('\n','<br>')|safe }}</p>
-                  {% else %}
-                    <p class="text-muted mb-0"><em>(sem conteúdo)</em></p>
-                  {% endif %}
-                {% endif %}
-              </div>
-            </div>
-            {% endfor %}
-          {% else %}
-            <div class="card card-body text-muted">Carregando avisos…</div>
           {% endif %}
         </div>
       </section>
@@ -1966,37 +1868,6 @@
           <div class="lanc-overlay-text">Lançando…</div>
         </div>
       </div>
-
-      <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 3000;">
-        <div id="toastAvisos" class="toast border-0" role="alert" aria-live="assertive" aria-atomic="true">
-          <div class="toast-header">
-            <i class="bi bi-megaphone-fill me-2 text-primary"></i>
-            <strong class="me-auto">Avisos</strong>
-            <small><span id="toastCount">0</span></small>
-            <button type="button" class="btn-close ms-2" data-bs-dismiss="toast" aria-label="Fechar"></button>
-          </div>
-          <div class="toast-body">
-            Você tem um novo aviso.
-            <div class="mt-2 pt-2 border-top d-flex gap-2">
-              <a id="toastVerAgora" class="btn btn-royal btn-sm" href="{{ url_for('portal_restaurante_avisos') }}">
-                <i class="bi bi-eye"></i> Ver agora
-              </a>
-              <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="toast">Depois</button>
-            </div>
-          </div>
-        </div>
-
-        <div id="toastOK" class="toast align-items-center text-bg-success border-0 mt-2" role="alert" aria-live="polite" aria-atomic="true">
-          <div class="d-flex">
-            <div class="toast-body">
-              <i class="bi bi-check2-circle me-1"></i> Aviso marcado como lido.
-            </div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
-          </div>
-        </div>
-      </div>
-
-      <audio id="audioAvisos" preload="auto" src="{{ url_for('static', filename='avisos.mp3') }}"></audio>
     </main>
   </div>
 
@@ -2349,7 +2220,6 @@ function setPhone(digits) {
         const t=a.getAttribute('data-target');
         a.classList.toggle('active', t===view);
       });
-      if(view==='avisos') initAvisos();
       if(view==='lancamentos') initLancamentos();
       if(view==='lancar') initLancar();
       if(view==='tabelas') initTabelas();
@@ -2397,172 +2267,6 @@ function setPhone(digits) {
         l.href=href;
         document.head.appendChild(l);
       }catch(e){}
-    }
-
-    let toastAvisosInst=null;
-    function ensureToastInstance(){
-      const el=document.getElementById('toastAvisos');
-      if(!el) return null;
-      if(!toastAvisosInst) toastAvisosInst = new bootstrap.Toast(el,{autohide:false});
-      return toastAvisosInst;
-    }
-
-    function setAvisosBadge(n, opts){
-      const o = Object.assign({showToast:false}, (opts||{}));
-      const b=document.getElementById('badgeAvisos');
-      if(b){
-        b.style.display = n>0 ? 'inline-flex':'none';
-        b.textContent=n;
-      }
-      const tCnt=document.getElementById('toastCount');
-      if(tCnt) tCnt.textContent=n;
-
-      if(!o.showToast) return;
-
-      const t=ensureToastInstance();
-      if(t){
-        if(n>0) t.show();
-        else t.hide();
-      }
-    }
-
-    let __audioAvisosUnlocked = false;
-    let __audioAvisosPending = false;
-
-    function tryPlayAvisoSound(){
-      const a = document.getElementById('audioAvisos');
-      if(!a) return;
-
-      try{
-        a.currentTime = 0;
-        const p = a.play();
-        if(p && typeof p.catch === 'function'){
-          p.catch(()=>{
-            __audioAvisosPending = true;
-          });
-        }
-      }catch(e){
-        __audioAvisosPending = true;
-      }
-    }
-
-    (function unlockAudioOnce(){
-      const a = document.getElementById('audioAvisos');
-      if(!a) return;
-
-      let unlocked = false;
-      async function unlock(){
-        if(unlocked) return;
-        unlocked = true;
-        try{
-          a.muted = true;
-          a.currentTime = 0;
-          await a.play();
-          a.pause();
-          a.muted = false;
-          a.currentTime = 0;
-
-          __audioAvisosUnlocked = true;
-
-          if(__audioAvisosPending){
-            __audioAvisosPending = false;
-            tryPlayAvisoSound();
-          }
-        }catch(e){
-          unlocked = false;
-          __audioAvisosUnlocked = false;
-        }
-      }
-
-      ['click','touchstart','keydown'].forEach(evt=>{
-        window.addEventListener(evt, unlock, {once:true, passive:true});
-      });
-    })();
-
-    let avisosWired=false;
-    function initAvisos(){
-      if(avisosWired) return;
-      avisosWired=true;
-
-      const toastOKEl = document.getElementById('toastOK');
-      const toastOK = toastOKEl ? new bootstrap.Toast(toastOKEl) : null;
-
-      function getUnread(){
-        return document.querySelectorAll('.aviso-card[data-lido="0"]').length;
-      }
-
-      function refresh(){
-        setAvisosBadge(getUnread(), {showToast:false});
-      }
-
-      document.getElementById('toggleNaoLidos')?.addEventListener('change', (e)=>{
-        const only=e.target.checked;
-        document.querySelectorAll('.aviso-card').forEach(card=>{
-          const lido=card.getAttribute('data-lido')==='1';
-          card.style.display = (only && lido) ? 'none' : '';
-        });
-      });
-
-      (document.getElementById('avisosListContainer')||document).addEventListener('click', async (ev)=>{
-        const btn=ev.target.closest('[data-acao="marcar-lido"]');
-        if(!btn) return;
-        const url=btn.getAttribute('data-url');
-        const card=btn.closest('.aviso-card');
-        try{
-          const resp=await fetch(url,{method:'POST',credentials:'same-origin'});
-          if(resp.ok){
-            card.setAttribute('data-lido','1');
-            card.classList.add('lido');
-            const meta=card.querySelector('.text-muted.small');
-            if(meta && !/Lido/.test(meta.innerHTML)){
-              meta.innerHTML += ' • <span class="text-success">Lido</span>';
-            }
-            btn.remove();
-            refresh();
-            toastOK?.show();
-            pollAvisos();
-          }else{
-            alert('Falha ao marcar como lido ('+resp.status+').');
-          }
-        }catch(e){
-          alert('Erro de rede.');
-        }
-      });
-
-      refresh();
-
-      if(!document.querySelector('#avisosListContainer .aviso-card')){
-        const href=document.getElementById('linkAvisos')?.href;
-        if(href) loadAvisosFromRoute(href);
-      }
-    }
-
-    async function loadAvisosFromRoute(href){
-      try{
-        const res=await fetch(href,{credentials:'same-origin'});
-        if(!res.ok) throw new Error(res.status);
-        const html=await res.text();
-        const dom=new DOMParser().parseFromString(html,'text/html');
-        const cards=[...dom.querySelectorAll('.aviso-card,#avisosListContainer .aviso,.aviso')];
-        const cont=document.getElementById('avisosListContainer');
-        if(!cont) return;
-        cont.innerHTML='';
-        if(cards.length){
-          cards.forEach(c=>cont.appendChild(document.importNode(c,true)));
-          avisosWired=false;
-          initAvisos();
-          const unreadLocal = cards.filter(c=>c.getAttribute('data-lido')==='0').length;
-          setAvisosBadge(unreadLocal, {showToast:false});
-          pollAvisos();
-        }else{
-          cont.innerHTML='<div class="card card-body text-muted">Nenhum aviso disponível.</div>';
-          setAvisosBadge(0, {showToast:false});
-          pollAvisos();
-        }
-      }catch(e){
-        const cont=document.getElementById('avisosListContainer');
-        if(cont) cont.innerHTML='<div class="card card-body text-muted">Não foi possível carregar os avisos agora.</div>';
-      }
     }
 
     let lancarWired = false;
@@ -3266,46 +2970,6 @@ function setPhone(digits) {
       modalEl.addEventListener('hidden.bs.modal',()=>{ frame.src=''; });
     }
 
-    let lastUnread = null;
-    let __shownAtLogin = false;
-
-    async function pollAvisos(){
-      try{
-        const r = await fetch('/api/rest/avisos/unread_count', {credentials:'same-origin'});
-        if(!r.ok) throw new Error(r.status);
-        const j = await r.json();
-        if(!j || !j.ok) return;
-
-        const unread = Number(j.unread || 0);
-        setAvisosBadge(unread, { showToast: false });
-
-        if(lastUnread === null){
-          lastUnread = unread;
-          if(unread > 0 && !__shownAtLogin){
-            __shownAtLogin = true;
-            setAvisosBadge(unread, { showToast: true });
-            tryPlayAvisoSound();
-          }
-          return;
-        }
-
-        if(unread > lastUnread){
-          onNewAviso(unread);
-        }
-
-        if(unread === 0 && lastUnread > 0){
-          setAvisosBadge(0, { showToast: true });
-        }
-
-        lastUnread = unread;
-      }catch(e){}
-    }
-
-    function onNewAviso(unread){
-      setAvisosBadge(unread, { showToast: true });
-      tryPlayAvisoSound();
-    }
-
     document.getElementById('sideNav')?.addEventListener('click', async (e)=>{
       const a=e.target.closest('a');
       if(!a) return;
@@ -3316,25 +2980,15 @@ function setPhone(digits) {
       a.classList.add('active');
       showSection(t);
       pushView(t);
-      if(t==='avisos' || t==='tabelas'){
+      if(t==='tabelas'){
         prefetch(a.href);
       }
-    });
-
-    document.getElementById('toastVerAgora')?.addEventListener('click', async (e)=>{
-      e.preventDefault();
-      const href=e.currentTarget.getAttribute('href');
-      showSection('avisos');
-      pushView('avisos');
-      await loadAvisosFromRoute(href);
     });
 
     document.addEventListener('DOMContentLoaded', ()=>{
       const initial=startView();
       showSection(initial);
       hideLancOverlay();
-      pollAvisos();
-      setInterval(pollAvisos, 25000);
     });
 
     window.addEventListener('popstate',(ev)=>{
