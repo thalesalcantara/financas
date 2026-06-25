@@ -1829,7 +1829,7 @@ def admin_perm_required(aba: str, acao: str = "ver"):
                 flash("Você não tem permissão para essa ação.", "danger")
 
                 if getattr(u, "is_master", False):
-                    return redirect(url_for("admin_dashboard", tab="resumo"))
+                    return redirect(url_for("admin_dashboard", tab="lancamentos"))
 
                 abas_liberadas = [
                     nome_aba
@@ -3000,7 +3000,7 @@ def index():
     if not u:
         return redirect(url_for("login"))
     if u.tipo == "admin":
-        return redirect(url_for("admin_dashboard", tab="resumo"))
+        return redirect(url_for("admin_dashboard", tab="lancamentos"))
     if u.tipo == "cooperado":
         return redirect(url_for("portal_cooperado"))
     if u.tipo == "restaurante":
@@ -3049,7 +3049,7 @@ def login():
             session["user_tipo"] = u.tipo
 
             if u.tipo == "admin":
-                return redirect(url_for("admin_dashboard", tab="resumo"))
+                return redirect(url_for("admin_dashboard", tab="lancamentos"))
             elif u.tipo == "cooperado":
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
@@ -3427,11 +3427,18 @@ def admin_sistemas_abrir(sistema):
     flash("Sistema inválido.", "warning")
     return redirect(url_for("admin_dashboard", tab="sistemas"))
 
+
+
+# Compatibilidade: portal antigo ainda consulta contador de avisos.
+@app.get("/api/rest/avisos/unread_count")
+def rest_avisos_unread_count_desativado():
+    return jsonify({"unread_count": 0, "count": 0})
+
 @app.route("/admin", methods=["GET"])
 @admin_required
 def admin_dashboard():
     args = request.args
-    active_tab = (args.get("tab") or "resumo").strip().lower()
+    active_tab = (args.get("tab") or "lancamentos").strip().lower()
 
     admin_logado = _usuario_logado()
     if not admin_logado:
@@ -3445,7 +3452,7 @@ def admin_dashboard():
         return redirect(url_for("login"))
 
     if active_tab not in ADMIN_ABAS:
-        active_tab = "resumo"
+        active_tab = "lancamentos"
 
     # monta o mapa de permissões logo no início
     if getattr(admin_logado, "is_master", False):
@@ -3466,7 +3473,7 @@ def admin_dashboard():
             for aba in ADMIN_ABAS.keys()
             if admin_perms.get(aba, {}).get("ver", False)
         ]
-        aba_preferida = "resumo" if "resumo" in abas_liberadas else abas_liberadas[0] if abas_liberadas else "resumo"
+        aba_preferida = "lancamentos" if "lancamentos" in abas_liberadas else abas_liberadas[0] if abas_liberadas else "lancamentos"
 
         if not abas_liberadas:
             session.clear()
@@ -4541,6 +4548,17 @@ def admin_dashboard():
             resumo_totais["a_receber"] += max(0.0, snap["disponivel_auto_restante"])
             resumo_totais["saldo_pendente"] += snap["saldo_devedor"]
             resumo_totais["pend_programado"] += snap["a_descontar"]
+
+    # Alívio de memória: quando não está na aba Escalas/Resumo, não manda listas pesadas ao template.
+    if active_tab != "escalas":
+        escala_editor_rows = []
+        escala_editor_rows_export = []
+        escala_historico_rows = []
+        trocas_historico = []
+        trocas_historico_flat = []
+        trocas_historico_export = []
+    if active_tab != "resumo":
+        resumo_coop_rows = []
 
     _rendered_html = render_template(
         "admin_dashboard.html",
@@ -7537,6 +7555,15 @@ def _xlsx_finish_and_send(wb, filename, *, fast=False):
     bio.seek(0)
     return send_file(bio, as_attachment=True, download_name=filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
+
+
+
+# Compatibilidade: alguns templates antigos chamavam admin_escalas.
+# Mantém Escalas dentro do próprio painel admin, sem quebrar url_for('admin_escalas').
+@app.get("/admin/escalas", endpoint="admin_escalas")
+@admin_required
+def admin_escalas_compat():
+    return redirect(url_for("admin_dashboard", tab="escalas"))
 
 @app.get("/admin/escalas/exportar_atual")
 @admin_perm_required("escalas", "ver")
