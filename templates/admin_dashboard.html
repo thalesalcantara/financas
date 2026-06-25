@@ -402,13 +402,6 @@
     a[data-bs-target="#coop_receitas"],
     a[data-bs-target="#beneficios"],
     a[data-bs-target="#sistemas"]{ display:none !important; }
-  
-    /* COOPEX_FAST_HIDE_UNUSED */
-    a[data-bs-target="#receitas"],
-    a[data-bs-target="#despesas"],
-    a[data-bs-target="#coop_receitas"],
-    a[data-bs-target="#beneficios"],
-    a[data-bs-target="#sistemas"]{display:none!important;}
   </style>
 </head>
 <body>
@@ -1336,25 +1329,7 @@
             font-size: 0.78rem;
           }
         }
-      
-        /* COOPEX_FAST_RESUMO_HIDE_EXTRA: mostra apenas cards principais do resumo */
-        #resumo #kpiRecCoopCorp,
-        #resumo #kpiDespCoopCorp,
-        #resumo #kpiRecCooperadosFull,
-        #resumo #kpiDespCooperados,
-        #resumo #kpiResultadoCoop,
-        #resumo #kpiTotalReceitasGeral,
-        #resumo #kpiBeneficiosRateados{display:none!important;}
-        #resumo #kpiRecCoopCorp.closest, #resumo .dummy-never{display:none!important;}
       </style>
-      <script>
-      document.addEventListener('DOMContentLoaded', function(){
-        ['kpiRecCoopCorp','kpiDespCoopCorp','kpiRecCooperadosFull','kpiDespCooperados','kpiResultadoCoop','kpiTotalReceitasGeral','kpiBeneficiosRateados'].forEach(function(id){
-          var el=document.getElementById(id); var card=el && el.closest('.col-12'); if(card) card.remove();
-        });
-        var tbl=document.getElementById('tblResumoCoop'); var c=tbl && tbl.closest('.card'); if(c) c.remove();
-      });
-      </script>
     </section>
 
     <!-- Dados do resumo já chegam prontos do backend. O HTML não recalcula financeiro. -->
@@ -2438,7 +2413,7 @@
                   data-user="{{ coop.usuario_ref.usuario|lower }}"
                   data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','')|lower }}">
                 <td class="text-center">
-                  <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
+                  <img src="{{ url_for('static', filename='img/default.png') }}"
                        class="avatar border" alt="{{ coop.nome }}"
                        style="width:40px;height:40px;object-fit:cover;">
                 </td>
@@ -2891,7 +2866,7 @@
             {% for r in restaurantes %}
               <tr data-nome="{{ r.nome|lower }}" data-user="{{ r.usuario_ref.usuario|lower }}" data-periodo="{{ r.periodo|lower }}" data-tipo="{{ 'farmacia' if r.eh_farmacia else 'estabelecimento' }}">
                 <td class="text-center">
-                  <img src="{{ r.foto_url or url_for('static', filename='img/default.png') }}"
+                  <img src="{{ url_for('static', filename='img/default.png') }}"
                        class="avatar border" alt="{{ r.nome }}"
                        style="width:40px;height:40px;object-fit:cover;">
                 </td>
@@ -3035,7 +3010,7 @@
     <div>
       <h5 class="mb-0 section-title">Gestão de Escalas</h5>
       <small class="section-subtitle">
-        Upload da planilha, alertas no topo e escala semanal carregada somente quando você abrir.
+        Upload da planilha e escala semanal carregada somente quando você abrir.
       </small>
     </div>
     <div class="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center">
@@ -3046,65 +3021,7 @@
       </div>
     </div>
   </div>
-
-  <div class="card p-3 mb-3 border-0 shadow-sm escala-alerta-card escala-alerta-top" id="escalaAlertasCard">
-    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-2">
-      <div>
-        <h6 class="mb-1 section-title">Alerta de contratos sem cooperado</h6>
-        <small class="section-subtitle">
-          O alerta fica no topo para aparecer logo. O som usa <strong>static/escala.mp3</strong> e toca quando surgir alerta novo com a aba aberta.
-        </small>
-      </div>
-      <div class="d-flex gap-2 align-items-center flex-wrap">
-        <span class="badge-soft" id="escalaAlertasCount">{{ escala_alertas_1h|length if escala_alertas_1h is defined else 0 }} alerta(s)</span>
-        <span class="badge-soft" id="escalaAlertasClock">Atualizando…</span>
-      </div>
-    </div>
-
-    <audio id="audioAlertaEscala" preload="auto">
-      <source src="{{ url_for('static', filename='escala.mp3') }}" type="audio/mpeg">
-    </audio>
-
-    <div id="escalaAlertasWrap"
-         data-initial='{{ escala_alertas_1h|default([])|tojson|safe }}'
-         data-endpoint='{{ url_for("admin_api_escala_alertas_1h") }}'>
-      {% if escala_alertas_1h %}
-        <div class="alert alert-warning border-0 shadow-sm mb-2">
-          <strong>Atenção:</strong> existem {{ escala_alertas_1h|length }} contrato(s) sem cooperado começando em até 1 hora.
-        </div>
-        <div class="table-responsive escala-alerta-table-wrap">
-          <table class="table table-sm align-middle mb-0">
-            <thead>
-              <tr>
-                <th>Dia</th>
-                <th>Data</th>
-                <th>Turno</th>
-                <th>Horário</th>
-                <th>Contrato</th>
-                <th>Faltam</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for a in escala_alertas_1h %}
-                <tr class="escala-alerta-row">
-                  <td>{{ a.weekday_label }}</td>
-                  <td>{{ a.data }}</td>
-                  <td>{{ a.turno or '—' }}</td>
-                  <td>{{ a.horario or '—' }}</td>
-                  <td><strong>{{ a.contrato }}</strong></td>
-                  <td>{{ a.minutos_restantes }} min</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% else %}
-        <div class="alert alert-success border-0 mb-0">Nenhum contrato sem cooperado começando dentro da próxima 1 hora.</div>
-      {% endif %}
-    </div>
-  </div>
-
-  <div class="card p-3 mb-3 escala-upload-card">
+<div class="card p-3 mb-3 escala-upload-card">
     <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
       <div class="flex-grow-1">
         <h6 class="mb-1 section-title">Upload da Escala (.xlsx)</h6>
@@ -3203,29 +3120,7 @@
           <span class="badge-soft" id="escalaWeeklyStatus">Aguardando abertura</span>
         </div>
       </div>
-
-      <div class="card border-0 bg-light-subtle p-3 mb-3">
-        <div class="row g-2 align-items-end">
-          <div class="col-lg-2 col-md-6">
-            <label class="form-label mb-1">Histórico escalas de</label>
-            <input type="date" class="form-control form-control-sm" name="escala_hist_inicio" form="formEscalaHist" value="{{ escala_hist_inicio.strftime('%Y-%m-%d') if escala_hist_inicio else '' }}">
-          </div>
-          <div class="col-lg-2 col-md-6">
-            <label class="form-label mb-1">até</label>
-            <input type="date" class="form-control form-control-sm" name="escala_hist_fim" form="formEscalaHist" value="{{ escala_hist_fim.strftime('%Y-%m-%d') if escala_hist_fim else '' }}">
-          </div>
-          <div class="col-lg-8 d-flex flex-wrap gap-2 justify-content-lg-end">
-            <form id="formEscalaHist" method="GET" action="{{ url_for('admin_dashboard') }}" class="d-flex gap-2 flex-wrap">
-              <input type="hidden" name="tab" value="escalas">
-              <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-clock-history me-1"></i>Ver histórico</button>
-            </form>
-            <a class="btn btn-outline-success btn-sm" href="{{ url_for('admin_exportar_escalas_atual', escala_hist_inicio=(escala_hist_inicio.strftime('%Y-%m-%d') if escala_hist_inicio else ''), escala_hist_fim=(escala_hist_fim.strftime('%Y-%m-%d') if escala_hist_fim else '')) }}"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Exportar escala atual + alterações</a>
-            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_exportar_escalas_historico', escala_hist_inicio=(escala_hist_inicio.strftime('%Y-%m-%d') if escala_hist_inicio else ''), escala_hist_fim=(escala_hist_fim.strftime('%Y-%m-%d') if escala_hist_fim else '')) }}"><i class="bi bi-download me-1"></i>Exportar histórico de escalas</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="escala-day-tabs mb-3" id="escalaDayTabs">
+<div class="escala-day-tabs mb-3" id="escalaDayTabs">
         <button type="button" class="btn btn-sm btn-royal active" data-day-filter="semana">Semana</button>
         <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="1">Segunda</button>
         <button type="button" class="btn btn-sm btn-outline-primary" data-day-filter="2">Terça</button>
@@ -3246,9 +3141,6 @@
     </div>
   </div>
 
-
-  
-  <!-- Histórico de escalas removido para deixar a aba leve. -->
 
   <!-- Cooperados & Escalas -->
   <div class="card p-3 mb-3">
@@ -3626,12 +3518,7 @@
       </div>
     {% endif %}
   </div>
-
-  <!-- HISTÓRICO DE TROCAS (aplicadas) -->
-  
-  <!-- Histórico de trocas aplicadas removido para deixar a aba leve. -->
-
-  <!-- Modal visualizar escala do cooperado -->
+<!-- Modal visualizar escala do cooperado -->
   <div class="modal fade" id="modalEscalas" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content">
@@ -5384,10 +5271,10 @@ document.addEventListener('DOMContentLoaded', function(){
     {% endfor %}
   ];
 
-  const wrapAlertas = document.getElementById('escalaAlertasWrap');
-  const countAlertas = document.getElementById('escalaAlertasCount');
-  const clockAlertas = document.getElementById('escalaAlertasClock');
-  const audioAlerta = document.getElementById('audioAlertaEscala');
+  const wrapAlertas = null;
+  const countAlertas = null;
+  const clockAlertas = null;
+  const audioAlerta = null;
   const toggleBtn = document.getElementById('btnToggleEscalaSemanal');
   const panel = document.getElementById('escalaWeeklyPanel');
   const mount = document.getElementById('escalaEditorMount');
@@ -5603,7 +5490,7 @@ document.addEventListener('DOMContentLoaded', function(){
   toggleBtn?.addEventListener('click', async function(){
     const opening = panel.hidden;
     panel.hidden = !panel.hidden;
-    this.innerHTML = opening ? '<i class="bi bi-chevron-up me-1"></i> Abrir escala semanal' : '<i class="bi bi-calendar-week me-1"></i> Abrir escala semanal';
+    this.innerHTML = opening ? '<i class="bi bi-chevron-up me-1"></i> Fechar escala semanal' : '<i class="bi bi-calendar-week me-1"></i> Abrir escala semanal';
     if (opening) await loadRows();
   });
 
@@ -5709,8 +5596,9 @@ document.addEventListener('DOMContentLoaded', function(){
     knownAlertIds = new Set((initial || []).map(a => String(a.id)));
     renderAlertas(initial || []);
   } catch(_) {}
-  pollAlertas();
-  setInterval(pollAlertas, 60000);
+  // Alertas com áudio desativados para deixar a aba Escalas mais leve.
+  // pollAlertas();
+  // setInterval(pollAlertas, 60000);
 });
 </script>
 
