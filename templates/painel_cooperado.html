@@ -274,6 +274,8 @@
 </style>
 </head>
 <body>
+{% set _unread = unread if unread is defined else (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else (avisos_unread_count if avisos_unread_count is defined else 0)) %}
+{% set unread = _unread|int %}
 {% set _qtd_prod = total_entregas_vida %}
 {% set _score_header = nota_vida|default(5.0) %}
 {% set _score_title = 'Sua pontuação geral' %}
@@ -308,6 +310,7 @@
   <div class="menu-links">
     <a href="{{ url_for('documentos_publicos') }}" class="menu-link"><i class="bi bi-folder2-open"></i><span>Documentos</span></a>
     <a href="{{ url_for('tabelas_publicas') }}" class="menu-link"><i class="bi bi-table"></i><span>Tabelas</span></a>
+    <a href="{{ url_for('portal_cooperado_avisos') }}" class="menu-link"><i class="bi bi-megaphone"></i><span>Avisos</span>{% if unread>0 %}<span class="badge rounded-pill bg-danger ms-auto">{{ unread }}</span>{% endif %}</a>
   </div>
 </div>
 <div id="fundoMenu" class="menu-backdrop" aria-hidden="true"></div>
@@ -349,6 +352,13 @@
         {% endfor %}
       {% endif %}
     {% endwith %}
+
+    {% if unread > 0 %}
+    <div class="alert alert-warning d-flex align-items-center justify-content-between gap-2 mb-0">
+      <div><i class="bi bi-megaphone-fill me-1"></i> Você tem <b>{{ unread }}</b> aviso(s) novo(s).</div>
+      <a class="btn btn-sm btn-warning" href="{{ url_for('portal_cooperado_avisos') }}">Ver</a>
+    </div>
+    {% endif %}
   </div>
 
   <section class="surface">
@@ -1114,8 +1124,23 @@
   </div>
 </div>
 
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:1080;">
+  <div id="toastAvisos" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false" data-unread-endpoint="/avisos/unread_count">
+    <div class="toast-header">
+      <i class="bi bi-megaphone-fill me-2"></i>
+      <strong class="me-auto">Novos avisos</strong>
+      <button class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="Fechar"></button>
+    </div>
+    <div class="toast-body">
+      Você tem <span id="toastCount">{{ unread }}</span> aviso(s) não lido(s).
+      <a href="{{ url_for('portal_cooperado_avisos') }}" class="link-primary fw-semibold ms-1">Ver agora</a>
+    </div>
+  </div>
 </div>
 
+<audio id="avisoSound" preload="auto" playsinline>
+  <source src="{{ url_for('static', filename='sounds/notify.mp3') }}" type="audio/mpeg">
+</audio>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -1161,6 +1186,33 @@ const MY_ESCALA   = {{ minha_escala_json | default([]) | tojson }};
   buttons.forEach(btn=>btn.addEventListener('click', ()=>showTab(btn.dataset.tab)));
   showTab(current, false);
 })();
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const toastEl = document.getElementById('toastAvisos');
+  const audio = document.getElementById('avisoSound');
+  const unreadCount = parseInt({{ unread|tojson }});
+  if (!toastEl || !audio) return;
+  const toast = new bootstrap.Toast(toastEl, { autohide:false });
+  function renderCount(c){ const el = document.getElementById('toastCount'); if (el) el.textContent = String(c); }
+  function ensureToast(c){ renderCount(c); if (c>0) toast.show(); else toast.hide(); }
+  ensureToast(unreadCount);
+  if (unreadCount>0){ audio.currentTime=0; audio.play().catch(()=>{}); }
+  const endpoint = toastEl.getAttribute('data-unread-endpoint') || '/avisos/unread_count';
+  let prev = unreadCount;
+  async function checkUnread(){
+    try{
+      const resp = await fetch(endpoint, { headers:{'Accept':'application/json'}, cache:'no-store', credentials:'same-origin' });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const c = Number(data.unread ?? data.count ?? 0) || 0;
+      ensureToast(c);
+      if ((prev===0 && c>0) || c>prev){ try{ audio.currentTime=0; await audio.play(); }catch{} }
+      prev = c;
+    }catch{}
+  }
+  setInterval(checkUnread, 8000);
+});
 </script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
