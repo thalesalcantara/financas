@@ -1507,6 +1507,7 @@
                     <th>Descrição</th>
                     <th class="text-center" style="width:120px;">Entregas</th>
                     <th class="text-end" style="width:140px;">Valor (R$)</th>
+                    <th class="text-center" style="width:120px;">Ações</th>
                   </tr>
                 </thead>
                 <tbody id="tbodyLanc">
@@ -1529,6 +1530,18 @@
                     <td class="text-end valor" data-valor="{{ '%.2f'|format(x.valor or 0) }}">
                       R$ {{ '%.2f'|format(x.valor or 0) }}
                     </td>
+                    <td class="text-center">
+                      {% if x.id %}
+                        {% if has_editar_lanc %}
+                          <a href="{{ url_for('editar_lancamento', id=x.id) }}" class="btn btn-outline-royal btn-sm" title="Editar">
+                            <i class="bi bi-pencil"></i>
+                          </a>
+                        {% endif %}
+                        <a href="{{ url_for('excluir_lancamento', id=x.id) }}" class="btn btn-outline-danger btn-sm" title="Excluir" onclick="return confirm('Excluir este lançamento?');">
+                          <i class="bi bi-trash"></i>
+                        </a>
+                      {% endif %}
+                    </td>
                   </tr>
                   {% else %}{% endfor %}
                 </tbody>
@@ -1537,6 +1550,7 @@
                     <th colspan="5" class="text-end">Totais</th>
                     <th class="text-center" id="ftEntregas">0</th>
                     <th class="text-end" id="ftValor">R$ 0,00</th>
+                    <th></th>
                   </tr>
                 </tfoot>
               </table>
@@ -1906,7 +1920,7 @@
                               {% endif %}
                             </td>
                             <td class="text-center">
-                              <a href="{{ url_for('excluir_lancamento', id=lanc.id) }}" class="btn btn-outline-danger btn-sm">
+                              <a href="{{ url_for('excluir_lancamento', id=lanc.id) }}" class="btn btn-outline-danger btn-sm" onclick="return confirm('Excluir este lançamento?');">
                                 <i class="bi bi-trash"></i>
                               </a>
                             </td>
