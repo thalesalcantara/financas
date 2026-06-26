@@ -10641,9 +10641,26 @@ def portal_restaurante():
     )
     totais_map = {cid: {"valor": float(valor or 0.0), "qtd": int(qtd or 0), "entregas": int(entregas or 0)} for cid, valor, qtd, entregas in totais_rows}
 
+    # Para o painel de lançamento, mantém a lista de produções por cooperado
+    # para aparecer a tabela antiga com Editar/Excluir, sem fazer 1 consulta por cooperado.
+    lancs_por_coop_periodo = defaultdict(list)
+    if view == "lancar":
+        lancamentos_periodo_all = (
+            Lancamento.query
+            .filter(
+                Lancamento.restaurante_id == rest.id,
+                Lancamento.data >= di,
+                Lancamento.data <= df,
+            )
+            .order_by(Lancamento.data.desc(), Lancamento.id.desc())
+            .all()
+        )
+        for _l in lancamentos_periodo_all:
+            lancs_por_coop_periodo[_l.cooperado_id].append(_l)
+
     for c in cooperados:
         t = totais_map.get(c.id, {"valor": 0.0, "qtd": 0, "entregas": 0})
-        c.lancamentos = []
+        c.lancamentos = lancs_por_coop_periodo.get(c.id, [])
         c.total_periodo = t["valor"]
         c.inss_periodo = c.total_periodo * 0.04
         c.sest_periodo = c.total_periodo * 0.005
