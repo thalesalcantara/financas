@@ -395,19 +395,7 @@
         padding:16px 10px;
       }
     }
-  
-    /* COOPEX leve: remove cards que não são usados no resumo */
-    #resumo .kpi-card:has(#kpiRecCoopCorp),
-    #resumo .kpi-card:has(#kpiDespCoopCorp),
-    #resumo .kpi-card:has(#kpiRecCooperadosFull),
-    #resumo .kpi-card:has(#kpiResultadoCoop),
-    #resumo .kpi-card:has(#kpiBeneficiosRateados){ display:none !important; }
-    #tblResumoCoop th:nth-child(5), #tblResumoCoop td:nth-child(5){ display:none !important; }
-
-    a[data-bs-target="#receitas"], a[data-bs-target="#despesas"],
-    a[data-bs-target="#coop_receitas"], a[data-bs-target="#beneficios"],
-    a[data-bs-target="#sistemas"]{ display:none !important; }
-</style>
+  </style>
 </head>
 <body>
 
@@ -420,7 +408,7 @@
 {% set compat     = compat if compat is defined else [] %}
 {% set avaliacoes = avaliacoes if avaliacoes is defined else [] %}
 {% set _flt       = _flt if _flt is defined else namespace(restaurante_id=None, cooperado_id=None, data_inicio='', data_fim='') %}
-{% set _tab       = (tab if tab is defined else request.args.get('tab','lancamentos')) %}
+{% set _tab       = (tab if tab is defined else request.args.get('tab','resumo')) %}
 
 {% set _perms = admin_perms if admin_perms is defined else {} %}
 {% set can_lanc_ver = admin_is_master or _perms.get('lancamentos', {}).get('ver', False) %}
@@ -458,6 +446,7 @@
 {% set can_escalas_ver = admin_is_master or _perms.get('escalas', {}).get('ver', False) %}
 {% set can_escalas_criar = admin_is_master or _perms.get('escalas', {}).get('criar', False) %}
 {% set can_escalas_editar = admin_is_master or _perms.get('escalas', {}).get('editar', False) %}
+{% set can_avisos_ver = admin_is_master or _perms.get('avisos', {}).get('ver', False) %}
 {% set can_documentos_ver = admin_is_master or _perms.get('documentos', {}).get('ver', False) %}
 {% set can_tabelas_ver = admin_is_master or _perms.get('tabelas', {}).get('ver', False) %}
 {% set can_avaliacoes_ver = admin_is_master or _perms.get('avaliacoes', {}).get('ver', False) %}
@@ -673,6 +662,13 @@
            aria-selected="{{ 'true' if _tab=='escalas' else 'false' }}">
           <i class="bi bi-calendar-week"></i>
           <span class="nav-link-label">Escalas</span>
+        </a>{% endif %}
+
+        <!-- Avisos (rota, como já era) -->
+        {% if can_avisos_ver %}<a class="nav-sublink {% if request.endpoint == 'admin_avisos' %}active{% endif %}"
+           href="{{ url_for('admin_avisos') }}">
+          <i class="bi bi-megaphone"></i>
+          <span class="nav-link-label">Avisos</span>
         </a>{% endif %}
       </div>
 
@@ -1187,7 +1183,7 @@
                     </tr>
                     {% endfor %}
                   {% else %}
-                    <tr><td colspan="8" class="text-center text-muted">Nenhum dado no período.</td></tr>
+                    <tr><td colspan="9" class="text-center text-muted">Nenhum dado no período.</td></tr>
                   {% endif %}
                 </tbody>
 
@@ -3286,7 +3282,7 @@
                   data-user="{{ coop.usuario_ref.usuario|lower }}"
                   data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','')|lower }}">
                 <td class="text-center">
-                  <img loading="lazy" src="{{ (coop.foto_url if _tab=='cooperados' else '') or url_for('static', filename='img/default.png') }}"
+                  <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
                        class="avatar border" alt="{{ coop.nome }}"
                        style="width:40px;height:40px;object-fit:cover;">
                 </td>
@@ -3739,7 +3735,7 @@
             {% for r in restaurantes %}
               <tr data-nome="{{ r.nome|lower }}" data-user="{{ r.usuario_ref.usuario|lower }}" data-periodo="{{ r.periodo|lower }}" data-tipo="{{ 'farmacia' if r.eh_farmacia else 'estabelecimento' }}">
                 <td class="text-center">
-                  <img loading="lazy" src="{{ (r.foto_url if _tab=='restaurantes' else '') or url_for('static', filename='img/default.png') }}"
+                  <img src="{{ r.foto_url or url_for('static', filename='img/default.png') }}"
                        class="avatar border" alt="{{ r.nome }}"
                        style="width:40px;height:40px;object-fit:cover;">
                 </td>
@@ -3894,6 +3890,64 @@
       </div>
     </div>
   </div>
+
+  <div class="card p-3 mb-3 border-0 shadow-sm escala-alerta-card escala-alerta-top" id="escalaAlertasCard">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-2">
+      <div>
+        <h6 class="mb-1 section-title">Aviso de contratos sem cooperado</h6>
+        <small class="section-subtitle">
+          O aviso fica no topo para aparecer logo. O som usa <strong>static/escala.mp3</strong> e toca quando surgir alerta novo com a aba aberta.
+        </small>
+      </div>
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+        <span class="badge-soft" id="escalaAlertasCount">{{ escala_alertas_1h|length if escala_alertas_1h is defined else 0 }} alerta(s)</span>
+        <span class="badge-soft" id="escalaAlertasClock">Atualizando…</span>
+      </div>
+    </div>
+
+    <audio id="audioAlertaEscala" preload="auto">
+      <source src="{{ url_for('static', filename='escala.mp3') }}" type="audio/mpeg">
+    </audio>
+
+    <div id="escalaAlertasWrap"
+         data-initial='{{ escala_alertas_1h|default([])|tojson|safe }}'
+         data-endpoint='{{ url_for("admin_api_escala_alertas_1h") }}'>
+      {% if escala_alertas_1h %}
+        <div class="alert alert-warning border-0 shadow-sm mb-2">
+          <strong>Atenção:</strong> existem {{ escala_alertas_1h|length }} contrato(s) sem cooperado começando em até 1 hora.
+        </div>
+        <div class="table-responsive escala-alerta-table-wrap">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Dia</th>
+                <th>Data</th>
+                <th>Turno</th>
+                <th>Horário</th>
+                <th>Contrato</th>
+                <th>Faltam</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in escala_alertas_1h %}
+                <tr class="escala-alerta-row">
+                  <td>{{ a.weekday_label }}</td>
+                  <td>{{ a.data }}</td>
+                  <td>{{ a.turno or '—' }}</td>
+                  <td>{{ a.horario or '—' }}</td>
+                  <td><strong>{{ a.contrato }}</strong></td>
+                  <td>{{ a.minutos_restantes }} min</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="alert alert-success border-0 mb-0">Nenhum contrato sem cooperado começando dentro da próxima 1 hora.</div>
+      {% endif %}
+    </div>
+  </div>
+
   <div class="card p-3 mb-3 escala-upload-card">
     <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
       <div class="flex-grow-1">
@@ -4034,6 +4088,51 @@
            data-can-edit="{{ '1' if can_escalas_editar else '0' }}">
         <div class="alert alert-light border mb-0">Clique em <strong>Abrir escala semanal</strong> para carregar a grade.</div>
       </div>
+    </div>
+  </div>
+
+
+  <div class="card p-3 mb-3 border-0 shadow-sm">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div>
+        <h6 class="mb-0 section-title">Histórico de escalas</h6>
+        <small class="section-subtitle">Últimos 31 dias das modificações e snapshots da escala.</small>
+      </div>
+      <span class="badge-soft">{{ escala_historico_rows|length if escala_historico_rows else 0 }} registro(s)</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Registrado em</th>
+            <th>Origem</th>
+            <th>Data</th>
+            <th>Turno</th>
+            <th>Horário</th>
+            <th>Contrato</th>
+            <th>Cooperado atual</th>
+            <th>Retirado</th>
+            <th>Entrou</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in escala_historico_rows or [] %}
+          <tr>
+            <td>{{ h.snapshot_em.strftime('%d/%m/%Y %H:%M') if h.snapshot_em else '—' }}</td>
+            <td>{{ h.origem or h.acao }}</td>
+            <td>{{ h.data }}</td>
+            <td>{{ h.turno or '—' }}</td>
+            <td>{{ h.horario or '—' }}</td>
+            <td>{{ h.contrato or '—' }}</td>
+            <td>{{ h.cooperado_nome or '—' }}</td>
+            <td>{{ h.saiu_nome or '—' }}</td>
+            <td>{{ h.entrou_nome or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="text-center text-muted">Sem histórico no período.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -4414,6 +4513,227 @@
     {% endif %}
   </div>
 
+  <!-- HISTÓRICO DE TROCAS (aplicadas) -->
+  <div class="card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h5 class="mb-0 section-title">
+          Trocas de Escala - Aplicadas
+        </h5>
+        <small class="section-subtitle">
+          Registro das trocas já aprovadas.
+        </small>
+      </div>
+      <span class="badge-soft">
+        {{ trocas_historico|length if trocas_historico else 0 }} registro(s)
+      </span>
+    </div>
+    <div class="row g-2 align-items-end mt-2 mb-2">
+      <div class="col-lg-2 col-md-6">
+        <label class="form-label mb-1">Histórico trocas de</label>
+        <input type="date" class="form-control form-control-sm" name="trocas_hist_inicio" form="formTrocasHist" value="{{ trocas_hist_inicio.strftime('%Y-%m-%d') if trocas_hist_inicio else '' }}">
+      </div>
+      <div class="col-lg-2 col-md-6">
+        <label class="form-label mb-1">até</label>
+        <input type="date" class="form-control form-control-sm" name="trocas_hist_fim" form="formTrocasHist" value="{{ trocas_hist_fim.strftime('%Y-%m-%d') if trocas_hist_fim else '' }}">
+      </div>
+      <div class="col-lg-8 d-flex flex-wrap gap-2 justify-content-lg-end">
+        <form id="formTrocasHist" method="GET" action="{{ url_for('admin_dashboard') }}" class="d-flex gap-2 flex-wrap">
+          <input type="hidden" name="tab" value="escalas">
+          <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-funnel me-1"></i>Filtrar histórico</button>
+        </form>
+        <a class="btn btn-outline-success btn-sm" href="{{ url_for('admin_exportar_trocas_historico', trocas_hist_inicio=(trocas_hist_inicio.strftime('%Y-%m-%d') if trocas_hist_inicio else ''), trocas_hist_fim=(trocas_hist_fim.strftime('%Y-%m-%d') if trocas_hist_fim else '')) }}"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Exportar trocas</a>
+      </div>
+    </div>
+
+    {% if trocas_historico %}
+      <div class="table-responsive mt-3 troca-historico-wrapper">
+        <table class="table table-sm align-middle mb-0 table-troca">
+          <thead>
+            <tr>
+              <th style="width: 80px;">#</th>
+              <th>Cooperado 1</th>
+              <th>Escala 1</th>
+              <th>Cooperado 2</th>
+              <th>Escala 2</th>
+              <th style="width: 220px;">Mensagem</th>
+              <th style="width: 150px;">Aplicada em</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in trocas_historico or [] %}
+              {% set solicitante  = t.solicitante  if t.solicitante  else None %}
+              {% set destinatario = t.destinatario if t.destinatario else None %}
+              {% set origem       = t.origem       if t.origem       else None %}
+
+              {% set solicitante_nome = (solicitante.nome if solicitante else t.solicitante_nome)|default('—', true) %}
+              {% set solicitante_id   = (solicitante.id   if solicitante else t.solicitante_id)|default('—', true) %}
+
+              {% set coop2_nome = (destinatario.nome if destinatario else t.destinatario_nome)|default('—', true) %}
+              {% set coop2_id   = (destinatario.id   if destinatario else t.destinatario_id)|default('—', true) %}
+
+              {% if origem and origem.data is defined %}
+                {% set origem_data = origem.data %}
+              {% elif t.origem_data is defined %}
+                {% set origem_data = t.origem_data %}
+              {% else %}
+                {% set origem_data = '—' %}
+              {% endif %}
+
+              {% if origem and origem.turno is defined %}
+                {% set origem_turno = origem.turno %}
+              {% elif t.origem_turno is defined %}
+                {% set origem_turno = t.origem_turno %}
+              {% else %}
+                {% set origem_turno = '—' %}
+              {% endif %}
+
+              {% if origem and origem.horario is defined %}
+                {% set origem_horario = origem.horario %}
+              {% elif t.origem_horario is defined %}
+                {% set origem_horario = t.origem_horario %}
+              {% else %}
+                {% set origem_horario = '—' %}
+              {% endif %}
+
+              {% if origem and origem.contrato is defined %}
+                {% set origem_contrato = origem.contrato %}
+              {% elif t.origem_contrato is defined %}
+                {% set origem_contrato = t.origem_contrato %}
+              {% else %}
+                {% set origem_contrato = '—' %}
+              {% endif %}
+
+              {% if t.destino_data is defined and t.destino_data %}
+                {% set destino_data = t.destino_data %}
+              {% else %}
+                {% set destino_data = '—' %}
+              {% endif %}
+
+              {% if t.destino_turno is defined and t.destino_turno %}
+                {% set destino_turno = t.destino_turno %}
+              {% else %}
+                {% set destino_turno = '—' %}
+              {% endif %}
+
+              {% if t.destino_horario is defined and t.destino_horario %}
+                {% set destino_horario = t.destino_horario %}
+              {% else %}
+                {% set destino_horario = '—' %}
+              {% endif %}
+
+              {% if t.destino_contrato is defined and t.destino_contrato %}
+                {% set destino_contrato = t.destino_contrato %}
+              {% else %}
+                {% set destino_contrato = '—' %}
+              {% endif %}
+
+              <tr>
+                <td>
+                  <div class="small fw-semibold">#{{ t.id|default('—', true) }}</div>
+                  <div class="text-muted-2 extra-small">
+                    {% if t.criada_em %}
+                      {% if t.criada_em.strftime is defined %}
+                        {{ t.criada_em.strftime('%d/%m/%Y %H:%M') }}
+                      {% else %}
+                        {{ t.criada_em }}
+                      {% endif %}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </td>
+
+                <td>
+                  <div class="small fw-semibold text-truncate">
+                    {{ solicitante_nome }}
+                  </div>
+                  <div class="text-muted-2 extra-small">
+                    ID {{ solicitante_id }}
+                  </div>
+                </td>
+
+                <td>
+                  <div class="extra-small text-muted">
+                    {{ origem_contrato }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ origem_data }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ origem_turno }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ origem_horario }}
+                  </div>
+                </td>
+
+                <td>
+                  <div class="small fw-semibold text-truncate text-success">
+                    {{ coop2_nome }}
+                  </div>
+                  <div class="text-muted-2 extra-small">
+                    ID {{ coop2_id }}
+                  </div>
+                </td>
+
+                <td>
+                  <div class="extra-small text-muted">
+                    {{ destino_contrato }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ destino_data }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ destino_turno }}
+                  </div>
+                  <div class="extra-small text-muted">
+                    {{ destino_horario }}
+                  </div>
+                </td>
+
+                <td class="mensagem-col">
+                  {% set raw_msg = t.mensagem or '' %}
+                  {% if 'AFETACAO_JSON' in raw_msg %}
+                    <div class="extra-small text-muted">
+                      Sem mensagem adicional.
+                    </div>
+                  {% elif raw_msg %}
+                    <div class="extra-small text-muted">
+                      {{ raw_msg }}
+                    </div>
+                  {% else %}
+                    <div class="extra-small text-muted">
+                      Sem mensagem adicional.
+                    </div>
+                  {% endif %}
+                </td>
+
+                <td>
+                  <div class="extra-small text-muted">
+                    {% if t.aplicada_em %}
+                      {% if t.aplicada_em.strftime is defined %}
+                        {{ t.aplicada_em.strftime('%d/%m/%Y %H:%M') }}
+                      {% else %}
+                        {{ t.aplicada_em }}
+                      {% endif %}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-center text-muted mt-2">
+        Sem trocas aplicadas.
+      </div>
+    {% endif %}
+  </div>
+
   <!-- Modal visualizar escala do cooperado -->
   <div class="modal fade" id="modalEscalas" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -4511,6 +4831,7 @@
       'escalas',
       'documentos',
       'tabelas',
+      'avisos',
       'avaliacoes',
       'config'
     ] %}
@@ -6527,8 +6848,8 @@ document.addEventListener('DOMContentLoaded', function(){
     knownAlertIds = new Set((initial || []).map(a => String(a.id)));
     renderAlertas(initial || []);
   } catch(_) {}
-  // Alertas/áudio removidos para deixar a aba Escalas leve.
-
+  pollAlertas();
+  setInterval(pollAlertas, 60000);
 });
 </script>
 
