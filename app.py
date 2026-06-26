@@ -47,7 +47,6 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError, DisconnectionError
 from sqlalchemy import delete as sa_delete
-from sqlalchemy.orm import selectinload
 
 # 👉 Novo: para gerar XLSX em memória
 from openpyxl import Workbook, load_workbook
@@ -896,6 +895,54 @@ class Tabela(db.Model):
     enviado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+# ---------- AVISOS (NOVO) ----------
+aviso_restaurantes = db.Table(
+    "aviso_restaurantes",
+    db.Column("aviso_id", db.Integer, db.ForeignKey("avisos.id"), primary_key=True),
+    db.Column("restaurante_id", db.Integer, db.ForeignKey("restaurantes.id"), primary_key=True),
+)
+
+aviso_cooperados = db.Table(
+    "aviso_cooperados",
+    db.Column("aviso_id", db.Integer, db.ForeignKey("avisos.id"), primary_key=True),
+    db.Column("cooperado_id", db.Integer, db.ForeignKey("cooperados.id"), primary_key=True),
+)
+
+class Aviso(db.Model):
+    __tablename__ = "avisos"
+    id = db.Column(db.Integer, primary_key=True)
+    titulo = db.Column(db.String(140), nullable=False)
+    corpo = db.Column(db.Text, nullable=False)
+    # escopo: global | restaurante | cooperado
+    tipo = db.Column(db.String(20), nullable=False, default="global")
+
+    # destino individual (opcional / legado)
+    destino_cooperado_id = db.Column(db.Integer, db.ForeignKey("cooperados.id"))
+    destino_cooperado = db.relationship("Cooperado", foreign_keys=[destino_cooperado_id])
+
+    # destinos por lista (N:N)
+    cooperados = db.relationship("Cooperado", secondary=aviso_cooperados, backref="avisos_recebidos")
+    restaurantes = db.relationship("Restaurante", secondary=aviso_restaurantes, backref="avisos")
+
+    prioridade = db.Column(db.String(10), default="normal")  # normal | alta
+    fixado = db.Column(db.Boolean, default=False)
+    ativo = db.Column(db.Boolean, default=True)
+    inicio_em = db.Column(db.DateTime)  # janela de exibição opcional
+    fim_em = db.Column(db.DateTime)
+
+    criado_por_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class AvisoLeitura(db.Model):
+    __tablename__ = "aviso_leituras"
+    id = db.Column(db.Integer, primary_key=True)
+    aviso_id = db.Column(db.Integer, db.ForeignKey("avisos.id"), nullable=False, index=True)
+    cooperado_id = db.Column(db.Integer, db.ForeignKey("cooperados.id"), nullable=True, index=True)
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=True, index=True)
+    lido_em = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint("aviso_id", "cooperado_id", "restaurante_id", name="uq_aviso_dest"), )
+
 # =========================
 # Helpers
 # =========================
@@ -1692,7 +1739,6 @@ def admin_required(fn):
 
 
 ADMIN_ABAS = {
-    "resumo": "Resumo",
     "lancamentos": "Lançamentos",
     "receitas": "Receitas Coop",
     "despesas": "Despesas Coop",
@@ -1702,6 +1748,7 @@ ADMIN_ABAS = {
     "cooperados": "Cooperados",
     "restaurantes": "Restaurantes",
     "escalas": "Escalas",
+    "avisos": "Avisos",
     "documentos": "Documentos",
     "tabelas": "Tabelas",
     "avaliacoes": "Avaliações",
@@ -1830,7 +1877,7 @@ def admin_perm_required(aba: str, acao: str = "ver"):
                 flash("Você não tem permissão para essa ação.", "danger")
 
                 if getattr(u, "is_master", False):
-                    return redirect(url_for("admin_dashboard", tab="lancamentos"))
+                    return redirect(url_for("admin_dashboard", tab="resumo"))
 
                 abas_liberadas = [
                     nome_aba
@@ -2539,6 +2586,55 @@ from datetime import datetime, date
 from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP, InvalidOperation
 from sqlalchemy import or_, and_
 
+# routes_avisos.py
+from datetime import datetime
+from flask import Blueprint, render_template, redirect, request, url_for, abort
+from flask_login import current_user
+
+
+def _cooperado_atual() -> Cooperado | None:
+    """
+    Retorna o Cooperado do usuário logado, usando a sessão da aplicação.
+    """
+    uid = session.get("user_id")
+    if not uid:
+        return None
+    return Cooperado.query.filter_by(usuario_id=uid).first()
+
+
+# --- Blueprint Portal ---
+portal_bp = Blueprint("portal", __name__, url_prefix="/portal")
+
+@portal_bp.get("/avisos", endpoint="portal_cooperado_avisos")
+@role_required("cooperado")
+def avisos_list():
+    coop = _cooperado_atual()
+    if not coop:
+        abort(403)
+
+    # pega todos os avisos que se aplicam ao cooperado (seu helper)
+    avisos = get_avisos_for_cooperado(coop)
+
+    # busca leituras de uma vez (evita N+1)
+    lidos_ids = {
+        r.aviso_id
+        for r in AvisoLeitura.query.filter_by(cooperado_id=coop.id).all()
+    }
+
+    # injeta flag lido para o template (sem tocar no banco)
+    for a in avisos:
+        a.lido = (a.id in lidos_ids)
+
+    avisos_nao_lidos_count = sum(1 for a in avisos if not getattr(a, "lido", False))
+    current_year = datetime.now().year
+
+    return render_template(
+        "portal_cooperado_avisos.html",
+        avisos=avisos,
+        avisos_nao_lidos_count=avisos_nao_lidos_count,
+        current_year=current_year
+    )
+
 # === AVALIAÇÕES: Cooperado -> Restaurante (AJUSTADO) =========================
 class AvaliacaoRestaurante(db.Model):
     __tablename__ = "avaliacoes_restaurante"
@@ -2592,6 +2688,81 @@ class AvaliacaoRestaurante(db.Model):
             media = sum(nums) / len(nums)
         self.media_ponderada = round(media, 2)
         self.estrelas_geral = round(media, 1)
+
+@portal_bp.post("/avisos/<int:aviso_id>/lido", endpoint="marcar_aviso_lido")
+@role_required("cooperado")
+def avisos_marcar_lido(aviso_id: int):
+    coop = _cooperado_atual()
+    if not coop:
+        abort(403)
+
+    aviso = Aviso.query.get_or_404(aviso_id)
+
+    # idempotente: só cria se ainda não houver leitura
+    ja_leu = AvisoLeitura.query.filter_by(
+        cooperado_id=coop.id,
+        aviso_id=aviso.id
+    ).first()
+
+    if not ja_leu:
+        db.session.add(AvisoLeitura(
+            cooperado_id=coop.id,
+            aviso_id=aviso.id,
+            lido_em=datetime.utcnow()
+        ))
+        db.session.commit()
+
+    next_url = request.form.get("next") or (url_for("portal.portal_cooperado_avisos") + f"#aviso-{aviso.id}")
+    return redirect(next_url)
+
+@portal_bp.post("/avisos/marcar-todos", endpoint="marcar_todos_avisos_lidos")
+@role_required("cooperado")
+def avisos_marcar_todos():
+    coop = _cooperado_atual()
+    if not coop:
+        abort(403)
+
+    avisos = get_avisos_for_cooperado(coop)
+    if not avisos:
+        return redirect(url_for("portal.portal_cooperado_avisos"))
+    ids_todos = {a.id for a in avisos}
+    ids_ja_lidos = {
+        r.aviso_id
+        for r in AvisoLeitura.query.filter_by(cooperado_id=coop.id).all()
+    }
+    ids_pendentes = list(ids_todos - ids_ja_lidos)
+
+    if ids_pendentes:
+        db.session.bulk_save_objects([
+            AvisoLeitura(cooperado_id=coop.id, aviso_id=aid, lido_em=datetime.utcnow())
+            for aid in ids_pendentes
+        ])
+        db.session.commit()
+
+    return redirect(url_for("portal.portal_cooperado_avisos"))
+
+  # --- Registro do blueprint 'portal' (uma única vez, após definir TODAS as rotas dele)
+# --- Registro do blueprint 'portal' (depois de definir TODAS as rotas do blueprint)
+def register_blueprints_once(app):
+    if "portal" not in app.blueprints:
+        app.register_blueprint(portal_bp)
+
+register_blueprints_once(app)
+
+# --- Alias para compatibilidade com o template (endpoint esperado: 'portal_cooperado_avisos')
+from flask import redirect, url_for
+
+def _portal_cooperado_avisos_alias():
+    # redireciona para a rota real dentro do blueprint 'portal'
+    return redirect(url_for("portal.portal_cooperado_avisos"))
+
+# publica a URL "antiga" (ajuste o path se o seu antigo era outro)
+app.add_url_rule(
+    "/portal/cooperado/avisos",         # caminho acessado
+    endpoint="portal_cooperado_avisos", # nome que o template usa no url_for(...)
+    view_func=_portal_cooperado_avisos_alias,
+    methods=["GET"],
+)
 
 # ======== Helpers p/ troca: data/weekday/turno ========
 def _parse_data_escala_str(s: str) -> date | None:
@@ -2886,6 +3057,130 @@ def to_css_color(v: str) -> str:
     }
     return mapa.get(t_low, t)
 
+# ---------- AVISOS: helpers ----------
+from sqlalchemy import case, or_, and_, func
+from sqlalchemy.orm import selectinload
+
+def _avisos_base_query():
+    # usa o relógio do banco; evita divergência de TZ/UTC da app
+    now = func.now()
+    return (
+        Aviso.query
+        .options(selectinload(Aviso.restaurantes), selectinload(Aviso.cooperados))  # evita N+1 no template
+        .filter(Aviso.ativo.is_(True))
+        .filter(or_(Aviso.inicio_em.is_(None), Aviso.inicio_em <= now))
+        .filter(or_(Aviso.fim_em.is_(None),    Aviso.fim_em    >= now))
+    )
+
+# PRIORIDADE: "alta" (0), "media"/"média" (1), outras/NULL (2)
+_PRIORD = case(
+    (func.lower(Aviso.prioridade) == "alta", 0),
+    (func.lower(Aviso.prioridade).in_(("media", "média")), 1),
+    else_=2,
+)
+
+
+def _parse_datetime_local(value: str | None):
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    raw = raw.replace("Z", "")
+    for candidate in (raw, raw.replace("T", " ")):
+        try:
+            return datetime.fromisoformat(candidate)
+        except Exception:
+            pass
+    try:
+        d = _parse_date(raw)
+        if d:
+            return datetime.combine(d, dtime.min)
+    except Exception:
+        pass
+    return None
+
+
+def _aviso_destinatarios(aviso: Aviso, cooperados_all=None, restaurantes_all=None):
+    cooperados_all = cooperados_all if cooperados_all is not None else Cooperado.query.order_by(Cooperado.nome.asc()).all()
+    restaurantes_all = restaurantes_all if restaurantes_all is not None else Restaurante.query.order_by(Restaurante.nome.asc()).all()
+
+    if aviso.tipo == "cooperado":
+        alvo_ids = {c.id for c in (list(getattr(aviso, "cooperados", []) or []))}
+        if alvo_ids:
+            coops = [c for c in cooperados_all if c.id in alvo_ids]
+        elif aviso.destino_cooperado_id:
+            coops = [c for c in cooperados_all if c.id == aviso.destino_cooperado_id]
+        else:
+            coops = list(cooperados_all)
+        rests = []
+    elif aviso.tipo == "restaurante":
+        alvo_ids = {r.id for r in (list(getattr(aviso, "restaurantes", []) or []))}
+        rests = [r for r in restaurantes_all if (not alvo_ids or r.id in alvo_ids)]
+        coops = []
+    elif aviso.tipo == "global":
+        coops = list(cooperados_all)
+        rests = list(restaurantes_all)
+    else:
+        coops = []
+        rests = []
+    return coops, rests
+
+
+def get_avisos_for_cooperado(coop: Cooperado):
+    q = (
+        _avisos_base_query()
+        .filter(
+            or_(
+                (Aviso.tipo == "global"),
+                and_(
+                    Aviso.tipo == "cooperado",
+                    or_(
+                        Aviso.cooperados.any(Cooperado.id == coop.id),
+                        Aviso.destino_cooperado_id == coop.id,
+                        and_(
+                            Aviso.destino_cooperado_id.is_(None),
+                            ~Aviso.cooperados.any(),
+                        ),
+                    ),
+                ),
+            )
+        )
+        .order_by(
+            Aviso.fixado.desc(),
+            _PRIORD.asc(),
+            Aviso.criado_em.desc(),
+        )
+    )
+    return q.all()
+
+def get_avisos_for_restaurante(rest: Restaurante):
+    """
+    RESTAURANTE vê:
+      - global
+      - restaurante (broadcast ou destinado a ESTE restaurante)
+    """
+    q = (
+        _avisos_base_query()
+        .filter(
+            or_(
+                (Aviso.tipo == "global"),
+                and_(
+                    Aviso.tipo == "restaurante",
+                    or_(
+                        ~Aviso.restaurantes.any(),                  # broadcast
+                        Aviso.restaurantes.any(Restaurante.id == rest.id),  # específico
+                    ),
+                ),
+            )
+        )
+        .order_by(
+            Aviso.fixado.desc(),
+            _PRIORD.asc(),
+            Aviso.criado_em.desc(),
+        )
+    )
+
+    return q.all()
+
 # =========================
 # Rotas de mídia (fotos armazenadas no banco)
 # =========================
@@ -3001,7 +3296,7 @@ def index():
     if not u:
         return redirect(url_for("login"))
     if u.tipo == "admin":
-        return redirect(url_for("admin_dashboard", tab="lancamentos"))
+        return redirect(url_for("admin_dashboard", tab="resumo"))
     if u.tipo == "cooperado":
         return redirect(url_for("portal_cooperado"))
     if u.tipo == "restaurante":
@@ -3050,7 +3345,7 @@ def login():
             session["user_tipo"] = u.tipo
 
             if u.tipo == "admin":
-                return redirect(url_for("admin_dashboard", tab="lancamentos"))
+                return redirect(url_for("admin_dashboard", tab="resumo"))
             elif u.tipo == "cooperado":
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
@@ -3432,7 +3727,7 @@ def admin_sistemas_abrir(sistema):
 @admin_required
 def admin_dashboard():
     args = request.args
-    active_tab = (args.get("tab") or "lancamentos").strip().lower()
+    active_tab = (args.get("tab") or "resumo").strip().lower()
 
     admin_logado = _usuario_logado()
     if not admin_logado:
@@ -3874,73 +4169,83 @@ def admin_dashboard():
     }
 
     # =========================
-    # Escalas - LEVE
+    # Escalas
     # =========================
-    escalas_all = []
+    escalas_all = (
+        db.session.query(Escala)
+        .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
+        .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(
+            or_(
+                Escala.cooperado_id.is_(None),
+                Usuario.ativo.is_(True)
+            )
+        )
+        .order_by(Escala.id.asc())
+        .all()
+    )
+
     esc_by_int = defaultdict(list)
     esc_by_str = defaultdict(list)
-    qtd_escalas_map = {}
-    qtd_sem_cadastro = 0
-    contratos_escala_opcoes = []
+
+    for e in escalas_all:
+        k_int = e.cooperado_id if e.cooperado_id is not None else 0
+        esc_item = {
+            "data": e.data,
+            "turno": e.turno,
+            "horario": e.horario,
+            "contrato": e.contrato,
+            "cor": getattr(e, "cor", None),
+            "nome_planilha": getattr(e, "cooperado_nome", None),
+        }
+        esc_by_int[k_int].append(esc_item)
+        esc_by_str[str(k_int)].append(esc_item)
+
+    cont_rows = dict(
+        db.session.query(Escala.cooperado_id, func.count(Escala.id))
+        .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
+        .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(
+            or_(
+                Escala.cooperado_id.is_(None),
+                Usuario.ativo.is_(True)
+            )
+        )
+        .group_by(Escala.cooperado_id)
+        .all()
+    )
+
+    qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
+    qtd_sem_cadastro = int(cont_rows.get(None, 0))
+
+    contratos_set = {((e.contrato or "").strip()) for e in escalas_all if (e.contrato or "").strip()}
+    contratos_set.update({((r.nome or "").strip()) for r in restaurantes if (r.nome or "").strip()})
+    contratos_escala_opcoes = sorted(contratos_set, key=lambda s: s.lower())
+
     escala_editor_rows = []
-    escala_alertas_1h = []
+    for e in sorted(escalas_all, key=_escala_sort_key):
+        coop_obj = None
+        if e.cooperado_id:
+            coop_obj = cooperados_map.get(e.cooperado_id)
 
-    if active_tab == "escalas":
-        escalas_all = (
-            db.session.query(Escala)
-            .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
-            .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
-            .filter(or_(Escala.cooperado_id.is_(None), Usuario.ativo.is_(True)))
-            .order_by(Escala.id.asc())
-            .all()
-        )
+        nome_atual = (coop_obj.nome if coop_obj else (e.cooperado_nome or "").strip())
+        escala_editor_rows.append({
+            "id": e.id,
+            "data": e.data or "",
+            "weekday_num": _escala_weekday_num(e.data),
+            "weekday_label": _escala_weekday_label(e.data),
+            "turno": e.turno or "",
+            "horario": e.horario or "",
+            "contrato": e.contrato or "",
+            "cooperado_id": e.cooperado_id,
+            "cooperado_nome": nome_atual or "",
+            "cooperado_nome_livre": (e.cooperado_nome or "") if not coop_obj else "",
+            "restaurante_id": e.restaurante_id,
+            "cor": getattr(e, "cor", None),
+        })
 
-        for e in escalas_all:
-            k_int = e.cooperado_id if e.cooperado_id is not None else 0
-            esc_item = {
-                "data": e.data,
-                "turno": e.turno,
-                "horario": e.horario,
-                "contrato": e.contrato,
-                "cor": getattr(e, "cor", None),
-                "nome_planilha": getattr(e, "cooperado_nome", None),
-            }
-            esc_by_int[k_int].append(esc_item)
-            esc_by_str[str(k_int)].append(esc_item)
+    escala_alertas_1h = _build_escala_alertas_1h(escalas_all, cooperados_map)
 
-        cont_rows = dict(
-            db.session.query(Escala.cooperado_id, func.count(Escala.id))
-            .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
-            .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
-            .filter(or_(Escala.cooperado_id.is_(None), Usuario.ativo.is_(True)))
-            .group_by(Escala.cooperado_id)
-            .all()
-        )
-
-        qtd_escalas_map = {c.id: int(cont_rows.get(c.id, 0)) for c in cooperados}
-        qtd_sem_cadastro = int(cont_rows.get(None, 0))
-
-        contratos_set = {((e.contrato or "").strip()) for e in escalas_all if (e.contrato or "").strip()}
-        contratos_set.update({((r.nome or "").strip()) for r in restaurantes if (r.nome or "").strip()})
-        contratos_escala_opcoes = sorted(contratos_set, key=lambda s: s.lower())
-
-        for e in sorted(escalas_all, key=_escala_sort_key):
-            coop_obj = cooperados_map.get(e.cooperado_id) if e.cooperado_id else None
-            nome_atual = (coop_obj.nome if coop_obj else (e.cooperado_nome or "").strip())
-            escala_editor_rows.append({
-                "id": e.id,
-                "data": e.data or "",
-                "weekday_num": _escala_weekday_num(e.data),
-                "weekday_label": _escala_weekday_label(e.data),
-                "turno": e.turno or "",
-                "horario": e.horario or "",
-                "contrato": e.contrato or "",
-                "cooperado_id": e.cooperado_id,
-                "cooperado_nome": nome_atual or "",
-                "cooperado_nome_livre": (e.cooperado_nome or "") if not coop_obj else "",
-                "restaurante_id": e.restaurante_id,
-                "cor": getattr(e, "cor", None),
-            })
     # =========================
     # Gráficos
     # =========================
@@ -4186,7 +4491,7 @@ def admin_dashboard():
             for coop in cooperados:
                 snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
                 prod = sum((l.valor or 0.0) for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-                rec = 0.0
+                rec = sum((r.valor or 0.0) for r in receitas_coop if getattr(r, "cooperado_id", None) == coop.id)
                 inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
                 sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
                 des = round(snap.get("descontado_periodo_despesa", 0.0), 2)
@@ -4290,42 +4595,129 @@ def admin_dashboard():
             "entrou": entrou,
         }
 
+    trocas_all = TrocaSolicitacao.query.order_by(TrocaSolicitacao.id.desc()).all()
     trocas_pendentes = []
     trocas_historico = []
     trocas_historico_flat = []
 
-    # Trocas: carrega somente pendentes na aba Escalas. Histórico aplicado foi removido da tela para ficar leve.
-    if active_tab == "escalas":
-        trocas_all = TrocaSolicitacao.query.filter_by(status="pendente").order_by(TrocaSolicitacao.id.desc()).all()
-        for t in trocas_all:
-            solicitante = Cooperado.query.get(t.solicitante_id)
-            destinatario = Cooperado.query.get(t.destino_id)
-            orig = Escala.query.get(t.origem_escala_id)
-            destino_data = destino_turno = destino_horario = destino_contrato = ""
-            if orig and destinatario:
-                destino_data = getattr(orig, "data", "") or ""
-                destino_turno = getattr(orig, "turno", "") or ""
-                destino_horario = getattr(orig, "horario", "") or ""
-                destino_contrato = getattr(orig, "contrato", "") or ""
-            trocas_pendentes.append({
-                "id": t.id,
-                "status": t.status,
-                "mensagem": t.mensagem,
-                "criada_em": t.criada_em,
-                "aplicada_em": t.aplicada_em,
-                "solicitante": solicitante,
-                "destinatario": destinatario,
-                "origem": orig,
-                "destino": destinatario,
-                "origem_desc": _escala_label(orig) if orig else "",
-                "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
-                "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
-                "destino_data": destino_data,
-                "destino_turno": destino_turno,
-                "destino_horario": destino_horario,
-                "destino_contrato": destino_contrato,
-                "linhas_afetadas": [],
-            })
+    for t in trocas_all:
+        solicitante = Cooperado.query.get(t.solicitante_id)
+        destinatario = Cooperado.query.get(t.destino_id)
+        orig = Escala.query.get(t.origem_escala_id)
+
+        linhas_afetadas = _parse_linhas_from_msg(t.mensagem) if t.status == "aprovada" else []
+
+        if t.status == "aprovada" and not linhas_afetadas and orig and solicitante and destinatario:
+            linhas_afetadas.append(_linha_from_escala(orig, saiu=solicitante.nome, entrou=destinatario.nome))
+
+            wd_o = _weekday_from_data_str(orig.data)
+            buck_o = _turno_bucket(orig.turno, orig.horario)
+            candidatas = Escala.query.filter_by(cooperado_id=destinatario.id).all()
+            best = None
+
+            for e in candidatas:
+                if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
+                    if (orig.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
+                        best = e
+                        break
+                    if best is None:
+                        best = e
+
+            if best:
+                linhas_afetadas.append(_linha_from_escala(best, saiu=destinatario.nome, entrou=solicitante.nome))
+
+        destino_data = ""
+        destino_turno = ""
+        destino_horario = ""
+        destino_contrato = ""
+
+        if t.status == "aprovada" and linhas_afetadas and solicitante and destinatario:
+            linha_dest = None
+            for r_ in linhas_afetadas:
+                if r_.get("saiu") == destinatario.nome and r_.get("entrou") == solicitante.nome:
+                    linha_dest = r_
+                    break
+
+            if linha_dest:
+                destino_data = linha_dest.get("dia", "")
+                turno_txt, horario_txt = _split_turno_horario(linha_dest.get("turno_horario", ""))
+                destino_turno = turno_txt
+                destino_horario = horario_txt
+                destino_contrato = linha_dest.get("contrato", "")
+
+        if not destino_data and orig and destinatario:
+            wd_o = _weekday_from_data_str(orig.data)
+            buck_o = _turno_bucket(orig.turno, orig.horario)
+            candidatas = Escala.query.filter_by(cooperado_id=destinatario.id).all()
+            best = None
+
+            for e in candidatas:
+                if _weekday_from_data_str(e.data) == wd_o and _turno_bucket(e.turno, e.horario) == buck_o:
+                    if (orig.contrato or "").strip().lower() == (e.contrato or "").strip().lower():
+                        best = e
+                        break
+                    if best is None:
+                        best = e
+
+            if best:
+                destino_data = best.data
+                destino_turno = (best.turno or "").strip()
+                destino_horario = (best.horario or "").strip()
+                destino_contrato = (best.contrato or "").strip()
+
+        item = {
+            "id": t.id,
+            "status": t.status,
+            "mensagem": t.mensagem,
+            "criada_em": t.criada_em,
+            "aplicada_em": t.aplicada_em,
+            "solicitante": solicitante,
+            "destinatario": destinatario,
+            "origem": orig,
+            "destino": destinatario,
+            "origem_desc": _escala_desc(orig),
+            "origem_weekday": _weekday_from_data_str(orig.data) if orig else None,
+            "origem_turno_bucket": _turno_bucket(orig.turno if orig else None, orig.horario if orig else None),
+            "destino_data": destino_data,
+            "destino_turno": destino_turno,
+            "destino_horario": destino_horario,
+            "destino_contrato": destino_contrato,
+            "linhas_afetadas": linhas_afetadas,
+        }
+
+        if t.status == "aprovada" and linhas_afetadas:
+            itens = []
+            for r_ in linhas_afetadas:
+                turno_txt, horario_txt = _split_turno_horario(r_.get("turno_horario", ""))
+                itens.append(
+                    {
+                        "data": r_.get("dia", ""),
+                        "turno": turno_txt,
+                        "horario": horario_txt,
+                        "contrato": r_.get("contrato", ""),
+                        "saiu_nome": r_.get("saiu", ""),
+                        "entrou_nome": r_.get("entrou", ""),
+                    }
+                )
+
+                trocas_historico_flat.append(
+                    {
+                        "data": r_.get("dia", ""),
+                        "turno": turno_txt,
+                        "horario": horario_txt,
+                        "contrato": r_.get("contrato", ""),
+                        "saiu_nome": r_.get("saiu", ""),
+                        "entrou_nome": r_.get("entrou", ""),
+                        "aplicada_em": t.aplicada_em,
+                    }
+                )
+
+            item["itens"] = itens
+
+        if t.status == "pendente":
+            trocas_pendentes.append(item)
+        else:
+            trocas_historico.append(item)
 
     admins = (
         Usuario.query
@@ -4353,10 +4745,52 @@ def admin_dashboard():
     escala_editor_rows_export = []
     trocas_historico_export = []
     contagem_contrato_turno = []
-    escala_hist_fim = current_date
-    escala_hist_inicio = current_date - timedelta(days=30)
-    trocas_hist_fim = current_date
-    trocas_hist_inicio = current_date - timedelta(days=30)
+
+    if active_tab == "escalas":
+        if not escala_hist_inicio and not escala_hist_fim:
+            escala_hist_fim = current_date
+            escala_hist_inicio = current_date - timedelta(days=30)
+        elif escala_hist_inicio and not escala_hist_fim:
+            escala_hist_fim = escala_hist_inicio
+        elif escala_hist_fim and not escala_hist_inicio:
+            escala_hist_inicio = escala_hist_fim
+
+        escala_hist_q = _history_rows_between(EscalaHistorico.query, EscalaHistorico.snapshot_em, escala_hist_inicio, escala_hist_fim)
+        escala_hist_rows_db = escala_hist_q.order_by(EscalaHistorico.snapshot_em.desc(), EscalaHistorico.id.desc()).all()
+        for h in escala_hist_rows_db:
+            escala_historico_rows.append({
+                "snapshot_em": h.snapshot_em,
+                "data": h.data or "",
+                "turno": h.turno or "",
+                "horario": h.horario or "",
+                "contrato": h.contrato or "",
+                "cooperado_nome": h.cooperado_nome or "",
+                "saiu_nome": h.saiu_nome or "",
+                "entrou_nome": h.entrou_nome or "",
+                "origem": h.origem or "",
+                "acao": h.acao or "",
+            })
+
+        hist_rows_for_current = _history_rows_between(EscalaHistorico.query.filter(EscalaHistorico.saiu_nome.isnot(None)), EscalaHistorico.snapshot_em, escala_hist_inicio, escala_hist_fim).all()
+        escala_editor_rows_export = _resolve_change_columns(escala_editor_rows, hist_rows_for_current)
+    else:
+        escala_hist_fim = escala_hist_fim or current_date
+        escala_hist_inicio = escala_hist_inicio or (current_date - timedelta(days=30))
+
+    if active_tab == "trocas":
+        if not trocas_hist_inicio and not trocas_hist_fim:
+            trocas_hist_fim = current_date
+            trocas_hist_inicio = current_date - timedelta(days=30)
+        elif trocas_hist_inicio and not trocas_hist_fim:
+            trocas_hist_fim = trocas_hist_inicio
+        elif trocas_hist_fim and not trocas_hist_inicio:
+            trocas_hist_inicio = trocas_hist_fim
+
+        trocas_hist_q = _history_rows_between(TrocaHistorico.query, TrocaHistorico.aplicada_em, trocas_hist_inicio, trocas_hist_fim)
+        trocas_historico_export = trocas_hist_q.order_by(TrocaHistorico.aplicada_em.desc(), TrocaHistorico.id.desc()).all()
+    else:
+        trocas_hist_fim = trocas_hist_fim or current_date
+        trocas_hist_inicio = trocas_hist_inicio or (current_date - timedelta(days=30))
 
 
     # resumo por cooperado calculado no backend para evitar travar no JS
@@ -4369,7 +4803,7 @@ def admin_dashboard():
     for coop in cooperados:
         snap = _compute_coop_debt_snapshot(coop.id, data_inicio, data_fim)
         prod = sum((l.valor or 0.0) for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
-        rec = 0.0
+        rec = sum((r.valor or 0.0) for r in receitas_coop if getattr(r, "cooperado_id", None) == coop.id)
         inss4 = sum((l.valor or 0.0) * INSS_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
         sest05 = sum((l.valor or 0.0) * SEST_ALIQ for l in lancamentos if getattr(l, "cooperado_id", None) == coop.id)
         des = round(snap.get("descontado_periodo_despesa", 0.0), 2)
@@ -4496,12 +4930,6 @@ def admin_dashboard():
                 return m.group(1)
     return _rendered_html
     
-
-@app.get("/admin/escalas", endpoint="admin_escalas")
-@admin_required
-def admin_escalas_compat():
-    return redirect(url_for("admin_dashboard", tab="escalas"))
-
 # =========================
 # Navegação/Export util
 # =========================
@@ -5612,6 +6040,328 @@ def delete_despesa(id):
 
 
 # =========================
+# Avisos (admin + públicos)
+# =========================
+@app.get("/avisos", endpoint="avisos_publicos")
+def avisos_publicos():
+    t = session.get("user_tipo")
+    if t == "cooperado":
+        return redirect(url_for("portal_cooperado_avisos"))
+    if t == "restaurante":
+        return redirect(url_for("portal_restaurante"))
+    return redirect(url_for("login"))
+
+
+@app.route("/admin/avisos", methods=["GET", "POST"])
+@admin_perm_required("avisos", "ver")
+def admin_avisos():
+    cooperados = Cooperado.query.order_by(Cooperado.nome.asc()).all()
+    restaurantes = Restaurante.query.order_by(Restaurante.nome.asc()).all()
+
+    if request.method == "POST":
+        if not admin_has_perm("avisos", "criar"):
+            flash("Você não tem permissão para publicar avisos.", "danger")
+            return redirect(url_for("admin_avisos"))
+
+        f = request.form
+
+        destino_tipo = (f.get("destino_tipo") or "").strip()
+        coop_alc = f.get("coop_alcance") or f.get("coop_alcance_ambos")
+        rest_alc = f.get("rest_alcance") or f.get("rest_alcance_ambos")
+        sel_coops = request.form.getlist("dest_cooperados[]") or request.form.getlist("dest_cooperados_ambos[]")
+        sel_rests = request.form.getlist("dest_restaurantes[]") or request.form.getlist("dest_restaurantes_ambos[]")
+
+        def _pick_msg(form):
+            for key in (
+                "corpo_html", "html", "mensagem_html", "conteudo_html", "descricao_html", "texto_html",
+                "mensagem", "corpo", "conteudo", "descricao", "texto", "resumo", "body", "content",
+            ):
+                v = form.get(key)
+                if v and v.strip():
+                    return v.strip()
+            return ""
+
+        titulo = (f.get("titulo") or "").strip()
+        msg = _pick_msg(f)
+        prioridade = ((f.get("prioridade") or "normal").strip() or "normal")
+        ativo = bool(f.get("ativo"))
+        exigir_confirmacao = bool(f.get("exigir_confirmacao")) if hasattr(Aviso, "exigir_confirmacao") else False
+
+        inicio_em = _parse_datetime_local(f.get("inicio_em") or f.get("agendar_inicio"))
+        fim_em = _parse_datetime_local(f.get("fim_em") or f.get("agendar_fim"))
+
+        if not titulo:
+            flash("Informe o título do aviso.", "warning")
+            return redirect(url_for("admin_avisos"))
+        if not msg:
+            flash("Informe a mensagem do aviso.", "warning")
+            return redirect(url_for("admin_avisos"))
+        if inicio_em and fim_em and fim_em < inicio_em:
+            flash("A data final do agendamento não pode ser menor que a inicial.", "warning")
+            return redirect(url_for("admin_avisos"))
+
+        def _mk_aviso(tipo: str):
+            a = Aviso(
+                titulo=titulo,
+                corpo=msg,
+                tipo=tipo,
+                prioridade=prioridade,
+                fixado=False,
+                ativo=ativo if hasattr(Aviso, "ativo") else True,
+                criado_por_id=session.get("user_id"),
+                inicio_em=inicio_em,
+                fim_em=fim_em,
+            )
+            if hasattr(a, "exigir_confirmacao"):
+                a.exigir_confirmacao = exigir_confirmacao
+            return a
+
+        avisos_para_criar = []
+
+        if destino_tipo == "cooperados":
+            if coop_alc == "selecionados":
+                if not sel_coops:
+                    flash("Selecione ao menos um cooperado.", "warning")
+                    return redirect(url_for("admin_avisos"))
+                try:
+                    coop_ids = sorted({int(x) for x in sel_coops})
+                except Exception:
+                    flash("Seleção de cooperado inválida.", "warning")
+                    return redirect(url_for("admin_avisos"))
+
+                a = _mk_aviso("cooperado")
+                a.destino_cooperado_id = None
+                a.cooperados = Cooperado.query.filter(Cooperado.id.in_(coop_ids)).all()
+                avisos_para_criar.append(a)
+            else:
+                a = _mk_aviso("cooperado")
+                a.destino_cooperado_id = None
+                a.cooperados = []
+                avisos_para_criar.append(a)
+
+        elif destino_tipo == "restaurantes":
+            if rest_alc == "selecionados":
+                if not sel_rests:
+                    flash("Selecione ao menos um restaurante.", "warning")
+                    return redirect(url_for("admin_avisos"))
+                try:
+                    ids = [int(x) for x in sel_rests]
+                except Exception:
+                    flash("Seleção de restaurante inválida.", "warning")
+                    return redirect(url_for("admin_avisos"))
+
+                a = _mk_aviso("restaurante")
+                a.restaurantes = Restaurante.query.filter(Restaurante.id.in_(ids)).all()
+                avisos_para_criar.append(a)
+            else:
+                a = _mk_aviso("restaurante")
+                a.restaurantes = []
+                avisos_para_criar.append(a)
+
+        elif destino_tipo == "ambos":
+            if coop_alc == "selecionados":
+                if not sel_coops:
+                    flash("Selecione ao menos um cooperado para o aviso dos cooperados.", "warning")
+                    return redirect(url_for("admin_avisos"))
+                try:
+                    coop_ids = sorted({int(x) for x in sel_coops})
+                except Exception:
+                    flash("Seleção de cooperado inválida.", "warning")
+                    return redirect(url_for("admin_avisos"))
+
+                a_coop = _mk_aviso("cooperado")
+                a_coop.destino_cooperado_id = None
+                a_coop.cooperados = Cooperado.query.filter(Cooperado.id.in_(coop_ids)).all()
+                avisos_para_criar.append(a_coop)
+            else:
+                a_coop = _mk_aviso("cooperado")
+                a_coop.destino_cooperado_id = None
+                a_coop.cooperados = []
+                avisos_para_criar.append(a_coop)
+
+            if rest_alc == "selecionados":
+                if not sel_rests:
+                    flash("Selecione ao menos um restaurante para o aviso dos restaurantes.", "warning")
+                    return redirect(url_for("admin_avisos"))
+                try:
+                    ids = [int(x) for x in sel_rests]
+                except Exception:
+                    flash("Seleção de restaurante inválida.", "warning")
+                    return redirect(url_for("admin_avisos"))
+
+                a_rest = _mk_aviso("restaurante")
+                a_rest.restaurantes = Restaurante.query.filter(Restaurante.id.in_(ids)).all()
+            else:
+                a_rest = _mk_aviso("restaurante")
+                a_rest.restaurantes = []
+
+            avisos_para_criar.append(a_rest)
+
+        else:
+            avisos_para_criar.append(_mk_aviso("global"))
+
+        for a in avisos_para_criar:
+            db.session.add(a)
+
+        db.session.commit()
+        flash("Aviso(s) salvo(s) com sucesso.", "success")
+        return redirect(url_for("admin_avisos"))
+
+    avisos = Aviso.query.options(selectinload(Aviso.restaurantes), selectinload(Aviso.cooperados)).order_by(Aviso.fixado.desc(), Aviso.criado_em.desc()).all()
+
+    leituras = AvisoLeitura.query.order_by(AvisoLeitura.lido_em.desc()).all()
+    leituras_por_aviso = defaultdict(list)
+    for leitura in leituras:
+        leituras_por_aviso[leitura.aviso_id].append(leitura)
+
+    now_dt = datetime.utcnow()
+
+    for a in avisos:
+        destinatarios_coop, destinatarios_rest = _aviso_destinatarios(a, cooperados_all=cooperados, restaurantes_all=restaurantes)
+        registros = leituras_por_aviso.get(a.id, [])
+
+        lidos_coop = {r.cooperado_id: r for r in registros if r.cooperado_id}
+        lidos_rest = {r.restaurante_id: r for r in registros if r.restaurante_id}
+
+        if a.tipo == "global":
+            a.destino_resumo = "Todos"
+        elif a.tipo == "cooperado":
+            if getattr(a, "cooperados", None):
+                a.destino_resumo = "Cooperados selecionados"
+            elif a.destino_cooperado_id:
+                a.destino_resumo = "Cooperado específico"
+            else:
+                a.destino_resumo = "Todos os cooperados"
+        elif a.tipo == "restaurante":
+            if getattr(a, "restaurantes", None):
+                a.destino_resumo = "Restaurantes selecionados"
+            else:
+                a.destino_resumo = "Todos os restaurantes"
+        else:
+            a.destino_resumo = a.tipo.capitalize()
+        a.agendado = bool(a.inicio_em and a.inicio_em > now_dt)
+        a.expirado = bool(a.fim_em and a.fim_em < now_dt)
+
+        a.leituras_cooperados = [
+            {
+                "id": c.id,
+                "nome": c.nome,
+                "lido": c.id in lidos_coop,
+                "lido_em": lidos_coop.get(c.id).lido_em if c.id in lidos_coop else None,
+            }
+            for c in destinatarios_coop
+        ]
+        a.leituras_restaurantes = [
+            {
+                "id": r.id,
+                "nome": r.nome,
+                "lido": r.id in lidos_rest,
+                "lido_em": lidos_rest.get(r.id).lido_em if r.id in lidos_rest else None,
+            }
+            for r in destinatarios_rest
+        ]
+        a.total_destinatarios = len(a.leituras_cooperados) + len(a.leituras_restaurantes)
+        a.total_lidos = sum(1 for x in a.leituras_cooperados if x["lido"]) + sum(1 for x in a.leituras_restaurantes if x["lido"])
+        a.total_pendentes = max(a.total_destinatarios - a.total_lidos, 0)
+
+    return render_template(
+        "admin_avisos.html",
+        avisos=avisos,
+        cooperados=cooperados,
+        restaurantes=restaurantes,
+        agora=now_dt,
+    )
+
+
+@app.route("/admin/avisos/<int:aviso_id>/toggle", methods=["POST", "GET"], endpoint="admin_avisos_toggle")
+@admin_perm_required("avisos", "editar")
+def admin_avisos_toggle(aviso_id):
+    a = Aviso.query.get_or_404(aviso_id)
+
+    if hasattr(a, "ativo"):
+        a.ativo = not bool(a.ativo)
+    else:
+        a.fixado = not bool(a.fixado)
+
+    db.session.commit()
+    flash("Aviso atualizado.", "success")
+    return redirect(request.referrer or url_for("admin_avisos"))
+
+
+@app.route("/admin/avisos/<int:aviso_id>/excluir", methods=["POST"], endpoint="admin_avisos_excluir")
+@admin_perm_required("avisos", "excluir")
+def admin_avisos_excluir(aviso_id):
+    a = Aviso.query.get_or_404(aviso_id)
+
+    try:
+        AvisoLeitura.query.filter_by(aviso_id=aviso_id).delete(synchronize_session=False)
+    except Exception:
+        pass
+
+    try:
+        if hasattr(a, "restaurantes"):
+            a.restaurantes.clear()
+    except Exception:
+        pass
+
+    db.session.delete(a)
+    db.session.commit()
+    flash("Aviso excluído.", "success")
+    return redirect(url_for("admin_avisos"))
+
+
+@app.route("/avisos/<int:aviso_id>/lido", methods=["POST", "GET"])
+def marcar_aviso_lido_universal(aviso_id: int):
+    if "user_id" not in session:
+        return redirect(url_for("login")) if request.method == "GET" else ("", 401)
+
+    user_id = session.get("user_id")
+    user_tipo = session.get("user_tipo")
+    Aviso.query.get_or_404(aviso_id)
+
+    def _ok_response():
+        if request.method == "POST":
+            return ("", 204)
+        return redirect(request.referrer or url_for("portal_cooperado_avisos"))
+
+    if user_tipo == "cooperado":
+        coop = Cooperado.query.filter_by(usuario_id=user_id).first()
+        if not coop:
+            return ("", 403) if request.method == "POST" else redirect(url_for("login"))
+
+        if not AvisoLeitura.query.filter_by(aviso_id=aviso_id, cooperado_id=coop.id).first():
+            db.session.add(
+                AvisoLeitura(
+                    aviso_id=aviso_id,
+                    cooperado_id=coop.id,
+                    lido_em=datetime.utcnow(),
+                )
+            )
+            db.session.commit()
+
+        return _ok_response()
+
+    if user_tipo == "restaurante":
+        rest = Restaurante.query.filter_by(usuario_id=user_id).first()
+        if not rest:
+            return ("", 403) if request.method == "POST" else redirect(url_for("login"))
+
+        if not AvisoLeitura.query.filter_by(aviso_id=aviso_id, restaurante_id=rest.id).first():
+            db.session.add(
+                AvisoLeitura(
+                    aviso_id=aviso_id,
+                    restaurante_id=rest.id,
+                    lido_em=datetime.utcnow(),
+                )
+            )
+            db.session.commit()
+
+        return _ok_response()
+
+    return ("", 403) if request.method == "POST" else redirect(url_for("login"))
+
+
+# =========================
 # CRUD Cooperados / Restaurantes / Senhas (Admin)
 # =========================
 @app.route("/cooperados/add", methods=["POST"])
@@ -5791,6 +6541,10 @@ def delete_cooperado(id):
         db.session.execute(
             sa_delete(DespesaCooperado).where(DespesaCooperado.cooperado_id == id)
         )
+        db.session.execute(
+            sa_delete(AvisoLeitura).where(AvisoLeitura.cooperado_id == id)
+        )
+
         db.session.delete(c)
         if u:
             db.session.delete(u)
@@ -9566,35 +10320,27 @@ def portal_restaurante():
             (c.nome or "").lower()
         )
     )
-    # -------------------- LANÇAMENTOS / TOTAIS POR PERÍODO - RÁPIDO --------------------
+    # -------------------- LANÇAMENTOS / TOTAIS POR PERÍODO --------------------
     total_bruto = 0.0
     total_qtd = 0
     total_entregas = 0
     total_inss = 0.0
     total_sest = 0.0
 
-    lancamentos_periodo_all = (
-        Lancamento.query
-        .filter(
-            Lancamento.restaurante_id == rest.id,
-            Lancamento.data >= di,
-            Lancamento.data <= df,
-        )
-        .order_by(Lancamento.data.desc(), Lancamento.id.desc())
-        .all()
-    )
-
-    lancs_por_coop_periodo = defaultdict(list)
-    for _l in lancamentos_periodo_all:
-        lancs_por_coop_periodo[_l.cooperado_id].append(_l)
-
     for c in cooperados:
-        c.lancamentos = lancs_por_coop_periodo.get(c.id, [])
+        q = (
+            Lancamento.query
+            .filter_by(restaurante_id=rest.id, cooperado_id=c.id)
+            .filter(Lancamento.data >= di, Lancamento.data <= df)
+            .order_by(Lancamento.data.desc(), Lancamento.id.desc())
+        )
+
+        c.lancamentos = q.all()
         c.total_periodo = sum((l.valor or 0.0) for l in c.lancamentos)
-        c.inss_periodo = round(c.total_periodo * 0.04, 2)
-        c.sest_periodo = round(c.total_periodo * 0.005, 2)
-        c.encargos_periodo = round(c.inss_periodo + c.sest_periodo, 2)
-        c.liquido_periodo = round(c.total_periodo - c.encargos_periodo, 2)
+        c.inss_periodo = sum((l.valor or 0.0) * 0.04 for l in c.lancamentos)
+        c.sest_periodo = sum((l.valor or 0.0) * 0.005 for l in c.lancamentos)
+        c.encargos_periodo = c.inss_periodo + c.sest_periodo
+        c.liquido_periodo = c.total_periodo - c.encargos_periodo
 
         total_bruto += c.total_periodo
         total_qtd += len(c.lancamentos)
@@ -9602,8 +10348,8 @@ def portal_restaurante():
         total_inss += c.inss_periodo
         total_sest += c.sest_periodo
 
-    total_encargos = round(total_inss + total_sest, 2)
-    total_liquido = round(total_bruto - total_encargos, 2)
+    total_encargos = total_inss + total_sest
+    total_liquido = total_bruto - total_encargos
 
     # -------------------- LISTA DE LANÇAMENTOS --------------------
     lancamentos_periodo = []
@@ -10121,6 +10867,69 @@ def excluir_lancamento(id):
     flash("Lançamento excluído.", "success")
     return redirect(url_for("portal_restaurante", view="lancamentos"))
 
+# =========================
+# Compat: Restaurante Avisos
+# =========================
+@app.get("/api/rest/avisos/unread_count")
+@role_required("restaurante")
+def api_rest_avisos_unread_count():
+    def _nocache(resp):
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        return resp
+
+    try:
+        u_id = session.get("user_id")
+        rest = Restaurante.query.filter_by(usuario_id=u_id).first()
+
+        if not rest:
+            return _nocache(
+                jsonify(
+                    ok=False,
+                    unread=0,
+                    count=0,
+                    error="Restaurante não encontrado"
+                )
+            ), 404
+
+        avisos_rest = get_avisos_for_restaurante(rest)
+
+        lidos_ids_rest = {
+            row[0]
+            for row in db.session.query(AvisoLeitura.aviso_id)
+            .filter_by(restaurante_id=rest.id)
+            .all()
+        }
+
+        avisos_nao_lidos_count = sum(
+            1 for a in avisos_rest if a.id not in lidos_ids_rest
+        )
+
+        return _nocache(
+            jsonify(
+                ok=True,
+                unread=int(avisos_nao_lidos_count),
+                count=int(avisos_nao_lidos_count)
+            )
+        ), 200
+
+    except Exception as e:
+        db.session.rollback()
+
+        try:
+            current_app.logger.exception(
+                "Erro ao calcular /api/rest/avisos/unread_count"
+            )
+        except Exception:
+            pass
+
+        return _nocache(
+            jsonify(
+                ok=False,
+                unread=0,
+                count=0,
+                error=str(e)
+            )
+        ), 500
 
 # =========================
 # Documentos (Admin + Público)
@@ -10603,6 +11412,208 @@ def admin_tabelas_normalize_arquivo_url():
         db.session.commit()
 
     return jsonify({"ok": True, "alterados": alterados})
+
+# =========================
+# AVISOS — Ações (cooperado)
+# =========================
+
+@app.post("/avisos/<int:aviso_id>/lido", endpoint="marcar_aviso_lido")
+@role_required("cooperado")
+def marcar_aviso_lido(aviso_id: int):
+    u_id = session.get("user_id")
+    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
+
+    aviso = Aviso.query.get_or_404(aviso_id)
+
+    ja_lido = AvisoLeitura.query.filter_by(
+        cooperado_id=coop.id, aviso_id=aviso.id
+    ).first()
+
+    if not ja_lido:
+        db.session.add(AvisoLeitura(
+            cooperado_id=coop.id,
+            aviso_id=aviso.id,
+            lido_em=datetime.utcnow(),
+        ))
+        db.session.commit()
+
+    # volta para a lista; se quiser voltar ancorado: + f"#aviso-{aviso.id}"
+    return redirect(url_for("portal_cooperado_avisos"))
+
+@app.post("/avisos/marcar-todos", endpoint="marcar_todos_avisos_lidos")
+@role_required("cooperado")
+def marcar_todos_avisos_lidos():
+    u_id = session.get("user_id")
+    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
+
+    # todos avisos visíveis ao cooperado
+    avisos = get_avisos_for_cooperado(coop)
+
+    # ids já lidos
+    lidos_ids = {
+        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
+        .filter(AvisoLeitura.cooperado_id == coop.id).all()
+    }
+
+    # persiste só os que faltam
+    now = datetime.utcnow()
+    for a in avisos:
+        if a.id not in lidos_ids:
+            db.session.add(AvisoLeitura(
+                cooperado_id=coop.id,
+                aviso_id=a.id,
+                lido_em=now,
+            ))
+
+    db.session.commit()
+    return redirect(url_for("portal_cooperado_avisos"))
+
+@app.get("/portal/restaurante/avisos")
+@role_required("restaurante")
+def portal_restaurante_avisos():
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+
+    # avisos aplicáveis
+    try:
+        avisos_db = get_avisos_for_restaurante(rest)
+    except NameError:
+        # fallback: global + restaurante (associados ou broadcast)
+        avisos_db = (Aviso.query
+                     .filter(Aviso.ativo.is_(True))
+                     .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
+                     .order_by(Aviso.fixado.desc(), Aviso.criado_em.desc())
+                     .all())
+
+    # ids já lidos
+    lidos_ids = {
+        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
+        .filter(AvisoLeitura.restaurante_id == rest.id).all()
+    }
+
+    def corpo_do_aviso(a: Aviso) -> str:
+        for k in ("corpo_html","html","conteudo_html","mensagem_html","descricao_html","texto_html",
+                  "corpo","conteudo","mensagem","descricao","texto","resumo","body","content"):
+            v = getattr(a, k, None)
+            if isinstance(v, str) and v.strip():
+                return v
+        return ""
+
+    avisos = [{
+        "id": a.id,
+        "titulo": a.titulo or "Aviso",
+        "criado_em": a.criado_em,
+        "lido": (a.id in lidos_ids),
+        "prioridade_alta": (str(a.prioridade or "").lower() == "alta"),
+        "corpo_html": corpo_do_aviso(a),
+    } for a in avisos_db]
+
+    avisos_nao_lidos_count = sum(1 for x in avisos if not x["lido"])
+    return render_template(
+        "portal_restaurante_avisos.html",   # crie/clone seu template
+        avisos=avisos,
+        avisos_nao_lidos_count=avisos_nao_lidos_count,
+        current_year=datetime.now().year,
+    )
+
+@app.post("/avisos-restaurante/marcar-todos", endpoint="marcar_todos_avisos_lidos_restaurante")
+@role_required("restaurante")
+def marcar_todos_avisos_lidos_restaurante():
+    u_id = session.get("user_id")
+    rest = Restaurante.query.filter_by(usuario_id=u_id).first_or_404()
+
+    try:
+        avisos = get_avisos_for_restaurante(rest)
+    except NameError:
+        avisos = (Aviso.query
+                  .filter(Aviso.ativo.is_(True))
+                  .filter(or_(Aviso.tipo == "global", Aviso.tipo == "restaurante"))
+                  .all())
+
+    lidos_ids = {
+        a_id for (a_id,) in db.session.query(AvisoLeitura.aviso_id)
+        .filter(AvisoLeitura.restaurante_id == rest.id).all()
+    }
+
+    now = datetime.utcnow()
+    for a in avisos:
+        if a.id not in lidos_ids:
+            db.session.add(AvisoLeitura(
+                restaurante_id=rest.id, aviso_id=a.id, lido_em=now
+            ))
+    db.session.commit()
+    return redirect(url_for("portal_restaurante_avisos"))
+
+# =========================
+# Avisos: contagem de não lidos (Cooperado/Restaurante)
+# =========================
+def _nocache_json(payload: dict, status: int = 200):
+    resp = jsonify(payload)
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp, status
+
+
+@app.get("/avisos/unread_count")
+@app.get("/avisos/unread_count/")
+@with_db_retry
+def avisos_unread_count():
+    """
+    Retorna a quantidade de avisos não lidos para o usuário logado.
+    Responde sempre em JSON e evita quebrar o painel quando houver sessão vazia,
+    usuário sem vínculo, ou qualquer falha na busca.
+    """
+    user_id = session.get("user_id")
+    user_tipo = (session.get("user_tipo") or "").strip().lower()
+
+    if not user_id:
+        return _nocache_json({"ok": False, "unread": 0, "count": 0, "error": "Sessão ausente"}, 401)
+
+    try:
+        count = 0
+
+        if user_tipo == "cooperado":
+            coop = Cooperado.query.filter_by(usuario_id=user_id).first()
+            if not coop:
+                return _nocache_json({"ok": False, "unread": 0, "count": 0, "error": "Cooperado não encontrado"}, 404)
+
+            avisos = get_avisos_for_cooperado(coop) or []
+            lidos_ids = {
+                aviso_id
+                for (aviso_id,) in db.session.query(AvisoLeitura.aviso_id)
+                .filter(AvisoLeitura.cooperado_id == coop.id)
+                .all()
+            }
+            count = sum(1 for a in avisos if a.id not in lidos_ids)
+
+        elif user_tipo == "restaurante":
+            rest = Restaurante.query.filter_by(usuario_id=user_id).first()
+            if not rest:
+                return _nocache_json({"ok": False, "unread": 0, "count": 0, "error": "Restaurante não encontrado"}, 404)
+
+            avisos = get_avisos_for_restaurante(rest) or []
+            lidos_ids = {
+                aviso_id
+                for (aviso_id,) in db.session.query(AvisoLeitura.aviso_id)
+                .filter(AvisoLeitura.restaurante_id == rest.id)
+                .all()
+            }
+            count = sum(1 for a in avisos if a.id not in lidos_ids)
+
+        else:
+            return _nocache_json({"ok": True, "unread": 0, "count": 0, "error": "Tipo de usuário sem avisos"}, 200)
+
+        return _nocache_json({"ok": True, "unread": int(count), "count": int(count)}, 200)
+
+    except Exception as e:
+        db.session.rollback()
+        try:
+            current_app.logger.exception("Erro ao calcular /avisos/unread_count")
+        except Exception:
+            pass
+        return _nocache_json({"ok": False, "unread": 0, "count": 0, "error": str(e)}, 500)
+
 
 # =========================
 # FARMÁCIA
