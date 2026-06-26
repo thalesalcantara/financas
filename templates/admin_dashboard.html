@@ -408,7 +408,7 @@
 {% set compat     = compat if compat is defined else [] %}
 {% set avaliacoes = avaliacoes if avaliacoes is defined else [] %}
 {% set _flt       = _flt if _flt is defined else namespace(restaurante_id=None, cooperado_id=None, data_inicio='', data_fim='') %}
-{% set _tab       = (tab if tab is defined else request.args.get('tab','lancamentos')) %}
+{% set _tab       = (tab if tab is defined else request.args.get('tab','resumo')) %}
 
 {% set _perms = admin_perms if admin_perms is defined else {} %}
 {% set can_lanc_ver = admin_is_master or _perms.get('lancamentos', {}).get('ver', False) %}
@@ -472,12 +472,7 @@
       <!-- Resumo (TAB, igual antes) -->
       {% if can_lanc_ver or can_receitas_ver or can_despesas_ver or can_coop_receitas_ver or can_coop_despesas_ver or can_beneficios_ver %}
       <a class="nav-link-main {{ 'active' if _tab=='resumo' else '' }}"
-         data-bs-toggle="tab"
-         data-bs-target="#resumo"
-         href="#resumo"
-         role="tab"
-         aria-controls="resumo"
-         aria-selected="{{ 'true' if _tab=='resumo' else 'false' }}">
+         href="{{ url_for('admin_dashboard', tab='resumo') }}">
         <div class="nav-link-left">
           <span class="nav-link-icon"><i class="bi bi-graph-up"></i></span>
           <span class="nav-link-label">Resumo</span>
@@ -514,72 +509,42 @@
       <div id="menuFinanceiro" class="collapse show nav-sublinks">
         <!-- Lançamentos (tab) -->
         {% if can_lanc_ver %}<a class="nav-sublink {{ 'active' if _tab=='lancamentos' else '' }}"
-           data-bs-toggle="tab"
-           data-bs-target="#lancamentos"
-           href="#lancamentos"
-           role="tab"
-           aria-controls="lancamentos"
-           aria-selected="{{ 'true' if _tab=='lancamentos' else 'false' }}">
+           href="{{ url_for('admin_dashboard', tab='lancamentos') }}">
           <i class="bi bi-journal-text"></i>
           <span class="nav-link-label">Lançamentos</span>
         </a>{% endif %}
 
         <!-- Receitas Coop (tab) -->
         {% if can_receitas_ver %}<a class="nav-sublink {{ 'active' if _tab=='receitas' else '' }}"
-           data-bs-toggle="tab"
-           data-bs-target="#receitas"
-           href="#receitas"
-           role="tab"
-           aria-controls="receitas"
-           aria-selected="{{ 'true' if _tab=='receitas' else 'false' }}">
+           href="{{ url_for('admin_dashboard', tab='receitas') }}">
           <i class="bi bi-credit-card"></i>
           <span class="nav-link-label">Receitas Coop</span>
         </a>{% endif %}
 
         <!-- Despesas Coop (tab) -->
         {% if can_despesas_ver %}<a class="nav-sublink {{ 'active' if _tab=='despesas' else '' }}"
-           data-bs-toggle="tab"
-           data-bs-target="#despesas"
-           href="#despesas"
-           role="tab"
-           aria-controls="despesas"
-           aria-selected="{{ 'true' if _tab=='despesas' else 'false' }}">
+           href="{{ url_for('admin_dashboard', tab='despesas') }}">
           <i class="bi bi-cart-dash"></i>
           <span class="nav-link-label">Despesas Coop</span>
         </a>{% endif %}
 
         <!-- Receitas Cooperados (tab) -->
         {% if can_coop_receitas_ver %}<a class="nav-sublink {{ 'active' if _tab=='coop_receitas' else '' }}"
-           data-bs-toggle="tab"
-           data-bs-target="#coop_receitas"
-           href="#coop_receitas"
-           role="tab"
-           aria-controls="coop_receitas"
-           aria-selected="{{ 'true' if _tab=='coop_receitas' else 'false' }}">
+           href="{{ url_for('admin_dashboard', tab='coop_receitas') }}">
           <i class="bi bi-wallet2"></i>
           <span class="nav-link-label">Receitas Cooperados</span>
         </a>{% endif %}
 
         <!-- Despesas Cooperados (tab) -->
         {% if can_coop_despesas_ver %}<a class="nav-sublink {{ 'active' if _tab=='coop_despesas' else '' }}"
-           data-bs-toggle="tab"
-           data-bs-target="#coop_despesas"
-           href="#coop_despesas"
-           role="tab"
-           aria-controls="coop_despesas"
-           aria-selected="{{ 'true' if _tab=='coop_despesas' else 'false' }}">
+           href="{{ url_for('admin_dashboard', tab='coop_despesas') }}">
           <i class="bi bi-bag-dash"></i>
           <span class="nav-link-label">Despesas Cooperados</span>
         </a>{% endif %}
 
         <!-- Benefícios (tab) -->
         {% if can_beneficios_ver %}<a class="nav-sublink {{ 'active' if _tab=='beneficios' else '' }}"
-           data-bs-toggle="tab"
-           data-bs-target="#beneficios"
-           href="#beneficios"
-           role="tab"
-           aria-controls="beneficios"
-           aria-selected="{{ 'true' if _tab=='beneficios' else 'false' }}">
+           href="{{ url_for('admin_dashboard', tab='beneficios') }}">
           <i class="bi bi-heart-pulse"></i>
           <span class="nav-link-label">Benefícios</span>
         </a>{% endif %}
@@ -601,24 +566,14 @@
       <div id="menuCadastros" class="collapse show nav-sublinks">
         <!-- Cooperados (tab) -->
         {% if can_cooperados_ver %}<a class="nav-sublink {{ 'active' if _tab=='cooperados' else '' }}"
-           data-bs-toggle="tab"
-           data-bs-target="#cooperados"
-           href="#cooperados"
-           role="tab"
-           aria-controls="cooperados"
-           aria-selected="{{ 'true' if _tab=='cooperados' else 'false' }}">
+           href="{{ url_for('admin_dashboard', tab='cooperados') }}">
           <i class="bi bi-person-badge"></i>
           <span class="nav-link-label">Cooperados</span>
         </a>{% endif %}
 
         <!-- Estabelecimentos (tab) -->
         {% if can_restaurantes_ver %}<a class="nav-sublink {{ 'active' if _tab=='restaurantes' else '' }}"
-           data-bs-toggle="tab"
-           data-bs-target="#restaurantes"
-           href="#restaurantes"
-           role="tab"
-           aria-controls="restaurantes"
-           aria-selected="{{ 'true' if _tab=='restaurantes' else 'false' }}">
+           href="{{ url_for('admin_dashboard', tab='restaurantes') }}">
           <i class="bi bi-shop-window"></i>
           <span class="nav-link-label">Estabelecimentos</span>
         </a>{% endif %}
@@ -654,12 +609,7 @@
       <div id="menuOperacao" class="collapse show nav-sublinks">
         <!-- Escalas (tab) -->
         {% if can_escalas_ver %}<a class="nav-sublink {{ 'active' if _tab=='escalas' else '' }}"
-           data-bs-toggle="tab"
-           data-bs-target="#escalas"
-           href="#escalas"
-           role="tab"
-           aria-controls="escalas"
-           aria-selected="{{ 'true' if _tab=='escalas' else 'false' }}">
+           href="{{ url_for('admin_dashboard', tab='escalas') }}">
           <i class="bi bi-calendar-week"></i>
           <span class="nav-link-label">Escalas</span>
         </a>{% endif %}
@@ -677,12 +627,7 @@
       <!-- Config (TAB) e Sair (rota) ---------------------------------------->
       <div class="sidebar-footer">
         {% if can_sistemas_ver %}<a class="nav-link-main {{ 'active' if _tab=='sistemas' else '' }}"
-           data-bs-toggle="tab"
-           data-bs-target="#sistemas"
-           href="#sistemas"
-           role="tab"
-           aria-controls="sistemas"
-           aria-selected="{{ 'true' if _tab=='sistemas' else 'false' }}">
+           href="{{ url_for('admin_dashboard', tab='sistemas') }}">
           <div class="nav-link-left">
             <span class="nav-link-icon"><i class="bi bi-diagram-3"></i></span>
             <span class="nav-link-label">Sistemas</span>
@@ -690,12 +635,7 @@
         </a>{% endif %}
 
         {% if can_config_ver %}<a class="nav-link-main {{ 'active' if _tab=='config' else '' }}"
-           data-bs-toggle="tab"
-           data-bs-target="#config"
-           href="#config"
-           role="tab"
-           aria-controls="config"
-           aria-selected="{{ 'true' if _tab=='config' else 'false' }}">
+           href="{{ url_for('admin_dashboard', tab='config') }}">
           <div class="nav-link-left">
             <span class="nav-link-icon"><i class="bi bi-gear"></i></span>
             <span class="nav-link-label">Configurações</span>
@@ -964,7 +904,7 @@
 
         <!-- KPIs -->
         <div class="row g-2 resumo-kpi-row">
-          <div class="col-12 col-sm-6 col-lg-4">
+          <div class="col-12 col-sm-6 col-lg-3">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-prod"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -979,7 +919,7 @@
           </div>
 
           <!-- INSS 4% -->
-          <div class="col-12 col-sm-6 col-lg-4">
+          <div class="col-12 col-sm-6 col-lg-3">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-inss"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -994,7 +934,7 @@
           </div>
 
           <!-- SEST/SENAT 0,5% -->
-          <div class="col-12 col-sm-6 col-lg-4">
+          <div class="col-12 col-sm-6 col-lg-3">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-sest"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1008,7 +948,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-4">
+          <div class="col-12 col-sm-6 col-lg-3">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-rec-coop"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1022,7 +962,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-4">
+          <div class="col-12 col-sm-6 col-lg-3">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-desp-coop"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1036,7 +976,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-4">
+          <div class="col-12 col-sm-6 col-lg-3">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-rec-coop2"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1050,7 +990,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-4">
+          <div class="col-12 col-sm-6 col-lg-3">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-desp-coop2"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1064,7 +1004,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-4">
+          <div class="col-12 col-sm-6 col-lg-3">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-res-coop"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1082,7 +1022,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-4">
+          <div class="col-12 col-sm-6 col-lg-3">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-total-rec"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1096,7 +1036,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-4">
+          <div class="col-12 col-sm-6 col-lg-3">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-entregas-periodo"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1110,7 +1050,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-4">
+          <div class="col-12 col-sm-6 col-lg-3">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-ticket-periodo"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1124,7 +1064,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-4">
+          <div class="col-12 col-sm-6 col-lg-3">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-benef-rateados"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1406,18 +1346,12 @@
 <!-- LANÇAMENTOS (versão moderna/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='lancamentos' else '' }}" id="lancamentos" role="tabpanel">
   {# ====== TOTAIS DO FILTRO (já vem filtrado do backend) ====== #}
+  {% set soma_valor    = (lancamentos|sum(attribute='valor')) if lancamentos else 0 %}
 <!--AJAX_LANC_START--><div id="lancamentosAjaxWrap">
-  {% set lancamentos = lancamentos if lancamentos is defined else [] %}
-  {% set ns_lanc = namespace(total=0, qtd=0) %}
-  {% for l in lancamentos %}
-    {% set ns_lanc.total = ns_lanc.total + (l.valor|default(0, true)|float) %}
-    {% set ns_lanc.qtd = ns_lanc.qtd + (l.qtd_entregas|default(0, true)|int) %}
-  {% endfor %}
-  {% set soma_valor   = ns_lanc.total %}
-  {% set soma_inss_4  = soma_valor * 0.04 %}
-  {% set soma_sest_05 = soma_valor * 0.005 %}
-  {% set soma_liq     = soma_valor - soma_inss_4 - soma_sest_05 %}
-  {% set soma_qtd     = ns_lanc.qtd %}
+  {% set soma_inss_4   = (soma_valor * 0.04) %}
+  {% set soma_sest_05  = (soma_valor * 0.005) %}
+  {% set soma_liq      = (soma_valor - soma_inss_4 - soma_sest_05) %}
+  {% set soma_qtd      = (lancamentos | map(attribute='qtd_entregas') | select('number') | sum) if lancamentos else 0 %}
 
   <!-- Header + KPIs -->
   <div class="card lanc-card-header mb-3">
@@ -3242,7 +3176,7 @@
           <label class="form-label">Foto (opcional)</label>
           <input type="file" class="form-control form-control-sm" name="foto" id="coopFoto" accept="image/*">
           <div class="d-flex align-items-center gap-2 mt-2">
-            <img loading="lazy" id="coopPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt="" style="width:40px;height:40px;object-fit:cover;">
+            <img id="coopPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt="" style="width:40px;height:40px;object-fit:cover;">
             <small class="text-muted">Prévia</small>
           </div>
         </div>
@@ -3288,7 +3222,7 @@
                   data-user="{{ coop.usuario_ref.usuario|lower }}"
                   data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','')|lower }}">
                 <td class="text-center">
-                  <img src="{{ (coop.foto_url if _tab=='cooperados' else None) or url_for('static', filename='img/default.png') }}" loading="lazy"
+                  <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
                        class="avatar border" alt="{{ coop.nome }}"
                        style="width:40px;height:40px;object-fit:cover;">
                 </td>
@@ -3572,7 +3506,7 @@
               <label class="form-label">Foto (opcional)</label>
               <input type="file" class="form-control form-control-sm" name="foto" accept="image/*">
               <div class="d-flex align-items-center gap-2 mt-2">
-                <img loading="lazy" id="editCoopPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt="" style="width:40px;height:40px;object-fit:cover;">
+                <img id="editCoopPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt="" style="width:40px;height:40px;object-fit:cover;">
                 <small class="text-muted">Prévia</small>
               </div>
             </div>
@@ -3693,7 +3627,7 @@
           <label class="form-label">Logo (opcional)</label>
           <input type="file" class="form-control form-control-sm" name="foto" id="restFoto" accept="image/*">
           <div class="d-flex align-items-center gap-2 mt-2">
-            <img loading="lazy" id="restPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt=""
+            <img id="restPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt=""
                  style="width:40px;height:40px;object-fit:cover;">
             <small class="text-muted">Prévia</small>
           </div>
@@ -3741,7 +3675,7 @@
             {% for r in restaurantes %}
               <tr data-nome="{{ r.nome|lower }}" data-user="{{ r.usuario_ref.usuario|lower }}" data-periodo="{{ r.periodo|lower }}" data-tipo="{{ 'farmacia' if r.eh_farmacia else 'estabelecimento' }}">
                 <td class="text-center">
-                  <img src="{{ (r.foto_url if _tab=='restaurantes' else None) or url_for('static', filename='img/default.png') }}" loading="lazy"
+                  <img src="{{ r.foto_url or url_for('static', filename='img/default.png') }}"
                        class="avatar border" alt="{{ r.nome }}"
                        style="width:40px;height:40px;object-fit:cover;">
                 </td>
@@ -3902,7 +3836,7 @@
       <div>
         <h6 class="mb-1 section-title">Aviso de contratos sem cooperado</h6>
         <small class="section-subtitle">
-          O aviso fica no topo para aparecer logo. Aviso visual no topo, sem áudio para deixar a página mais leve.
+          O aviso fica no topo para aparecer logo. O som usa <strong>static/escala.mp3</strong> e toca quando surgir alerta novo com a aba aberta.
         </small>
       </div>
       <div class="d-flex gap-2 align-items-center flex-wrap">
@@ -3911,7 +3845,9 @@
       </div>
     </div>
 
-<!-- áudio de escala desativado para desempenho -->
+    <audio id="audioAlertaEscala" preload="auto">
+      <source src="{{ url_for('static', filename='escala.mp3') }}" type="audio/mpeg">
+    </audio>
 
     <div id="escalaAlertasWrap"
          data-initial='{{ escala_alertas_1h|default([])|tojson|safe }}'
@@ -5747,18 +5683,15 @@
         execScripts(firstEl);
 
         if (window.history && window.history.replaceState){
-          const cleanParams = new URLSearchParams(params);
-          cleanParams.delete('ajax_partial');
-          cleanParams.delete('ajax');
-          const cleanUrl = `${window.location.pathname}?${cleanParams.toString()}`;
+          const viewParams = new URLSearchParams(params);
+          viewParams.delete('ajax_partial');
+          viewParams.delete('ajax');
+          const cleanUrl = `${window.location.pathname}?${viewParams.toString()}`;
           window.history.replaceState({}, '', cleanUrl);
         }
         initAjaxFilters();
       }catch(err){
-        const cleanParams = new URLSearchParams(params);
-        cleanParams.delete('ajax_partial');
-        cleanParams.delete('ajax');
-        const fallbackUrl = `${baseAction}?${cleanParams.toString()}`;
+        const fallbackUrl = `${baseAction}?${params.toString()}`;
         window.location.href = fallbackUrl;
       }
     }
@@ -5830,6 +5763,7 @@
     tds[7].textContent = brMoney(inss);
     tds[8].textContent = brMoney(sest);
     tds[9].textContent = brMoney(liq);
+    if (ehAd) tds[5].innerHTML = '<span class="badge bg-success">Aprovado</span>'; else tds[5].textContent = '—';
     const editBtn = row.querySelector('[data-bs-target="#modalEditLancamento"]');
     if (editBtn){
       editBtn.dataset.restaurante = restaurante?.value || '';
@@ -6921,21 +6855,6 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
-
-<script id="coopex-url-tabs-fast">
-document.addEventListener('DOMContentLoaded', function(){
-  document.querySelectorAll('a[data-bs-toggle="tab"][data-bs-target]').forEach(function(a){
-    const target = (a.getAttribute('data-bs-target') || '').replace('#','').trim();
-    if (!target) return;
-    a.removeAttribute('data-bs-toggle');
-    a.setAttribute('href', '/admin?tab=' + encodeURIComponent(target));
-    a.addEventListener('click', function(ev){
-      ev.preventDefault();
-      window.location.href = this.getAttribute('href');
-    });
-  });
-});
-</script>
 </body>
 </html>
 
