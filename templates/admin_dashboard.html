@@ -408,7 +408,7 @@
 {% set compat     = compat if compat is defined else [] %}
 {% set avaliacoes = avaliacoes if avaliacoes is defined else [] %}
 {% set _flt       = _flt if _flt is defined else namespace(restaurante_id=None, cooperado_id=None, data_inicio='', data_fim='') %}
-{% set _tab       = (tab if tab is defined else request.args.get('tab','resumo')) %}
+{% set _tab       = (tab if tab is defined else request.args.get('tab','lancamentos')) %}
 
 {% set _perms = admin_perms if admin_perms is defined else {} %}
 {% set can_lanc_ver = admin_is_master or _perms.get('lancamentos', {}).get('ver', False) %}
@@ -472,7 +472,12 @@
       <!-- Resumo (TAB, igual antes) -->
       {% if can_lanc_ver or can_receitas_ver or can_despesas_ver or can_coop_receitas_ver or can_coop_despesas_ver or can_beneficios_ver %}
       <a class="nav-link-main {{ 'active' if _tab=='resumo' else '' }}"
-         href="{{ url_for('admin_dashboard', tab='resumo') }}">
+         data-bs-toggle="tab"
+         data-bs-target="#resumo"
+         href="#resumo"
+         role="tab"
+         aria-controls="resumo"
+         aria-selected="{{ 'true' if _tab=='resumo' else 'false' }}">
         <div class="nav-link-left">
           <span class="nav-link-icon"><i class="bi bi-graph-up"></i></span>
           <span class="nav-link-label">Resumo</span>
@@ -509,42 +514,72 @@
       <div id="menuFinanceiro" class="collapse show nav-sublinks">
         <!-- Lançamentos (tab) -->
         {% if can_lanc_ver %}<a class="nav-sublink {{ 'active' if _tab=='lancamentos' else '' }}"
-           href="{{ url_for('admin_dashboard', tab='lancamentos') }}">
+           data-bs-toggle="tab"
+           data-bs-target="#lancamentos"
+           href="#lancamentos"
+           role="tab"
+           aria-controls="lancamentos"
+           aria-selected="{{ 'true' if _tab=='lancamentos' else 'false' }}">
           <i class="bi bi-journal-text"></i>
           <span class="nav-link-label">Lançamentos</span>
         </a>{% endif %}
 
         <!-- Receitas Coop (tab) -->
         {% if can_receitas_ver %}<a class="nav-sublink {{ 'active' if _tab=='receitas' else '' }}"
-           href="{{ url_for('admin_dashboard', tab='receitas') }}">
+           data-bs-toggle="tab"
+           data-bs-target="#receitas"
+           href="#receitas"
+           role="tab"
+           aria-controls="receitas"
+           aria-selected="{{ 'true' if _tab=='receitas' else 'false' }}">
           <i class="bi bi-credit-card"></i>
           <span class="nav-link-label">Receitas Coop</span>
         </a>{% endif %}
 
         <!-- Despesas Coop (tab) -->
         {% if can_despesas_ver %}<a class="nav-sublink {{ 'active' if _tab=='despesas' else '' }}"
-           href="{{ url_for('admin_dashboard', tab='despesas') }}">
+           data-bs-toggle="tab"
+           data-bs-target="#despesas"
+           href="#despesas"
+           role="tab"
+           aria-controls="despesas"
+           aria-selected="{{ 'true' if _tab=='despesas' else 'false' }}">
           <i class="bi bi-cart-dash"></i>
           <span class="nav-link-label">Despesas Coop</span>
         </a>{% endif %}
 
         <!-- Receitas Cooperados (tab) -->
         {% if can_coop_receitas_ver %}<a class="nav-sublink {{ 'active' if _tab=='coop_receitas' else '' }}"
-           href="{{ url_for('admin_dashboard', tab='coop_receitas') }}">
+           data-bs-toggle="tab"
+           data-bs-target="#coop_receitas"
+           href="#coop_receitas"
+           role="tab"
+           aria-controls="coop_receitas"
+           aria-selected="{{ 'true' if _tab=='coop_receitas' else 'false' }}">
           <i class="bi bi-wallet2"></i>
           <span class="nav-link-label">Receitas Cooperados</span>
         </a>{% endif %}
 
         <!-- Despesas Cooperados (tab) -->
         {% if can_coop_despesas_ver %}<a class="nav-sublink {{ 'active' if _tab=='coop_despesas' else '' }}"
-           href="{{ url_for('admin_dashboard', tab='coop_despesas') }}">
+           data-bs-toggle="tab"
+           data-bs-target="#coop_despesas"
+           href="#coop_despesas"
+           role="tab"
+           aria-controls="coop_despesas"
+           aria-selected="{{ 'true' if _tab=='coop_despesas' else 'false' }}">
           <i class="bi bi-bag-dash"></i>
           <span class="nav-link-label">Despesas Cooperados</span>
         </a>{% endif %}
 
         <!-- Benefícios (tab) -->
         {% if can_beneficios_ver %}<a class="nav-sublink {{ 'active' if _tab=='beneficios' else '' }}"
-           href="{{ url_for('admin_dashboard', tab='beneficios') }}">
+           data-bs-toggle="tab"
+           data-bs-target="#beneficios"
+           href="#beneficios"
+           role="tab"
+           aria-controls="beneficios"
+           aria-selected="{{ 'true' if _tab=='beneficios' else 'false' }}">
           <i class="bi bi-heart-pulse"></i>
           <span class="nav-link-label">Benefícios</span>
         </a>{% endif %}
@@ -566,14 +601,24 @@
       <div id="menuCadastros" class="collapse show nav-sublinks">
         <!-- Cooperados (tab) -->
         {% if can_cooperados_ver %}<a class="nav-sublink {{ 'active' if _tab=='cooperados' else '' }}"
-           href="{{ url_for('admin_dashboard', tab='cooperados') }}">
+           data-bs-toggle="tab"
+           data-bs-target="#cooperados"
+           href="#cooperados"
+           role="tab"
+           aria-controls="cooperados"
+           aria-selected="{{ 'true' if _tab=='cooperados' else 'false' }}">
           <i class="bi bi-person-badge"></i>
           <span class="nav-link-label">Cooperados</span>
         </a>{% endif %}
 
         <!-- Estabelecimentos (tab) -->
         {% if can_restaurantes_ver %}<a class="nav-sublink {{ 'active' if _tab=='restaurantes' else '' }}"
-           href="{{ url_for('admin_dashboard', tab='restaurantes') }}">
+           data-bs-toggle="tab"
+           data-bs-target="#restaurantes"
+           href="#restaurantes"
+           role="tab"
+           aria-controls="restaurantes"
+           aria-selected="{{ 'true' if _tab=='restaurantes' else 'false' }}">
           <i class="bi bi-shop-window"></i>
           <span class="nav-link-label">Estabelecimentos</span>
         </a>{% endif %}
@@ -609,7 +654,12 @@
       <div id="menuOperacao" class="collapse show nav-sublinks">
         <!-- Escalas (tab) -->
         {% if can_escalas_ver %}<a class="nav-sublink {{ 'active' if _tab=='escalas' else '' }}"
-           href="{{ url_for('admin_dashboard', tab='escalas') }}">
+           data-bs-toggle="tab"
+           data-bs-target="#escalas"
+           href="#escalas"
+           role="tab"
+           aria-controls="escalas"
+           aria-selected="{{ 'true' if _tab=='escalas' else 'false' }}">
           <i class="bi bi-calendar-week"></i>
           <span class="nav-link-label">Escalas</span>
         </a>{% endif %}
@@ -627,7 +677,12 @@
       <!-- Config (TAB) e Sair (rota) ---------------------------------------->
       <div class="sidebar-footer">
         {% if can_sistemas_ver %}<a class="nav-link-main {{ 'active' if _tab=='sistemas' else '' }}"
-           href="{{ url_for('admin_dashboard', tab='sistemas') }}">
+           data-bs-toggle="tab"
+           data-bs-target="#sistemas"
+           href="#sistemas"
+           role="tab"
+           aria-controls="sistemas"
+           aria-selected="{{ 'true' if _tab=='sistemas' else 'false' }}">
           <div class="nav-link-left">
             <span class="nav-link-icon"><i class="bi bi-diagram-3"></i></span>
             <span class="nav-link-label">Sistemas</span>
@@ -635,7 +690,12 @@
         </a>{% endif %}
 
         {% if can_config_ver %}<a class="nav-link-main {{ 'active' if _tab=='config' else '' }}"
-           href="{{ url_for('admin_dashboard', tab='config') }}">
+           data-bs-toggle="tab"
+           data-bs-target="#config"
+           href="#config"
+           role="tab"
+           aria-controls="config"
+           aria-selected="{{ 'true' if _tab=='config' else 'false' }}">
           <div class="nav-link-left">
             <span class="nav-link-icon"><i class="bi bi-gear"></i></span>
             <span class="nav-link-label">Configurações</span>
@@ -1346,8 +1406,9 @@
 <!-- LANÇAMENTOS (versão moderna/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='lancamentos' else '' }}" id="lancamentos" role="tabpanel">
   {# ====== TOTAIS DO FILTRO (já vem filtrado do backend) ====== #}
-  {% set soma_valor    = (lancamentos|sum(attribute='valor')) if lancamentos else 0 %}
 <!--AJAX_LANC_START--><div id="lancamentosAjaxWrap">
+  {% set lancamentos = lancamentos if lancamentos is defined else [] %}
+  {% set soma_valor    = (lancamentos|sum(attribute='valor')) if lancamentos else 0 %}
   {% set soma_inss_4   = (soma_valor * 0.04) %}
   {% set soma_sest_05  = (soma_valor * 0.005) %}
   {% set soma_liq      = (soma_valor - soma_inss_4 - soma_sest_05) %}
@@ -5683,10 +5744,10 @@
         execScripts(firstEl);
 
         if (window.history && window.history.replaceState){
-          const viewParams = new URLSearchParams(params);
-          viewParams.delete('ajax_partial');
-          viewParams.delete('ajax');
-          const cleanUrl = `${window.location.pathname}?${viewParams.toString()}`;
+          const cleanParams = new URLSearchParams(params);
+          cleanParams.delete('ajax_partial');
+          cleanParams.delete('ajax');
+          const cleanUrl = `${window.location.pathname}?${cleanParams.toString()}`;
           window.history.replaceState({}, '', cleanUrl);
         }
         initAjaxFilters();
@@ -5703,6 +5764,7 @@
       ['formFiltroCoopReceitas', 'coop_receitas', 'coopReceitasAjaxWrap', 'coop_receitas'],
       ['formFiltroCoopDespesas', 'coop_despesas', 'coopDespesasAjaxWrap', 'coop_despesas'],
       ['formFiltroBeneficios', 'beneficios', 'beneficiosAjaxWrap', 'beneficios'],
+      ['formFiltroResumo', 'resumo', 'resumo', 'resumo'],
     ];
 
     bindings.forEach(([formId, partial, wrapId, tabName]) => {
@@ -5715,7 +5777,7 @@
       });
     });
 
-    ['formFiltroResumo'].forEach((formId) => {
+    [].forEach((formId) => {
       const form = document.getElementById(formId);
       if (!form || form.dataset.normalBound) return;
       form.dataset.normalBound = '1';
@@ -6853,6 +6915,160 @@ document.addEventListener('DOMContentLoaded', function () {
 
   syncUrlWithTab(getActiveTabName());
 });
+</script>
+
+
+<script>
+(function(){
+  const partialMap = {
+    resumo: {partial:'resumo', wrap:'resumo', section:true},
+    lancamentos: {partial:'lancamentos', wrap:'lancamentosAjaxWrap'},
+    receitas: {partial:'receitas', wrap:'receitasAjaxWrap'},
+    despesas: {partial:'despesas', wrap:'despesasAjaxWrap'},
+    coop_receitas: {partial:'coop_receitas', wrap:'coopReceitasAjaxWrap'},
+    coop_despesas: {partial:'coop_despesas', wrap:'coopDespesasAjaxWrap'},
+    beneficios: {partial:'beneficios', wrap:'beneficiosAjaxWrap'}
+  };
+  const cache = new Map();
+  const inflight = new Map();
+
+  function baseParams(tab){
+    const params = new URLSearchParams(window.location.search || '');
+    params.delete('ajax_partial');
+    params.delete('ajax');
+    params.set('tab', tab);
+    return params;
+  }
+
+  function cacheKey(tab){
+    const p = baseParams(tab);
+    p.delete('tab');
+    return tab + '::' + p.toString();
+  }
+
+  function execScripts(root){
+    if (!root) return;
+    root.querySelectorAll('script').forEach(old => {
+      const ns = document.createElement('script');
+      if (old.src) ns.src = old.src;
+      if (old.type) ns.type = old.type;
+      ns.textContent = old.textContent || '';
+      old.replaceWith(ns);
+    });
+  }
+
+  function installPartial(tab, html){
+    const cfg = partialMap[tab];
+    if (!cfg || !html || !html.trim()) return false;
+    const holder = document.createElement('div');
+    holder.innerHTML = html.trim();
+    let incoming;
+    if (cfg.section) {
+      incoming = holder.querySelector('#' + cfg.wrap) || holder.firstElementChild;
+      const current = document.getElementById(cfg.wrap);
+      if (!incoming || !current) return false;
+      const active = current.classList.contains('active') || current.classList.contains('show');
+      if (active) incoming.classList.add('show','active');
+      current.replaceWith(incoming);
+      execScripts(incoming);
+      return true;
+    }
+    incoming = holder.querySelector('#' + cfg.wrap) || holder.firstElementChild;
+    const current = document.getElementById(cfg.wrap);
+    if (!incoming || !current) return false;
+    current.replaceWith(incoming);
+    execScripts(incoming);
+    return true;
+  }
+
+  async function fetchPartial(tab, priority){
+    const cfg = partialMap[tab];
+    if (!cfg) return null;
+    const key = cacheKey(tab);
+    if (cache.has(key)) return cache.get(key);
+    if (inflight.has(key)) return inflight.get(key);
+    const params = baseParams(tab);
+    params.set('ajax_partial', cfg.partial);
+    const url = window.location.pathname + '?' + params.toString();
+    const promise = fetch(url, {headers:{'X-Requested-With':'XMLHttpRequest'}, credentials:'same-origin'})
+      .then(r => r.ok ? r.text() : Promise.reject(new Error('Falha ao carregar ' + tab)))
+      .then(html => {
+        cache.set(key, html);
+        inflight.delete(key);
+        installPartial(tab, html);
+        return html;
+      })
+      .catch(err => { inflight.delete(key); if(priority) console.warn(err); return null; });
+    inflight.set(key, promise);
+    return promise;
+  }
+
+  function setUrlTab(tab){
+    if (!window.history || !window.history.replaceState) return;
+    const params = new URLSearchParams(window.location.search || '');
+    params.delete('ajax_partial');
+    params.delete('ajax');
+    params.set('tab', tab);
+    window.history.replaceState({}, '', window.location.pathname + '?' + params.toString());
+  }
+
+  function showTab(tab){
+    const link = document.querySelector(`[data-bs-target="#${tab}"]`);
+    if (link && window.bootstrap) {
+      bootstrap.Tab.getOrCreateInstance(link).show();
+    } else {
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('show','active'));
+      const pane = document.getElementById(tab);
+      if (pane) pane.classList.add('show','active');
+    }
+    setUrlTab(tab);
+  }
+
+  function bindTabs(){
+    Object.keys(partialMap).forEach(tab => {
+      document.querySelectorAll(`[data-bs-target="#${tab}"]`).forEach(a => {
+        if (a.dataset.coopexTabCacheBound) return;
+        a.dataset.coopexTabCacheBound = '1';
+        a.addEventListener('click', function(ev){
+          ev.preventDefault();
+          const key = cacheKey(tab);
+          if (cache.has(key)) installPartial(tab, cache.get(key));
+          showTab(tab);
+          if (!cache.has(key)) {
+            const pane = document.getElementById(tab);
+            if (pane && tab === 'resumo' && !pane.dataset.loadingPainted) {
+              pane.dataset.loadingPainted = '1';
+              const shell = pane.querySelector('.resumo-shell') || pane;
+              shell.insertAdjacentHTML('afterbegin', '<div class="alert alert-info py-2 mb-2" id="resumoLoadingBg"><i class="bi bi-hourglass-split"></i> Carregando resumo em segundo plano...</div>');
+            }
+            fetchPartial(tab, true).then(() => {
+              const msg = document.getElementById('resumoLoadingBg');
+              if (msg) msg.remove();
+              showTab(tab);
+              if (typeof initAjaxFilters === 'function') initAjaxFilters();
+            });
+          }
+        }, true);
+      });
+    });
+  }
+
+  async function warmQueue(){
+    const current = new URLSearchParams(window.location.search || '').get('tab') || 'lancamentos';
+    const order = ['resumo','lancamentos','coop_despesas','receitas','despesas','coop_receitas','beneficios'].filter(t => t !== current);
+    await new Promise(r => setTimeout(r, 1200));
+    for (const tab of order){
+      await fetchPartial(tab, false);
+      await new Promise(r => setTimeout(r, 700));
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    bindTabs();
+    warmQueue();
+  });
+  window.CoopexTabCache = {cache, fetchPartial, installPartial};
+})();
 </script>
 
 </body>
