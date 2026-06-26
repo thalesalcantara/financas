@@ -408,7 +408,7 @@
 {% set compat     = compat if compat is defined else [] %}
 {% set avaliacoes = avaliacoes if avaliacoes is defined else [] %}
 {% set _flt       = _flt if _flt is defined else namespace(restaurante_id=None, cooperado_id=None, data_inicio='', data_fim='') %}
-{% set _tab       = (tab if tab is defined else request.args.get('tab','resumo')) %}
+{% set _tab       = (tab if tab is defined else request.args.get('tab','lancamentos')) %}
 
 {% set _perms = admin_perms if admin_perms is defined else {} %}
 {% set can_lanc_ver = admin_is_master or _perms.get('lancamentos', {}).get('ver', False) %}
@@ -964,7 +964,7 @@
 
         <!-- KPIs -->
         <div class="row g-2 resumo-kpi-row">
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="col-12 col-sm-6 col-lg-4">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-prod"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -979,7 +979,7 @@
           </div>
 
           <!-- INSS 4% -->
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="col-12 col-sm-6 col-lg-4">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-inss"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -994,7 +994,7 @@
           </div>
 
           <!-- SEST/SENAT 0,5% -->
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="col-12 col-sm-6 col-lg-4">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-sest"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1008,7 +1008,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="col-12 col-sm-6 col-lg-4">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-rec-coop"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1022,7 +1022,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="col-12 col-sm-6 col-lg-4">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-desp-coop"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1036,7 +1036,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="col-12 col-sm-6 col-lg-4">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-rec-coop2"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1050,7 +1050,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="col-12 col-sm-6 col-lg-4">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-desp-coop2"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1064,7 +1064,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="col-12 col-sm-6 col-lg-4">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-res-coop"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1082,7 +1082,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="col-12 col-sm-6 col-lg-4">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-total-rec"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1096,7 +1096,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="col-12 col-sm-6 col-lg-4">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-entregas-periodo"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1110,7 +1110,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="col-12 col-sm-6 col-lg-4">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-ticket-periodo"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1124,7 +1124,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-sm-6 col-lg-3">
+          <div class="col-12 col-sm-6 col-lg-4">
             <div class="card border-0 shadow-sm rounded-4 h-100 p-3 kpi-card">
               <div class="kpi-border kpi-benef-rateados"></div>
               <div class="d-flex align-items-center justify-content-between">
@@ -1406,12 +1406,18 @@
 <!-- LANÇAMENTOS (versão moderna/compacta – drop-in) -->
 <section class="tab-pane fade {{ 'show active' if _tab=='lancamentos' else '' }}" id="lancamentos" role="tabpanel">
   {# ====== TOTAIS DO FILTRO (já vem filtrado do backend) ====== #}
-  {% set soma_valor    = (lancamentos|sum(attribute='valor')) if lancamentos else 0 %}
 <!--AJAX_LANC_START--><div id="lancamentosAjaxWrap">
-  {% set soma_inss_4   = (soma_valor * 0.04) %}
-  {% set soma_sest_05  = (soma_valor * 0.005) %}
-  {% set soma_liq      = (soma_valor - soma_inss_4 - soma_sest_05) %}
-  {% set soma_qtd      = (lancamentos | map(attribute='qtd_entregas') | select('number') | sum) if lancamentos else 0 %}
+  {% set lancamentos = lancamentos if lancamentos is defined else [] %}
+  {% set ns_lanc = namespace(total=0, qtd=0) %}
+  {% for l in lancamentos %}
+    {% set ns_lanc.total = ns_lanc.total + (l.valor|default(0, true)|float) %}
+    {% set ns_lanc.qtd = ns_lanc.qtd + (l.qtd_entregas|default(0, true)|int) %}
+  {% endfor %}
+  {% set soma_valor   = ns_lanc.total %}
+  {% set soma_inss_4  = soma_valor * 0.04 %}
+  {% set soma_sest_05 = soma_valor * 0.005 %}
+  {% set soma_liq     = soma_valor - soma_inss_4 - soma_sest_05 %}
+  {% set soma_qtd     = ns_lanc.qtd %}
 
   <!-- Header + KPIs -->
   <div class="card lanc-card-header mb-3">
@@ -3236,7 +3242,7 @@
           <label class="form-label">Foto (opcional)</label>
           <input type="file" class="form-control form-control-sm" name="foto" id="coopFoto" accept="image/*">
           <div class="d-flex align-items-center gap-2 mt-2">
-            <img id="coopPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt="" style="width:40px;height:40px;object-fit:cover;">
+            <img loading="lazy" id="coopPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt="" style="width:40px;height:40px;object-fit:cover;">
             <small class="text-muted">Prévia</small>
           </div>
         </div>
@@ -3282,7 +3288,7 @@
                   data-user="{{ coop.usuario_ref.usuario|lower }}"
                   data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','')|lower }}">
                 <td class="text-center">
-                  <img src="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
+                  <img src="{{ (coop.foto_url if _tab=='cooperados' else None) or url_for('static', filename='img/default.png') }}" loading="lazy"
                        class="avatar border" alt="{{ coop.nome }}"
                        style="width:40px;height:40px;object-fit:cover;">
                 </td>
@@ -3566,7 +3572,7 @@
               <label class="form-label">Foto (opcional)</label>
               <input type="file" class="form-control form-control-sm" name="foto" accept="image/*">
               <div class="d-flex align-items-center gap-2 mt-2">
-                <img id="editCoopPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt="" style="width:40px;height:40px;object-fit:cover;">
+                <img loading="lazy" id="editCoopPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt="" style="width:40px;height:40px;object-fit:cover;">
                 <small class="text-muted">Prévia</small>
               </div>
             </div>
@@ -3687,7 +3693,7 @@
           <label class="form-label">Logo (opcional)</label>
           <input type="file" class="form-control form-control-sm" name="foto" id="restFoto" accept="image/*">
           <div class="d-flex align-items-center gap-2 mt-2">
-            <img id="restPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt=""
+            <img loading="lazy" id="restPreview" class="avatar border" src="{{ url_for('static', filename='img/default.png') }}" alt=""
                  style="width:40px;height:40px;object-fit:cover;">
             <small class="text-muted">Prévia</small>
           </div>
@@ -3735,7 +3741,7 @@
             {% for r in restaurantes %}
               <tr data-nome="{{ r.nome|lower }}" data-user="{{ r.usuario_ref.usuario|lower }}" data-periodo="{{ r.periodo|lower }}" data-tipo="{{ 'farmacia' if r.eh_farmacia else 'estabelecimento' }}">
                 <td class="text-center">
-                  <img src="{{ r.foto_url or url_for('static', filename='img/default.png') }}"
+                  <img src="{{ (r.foto_url if _tab=='restaurantes' else None) or url_for('static', filename='img/default.png') }}" loading="lazy"
                        class="avatar border" alt="{{ r.nome }}"
                        style="width:40px;height:40px;object-fit:cover;">
                 </td>
@@ -3896,7 +3902,7 @@
       <div>
         <h6 class="mb-1 section-title">Aviso de contratos sem cooperado</h6>
         <small class="section-subtitle">
-          O aviso fica no topo para aparecer logo. O som usa <strong>static/escala.mp3</strong> e toca quando surgir alerta novo com a aba aberta.
+          O aviso fica no topo para aparecer logo. Aviso visual no topo, sem áudio para deixar a página mais leve.
         </small>
       </div>
       <div class="d-flex gap-2 align-items-center flex-wrap">
@@ -3905,9 +3911,7 @@
       </div>
     </div>
 
-    <audio id="audioAlertaEscala" preload="auto">
-      <source src="{{ url_for('static', filename='escala.mp3') }}" type="audio/mpeg">
-    </audio>
+<!-- áudio de escala desativado para desempenho -->
 
     <div id="escalaAlertasWrap"
          data-initial='{{ escala_alertas_1h|default([])|tojson|safe }}'
@@ -5743,12 +5747,18 @@
         execScripts(firstEl);
 
         if (window.history && window.history.replaceState){
-          const cleanUrl = `${window.location.pathname}?${params.toString()}`;
+          const cleanParams = new URLSearchParams(params);
+          cleanParams.delete('ajax_partial');
+          cleanParams.delete('ajax');
+          const cleanUrl = `${window.location.pathname}?${cleanParams.toString()}`;
           window.history.replaceState({}, '', cleanUrl);
         }
         initAjaxFilters();
       }catch(err){
-        const fallbackUrl = `${baseAction}?${params.toString()}`;
+        const cleanParams = new URLSearchParams(params);
+        cleanParams.delete('ajax_partial');
+        cleanParams.delete('ajax');
+        const fallbackUrl = `${baseAction}?${cleanParams.toString()}`;
         window.location.href = fallbackUrl;
       }
     }
@@ -5820,7 +5830,6 @@
     tds[7].textContent = brMoney(inss);
     tds[8].textContent = brMoney(sest);
     tds[9].textContent = brMoney(liq);
-    if (ehAd) tds[5].innerHTML = '<span class="badge bg-success">Aprovado</span>'; else tds[5].textContent = '—';
     const editBtn = row.querySelector('[data-bs-target="#modalEditLancamento"]');
     if (editBtn){
       editBtn.dataset.restaurante = restaurante?.value || '';
@@ -6912,6 +6921,21 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+
+<script id="coopex-url-tabs-fast">
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('a[data-bs-toggle="tab"][data-bs-target]').forEach(function(a){
+    const target = (a.getAttribute('data-bs-target') || '').replace('#','').trim();
+    if (!target) return;
+    a.removeAttribute('data-bs-toggle');
+    a.setAttribute('href', '/admin?tab=' + encodeURIComponent(target));
+    a.addEventListener('click', function(ev){
+      ev.preventDefault();
+      window.location.href = this.getAttribute('href');
+    });
+  });
+});
+</script>
 </body>
 </html>
 
