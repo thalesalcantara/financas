@@ -300,7 +300,7 @@
 
 <div id="menuLateral" class="menu-drawer" aria-label="Menu lateral">
   <div class="menu-head">
-    <img loading="lazy" class="menu-avatar" src="{{ cooperado.foto_url or url_for('static', filename='img/default.png') }}" alt="Foto">
+    <img class="menu-avatar" src="{{ cooperado.foto_url or url_for('static', filename='img/default.png') }}" alt="Foto">
     <div class="flex-grow-1 min-w-0">
       <div class="menu-title">{{ cooperado.nome if cooperado and cooperado.nome else 'Cooperado' }}</div>
       <div class="menu-sub">Painel Coopex</div>
@@ -320,7 +320,7 @@
     <div class="topbar-inner">
       <div class="top-row">
         <button class="avatar-btn" id="abrirMenu" title="Abrir menu" aria-label="Abrir menu">
-          <img loading="lazy" src="{{ cooperado.foto_url or url_for('static', filename='img/default.png') }}" alt="Avatar">
+          <img src="{{ cooperado.foto_url or url_for('static', filename='img/default.png') }}" alt="Avatar">
         </button>
         <div class="brand-block">
           <div class="brand-kicker">coopex</div>
