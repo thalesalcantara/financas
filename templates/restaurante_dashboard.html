@@ -1739,7 +1739,7 @@
             <div class="lancar-layout-card" id="blocoLancamento">
               <div class="card-body">
                 <div class="selected-header text-center mb-3" id="selectedHeader" style="display:none;">
-                  <img id="selFoto" src="" class="big mb-2" alt="Foto do cooperado selecionado">
+                  <img loading="lazy" id="selFoto" src="" class="big mb-2" alt="Foto do cooperado selecionado">
 
                   <div class="fw-bold fs-5 d-flex justify-content-center align-items-center gap-2 flex-wrap">
                     <span id="selNome"></span>
@@ -1996,7 +1996,7 @@
         </div>
       </div>
 
-      <audio id="audioAvisos" preload="auto" src="{{ url_for('static', filename='avisos.mp3') }}"></audio>
+      <audio id="audioAvisos" preload="none" src="{{ url_for('static', filename='avisos.mp3') }}"></audio>
     </main>
   </div>
 
