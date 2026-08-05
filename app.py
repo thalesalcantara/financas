@@ -142,6 +142,23 @@ max_overflow = int(os.environ.get("DB_MAX_OVERFLOW", str(default_max_overflow)))
 pool_recycle = int(os.environ.get("SQL_POOL_RECYCLE", "240"))  # 4 min < timeout de idle do provider
 pool_timeout = int(os.environ.get("SQL_POOL_TIMEOUT", "20"))   # espera máx. por conexão do pool (s)
 
+engine_options = {
+    "pool_pre_ping": True,
+    "pool_recycle": pool_recycle,
+}
+if not URI.startswith("sqlite"):
+    engine_options.update({
+        "poolclass": QueuePool,
+        "pool_size": pool_size,
+        "max_overflow": max_overflow,
+        "pool_timeout": pool_timeout,
+        "pool_use_lifo": True,
+        "connect_args": {
+            "connect_timeout": int(os.getenv("PGCONNECT_TIMEOUT", "5")),
+            "options": "-c statement_timeout=15000",
+        },
+    })
+
 app.config.update(
     SQLALCHEMY_DATABASE_URI=URI,
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
@@ -152,21 +169,7 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.environ.get("FLASK_SECURE_COOKIES", "1") == "1",
     PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
-    SQLALCHEMY_ENGINE_OPTIONS={
-        "poolclass": QueuePool,
-        "pool_size": pool_size,
-        "max_overflow": max_overflow,
-        "pool_timeout": pool_timeout,
-        "pool_pre_ping": True,       # testa conexão antes de usar (evita usar conn morta)
-        "pool_use_lifo": True,       # reduz churn de conexões sob carga
-        "pool_recycle": pool_recycle,  # recicla sockets ociosos (evita timeout de idle / TLS)
-        "connect_args": {
-            # tempo máx. para abrir conexão
-            "connect_timeout": int(os.getenv("PGCONNECT_TIMEOUT", "5")),
-            # tempo máx. por statement no servidor (defensivo)
-            "options": "-c statement_timeout=15000",
-        },
-    },
+    SQLALCHEMY_ENGINE_OPTIONS=engine_options,
 )
 
 db = SQLAlchemy(app)
@@ -9469,8 +9472,14 @@ def portal_cooperado():
 
     # ---------- ESCALA (dedupe + ordenação cronológica robusta) ----------
     raw_escala = (
-        Escala.query.filter_by(cooperado_id=coop.id)
+        Escala.query.filter(
+            or_(
+                Escala.cooperado_id == coop.id,
+                func.lower(func.trim(Escala.cooperado_nome)) == (coop.nome or "").strip().lower(),
+            )
+        )
         .order_by(Escala.id.asc())
+        .limit(100)
         .all()
     )
 

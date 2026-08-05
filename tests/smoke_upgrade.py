@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 DB_PATH = Path("/tmp/coopex_upgrade_test.db")
@@ -30,6 +30,7 @@ def login(client, user_id: int, role: str) -> None:
 with app.app_context():
     db.drop_all()
     db.create_all()
+    production_date = date.today() - timedelta(days=1)
 
     admin_user = legacy.Usuario(
         usuario="admin-upgrade",
@@ -69,7 +70,7 @@ with app.app_context():
     escala = legacy.Escala(
         cooperado_id=coop.id,
         restaurante_id=rest.id,
-        data=date.today().isoformat(),
+        data=production_date.isoformat(),
         turno="Manhã",
         horario="08:00 às 09:00",
         contrato=rest.nome,
@@ -93,10 +94,13 @@ assert health.status_code == 200
 assert health.get_json()["ok"] is True
 
 login(client, ids["coop_user"], "cooperado")
+agenda = client.get("/coop/agenda")
+assert agenda.status_code == 200
+assert b"Estabelecimento Teste" in agenda.data
 payload = {
     "escala_id": str(ids["escala"]),
     "restaurante_id": str(ids["rest"]),
-    "data": date.today().isoformat(),
+    "data": production_date.isoformat(),
     "hora_inicio": "08:00",
     "hora_fim": "09:00",
     "qtd_entregas": "10",

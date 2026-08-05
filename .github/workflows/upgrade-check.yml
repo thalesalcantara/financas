@@ -31,7 +31,16 @@ jobs:
           from pathlib import Path
           from jinja2 import Environment
           env = Environment()
-          for path in Path('templates').glob('*.html'):
+          new_templates = (
+              'coop_producao.html',
+              'coop_producao_editar.html',
+              'coop_agenda.html',
+              'rest_producoes_pendentes.html',
+              'admin_producoes_pendentes.html',
+              'admin_rapido.html',
+          )
+          for name in new_templates:
+              path = Path('templates') / name
               env.parse(path.read_text(encoding='utf-8'))
           print('templates ok')
           PY

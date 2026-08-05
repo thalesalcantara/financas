@@ -121,16 +121,13 @@ class ProducaoCooperadoHistorico(db.Model):
 
 def _install_schema() -> None:
     with app.app_context():
-        db.create_all()
+        # Cria exclusivamente as tabelas desta melhoria. checkfirst torna a
+        # operação idempotente e evita percorrer/mexer no esquema legado.
+        engine = db.engine
+        ProducaoCooperado.__table__.create(bind=engine, checkfirst=True)
+        ProducaoCooperadoHistorico.__table__.create(bind=engine, checkfirst=True)
         schema = "" if legacy._is_sqlite() else "public."
         statements = (
-            f"CREATE INDEX IF NOT EXISTS ix_lanc_rest_data_fast ON {schema}lancamentos (restaurante_id, data)",
-            f"CREATE INDEX IF NOT EXISTS ix_lanc_coop_data_fast ON {schema}lancamentos (cooperado_id, data)",
-            f"CREATE INDEX IF NOT EXISTS ix_lanc_slot_fast ON {schema}lancamentos (restaurante_id, cooperado_id, data, hora_inicio, hora_fim)",
-            f"CREATE INDEX IF NOT EXISTS ix_escala_coop_fast ON {schema}escalas (cooperado_id)",
-            f"CREATE INDEX IF NOT EXISTS ix_escala_rest_fast ON {schema}escalas (restaurante_id)",
-            f"CREATE INDEX IF NOT EXISTS ix_troca_dest_status_fast ON {schema}trocas (destino_id, status)",
-            f"CREATE INDEX IF NOT EXISTS ix_troca_solic_status_fast ON {schema}trocas (solicitante_id, status)",
             f"CREATE INDEX IF NOT EXISTS ix_prod_rest_status_fast ON {schema}producoes_cooperado (restaurante_id, status, data)",
             f"CREATE INDEX IF NOT EXISTS ix_prod_coop_status_fast ON {schema}producoes_cooperado (cooperado_id, status, data)",
         )
@@ -634,9 +631,17 @@ def coop_agenda():
         return denied
     coop = _cooperado_current()
     selected_day = (request.args.get("dia") or "").strip().lower()
+    # Escalas antigas podem ter somente cooperado_nome preenchido (planilha).
+    # Exibir ambos os formatos preserva o legado sem carregar a tabela inteira.
     scales = (
-        Escala.query.filter_by(cooperado_id=coop.id)
+        Escala.query.filter(
+            or_(
+                Escala.cooperado_id == coop.id,
+                func.lower(func.trim(Escala.cooperado_nome)) == (coop.nome or "").strip().lower(),
+            )
+        )
         .order_by(Escala.id.asc())
+        .limit(100)
         .all()
     )
     today = datetime.now(TZ).date()
@@ -1162,6 +1167,7 @@ COOP_FLOATING = r'''
 @media(max-width:520px){#coopexProdDock{left:10px;right:10px;bottom:10px}#coopexProdDock a{flex:1;justify-content:center;padding:13px 10px}}
 </style>
 <div id="coopexProdDock">
+<a class="agenda" href="/documentos"><i class="bi bi-folder2-open"></i> Documentos</a>
 <a class="agenda" href="/coop/agenda"><i class="bi bi-calendar3"></i> Escala</a>
 <a class="prod" href="/coop/producao"><i class="bi bi-plus-circle-fill"></i> Informar produção</a>
 </div>
