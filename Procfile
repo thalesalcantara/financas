@@ -1,2 +1,1 @@
-web: gunicorn app:app --worker-class gthread --workers 1 --threads 8 --timeout 120 --keep-alive 75 --worker-tmp-dir /dev/shm --access-logfile - --log-level info
-
+web: gunicorn enhanced_app:app --worker-class gthread --workers 1 --threads 4 --timeout 120 --keep-alive 30 --worker-tmp-dir /dev/shm --max-requests 700 --max-requests-jitter 70 --access-logfile - --log-level info
