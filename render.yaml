@@ -6,19 +6,20 @@ services:
     autoDeploy: false
     buildCommand: pip install -r requirements.txt
     startCommand: >
-      gunicorn app:app
+      gunicorn enhanced_app:app
       --bind 0.0.0.0:$PORT
-      --workers ${WEB_CONCURRENCY:-1}          # 1 worker para gastar menos RAM
-      --threads 1
+      --worker-class gthread
+      --workers ${WEB_CONCURRENCY:-1}
+      --threads ${GTHREADS:-4}
       --timeout 120
       --graceful-timeout 30
-      --keep-alive 5
-      --max-requests 400                      # recicla mais cedo p/ não acumular memória
-      --max-requests-jitter 50
+      --keep-alive 30
+      --max-requests 700
+      --max-requests-jitter 70
       --access-logfile /dev/null
       --error-logfile -
       --log-level info
-    healthCheckPath: /healthz
+    healthCheckPath: /healthz/upgrade
     envVars:
       - key: TZ
         value: America/Sao_Paulo
@@ -29,7 +30,11 @@ services:
       - key: PYTHONUTF8
         value: "1"
       - key: WEB_CONCURRENCY
-        value: "1"         # força só 1 worker mesmo
+        value: "1"
+      - key: GTHREADS
+        value: "4"
+      - key: DB_TARGET_CONNS
+        value: "20"
       - key: SECRET_KEY
         sync: false
       - key: DATABASE_URL
