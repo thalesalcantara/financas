@@ -1,0 +1,38 @@
+name: COOPEX upgrade check
+
+on:
+  push:
+    branches:
+      - feature/producao-cooperado-admin-rapido
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      FLASK_ENV: development
+      FLASK_SECURE_COOKIES: "0"
+      INIT_DB_ON_START: "0"
+      SECRET_KEY: test-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile Python
+        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py tests/smoke_upgrade.py
+      - name: Validate Jinja templates
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from jinja2 import Environment
+          env = Environment()
+          for path in Path('templates').glob('*.html'):
+              env.parse(path.read_text(encoding='utf-8'))
+          print('templates ok')
+          PY
+      - name: Run production workflow smoke test
+        run: PYTHONPATH=. python tests/smoke_upgrade.py
