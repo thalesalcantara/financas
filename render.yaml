@@ -6,20 +6,19 @@ services:
     autoDeploy: false
     buildCommand: pip install -r requirements.txt
     startCommand: >
-      gunicorn enhanced_app:app
+      gunicorn app:app
       --bind 0.0.0.0:$PORT
-      --worker-class gthread
       --workers ${WEB_CONCURRENCY:-1}
-      --threads ${GTHREADS:-4}
+      --threads 1
       --timeout 120
       --graceful-timeout 30
-      --keep-alive 30
-      --max-requests 700
-      --max-requests-jitter 70
+      --keep-alive 5
+      --max-requests 400
+      --max-requests-jitter 50
       --access-logfile /dev/null
       --error-logfile -
       --log-level info
-    healthCheckPath: /healthz/upgrade
+    healthCheckPath: /healthz
     envVars:
       - key: TZ
         value: America/Sao_Paulo
@@ -31,10 +30,6 @@ services:
         value: "1"
       - key: WEB_CONCURRENCY
         value: "1"
-      - key: GTHREADS
-        value: "4"
-      - key: DB_TARGET_CONNS
-        value: "20"
       - key: SECRET_KEY
         sync: false
       - key: DATABASE_URL
