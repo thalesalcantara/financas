@@ -1,1 +1,1 @@
-web: gunicorn app:app --config gunicorn_conf.py --worker-class gthread --workers 1 --threads 4 --timeout 120 --keep-alive 15 --worker-tmp-dir /dev/shm --access-logfile /dev/null --error-logfile - --log-level info --env INIT_DB_ON_START=0
+web: gunicorn app:app --config gunicorn.conf.py --worker-class gthread --workers 1 --threads 4 --timeout 120 --keep-alive 15 --worker-tmp-dir /dev/shm --access-logfile /dev/null --error-logfile - --log-level info --env INIT_DB_ON_START=0
