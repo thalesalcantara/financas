@@ -6,28 +6,33 @@ services:
     autoDeploy: false
     buildCommand: pip install -r requirements.txt
     startCommand: >
-      gunicorn enhanced_app:app
+      gunicorn app:app
+      --config gunicorn_conf.py
       --bind 0.0.0.0:$PORT
+      --worker-class gthread
       --workers ${WEB_CONCURRENCY:-1}
-      --threads 1
+      --threads 4
       --timeout 120
       --graceful-timeout 30
-      --keep-alive 5
-      --max-requests 400
-      --max-requests-jitter 50
+      --keep-alive 15
+      --max-requests 800
+      --max-requests-jitter 80
       --access-logfile /dev/null
       --error-logfile -
       --log-level info
+      --env INIT_DB_ON_START=0
     healthCheckPath: /healthz
     envVars:
       - key: TZ
-        value: America/Sao_Paulo
+        value: America/Fortaleza
       - key: PYTHON_VERSION
         value: 3.12.5
       - key: FLASK_ENV
         value: production
       - key: PYTHONUTF8
         value: "1"
+      - key: INIT_DB_ON_START
+        value: "0"
       - key: WEB_CONCURRENCY
         value: "1"
       - key: SECRET_KEY
