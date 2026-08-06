@@ -2,338 +2,102 @@
 <html lang="pt-br">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Minhas Tabelas • {{ restaurante.nome or login_nome }}</title>
-
-  <!-- Bootstrap / Icons -->
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Tabelas • {{ (restaurante.nome if restaurante else login_nome)|replace('_',' ') }}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-
   <style>
-    :root{
-      --royal:#2141d9; --royal-2:#3654e6; --royal-3:#eaf0ff;
-      --ink:#0b1220; --muted:#6b7280; --soft:#f5f7ff; --danger:#e74c3c; --ok:#16a34a;
-      --border:#e6e9f2; --chip:#eef1ff; --card:#fff; --bg:#fff; --text:#111827;
-      --aside-grad1: var(--royal); --aside-grad2: var(--royal-2);
-    }
-    /* Dark theme */
-    :root[data-theme="dark"]{
-      --bg:#0b1220; --text:#e5e7eb; --muted:#9aa4b2; --card:#0f172a;
-      --border:#1f2a44; --chip:#132040; --royal:#3b82f6; --royal-2:#2563eb; --royal-3:#0b2447;
-      --aside-grad1:#0b2a6b; --aside-grad2:#143d86;
-    }
-
-    html,body{height:100%}
-    body{margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif}
-
-    /* ===== Layout com o mesmo menu lateral ===== */
-    .shell{display:grid; grid-template-columns:260px 1fr; min-height:100vh}
-    .aside{
-      background:linear-gradient(180deg, var(--aside-grad1) 0%, var(--aside-grad2) 100%);
-      color:#fff; padding:18px 16px; position:sticky; top:0; height:100dvh;
-    }
-    .brand{ font-weight:800; letter-spacing:.5px; font-size:1.15rem; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.08); display:flex; align-items:center; gap:8px; }
-    .theme-toggle{ margin-top:10px; border:1px solid rgba(255,255,255,.25); color:#fff; background:rgba(255,255,255,.06); border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:8px; cursor:pointer; }
-
-    .navmenu{ margin-top:18px; display:flex; flex-direction:column; gap:6px; }
-    .navmenu a{
-      color:#fff; padding:9px 12px; border-radius:10px; display:flex; align-items:center; gap:10px; font-weight:600;
-      position:relative; font-size:.96rem;
-    }
-    .navmenu a span{ text-decoration:underline; }
-    .navmenu a.active, .navmenu a:hover{ background:rgba(255,255,255,.14); }
-
-    /* bolinha de contagem de avisos (igual ao painel) */
-    .badge-dot{
-      min-width:22px; height:22px; line-height:22px; border-radius:999px; padding:0 6px;
-      font-size:.75rem; font-weight:800; display:inline-flex; align-items:center; justify-content:center;
-      background:#dc3545; color:#fff; box-shadow:0 0 0 2px rgba(255,255,255,.25) inset; margin-left:auto;
-    }
-
-    .content{ padding:24px clamp(14px,3vw,32px); }
-    .section-title{ color:var(--royal); font-weight:800; font-size:1.25rem; display:flex; gap:10px; align-items:center; }
-    .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 0 #0000000a; }
-
-    /* Cartão da Tabela */
-    .doc-row{
-      border:1px solid var(--border); border-radius:16px; padding:14px 16px; background:var(--card);
-      box-shadow:0 10px 28px #00000012; transition:transform .08s ease, box-shadow .12s ease; cursor:pointer;
-    }
-    .doc-row:active{transform:scale(.995)}
-    .doc-row:hover{box-shadow:0 12px 32px #00000018}
-    .doc-title{font-weight:800; font-size:1.05rem}
-    .doc-cat{font-size:.75rem; color:var(--royal); text-transform:uppercase; letter-spacing:.08em; font-weight:800}
-    .doc-date{color:var(--muted); font-size:.9rem}
-    .doc-desc{font-size:.95rem; color:var(--text); background:var(--soft); border-radius:10px; padding:.6em .9em}
-    .chip{display:inline-flex; align-items:center; gap:.35rem; padding:.25rem .6rem; border-radius:999px; background:var(--chip); border:1px solid var(--border); font-weight:700; font-size:.8rem}
-
-    .btn-royal{ background:var(--royal); color:#fff; border:none; border-radius:12px; padding:.55rem .8rem; box-shadow:0 8px 16px #2747d933 }
-    .btn-royal:hover{ background:var(--royal-2) }
-
-    .tiny{ color:var(--muted); font-size:.85rem }
-
-    /* Modal fullscreen do leitor */
-    .modal-dialog.modal-fullscreen{margin:0;max-width:100vw;width:100vw;height:100vh}
-    .modal-content{border-radius:0;height:100vh;background:var(--card)}
-    .reader-frame,.reader-img{width:100%;height:82vh;border:0;background:#fff;display:block;margin:0 auto}
-    @media (max-width:520px){ .reader-frame,.reader-img{height:74vh} }
-
-    @media (max-width: 920px){
-      .shell{ grid-template-columns: 66px 1fr; }
-      .brand span{ display:none; }
-      .navmenu a span{ display:none; }
-    }
+    :root{--royal:#064fc8;--royal2:#063b9e;--bg:#f4f7fc;--ink:#07183e;--muted:#61708c;--line:#dbe4f1}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    a{text-decoration:none}.topbar{position:sticky;top:0;z-index:1000;height:72px;background:linear-gradient(90deg,#062b80,#064fc8 58%,#063b9e);color:#fff;display:flex;align-items:stretch;padding:0 18px;box-shadow:0 4px 18px rgba(4,45,126,.2)}
+    .welcome{width:260px;min-width:260px;display:flex;align-items:center;gap:11px;color:#fff}.welcome-icon{width:44px;height:44px;border-radius:10px;border:2px solid rgba(255,255,255,.72);display:grid;place-items:center;font-size:1.15rem;background:rgba(255,255,255,.08)}
+    .welcome-copy{display:flex;flex-direction:column;line-height:1.05;min-width:0}.welcome-copy small{font-size:.62rem;letter-spacing:.08em;color:rgba(255,255,255,.76);font-weight:800}.welcome-copy strong{font-size:.98rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}
+    .nav{display:flex;align-items:stretch;overflow-x:auto;scrollbar-width:none;flex:1}.nav::-webkit-scrollbar{display:none}.nav a{display:flex;align-items:center;justify-content:center;gap:7px;padding:0 15px;color:#fff;font-size:.82rem;font-weight:750;white-space:nowrap;position:relative}.nav a:hover,.nav a.active{background:rgba(255,255,255,.11)}.nav a.active:after{content:"";position:absolute;left:12px;right:12px;bottom:0;height:4px;background:#fff;border-radius:4px 4px 0 0}.badge-dot{min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:#e11d48;color:#fff;display:inline-grid;place-items:center;font-size:.66rem;font-weight:900}
+    main{max-width:1540px;margin:0 auto;padding:18px}.hero{background:#fff;border:1px solid var(--line);border-radius:15px;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;box-shadow:0 4px 15px rgba(15,38,85,.05);margin-bottom:14px}.hero-left{display:flex;align-items:center;gap:14px}.hero-icon{width:58px;height:58px;border-radius:13px;background:linear-gradient(135deg,var(--royal),var(--royal2));color:#fff;display:grid;place-items:center;font-size:1.45rem;box-shadow:0 9px 20px rgba(6,79,200,.22)}.hero h1{font-size:1.35rem;margin:0;font-weight:850}.hero p{margin:4px 0 0;color:var(--muted);font-size:.86rem}
+    .table-card{background:#fff;border:1px solid var(--line);border-radius:15px;box-shadow:0 4px 15px rgba(15,38,85,.045);overflow:hidden}.table-head{padding:15px 17px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}.table-head strong{font-size:1rem}.status-pill{border-radius:999px;padding:6px 10px;background:#edf4ff;color:var(--royal);font-size:.74rem;font-weight:800}
+    .doc{margin:14px;border:1px solid #cfe0fa;border-left:5px solid var(--royal);border-radius:13px;padding:15px;background:linear-gradient(180deg,#fbfdff,#fff);display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}.doc-cat{font-size:.68rem;font-weight:850;letter-spacing:.08em;color:var(--royal)}.doc-title{font-size:1.05rem;font-weight:850;margin-top:3px}.doc-meta{font-size:.78rem;color:var(--muted);margin-top:5px}.doc-desc{margin-top:10px;background:#f5f8fd;border:1px solid #e6edf7;border-radius:10px;padding:9px 11px;font-size:.82rem}.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.chip{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:5px 9px;background:#edf4ff;color:#254a89;font-size:.7rem;font-weight:800}
+    .actions{display:flex;gap:8px}.btn-royal{border:0;background:var(--royal);color:#fff;border-radius:9px;padding:9px 13px;font-weight:800}.btn-royal:hover{background:var(--royal2);color:#fff}.empty{padding:42px 20px;text-align:center;color:var(--muted)}
+    .modal-content{border:0}.reader{width:100%;height:82vh;border:0;background:#fff}.reader-img{width:100%;height:82vh;object-fit:contain;background:#fff}
+    @media(max-width:980px){.topbar{height:auto;min-height:0;flex-wrap:wrap;padding:8px 10px 0}.welcome{width:100%;min-width:0;height:45px}.nav{width:100%;flex:0 0 100%;height:50px}.nav a{padding:0 11px;font-size:.74rem}main{padding:10px}.hero{padding:14px}.doc{grid-template-columns:1fr}.actions{justify-content:flex-start}}
+    @media(max-width:560px){.welcome-copy strong{max-width:230px}.hero-icon{width:48px;height:48px}.hero h1{font-size:1.15rem}.doc{margin:9px;padding:12px}.actions{flex-direction:column}.actions .btn{width:100%}}
   </style>
 </head>
 <body>
-  <div class="shell">
-    <!-- ===== Aside (mesmo do painel) ===== -->
-    <aside class="aside">
-      <div class="brand"><i class="bi bi-building"></i><span>Portal do Estabelecimento</span></div>
-      <button id="btnTheme" class="theme-toggle" type="button"><i class="bi bi-moon"></i><span id="lblTheme">Escuro</span></button>
+  {% set _nome = ((restaurante.nome if restaurante else login_nome)|default('ESTABELECIMENTO'))|replace('_',' ') %}
+  {% set _avisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count)|default(0) %}
+  <header class="topbar">
+    <div class="welcome">
+      <div class="welcome-icon"><i class="bi bi-shop"></i></div>
+      <div class="welcome-copy"><small>SEJA BEM-VINDO</small><strong>{{ _nome }}</strong></div>
+    </div>
+    <nav class="nav">
+      <a href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-plus-circle"></i><span>Lançar Produção</span></a>
+      <a href="{{ url_for('portal_restaurante', view='lancamentos') }}"><i class="bi bi-clock-history"></i><span>Histórico de Produção</span></a>
+      <a href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-calendar3"></i><span>Escala</span></a>
+      <a class="active" href="{{ url_for('rest_tabelas') }}"><i class="bi bi-table"></i><span>Tabelas</span></a>
+      <a href="{{ url_for('portal_restaurante', view='config') }}"><i class="bi bi-gear"></i><span>Configuração</span></a>
+      <a href="{{ url_for('portal_restaurante_avisos') }}"><i class="bi bi-megaphone"></i><span>Avisos</span>{% if _avisos %}<b class="badge-dot">{{ _avisos }}</b>{% endif %}</a>
+      <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
+    </nav>
+  </header>
 
-      <nav class="navmenu" id="sideNav">
-        <a data-target="lancar" class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos','tabelas']) else '' }}" href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-person-lines-fill"></i><span>Cooperados</span></a>
-        <a data-target="lancamentos" class="{{ 'active' if view=='lancamentos' else '' }}" href="{{ url_for('portal_restaurante', view='lancamentos') }}"><i class="bi bi-receipt"></i><span>Lançamentos</span></a>
-        <a data-target="escalas" class="{{ 'active' if view=='escalas' else '' }}" href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-calendar-week"></i><span>Escala</span></a>
+  <main>
+    <section class="hero">
+      <div class="hero-left">
+        <div class="hero-icon"><i class="bi bi-table"></i></div>
+        <div><h1>Minhas Tabelas</h1><p>Consulte e baixe a tabela publicada para o estabelecimento.</p></div>
+      </div>
+      <span class="status-pill"><i class="bi bi-shield-check me-1"></i>Documento oficial</span>
+    </section>
 
-        {% if session.get('user_tipo') == 'restaurante' %}
-        <a id="linkTabelas" data-target="tabelas" class="{{ 'active' if view=='tabelas' else '' }}" href="{{ url_for('rest_tabelas') }}">
-          <i class="bi bi-table"></i><span>Tabelas</span>
-        </a>
-        {% endif %}
-
-        <a data-target="config" class="{{ 'active' if view=='config' else '' }}" href="{{ url_for('portal_restaurante', view='config') }}"><i class="bi bi-gear"></i><span>Configuração</span></a>
-
-        <a id="linkAvisos" data-target="avisos" class="{{ 'active' if view=='avisos' else '' }}" href="{{ url_for('portal_restaurante', view='avisos') }}">
-          <i class="bi bi-megaphone"></i><span>Avisos</span>
-          {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
-          <span class="badge-dot" id="badgeSidebar" {% if _cntAvisos == 0 %}style="display:none"{% endif %}>{{ _cntAvisos }}</span>
-        </a>
-
-        <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
-      </nav>
-    </aside>
-
-    <!-- ===== Main ===== -->
-    <main class="content">
-      <div class="section-title"><i class="bi bi-table"></i> Minhas Tabelas</div>
-
+    <section class="table-card">
+      <div class="table-head"><strong><i class="bi bi-folder2-open me-1"></i>Tabela disponível</strong><span class="status-pill">{{ 1 if tabela else 0 }} arquivo</span></div>
       {% if not tabela %}
-        <div class="card card-body text-center text-muted">
-          <div class="mb-2"><i class="bi bi-inbox"></i></div>
-          Ainda não há tabela publicada para <strong>{{ login_nome }}</strong>.
-        </div>
+      <div class="empty"><i class="bi bi-inbox fs-2 d-block mb-2"></i>Ainda não há tabela publicada para <strong>{{ _nome }}</strong>.</div>
       {% else %}
-        {% set titulo = tabela.titulo or login_nome %}
+        {% set titulo = tabela.titulo or _nome %}
         {% set nome_arquivo = tabela.arquivo_nome or '' %}
         {% set ext = nome_arquivo.split('.')[-1]|lower if '.' in nome_arquivo else '' %}
-
-        <article class="doc-row my-2"
-                 data-title="{{ titulo|lower }}"
-                 data-cat="tabela"
-                 data-desc="{{ (tabela.descricao or '')|lower }}"
-                 data-view="{{ url_for('rest_tabela_abrir', tabela_id=tabela.id) }}"
-                 data-download="{{ url_for('rest_tabela_download', tabela_id=tabela.id) }}"
-                 data-title-full="{{ titulo }}"
-                 data-ext="{{ ext }}">
-          <div class="d-flex justify-content-between align-items-start">
-            <div class="pe-2">
-              <div class="doc-cat">TABELA</div>
-              <div class="doc-title d-flex align-items-center gap-2">
-                <i class="bi bi-journal-text"></i> {{ titulo }}
-              </div>
-              <div class="doc-date">
-                {{ tabela.enviado_em.strftime('%d/%m/%Y %H:%M') if tabela.enviado_em else '' }}
-              </div>
-              {% if tabela.descricao %}
-                <div class="doc-desc mt-2">{{ tabela.descricao }}</div>
-              {% endif %}
-              <div class="mt-2 d-flex flex-wrap gap-2">
-                <span class="chip"><i class="bi bi-file-earmark"></i> {{ nome_arquivo or '—' }}</span>
-                {% if ext %}<span class="chip"><i class="bi bi-tag"></i> {{ ext|upper }}</span>{% endif %}
-              </div>
-            </div>
-            <div class="ms-2 d-flex flex-column gap-2">
-              <button class="btn btn-royal" data-open title="Visualizar">
-                <i class="bi bi-journal-bookmark-fill"></i>
-              </button>
-              <a class="btn btn-outline-secondary btn-sm" data-direct-download
-                 href="{{ url_for('rest_tabela_download', tabela_id=tabela.id) }}" title="Baixar">
-                <i class="bi bi-download"></i>
-              </a>
-            </div>
+        <article class="doc">
+          <div>
+            <div class="doc-cat">TABELA DO ESTABELECIMENTO</div>
+            <div class="doc-title"><i class="bi bi-journal-text me-1"></i>{{ titulo }}</div>
+            <div class="doc-meta">{% if tabela.enviado_em %}Atualizada em {{ tabela.enviado_em.strftime('%d/%m/%Y às %H:%M') }}{% endif %}</div>
+            {% if tabela.descricao %}<div class="doc-desc">{{ tabela.descricao }}</div>{% endif %}
+            <div class="chips"><span class="chip"><i class="bi bi-file-earmark"></i>{{ nome_arquivo or 'Arquivo' }}</span>{% if ext %}<span class="chip"><i class="bi bi-tag"></i>{{ ext|upper }}</span>{% endif %}</div>
           </div>
-          <div class="text-muted small mt-2">Clique para visualizar em tela cheia ou baixe o arquivo.</div>
+          <div class="actions">
+            <button type="button" class="btn btn-royal" data-bs-toggle="modal" data-bs-target="#modalTabela"><i class="bi bi-eye me-1"></i>Visualizar</button>
+            <a class="btn btn-outline-primary" href="{{ url_for('rest_tabela_download', tabela_id=tabela.id) }}"><i class="bi bi-download me-1"></i>Baixar</a>
+          </div>
         </article>
       {% endif %}
+    </section>
+  </main>
 
-      <div class="text-center mt-3 mb-2">
-        <small class="tiny">© {{ current_year|default('') }} Coopex</small>
-      </div>
-    </main>
-  </div>
-
-  <!-- MODAL FULLSCREEN -->
-  <div class="modal fade" id="modalTabela" tabindex="-1" aria-labelledby="modalTabelaLabel" aria-hidden="true">
+  {% if tabela %}
+  <div class="modal fade" id="modalTabela" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-fullscreen">
       <div class="modal-content">
         <div class="modal-header">
-          <div>
-            <div class="doc-cat mb-0" id="modalTabelaCat">TABELA</div>
-            <h5 class="modal-title" id="modalTabelaLabel"></h5>
-          </div>
-          <div class="d-flex align-items-center gap-2">
-            <a id="modalAbrirNovaAba" href="#" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm">
-              <i class="bi bi-box-arrow-up-right"></i> Abrir em nova aba
-            </a>
-            <a id="modalBaixar" href="#" class="btn btn-primary btn-sm">
-              <i class="bi bi-download"></i> Baixar
-            </a>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          <div><small class="text-primary fw-bold">TABELA</small><h5 class="modal-title">{{ titulo }}</h5></div>
+          <div class="d-flex gap-2">
+            <a class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" href="{{ url_for('rest_tabela_abrir', tabela_id=tabela.id) }}"><i class="bi bi-box-arrow-up-right me-1"></i>Nova aba</a>
+            <a class="btn btn-primary btn-sm" href="{{ url_for('rest_tabela_download', tabela_id=tabela.id) }}"><i class="bi bi-download me-1"></i>Baixar</a>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
         </div>
         <div class="modal-body p-2">
-          <iframe id="modalFrame" class="reader-frame d-none" allowfullscreen referrerpolicy="no-referrer"></iframe>
-          <img id="modalImg" class="reader-img d-none" alt="">
-          <div id="modalAviso" class="small text-muted mt-2 d-none">
-            Se o arquivo não abrir no visualizador, utilize “Abrir em nova aba” ou “Baixar”.
-          </div>
+          {% if ext in ['png','jpg','jpeg','webp','gif'] %}
+          <img class="reader-img" src="{{ url_for('rest_tabela_abrir', tabela_id=tabela.id) }}" alt="{{ titulo }}">
+          {% else %}
+          <iframe class="reader" src="{{ url_for('rest_tabela_abrir', tabela_id=tabela.id) }}"></iframe>
+          {% endif %}
         </div>
       </div>
     </div>
   </div>
-
-  <!-- Scripts -->
+  {% endif %}
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    /* ===== Tema (Claro/Escuro) — igual ao painel ===== */
-    const THEME_KEY='portal_theme';
-    function applyTheme(t){
-      document.documentElement.setAttribute('data-theme', t==='dark'?'dark':'light');
-      const lbl=document.getElementById('lblTheme'); const icon=document.querySelector('#btnTheme i');
-      if(lbl) lbl.textContent = (t==='dark')?'Claro':'Escuro';
-      if(icon){ icon.classList.toggle('bi-moon', t!=='dark'); icon.classList.toggle('bi-sun', t==='dark'); }
-      localStorage.setItem(THEME_KEY, t);
-    }
-    (function initTheme(){
-      const saved = localStorage.getItem(THEME_KEY) || 'light';
-      applyTheme(saved);
-      document.getElementById('btnTheme')?.addEventListener('click', ()=>{
-        const cur = localStorage.getItem(THEME_KEY) || 'light';
-        applyTheme(cur==='dark'?'light':'dark');
-      });
-    })();
-
-    /* ===== Prefetch nos links do menu (abre rápido, “parece SPA”) ===== */
-    function prefetch(href){
-      try{
-        const l=document.createElement('link');
-        l.rel='prefetch'; l.href=href; document.head.appendChild(l);
-      }catch(e){}
-    }
-    document.getElementById('sideNav')?.addEventListener('mouseenter', (e)=>{
-      const a = e.target.closest('a'); if(!a) return;
-      if (a.href) prefetch(a.href);
-    });
-    document.getElementById('linkAvisos')?.addEventListener('mouseenter', e=>prefetch(e.currentTarget.href));
-    document.getElementById('linkTabelas')?.addEventListener('mouseenter', e=>prefetch(e.currentTarget.href));
-
-    /* ===== Visualização da tabela (fecha com Botão Voltar sem travar) ===== */
-    (function(){
-      const modalEl = document.getElementById('modalTabela');
-      const modal = new bootstrap.Modal(modalEl, { backdrop: true, focus: false });
-
-      const lbl = document.getElementById('modalTabelaLabel');
-      const frame = document.getElementById('modalFrame');
-      const img = document.getElementById('modalImg');
-      const aviso = document.getElementById('modalAviso');
-      const baixar = document.getElementById('modalBaixar');
-      const novaAba = document.getElementById('modalAbrirNovaAba');
-
-      let modalOpen = false;
-      let pushedState = false;
-      let closingFromPop = false;
-
-      function openViewer(viewUrl, downloadUrl, title, ext){
-        lbl.textContent = title || '';
-        baixar.href = downloadUrl || viewUrl || '#';
-        novaAba.href = viewUrl || downloadUrl || '#';
-
-        // reset UI
-        frame.classList.add('d-none'); img.classList.add('d-none'); aviso.classList.add('d-none');
-
-        const e = (ext || '').toLowerCase();
-        if (e === 'pdf') {
-          frame.src = viewUrl;
-          frame.classList.remove('d-none');
-        } else if (['jpg','jpeg','png','webp','gif','bmp','svg'].includes(e)) {
-          img.src = viewUrl;
-          img.classList.remove('d-none');
-        } else {
-          aviso.classList.remove('d-none');
-        }
-
-        modal.show();
-        modalOpen = true;
-
-        // empurra um estado para capturar o botão Voltar
-        try { history.pushState({ modalTabela:true }, '', location.href); pushedState = true; } catch(_) {}
-      }
-
-      // Delegação: abre o modal ao clicar no card ou no botão data-open (mas ignora cliques em links/botões internos não marcados)
-      document.addEventListener('click', function(ev){
-        const card = ev.target.closest('.doc-row');
-        if (!card) return;
-
-        // não abrir quando clicar em download direto, links ou botões que não sejam o [data-open]
-        if (!ev.target.closest('[data-open]') && ev.target.closest('a,button,[role="button"]')) {
-          // se for o botão de Baixar (data-direct-download), deixa seguir
-          return;
-        }
-
-        // evita abrir múltiplas vezes
-        if (modalOpen) return;
-
-        const viewUrl = card.dataset.view || '#';
-        const downUrl = card.dataset.download || viewUrl;
-        const title = card.dataset.titleFull || '';
-        const ext = card.dataset.ext || '';
-        openViewer(viewUrl, downUrl, title, ext);
-      });
-
-      // Fecha via botão Voltar do navegador
-      window.addEventListener('popstate', function(){
-        if (modalOpen) {
-          closingFromPop = true;    // indica que o fechamento veio do "Voltar"
-          modal.hide();
-        }
-      });
-
-      // Quando o modal é escondido, limpar e sincronizar histórico
-      modalEl.addEventListener('hidden.bs.modal', ()=>{
-        // limpar mídias para liberar memória/perf
-        frame.src=''; img.src='';
-
-        // se abrimos via pushState e NÃO foi o popstate que fechou, damos um back para remover o estado "extra"
-        if (pushedState && !closingFromPop) {
-          try { history.back(); } catch(_) {}
-        }
-
-        // reset flags
-        modalOpen = false;
-        pushedState = false;
-        closingFromPop = false;
-      });
-    })();
-
-    /* ===== Badge de avisos na lateral ===== */
-    (function syncBadge(){
-      const badgeSidebar=document.getElementById('badgeSidebar');
-      if(!badgeSidebar) return;
-      const n = Number(badgeSidebar.textContent.trim()||'0');
-      badgeSidebar.style.display = n>0 ? 'inline-flex' : 'none';
-    })();
-  </script>
 </body>
 </html>
