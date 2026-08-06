@@ -34,13 +34,18 @@ def _install_final_ui_order() -> None:
                 source = source.replace(marker, marker + "\n      " + include, 1)
 
         elif template == "restaurante_dashboard.html":
+            source = source.replace(
+                '<img id="selFoto" src="" class="big mb-2" alt="Foto do cooperado selecionado">',
+                '<img id="selFoto" src="" class="big mb-2" alt="Foto do cooperado selecionado" onerror="if(!this.dataset.fallback){this.dataset.fallback=\'1\';this.src=\'{{ url_for(\'static\', filename=\'img/default.png\') }}\';}">',
+                1,
+            )
             modal = """
   <div class="modal fade coopex-photo-modal" id="coopexPhotoModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl">
       <div class="modal-content">
         <div class="modal-body p-2 text-center position-relative">
           <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Fechar"></button>
-          <img id="coopexExpandedPhoto" src="" alt="Foto ampliada do cooperado">
+          <img id="coopexExpandedPhoto" src="" alt="Foto ampliada do cooperado" onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='{{ url_for('static', filename='img/default.png') }}';}">
         </div>
       </div>
     </div>
