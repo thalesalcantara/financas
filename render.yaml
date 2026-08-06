@@ -3,7 +3,7 @@ services:
     name: financas-coopex
     env: python
     plan: starter
-    autoDeploy: false
+    autoDeploy: true
     buildCommand: pip install -r requirements.txt
     startCommand: >
       gunicorn app:app
