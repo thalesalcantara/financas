@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-06.1308"
+BUILD_VERSION = "2026-08-06.1312"
 
 
 def post_worker_init(worker):
@@ -31,6 +31,7 @@ def post_worker_init(worker):
         import production_ui_finalize  # noqa: F401
         import performance_ui_fix  # noqa: F401
         import performance_ui_hotfix  # noqa: F401
+        import performance_query_override  # noqa: F401
         import performance_ui_finalize  # noqa: F401
 
         if "coopex_build_probe" not in flask_app.view_functions:
@@ -52,6 +53,8 @@ def post_worker_init(worker):
                     cooperative_history_preserved=True,
                     cooperative_rating_preserved=True,
                     optimized_panel_queries=True,
+                    indexed_scale_queries=True,
+                    legacy_scale_fallback=True,
                     media_route_photos=True,
                     enlarged_cooperative_photo=True,
                     full_history_table=True,
