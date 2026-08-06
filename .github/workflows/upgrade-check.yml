@@ -71,7 +71,8 @@ jobs:
           assert 'coopexPhotoModal' in rest_source
           assert 'coopex-horizontal-menu-critical' in rest_source
           assert 'flex-direction:row!important' in rest_source
-          assert '?v=20260806-1330' in rest_source
+          assert 'filename=\'css/restaurante_v3.css\', v=' in rest_source
+          assert 'filename=\'js/restaurante_v3.js\', v=' in rest_source
           assert "url_for('media_coop', coop_id=coop.id)" in rest_source
           assert 'data-coopex-producoes="1"' not in rest_source
           assert 'cooperado_producao_v3.css' in coop_source
