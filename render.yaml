@@ -21,6 +21,10 @@ services:
       --error-logfile -
       --log-level info
       --env INIT_DB_ON_START=0
+      --env GTHREADS=4
+      --env DB_POOL_SIZE=5
+      --env DB_MAX_OVERFLOW=5
+      --env SQL_POOL_TIMEOUT=8
     healthCheckPath: /healthz
     envVars:
       - key: TZ
@@ -35,6 +39,14 @@ services:
         value: "0"
       - key: WEB_CONCURRENCY
         value: "1"
+      - key: GTHREADS
+        value: "4"
+      - key: DB_POOL_SIZE
+        value: "5"
+      - key: DB_MAX_OVERFLOW
+        value: "5"
+      - key: SQL_POOL_TIMEOUT
+        value: "8"
       - key: SECRET_KEY
         sync: false
       - key: DATABASE_URL
