@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile Python
-        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py performance_ui_fix.py performance_ui_hotfix.py performance_query_override.py performance_ui_finalize.py gunicorn_conf.py tests/smoke_upgrade.py
+        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py performance_ui_fix.py performance_ui_hotfix.py performance_query_override.py performance_ui_finalize.py menu_horizontal_enforcer.py gunicorn_conf.py tests/smoke_upgrade.py
       - name: Validate Jinja templates
         run: |
           python - <<'PY'
@@ -54,7 +54,8 @@ jobs:
           python - <<'PY'
           import performance_ui_hotfix
           import performance_query_override
-          import performance_ui_finalize as ui
+          import performance_ui_finalize
+          import menu_horizontal_enforcer as ui
 
           app = ui.app
           for name in ('restaurante_dashboard.html', 'painel_cooperado.html'):
@@ -68,6 +69,9 @@ jobs:
           assert '_rest_approvals_tabs.html' in rest_source
           assert 'restaurante_v3.js' in rest_source
           assert 'coopexPhotoModal' in rest_source
+          assert 'coopex-horizontal-menu-critical' in rest_source
+          assert 'flex-direction:row!important' in rest_source
+          assert '?v=20260806-1330' in rest_source
           assert "url_for('media_coop', coop_id=coop.id)" in rest_source
           assert 'data-coopex-producoes="1"' not in rest_source
           assert 'cooperado_producao_v3.css' in coop_source
