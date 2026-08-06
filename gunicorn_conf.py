@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-06.1330"
+BUILD_VERSION = "2026-08-06.1336"
 
 
 def post_worker_init(worker):
@@ -70,7 +70,7 @@ def post_worker_init(worker):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Painéis otimizados e menu horizontal travado. Build %s", BUILD_VERSION)
+        log.info("Hotfix Jinja aplicado e menu horizontal preservado. Build %s", BUILD_VERSION)
     except Exception:
         log.exception(
             "Melhorias complementares não carregaram; mantendo o aplicativo principal disponível."
