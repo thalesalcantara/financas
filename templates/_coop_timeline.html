@@ -1,8 +1,8 @@
 <div class="section-card coopex-daily-sequence">
   <div class="coopex-sequence-head">
     <div>
-      <h2><i class="bi bi-calendar2-check me-1"></i>Produções e escala em sequência</h2>
-      <p>Por padrão aparece somente o dia de hoje. Use as datas acima para consultar a semana ou localizar uma produção não lançada.</p>
+      <h2><i class="bi bi-calendar2-check me-1"></i>Escala e produção do dia</h2>
+      <p>As produções já registradas e suas avaliações permanecem acima. Aqui aparece a escala do dia e o que ainda precisa ser lançado.</p>
     </div>
     {% if coopex_filter_start and coopex_filter_end %}
     <span class="coopex-sequence-period">
@@ -21,7 +21,7 @@
             {{ ['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'][x.data.weekday()] }},
             {{ x.data.strftime('%d/%m/%Y') }}
           </div>
-          <div class="coopex-day-meta">{% if x.kind == 'scale' %}Escala diária{% else %}Produção registrada fora da escala{% endif %}</div>
+          <div class="coopex-day-meta">Escala diária na sequência da produção</div>
         </div>
         <span class="coopex-day-status">{{ x.status_label }}</span>
       </div>
@@ -39,7 +39,7 @@
         <div class="coopex-day-cell"><small>Valor</small><strong>R$ {{ '%.2f'|format(x.valor_total or 0)|replace('.', ',') }}</strong></div>
       </div>
 
-      {% if x.kind == 'scale' and x.pode_lancar %}
+      {% if x.pode_lancar %}
       <form class="coopex-day-form" method="post" action="{{ url_for('coop_producao') }}">
         <input type="hidden" name="return_to" value="painel">
         <input type="hidden" name="escala_id" value="{{ x.escala.id }}">
@@ -49,18 +49,32 @@
         <div><label>Valor total da produção</label><input type="number" min="0.01" step="0.01" name="valor_total" required></div>
         <button type="submit"><i class="bi bi-send-check me-1"></i>Lançar produção</button>
       </form>
-      {% elif x.kind == 'scale' and not x.finalizada and not x.lancamento and not x.producao %}
+      {% elif not x.finalizada and not x.lancamento and not x.producao %}
       <div class="coopex-day-note"><i class="bi bi-lock-fill me-1"></i>O lançamento será liberado somente após o término do horário da escala.</div>
       {% elif x.lancamento or (x.producao and x.producao.status == 'aprovada') %}
-      <div class="coopex-day-note"><i class="bi bi-check-circle-fill text-success me-1"></i>Produção aprovada{% if x.avaliada %} e avaliada{% else %}. Avaliação ainda não registrada{% endif %}.</div>
+      <div class="coopex-day-note">
+        <i class="bi bi-check-circle-fill text-success me-1"></i>Produção aprovada.
+        {% if x.avaliada %}
+          <div class="coopex-day-rating" aria-label="Sua avaliação">
+            {% for i in range(1,6) %}
+              <i class="bi {{ 'bi-star-fill' if i <= (x.avaliacao_nota or 0)|round(0, 'floor') else 'bi-star' }}"></i>
+            {% endfor %}
+            <span>Sua avaliação: {{ '%.1f'|format(x.avaliacao_nota or 0)|replace('.', ',') }}</span>
+          </div>
+        {% else %}
+          <span>A avaliação ainda não foi registrada.</span>
+        {% endif %}
+      </div>
       {% elif x.producao and x.producao.status == 'pendente' %}
       <div class="coopex-day-note"><i class="bi bi-hourglass-split text-warning me-1"></i>Produção enviada e aguardando aprovação do estabelecimento.</div>
+      {% elif x.producao and x.producao.status == 'recusada' %}
+      <div class="coopex-day-note"><i class="bi bi-x-circle-fill text-danger me-1"></i>Produção recusada e bloqueada para novo envio.</div>
       {% endif %}
     </article>
     {% else %}
     <div class="coopex-sequence-empty">
       <i class="bi bi-calendar-x fs-4 d-block mb-2"></i>
-      Nenhuma escala ou produção encontrada para o período. Ajuste as datas acima para localizar dias anteriores.
+      Nenhuma escala encontrada para o dia. Use o filtro de datas para consultar a semana ou localizar uma produção anterior.
     </div>
     {% endfor %}
   </div>
