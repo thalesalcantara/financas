@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-06.1238"
+BUILD_VERSION = "2026-08-06.1305"
 
 
 def post_worker_init(worker):
@@ -29,6 +29,8 @@ def post_worker_init(worker):
         import production_scale_patch  # noqa: F401
         import production_ui_patch  # noqa: F401
         import production_ui_finalize  # noqa: F401
+        import performance_ui_fix  # noqa: F401
+        import performance_ui_finalize  # noqa: F401
 
         if "coopex_build_probe" not in flask_app.view_functions:
             from flask import jsonify
@@ -46,6 +48,13 @@ def post_worker_init(worker):
                     tables_horizontal_dashboard=True,
                     cooperative_daily_timeline=True,
                     cooperative_default_today=True,
+                    cooperative_history_preserved=True,
+                    cooperative_rating_preserved=True,
+                    optimized_panel_queries=True,
+                    media_route_photos=True,
+                    enlarged_cooperative_photo=True,
+                    full_history_table=True,
+                    launch_preview_limit=2,
                     extra_production_tab=False,
                 )
 
@@ -54,7 +63,7 @@ def post_worker_init(worker):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Interface diária e aprovações integradas. Build %s", BUILD_VERSION)
+        log.info("Painéis otimizados e conteúdo preservado. Build %s", BUILD_VERSION)
     except Exception:
         log.exception(
             "Melhorias complementares não carregaram; mantendo o aplicativo principal disponível."
