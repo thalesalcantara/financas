@@ -3,7 +3,7 @@ from __future__ import annotations
 import performance_ui_finalize as final_ui
 
 app = final_ui.app
-BUILD = "20260806-1330"
+BUILD = "20260806-1336"
 
 
 def _install() -> None:
@@ -33,8 +33,16 @@ def _install() -> None:
                 '''<div class="brand coopex-brand-welcome"><i class="bi bi-shop"></i><span class="coopex-brand-copy"><small>SEJA BEM-VINDO</small><strong>{{ coopex_rest_display_name|default('ESTABELECIMENTO') }}</strong></span></div>''',
                 1,
             )
-            source = source.replace("css/restaurante_v3.css') }}", f"css/restaurante_v3.css') }}?v={BUILD}")
-            source = source.replace("js/restaurante_v3.js') }}", f"js/restaurante_v3.js') }}?v={BUILD}")
+            source = source.replace(
+                '<link rel="stylesheet" href="{{ url_for(\'static\', filename=\'css/restaurante_v3.css\') }}">',
+                '<link rel="stylesheet" href="{{ url_for(\'static\', filename=\'css/restaurante_v3.css\', v=\'' + BUILD + '\') }}">',
+                1,
+            )
+            source = source.replace(
+                '<script src="{{ url_for(\'static\', filename=\'js/restaurante_v3.js\') }}"></script>',
+                '<script src="{{ url_for(\'static\', filename=\'js/restaurante_v3.js\', v=\'' + BUILD + '\') }}"></script>',
+                1,
+            )
             if "coopex-horizontal-menu-critical" not in source:
                 source = source.replace("</head>", critical_css + "\n</head>", 1)
         return source, filename, uptodate
