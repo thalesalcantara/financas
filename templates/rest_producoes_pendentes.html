@@ -1,55 +1,105 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Produções</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Produções da Semana</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <style>
-    :root{--wine:#8d102c;--bg:#f6f6f8;--ink:#202126;--muted:#747780;--line:#e8e8ed;--red:#d93b48;--green:#168c4a}*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Inter,system-ui,Arial;color:var(--ink)}a{text-decoration:none;color:inherit}.wrap{max-width:920px;margin:auto;padding:12px 12px 34px}.head{background:linear-gradient(145deg,var(--wine),#70091f);color:#fff;border-radius:20px;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:12px}.head h1{font-size:1.16rem;margin:2px 0 0}.head-actions{display:flex;gap:8px}.head-actions button,.head-actions a{border:1px solid rgba(255,255,255,.38);background:transparent;color:#fff;border-radius:11px;padding:9px 11px;font-weight:850}.flash,.hint,.toolbar{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-top:11px}.flash.success{background:#e9f8ef;color:#126b39}.flash.warning{background:#fff6d9;color:#705900}.flash.danger{background:#ffeaed;color:#902033}.hint{background:#fff7e4;border-color:#efcf78;color:#6c5300;font-size:.86rem}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px}.toolbar button{border:0;border-radius:11px;background:var(--green);color:#fff;padding:9px 12px;font-weight:850}.section-title{font-size:1rem;margin:20px 2px 8px}.card{background:#fff;border:1px solid var(--line);border-left:6px solid var(--red);border-radius:18px;padding:15px;margin-top:11px;box-shadow:0 5px 18px rgba(25,25,30,.05)}.card.green{border-left-color:var(--green)}.top{display:flex;justify-content:space-between;gap:12px}.name{font-weight:900}.meta{color:var(--muted);font-size:.8rem;margin-top:4px}.status{border-radius:999px;padding:6px 9px;background:#ffeaed;color:#9d2030;font-size:.69rem;font-weight:900;text-align:center;max-width:180px}.green .status{background:#e4f7eb;color:#126c39}.value{font-size:1.28rem;font-weight:950;margin-top:11px}.proposal{margin-top:12px;padding:12px;background:#f7faf8;border:1px solid #d9edde;border-radius:14px}.proposal-title{font-size:.78rem;font-weight:900;color:var(--green);margin-bottom:8px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}label{display:block;font-size:.71rem;font-weight:850;color:var(--muted);margin-bottom:5px}input{width:100%;height:43px;border:1px solid var(--line);border-radius:11px;padding:0 10px;font-size:1rem}.approve{width:100%;height:45px;border:0;border-radius:12px;background:var(--green);color:#fff;font-weight:900;margin-top:9px}.correct{display:flex;gap:8px;margin-top:9px}.correct input{flex:1}.correct button{border:1px solid var(--red);background:#fff;color:var(--red);border-radius:11px;padding:0 11px;font-weight:850}.locked,.done{margin-top:12px;border-radius:12px;padding:11px;text-align:center;font-size:.81rem;font-weight:850}.locked{background:#f1f2f4;color:#757981}.done{background:#e9f8ef;color:#126b39}.history{background:#fff;border:1px solid var(--line);border-radius:18px;padding:15px;margin-top:18px}.history-row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}.history-row:first-of-type{border-top:0}.badge{font-size:.7rem;font-weight:900}.empty{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;text-align:center;color:var(--muted);margin-top:10px}@media(max-width:580px){.wrap{padding:8px}.head{border-radius:16px;align-items:flex-start}.head-actions{flex-direction:column}.top{align-items:flex-start}.form-grid{grid-template-columns:1fr}.correct{flex-direction:column}.correct button{height:42px}.toolbar{align-items:flex-start;flex-direction:column}}
+    :root{--royal:#2141d9;--royal2:#3654e6;--soft:#edf1ff;--bg:#f5f7ff;--card:#fff;--ink:#111827;--muted:#6b7280;--line:#e1e5f2;--red:#dc3545;--green:#16924d}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--ink)}a{text-decoration:none;color:inherit}.shell{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:100vh}.aside{height:100dvh;position:sticky;top:0;padding:18px 14px;color:#fff;background:radial-gradient(circle at top left,rgba(255,255,255,.16),transparent 28%),linear-gradient(180deg,#1736c9 0%,var(--royal) 40%,var(--royal2) 100%);box-shadow:inset -1px 0 rgba(255,255,255,.08);overflow:auto}.brand{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid rgba(255,255,255,.16);border-radius:16px;background:rgba(255,255,255,.1);font-weight:900;box-shadow:0 10px 24px rgba(0,0,0,.12)}.brand i{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:rgba(255,255,255,.16)}.nav{display:flex;flex-direction:column;gap:7px;margin-top:18px}.nav a,.nav button{position:relative;width:100%;display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid transparent;border-radius:14px;color:#fff;background:transparent;font:inherit;font-size:.9rem;font-weight:800;text-align:left;cursor:pointer}.nav a:hover,.nav button:hover,.nav a.active{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.12)}.nav a.active{box-shadow:0 10px 22px rgba(0,0,0,.14)}.nav a.active:before{content:"";position:absolute;left:-6px;top:9px;bottom:9px;width:4px;border-radius:999px;background:#fff}.nav i{width:20px;text-align:center}.badge-count{margin-left:auto;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:#fff;color:var(--royal);display:grid;place-items:center;font-size:.7rem;font-weight:900}.content{min-width:0;padding:24px}.welcome{display:flex;justify-content:space-between;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-left:5px solid var(--royal);border-radius:18px;padding:15px 18px;box-shadow:0 8px 24px rgba(33,65,217,.07)}.eyebrow{font-size:.73rem;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.welcome h1{font-size:1.2rem;color:var(--royal);margin:3px 0 2px}.welcome p{margin:0;color:var(--muted);font-size:.87rem}.sound{border:1px solid var(--royal);border-radius:999px;background:#fff;color:var(--royal);padding:9px 13px;font-weight:850;white-space:nowrap}.flash,.hint,.toolbar{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-top:12px}.flash.success{background:#eaf8ef;color:#126a38}.flash.warning{background:#fff7dc;color:#725900}.flash.danger{background:#ffeaed;color:#8f2030}.hint{background:var(--soft);border-color:#cfd8ff;color:#263d9c;font-size:.86rem}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px}.toolbar button{border:0;border-radius:999px;background:var(--royal);color:#fff;padding:10px 14px;font-weight:900}.title{display:flex;align-items:center;gap:8px;color:var(--royal);font-size:1.06rem;margin:22px 2px 9px}.week-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.prod-card{background:#fff;border:1px solid var(--line);border-left:6px solid var(--red);border-radius:18px;padding:15px;box-shadow:0 6px 20px rgba(15,23,42,.05);min-width:0}.prod-card.green{border-left-color:var(--green)}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.name{font-weight:900;overflow-wrap:anywhere}.meta{color:var(--muted);font-size:.8rem;margin-top:4px}.status{max-width:195px;padding:6px 9px;border-radius:999px;background:#ffeaed;color:#9e2031;font-size:.69rem;font-weight:900;text-align:center}.green .status{background:#e5f7ec;color:#126c39}.amount{font-size:1.3rem;font-weight:950;margin-top:12px}.panel{margin-top:12px;padding:12px;border:1px solid #d8e0ff;border-radius:14px;background:#f9faff}.panel-title{font-size:.77rem;font-weight:900;color:var(--royal);margin-bottom:9px}.fields{display:grid;grid-template-columns:1fr 1fr;gap:9px}label{display:block;color:var(--muted);font-size:.71rem;font-weight:900;text-transform:uppercase;letter-spacing:.03em;margin-bottom:5px}input{width:100%;height:44px;border:1px solid var(--line);border-radius:11px;background:#fff;padding:0 11px;font-size:1rem;outline:none}input:focus{border-color:var(--royal);box-shadow:0 0 0 3px rgba(33,65,217,.12)}.primary{width:100%;height:45px;border:0;border-radius:999px;background:var(--royal);color:#fff;font-weight:900;margin-top:9px}.primary:hover{background:var(--royal2)}.correction{display:flex;gap:8px;margin-top:9px}.correction input{flex:1}.correction button{border:1px solid var(--red);border-radius:999px;background:#fff;color:var(--red);padding:0 13px;font-weight:850}.done,.blocked{margin-top:12px;border-radius:12px;padding:11px;text-align:center;font-size:.81rem;font-weight:850}.done{background:#e9f8ef;color:#126b39}.blocked{background:#f1f2f5;color:#737781}.empty{background:#fff;border:1px dashed var(--line);border-radius:17px;padding:24px;text-align:center;color:var(--muted);grid-column:1/-1}.history{background:#fff;border:1px solid var(--line);border-radius:18px;padding:15px;margin-top:18px}.history-row{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-top:1px solid var(--line)}.history-row:first-of-type{border-top:0}.history-status{font-size:.7rem;font-weight:900;color:var(--muted)}
+    @media(max-width:1050px){.shell{grid-template-columns:82px minmax(0,1fr)}.aside{padding:14px 10px}.brand{justify-content:center;padding:10px}.brand span,.nav span.label{display:none}.nav a,.nav button{justify-content:center;padding:12px 9px}.nav a.active:before{left:3px}.badge-count{position:absolute;right:3px;top:3px}.content{padding:18px 14px}.week-grid{grid-template-columns:1fr}}
+    @media(max-width:640px){.shell{display:block}.aside{height:auto;position:sticky;z-index:30;padding:8px 10px;overflow:visible}.brand{display:none}.nav{margin:0;display:flex;flex-direction:row;overflow-x:auto;gap:5px;padding-bottom:2px}.nav a,.nav button{flex:0 0 auto;width:auto;min-width:54px;border-radius:12px;padding:9px 11px}.nav a.active:before{left:10px;right:10px;top:auto;bottom:-2px;width:auto;height:3px}.content{padding:12px 9px 28px}.welcome{align-items:flex-start;padding:13px}.welcome h1{font-size:1.05rem}.sound{padding:8px 10px;font-size:.75rem}.fields{grid-template-columns:1fr}.top{align-items:flex-start}.status{max-width:145px}.toolbar{align-items:flex-start;flex-direction:column}.toolbar button{width:100%}.correction{flex-direction:column}.correction button{height:43px}.history-row{font-size:.88rem}}
   </style>
 </head>
-<body><main class="wrap">
-<header class="head"><div><small>ESTABELECIMENTO</small><h1>Produções da escala</h1></div><div class="head-actions"><button id="sound" type="button">Ativar alerta</button><a href="/portal/restaurante">Voltar</a></div></header>
-{% with messages=get_flashed_messages(with_categories=true) %}{% for cat,msg in messages %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}{% endwith %}
-<div class="hint"><strong>Valor final:</strong> o valor enviado pelo cooperado é uma proposta. O estabelecimento pode manter, aumentar ou reduzir a quantidade e o valor total antes de aprovar. Só o valor aprovado entra no financeiro.</div>
-<form id="bulk" method="post" action="/rest/producoes/aprovar-selecionadas"></form>
-{% if pendentes %}<div class="toolbar"><strong>{{ pendentes|length }} produção(ões) enviada(s) para conferir</strong><button form="bulk">Aprovar selecionadas sem alterar</button></div>{% endif %}
-<h2 class="section-title">Todas as produções previstas</h2>
+<body>
+<div class="shell">
+  <aside class="aside">
+    <div class="brand"><i class="bi bi-building"></i><span>Portal do Estabelecimento</span></div>
+    <nav class="nav">
+      <a href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-person-lines-fill"></i><span class="label">Lançar Produção</span></a>
+      <a class="active" href="{{ url_for('rest_producoes_pendentes') }}"><i class="bi bi-clipboard-check"></i><span class="label">Produções da Semana</span>{% if pendentes %}<b class="badge-count">{{ pendentes|length }}</b>{% endif %}</a>
+      <a href="{{ url_for('portal_restaurante', view='lancamentos') }}"><i class="bi bi-receipt"></i><span class="label">Histórico de Produção</span></a>
+      <a href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-calendar-week"></i><span class="label">Escala</span></a>
+      <a href="{{ url_for('rest_tabelas') }}"><i class="bi bi-table"></i><span class="label">Tabelas</span></a>
+      <a href="{{ url_for('portal_restaurante', view='config') }}"><i class="bi bi-gear"></i><span class="label">Configuração</span></a>
+      <a href="{{ url_for('portal_restaurante_avisos') }}"><i class="bi bi-megaphone"></i><span class="label">Avisos</span></a>
+      <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i><span class="label">Sair</span></a>
+    </nav>
+  </aside>
 
-{% for x in previstas %}
-<article class="card {{ x.color }}" id="escala-{{ x.escala.id }}">
-  <div class="top">
-    <div>{% if x.producao and x.producao.status=='pendente' %}<input form="bulk" type="checkbox" name="ids" value="{{ x.producao.id }}" style="width:auto;height:auto;margin-right:7px">{% endif %}<span class="name">{{ x.cooperado.nome if x.cooperado else (x.escala.cooperado_nome or 'Cooperado não vinculado') }}</span><div class="meta">{{ x.data.strftime('%d/%m/%Y') if x.data else (x.escala.data or 'Sem data') }} · {{ x.escala.turno or '' }} · {{ x.escala.horario or 'Sem horário' }}</div></div>
-    <span class="status">{{ x.status_label }}</span>
-  </div>
-  <div class="value">R$ {{ '%.2f'|format(x.valor_total or 0)|replace('.', ',') }}</div>
+  <main class="content">
+    <header class="welcome">
+      <div><div class="eyebrow">Bem-vindo</div><h1>{{ display_name }}</h1><p>Confira, ajuste, aprove ou lance as produções da semana.</p></div>
+      <button id="sound" class="sound" type="button"><i class="bi bi-volume-up"></i> Ativar alerta</button>
+    </header>
 
-  {% if x.producao and x.producao.status=='pendente' and x.producao.valor_total > 0 %}
-    <div class="proposal">
-      <div class="proposal-title">Valor sugerido pelo cooperado — altere para mais ou para menos antes de aprovar</div>
-      <form method="post" action="/rest/producoes/{{ x.producao.id }}/aprovar">
-        <div class="form-grid"><div><label>Quantidade final</label><input type="number" min="1" name="qtd_entregas" value="{{ x.producao.qtd_entregas }}" required></div><div><label>Valor total final</label><input type="number" min="0.01" step="0.01" name="valor_total" value="{{ '%.2f'|format(x.producao.valor_total) }}" required></div></div>
-        <button class="approve"><i class="bi bi-check-circle-fill"></i> Aprovar valor final</button>
-      </form>
-      <form method="post" action="/rest/producoes/{{ x.producao.id }}/recusar" class="correct"><input name="motivo" placeholder="Motivo para o cooperado corrigir" required><button>Solicitar correção</button></form>
-    </div>
-  {% elif x.pode_lancar %}
-    <div class="proposal"><div class="proposal-title">O cooperado ainda não informou. O estabelecimento pode lançar diretamente.</div><form method="post" action="/rest/producoes/escala/{{ x.escala.id }}/lancar"><div class="form-grid"><div><label>Quantidade de entregas</label><input type="number" min="1" name="qtd_entregas" required></div><div><label>Valor total</label><input type="number" min="0.01" step="0.01" name="valor_total" required></div></div><button class="approve"><i class="bi bi-plus-circle-fill"></i> Lançar produção</button></form></div>
-  {% elif not x.finalizada %}
-    <div class="locked"><i class="bi bi-lock-fill"></i> O lançamento só será liberado depois do fim do horário.</div>
-  {% elif x.color=='green' %}
-    <div class="done"><i class="bi bi-check-circle-fill"></i> Produção registrada. Novo lançamento bloqueado para evitar duplicidade.</div>
-  {% elif not x.cooperado %}
-    <div class="locked">A escala não possui cooperado válido.</div>
-  {% endif %}
-</article>
-{% else %}<div class="empty">Nenhuma escala encontrada para este estabelecimento.</div>{% endfor %}
+    {% with messages=get_flashed_messages(with_categories=true) %}{% for cat,msg in messages %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}{% endwith %}
+    <div class="hint"><strong>Regra:</strong> o estabelecimento pode lançar em qualquer horário. O cooperado só consegue lançar depois que o horário da escala terminar. Quando o cooperado envia, o estabelecimento pode manter, aumentar ou reduzir a quantidade e o valor antes de aprovar.</div>
 
-<section class="history"><h2 class="section-title" style="margin-top:0">Histórico recente</h2>{% for p in recentes %}<div class="history-row"><div><strong>{{ p.cooperado.nome }}</strong><div class="meta">{{ p.data.strftime('%d/%m/%Y') }} · {{ p.qtd_entregas }} entrega(s)</div></div><div style="text-align:right"><strong>R$ {{ '%.2f'|format(p.valor_total or 0)|replace('.', ',') }}</strong><div class="badge">{{ p.status|capitalize }}</div></div></div>{% else %}<div class="meta">Sem histórico recente.</div>{% endfor %}</section>
-</main>
+    <form id="bulk" method="post" action="/rest/producoes/aprovar-selecionadas"></form>
+    {% if pendentes %}<div class="toolbar"><strong>{{ pendentes|length }} produção(ões) enviada(s) aguardando conferência</strong><button form="bulk"><i class="bi bi-check2-all"></i> Aprovar selecionadas sem alterar</button></div>{% endif %}
+
+    <h2 class="title"><i class="bi bi-calendar-week"></i> Produções previstas da semana</h2>
+    <section class="week-grid">
+      {% for x in previstas %}
+      <article class="prod-card {{ x.color }}" id="escala-{{ x.escala.id }}">
+        <div class="top">
+          <div>
+            {% if x.producao and x.producao.status=='pendente' %}<input form="bulk" type="checkbox" name="ids" value="{{ x.producao.id }}" style="width:auto;height:auto;margin-right:7px">{% endif %}
+            <span class="name">{{ x.cooperado.nome if x.cooperado else (x.escala.cooperado_nome or 'Cooperado não vinculado') }}</span>
+            <div class="meta">{{ x.data.strftime('%d/%m/%Y') if x.data else (x.escala.data or 'Sem data') }} · {{ x.escala.turno or '' }} · {{ x.escala.horario or 'Sem horário' }}</div>
+          </div>
+          <span class="status">{{ x.status_label }}</span>
+        </div>
+        <div class="amount">R$ {{ '%.2f'|format(x.valor_total or 0)|replace('.', ',') }}</div>
+        {% if x.producao and x.producao.qtd_entregas %}<div class="meta">{{ x.producao.qtd_entregas }} entrega(s)</div>{% endif %}
+
+        {% if x.producao and x.producao.status=='pendente' and x.producao.valor_total > 0 %}
+          <div class="panel">
+            <div class="panel-title">Proposta do cooperado — ajuste para mais ou para menos antes de aprovar</div>
+            <form method="post" action="/rest/producoes/{{ x.producao.id }}/aprovar">
+              <div class="fields">
+                <div><label>Quantidade final</label><input type="number" min="1" name="qtd_entregas" value="{{ x.producao.qtd_entregas }}" required></div>
+                <div><label>Valor total final</label><input type="number" min="0.01" step="0.01" name="valor_total" value="{{ '%.2f'|format(x.producao.valor_total) }}" required></div>
+              </div>
+              <button class="primary"><i class="bi bi-check-circle-fill"></i> Aprovar valor final</button>
+            </form>
+            <form method="post" action="/rest/producoes/{{ x.producao.id }}/recusar" class="correction"><input name="motivo" placeholder="Motivo da recusa" required><button>Recusar</button></form>
+          </div>
+        {% elif x.pode_lancar %}
+          <div class="panel">
+            <div class="panel-title">O estabelecimento pode lançar esta produção agora.</div>
+            <form method="post" action="/rest/producoes/escala/{{ x.escala.id }}/lancar">
+              <div class="fields">
+                <div><label>Quantidade de entregas</label><input type="number" min="1" name="qtd_entregas" required></div>
+                <div><label>Valor total</label><input type="number" min="0.01" step="0.01" name="valor_total" required></div>
+              </div>
+              <button class="primary"><i class="bi bi-plus-circle-fill"></i> Lançar produção</button>
+            </form>
+          </div>
+        {% elif x.color=='green' %}
+          <div class="done"><i class="bi bi-check-circle-fill"></i> Produção registrada. Um segundo lançamento está bloqueado.</div>
+        {% elif not x.cooperado %}
+          <div class="blocked">A escala ainda não está vinculada a um cooperado válido.</div>
+        {% endif %}
+      </article>
+      {% else %}<div class="empty">Nenhuma escala desta semana foi encontrada para este estabelecimento.</div>{% endfor %}
+    </section>
+
+    <section class="history">
+      <h2 class="title" style="margin-top:0"><i class="bi bi-clock-history"></i> Histórico recente</h2>
+      {% for p in recentes %}<div class="history-row"><div><strong>{{ p.cooperado.nome }}</strong><div class="meta">{{ p.data.strftime('%d/%m/%Y') }} · {{ p.qtd_entregas }} entrega(s)</div></div><div style="text-align:right"><strong>R$ {{ '%.2f'|format(p.valor_total or 0)|replace('.', ',') }}</strong><div class="history-status">{{ p.status|capitalize }}</div></div></div>{% else %}<div class="meta">Sem histórico recente.</div>{% endfor %}
+    </section>
+  </main>
+</div>
 <audio id="alertAudio" preload="none" src="/static/avisos.mp3"></audio>
 <script>
 let active=localStorage.getItem('coopexProdSound')==='1',last=Number(sessionStorage.getItem('coopexProdLatest')||0),ctx;const btn=document.getElementById('sound'),audio=document.getElementById('alertAudio');
-function label(){btn.textContent=active?'Alerta ativo':'Ativar alerta'}function tone(){if(!active)return;try{audio.volume=1;audio.currentTime=0;audio.play().catch(()=>{ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=980;g.gain.value=.55;o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+.55)})}catch(e){}}
+function label(){btn.innerHTML=active?'<i class="bi bi-volume-up-fill"></i> Alerta ativo':'<i class="bi bi-volume-up"></i> Ativar alerta'}
+function tone(){if(!active)return;try{audio.volume=1;audio.currentTime=0;audio.play().catch(()=>{ctx=ctx||new(window.AudioContext||window.webkitAudioContext)();const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=980;g.gain.value=.55;o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+.55)})}catch(e){}}
 btn.onclick=()=>{active=true;localStorage.setItem('coopexProdSound','1');label();tone()};label();
 async function poll(){try{const r=await fetch('/api/rest/producoes/pendentes/status',{cache:'no-store'}),j=await r.json(),latest=Number(j.latest||0);if(last&&latest>last){tone();setTimeout(()=>location.reload(),700)}last=Math.max(last,latest);sessionStorage.setItem('coopexProdLatest',String(last))}catch(e){}}poll();setInterval(poll,12000);
-</script></body></html>
+</script>
+</body>
+</html>
