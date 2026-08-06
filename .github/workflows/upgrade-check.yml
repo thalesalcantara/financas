@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile Python
-        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py gunicorn_conf.py tests/smoke_upgrade.py
+        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py performance_ui_fix.py performance_ui_finalize.py gunicorn_conf.py tests/smoke_upgrade.py
       - name: Validate Jinja templates
         run: |
           python - <<'PY'
@@ -52,7 +52,7 @@ jobs:
       - name: Validate transformed panels
         run: |
           python - <<'PY'
-          import production_ui_finalize as ui
+          import performance_ui_finalize as ui
 
           app = ui.app
           for name in ('restaurante_dashboard.html', 'painel_cooperado.html'):
@@ -65,9 +65,14 @@ jobs:
           assert 'SEJA BEM-VINDO' in rest_source
           assert '_rest_approvals_tabs.html' in rest_source
           assert 'restaurante_v3.js' in rest_source
+          assert 'coopexPhotoModal' in rest_source
+          assert "url_for('media_coop', coop_id=coop.id)" in rest_source
           assert 'data-coopex-producoes="1"' not in rest_source
           assert 'cooperado_producao_v3.css' in coop_source
-          assert '_coop_timeline.html' in coop_source
+          assert coop_source.count("{% include '_coop_timeline.html' %}") == 1
+          history_pos = coop_source.find('Produções no período')
+          timeline_pos = coop_source.find("{% include '_coop_timeline.html' %}")
+          assert history_pos >= 0 and timeline_pos > history_pos
           assert 'data-week-production-card="1"' not in coop_source
           print('transformed panels ok')
           PY
