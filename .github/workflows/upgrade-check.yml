@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile Python
-        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py gunicorn_conf.py tests/smoke_upgrade.py
+        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py gunicorn_conf.py tests/smoke_upgrade.py
       - name: Validate Jinja templates
         run: |
           python - <<'PY'
@@ -35,8 +35,9 @@ jobs:
               'coop_producao.html',
               'coop_producao_editar.html',
               'coop_agenda.html',
+              'painel_cooperado.html',
               'rest_producoes_pendentes.html',
-              'restaurante_home_leve.html',
+              'restaurante_dashboard.html',
               'admin_producoes_pendentes.html',
               'admin_rapido.html',
           )
