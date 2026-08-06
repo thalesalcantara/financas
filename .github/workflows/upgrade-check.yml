@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile Python
-        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py gunicorn_conf.py tests/smoke_upgrade.py
+        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py gunicorn_conf.py tests/smoke_upgrade.py
       - name: Validate Jinja templates
         run: |
           python - <<'PY'
@@ -45,6 +45,25 @@ jobs:
               path = Path('templates') / name
               env.parse(path.read_text(encoding='utf-8'))
           print('templates ok')
+          PY
+      - name: Validate transformed panels
+        run: |
+          python - <<'PY'
+          import production_ui_finalize as ui
+
+          app = ui.app
+          for name in ('restaurante_dashboard.html', 'painel_cooperado.html'):
+              source, _, _ = app.jinja_loader.get_source(app.jinja_env, name)
+              app.jinja_env.parse(source)
+
+          rest_source, _, _ = app.jinja_loader.get_source(app.jinja_env, 'restaurante_dashboard.html')
+          coop_source, _, _ = app.jinja_loader.get_source(app.jinja_env, 'painel_cooperado.html')
+          assert 'COOPEX — painel horizontal azul royal' in rest_source
+          assert 'Valores enviados pelos cooperados' in rest_source
+          assert 'data-coopex-producoes="1"' not in rest_source
+          assert 'Produções previstas nesta semana' in coop_source
+          assert 'data-week-production-card="1"' not in coop_source
+          print('transformed panels ok')
           PY
       - name: Run production workflow smoke test
         run: PYTHONPATH=. python tests/smoke_upgrade.py
