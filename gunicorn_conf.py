@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-06.1312"
+BUILD_VERSION = "2026-08-06.1330"
 
 
 def post_worker_init(worker):
@@ -33,6 +33,7 @@ def post_worker_init(worker):
         import performance_ui_hotfix  # noqa: F401
         import performance_query_override  # noqa: F401
         import performance_ui_finalize  # noqa: F401
+        import menu_horizontal_enforcer  # noqa: F401
 
         if "coopex_build_probe" not in flask_app.view_functions:
             from flask import jsonify
@@ -44,6 +45,8 @@ def post_worker_init(worker):
                     build=BUILD_VERSION,
                     production_scale=True,
                     restaurant_horizontal_dashboard=True,
+                    horizontal_menu_enforced=True,
+                    old_sidebar_disabled=True,
                     restaurant_welcome_name=True,
                     restaurant_approval_tab=True,
                     strong_approval_sound=True,
@@ -67,7 +70,7 @@ def post_worker_init(worker):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Painéis otimizados e conteúdo preservado. Build %s", BUILD_VERSION)
+        log.info("Painéis otimizados e menu horizontal travado. Build %s", BUILD_VERSION)
     except Exception:
         log.exception(
             "Melhorias complementares não carregaram; mantendo o aplicativo principal disponível."
