@@ -5,22 +5,36 @@ document.addEventListener('DOMContentLoaded',function(){
   const buttons=section.querySelectorAll('[data-coopex-tab]');
   const approvalPanel=document.getElementById('coopexApprovalPanel');
   const mainRow=section.querySelector('.row.g-4.align-items-start');
-  const launchesTable=section.querySelector('#tblLanc');
-  const launchesCard=launchesTable?launchesTable.closest('.card,.lancar-layout-card'):null;
 
   function selectTab(name){
     buttons.forEach(btn=>btn.classList.toggle('active',btn.dataset.coopexTab===name));
     const approvals=name==='approvals';
     if(approvalPanel)approvalPanel.classList.toggle('active',approvals);
     if(mainRow)mainRow.style.display=approvals?'none':'';
-    if(launchesCard)launchesCard.style.display=approvals?'none':'';
   }
   buttons.forEach(btn=>btn.addEventListener('click',()=>selectTab(btn.dataset.coopexTab)));
 
-  const tbody=document.getElementById('tbodyLanc');
-  if(tbody){
-    Array.from(tbody.querySelectorAll('tr')).forEach((row,index)=>{
-      if(index>=2)row.style.display='none';
+  /*
+    O Histórico de Produção nunca é cortado. A limitação visual de dois itens
+    é aplicada somente pela classe da tabela individual abaixo do formulário.
+  */
+
+  const selectedPhoto=document.getElementById('selFoto');
+  const expandedPhoto=document.getElementById('coopexExpandedPhoto');
+  const photoModalElement=document.getElementById('coopexPhotoModal');
+  if(selectedPhoto&&expandedPhoto&&photoModalElement){
+    selectedPhoto.setAttribute('title','Clique para ampliar a foto');
+    selectedPhoto.setAttribute('role','button');
+    selectedPhoto.setAttribute('tabindex','0');
+    const openPhoto=()=>{
+      if(!selectedPhoto.src)return;
+      expandedPhoto.src=selectedPhoto.src;
+      expandedPhoto.alt=selectedPhoto.alt||'Foto ampliada do cooperado';
+      bootstrap.Modal.getOrCreateInstance(photoModalElement).show();
+    };
+    selectedPhoto.addEventListener('click',openPhoto);
+    selectedPhoto.addEventListener('keydown',event=>{
+      if(event.key==='Enter'||event.key===' '){event.preventDefault();openPhoto();}
     });
   }
 
@@ -96,5 +110,5 @@ document.addEventListener('DOMContentLoaded',function(){
       sessionStorage.setItem('coopexApprovalCount',String(lastCount));
     }catch(e){}
   }
-  setInterval(pollApprovals,10000);
+  setInterval(pollApprovals,15000);
 });
