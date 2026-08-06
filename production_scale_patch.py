@@ -18,6 +18,7 @@ TZ = flow.TZ
 
 
 def _weekday_zero_based(scale) -> int | None:
+    """Converte o dia legado (segunda=1) para o padrão Python (segunda=0)."""
     helper = getattr(flow.legacy, "_weekday_from_data_str", None)
     if helper:
         try:
@@ -34,13 +35,72 @@ def _weekday_zero_based(scale) -> int | None:
     return next((value for key, value in flow._WEEKDAYS.items() if key in text), None)
 
 
-# O sistema legado representa segunda=1 e domingo=7. O fluxo novo trabalha
-# com weekday do Python (segunda=0), portanto a conversão é obrigatória.
+# O cadastro legado usa segunda=1 e domingo=7. Sem esta conversão, as
+# produções são deslocadas e algumas saem da semana exibida.
 flow._weekday_for_scale = _weekday_zero_based
+
+
+_original_coop_scale_rows = flow._coop_scale_rows
+
+
+def _coop_scale_rows_with_locked_refusals(coop):
+    """Mantém todas as escalas da semana e bloqueia definitivamente recusadas."""
+    rows = _original_coop_scale_rows(coop)
+    for row in rows:
+        production = getattr(row, "producao", None)
+        if production and production.status == "recusada":
+            row.pode_lancar = False
+            row.color = "red"
+            row.status_label = "Recusada pelo estabelecimento · bloqueada"
+    return rows
+
+
+flow._coop_scale_rows = _coop_scale_rows_with_locked_refusals
 
 
 def _role_is(role: str) -> bool:
     return (session.get("user_tipo") or "").strip().lower() == role
+
+
+_original_coop_producao_flow = flow.coop_producao_flow
+
+
+def coop_producao_locked_flow():
+    """Impede reenvio por formulário ou acesso direto após uma recusa."""
+    if request.method == "POST" and _role_is("cooperado"):
+        coop = flow._coop_current()
+        scale_id = request.form.get("escala_id", type=int)
+        if scale_id:
+            refused = ProducaoCooperado.query.filter_by(
+                cooperado_id=coop.id,
+                escala_id=scale_id,
+                status="recusada",
+            ).first()
+            if refused:
+                flash(
+                    "Esta produção foi recusada pelo estabelecimento e está bloqueada para novo envio.",
+                    "warning",
+                )
+                return redirect(url_for("coop_producao"))
+    return _original_coop_producao_flow()
+
+
+def coop_producao_edit_locked(item_id: int):
+    if not _role_is("cooperado"):
+        return redirect(url_for("login"))
+    coop = flow._coop_current()
+    item = ProducaoCooperado.query.filter_by(
+        id=item_id,
+        cooperado_id=coop.id,
+    ).first_or_404()
+    if item.status == "recusada":
+        flash(
+            "Esta produção foi recusada e permanece bloqueada. Não é permitido tentar novamente.",
+            "warning",
+        )
+    else:
+        flash("Esta produção não pode ser alterada pelo cooperado.", "warning")
+    return redirect(url_for("coop_producao"))
 
 
 def rest_approve_adjusted(item_id: int):
@@ -164,6 +224,10 @@ def portal_restaurante_light():
     )
 
 
+flow.coop_producao_flow = coop_producao_locked_flow
+app.view_functions["coop_producao"] = coop_producao_locked_flow
+app.view_functions["coop_producao_nova"] = coop_producao_locked_flow
+app.view_functions["coop_producao_editar"] = coop_producao_edit_locked
 app.view_functions["rest_producao_aprovar"] = rest_approve_adjusted
 if _legacy_portal:
     app.view_functions["portal_restaurante"] = portal_restaurante_light
