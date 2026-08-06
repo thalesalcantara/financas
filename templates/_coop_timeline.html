@@ -1,0 +1,67 @@
+<div class="section-card coopex-daily-sequence">
+  <div class="coopex-sequence-head">
+    <div>
+      <h2><i class="bi bi-calendar2-check me-1"></i>Produções e escala em sequência</h2>
+      <p>Por padrão aparece somente o dia de hoje. Use as datas acima para consultar a semana ou localizar uma produção não lançada.</p>
+    </div>
+    {% if coopex_filter_start and coopex_filter_end %}
+    <span class="coopex-sequence-period">
+      {{ coopex_filter_start.strftime('%d/%m/%Y') }}
+      {% if coopex_filter_end != coopex_filter_start %} a {{ coopex_filter_end.strftime('%d/%m/%Y') }}{% endif %}
+    </span>
+    {% endif %}
+  </div>
+
+  <div class="coopex-day-stack">
+    {% for x in coopex_coop_timeline|default([]) %}
+    <article class="coopex-day-row {{ x.color }}">
+      <div class="coopex-day-top">
+        <div>
+          <div class="coopex-day-date">
+            {{ ['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'][x.data.weekday()] }},
+            {{ x.data.strftime('%d/%m/%Y') }}
+          </div>
+          <div class="coopex-day-meta">{% if x.kind == 'scale' %}Escala diária{% else %}Produção registrada fora da escala{% endif %}</div>
+        </div>
+        <span class="coopex-day-status">{{ x.status_label }}</span>
+      </div>
+
+      <div class="coopex-day-grid">
+        <div class="coopex-day-cell">
+          <small>Estabelecimento</small>
+          <strong>{{ x.restaurante.nome|replace('_',' ') if x.restaurante else 'Não vinculado' }}</strong>
+        </div>
+        <div class="coopex-day-cell">
+          <small>Horário</small>
+          <strong>{{ x.inicio or '--:--' }}{% if x.fim %} - {{ x.fim }}{% endif %}</strong>
+        </div>
+        <div class="coopex-day-cell"><small>Entregas</small><strong>{{ x.qtd_entregas or 0 }}</strong></div>
+        <div class="coopex-day-cell"><small>Valor</small><strong>R$ {{ '%.2f'|format(x.valor_total or 0)|replace('.', ',') }}</strong></div>
+      </div>
+
+      {% if x.kind == 'scale' and x.pode_lancar %}
+      <form class="coopex-day-form" method="post" action="{{ url_for('coop_producao') }}">
+        <input type="hidden" name="return_to" value="painel">
+        <input type="hidden" name="escala_id" value="{{ x.escala.id }}">
+        <input type="hidden" name="data_inicio" value="{{ coopex_filter_start.strftime('%Y-%m-%d') if coopex_filter_start else '' }}">
+        <input type="hidden" name="data_fim" value="{{ coopex_filter_end.strftime('%Y-%m-%d') if coopex_filter_end else '' }}">
+        <div><label>Quantidade de entregas</label><input type="number" min="1" name="qtd_entregas" required></div>
+        <div><label>Valor total da produção</label><input type="number" min="0.01" step="0.01" name="valor_total" required></div>
+        <button type="submit"><i class="bi bi-send-check me-1"></i>Lançar produção</button>
+      </form>
+      {% elif x.kind == 'scale' and not x.finalizada and not x.lancamento and not x.producao %}
+      <div class="coopex-day-note"><i class="bi bi-lock-fill me-1"></i>O lançamento será liberado somente após o término do horário da escala.</div>
+      {% elif x.lancamento or (x.producao and x.producao.status == 'aprovada') %}
+      <div class="coopex-day-note"><i class="bi bi-check-circle-fill text-success me-1"></i>Produção aprovada{% if x.avaliada %} e avaliada{% else %}. Avaliação ainda não registrada{% endif %}.</div>
+      {% elif x.producao and x.producao.status == 'pendente' %}
+      <div class="coopex-day-note"><i class="bi bi-hourglass-split text-warning me-1"></i>Produção enviada e aguardando aprovação do estabelecimento.</div>
+      {% endif %}
+    </article>
+    {% else %}
+    <div class="coopex-sequence-empty">
+      <i class="bi bi-calendar-x fs-4 d-block mb-2"></i>
+      Nenhuma escala ou produção encontrada para o período. Ajuste as datas acima para localizar dias anteriores.
+    </div>
+    {% endfor %}
+  </div>
+</div>
