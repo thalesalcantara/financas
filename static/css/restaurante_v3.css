@@ -1,0 +1,78 @@
+/* COOPEX UI V3 — painel horizontal compacto azul royal */
+:root{
+  --royal:#064fc8!important;
+  --royal-2:#063b9e!important;
+  --royal-soft:#edf4ff!important;
+  --bg:#f4f7fc!important;
+  --text:#07183e!important;
+  --muted:#61708c!important;
+  --border:#dbe4f1!important;
+}
+body{background:var(--bg)!important;color:var(--text)!important}
+.shell{display:block!important;min-height:100vh!important}
+.aside{position:sticky!important;top:0!important;z-index:1050!important;width:100%!important;height:72px!important;min-height:72px!important;padding:0 18px!important;display:flex!important;flex-direction:row!important;align-items:stretch!important;gap:14px!important;overflow:visible!important;color:#fff!important;background:linear-gradient(90deg,#062b80,#064fc8 58%,#063b9e)!important;box-shadow:0 4px 18px rgba(4,45,126,.20)!important}
+.brand.coopex-brand-welcome{width:260px!important;min-width:260px!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;display:flex!important;align-items:center!important;gap:11px!important}
+.coopex-brand-welcome>i{width:44px!important;height:44px!important;border-radius:10px!important;border:2px solid rgba(255,255,255,.72)!important;background:rgba(255,255,255,.08)!important;display:grid!important;place-items:center!important;font-size:1.15rem!important}
+.coopex-brand-copy{display:flex!important;flex-direction:column!important;min-width:0!important;line-height:1.05!important}
+.coopex-brand-copy small{font-size:.62rem!important;letter-spacing:.08em!important;color:rgba(255,255,255,.76)!important;font-weight:800!important}
+.coopex-brand-copy strong{font-size:.98rem!important;color:#fff!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;max-width:190px!important}
+.theme-toggle{display:none!important}
+.navmenu{margin:0!important;display:flex!important;flex:1!important;min-width:0!important;flex-direction:row!important;align-items:stretch!important;gap:0!important;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:none!important}
+.navmenu::-webkit-scrollbar{display:none!important}
+.navmenu a{min-height:72px!important;margin:0!important;padding:0 15px!important;border:0!important;border-radius:0!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;gap:7px!important;white-space:nowrap!important;font-size:.82rem!important;font-weight:750!important;color:#fff!important;transform:none!important}
+.navmenu a span{display:inline!important}
+.navmenu a:hover,.navmenu a.active{background:rgba(255,255,255,.11)!important;box-shadow:none!important}
+.navmenu a.active::before{left:12px!important;right:12px!important;top:auto!important;bottom:0!important;width:auto!important;height:4px!important;background:#fff!important}
+.coopex-welcome-bar{display:none!important}
+.content{width:100%!important;max-width:1720px!important;margin:0 auto!important;padding:12px 18px 22px!important}
+section[data-view="lancar"]>.hero-panel{display:inline-flex!important;width:66%!important;min-height:102px!important;vertical-align:top!important;margin:0 1% 10px 0!important;padding:17px 20px!important;justify-content:center!important;border-radius:13px!important;background:#fff!important;border:1px solid var(--border)!important;box-shadow:0 3px 13px rgba(15,38,85,.05)!important}
+.hero-title{font-size:1.35rem!important;color:#07183e!important}
+.hero-subtitle{font-size:.84rem!important;color:#465776!important;margin-top:3px!important}
+section[data-view="lancar"]>.pending-wrap{display:inline-grid!important;width:33%!important;vertical-align:top!important;margin:0 0 10px!important}
+section[data-view="lancar"]>.pending-wrap .pending-col{grid-column:span 12!important}
+.pending-card{min-height:102px!important;border-radius:13px!important;background:#fff!important;display:flex!important;flex-direction:column!important;justify-content:center!important;padding:14px 17px!important;box-shadow:0 3px 13px rgba(15,38,85,.04)!important}
+.pending-title{font-size:.9rem!important}.pending-sub{font-size:.78rem!important;margin-bottom:0!important}
+section[data-view="lancar"]>.card.card-body.mb-3{margin-bottom:10px!important;padding:11px 14px!important;border-radius:13px!important}
+.form-control,.form-select{border-radius:8px!important;min-height:38px!important;font-size:.84rem!important}
+.form-label{text-transform:none!important;letter-spacing:0!important;font-size:.74rem!important;color:#18315f!important;margin-bottom:3px!important}
+.btn-royal,.btn-outline-royal{border-radius:8px!important;font-size:.8rem!important}
+section[data-view="lancar"]>.row.g-4{--bs-gutter-x:12px!important;--bs-gutter-y:10px!important}
+.lancar-layout-card,.card,.card-soft,.table-box,.coop-list-box{border-radius:13px!important;border-color:var(--border)!important;box-shadow:0 3px 13px rgba(15,38,85,.045)!important}
+.lancar-layout-card .card-body{padding:12px!important}
+.coop-list-body{max-height:230px!important;padding:8px!important}
+.cooperado-item{border-radius:9px!important;padding:8px 10px!important;margin-bottom:6px!important}
+.selected-header{min-height:64px!important;text-align:left!important;display:flex!important;align-items:center!important;gap:12px!important;background:#fff!important;border:0!important;border-bottom:1px solid var(--border)!important;border-radius:0!important;padding:7px 4px 10px!important;margin-bottom:8px!important}
+.selected-header img.big{width:48px!important;height:48px!important;margin:0!important}
+section[data-view="lancar"] #formLancamento{padding:9px 10px!important;margin-top:5px!important}
+section[data-view="lancar"] #formLancamento .row{--bs-gutter-x:8px!important;--bs-gutter-y:6px!important}
+section[data-view="lancar"] textarea.form-control{min-height:54px!important;max-height:54px!important}
+.table th,.table td{font-size:.75rem!important;padding:.32rem .42rem!important;vertical-align:middle!important}
+.table thead th{background:#f7f9fd!important;text-transform:none!important;letter-spacing:0!important;color:#294068!important}
+#tblLanc tbody tr:nth-child(n+3){display:none}
+.coopex-prod-tabs{clear:both;display:flex;align-items:stretch;gap:0;background:#fff;border:1px solid var(--border);border-radius:12px;margin:0 0 10px;overflow:hidden;box-shadow:0 3px 12px rgba(15,38,85,.04)}
+.coopex-prod-tab{border:0;background:#fff;color:#465776;padding:10px 18px;font-size:.82rem;font-weight:800;border-bottom:3px solid transparent;display:flex;align-items:center;gap:7px}
+.coopex-prod-tab.active{color:#064fc8;border-bottom-color:#064fc8;background:#f8fbff}
+.coopex-prod-tab .badge{background:#e11d48!important}
+.coopex-sound-toggle{margin-left:auto!important;border-left:1px solid var(--border)!important}
+.coopex-approval-panel{display:none;background:#fff;border:1px solid var(--border);border-radius:13px;padding:12px;margin-bottom:10px;box-shadow:0 3px 13px rgba(15,38,85,.045)}
+.coopex-approval-panel.active{display:block}
+.coopex-approval-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.coopex-approval-card{border:1px solid #cfe0fa;border-left:4px solid #064fc8;border-radius:10px;padding:10px;background:#fbfdff}
+.coopex-approval-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:7px}
+.coopex-approval-name{font-weight:800;font-size:.84rem}.coopex-approval-meta{font-size:.69rem;color:#60708c}.coopex-approval-value{font-weight:850;color:#064fc8;white-space:nowrap}
+.coopex-approval-form{display:grid;grid-template-columns:1fr 1fr auto;gap:7px;align-items:end}
+.coopex-approval-form label{display:block;font-size:.66rem;font-weight:800;color:#60708c;margin-bottom:3px}
+.coopex-approval-form input{width:100%;height:35px;border:1px solid var(--border);border-radius:7px;padding:0 8px}
+.coopex-approval-form button{height:35px;border:0;border-radius:7px;background:#064fc8;color:#fff;padding:0 11px;font-weight:800}
+.coopex-inline-board{display:none!important}
+section[data-view="lancamentos"]>.section-title{font-size:1.35rem!important;color:#07183e!important;margin-bottom:12px!important}
+section[data-view="lancamentos"]>.row{--bs-gutter-x:12px!important}
+section[data-view="lancamentos"] .card{overflow:hidden!important}
+section[data-view="lancamentos"] .table{border-collapse:separate!important;border-spacing:0 7px!important}
+section[data-view="lancamentos"] .table thead th{border:0!important;background:#eef4ff!important;color:#17366f!important;padding:.58rem .65rem!important}
+section[data-view="lancamentos"] .table tbody tr{background:#fff!important;box-shadow:0 3px 10px rgba(15,38,85,.05)!important}
+section[data-view="lancamentos"] .table tbody td{border-top:1px solid #e2e8f2!important;border-bottom:1px solid #e2e8f2!important;padding:.62rem .65rem!important}
+section[data-view="lancamentos"] .table tbody td:first-child{border-left:4px solid #064fc8!important;border-radius:10px 0 0 10px!important}
+section[data-view="lancamentos"] .table tbody td:last-child{border-right:1px solid #e2e8f2!important;border-radius:0 10px 10px 0!important}
+@media(max-width:980px){.aside{height:auto!important;min-height:0!important;padding:8px 10px 0!important;flex-wrap:wrap!important;gap:4px!important}.brand.coopex-brand-welcome{width:100%!important;min-width:0!important;height:45px!important}.navmenu{width:100%!important;flex:0 0 100%!important;height:50px!important}.navmenu a{min-height:50px!important;padding:0 11px!important;font-size:.74rem!important}.content{padding:10px 9px 20px!important}section[data-view="lancar"]>.hero-panel,section[data-view="lancar"]>.pending-wrap{display:flex!important;width:100%!important;margin-right:0!important}.coopex-approval-grid{grid-template-columns:1fr!important}}
+@media(max-width:575px){.coopex-brand-copy strong{max-width:230px!important}.navmenu a{padding:0 9px!important}.navmenu a span{display:inline!important}.coopex-prod-tabs{overflow-x:auto}.coopex-prod-tab{white-space:nowrap;padding:9px 12px}.coopex-approval-form{grid-template-columns:1fr!important}.coopex-approval-form button{width:100%!important}}
