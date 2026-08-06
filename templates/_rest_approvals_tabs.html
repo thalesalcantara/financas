@@ -1,0 +1,54 @@
+{% set _coopex_pending = coopex_rest_pending_rows|default([]) %}
+<div class="coopex-prod-tabs" id="coopexProdTabs">
+  <button type="button" class="coopex-prod-tab active" data-coopex-tab="launch">
+    <i class="bi bi-plus-circle"></i> Lançamentos
+  </button>
+  <button type="button" class="coopex-prod-tab" data-coopex-tab="approvals">
+    <i class="bi bi-check2-square"></i> Aprovações
+    {% if _coopex_pending %}<span class="badge rounded-pill">{{ _coopex_pending|length }}</span>{% endif %}
+  </button>
+  <button type="button" class="coopex-prod-tab coopex-sound-toggle" id="coopexSoundToggle">
+    <i class="bi bi-volume-up-fill"></i> Som forte
+  </button>
+</div>
+
+<div class="coopex-approval-panel" id="coopexApprovalPanel" data-pending-count="{{ _coopex_pending|length }}">
+  <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+    <div>
+      <strong><i class="bi bi-bell-fill text-danger me-1"></i>Aprovações de lançamentos</strong>
+      <div class="small text-muted">Ajuste a quantidade ou o valor total antes de aprovar.</div>
+    </div>
+    <span class="badge rounded-pill bg-danger">{{ _coopex_pending|length }}</span>
+  </div>
+
+  {% if _coopex_pending %}
+  <div class="coopex-approval-grid">
+    {% for x in _coopex_pending %}
+    <article class="coopex-approval-card">
+      <div class="coopex-approval-head">
+        <div>
+          <div class="coopex-approval-name">{{ x.cooperado.nome if x.cooperado else (x.escala.cooperado_nome or 'Cooperado') }}</div>
+          <div class="coopex-approval-meta">{{ x.data.strftime('%d/%m/%Y') if x.data else x.escala.data }} · {{ x.escala.horario or 'Sem horário' }}</div>
+        </div>
+        <div class="coopex-approval-value">R$ {{ '%.2f'|format(x.producao.valor_total or 0)|replace('.', ',') }}</div>
+      </div>
+      <form class="coopex-approval-form" method="post" action="{{ url_for('rest_producao_aprovar', item_id=x.producao.id) }}">
+        <div>
+          <label>Entregas finais</label>
+          <input type="number" min="1" name="qtd_entregas" value="{{ x.producao.qtd_entregas or '' }}" required>
+        </div>
+        <div>
+          <label>Valor total final</label>
+          <input type="number" min="0.01" step="0.01" name="valor_total" value="{{ '%.2f'|format(x.producao.valor_total or 0) }}" required>
+        </div>
+        <button type="submit"><i class="bi bi-check-circle me-1"></i>Aprovar</button>
+      </form>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-3">
+    <i class="bi bi-check2-circle text-success me-1"></i>Nenhum lançamento aguardando aprovação.
+  </div>
+  {% endif %}
+</div>
