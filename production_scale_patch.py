@@ -17,6 +17,28 @@ ProducaoCooperado = flow.ProducaoCooperado
 TZ = flow.TZ
 
 
+def _weekday_zero_based(scale) -> int | None:
+    helper = getattr(flow.legacy, "_weekday_from_data_str", None)
+    if helper:
+        try:
+            value = helper(scale.data)
+            if value is not None:
+                value = int(value)
+                if 1 <= value <= 7:
+                    return value - 1
+                if 0 <= value <= 6:
+                    return value
+        except Exception:
+            pass
+    text = str(scale.data or "").strip().casefold()
+    return next((value for key, value in flow._WEEKDAYS.items() if key in text), None)
+
+
+# O sistema legado representa segunda=1 e domingo=7. O fluxo novo trabalha
+# com weekday do Python (segunda=0), portanto a conversão é obrigatória.
+flow._weekday_for_scale = _weekday_zero_based
+
+
 def _role_is(role: str) -> bool:
     return (session.get("user_tipo") or "").strip().lower() == role
 
@@ -101,12 +123,14 @@ def portal_restaurante_light():
 
     requested_view = (request.args.get("view") or "").strip().lower()
     if requested_view not in {"", "home", "inicio"}:
-        return _legacy_portal()
+        if _legacy_portal:
+            return _legacy_portal()
+        abort(404)
 
     rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first()
     if not rest:
         return "Seu usuário não está vinculado a um estabelecimento.", 403
-    if getattr(rest, "eh_farmacia", False):
+    if getattr(rest, "eh_farmacia", False) and _legacy_portal:
         return _legacy_portal()
 
     today = datetime.now(TZ).date()
