@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <style>
     :root{--blue:#2747d9;--bg:#f4f6fb;--ink:#172033;--muted:#6b7280;--line:#e5e9f2;--red:#d93646;--green:#16924d}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Inter,system-ui,Arial;color:var(--ink)}a{text-decoration:none;color:inherit}.wrap{max-width:850px;margin:auto;padding:12px 12px 32px}.head{background:linear-gradient(135deg,var(--blue),#3157ff);color:#fff;border-radius:20px;padding:18px;display:flex;justify-content:space-between;align-items:center;gap:12px}.head h1{font-size:1.18rem;margin:2px 0 0}.back{border:1px solid rgba(255,255,255,.35);border-radius:12px;padding:9px 12px;font-weight:800}.notice,.flash{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-top:12px;font-size:.87rem}.notice{background:#fff8dc;border-color:#ecd36a;color:#6b5600}.flash.success{background:#eaf8ef;color:#126a38}.flash.warning{background:#fff7dc;color:#725900}.flash.danger{background:#ffeaed;color:#8f2030}.title{font-size:1rem;margin:20px 2px 10px}.card{background:#fff;border:1px solid var(--line);border-left:6px solid var(--red);border-radius:18px;padding:15px;margin-top:11px;box-shadow:0 5px 18px rgba(20,28,45,.05)}.card.green{border-left-color:var(--green)}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.place{font-weight:900;font-size:1rem}.meta{color:var(--muted);font-size:.8rem;margin-top:4px}.status{border-radius:999px;padding:6px 9px;font-size:.7rem;font-weight:900;background:#ffeaed;color:#a61f32;text-align:center}.green .status{background:#e5f7ec;color:#126c39}.value{font-size:1.28rem;font-weight:950;margin-top:12px}.form{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:13px;padding-top:13px;border-top:1px solid var(--line)}label{display:block;font-size:.72rem;font-weight:850;color:var(--muted);margin-bottom:5px}input{width:100%;height:44px;border:1px solid var(--line);border-radius:12px;padding:0 11px;font-size:1rem}.send{grid-column:1/-1;height:46px;border:0;border-radius:13px;background:var(--blue);color:#fff;font-weight:900;font-size:.92rem}.locked{margin-top:12px;border-radius:12px;background:#f3f4f6;color:#767b84;padding:11px;text-align:center;font-size:.82rem;font-weight:800}.done{margin-top:11px;color:var(--green);font-size:.82rem;font-weight:850}.empty{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px;text-align:center;color:var(--muted)}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Inter,system-ui,Arial;color:var(--ink)}a{text-decoration:none;color:inherit}.wrap{max-width:850px;margin:auto;padding:12px 12px 32px}.head{background:linear-gradient(135deg,var(--blue),#3157ff);color:#fff;border-radius:20px;padding:18px;display:flex;justify-content:space-between;align-items:center;gap:12px}.head h1{font-size:1.18rem;margin:2px 0 0}.back{border:1px solid rgba(255,255,255,.35);border-radius:12px;padding:9px 12px;font-weight:800}.notice,.flash{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-top:12px;font-size:.87rem}.notice{background:#fff8dc;border-color:#ecd36a;color:#6b5600}.flash.success{background:#eaf8ef;color:#126a38}.flash.warning{background:#fff7dc;color:#725900}.flash.danger{background:#ffeaed;color:#8f2030}.title{font-size:1rem;margin:20px 2px 10px}.card{background:#fff;border:1px solid var(--line);border-left:6px solid var(--red);border-radius:18px;padding:15px;margin-top:11px;box-shadow:0 5px 18px rgba(20,28,45,.05)}.card.green{border-left-color:var(--green)}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.place{font-weight:900;font-size:1rem}.meta{color:var(--muted);font-size:.8rem;margin-top:4px}.status{border-radius:999px;padding:6px 9px;font-size:.7rem;font-weight:900;background:#ffeaed;color:#a61f32;text-align:center}.green .status{background:#e5f7ec;color:#126c39}.value{font-size:1.28rem;font-weight:950;margin-top:12px}.form{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:13px;padding-top:13px;border-top:1px solid var(--line)}label{display:block;font-size:.72rem;font-weight:850;color:var(--muted);margin-bottom:5px}input{width:100%;height:44px;border:1px solid var(--line);border-radius:12px;padding:0 11px;font-size:1rem}.send{grid-column:1/-1;height:46px;border:0;border-radius:13px;background:var(--blue);color:#fff;font-weight:900;font-size:.92rem}.locked{margin-top:12px;border-radius:12px;background:#f3f4f6;color:#767b84;padding:11px;text-align:center;font-size:.82rem;font-weight:800}.locked.refused{background:#ffeaed;color:#992235;border:1px solid #f3bec6}.done{margin-top:11px;color:var(--green);font-size:.82rem;font-weight:850}.empty{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px;text-align:center;color:var(--muted)}
     @media(max-width:540px){.wrap{padding:8px}.head{border-radius:16px}.top{align-items:flex-start}.status{max-width:145px}.form{grid-template-columns:1fr}}
   </style>
 </head>
@@ -15,8 +15,8 @@
 <main class="wrap">
   <header class="head"><div><small>PAINEL DO COOPERADO</small><h1>Minhas produções</h1></div><a class="back" href="/portal/cooperado"><i class="bi bi-arrow-left"></i> Voltar</a></header>
   {% with messages=get_flashed_messages(with_categories=true) %}{% for cat,msg in messages %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}{% endwith %}
-  <div class="notice"><strong>Como funciona:</strong> cada escala aparece com R$ 0,00 em vermelho. O lançamento somente é liberado depois do fim do horário. Quando cooperado ou estabelecimento informa um valor, fica verde. O financeiro só recebe após a aprovação do estabelecimento.</div>
-  <h2 class="title">Produções da escala</h2>
+  <div class="notice"><strong>Como funciona:</strong> todas as escalas da semana aparecem com R$ 0,00 em vermelho. O lançamento só é liberado depois do fim do horário. Quando houver valor informado, fica verde. Se o estabelecimento recusar, o registro permanece bloqueado e o cooperado não pode tentar novamente.</div>
+  <h2 class="title">Produções da semana</h2>
 
   {% for x in previsoes %}
   <article class="card {{ x.color }}">
@@ -27,7 +27,9 @@
     <div class="value">R$ {{ '%.2f'|format(x.valor_total or 0)|replace('.', ',') }}</div>
     {% if x.qtd_entregas %}<div class="meta">{{ x.qtd_entregas }} entrega(s)</div>{% endif %}
 
-    {% if x.pode_lancar %}
+    {% if x.producao and x.producao.status == 'recusada' %}
+      <div class="locked refused"><i class="bi bi-lock-fill"></i> Recusada pelo estabelecimento. Esta produção está bloqueada para novo envio.{% if x.producao.motivo_recusa %}<br><small>Motivo: {{ x.producao.motivo_recusa }}</small>{% endif %}</div>
+    {% elif x.pode_lancar %}
       <form method="post" class="form">
         <input type="hidden" name="escala_id" value="{{ x.escala.id }}">
         <div><label>Quantidade de entregas</label><input type="number" min="1" name="qtd_entregas" value="{{ x.qtd_entregas or '' }}" required></div>
@@ -42,7 +44,7 @@
       <div class="locked">A escala precisa ser vinculada ao estabelecimento.</div>
     {% endif %}
   </article>
-  {% else %}<div class="empty">Nenhuma escala encontrada.</div>{% endfor %}
+  {% else %}<div class="empty">Nenhuma escala encontrada para esta semana.</div>{% endfor %}
 </main>
 </body>
 </html>
