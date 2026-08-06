@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-06.1212"
+BUILD_VERSION = "2026-08-06.1238"
 
 
 def post_worker_init(worker):
@@ -18,8 +18,6 @@ def post_worker_init(worker):
 
         flask_app = upgrade.app
 
-        # Remove o processamento antigo que relia, alterava e compactava todo
-        # HTML/JSON depois de cada resposta. Isso pesava inclusive após o login.
         callbacks = flask_app.after_request_funcs.get(None, [])
         flask_app.after_request_funcs[None] = [
             callback
@@ -27,7 +25,6 @@ def post_worker_init(worker):
             if getattr(callback, "__name__", "") != "coopex_upgrade_after_request"
         ]
 
-        # Fluxo por escala, regras de aprovação e interface integrada.
         import production_scale_flow  # noqa: F401
         import production_scale_patch  # noqa: F401
         import production_ui_patch  # noqa: F401
@@ -43,7 +40,12 @@ def post_worker_init(worker):
                     build=BUILD_VERSION,
                     production_scale=True,
                     restaurant_horizontal_dashboard=True,
-                    cooperative_inline_production=True,
+                    restaurant_welcome_name=True,
+                    restaurant_approval_tab=True,
+                    strong_approval_sound=True,
+                    tables_horizontal_dashboard=True,
+                    cooperative_daily_timeline=True,
+                    cooperative_default_today=True,
                     extra_production_tab=False,
                 )
 
@@ -52,7 +54,7 @@ def post_worker_init(worker):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Painéis e fluxo semanal integrados. Build %s", BUILD_VERSION)
+        log.info("Interface diária e aprovações integradas. Build %s", BUILD_VERSION)
     except Exception:
         log.exception(
             "Melhorias complementares não carregaram; mantendo o aplicativo principal disponível."
