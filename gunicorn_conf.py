@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-06.1155"
+BUILD_VERSION = "2026-08-06.1212"
 
 
 def post_worker_init(worker):
@@ -27,10 +27,11 @@ def post_worker_init(worker):
             if getattr(callback, "__name__", "") != "coopex_upgrade_after_request"
         ]
 
-        # Fluxo por escala, regras de aprovação e atalhos de interface.
+        # Fluxo por escala, regras de aprovação e interface integrada.
         import production_scale_flow  # noqa: F401
         import production_scale_patch  # noqa: F401
         import production_ui_patch  # noqa: F401
+        import production_ui_finalize  # noqa: F401
 
         if "coopex_build_probe" not in flask_app.view_functions:
             from flask import jsonify
@@ -41,8 +42,9 @@ def post_worker_init(worker):
                     ok=True,
                     build=BUILD_VERSION,
                     production_scale=True,
-                    original_restaurant_dashboard=True,
-                    cooperative_weekly_production=True,
+                    restaurant_horizontal_dashboard=True,
+                    cooperative_inline_production=True,
+                    extra_production_tab=False,
                 )
 
         @flask_app.after_request
@@ -50,7 +52,7 @@ def post_worker_init(worker):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Fluxo semanal de produção carregado. Build %s", BUILD_VERSION)
+        log.info("Painéis e fluxo semanal integrados. Build %s", BUILD_VERSION)
     except Exception:
         log.exception(
             "Melhorias complementares não carregaram; mantendo o aplicativo principal disponível."
