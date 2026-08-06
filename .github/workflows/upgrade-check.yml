@@ -24,22 +24,23 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile Python
-        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py tests/smoke_upgrade.py
+        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py gunicorn_conf.py tests/smoke_upgrade.py
       - name: Validate Jinja templates
         run: |
           python - <<'PY'
           from pathlib import Path
           from jinja2 import Environment
           env = Environment()
-          new_templates = (
+          templates = (
               'coop_producao.html',
               'coop_producao_editar.html',
               'coop_agenda.html',
               'rest_producoes_pendentes.html',
+              'restaurante_home_leve.html',
               'admin_producoes_pendentes.html',
               'admin_rapido.html',
           )
-          for name in new_templates:
+          for name in templates:
               path = Path('templates') / name
               env.parse(path.read_text(encoding='utf-8'))
           print('templates ok')
