@@ -16,7 +16,7 @@ Restaurante = shifts.patch.Restaurante
 Lancamento = shifts.patch.Lancamento
 ProducaoCooperado = shifts.patch.ProducaoCooperado
 TZ = shifts.patch.TZ
-BUILD = "20260807-0958"
+BUILD = "20260807-1009"
 
 
 if "coop_latest_incoming_evaluation" not in app.view_functions:
@@ -29,7 +29,6 @@ if "coop_latest_incoming_evaluation" not in app.view_functions:
         if not coop:
             return jsonify(ok=False, latest_id=0), 404
 
-        # `avaliacoes` é a avaliação recebida pelo cooperado.
         try:
             row = db.session.execute(
                 sa_text(
@@ -126,8 +125,6 @@ def _week_pending_rows(rest):
         start_time, end_time = shifts.patch.upgrade._times_from_text(scale.horario)
         end_at = shifts.flow._end_at(data_ref, start_time, end_time)
 
-        # Sem horário final confiável não inventamos um horário. Para hoje,
-        # só vira pendência após o fim exato do turno. Dias anteriores vencem.
         if data_ref == today:
             if not end_at or now < end_at:
                 continue
@@ -192,14 +189,8 @@ def _install_coop_ui() -> None:
 
     original_get_source = loader.get_source
 
-    css_tag = (
-        '<link rel="stylesheet" href="{{ url_for(\'static\', '
-        "filename='css/cooperado_v4.css', v='" + BUILD + "') }}">"
-    )
-    js_tag = (
-        '<script src="{{ url_for(\'static\', '
-        "filename='js/cooperado_v4.js', v='" + BUILD + "') }}"></script>"
-    )
+    css_tag = """<link rel="stylesheet" href="{{ url_for('static', filename='css/cooperado_v4.css', v='__BUILD__') }}">""".replace("__BUILD__", BUILD)
+    js_tag = """<script src="{{ url_for('static', filename='js/cooperado_v4.js', v='__BUILD__') }}"></script>""".replace("__BUILD__", BUILD)
 
     def get_source(environment, template):
         source, filename, uptodate = original_get_source(environment, template)
