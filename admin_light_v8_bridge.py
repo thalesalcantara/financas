@@ -5,7 +5,7 @@ from flask import redirect, request, url_for
 import admin_light_v8 as light
 
 app = light.app
-BUILD = light.BUILD
+BUILD = "20260807-1318"
 
 
 @app.before_request
@@ -13,10 +13,13 @@ def _admin_light_v8_redirects():
     if request.method != "GET" or (request.headers.get("X-Requested-With") or "").lower() == "xmlhttprequest":
         return None
 
+    # legacy=1 significa: manter exatamente a função/modo antigo, alterando
+    # somente o visual/menu pelo bridge. Nunca redireciona esse acesso.
+    if request.args.get("legacy") == "1":
+        return None
+
     path = request.path or ""
     endpoint = request.endpoint or ""
-
-    # Toda entrada principal do Admin deve cair no visual leve V8.
     if endpoint == "admin_dashboard" or path == "/admin":
         tab = (request.args.get("tab") or "").strip().lower()
         target = {
@@ -29,11 +32,10 @@ def _admin_light_v8_redirects():
             "documentos": "admin_light_documents",
             "tabelas": "admin_light_tables",
             "avisos": "admin_light_notices",
-            "config": "admin_light_summary",
         }.get(tab)
         if target:
             values = {}
-            for key in ("data_inicio", "data_fim", "q", "cooperado_id", "status"):
+            for key in ("data_inicio", "data_fim", "q", "cooperado_id", "restaurante_id", "status"):
                 value = request.args.get(key)
                 if value not in (None, ""):
                     values[key] = value
@@ -48,12 +50,7 @@ def _admin_light_v8_redirects():
     }
     target = path_map.get(path)
     if target:
-        values = {}
-        for key in ("data_inicio", "data_fim", "q", "cooperado_id", "status"):
-            value = request.args.get(key)
-            if value not in (None, ""):
-                values[key] = value
-        return redirect(url_for(target, **values))
+        return redirect(url_for(target))
     return None
 
 
@@ -71,19 +68,29 @@ def _install_bridge_templates():
         "admin_escalas (3).html",
         "admin_rapido.html",
         "admin_lancamentos.html",
+        "editar_tabelas.html",
+        "editar_documentos.html",
     }
+    css_tag = "<link rel=\"stylesheet\" href=\"{{ url_for('static', filename='css/admin_light_v8.css', v='" + BUILD + "') }}\">"
     js_tag = "<script src=\"{{ url_for('static', filename='js/admin_light_v8_bridge.js', v='" + BUILD + "') }}\"></script>"
     flat_css = """
 <style id="adminLightV8FlatOverride">
+html,body{min-width:1180px!important}body{padding-top:68px!important;background:#f5f7ff!important}
+.sidebar,.admin-v6-topbar,.admin-topbar{display:none!important}
+.layout,.shell{display:block!important;min-height:0!important}
+.main,.content{margin-left:0!important;width:100%!important;max-width:none!important;padding:10px 14px 18px!important}
+.content-shell,.container-fluid,.main>.tab-content{max-width:none!important;width:100%!important}
 .sidebar .brand,.surface-card,.admin-card,.card{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
-.main .card,.main .surface-card{box-shadow:0 2px 8px rgba(16,24,40,.05)!important;border-color:#e5e9f2!important}
+.main .card,.main .surface-card,.content .card{box-shadow:0 2px 6px rgba(15,23,42,.035)!important;border-color:#e1e5f2!important}
 </style>
 """
 
     def get_source(environment, template):
         source, filename, uptodate = original_get_source(environment, template)
         if template in old_admin_templates:
-            if "adminLightV8FlatOverride" not in source:
+            if "admin_light_v8.css" not in source:
+                source = source.replace("</head>", css_tag + "\n" + flat_css + "\n</head>", 1)
+            elif "adminLightV8FlatOverride" not in source:
                 source = source.replace("</head>", flat_css + "\n</head>", 1)
             if "admin_light_v8_bridge.js" not in source:
                 source = source.replace("</body>", js_tag + "\n</body>", 1)
@@ -95,4 +102,4 @@ def _install_bridge_templates():
 
 
 _install_bridge_templates()
-app.logger.info("Bridge Admin V8 carregado: rotas antigas bloqueadas e visual leve obrigatório.")
+app.logger.info("Bridge Admin V8 completo: funções antigas preservadas com o mesmo menu horizontal.")
