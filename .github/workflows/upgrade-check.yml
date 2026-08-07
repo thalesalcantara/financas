@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile Python
-        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py performance_ui_fix.py performance_ui_hotfix.py performance_query_override.py performance_ui_finalize.py menu_horizontal_enforcer.py gunicorn_conf.py tests/smoke_upgrade.py
+        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py performance_ui_fix.py performance_ui_hotfix.py performance_query_override.py production_shift_time_fix.py performance_ui_finalize.py menu_horizontal_enforcer.py cooperative_notifications_ui.py gunicorn_conf.py tests/smoke_upgrade.py
       - name: Validate Jinja templates
         run: |
           python - <<'PY'
@@ -49,39 +49,72 @@ jobs:
               env.parse(path.read_text(encoding='utf-8'))
           print('templates ok')
           PY
+      - name: Validate exact shift rules
+        run: |
+          python - <<'PY'
+          from datetime import date
+          from types import SimpleNamespace
+          import production_shift_time_fix as shifts
+
+          assert shifts.exact_scale_date(SimpleNamespace(data='07/08/26-SEX')) == date(2026, 8, 7)
+          assert shifts.exact_scale_date(SimpleNamespace(data='31/07/26-SEX')) == date(2026, 7, 31)
+          assert shifts.upgrade._times_from_text('18:00 às 22:00') == ('18:00', '22:00')
+          assert shifts.upgrade._times_from_text('17:30 às 22:30') == ('17:30', '22:30')
+          assert shifts.upgrade._times_from_text('11:00 às 15:00') == ('11:00', '15:00')
+          end_22 = shifts.flow._end_at(date(2026, 8, 7), '18:00', '22:00')
+          end_2230 = shifts.flow._end_at(date(2026, 8, 7), '17:30', '22:30')
+          overnight = shifts.flow._end_at(date(2026, 8, 7), '19:00', '07:00')
+          assert (end_22.hour, end_22.minute, end_22.day) == (22, 0, 7)
+          assert (end_2230.hour, end_2230.minute, end_2230.day) == (22, 30, 7)
+          assert (overnight.hour, overnight.minute, overnight.day) == (7, 0, 8)
+          print('exact shift rules ok')
+          PY
       - name: Validate transformed panels
         run: |
           python - <<'PY'
-          import performance_ui_hotfix
-          import performance_query_override
-          import performance_ui_finalize
-          import menu_horizontal_enforcer as ui
+          import cooperative_notifications_ui as ui
 
           app = ui.app
-          for name in ('restaurante_dashboard.html', 'painel_cooperado.html'):
+          for name in ('restaurante_dashboard.html', 'painel_cooperado.html', 'coop_producao.html'):
               source, _, _ = app.jinja_loader.get_source(app.jinja_env, name)
               app.jinja_env.parse(source)
 
           rest_source, _, _ = app.jinja_loader.get_source(app.jinja_env, 'restaurante_dashboard.html')
           coop_source, _, _ = app.jinja_loader.get_source(app.jinja_env, 'painel_cooperado.html')
-          assert 'restaurante_v3.css' in rest_source
+          launch_source, _, _ = app.jinja_loader.get_source(app.jinja_env, 'coop_producao.html')
+
           assert 'SEJA BEM-VINDO' in rest_source
           assert '_rest_approvals_tabs.html' in rest_source
           assert 'restaurante_v3.js' in rest_source
-          assert 'coopexPhotoModal' in rest_source
           assert 'coopex-horizontal-menu-critical' in rest_source
-          assert 'flex-direction:row!important' in rest_source
-          assert 'filename=\'css/restaurante_v3.css\', v=' in rest_source
-          assert 'filename=\'js/restaurante_v3.js\', v=' in rest_source
-          assert "url_for('media_coop', coop_id=coop.id)" in rest_source
+          assert 'coopex_rest_week_pending_rows' in rest_source
           assert 'data-coopex-producoes="1"' not in rest_source
+
           assert 'cooperado_producao_v3.css' in coop_source
+          assert 'cooperado_v4.css' in coop_source
+          assert 'cooperado_v4.js' in coop_source
+          assert 'coopex-production-card' in coop_source
+          assert 'Produção aprovada' in coop_source
+          assert 'Avaliada' in coop_source
           assert coop_source.count("{% include '_coop_timeline.html' %}") == 1
           history_pos = coop_source.find('Produções no período')
           timeline_pos = coop_source.find("{% include '_coop_timeline.html' %}")
           assert history_pos >= 0 and timeline_pos > history_pos
-          assert 'data-week-production-card="1"' not in coop_source
+          assert 'data-coopex-production-submit="1"' in launch_source
           print('transformed panels ok')
+          PY
+      - name: Validate notification intervals
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          rest_js = Path('static/js/restaurante_v3.js').read_text(encoding='utf-8')
+          coop_js = Path('static/js/cooperado_v4.js').read_text(encoding='utf-8')
+          assert '5*60*1000' in rest_js
+          assert '/static/avisos.mp3' in rest_js
+          assert '/static/dinheiro.mp3' in coop_js
+          assert 'coopex:lastIncomingEvaluation:' in coop_js
+          assert 'data-coopex-production-submit' in coop_js
+          print('notification rules ok')
           PY
       - name: Run production workflow smoke test
         run: PYTHONPATH=. python tests/smoke_upgrade.py
