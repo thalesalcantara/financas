@@ -1,0 +1,23 @@
+/* COOPEX — Produções do cooperado V4 */
+#tab-producoes .section-card{box-shadow:0 5px 16px rgba(15,23,42,.045)!important;border-radius:16px!important;padding:12px!important}
+#tab-producoes .list-stack{gap:8px!important}
+#tab-producoes .coopex-production-card{position:relative;border-radius:14px!important;padding:11px 12px!important;box-shadow:0 3px 12px rgba(15,23,42,.04)!important;border:1px solid rgba(15,23,42,.07)!important;border-left:4px solid #16a34a!important;background:#fff!important}
+#tab-producoes .coopex-production-card .item-row{gap:8px!important}
+#tab-producoes .coopex-production-card .item-title{font-size:.91rem!important;line-height:1.25!important}
+#tab-producoes .coopex-production-card .item-meta,#tab-producoes .coopex-production-card .item-small{font-size:.74rem!important;line-height:1.35!important}
+#tab-producoes .coopex-production-card .item-amount{font-size:.95rem!important;color:#0f172a!important}
+#tab-producoes .coopex-prod-state{display:inline-flex;align-items:center;gap:5px;margin-top:6px;border-radius:999px;padding:4px 8px;background:#dcfce7;color:#166534;font-size:.68rem;font-weight:850}
+#tab-producoes .coopex-prod-state.pending-rating{background:#eef3ff;color:#2747d9}
+#tab-producoes .coopex-production-card .rating-stars .bi-star,#tab-producoes .coopex-production-card .rating-stars .bi-star-fill{font-size:1rem!important}
+#tab-producoes .coopex-production-card .avaliar-form{margin-top:7px;padding-top:7px;border-top:1px solid rgba(15,23,42,.06)}
+#tab-producoes .coopex-production-card .avaliar-form textarea{min-height:52px!important}
+#tab-producoes .coopex-daily-sequence{margin-top:10px!important;border-top:0!important;background:#fff!important}
+#tab-producoes .coopex-day-row{padding:10px!important;border-radius:13px!important;box-shadow:0 3px 12px rgba(15,23,42,.035)!important}
+#tab-producoes .coopex-day-grid{gap:6px!important;margin-top:7px!important}
+#tab-producoes .coopex-day-cell{padding:7px!important;border-radius:9px!important}
+#tab-producoes .coopex-day-cell small{font-size:.62rem!important}
+#tab-producoes .coopex-day-cell strong{font-size:.79rem!important}
+#tab-producoes .coopex-day-note{font-size:.72rem!important;padding:7px 8px!important}
+#tab-producoes .coopex-day-form{gap:6px!important;margin-top:7px!important}
+#tab-producoes .coopex-day-form input,#tab-producoes .coopex-day-form button{height:37px!important}
+@media(max-width:580px){#tab-producoes .coopex-production-card{padding:10px!important}#tab-producoes .coopex-production-card .item-row{align-items:flex-start!important}#tab-producoes .coopex-production-card .item-amount{font-size:.9rem!important}.coopex-prod-state{font-size:.65rem!important}}
