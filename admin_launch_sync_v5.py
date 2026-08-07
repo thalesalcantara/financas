@@ -10,7 +10,7 @@ upgrade = rejection.upgrade
 db = upgrade.db
 Lancamento = upgrade.Lancamento
 
-BUILD = "20260807-1032"
+BUILD = "20260807-1104"
 
 
 def _is_admin() -> bool:
@@ -37,6 +37,7 @@ def _install_admin_live_sync() -> None:
 (function(){
   let lastLatest=null;
   let checking=false;
+  let reloading=false;
 
   function lancamentosAtivo(){
     const p=new URLSearchParams(window.location.search||'');
@@ -45,45 +46,43 @@ def _install_admin_live_sync() -> None:
     return !!pane && (pane.classList.contains('active') || pane.classList.contains('show'));
   }
 
-  async function refreshLancamentos(){
-    const api=window.CoopexTabCache;
-    if(!api || typeof api.fetchPartial!=='function') return;
-    // O lançamento aprovado pode ter sido criado em outra sessão/tela.
-    // Limpamos o cache apenas quando realmente houve lançamento novo.
-    try{ api.cache?.clear?.(); }catch(e){}
-    await api.fetchPartial('lancamentos',true);
+  function safeReloadLancamentos(){
+    if(reloading) return;
+    reloading=true;
+    const url=new URL(window.location.href);
+    url.searchParams.set('tab','lancamentos');
+    url.searchParams.delete('ajax_partial');
+    url.searchParams.delete('ajax');
+    url.searchParams.set('_sync',String(Date.now()));
+    window.location.replace(url.toString());
   }
 
-  async function checkLatest(forceRefresh){
-    if(checking || document.visibilityState==='hidden') return;
+  async function checkLatest(){
+    if(checking || reloading || document.visibilityState==='hidden') return;
     checking=true;
     try{
       const r=await fetch('/api/admin/lancamentos/latest',{credentials:'same-origin',cache:'no-store'});
       if(!r.ok) return;
       const data=await r.json();
       const latest=Number(data.latest||0);
-      const changed=(lastLatest!==null && latest>lastLatest);
-      if(forceRefresh || changed){
-        if(lancamentosAtivo()) await refreshLancamentos();
+      if(lastLatest===null){
+        lastLatest=latest;
+        return;
       }
-      lastLatest=latest;
+      if(latest>lastLatest){
+        lastLatest=latest;
+        if(lancamentosAtivo()) safeReloadLancamentos();
+      }
     }catch(e){}finally{checking=false;}
   }
 
   document.addEventListener('DOMContentLoaded',function(){
-    // Ao abrir o Admin em Lançamentos, busca a versão atual do banco uma vez.
-    setTimeout(()=>checkLatest(lancamentosAtivo()),350);
-
-    document.querySelectorAll('[data-bs-target="#lancamentos"]').forEach(el=>{
-      el.addEventListener('click',()=>setTimeout(()=>checkLatest(true),80));
-    });
-
-    // Polling é mínimo: só consulta um MAX(id); a tabela completa só é
-    // recarregada quando surge um lançamento novo e a aba está aberta.
-    setInterval(()=>checkLatest(false),15000);
-    window.addEventListener('focus',()=>checkLatest(false));
+    // Apenas memoriza o último ID. Não substitui mais a tabela por parcial.
+    setTimeout(checkLatest,350);
+    setInterval(checkLatest,15000);
+    window.addEventListener('focus',checkLatest);
     document.addEventListener('visibilitychange',()=>{
-      if(document.visibilityState==='visible') checkLatest(false);
+      if(document.visibilityState==='visible') checkLatest();
     });
   });
 })();
