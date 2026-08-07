@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile Python
-        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py performance_ui_fix.py performance_ui_hotfix.py performance_query_override.py production_shift_time_fix.py performance_ui_finalize.py menu_horizontal_enforcer.py cooperative_notifications_ui.py operational_rules_v5.py approval_rejection_v5.py gunicorn_conf.py tests/smoke_upgrade.py
+        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py performance_ui_fix.py performance_ui_hotfix.py performance_query_override.py production_shift_time_fix.py performance_ui_finalize.py menu_horizontal_enforcer.py cooperative_notifications_ui.py operational_rules_v5.py approval_rejection_v5.py approval_return_dashboard_v5.py admin_launch_sync_v5.py gunicorn_conf.py tests/smoke_upgrade.py
       - name: Validate Jinja templates
         run: |
           python - <<'PY'
@@ -46,8 +46,7 @@ jobs:
               'admin_rapido.html',
           )
           for name in templates:
-              path = Path('templates') / name
-              env.parse(path.read_text(encoding='utf-8'))
+              env.parse((Path('templates') / name).read_text(encoding='utf-8'))
           print('templates ok')
           PY
       - name: Validate exact shift rules
@@ -56,7 +55,6 @@ jobs:
           from datetime import date
           from types import SimpleNamespace
           import production_shift_time_fix as shifts
-
           assert shifts.exact_scale_date(SimpleNamespace(data='07/08/26-SEX')) == date(2026, 8, 7)
           assert shifts.upgrade._times_from_text('18:00 às 22:00') == ('18:00', '22:00')
           assert shifts.upgrade._times_from_text('17:30 às 22:30') == ('17:30', '22:30')
@@ -68,9 +66,11 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import approval_rejection_v5 as rejection
+          import approval_return_dashboard_v5 as approval
+          import admin_launch_sync_v5 as sync
           import operational_rules_v5 as ui
 
-          app = ui.app
+          app = sync.app
           for name in ('restaurante_dashboard.html', 'painel_cooperado.html', 'coop_producao.html', 'admin_dashboard.html'):
               source, _, _ = app.jinja_loader.get_source(app.jinja_env, name)
               app.jinja_env.parse(source)
@@ -79,8 +79,10 @@ jobs:
           css = Path('static/css/operational_v5.css').read_text(encoding='utf-8')
           assert 'Recusar e bloquear' in approvals
           assert "url_for('rest_producao_recusar'" in approvals
+          assert 'return_dashboard' in approvals
           assert 'coopex-reject-btn' in css
           assert app.view_functions['rest_producao_recusar'] is rejection.rest_reject_and_lock
+          assert app.view_functions['rest_producao_aprovar'] is approval.rest_approve_return_dashboard
 
           rest_source, _, _ = app.jinja_loader.get_source(app.jinja_env, 'restaurante_dashboard.html')
           coop_source, _, _ = app.jinja_loader.get_source(app.jinja_env, 'painel_cooperado.html')
@@ -90,11 +92,12 @@ jobs:
           assert 'coopexTimelineDeferred' in coop_source
           assert '/api/coop/timeline' in coop_source
           assert 'warmQueue();' not in admin_source
+          assert 'coopexAdminLaunchSyncV5' in admin_source
           with app.test_request_context('/admin?tab=cooperados'):
               assert ui._operational_filter_enabled() is False
           with app.test_request_context('/admin?tab=escalas'):
               assert ui._operational_filter_enabled() is True
-          print('operational v5 and rejection ok')
+          print('operational v5, approval and admin sync ok')
           PY
       - name: Validate notification intervals
         run: |
