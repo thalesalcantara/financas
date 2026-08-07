@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-07.1215"
+BUILD_VERSION = "2026-08-07.1320"
 
 
 def post_worker_init(worker):
@@ -44,6 +44,7 @@ def post_worker_init(worker):
         import admin_runtime_v7  # noqa: F401
         import admin_light_v8  # noqa: F401
         import admin_light_v8_bridge  # noqa: F401
+        import admin_preserve_v9  # noqa: F401
 
         if "coopex_build_probe" not in flask_app.view_functions:
             from flask import jsonify
@@ -72,17 +73,28 @@ def post_worker_init(worker):
                     admin_launch_live_sync=True,
                     admin_launch_partial_replacement_disabled=True,
                     admin_actions_persistent=True,
-                    admin_horizontal_v8=True,
+                    admin_horizontal_v9=True,
+                    admin_menu_matches_restaurant=True,
                     admin_lightweight_design=True,
+                    admin_full_desktop=True,
                     admin_summary_default_today=True,
                     admin_summary_live_table=True,
+                    admin_launch_full_filters=True,
+                    admin_launch_deductions_visible=True,
+                    admin_launch_full_edit=True,
+                    admin_scale_weekly_mode_preserved=True,
+                    admin_scale_add_person=True,
                     admin_scale_separate_light_page=True,
                     admin_swaps_separate_light_page=True,
                     admin_scale_history_separate_light_page=True,
                     admin_documents_separate_light_page=True,
+                    admin_legacy_modes_preserved=True,
+                    admin_config_preserved=True,
                     admin_systems_tab_removed=True,
                     admin_ratings_lifetime=True,
                     cooperative_rating_lifetime=True,
+                    cooperative_password_edit=True,
+                    cooperative_username_edit=True,
                     cooperative_photo_db_route=True,
                     cooperative_phone_db_field=True,
                     inactive_cooperatives_operationally_hidden=True,
@@ -107,7 +119,7 @@ def post_worker_init(worker):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Admin leve V8 carregado. Build %s", BUILD_VERSION)
+        log.info("Admin V9 completo e leve carregado. Build %s", BUILD_VERSION)
     except Exception:
         log.exception(
             "Melhorias complementares não carregaram; mantendo o aplicativo principal disponível."
