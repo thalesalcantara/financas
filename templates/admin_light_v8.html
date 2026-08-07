@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#2141d9">
+  <title>{{ page_title }} — COOPEX</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_light_v8.css', v=build) }}">
+</head>
+<body>
+<header class="alv8-top">
+  <a class="alv8-brand" href="{{ url_for('admin_light_summary') }}"><small>PAINEL COOPEX</small>Administração</a>
+  <nav class="alv8-nav">
+    <a class="alv8-direct {{ 'active' if view=='resumo' else '' }}" href="{{ url_for('admin_light_summary') }}"><i class="bi bi-speedometer2"></i> Resumo</a>
+
+    <div class="alv8-group">
+      <button type="button"><i class="bi bi-cash-stack"></i> Financeiro <i class="bi bi-chevron-down"></i></button>
+      <div class="alv8-menu">
+        <a class="{{ 'active' if view=='lancamentos' else '' }}" href="{{ url_for('admin_light_launches') }}"><i class="bi bi-receipt"></i> Lançamentos</a>
+        <a href="/admin?tab=receitas"><i class="bi bi-arrow-down-circle"></i> Receitas Coop</a>
+        <a href="/admin?tab=despesas"><i class="bi bi-arrow-up-circle"></i> Despesas Coop</a>
+        <a href="/admin?tab=coop_receitas"><i class="bi bi-wallet2"></i> Receitas Cooperados</a>
+        <a href="/admin?tab=coop_despesas"><i class="bi bi-wallet"></i> Despesas Cooperados</a>
+        <a href="/admin?tab=beneficios"><i class="bi bi-gift"></i> Benefícios</a>
+      </div>
+    </div>
+
+    <div class="alv8-group">
+      <button type="button"><i class="bi bi-calendar3"></i> Operação <i class="bi bi-chevron-down"></i></button>
+      <div class="alv8-menu">
+        <a class="{{ 'active' if view=='escala' else '' }}" href="{{ url_for('admin_light_scale') }}"><i class="bi bi-calendar-week"></i> Escala</a>
+        <a class="{{ 'active' if view=='trocas' else '' }}" href="{{ url_for('admin_light_swaps') }}"><i class="bi bi-arrow-left-right"></i> Trocas</a>
+        <a class="{{ 'active' if view=='historico' else '' }}" href="{{ url_for('admin_light_history') }}"><i class="bi bi-clock-history"></i> Histórico</a>
+        <a class="{{ 'active' if view=='documentos' else '' }}" href="{{ url_for('admin_light_documents') }}"><i class="bi bi-file-earmark-check"></i> Documentos</a>
+      </div>
+    </div>
+
+    <div class="alv8-group">
+      <button type="button"><i class="bi bi-people"></i> Cadastros <i class="bi bi-chevron-down"></i></button>
+      <div class="alv8-menu">
+        <a class="{{ 'active' if view=='cooperados' else '' }}" href="{{ url_for('admin_light_cooperatives') }}"><i class="bi bi-person-vcard"></i> Cooperados</a>
+        <a href="/admin?tab=restaurantes"><i class="bi bi-shop"></i> Estabelecimentos</a>
+        <a class="{{ 'active' if view=='tabelas' else '' }}" href="{{ url_for('admin_light_tables') }}"><i class="bi bi-table"></i> Tabelas</a>
+      </div>
+    </div>
+
+    <div class="alv8-group">
+      <button type="button"><i class="bi bi-bar-chart"></i> Gestão <i class="bi bi-chevron-down"></i></button>
+      <div class="alv8-menu">
+        <a class="{{ 'active' if view=='avaliacoes' else '' }}" href="{{ url_for('admin_light_ratings') }}"><i class="bi bi-star"></i> Avaliações</a>
+        <a class="{{ 'active' if view=='avisos' else '' }}" href="{{ url_for('admin_light_notices') }}"><i class="bi bi-megaphone"></i> Avisos</a>
+      </div>
+    </div>
+    <span class="alv8-spacer"></span>
+    <a class="alv8-direct" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a>
+  </nav>
+</header>
+
+<main class="alv8-page">
+  <div class="alv8-head">
+    <div><h1 class="alv8-title">{{ page_title }}</h1><p class="alv8-sub">{{ page_subtitle }}</p></div>
+    {% if view=='escala' %}<div class="alv8-actions"><a class="alv8-btn" href="{{ url_for('admin_light_swaps') }}"><i class="bi bi-arrow-left-right"></i> Trocas</a><a class="alv8-btn" href="{{ url_for('admin_light_history') }}"><i class="bi bi-clock-history"></i> Histórico</a><a class="alv8-btn" href="{{ url_for('admin_light_documents') }}"><i class="bi bi-file-earmark-check"></i> Documentos</a></div>{% endif %}
+  </div>
+
+  {% with msgs=get_flashed_messages(with_categories=true) %}{% if msgs %}<div class="alv8-card">{% for cat,msg in msgs %}<div class="alv8-note">{{ msg }}</div>{% endfor %}</div>{% endif %}{% endwith %}
+
+  {% if view=='resumo' %}
+    <form class="alv8-card alv8-filter" method="get">
+      <div class="alv8-field"><label>Data inicial</label><input class="alv8-input" type="date" name="data_inicio" value="{{ data_inicio.isoformat() if data_inicio else '' }}"></div>
+      <div class="alv8-field"><label>Data final</label><input class="alv8-input" type="date" name="data_fim" value="{{ data_fim.isoformat() if data_fim else '' }}"></div>
+      <button class="alv8-btn primary"><i class="bi bi-funnel"></i> Aplicar</button>
+      <a class="alv8-btn" href="{{ url_for('admin_light_summary') }}">Hoje</a>
+    </form>
+    <div class="alv8-grid">
+      <div class="alv8-kpi"><span>Produção</span><strong>R$ {{ '%.2f'|format(totals.prod) }}</strong></div>
+      <div class="alv8-kpi"><span>INSS 4%</span><strong>R$ {{ '%.2f'|format(totals.inss) }}</strong></div>
+      <div class="alv8-kpi"><span>SEST/SENAT 0,5%</span><strong>R$ {{ '%.2f'|format(totals.sest) }}</strong></div>
+      <div class="alv8-kpi"><span>Lançamentos</span><strong>{{ totals.qtd }}</strong></div>
+      <div class="alv8-kpi"><span>Receitas cooperados</span><strong>R$ {{ '%.2f'|format(totals.rec_coop) }}</strong></div>
+      <div class="alv8-kpi"><span>Despesas cooperados</span><strong>R$ {{ '%.2f'|format(totals.desp_coop) }}</strong></div>
+      <div class="alv8-kpi"><span>Adiantamentos</span><strong>R$ {{ '%.2f'|format(totals.adiant) }}</strong></div>
+      <div class="alv8-kpi"><span>Resultado central</span><strong>R$ {{ '%.2f'|format(totals.receita_central-totals.despesa_central) }}</strong></div>
+    </div>
+    <div class="alv8-card"><h3>Resumo por cooperado</h3><div class="alv8-table-wrap"><table class="alv8-table"><thead><tr><th>Cooperado</th><th>Produção</th><th>INSS</th><th>SEST</th><th>Receitas</th><th>Despesas</th><th>Adiant.</th><th>A receber</th></tr></thead><tbody>{% for r in rows %}<tr><td><strong>{{ r.nome }}</strong><br><small>{{ r.qtd }} lançamento(s)</small></td><td>R$ {{ '%.2f'|format(r.prod) }}</td><td>R$ {{ '%.2f'|format(r.inss) }}</td><td>R$ {{ '%.2f'|format(r.sest) }}</td><td>R$ {{ '%.2f'|format(r.rec) }}</td><td>R$ {{ '%.2f'|format(r.desp) }}</td><td>R$ {{ '%.2f'|format(r.adiant) }}</td><td><strong>R$ {{ '%.2f'|format(r.receber) }}</strong></td></tr>{% else %}<tr><td colspan="8" class="alv8-empty">Nenhum dado no período.</td></tr>{% endfor %}</tbody></table></div></div>
+
+  {% elif view=='lancamentos' %}
+    <form class="alv8-card alv8-filter" method="get"><div class="alv8-field"><label>Início</label><input class="alv8-input" type="date" name="data_inicio" value="{{ data_inicio.isoformat() if data_inicio else '' }}"></div><div class="alv8-field"><label>Fim</label><input class="alv8-input" type="date" name="data_fim" value="{{ data_fim.isoformat() if data_fim else '' }}"></div><div class="alv8-field grow"><label>Buscar</label><input class="alv8-input" name="q" value="{{ q }}" placeholder="Cooperado, estabelecimento ou descrição"></div><button class="alv8-btn primary">Filtrar</button></form>
+    <div class="alv8-grid"><div class="alv8-kpi"><span>Total filtrado</span><strong>R$ {{ '%.2f'|format(launch_total) }}</strong></div><div class="alv8-kpi"><span>Registros na tela</span><strong>{{ launches|length }}</strong></div></div>
+    <div class="alv8-card"><div class="alv8-table-wrap"><table class="alv8-table"><thead><tr><th>Data</th><th>Cooperado</th><th>Estabelecimento</th><th>Horário</th><th>Entregas</th><th>Valor</th><th>Descrição</th><th>Ações</th></tr></thead><tbody>{% for l in launches %}<tr data-launch="{{ l.id }}"><td>{{ l.data.strftime('%d/%m/%Y') if l.data else '—' }}</td><td>{{ coop_map.get(l.cooperado_id).nome if coop_map.get(l.cooperado_id) else '#'~l.cooperado_id }}</td><td>{{ rest_map.get(l.restaurante_id).nome if rest_map.get(l.restaurante_id) else '#'~l.restaurante_id }}</td><td>{{ l.hora_inicio or '—' }}–{{ l.hora_fim or '—' }}</td><td><input class="alv8-input js-qtd" type="number" value="{{ l.qtd_entregas or 0 }}" style="width:75px"></td><td><input class="alv8-input js-valor" type="number" step="0.01" value="{{ '%.2f'|format(l.valor or 0) }}" style="width:95px"></td><td><input class="alv8-input js-desc" value="{{ l.descricao or '' }}" style="min-width:180px"></td><td><div class="alv8-inline"><button class="alv8-btn primary js-save-launch" type="button">Salvar</button><button class="alv8-btn danger js-del-launch" type="button">Excluir</button></div></td></tr>{% else %}<tr><td colspan="8" class="alv8-empty">Nenhum lançamento.</td></tr>{% endfor %}</tbody></table></div></div>
+
+  {% elif view=='escala' %}
+    <form class="alv8-card alv8-filter" method="get"><div class="alv8-field grow"><label>Buscar escala</label><input class="alv8-input" name="q" value="{{ q }}" placeholder="Nome, contrato, data ou horário"></div><button class="alv8-btn primary">Buscar</button></form>
+    <details class="alv8-card"><summary><strong>Adicionar escala</strong></summary><form method="post" action="{{ url_for('admin_light_scale_create') }}" class="alv8-filter" style="margin-top:10px"><div class="alv8-field"><label>Cooperado</label><select class="alv8-select" name="cooperado_id" required><option value="">Selecione</option>{% for c in cooperados %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}</select></div><div class="alv8-field"><label>Estabelecimento</label><select class="alv8-select" name="restaurante_id"><option value="">Sem vínculo</option>{% for r in restaurantes %}<option value="{{ r.id }}">{{ r.nome }}</option>{% endfor %}</select></div><div class="alv8-field"><label>Data / dia</label><input class="alv8-input" name="data" placeholder="08/08/2026 ou Segunda"></div><div class="alv8-field"><label>Turno</label><input class="alv8-input" name="turno" placeholder="Dia / Noite"></div><div class="alv8-field"><label>Horário</label><input class="alv8-input" name="horario" placeholder="18:00 às 22:30"></div><div class="alv8-field grow"><label>Contrato</label><input class="alv8-input" name="contrato"></div><button class="alv8-btn primary">Adicionar</button></form></details>
+    <div class="alv8-card"><h3>Escala ativa <span class="alv8-badge">máx. 180 por abertura</span></h3><div class="alv8-table-wrap"><table class="alv8-table alv8-compact"><thead><tr><th>Cooperado</th><th>Data</th><th>Turno</th><th>Horário</th><th>Contrato</th><th>Ações</th></tr></thead><tbody>{% for s in scales %}<tr data-scale="{{ s.id }}"><td><select class="alv8-select js-coop">{% for c in cooperados %}<option value="{{ c.id }}" {{ 'selected' if c.id==s.cooperado_id else '' }}>{{ c.nome }}</option>{% endfor %}</select></td><td><input class="alv8-input js-data" value="{{ s.data or '' }}"></td><td><input class="alv8-input js-turno" value="{{ s.turno or '' }}"></td><td><input class="alv8-input js-horario" value="{{ s.horario or '' }}"></td><td><input class="alv8-input js-contrato" value="{{ s.contrato or '' }}"></td><td><div class="alv8-inline"><button type="button" class="alv8-btn primary js-save-scale">Salvar</button><button type="button" class="alv8-btn danger js-del-scale">Excluir</button></div></td></tr>{% else %}<tr><td colspan="6" class="alv8-empty">Nenhuma escala ativa encontrada.</td></tr>{% endfor %}</tbody></table></div></div>
+
+  {% elif view=='trocas' %}
+    <div class="alv8-card"><div class="alv8-table-wrap"><table class="alv8-table"><thead><tr><th>ID</th><th>Solicitante</th><th>Destino</th><th>Escala</th><th>Mensagem</th><th>Status</th><th>Criada</th></tr></thead><tbody>{% for t in trocas %}{% set e=scale_map.get(t.origem_escala_id) %}<tr><td>#{{ t.id }}</td><td>{{ coop_map.get(t.solicitante_id).nome if coop_map.get(t.solicitante_id) else '—' }}</td><td>{{ coop_map.get(t.destino_id).nome if coop_map.get(t.destino_id) else '—' }}</td><td>{% if e %}{{ e.data or '' }} · {{ e.horario or '' }} · {{ e.contrato or '' }}{% else %}—{% endif %}</td><td>{{ t.mensagem or '—' }}</td><td><span class="alv8-badge {{ 'warn' if t.status=='pendente' else 'ok' if t.status in ['aprovada','aceita'] else 'bad' }}">{{ t.status or '—' }}</span></td><td>{{ t.criada_em.strftime('%d/%m/%Y %H:%M') if t.criada_em else '—' }}</td></tr>{% else %}<tr><td colspan="7" class="alv8-empty">Nenhuma troca.</td></tr>{% endfor %}</tbody></table></div></div>
+
+  {% elif view=='historico' %}
+    <div class="alv8-tabs"><a class="{{ 'active' if history_type=='escala' else '' }}" href="{{ url_for('admin_light_history', tipo='escala') }}">Escalas</a><a class="{{ 'active' if history_type=='trocas' else '' }}" href="{{ url_for('admin_light_history', tipo='trocas') }}">Trocas</a></div>
+    <div class="alv8-card"><div class="alv8-table-wrap"><table class="alv8-table">{% if history_type=='trocas' %}<thead><tr><th>Data</th><th>Tipo</th><th>Saiu</th><th>Entrou</th><th>Contrato</th><th>Aplicada</th></tr></thead><tbody>{% for h in history_rows %}<tr><td>{{ h.data or '—' }}</td><td>{{ h.tipo or '—' }}</td><td>{{ h.saiu_nome or h.solicitante_nome or '—' }}</td><td>{{ h.entrou_nome or h.destino_nome or '—' }}</td><td>{{ h.contrato or '—' }}</td><td>{{ h.aplicada_em.strftime('%d/%m/%Y %H:%M') if h.aplicada_em else '—' }}</td></tr>{% else %}<tr><td colspan="6" class="alv8-empty">Sem histórico.</td></tr>{% endfor %}</tbody>{% else %}<thead><tr><th>Data</th><th>Turno</th><th>Horário</th><th>Contrato</th><th>Cooperado</th><th>Ação</th><th>Registro</th></tr></thead><tbody>{% for h in history_rows %}<tr><td>{{ h.data or '—' }}</td><td>{{ h.turno or '—' }}</td><td>{{ h.horario or '—' }}</td><td>{{ h.contrato or '—' }}</td><td>{{ h.cooperado_nome or h.entrou_nome or '—' }}</td><td>{{ h.acao or h.origem or '—' }}</td><td>{{ h.snapshot_em.strftime('%d/%m/%Y %H:%M') if h.snapshot_em else '—' }}</td></tr>{% else %}<tr><td colspan="7" class="alv8-empty">Sem histórico.</td></tr>{% endfor %}</tbody>{% endif %}</table></div></div>
+
+  {% elif view=='documentos' %}
+    <form class="alv8-card alv8-filter"><div class="alv8-field grow"><label>Buscar cooperado</label><input class="alv8-input" name="q" value="{{ q }}"></div><button class="alv8-btn primary">Buscar</button></form>
+    <div class="alv8-card"><div class="alv8-table-wrap"><table class="alv8-table"><thead><tr><th>Cooperado</th><th>CNH</th><th>Validade CNH</th><th>Placa</th><th>Validade placa</th><th>Status</th><th>Ação</th></tr></thead><tbody>{% for c in cooperados %}{% set cnh_ok=c.cnh_validade and c.cnh_validade>=status_today %}{% set placa_ok=c.placa_validade and c.placa_validade>=status_today %}<tr><td><strong>{{ c.nome }}</strong></td><td>{{ c.cnh_numero or '—' }}</td><td>{{ c.cnh_validade.strftime('%d/%m/%Y') if c.cnh_validade else '—' }}</td><td>{{ c.placa or '—' }}</td><td>{{ c.placa_validade.strftime('%d/%m/%Y') if c.placa_validade else '—' }}</td><td><span class="alv8-badge {{ 'ok' if cnh_ok and placa_ok else 'bad' }}">{{ 'Em dia' if cnh_ok and placa_ok else 'Verificar' }}</span></td><td><a class="alv8-btn" href="{{ url_for('editar_documentos', coop_id=c.id) }}">Editar</a></td></tr>{% else %}<tr><td colspan="7" class="alv8-empty">Nenhum cooperado ativo.</td></tr>{% endfor %}</tbody></table></div></div>
+
+  {% elif view=='cooperados' %}
+    <div class="alv8-tabs"><a class="{{ 'active' if status=='ativos' else '' }}" href="{{ url_for('admin_light_cooperatives', status='ativos') }}">Ativos</a><a class="{{ 'active' if status=='inativos' else '' }}" href="{{ url_for('admin_light_cooperatives', status='inativos') }}">Desativados</a><a class="{{ 'active' if status=='excluidos' else '' }}" href="{{ url_for('admin_light_cooperatives', status='excluidos') }}">Excluídos/arquivo</a></div>
+    <form class="alv8-card alv8-filter"><input type="hidden" name="status" value="{{ status }}"><div class="alv8-field grow"><label>Buscar</label><input class="alv8-input" name="q" value="{{ q }}" placeholder="Nome, telefone ou usuário"></div><button class="alv8-btn primary">Buscar</button></form>
+    <div class="alv8-card"><div class="alv8-table-wrap"><table class="alv8-table"><thead><tr><th>Cooperado</th><th>Telefone</th><th>Usuário</th><th>Status</th><th>Cadastro</th><th>Ações</th></tr></thead><tbody>{% for row in cooperados %}<tr><td><div class="alv8-person"><img class="alv8-photo" src="{{ url_for('admin_light_media_coop', coop_id=row.coop.id) }}?v={{ row.coop.ultima_atualizacao.timestamp() if row.coop.ultima_atualizacao else row.coop.id }}" alt=""><div><strong>{{ row.coop.nome }}</strong><small>#{{ row.coop.id }}</small></div></div></td><td>{{ row.phone or '—' }}</td><td>{{ row.user.usuario }}</td><td>{% if row.archived %}<span class="alv8-badge bad">Excluído</span>{% elif row.active %}<span class="alv8-badge ok">Ativo</span>{% else %}<span class="alv8-badge warn">Desativado</span>{% endif %}</td><td><details><summary class="alv8-btn">Editar</summary><form enctype="multipart/form-data" method="post" action="{{ url_for('admin_light_coop_save', coop_id=row.coop.id) }}" style="min-width:300px;padding-top:8px"><input type="hidden" name="status" value="{{ status }}"><label class="alv8-sub">Nome</label><input class="alv8-input" name="nome" value="{{ row.coop.nome }}"><label class="alv8-sub">Telefone</label><input class="alv8-input" name="telefone" value="{{ row.coop.telefone or '' }}"><label class="alv8-sub">Foto</label><input class="alv8-input" type="file" name="foto" accept="image/*"><button class="alv8-btn primary" style="margin-top:6px">Salvar cadastro</button></form></details></td><td><div class="alv8-inline">{% if row.archived or not row.active %}<form method="post" action="{{ url_for('admin_light_coop_status', coop_id=row.coop.id) }}"><button class="alv8-btn ok" name="acao" value="ativar">Ativar</button></form>{% else %}<form method="post" action="{{ url_for('admin_light_coop_status', coop_id=row.coop.id) }}"><button class="alv8-btn" name="acao" value="desativar">Desativar</button></form><form method="post" action="{{ url_for('admin_light_coop_status', coop_id=row.coop.id) }}" onsubmit="return confirm('Excluir do cadastro operacional? O histórico será preservado.');"><button class="alv8-btn danger" name="acao" value="excluir">Excluir</button></form>{% endif %}</div></td></tr>{% else %}<tr><td colspan="6" class="alv8-empty">Nenhum cooperado neste status.</td></tr>{% endfor %}</tbody></table></div></div>
+
+  {% elif view=='avaliacoes' %}
+    <div class="alv8-note">A média abaixo considera toda a vida do cooperado. Não existe reinício semanal.</div>
+    <div class="alv8-card"><div class="alv8-table-wrap"><table class="alv8-table"><thead><tr><th>Cooperado</th><th>Avaliações</th><th>Nota geral</th><th>Pontualidade</th><th>Educação</th><th>Eficiência</th><th>Apresentação</th><th>Precisa melhorar</th><th></th></tr></thead><tbody>{% for r in ranking %}<tr><td><strong>{{ r.nome }}</strong></td><td>{{ r.qtd }}</td><td><span class="alv8-score {{ 'good' if r.geral>=4.5 else 'attn' if r.geral>=3.5 else 'bad' }}">{{ '%.2f'|format(r.geral) }}</span></td><td>{{ '%.2f'|format(r.pont) }}</td><td>{{ '%.2f'|format(r.educ) }}</td><td>{{ '%.2f'|format(r.efic) }}</td><td>{{ '%.2f'|format(r.apres) }}</td><td><span class="alv8-badge {{ 'ok' if r.geral>=4.5 else 'warn' }}">{{ r.melhorar }}</span></td><td><a class="alv8-btn" href="{{ url_for('admin_light_ratings', cooperado_id=r.id) }}">Ver avaliações</a></td></tr>{% else %}<tr><td colspan="9" class="alv8-empty">Ainda não há avaliações de cooperados.</td></tr>{% endfor %}</tbody></table></div></div>
+    {% if selected_coop %}<div class="alv8-card"><h3>Histórico vitalício — {{ selected_coop.nome }}</h3><div class="alv8-table-wrap"><table class="alv8-table"><thead><tr><th>Data</th><th>Geral</th><th>Pont.</th><th>Educação</th><th>Eficiência</th><th>Apresentação</th><th>Comentário</th></tr></thead><tbody>{% for a in detail %}<tr><td>{{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em else '—' }}</td><td>{{ a.estrelas_geral or '—' }}</td><td>{{ a.estrelas_pontualidade or '—' }}</td><td>{{ a.estrelas_educacao or '—' }}</td><td>{{ a.estrelas_eficiencia or '—' }}</td><td>{{ a.estrelas_apresentacao or '—' }}</td><td>{{ a.comentario or '—' }}</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
+
+  {% elif view=='tabelas' %}
+    <div class="alv8-card"><div class="alv8-table-wrap"><table class="alv8-table"><thead><tr><th>Título</th><th>Categoria</th><th>Descrição</th><th>Enviado</th><th>Arquivo</th></tr></thead><tbody>{% for t in tabelas %}<tr><td><strong>{{ t.titulo }}</strong></td><td>{{ t.categoria or '—' }}</td><td>{{ t.descricao or '—' }}</td><td>{{ t.enviado_em.strftime('%d/%m/%Y') if t.enviado_em else '—' }}</td><td><a class="alv8-btn primary" href="{{ t.arquivo_url }}" target="_blank">Abrir</a></td></tr>{% else %}<tr><td colspan="5" class="alv8-empty">Nenhuma tabela cadastrada.</td></tr>{% endfor %}</tbody></table></div></div>
+
+  {% elif view=='avisos' %}
+    <details class="alv8-card" open><summary><strong>Publicar aviso</strong></summary><form method="post" class="alv8-filter" style="margin-top:10px"><div class="alv8-field grow"><label>Título</label><input class="alv8-input" name="titulo" maxlength="140" required></div><div class="alv8-field"><label>Destino</label><select class="alv8-select" name="tipo"><option value="global">Todos</option><option value="cooperado">Cooperados</option><option value="restaurante">Estabelecimentos</option></select></div><div class="alv8-field"><label>Prioridade</label><select class="alv8-select" name="prioridade"><option value="normal">Normal</option><option value="alta">Alta</option></select></div><div class="alv8-field grow" style="flex-basis:100%"><label>Mensagem</label><textarea class="alv8-textarea" name="corpo" required></textarea></div><label class="alv8-inline"><input type="checkbox" name="fixado" value="1"> Fixar aviso</label><button class="alv8-btn primary">Publicar</button></form></details>
+    <div class="alv8-card"><div class="alv8-table-wrap"><table class="alv8-table"><thead><tr><th>Data</th><th>Título</th><th>Destino</th><th>Prioridade</th><th>Status</th><th>Mensagem</th><th>Ação</th></tr></thead><tbody>{% for a in avisos %}<tr><td>{{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em else '—' }}</td><td><strong>{{ a.titulo }}</strong></td><td>{{ a.tipo }}</td><td>{{ a.prioridade or 'normal' }}</td><td><span class="alv8-badge {{ 'ok' if a.ativo else 'bad' }}">{{ 'Ativo' if a.ativo else 'Inativo' }}</span></td><td>{{ a.corpo }}</td><td><form method="post" action="{{ url_for('admin_light_notice_toggle', item_id=a.id) }}"><button class="alv8-btn">{{ 'Desativar' if a.ativo else 'Ativar' }}</button></form></td></tr>{% else %}<tr><td colspan="7" class="alv8-empty">Nenhum aviso.</td></tr>{% endfor %}</tbody></table></div></div>
+  {% endif %}
+  <div class="alv8-footer">COOPEX Admin V8 · {{ build }}</div>
+</main>
+
+<script>
+(function(){
+  document.querySelectorAll('.alv8-group>button').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();const g=btn.parentElement;document.querySelectorAll('.alv8-group').forEach(x=>{if(x!==g)x.classList.remove('open')});g.classList.toggle('open')}));
+  document.addEventListener('click',()=>document.querySelectorAll('.alv8-group').forEach(x=>x.classList.remove('open')));
+
+  async function jsonReq(url,method,payload){const r=await fetch(url,{method,credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},body:payload?JSON.stringify(payload):undefined});let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw new Error(j.message||'Falha na operação');return j}
+
+  document.querySelectorAll('[data-scale]').forEach(row=>{
+    row.querySelector('.js-save-scale')?.addEventListener('click',async()=>{const id=row.dataset.scale;const payload={cooperado_id:row.querySelector('.js-coop').value,data:row.querySelector('.js-data').value,turno:row.querySelector('.js-turno').value,horario:row.querySelector('.js-horario').value,contrato:row.querySelector('.js-contrato').value};try{await jsonReq('/api/admin/escalas/'+id,'PATCH',payload);row.style.background='#ecfdf3';setTimeout(()=>row.style.background='',900)}catch(e){alert(e.message)}});
+    row.querySelector('.js-del-scale')?.addEventListener('click',async()=>{if(!confirm('Excluir esta escala?'))return;try{await jsonReq('/api/admin/escalas/'+row.dataset.scale,'DELETE');row.remove()}catch(e){alert(e.message)}});
+  });
+  document.querySelectorAll('[data-launch]').forEach(row=>{
+    row.querySelector('.js-save-launch')?.addEventListener('click',async()=>{const id=row.dataset.launch;const payload={qtd_entregas:Number(row.querySelector('.js-qtd').value||0),valor:Number(row.querySelector('.js-valor').value||0),descricao:row.querySelector('.js-desc').value};try{await jsonReq('/api/admin/lancamentos/'+id,'PATCH',payload);row.style.background='#ecfdf3';setTimeout(()=>row.style.background='',900)}catch(e){alert(e.message)}});
+    row.querySelector('.js-del-launch')?.addEventListener('click',async()=>{if(!confirm('Excluir este lançamento?'))return;try{await jsonReq('/api/admin/lancamentos/'+row.dataset.launch,'DELETE');row.remove()}catch(e){alert(e.message)}});
+  });
+})();
+</script>
+</body>
+</html>
