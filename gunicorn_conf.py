@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-07.1348"
+BUILD_VERSION = "2026-08-07.1416"
 
 
 def post_worker_init(worker):
@@ -46,6 +46,7 @@ def post_worker_init(worker):
         import admin_light_v8_bridge  # noqa: F401
         import admin_preserve_v9  # noqa: F401
         import admin_v10_fix  # noqa: F401
+        import admin_v10_hotfix  # noqa: F401
 
         if "coopex_build_probe" not in flask_app.view_functions:
             from flask import jsonify
@@ -115,11 +116,13 @@ def post_worker_init(worker):
                     extra_production_tab=False,
                     admin_v10=True,
                     brl_display=True,
+                    brl_jinja_global=True,
                     establishments_monday_to_sunday=True,
                     finance_tabs_lazy=True,
                     establishments_light=True,
                     cooperatives_json_500_fixed=True,
                     scale_partial_name_search=True,
+                    scale_xlsx_upload_preserved=True,
                     swaps_compact_summary=True,
                     blitz_cnh_crlv=True,
                 )
