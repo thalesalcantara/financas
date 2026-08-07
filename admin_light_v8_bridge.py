@@ -15,27 +15,45 @@ def _admin_light_v8_redirects():
 
     path = request.path or ""
     endpoint = request.endpoint or ""
+
+    # Toda entrada principal do Admin deve cair no visual leve V8.
     if endpoint == "admin_dashboard" or path == "/admin":
         tab = (request.args.get("tab") or "").strip().lower()
         target = {
+            "": "admin_light_summary",
             "resumo": "admin_light_summary",
+            "lancamentos": "admin_light_launches",
             "escalas": "admin_light_scale",
             "cooperados": "admin_light_cooperatives",
+            "avaliacoes": "admin_light_ratings",
+            "documentos": "admin_light_documents",
+            "tabelas": "admin_light_tables",
+            "avisos": "admin_light_notices",
+            "config": "admin_light_summary",
         }.get(tab)
-        if tab == "config":
-            target = "admin_light_summary"
         if target:
-            return redirect(url_for(target))
+            values = {}
+            for key in ("data_inicio", "data_fim", "q", "cooperado_id", "status"):
+                value = request.args.get(key)
+                if value not in (None, ""):
+                    values[key] = value
+            return redirect(url_for(target, **values))
 
     path_map = {
         "/admin/avaliacoes": "admin_light_ratings",
         "/admin/documentos": "admin_light_documents",
         "/admin/tabelas": "admin_light_tables",
         "/admin/avisos": "admin_light_notices",
+        "/admin/rapido": "admin_light_launches",
     }
     target = path_map.get(path)
     if target:
-        return redirect(url_for(target))
+        values = {}
+        for key in ("data_inicio", "data_fim", "q", "cooperado_id", "status"):
+            value = request.args.get(key)
+            if value not in (None, ""):
+                values[key] = value
+        return redirect(url_for(target, **values))
     return None
 
 
@@ -51,6 +69,8 @@ def _install_bridge_templates():
         "admin_tabelas.html",
         "admin_avisos.html",
         "admin_escalas (3).html",
+        "admin_rapido.html",
+        "admin_lancamentos.html",
     }
     js_tag = "<script src=\"{{ url_for('static', filename='js/admin_light_v8_bridge.js', v='" + BUILD + "') }}\"></script>"
     flat_css = """
@@ -75,4 +95,4 @@ def _install_bridge_templates():
 
 
 _install_bridge_templates()
-app.logger.info("Bridge Admin V8 carregado: abas pesadas redirecionadas e Sistemas removido.")
+app.logger.info("Bridge Admin V8 carregado: rotas antigas bloqueadas e visual leve obrigatório.")
