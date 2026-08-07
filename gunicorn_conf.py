@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-07.1120"
+BUILD_VERSION = "2026-08-07.1215"
 
 
 def post_worker_init(worker):
@@ -42,6 +42,8 @@ def post_worker_init(worker):
         import admin_launch_sync_v5  # noqa: F401
         import admin_ui_v6  # noqa: F401
         import admin_runtime_v7  # noqa: F401
+        import admin_light_v8  # noqa: F401
+        import admin_light_v8_bridge  # noqa: F401
 
         if "coopex_build_probe" not in flask_app.view_functions:
             from flask import jsonify
@@ -70,35 +72,32 @@ def post_worker_init(worker):
                     admin_launch_live_sync=True,
                     admin_launch_partial_replacement_disabled=True,
                     admin_actions_persistent=True,
-                    admin_horizontal_v7=True,
-                    admin_grouped_dropdowns=True,
+                    admin_horizontal_v8=True,
                     admin_lightweight_design=True,
                     admin_summary_default_today=True,
-                    admin_summary_ajax_on_demand=True,
-                    admin_summary_table_live_data=True,
-                    admin_tables_unified_design=True,
-                    admin_documents_unified_design=True,
-                    admin_notices_unified_design=True,
-                    admin_ratings_unified_design=True,
-                    admin_ratings_page_size_50=True,
+                    admin_summary_live_table=True,
+                    admin_scale_separate_light_page=True,
+                    admin_swaps_separate_light_page=True,
+                    admin_scale_history_separate_light_page=True,
+                    admin_documents_separate_light_page=True,
+                    admin_systems_tab_removed=True,
+                    admin_ratings_lifetime=True,
+                    cooperative_rating_lifetime=True,
+                    cooperative_photo_db_route=True,
+                    cooperative_phone_db_field=True,
+                    inactive_cooperatives_operationally_hidden=True,
+                    archived_cooperatives_history_preserved=True,
+                    admin_tab_prefetch_disabled=True,
                     normal_financial_deductions_for_approved_launch=True,
                     restaurant_alarm_every_5_minutes=True,
                     cooperative_submission_sound=True,
                     cooperative_new_rating_sound_once=True,
-                    cooperative_light_production_cards=True,
                     cooperative_timeline_on_demand=True,
-                    cooperative_rating_preserved=True,
-                    inactive_cooperatives_operationally_hidden=True,
-                    inactive_visible_only_in_admin_cooperatives=True,
-                    admin_tab_prefetch_disabled=True,
                     restaurant_horizontal_dashboard=True,
                     horizontal_menu_enforced=True,
                     old_sidebar_disabled=True,
                     optimized_panel_queries=True,
                     indexed_scale_queries=True,
-                    media_route_photos=True,
-                    enlarged_cooperative_photo=True,
-                    full_history_table=True,
                     launch_preview_limit=2,
                     extra_production_tab=False,
                 )
@@ -108,7 +107,7 @@ def post_worker_init(worker):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Admin V7 unificado e resumo diário carregados. Build %s", BUILD_VERSION)
+        log.info("Admin leve V8 carregado. Build %s", BUILD_VERSION)
     except Exception:
         log.exception(
             "Melhorias complementares não carregaram; mantendo o aplicativo principal disponível."
