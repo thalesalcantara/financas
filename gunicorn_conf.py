@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-07.1035"
+BUILD_VERSION = "2026-08-07.1104"
 
 
 def post_worker_init(worker):
@@ -40,6 +40,7 @@ def post_worker_init(worker):
         import approval_rejection_v5  # noqa: F401
         import approval_return_dashboard_v5  # noqa: F401
         import admin_launch_sync_v5  # noqa: F401
+        import admin_ui_v6  # noqa: F401
 
         if "coopex_build_probe" not in flask_app.view_functions:
             from flask import jsonify
@@ -66,7 +67,11 @@ def post_worker_init(worker):
                     approval_no_second_launch_required=True,
                     approval_named_confirmation=True,
                     admin_launch_live_sync=True,
-                    admin_launch_cache_bypass_on_change=True,
+                    admin_launch_partial_replacement_disabled=True,
+                    admin_actions_persistent=True,
+                    admin_horizontal_v6=True,
+                    admin_grouped_dropdowns=True,
+                    admin_lightweight_design=True,
                     normal_financial_deductions_for_approved_launch=True,
                     restaurant_alarm_every_5_minutes=True,
                     cooperative_submission_sound=True,
@@ -94,7 +99,7 @@ def post_worker_init(worker):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Aprovação integrada ao painel principal e ao lançamento normal. Build %s", BUILD_VERSION)
+        log.info("Admin V6 horizontal e ações persistentes carregados. Build %s", BUILD_VERSION)
     except Exception:
         log.exception(
             "Melhorias complementares não carregaram; mantendo o aplicativo principal disponível."
