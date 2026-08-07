@@ -14,11 +14,6 @@ document.addEventListener('DOMContentLoaded',function(){
   }
   buttons.forEach(btn=>btn.addEventListener('click',()=>selectTab(btn.dataset.coopexTab)));
 
-  /*
-    O Histórico de Produção nunca é cortado. A limitação visual de dois itens
-    é aplicada somente pela classe da tabela individual abaixo do formulário.
-  */
-
   const selectedPhoto=document.getElementById('selFoto');
   const expandedPhoto=document.getElementById('coopexExpandedPhoto');
   const photoModalElement=document.getElementById('coopexPhotoModal');
@@ -40,8 +35,10 @@ document.addEventListener('DOMContentLoaded',function(){
 
   const soundButton=document.getElementById('coopexSoundToggle');
   const pendingCount=Number(approvalPanel?.dataset.pendingCount||0);
+  let currentPending=pendingCount;
   let soundOn=localStorage.getItem('coopexStrongApprovalSound')!=='0';
   let audioContext=null;
+  let userInteracted=false;
 
   function refreshSoundButton(){
     if(!soundButton)return;
@@ -50,6 +47,7 @@ document.addEventListener('DOMContentLoaded',function(){
       :'<i class="bi bi-volume-mute-fill"></i> Ativar som';
   }
   function armSound(){
+    userInteracted=true;
     if(!audioContext){
       const Ctx=window.AudioContext||window.webkitAudioContext;
       if(Ctx)audioContext=new Ctx();
@@ -73,7 +71,7 @@ document.addEventListener('DOMContentLoaded',function(){
     });
   }
   async function strongAlarm(){
-    if(!soundOn)return;
+    if(!soundOn||currentPending<=0)return;
     try{
       const audio=new Audio('/static/avisos.mp3');
       audio.volume=1;
@@ -82,12 +80,17 @@ document.addEventListener('DOMContentLoaded',function(){
     }catch(e){oscillatorAlarm();}
   }
 
-  document.addEventListener('pointerdown',armSound,{once:true});
+  document.addEventListener('pointerdown',()=>{
+    const firstInteraction=!userInteracted;
+    armSound();
+    if(firstInteraction&&currentPending>0)strongAlarm();
+  },{passive:true});
+
   soundButton?.addEventListener('click',()=>{
     soundOn=!soundOn;
     localStorage.setItem('coopexStrongApprovalSound',soundOn?'1':'0');
     armSound();refreshSoundButton();
-    if(soundOn)strongAlarm();
+    if(soundOn&&currentPending>0)strongAlarm();
   });
   refreshSoundButton();
 
@@ -100,15 +103,23 @@ document.addEventListener('DOMContentLoaded',function(){
       const data=await response.json();
       const latest=Number(data.latest||0);
       const count=Number(data.count??data.pending_count??0);
+      currentPending=count;
+
       if((lastLatest&&latest>lastLatest)||count>lastCount){
         strongAlarm();
         setTimeout(()=>location.reload(),900);
       }
+
       lastLatest=Math.max(lastLatest,latest);
       lastCount=count;
       sessionStorage.setItem('coopexApprovalLatest',String(lastLatest));
       sessionStorage.setItem('coopexApprovalCount',String(lastCount));
     }catch(e){}
   }
+
+  // Atualiza a quantidade rapidamente, mas o lembrete sonoro persistente é a cada 5 minutos.
   setInterval(pollApprovals,15000);
+  setInterval(()=>{
+    if(currentPending>0)strongAlarm();
+  },5*60*1000);
 });
