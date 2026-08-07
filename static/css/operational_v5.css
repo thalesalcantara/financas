@@ -37,6 +37,29 @@ section[data-view="lancar"] > .pending-wrap .btn-sm{
   white-space:nowrap !important;
 }
 
+/* Aprovação: recusa é uma ação separada e bloqueante para o cooperado. */
+.coopex-reject-form{
+  margin-top:7px;
+  padding-top:7px;
+  border-top:1px solid #fee2e2;
+  display:flex;
+  justify-content:flex-end;
+}
+.coopex-reject-btn{
+  min-height:34px;
+  border:1px solid #ef4444 !important;
+  border-radius:8px !important;
+  padding:.36rem .7rem !important;
+  background:#fff !important;
+  color:#dc2626 !important;
+  font-size:.78rem !important;
+  font-weight:800 !important;
+}
+.coopex-reject-btn:hover{
+  background:#fef2f2 !important;
+  color:#b91c1c !important;
+}
+
 /* Cooperado: placeholder leve enquanto a aba Produções não foi aberta. */
 .coopex-v5-loading{
   padding:12px 14px;
@@ -68,4 +91,6 @@ body .tab-pane:not(.show):not(.active){
     max-height:none !important;
     overflow:visible !important;
   }
+  .coopex-reject-form{justify-content:stretch}
+  .coopex-reject-btn{width:100%}
 }
