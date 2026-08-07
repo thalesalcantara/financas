@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-07.1042"
+BUILD_VERSION = "2026-08-07.1055"
 
 
 def post_worker_init(worker):
@@ -37,6 +37,7 @@ def post_worker_init(worker):
         import menu_horizontal_enforcer  # noqa: F401
         import cooperative_notifications_ui  # noqa: F401
         import operational_rules_v5  # noqa: F401
+        import approval_rejection_v5  # noqa: F401
 
         if "coopex_build_probe" not in flask_app.view_functions:
             from flask import jsonify
@@ -55,6 +56,10 @@ def post_worker_init(worker):
                     restaurant_pending_without_inner_scroll=True,
                     restaurant_current_shift_only=True,
                     restaurant_approval_tab=True,
+                    restaurant_reject_and_lock=True,
+                    rejected_coop_resubmit_blocked=True,
+                    rejected_rest_manual_launch_allowed=True,
+                    approved_value_creates_admin_launch=True,
                     restaurant_alarm_every_5_minutes=True,
                     cooperative_submission_sound=True,
                     cooperative_new_rating_sound_once=True,
@@ -81,7 +86,7 @@ def post_worker_init(worker):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Regras operacionais V5 e paineis sob demanda carregados. Build %s", BUILD_VERSION)
+        log.info("Regras operacionais V5 e recusa bloqueante carregadas. Build %s", BUILD_VERSION)
     except Exception:
         log.exception(
             "Melhorias complementares não carregaram; mantendo o aplicativo principal disponível."
