@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile Python
-        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py performance_ui_fix.py performance_ui_hotfix.py performance_query_override.py production_shift_time_fix.py performance_ui_finalize.py menu_horizontal_enforcer.py cooperative_notifications_ui.py operational_rules_v5.py approval_rejection_v5.py approval_return_dashboard_v5.py admin_launch_sync_v5.py admin_ui_v6.py gunicorn_conf.py tests/smoke_upgrade.py
+        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py performance_ui_fix.py performance_ui_hotfix.py performance_query_override.py production_shift_time_fix.py performance_ui_finalize.py menu_horizontal_enforcer.py cooperative_notifications_ui.py operational_rules_v5.py approval_rejection_v5.py approval_return_dashboard_v5.py admin_launch_sync_v5.py admin_ui_v6.py admin_runtime_v7.py gunicorn_conf.py tests/smoke_upgrade.py
       - name: Validate Jinja templates
         run: |
           python - <<'PY'
@@ -42,6 +42,12 @@ jobs:
               'restaurante_dashboard.html',
               'restaurantes_tabelas.html',
               'admin_dashboard.html',
+              'admin_avaliacoes.html',
+              'admin_tabelas.html',
+              'admin_documentos.html',
+              'admin_avisos.html',
+              'editar_tabelas.html',
+              'editar_documentos.html',
               'admin_producoes_pendentes.html',
               'admin_rapido.html',
           )
@@ -61,19 +67,31 @@ jobs:
           assert shifts.upgrade._times_from_text('11:00 às 15:00') == ('11:00', '15:00')
           print('exact shift rules ok')
           PY
-      - name: Validate operational V6
+      - name: Validate operational V7
         run: |
           python - <<'PY'
+          from datetime import date
           from pathlib import Path
           import approval_rejection_v5 as rejection
           import approval_return_dashboard_v5 as approval
-          import admin_ui_v6 as admin_v6
+          import admin_runtime_v7 as runtime
           import operational_rules_v5 as ui
 
-          app = admin_v6.app
-          for name in ('restaurante_dashboard.html', 'painel_cooperado.html', 'coop_producao.html', 'admin_dashboard.html'):
+          app = runtime.app
+          transformed = (
+              'admin_dashboard.html',
+              'admin_avaliacoes.html',
+              'admin_tabelas.html',
+              'admin_documentos.html',
+              'admin_avisos.html',
+              'editar_tabelas.html',
+              'editar_documentos.html',
+          )
+          for name in transformed:
               source, _, _ = app.jinja_loader.get_source(app.jinja_env, name)
               app.jinja_env.parse(source)
+              assert 'css/admin_v6.css' in source, name
+              assert 'js/admin_v6.js' in source, name
 
           approvals = Path('templates/_rest_approvals_tabs.html').read_text(encoding='utf-8')
           css = Path('static/css/admin_v6.css').read_text(encoding='utf-8')
@@ -82,23 +100,29 @@ jobs:
           assert 'Recusar e bloquear' in approvals
           assert app.view_functions['rest_producao_recusar'] is rejection.rest_reject_and_lock
           assert app.view_functions['rest_producao_aprovar'] is approval.rest_approve_return_dashboard
-
-          admin_source, _, _ = app.jinja_loader.get_source(app.jinja_env, 'admin_dashboard.html')
-          assert 'css/admin_v6.css' in admin_source
-          assert 'js/admin_v6.js' in admin_source
-          assert 'coopexAdminLaunchSyncV5' in admin_source
           assert 'admin-v6-topbar' in css
+          assert '#resumo .kpi-card' in css
           assert '.sidebar{display:none!important}' in css
+          assert "FAST_PARTIALS=new Set(['resumo'" in js
+          assert "tab==='resumo'" in js
           assert 'disableBrokenLancamentoAjax' in js
           assert 'forceActionVisibility' in js
           assert "window.location.replace" in sync_js
           assert "fetchPartial('lancamentos'" not in sync_js
-          assert 'warmQueue();' not in admin_source
+
+          with app.test_request_context('/admin?tab=resumo'):
+              app.preprocess_request()
+              assert runtime.app is app
+              assert __import__('flask').request.args.get('data_inicio') == date.today().isoformat()
+              assert __import__('flask').request.args.get('data_fim') == date.today().isoformat()
+          with app.test_request_context('/admin/avaliacoes'):
+              app.preprocess_request()
+              assert __import__('flask').request.args.get('per_page') == '50'
           with app.test_request_context('/admin?tab=cooperados'):
               assert ui._operational_filter_enabled() is False
           with app.test_request_context('/admin?tab=escalas'):
               assert ui._operational_filter_enabled() is True
-          print('operational v6 ok')
+          print('operational v7 ok')
           PY
       - name: Validate notification intervals
         run: |
