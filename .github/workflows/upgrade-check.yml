@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile Python
-        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py performance_ui_fix.py performance_ui_hotfix.py performance_query_override.py production_shift_time_fix.py performance_ui_finalize.py menu_horizontal_enforcer.py cooperative_notifications_ui.py gunicorn_conf.py tests/smoke_upgrade.py
+        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py performance_ui_fix.py performance_ui_hotfix.py performance_query_override.py production_shift_time_fix.py performance_ui_finalize.py menu_horizontal_enforcer.py cooperative_notifications_ui.py operational_rules_v5.py gunicorn_conf.py tests/smoke_upgrade.py
       - name: Validate Jinja templates
         run: |
           python - <<'PY'
@@ -41,6 +41,7 @@ jobs:
               'rest_producoes_pendentes.html',
               'restaurante_dashboard.html',
               'restaurantes_tabelas.html',
+              'admin_dashboard.html',
               'admin_producoes_pendentes.html',
               'admin_rapido.html',
           )
@@ -69,39 +70,49 @@ jobs:
           assert (overnight.hour, overnight.minute, overnight.day) == (7, 0, 8)
           print('exact shift rules ok')
           PY
-      - name: Validate transformed panels
+      - name: Validate operational V5
         run: |
           python - <<'PY'
-          import cooperative_notifications_ui as ui
+          from pathlib import Path
+          import operational_rules_v5 as ui
 
           app = ui.app
-          for name in ('restaurante_dashboard.html', 'painel_cooperado.html', 'coop_producao.html'):
+          for name in ('restaurante_dashboard.html', 'painel_cooperado.html', 'coop_producao.html', 'admin_dashboard.html'):
               source, _, _ = app.jinja_loader.get_source(app.jinja_env, name)
               app.jinja_env.parse(source)
 
           rest_source, _, _ = app.jinja_loader.get_source(app.jinja_env, 'restaurante_dashboard.html')
           coop_source, _, _ = app.jinja_loader.get_source(app.jinja_env, 'painel_cooperado.html')
           launch_source, _, _ = app.jinja_loader.get_source(app.jinja_env, 'coop_producao.html')
+          admin_source, _, _ = app.jinja_loader.get_source(app.jinja_env, 'admin_dashboard.html')
+          css = Path('static/css/operational_v5.css').read_text(encoding='utf-8')
 
           assert 'SEJA BEM-VINDO' in rest_source
           assert '_rest_approvals_tabs.html' in rest_source
-          assert 'restaurante_v3.js' in rest_source
-          assert 'coopex-horizontal-menu-critical' in rest_source
           assert 'coopex_rest_week_pending_rows' in rest_source
+          assert 'coopex_rest_current_coop_ids' in rest_source
+          assert 'No turno agora' in rest_source
+          assert 'operational_v5.css' in rest_source
           assert 'data-coopex-producoes="1"' not in rest_source
 
-          assert 'cooperado_producao_v3.css' in coop_source
           assert 'cooperado_v4.css' in coop_source
           assert 'cooperado_v4.js' in coop_source
           assert 'coopex-production-card' in coop_source
-          assert 'Produção aprovada' in coop_source
-          assert 'Avaliada' in coop_source
-          assert coop_source.count("{% include '_coop_timeline.html' %}") == 1
-          history_pos = coop_source.find('Produções no período')
-          timeline_pos = coop_source.find("{% include '_coop_timeline.html' %}")
-          assert history_pos >= 0 and timeline_pos > history_pos
+          assert 'coopexTimelineDeferred' in coop_source
+          assert "{% include '_coop_timeline.html' %}" not in coop_source
+          assert '/api/coop/timeline' in coop_source
           assert 'data-coopex-production-submit="1"' in launch_source
-          print('transformed panels ok')
+
+          assert 'warmQueue();' not in admin_source
+          assert 'operational_v5.css' in admin_source
+          assert 'max-height:none' in css
+          assert 'overflow:visible' in css
+
+          with app.test_request_context('/admin?tab=cooperados'):
+              assert ui._operational_filter_enabled() is False
+          with app.test_request_context('/admin?tab=escalas'):
+              assert ui._operational_filter_enabled() is True
+          print('operational v5 ok')
           PY
       - name: Validate notification intervals
         run: |
