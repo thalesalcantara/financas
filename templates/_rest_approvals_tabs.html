@@ -16,7 +16,7 @@
   <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
     <div>
       <strong><i class="bi bi-bell-fill text-danger me-1"></i>Aprovações de lançamentos</strong>
-      <div class="small text-muted">Ajuste a quantidade ou o valor total antes de aprovar.</div>
+      <div class="small text-muted">Ajuste quantidade/valor para aprovar ou recuse para bloquear novo envio do cooperado.</div>
     </div>
     <span class="badge rounded-pill bg-danger">{{ _coopex_pending|length }}</span>
   </div>
@@ -32,6 +32,7 @@
         </div>
         <div class="coopex-approval-value">R$ {{ '%.2f'|format(x.producao.valor_total or 0)|replace('.', ',') }}</div>
       </div>
+
       <form class="coopex-approval-form" method="post" action="{{ url_for('rest_producao_aprovar', item_id=x.producao.id) }}">
         <div>
           <label>Entregas finais</label>
@@ -42,6 +43,14 @@
           <input type="number" min="0.01" step="0.01" name="valor_total" value="{{ '%.2f'|format(x.producao.valor_total or 0) }}" required>
         </div>
         <button type="submit"><i class="bi bi-check-circle me-1"></i>Aprovar</button>
+      </form>
+
+      <form class="coopex-reject-form" method="post" action="{{ url_for('rest_producao_recusar', item_id=x.producao.id) }}" onsubmit="return confirm('Recusar esta produção? O cooperado ficará bloqueado para reenviar esta escala e somente o estabelecimento poderá lançar o valor depois.');">
+        <input type="hidden" name="motivo" value="Recusada pelo estabelecimento. Novo envio do cooperado bloqueado; lançamento permitido somente pelo estabelecimento.">
+        <input type="hidden" name="return_dashboard" value="1">
+        <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+        <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim','') }}">
+        <button type="submit" class="coopex-reject-btn"><i class="bi bi-x-circle me-1"></i>Recusar e bloquear</button>
       </form>
     </article>
     {% endfor %}
