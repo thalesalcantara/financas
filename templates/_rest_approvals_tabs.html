@@ -34,6 +34,9 @@
       </div>
 
       <form class="coopex-approval-form" method="post" action="{{ url_for('rest_producao_aprovar', item_id=x.producao.id) }}">
+        <input type="hidden" name="return_dashboard" value="1">
+        <input type="hidden" name="data_inicio" value="{{ request.args.get('data_inicio','') }}">
+        <input type="hidden" name="data_fim" value="{{ request.args.get('data_fim','') }}">
         <div>
           <label>Entregas finais</label>
           <input type="number" min="1" name="qtd_entregas" value="{{ x.producao.qtd_entregas or '' }}" required>
