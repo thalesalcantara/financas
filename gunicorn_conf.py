@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-07.1032"
+BUILD_VERSION = "2026-08-07.1035"
 
 
 def post_worker_init(worker):
@@ -38,6 +38,7 @@ def post_worker_init(worker):
         import cooperative_notifications_ui  # noqa: F401
         import operational_rules_v5  # noqa: F401
         import approval_rejection_v5  # noqa: F401
+        import approval_return_dashboard_v5  # noqa: F401
         import admin_launch_sync_v5  # noqa: F401
 
         if "coopex_build_probe" not in flask_app.view_functions:
@@ -61,6 +62,9 @@ def post_worker_init(worker):
                     rejected_coop_resubmit_blocked=True,
                     rejected_rest_manual_launch_allowed=True,
                     approved_value_creates_admin_launch=True,
+                    approval_returns_main_dashboard=True,
+                    approval_no_second_launch_required=True,
+                    approval_named_confirmation=True,
                     admin_launch_live_sync=True,
                     admin_launch_cache_bypass_on_change=True,
                     normal_financial_deductions_for_approved_launch=True,
@@ -90,7 +94,7 @@ def post_worker_init(worker):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Lançamentos aprovados sincronizados com o Admin. Build %s", BUILD_VERSION)
+        log.info("Aprovação integrada ao painel principal e ao lançamento normal. Build %s", BUILD_VERSION)
     except Exception:
         log.exception(
             "Melhorias complementares não carregaram; mantendo o aplicativo principal disponível."
