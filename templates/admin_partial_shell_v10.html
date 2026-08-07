@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#064fc8">
+  <title>{{ page_title }} — COOPEX</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_light_v8.css', v=build) }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_v6.css', v=build) }}">
+  <style>
+    body{background:#f4f7fc!important;color:#0d1b3e!important}
+    .v10-partial-page{padding:14px 18px 24px;min-height:calc(100vh - 64px)}
+    .v10-partial-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 12px}
+    .v10-partial-head h1{font-size:21px;margin:0;font-weight:800;color:#0d1b3e}
+    .v10-partial-status{font-size:12px;color:#64748b;display:flex;align-items:center;gap:7px}
+    .v10-partial-status .spinner-border{width:14px;height:14px;border-width:2px}
+    #v10PartialMount{min-height:120px}
+    #v10PartialMount>.tab-pane,#v10PartialMount>section{display:block!important;opacity:1!important}
+    #v10PartialMount .container,#v10PartialMount .container-fluid{max-width:none!important;width:100%!important;padding-left:0!important;padding-right:0!important}
+    #v10PartialMount .card{border:1px solid #dfe7f4!important;box-shadow:none!important;border-radius:12px!important}
+    #v10PartialMount .table-responsive{border-radius:10px}
+    #v10PartialMount .modal{z-index:1080}
+    .modal-backdrop{z-index:1070}
+  </style>
+</head>
+<body>
+  {% include '_admin_nav_v10.html' %}
+  <main class="v10-partial-page">
+    <div class="v10-partial-head">
+      <h1>{{ page_title }}</h1>
+      <div id="v10Status" class="v10-partial-status"><span class="spinner-border"></span> Carregando somente esta aba...</div>
+    </div>
+    <div id="v10PartialMount"></div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+  (function(){
+    const mount=document.getElementById('v10PartialMount');
+    const status=document.getElementById('v10Status');
+    const base={{ partial_url|tojson }};
+    let controller=null;
+
+    function setLoading(on,text){
+      if(!status)return;
+      status.innerHTML=on?'<span class="spinner-border"></span> '+(text||'Carregando...'):(text||'Pronto');
+    }
+
+    function executeScripts(root){
+      root.querySelectorAll('script').forEach(old=>{
+        const s=document.createElement('script');
+        [...old.attributes].forEach(a=>s.setAttribute(a.name,a.value));
+        s.textContent=old.textContent;
+        old.replaceWith(s);
+      });
+    }
+
+    function buildPartialUrl(form){
+      const u=new URL(base,location.origin);
+      if(form){
+        const fd=new FormData(form);
+        [...u.searchParams.keys()].forEach(k=>{
+          if(!['tab','legacy','ajax_partial'].includes(k))u.searchParams.delete(k);
+        });
+        for(const [k,v] of fd.entries())if(v!==''&&v!=null)u.searchParams.append(k,v);
+      }
+      u.searchParams.set('legacy','1');
+      u.searchParams.set('ajax_partial',{{ active_tab|tojson }});
+      u.searchParams.set('tab',{{ active_tab|tojson }});
+      return u.toString();
+    }
+
+    async function load(url){
+      if(controller)controller.abort();
+      controller=new AbortController();
+      setLoading(true,'Carregando somente esta aba...');
+      try{
+        const r=await fetch(url||base,{credentials:'same-origin',cache:'no-store',headers:{'X-Requested-With':'XMLHttpRequest'},signal:controller.signal});
+        if(!r.ok)throw new Error('HTTP '+r.status);
+        mount.innerHTML=await r.text();
+        executeScripts(mount);
+        bind();
+        setLoading(false,'Pronto');
+      }catch(e){
+        if(e.name==='AbortError')return;
+        mount.innerHTML='<div class="alv8-card"><strong>Não foi possível carregar esta aba.</strong><br><small>'+String(e.message||e)+'</small></div>';
+        setLoading(false,'Falha ao carregar');
+      }
+    }
+
+    function bind(){
+      mount.querySelectorAll('form').forEach(form=>{
+        if(form.dataset.v10Bound)return;
+        form.dataset.v10Bound='1';
+        form.addEventListener('submit',async ev=>{
+          const method=(form.method||'get').toLowerCase();
+          if(method==='get'){
+            ev.preventDefault();
+            await load(buildPartialUrl(form));
+            return;
+          }
+          ev.preventDefault();
+          setLoading(true,'Salvando...');
+          try{
+            const r=await fetch(form.action||location.href,{method:method.toUpperCase(),body:new FormData(form),credentials:'same-origin',headers:{'X-Requested-With':'XMLHttpRequest'}});
+            if(!r.ok && r.status!==302)throw new Error('HTTP '+r.status);
+            await load(buildPartialUrl());
+          }catch(e){alert('Não foi possível salvar: '+(e.message||e));setLoading(false,'Falha ao salvar')}
+        });
+      });
+
+      mount.querySelectorAll('a[href]').forEach(a=>{
+        if(a.dataset.v10Bound)return;
+        const href=a.getAttribute('href')||'';
+        if(!/\/delete(?:\?|$)|\/excluir(?:\?|$)/.test(href))return;
+        a.dataset.v10Bound='1';
+        a.addEventListener('click',async ev=>{
+          ev.preventDefault();
+          if(!confirm('Confirmar exclusão?'))return;
+          try{await fetch(a.href,{credentials:'same-origin',headers:{'X-Requested-With':'XMLHttpRequest'}});await load(buildPartialUrl())}catch(e){alert('Não foi possível excluir.')}
+        });
+      });
+    }
+
+    load(base);
+  })();
+  </script>
+</body>
+</html>
