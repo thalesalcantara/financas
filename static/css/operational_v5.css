@@ -1,0 +1,71 @@
+/* COOPEX Operational V5 */
+
+/* Pendências do estabelecimento: todas visíveis, sem scroll interno. */
+section[data-view="lancar"] > .pending-wrap{
+  align-self:flex-start !important;
+}
+section[data-view="lancar"] > .pending-wrap .pending-card{
+  max-height:none !important;
+  overflow:visible !important;
+  justify-content:flex-start !important;
+  min-height:82px !important;
+}
+section[data-view="lancar"] > .pending-wrap .pending-list{
+  display:flex !important;
+  flex-direction:column !important;
+  gap:4px !important;
+  margin-top:6px !important;
+}
+section[data-view="lancar"] > .pending-wrap .pending-item{
+  padding:5px 7px !important;
+  border-radius:8px !important;
+  gap:6px !important;
+  min-height:0 !important;
+}
+section[data-view="lancar"] > .pending-wrap .pending-item strong{
+  font-size:.76rem !important;
+  line-height:1.15 !important;
+}
+section[data-view="lancar"] > .pending-wrap .pending-item-meta{
+  font-size:.67rem !important;
+  line-height:1.2 !important;
+}
+section[data-view="lancar"] > .pending-wrap .pending-badge,
+section[data-view="lancar"] > .pending-wrap .btn-sm{
+  font-size:.68rem !important;
+  padding:.22rem .42rem !important;
+  white-space:nowrap !important;
+}
+
+/* Cooperado: placeholder leve enquanto a aba Produções não foi aberta. */
+.coopex-v5-loading{
+  padding:12px 14px;
+  border:1px dashed rgba(39,71,217,.20);
+  border-radius:14px;
+  background:#f8faff;
+  color:#64748b;
+  font-size:.78rem;
+  text-align:center;
+}
+
+/* Reduz repaints e custo de renderização das abas fora da tela. */
+#tab-ajustes:not(.active),
+#tab-escalas:not(.active),
+#tab-trocas:not(.active),
+#tab-farmacia:not(.active){
+  content-visibility:auto;
+  contain-intrinsic-size:1px 700px;
+}
+
+/* Admin: evita custo de pintura das abas ocultas; dados continuam carregando ao clicar. */
+body .tab-pane:not(.show):not(.active){
+  content-visibility:auto;
+  contain-intrinsic-size:1px 900px;
+}
+
+@media(max-width:980px){
+  section[data-view="lancar"] > .pending-wrap .pending-card{
+    max-height:none !important;
+    overflow:visible !important;
+  }
+}
