@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-06.1336"
+BUILD_VERSION = "2026-08-07.1005"
 
 
 def post_worker_init(worker):
@@ -32,8 +32,10 @@ def post_worker_init(worker):
         import performance_ui_fix  # noqa: F401
         import performance_ui_hotfix  # noqa: F401
         import performance_query_override  # noqa: F401
+        import production_shift_time_fix  # noqa: F401
         import performance_ui_finalize  # noqa: F401
         import menu_horizontal_enforcer  # noqa: F401
+        import cooperative_notifications_ui  # noqa: F401
 
         if "coopex_build_probe" not in flask_app.view_functions:
             from flask import jsonify
@@ -44,20 +46,22 @@ def post_worker_init(worker):
                     ok=True,
                     build=BUILD_VERSION,
                     production_scale=True,
+                    exact_scale_date=True,
+                    exact_shift_end=True,
+                    multiple_daily_shifts=True,
+                    previous_day_submission=True,
+                    restaurant_week_pending=True,
+                    restaurant_approval_tab=True,
+                    restaurant_alarm_every_5_minutes=True,
+                    cooperative_submission_sound=True,
+                    cooperative_new_rating_sound_once=True,
+                    cooperative_light_production_cards=True,
+                    cooperative_rating_preserved=True,
                     restaurant_horizontal_dashboard=True,
                     horizontal_menu_enforced=True,
                     old_sidebar_disabled=True,
-                    restaurant_welcome_name=True,
-                    restaurant_approval_tab=True,
-                    strong_approval_sound=True,
-                    tables_horizontal_dashboard=True,
-                    cooperative_daily_timeline=True,
-                    cooperative_default_today=True,
-                    cooperative_history_preserved=True,
-                    cooperative_rating_preserved=True,
                     optimized_panel_queries=True,
                     indexed_scale_queries=True,
-                    legacy_scale_fallback=True,
                     media_route_photos=True,
                     enlarged_cooperative_photo=True,
                     full_history_table=True,
@@ -70,7 +74,7 @@ def post_worker_init(worker):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Hotfix Jinja aplicado e menu horizontal preservado. Build %s", BUILD_VERSION)
+        log.info("Turnos exatos e notificações carregados. Build %s", BUILD_VERSION)
     except Exception:
         log.exception(
             "Melhorias complementares não carregaram; mantendo o aplicativo principal disponível."
