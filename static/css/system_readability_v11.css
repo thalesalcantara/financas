@@ -1,0 +1,12 @@
+/* COOPEX V11 — legibilidade em 100% de zoom do navegador.
+   Aumenta somente tipografia/peso; não remove funções nem altera regras. */
+html{font-size:16px}
+body{font-size:15px!important;font-weight:700!important}
+body button,body input,body select,body textarea,body label,body a,body td,body th,body p,body span,body small,body summary{font-weight:700}
+body input,body select,body textarea,body button{font-size:13px!important}
+body table{font-size:13px!important}
+body table th{font-size:12px!important;font-weight:800!important}
+body table td{font-size:13px!important;font-weight:700!important}
+body small,.small{font-size:12px!important;font-weight:700!important}
+body .text-muted,body .text-secondary,body [class*="muted"]{font-weight:700!important}
+body h1,body h2,body h3,body h4,body h5,body h6,body strong,body b{font-weight:800!important}
