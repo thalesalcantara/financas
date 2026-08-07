@@ -13,6 +13,45 @@ TZ = patch.TZ
 
 _DATE_BR = re.compile(r"(?<!\d)(\d{2})/(\d{2})/(\d{2,4})(?!\d)")
 _DATE_ISO = re.compile(r"(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)")
+_TIME_TOKEN = re.compile(r"(?<!\d)(2[0-3]|[01]?\d)(?:\s*(?::|h)\s*([0-5]\d))?(?!\d)", re.I)
+
+
+def _norm_time_fixed(raw) -> str:
+    text = str(raw or "").strip().lower()
+    match = _TIME_TOKEN.search(text)
+    if not match:
+        return ""
+    hour = int(match.group(1))
+    minute = int(match.group(2) or 0)
+    return f"{hour:02d}:{minute:02d}"
+
+
+def _times_from_text_fixed(raw) -> tuple[str, str]:
+    matches = list(_TIME_TOKEN.finditer(str(raw or "")))
+    if not matches:
+        return "", ""
+
+    def fmt(match):
+        return f"{int(match.group(1)):02d}:{int(match.group(2) or 0):02d}"
+
+    start = fmt(matches[0])
+    end = fmt(matches[-1]) if len(matches) > 1 else ""
+    return start, end
+
+
+def _minutes_fixed(raw) -> int | None:
+    value = _norm_time_fixed(raw)
+    if not value:
+        return None
+    hour, minute = map(int, value.split(":"))
+    return hour * 60 + minute
+
+
+# Corrige o parser na origem para todos os módulos que usam coopex_upgrade.
+# O erro antigo interpretava o "00" de 22:00 como um horário separado.
+upgrade._norm_time = _norm_time_fixed
+upgrade._times_from_text = _times_from_text_fixed
+upgrade._minutes = _minutes_fixed
 
 
 def exact_scale_date(scale, today: date | None = None) -> date | None:
@@ -58,12 +97,7 @@ def matches_exact_day(scale, day: date) -> bool:
 
 
 def _filter_active_window(rows):
-    """Mantém a semana atual e pendências recentes sem misturar escalas antigas.
-
-    A janela de 31 dias permite, por exemplo, lançar ontem hoje mesmo quando
-    houve virada de semana. A tela principal continua filtrando somente o dia
-    solicitado; esta janela serve para validar o POST pelo escala_id.
-    """
+    """Mantém a semana atual e pendências recentes sem misturar escalas antigas."""
     today = datetime.now(TZ).date()
     monday = today - timedelta(days=today.weekday())
     sunday = monday + timedelta(days=6)
@@ -76,7 +110,6 @@ def _filter_active_window(rows):
     return result
 
 
-# As rotinas de produção consultam estes nomes em tempo de execução.
 patch._current_week_date = exact_scale_date
 flow._scale_date = exact_scale_date
 perf._matches_day = matches_exact_day
@@ -95,9 +128,6 @@ def rest_scales_active_window(rest):
 
 patch._coop_scales = coop_scales_active_window
 patch._rest_scales = rest_scales_active_window
-
-# Mantém as buscas indexadas no painel principal, mas a correspondência de
-# data passa a ser exata. Um filtro de ontem encontra somente ontem.
 query_override.perf._matches_day = matches_exact_day
 
 
