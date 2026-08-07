@@ -18,10 +18,8 @@ _DATE_ISO = re.compile(r"(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)")
 def exact_scale_date(scale, today: date | None = None) -> date | None:
     """Retorna a data realmente gravada na escala.
 
-    Escalas como `07/08/26-SEX` precisam continuar sendo 07/08/2026.
-    Elas nunca devem ser convertidas para outra sexta-feira só porque o dia
-    da semana é igual. O fallback por weekday é exclusivo para registros
-    legados que realmente não possuem uma data válida.
+    Ex.: `07/08/26-SEX` continua sendo 07/08/2026. A data não é movida para
+    outra sexta-feira. Só registros legados sem data válida usam o weekday.
     """
     raw = str(getattr(scale, "data", "") or "").strip()
 
@@ -47,7 +45,6 @@ def exact_scale_date(scale, today: date | None = None) -> date | None:
     if parsed:
         return parsed
 
-    # Compatibilidade: somente escalas antigas sem data real usam o weekday.
     today = today or datetime.now(TZ).date()
     weekday = patch._weekday_zero_based(scale)
     if weekday is None:
@@ -60,14 +57,21 @@ def matches_exact_day(scale, day: date) -> bool:
     return exact_scale_date(scale, day) == day
 
 
-def _filter_current_week(rows):
+def _filter_active_window(rows):
+    """Mantém a semana atual e pendências recentes sem misturar escalas antigas.
+
+    A janela de 31 dias permite, por exemplo, lançar ontem hoje mesmo quando
+    houve virada de semana. A tela principal continua filtrando somente o dia
+    solicitado; esta janela serve para validar o POST pelo escala_id.
+    """
     today = datetime.now(TZ).date()
     monday = today - timedelta(days=today.weekday())
     sunday = monday + timedelta(days=6)
+    start = today - timedelta(days=31)
     result = []
     for scale in rows:
         d = exact_scale_date(scale, today)
-        if d and monday <= d <= sunday:
+        if d and start <= d <= sunday:
             result.append(scale)
     return result
 
@@ -81,19 +85,19 @@ _original_patch_coop_scales = patch._coop_scales
 _original_patch_rest_scales = patch._rest_scales
 
 
-def coop_scales_current_week(coop):
-    return _filter_current_week(_original_patch_coop_scales(coop))
+def coop_scales_active_window(coop):
+    return _filter_active_window(_original_patch_coop_scales(coop))
 
 
-def rest_scales_current_week(rest):
-    return _filter_current_week(_original_patch_rest_scales(rest))
+def rest_scales_active_window(rest):
+    return _filter_active_window(_original_patch_rest_scales(rest))
 
 
-patch._coop_scales = coop_scales_current_week
-patch._rest_scales = rest_scales_current_week
+patch._coop_scales = coop_scales_active_window
+patch._rest_scales = rest_scales_active_window
 
 # Mantém as buscas indexadas no painel principal, mas a correspondência de
-# data passa a ser exata. Assim um filtro de ontem continua encontrando ontem.
+# data passa a ser exata. Um filtro de ontem encontra somente ontem.
 query_override.perf._matches_day = matches_exact_day
 
 
