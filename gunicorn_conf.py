@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-07.1104"
+BUILD_VERSION = "2026-08-07.1120"
 
 
 def post_worker_init(worker):
@@ -41,6 +41,7 @@ def post_worker_init(worker):
         import approval_return_dashboard_v5  # noqa: F401
         import admin_launch_sync_v5  # noqa: F401
         import admin_ui_v6  # noqa: F401
+        import admin_runtime_v7  # noqa: F401
 
         if "coopex_build_probe" not in flask_app.view_functions:
             from flask import jsonify
@@ -69,9 +70,17 @@ def post_worker_init(worker):
                     admin_launch_live_sync=True,
                     admin_launch_partial_replacement_disabled=True,
                     admin_actions_persistent=True,
-                    admin_horizontal_v6=True,
+                    admin_horizontal_v7=True,
                     admin_grouped_dropdowns=True,
                     admin_lightweight_design=True,
+                    admin_summary_default_today=True,
+                    admin_summary_ajax_on_demand=True,
+                    admin_summary_table_live_data=True,
+                    admin_tables_unified_design=True,
+                    admin_documents_unified_design=True,
+                    admin_notices_unified_design=True,
+                    admin_ratings_unified_design=True,
+                    admin_ratings_page_size_50=True,
                     normal_financial_deductions_for_approved_launch=True,
                     restaurant_alarm_every_5_minutes=True,
                     cooperative_submission_sound=True,
@@ -99,7 +108,7 @@ def post_worker_init(worker):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Admin V6 horizontal e ações persistentes carregados. Build %s", BUILD_VERSION)
+        log.info("Admin V7 unificado e resumo diário carregados. Build %s", BUILD_VERSION)
     except Exception:
         log.exception(
             "Melhorias complementares não carregaram; mantendo o aplicativo principal disponível."
