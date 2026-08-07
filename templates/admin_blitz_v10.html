@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#064fc8">
+  <title>Blitz — COOPEX</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_light_v8.css', v=build) }}">
+  <style>
+    .v10-blitz-edit{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr auto;gap:8px;align-items:end}
+    .v10-doc-ok{color:#15803d;font-weight:700}.v10-doc-bad{color:#dc2626;font-weight:700}.v10-doc-warn{color:#b45309;font-weight:700}
+  </style>
+</head>
+<body>
+  {% include '_admin_nav_v10.html' %}
+  <main class="alv8-page">
+    <div class="alv8-head"><div><h1 class="alv8-title">Blitz — CNH e CRLV</h1><p class="alv8-sub">Conferência operacional vinculada à Escala. Aqui ficam somente CNH, validade, placa e validade do CRLV.</p></div><div class="alv8-actions"><a class="alv8-btn primary" href="{{ url_for('admin_light_scale') }}"><i class="bi bi-calendar-week"></i> Voltar para Escala</a></div></div>
+    {% with msgs=get_flashed_messages(with_categories=true) %}{% if msgs %}<div class="alv8-card">{% for cat,msg in msgs %}<div class="alv8-note">{{ msg }}</div>{% endfor %}</div>{% endif %}{% endwith %}
+
+    <form class="alv8-card alv8-filter" method="get">
+      <div class="alv8-field grow"><label>Buscar cooperado</label><input class="alv8-input" name="q" value="{{ q }}" placeholder="Nome, CNH ou placa"></div>
+      <button class="alv8-btn primary"><i class="bi bi-search"></i> Buscar</button>
+      <a class="alv8-btn" href="{{ url_for('admin_v10_blitz') }}">Limpar</a>
+    </form>
+
+    <div class="alv8-card"><div class="alv8-table-wrap"><table class="alv8-table">
+      <thead><tr><th>Cooperado</th><th>CNH</th><th>Validade CNH</th><th>Placa / CRLV</th><th>Validade CRLV</th><th>Situação</th><th>Editar</th></tr></thead>
+      <tbody>
+      {% for c in cooperados %}
+        {% set cnh_ok=c.cnh_validade and c.cnh_validade>=today %}{% set crlv_ok=c.placa_validade and c.placa_validade>=today %}
+        <tr>
+          <td><strong>{{ c.nome }}</strong></td>
+          <td>{{ c.cnh_numero or '—' }}</td>
+          <td class="{{ 'v10-doc-ok' if cnh_ok else 'v10-doc-bad' }}">{{ c.cnh_validade.strftime('%d/%m/%Y') if c.cnh_validade else 'Não informada' }}</td>
+          <td>{{ c.placa or '—' }}</td>
+          <td class="{{ 'v10-doc-ok' if crlv_ok else 'v10-doc-bad' }}">{{ c.placa_validade.strftime('%d/%m/%Y') if c.placa_validade else 'Não informada' }}</td>
+          <td><span class="alv8-badge {{ 'ok' if cnh_ok and crlv_ok else 'bad' }}">{{ 'Em dia' if cnh_ok and crlv_ok else 'Verificar' }}</span></td>
+          <td><details><summary class="alv8-btn edit"><i class="bi bi-pencil"></i> Editar</summary><form method="post" action="{{ url_for('admin_v10_blitz_save', coop_id=c.id) }}" class="v10-blitz-edit" style="margin-top:9px"><input type="hidden" name="q" value="{{ q }}"><div class="alv8-field"><label>CNH</label><input class="alv8-input" name="cnh_numero" value="{{ c.cnh_numero or '' }}"></div><div class="alv8-field"><label>Validade CNH</label><input class="alv8-input" type="date" name="cnh_validade" value="{{ c.cnh_validade.isoformat() if c.cnh_validade else '' }}"></div><div class="alv8-field"><label>Placa</label><input class="alv8-input" name="placa" value="{{ c.placa or '' }}"></div><div class="alv8-field"><label>Validade CRLV</label><input class="alv8-input" type="date" name="placa_validade" value="{{ c.placa_validade.isoformat() if c.placa_validade else '' }}"></div><button class="alv8-btn primary">Salvar</button></form></details></td>
+        </tr>
+      {% else %}<tr><td colspan="7" class="alv8-empty">Nenhum cooperado encontrado.</td></tr>{% endfor %}
+      </tbody>
+    </table></div></div>
+  </main>
+</body>
+</html>
