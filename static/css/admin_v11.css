@@ -1,0 +1,19 @@
+/* Admin V11 — leitura equivalente ao navegador em ~125%, sem aumentar vazios. */
+.alv8-brand-copy small{font-size:12px!important}.alv8-brand-copy strong{font-size:16px!important}
+.alv8-group>button,.alv8-direct{font-size:15px!important;font-weight:800!important;padding-left:12px!important;padding-right:12px!important}
+.alv8-menu a{font-size:14px!important;font-weight:800!important;padding:9px 10px!important}
+.alv8-title{font-size:24px!important;font-weight:900!important}.alv8-sub{font-size:14px!important;font-weight:700!important}
+.alv8-card h3{font-size:16px!important;font-weight:900!important}.alv8-card p{font-size:13px!important;font-weight:700!important}
+.alv8-kpi span{font-size:12px!important;font-weight:800!important}.alv8-kpi strong{font-size:19px!important;font-weight:900!important}
+.alv8-field label,.alv8-edit-coop label{font-size:12px!important;font-weight:800!important}
+.alv8-input,.alv8-select,.alv8-textarea{font-size:13px!important;font-weight:700!important;padding:7px 8px!important}
+.alv8-btn{font-size:13px!important;font-weight:900!important}.alv8-check{font-size:13px!important;font-weight:800!important}
+.alv8-table{font-size:13px!important}.alv8-table th{font-size:12px!important;font-weight:900!important}.alv8-table td{font-size:13px!important;font-weight:700!important}
+.alv8-badge{font-size:11px!important;font-weight:900!important}.alv8-person strong{font-size:13px!important}.alv8-person small{font-size:11px!important}
+.alv8-note{font-size:13px!important;font-weight:800!important}.alv8-tabs a,.alv8-tabs button{font-size:13px!important;font-weight:900!important}
+.alv8-compact .alv8-input,.alv8-compact .alv8-select{font-size:12px!important}.alv8-compact .alv8-btn{font-size:12px!important}
+.alv8-footer{font-size:11px!important}.alv8-table tfoot th,.alv8-table tfoot td{background:#eef3ff!important;color:#102a56!important;font-weight:900!important;border-top:2px solid #b9c9ef!important}
+.v11-counter{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:24px;padding:0 8px;border-radius:999px;background:#e8efff;color:#064fc8;font-size:12px;font-weight:900;margin-left:5px}
+.v11-bulkbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}.v11-check{width:17px;height:17px;accent-color:#064fc8}
+.v11-config-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.v11-config-wide{grid-column:1/-1}.v11-config-card{background:#fff;border:1px solid #dfe7f4;border-radius:12px;padding:14px}.v11-config-card h3{margin:0 0 5px;font-size:17px}.v11-config-card p{margin:0 0 12px;color:#64748b;font-size:13px}.v11-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.v11-form-grid .wide{grid-column:1/-1}.v11-admin-row{border:1px solid #e2e8f0;border-radius:10px;padding:11px;margin-bottom:9px;background:#fff}.v11-admin-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.v11-perm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.v11-perm-card{border:1px solid #e2e8f0;border-radius:9px;padding:9px;background:#f8fbff}.v11-perm-card strong{display:block;margin-bottom:7px}.v11-perm-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.v11-partial-page{padding:10px 14px 18px!important}.v11-partial-head h1{font-size:22px!important;font-weight:900!important}
+@media(max-width:1350px){.alv8-group>button,.alv8-direct{padding-left:9px!important;padding-right:9px!important;font-size:14px!important}.v11-perm-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
