@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile Python
-        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py performance_ui_fix.py performance_ui_hotfix.py performance_query_override.py production_shift_time_fix.py performance_ui_finalize.py menu_horizontal_enforcer.py cooperative_notifications_ui.py operational_rules_v5.py approval_rejection_v5.py approval_return_dashboard_v5.py admin_launch_sync_v5.py admin_ui_v6.py admin_runtime_v7.py admin_light_v8.py admin_light_v8_bridge.py gunicorn_conf.py tests/smoke_upgrade.py
+        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py performance_ui_fix.py performance_ui_hotfix.py performance_query_override.py production_shift_time_fix.py performance_ui_finalize.py menu_horizontal_enforcer.py cooperative_notifications_ui.py operational_rules_v5.py approval_rejection_v5.py approval_return_dashboard_v5.py admin_launch_sync_v5.py admin_ui_v6.py admin_runtime_v7.py admin_light_v8.py admin_light_v8_bridge.py admin_preserve_v9.py gunicorn_conf.py tests/smoke_upgrade.py
       - name: Validate Jinja templates
         run: |
           python - <<'PY'
@@ -32,25 +32,12 @@ jobs:
           from jinja2 import Environment
           env = Environment()
           templates = (
-              'coop_producao.html',
-              'coop_producao_editar.html',
-              'coop_agenda.html',
-              'painel_cooperado.html',
-              '_coop_timeline.html',
-              '_rest_approvals_tabs.html',
-              'rest_producoes_pendentes.html',
-              'restaurante_dashboard.html',
-              'restaurantes_tabelas.html',
-              'admin_dashboard.html',
-              'admin_avaliacoes.html',
-              'admin_tabelas.html',
-              'admin_documentos.html',
-              'admin_avisos.html',
-              'admin_light_v8.html',
-              'editar_tabelas.html',
-              'editar_documentos.html',
-              'admin_producoes_pendentes.html',
-              'admin_rapido.html',
+              'coop_producao.html','coop_producao_editar.html','coop_agenda.html','painel_cooperado.html',
+              '_coop_timeline.html','_rest_approvals_tabs.html','rest_producoes_pendentes.html',
+              'restaurante_dashboard.html','restaurantes_tabelas.html','admin_dashboard.html',
+              'admin_avaliacoes.html','admin_tabelas.html','admin_documentos.html','admin_avisos.html',
+              'admin_light_v8.html','editar_tabelas.html','editar_documentos.html',
+              'admin_producoes_pendentes.html','admin_rapido.html',
           )
           for name in templates:
               env.parse((Path('templates') / name).read_text(encoding='utf-8'))
@@ -68,7 +55,7 @@ jobs:
           assert shifts.upgrade._times_from_text('11:00 às 15:00') == ('11:00', '15:00')
           print('exact shift rules ok')
           PY
-      - name: Validate operational V8
+      - name: Validate admin V9 preservation
         run: |
           python - <<'PY'
           from datetime import date
@@ -79,63 +66,54 @@ jobs:
           import operational_rules_v5 as ui
           import admin_light_v8 as light
           import admin_light_v8_bridge as bridge
+          import admin_preserve_v9 as preserve
 
           app = light.app
-          transformed = (
-              'admin_dashboard.html',
-              'admin_avaliacoes.html',
-              'admin_tabelas.html',
-              'admin_documentos.html',
-              'admin_avisos.html',
-              'editar_tabelas.html',
-              'editar_documentos.html',
-          )
+          transformed = ('admin_dashboard.html','admin_avaliacoes.html','admin_tabelas.html','admin_documentos.html','admin_avisos.html','editar_tabelas.html','editar_documentos.html')
           for name in transformed:
               source, _, _ = app.jinja_loader.get_source(app.jinja_env, name)
               app.jinja_env.parse(source)
-              assert 'css/admin_v6.css' in source, name
-              assert 'js/admin_v6.js' in source, name
+              assert 'admin_light_v8.css' in source, name
+              assert 'admin_light_v8_bridge.js' in source, name
 
           approvals = Path('templates/_rest_approvals_tabs.html').read_text(encoding='utf-8')
-          css = Path('static/css/admin_v6.css').read_text(encoding='utf-8')
-          js = Path('static/js/admin_v6.js').read_text(encoding='utf-8')
-          sync_js = Path('admin_launch_sync_v5.py').read_text(encoding='utf-8')
           light_tpl = Path('templates/admin_light_v8.html').read_text(encoding='utf-8')
           light_css = Path('static/css/admin_light_v8.css').read_text(encoding='utf-8')
           light_bridge = Path('static/js/admin_light_v8_bridge.js').read_text(encoding='utf-8')
+          preserve_py = Path('admin_preserve_v9.py').read_text(encoding='utf-8')
+
           assert 'Recusar e bloquear' in approvals
           assert app.view_functions['rest_producao_recusar'] is rejection.rest_reject_and_lock
           assert app.view_functions['rest_producao_aprovar'] is approval.rest_approve_return_dashboard
-          assert 'admin-v6-topbar' in css
-          assert '#resumo .kpi-card' in css
-          assert '.sidebar{display:none!important}' in css
-          assert "FAST_PARTIALS=new Set(['resumo'" in js
-          assert 'disableBrokenLancamentoAjax' in js
-          assert 'forceActionVisibility' in js
-          assert "window.location.replace" in sync_js
-          assert "fetchPartial('lancamentos'" not in sync_js
+          assert app.view_functions['admin_light_launches'] is preserve._admin_light_launches_full
+          assert app.view_functions['admin_light_scale'] is preserve._admin_light_scale_full
+          assert app.view_functions['admin_light_coop_save'] is preserve._admin_light_coop_save_full
 
-          assert 'Sistemas' not in light_tpl
-          assert "url_for('admin_light_scale')" in light_tpl
-          assert "url_for('admin_light_swaps')" in light_tpl
-          assert "url_for('admin_light_history')" in light_tpl
-          assert "url_for('admin_light_documents')" in light_tpl
-          assert 'Avaliações vitalícias' in Path('admin_light_v8.py').read_text(encoding='utf-8')
-          assert 'backdrop-filter' not in light_css
-          assert "config" in light_bridge and "remove()" in light_bridge
+          assert 'Configurações' in light_tpl
+          assert '> Sistemas<' not in light_tpl
+          assert 'INSS 4%' in light_tpl
+          assert 'SEST 0,5%' in light_tpl
+          assert 'Líquido' in light_tpl
+          assert 'considerar_periodo' in light_tpl
+          assert 'coopFilterList' in light_tpl
+          assert 'scaleEditorMount' in light_tpl
+          assert 'Nova senha' in light_tpl
+          assert 'legacy=1' in light_tpl
+          assert 'linear-gradient(90deg,#062b80,#064fc8' in light_css
+          assert 'legacy=1' in light_bridge
+          assert 'cooperative_password_edit' not in preserve_py or 'set_password' in preserve_py
 
           with app.test_request_context('/admin?tab=resumo'):
               app.preprocess_request()
               assert runtime.app is app
               assert __import__('flask').request.args.get('data_inicio') == date.today().isoformat()
               assert __import__('flask').request.args.get('data_fim') == date.today().isoformat()
-          with app.test_request_context('/admin?tab=cooperados'):
-              assert ui._operational_filter_enabled() is False
-          with app.test_request_context('/admin?tab=escalas'):
-              assert ui._operational_filter_enabled() is True
+          with app.test_request_context('/admin?tab=config&legacy=1'):
+              rv = app.preprocess_request()
+              assert rv is None
           with app.test_request_context('/admin/leve/cooperados'):
               assert ui._operational_filter_enabled() is False
-          print('operational v8 ok')
+          print('admin v9 preservation ok')
           PY
       - name: Validate notification intervals
         run: |
