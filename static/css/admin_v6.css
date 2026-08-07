@@ -1,0 +1,61 @@
+/* COOPEX ADMIN V6 — horizontal, royal blue/white, lightweight */
+:root{
+  --adm-royal:#064fc8;
+  --adm-royal-dark:#073a9c;
+  --adm-royal-soft:#eef4ff;
+  --adm-bg:#f4f7fc;
+  --adm-card:#fff;
+  --adm-text:#102044;
+  --adm-muted:#66758f;
+  --adm-border:#dde6f2;
+  --adm-shadow:0 4px 16px rgba(15,38,85,.055);
+}
+html,body{background:var(--adm-bg)!important;color:var(--adm-text)!important}
+body{font-family:Roboto,Arial,sans-serif!important;overflow-x:hidden!important}
+.layout{display:block!important;min-height:100vh!important}
+.sidebar{display:none!important}
+.main{margin-left:0!important;width:100%!important;max-width:none!important;padding:12px 16px 24px!important}
+
+.admin-v6-topbar{
+  position:sticky;top:0;z-index:5000;width:100%;height:68px;
+  display:flex;align-items:stretch;gap:10px;padding:0 16px;
+  background:linear-gradient(90deg,var(--adm-royal-dark),var(--adm-royal) 58%,#063c9e);
+  box-shadow:0 4px 18px rgba(4,45,126,.18);color:#fff;
+}
+.admin-v6-brand{display:flex;align-items:center;gap:10px;min-width:235px;padding-right:14px;border-right:1px solid rgba(255,255,255,.14)}
+.admin-v6-brand-icon{width:40px;height:40px;border:2px solid rgba(255,255,255,.68);border-radius:10px;display:grid;place-items:center;font-size:1.05rem;background:rgba(255,255,255,.08)}
+.admin-v6-brand-copy{min-width:0;line-height:1.05}.admin-v6-brand-copy small{display:block;font-size:.67rem;font-weight:800;letter-spacing:.07em;color:rgba(255,255,255,.76)}.admin-v6-brand-copy strong{display:block;margin-top:4px;font-size:.96rem;font-weight:850;color:#fff;white-space:nowrap}
+.admin-v6-nav{display:flex;align-items:stretch;flex:1;min-width:0;overflow:visible}
+.admin-v6-group{position:relative;display:flex;align-items:stretch}
+.admin-v6-group-btn,.admin-v6-direct{height:68px;border:0;background:transparent;color:#fff!important;text-decoration:none!important;padding:0 14px;display:flex;align-items:center;gap:7px;font-size:.9rem;font-weight:750;white-space:nowrap;cursor:pointer}
+.admin-v6-group-btn:hover,.admin-v6-direct:hover,.admin-v6-group.open>.admin-v6-group-btn{background:rgba(255,255,255,.12)}
+.admin-v6-caret{font-size:.7rem;transition:transform .16s ease}.admin-v6-group.open .admin-v6-caret{transform:rotate(180deg)}
+.admin-v6-menu{position:absolute;top:62px;left:0;min-width:225px;padding:7px;background:#fff;border:1px solid var(--adm-border);border-radius:12px;box-shadow:0 15px 35px rgba(15,38,85,.15);display:none;z-index:5100}
+.admin-v6-group.open>.admin-v6-menu,.admin-v6-group:hover>.admin-v6-menu{display:block}
+.admin-v6-menu a{display:flex!important;align-items:center!important;gap:9px!important;width:100%!important;padding:9px 10px!important;margin:0!important;border:0!important;border-radius:8px!important;background:#fff!important;color:#203458!important;text-decoration:none!important;font-size:.86rem!important;font-weight:650!important;white-space:nowrap!important}
+.admin-v6-menu a:hover,.admin-v6-menu a.active{background:var(--adm-royal-soft)!important;color:var(--adm-royal)!important;transform:none!important;box-shadow:none!important}
+.admin-v6-spacer{flex:1}
+.admin-v6-logout{margin-left:auto}
+
+/* Conteúdo mais leve sem remover informação */
+.main>.tab-content,.content-shell,.tab-pane>.content-shell,.tab-pane>.container-fluid{width:100%!important;max-width:none!important;margin:0!important}
+.card,.card-modern,.surface-card{border:1px solid var(--adm-border)!important;border-radius:14px!important;box-shadow:var(--adm-shadow)!important;background:#fff!important}
+.card-body{padding:14px!important}
+.panel-head{padding:14px 16px!important;border-radius:14px!important;margin-bottom:12px!important;box-shadow:var(--adm-shadow)!important;background:#fff!important;color:var(--adm-text)!important;border:1px solid var(--adm-border)!important}
+.panel-head-title{font-size:1.22rem!important;color:var(--adm-text)!important}.panel-head-sub{color:var(--adm-muted)!important;font-size:.86rem!important}
+.form-label,.lanc-label{font-size:.79rem!important;color:#304568!important;margin-bottom:4px!important}
+.form-control,.form-select,.input-group-text{min-height:40px!important;border-radius:10px!important;border-color:var(--adm-border)!important;background:#fff!important;font-size:.88rem!important}
+.btn{border-radius:9px!important}.btn-royal{border-radius:9px!important;padding:8px 13px!important;box-shadow:none!important;background:var(--adm-royal)!important}
+.table-responsive,.table-wrap{border:0!important;border-radius:12px!important;overflow:auto!important;background:#fff!important}
+.table{margin-bottom:0!important}.table thead th,.table-light th{position:static!important;background:#f7f9fd!important;color:#304568!important;font-size:.73rem!important;padding:.65rem .62rem!important;border-color:#e5ebf4!important}.table tbody td,.table tfoot td{font-size:.86rem!important;padding:.64rem .62rem!important;border-color:#edf1f7!important}.table tbody tr:hover{background:#f8fbff!important}
+.badge-soft{background:var(--adm-royal-soft)!important;color:var(--adm-royal)!important}
+
+/* Ações sempre visíveis no lançamento normal */
+#lancamentos th:last-child,#lancamentos td:last-child{min-width:92px!important;text-align:center!important}
+#lancamentos td:last-child .btn,#lancamentos td:last-child form,#lancamentos .btn-del-ajax{visibility:visible!important;opacity:1!important;display:inline-flex!important}
+#lancamentos td:last-child form{display:inline-block!important}
+#lancamentos .btn-warning,#lancamentos .btn-outline-warning{background:#ffb800!important;border-color:#ffb800!important;color:#172033!important}
+#lancamentos .btn-danger,#lancamentos .btn-outline-danger{background:#ef3340!important;border-color:#ef3340!important;color:#fff!important}
+
+@media(max-width:1120px){.admin-v6-brand{min-width:205px}.admin-v6-group-btn,.admin-v6-direct{padding:0 10px;font-size:.84rem}}
+@media(max-width:900px){.admin-v6-topbar{height:auto;min-height:68px;flex-wrap:wrap;padding:6px 9px}.admin-v6-brand{width:100%;height:44px;border-right:0;border-bottom:1px solid rgba(255,255,255,.12)}.admin-v6-nav{width:100%;flex:0 0 100%;height:50px;overflow-x:auto;overflow-y:visible;scrollbar-width:none}.admin-v6-nav::-webkit-scrollbar{display:none}.admin-v6-group-btn,.admin-v6-direct{height:50px}.admin-v6-menu{top:46px}.main{padding:9px 8px 18px!important}}
