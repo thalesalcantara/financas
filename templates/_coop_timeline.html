@@ -2,7 +2,7 @@
   <div class="coopex-sequence-head">
     <div>
       <h2><i class="bi bi-calendar2-check me-1"></i>Escala e produção do dia</h2>
-      <p>As produções já registradas e suas avaliações permanecem acima. Aqui aparece a escala do dia e o que ainda precisa ser lançado.</p>
+      <p>As produções já registradas e suas avaliações permanecem acima. Aqui aparece cada escala do período com o horário exato de liberação.</p>
     </div>
     {% if coopex_filter_start and coopex_filter_end %}
     <span class="coopex-sequence-period">
@@ -21,7 +21,7 @@
             {{ ['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'][x.data.weekday()] }},
             {{ x.data.strftime('%d/%m/%Y') }}
           </div>
-          <div class="coopex-day-meta">Escala diária na sequência da produção</div>
+          <div class="coopex-day-meta">{{ x.escala.turno or 'Turno' }} · escala #{{ x.escala.id }}</div>
         </div>
         <span class="coopex-day-status">{{ x.status_label }}</span>
       </div>
@@ -32,7 +32,7 @@
           <strong>{{ x.restaurante.nome|replace('_',' ') if x.restaurante else 'Não vinculado' }}</strong>
         </div>
         <div class="coopex-day-cell">
-          <small>Horário</small>
+          <small>Horário exato</small>
           <strong>{{ x.inicio or '--:--' }}{% if x.fim %} - {{ x.fim }}{% endif %}</strong>
         </div>
         <div class="coopex-day-cell"><small>Entregas</small><strong>{{ x.qtd_entregas or 0 }}</strong></div>
@@ -40,7 +40,7 @@
       </div>
 
       {% if x.pode_lancar %}
-      <form class="coopex-day-form" method="post" action="{{ url_for('coop_producao') }}">
+      <form class="coopex-day-form" data-coopex-production-submit="1" method="post" action="{{ url_for('coop_producao') }}">
         <input type="hidden" name="return_to" value="painel">
         <input type="hidden" name="escala_id" value="{{ x.escala.id }}">
         <input type="hidden" name="data_inicio" value="{{ coopex_filter_start.strftime('%Y-%m-%d') if coopex_filter_start else '' }}">
@@ -50,7 +50,7 @@
         <button type="submit"><i class="bi bi-send-check me-1"></i>Lançar produção</button>
       </form>
       {% elif not x.finalizada and not x.lancamento and not x.producao %}
-      <div class="coopex-day-note"><i class="bi bi-lock-fill me-1"></i>O lançamento será liberado somente após o término do horário da escala.</div>
+      <div class="coopex-day-note"><i class="bi bi-lock-fill me-1"></i>Libera exatamente às {{ x.fim or 'final do horário' }} desta escala.</div>
       {% elif x.lancamento or (x.producao and x.producao.status == 'aprovada') %}
       <div class="coopex-day-note">
         <i class="bi bi-check-circle-fill text-success me-1"></i>Produção aprovada.
@@ -74,7 +74,7 @@
     {% else %}
     <div class="coopex-sequence-empty">
       <i class="bi bi-calendar-x fs-4 d-block mb-2"></i>
-      Nenhuma escala encontrada para o dia. Use o filtro de datas para consultar a semana ou localizar uma produção anterior.
+      Nenhuma escala encontrada para a data. Use o filtro para consultar outro dia ou o período da semana.
     </div>
     {% endfor %}
   </div>
