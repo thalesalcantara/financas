@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#064fc8">
+  <title>Estabelecimentos — COOPEX</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_light_v8.css', v=build) }}">
+  <style>
+    .v10-est-grid{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:10px;align-items:end}
+    .v10-est-actions{display:flex;gap:6px;flex-wrap:wrap}
+    .v10-est-photo{width:42px;height:42px;border-radius:10px;object-fit:cover;border:1px solid #dbe5f4;background:#fff}
+    .v10-est-name{display:flex;align-items:center;gap:9px}
+    .v10-details summary{list-style:none;cursor:pointer}.v10-details summary::-webkit-details-marker{display:none}
+    .v10-edit{margin-top:10px;padding:12px;border:1px solid #dfe7f4;border-radius:10px;background:#f8fbff}
+    @media(max-width:1100px){.v10-est-grid{grid-template-columns:repeat(3,minmax(160px,1fr))}}
+  </style>
+</head>
+<body>
+  {% include '_admin_nav_v10.html' %}
+  <main class="alv8-page">
+    <div class="alv8-head"><div><h1 class="alv8-title">Estabelecimentos</h1><p class="alv8-sub">Página leve. Todos os estabelecimentos usam o período de segunda a domingo.</p></div></div>
+    {% with msgs=get_flashed_messages(with_categories=true) %}{% if msgs %}<div class="alv8-card">{% for cat,msg in msgs %}<div class="alv8-note">{{ msg }}</div>{% endfor %}</div>{% endif %}{% endwith %}
+
+    <form class="alv8-card alv8-filter" method="get">
+      <div class="alv8-field grow"><label>Buscar</label><input class="alv8-input" name="q" value="{{ q }}" placeholder="Nome ou usuário do estabelecimento"></div>
+      <div class="alv8-field"><label>Status</label><select class="alv8-select" name="status"><option value="todos" {{ 'selected' if status=='todos' else '' }}>Todos</option><option value="ativos" {{ 'selected' if status=='ativos' else '' }}>Ativos</option><option value="inativos" {{ 'selected' if status=='inativos' else '' }}>Inativos</option></select></div>
+      <button class="alv8-btn primary"><i class="bi bi-search"></i> Buscar</button>
+      <a class="alv8-btn" href="{{ url_for('admin_v10_establishments') }}">Limpar</a>
+    </form>
+
+    <details class="alv8-card">
+      <summary><strong><i class="bi bi-shop-window"></i> Novo estabelecimento</strong></summary>
+      <form method="post" action="{{ url_for('add_restaurante') }}" enctype="multipart/form-data" class="v10-est-grid" style="margin-top:12px">
+        <input type="hidden" name="periodo" value="seg-dom">
+        <div class="alv8-field"><label>Nome</label><input class="alv8-input" name="nome" required></div>
+        <div class="alv8-field"><label>Usuário</label><input class="alv8-input" name="usuario" required></div>
+        <div class="alv8-field"><label>Senha</label><input class="alv8-input" type="password" name="senha" required></div>
+        <div class="alv8-field"><label>Taxa administrativa (R$)</label><input class="alv8-input" type="number" step="0.01" name="taxa_admin_valor" value="0"></div>
+        <div class="alv8-field"><label>Data base</label><input class="alv8-input" type="date" name="taxa_admin_data_base"></div>
+        <div class="alv8-field"><label>Multa (%)</label><input class="alv8-input" type="number" step="0.01" name="taxa_admin_multa_percentual" value="2.00"></div>
+        <div class="alv8-field"><label>Juros/dia (%)</label><input class="alv8-input" type="number" step="0.01" name="taxa_admin_juros_dia_percentual" value="0.03"></div>
+        <div class="alv8-field"><label>Foto</label><input class="alv8-input" type="file" name="foto" accept="image/*"></div>
+        <div class="alv8-field"><label>Status</label><select class="alv8-select" name="ativo"><option value="1">Ativo</option><option value="0">Inativo</option></select></div>
+        <label class="alv8-check"><input type="checkbox" name="eh_farmacia" value="1"> Farmácia</label>
+        <button class="alv8-btn primary"><i class="bi bi-plus-circle"></i> Cadastrar</button>
+      </form>
+    </details>
+
+    <div class="alv8-card"><div class="alv8-table-wrap"><table class="alv8-table">
+      <thead><tr><th>Estabelecimento</th><th>Usuário</th><th>Período</th><th>Taxa adm.</th><th>Data base</th><th>Tipo</th><th>Status</th><th>Ações</th></tr></thead>
+      <tbody>
+      {% for row in rows %}{% set r=row.rest %}
+        <tr>
+          <td><div class="v10-est-name"><img loading="lazy" class="v10-est-photo" src="{{ url_for('admin_v10_media_rest', rest_id=r.id) }}" alt=""><strong>{{ r.nome }}</strong></div></td>
+          <td>{{ r.usuario_ref.usuario if r.usuario_ref else '—' }}</td>
+          <td>Segunda a domingo</td>
+          <td>R$ {{ r.taxa_admin_valor|brl }}</td>
+          <td>{{ r.taxa_admin_data_base.strftime('%d/%m/%Y') if r.taxa_admin_data_base else '—' }}</td>
+          <td>{{ 'Farmácia' if r.eh_farmacia else 'Estabelecimento' }}</td>
+          <td><span class="alv8-badge {{ 'ok' if row.active else 'bad' }}">{{ 'Ativo' if row.active else 'Inativo' }}</span></td>
+          <td>
+            <div class="v10-est-actions">
+              <details class="v10-details"><summary class="alv8-btn edit"><i class="bi bi-pencil"></i> Editar</summary>
+                <form method="post" action="{{ url_for('edit_restaurante', id=r.id) }}" enctype="multipart/form-data" class="v10-edit v10-est-grid">
+                  <input type="hidden" name="periodo" value="seg-dom">
+                  <div class="alv8-field"><label>Nome</label><input class="alv8-input" name="nome" value="{{ r.nome }}" required></div>
+                  <div class="alv8-field"><label>Usuário</label><input class="alv8-input" name="usuario" value="{{ r.usuario_ref.usuario if r.usuario_ref else '' }}" required></div>
+                  <div class="alv8-field"><label>Taxa administrativa</label><input class="alv8-input" type="number" step="0.01" name="taxa_admin_valor" value="{{ r.taxa_admin_valor or 0 }}"></div>
+                  <div class="alv8-field"><label>Data base</label><input class="alv8-input" type="date" name="taxa_admin_data_base" value="{{ r.taxa_admin_data_base.isoformat() if r.taxa_admin_data_base else '' }}"></div>
+                  <div class="alv8-field"><label>Multa (%)</label><input class="alv8-input" type="number" step="0.01" name="taxa_admin_multa_percentual" value="{{ r.taxa_admin_multa_percentual if r.taxa_admin_multa_percentual is not none else 2 }}"></div>
+                  <div class="alv8-field"><label>Juros/dia (%)</label><input class="alv8-input" type="number" step="0.01" name="taxa_admin_juros_dia_percentual" value="{{ r.taxa_admin_juros_dia_percentual if r.taxa_admin_juros_dia_percentual is not none else 0.03 }}"></div>
+                  <div class="alv8-field"><label>Status</label><select class="alv8-select" name="ativo"><option value="1" {{ 'selected' if row.active else '' }}>Ativo</option><option value="0" {{ 'selected' if not row.active else '' }}>Inativo</option></select></div>
+                  <div class="alv8-field"><label>Foto</label><input class="alv8-input" type="file" name="foto" accept="image/*"></div>
+                  <label class="alv8-check"><input type="checkbox" name="eh_farmacia" value="1" {{ 'checked' if r.eh_farmacia else '' }}> Farmácia</label>
+                  <button class="alv8-btn primary">Salvar</button>
+                </form>
+              </details>
+              <details class="v10-details"><summary class="alv8-btn"><i class="bi bi-key"></i> Senha</summary>
+                <form method="post" action="{{ url_for('reset_senha_restaurante', id=r.id) }}" class="v10-edit">
+                  <div class="alv8-field"><label>Nova senha</label><input class="alv8-input" type="password" name="nova_senha" required></div>
+                  <div class="alv8-field"><label>Confirmar</label><input class="alv8-input" type="password" name="confirmar_senha" required></div>
+                  <button class="alv8-btn primary">Alterar senha</button>
+                </form>
+              </details>
+              <form method="post" action="{{ url_for('delete_restaurante', id=r.id) }}" onsubmit="return confirm('Excluir este estabelecimento e os vínculos relacionados?');"><button class="alv8-btn danger"><i class="bi bi-trash"></i> Excluir</button></form>
+            </div>
+          </td>
+        </tr>
+      {% else %}<tr><td colspan="8" class="alv8-empty">Nenhum estabelecimento encontrado.</td></tr>{% endfor %}
+      </tbody>
+    </table></div></div>
+  </main>
+</body>
+</html>
