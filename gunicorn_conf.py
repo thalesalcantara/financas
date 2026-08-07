@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-07.1005"
+BUILD_VERSION = "2026-08-07.1042"
 
 
 def post_worker_init(worker):
@@ -36,6 +36,7 @@ def post_worker_init(worker):
         import performance_ui_finalize  # noqa: F401
         import menu_horizontal_enforcer  # noqa: F401
         import cooperative_notifications_ui  # noqa: F401
+        import operational_rules_v5  # noqa: F401
 
         if "coopex_build_probe" not in flask_app.view_functions:
             from flask import jsonify
@@ -51,12 +52,18 @@ def post_worker_init(worker):
                     multiple_daily_shifts=True,
                     previous_day_submission=True,
                     restaurant_week_pending=True,
+                    restaurant_pending_without_inner_scroll=True,
+                    restaurant_current_shift_only=True,
                     restaurant_approval_tab=True,
                     restaurant_alarm_every_5_minutes=True,
                     cooperative_submission_sound=True,
                     cooperative_new_rating_sound_once=True,
                     cooperative_light_production_cards=True,
+                    cooperative_timeline_on_demand=True,
                     cooperative_rating_preserved=True,
+                    inactive_cooperatives_operationally_hidden=True,
+                    inactive_visible_only_in_admin_cooperatives=True,
+                    admin_tab_prefetch_disabled=True,
                     restaurant_horizontal_dashboard=True,
                     horizontal_menu_enforced=True,
                     old_sidebar_disabled=True,
@@ -74,7 +81,7 @@ def post_worker_init(worker):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Turnos exatos e notificações carregados. Build %s", BUILD_VERSION)
+        log.info("Regras operacionais V5 e paineis sob demanda carregados. Build %s", BUILD_VERSION)
     except Exception:
         log.exception(
             "Melhorias complementares não carregaram; mantendo o aplicativo principal disponível."
