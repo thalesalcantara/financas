@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import event, func
+from sqlalchemy import event
 
 import admin_v10_fix as v10
 
 app = v10.app
 db = v10.db
 Usuario = v10.Usuario
-Cooperado = v10.Cooperado
 legacy = v10.legacy
 
 # O V10 converteu expressões monetárias para chamadas brl(...).
@@ -67,7 +66,6 @@ def _install_inactive_lock() -> None:
 try:
     _install_inactive_lock()
 except Exception:
-    db.session.rollback()
     app.logger.exception("Falha ao instalar trava persistente de cooperados inativos")
 
 
@@ -141,45 +139,30 @@ v10._set_coop_status = _set_coop_status_persistent
 
 
 # ---------------------------------------------------------------------------
-# Identidade canônica da escala — versão leve
+# Distribuição da escala — caminho rápido
 # ---------------------------------------------------------------------------
-# Não varre escalas nem cooperados no startup. Esta lógica só é executada quando
-# o importador XLSX precisa resolver um nome da planilha.
+# O importador já carrega a lista de cooperados. Não fazemos nenhuma consulta
+# adicional por linha da planilha. Apenas retiramos da lista os usuários que o
+# administrador já desativou e deixamos o comparador legado resolver nomes
+# abreviados dentro do nome completo (ex.: AZEVEDO -> FRANCISCO OLIVEIRA AZEVEDO).
 _original_match_cooperado_by_name = getattr(legacy, "_match_cooperado_by_name", None)
 
 
-def _match_cooperado_username_first(nome_planilha, cooperados):
-    raw = " ".join(str(nome_planilha or "").strip().split())
-    if raw:
-        allowed_ids = {
-            int(c.id)
-            for c in (cooperados or [])
-            if getattr(c, "id", None) is not None
-        }
+def _match_cooperado_active_only(nome_planilha, cooperados):
+    if _original_match_cooperado_by_name is None:
+        return None
 
-        if allowed_ids:
-            canonical = (
-                db.session.query(Cooperado)
-                .join(Usuario, Cooperado.usuario_id == Usuario.id)
-                .filter(
-                    Cooperado.id.in_(allowed_ids),
-                    Usuario.tipo == "cooperado",
-                    Usuario.ativo.is_(True),
-                    func.lower(func.trim(Usuario.usuario)) == raw.lower(),
-                )
-                .order_by(Cooperado.id.asc())
-                .first()
-            )
-            if canonical is not None:
-                return canonical
-
-    if _original_match_cooperado_by_name is not None:
-        return _original_match_cooperado_by_name(nome_planilha, cooperados)
-    return None
+    ativos = [
+        coop
+        for coop in (cooperados or [])
+        if getattr(coop, "usuario_id", None) is not None
+        and int(coop.usuario_id) not in _DURABLE_INACTIVE_USER_IDS
+    ]
+    return _original_match_cooperado_by_name(nome_planilha, ativos)
 
 
 if _original_match_cooperado_by_name is not None:
-    legacy._match_cooperado_by_name = _match_cooperado_username_first
+    legacy._match_cooperado_by_name = _match_cooperado_active_only
 
 
 def _install_scale_xlsx_hotfix() -> None:
@@ -211,9 +194,9 @@ if "upload_escala" not in app.view_functions:
     app.logger.error("Hotfix XLSX: endpoint upload_escala não está registrado.")
 else:
     app.logger.info(
-        "Hotfix XLSX leve ativo: upload restaurado e identidade por usuário sem varredura no startup."
+        "Hotfix XLSX rápido ativo: distribuição sem consultas adicionais por linha."
     )
 
 app.logger.info(
-    "Admin V10 hotfix leve carregado: sem reparo global de escalas no startup."
+    "Admin V10 hotfix leve carregado: escala distribuída somente entre cooperados ativos."
 )
