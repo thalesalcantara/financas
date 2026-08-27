@@ -8,6 +8,35 @@ app = light.app
 BUILD = "20260807-1318"
 
 
+def _first_allowed_admin_target():
+    """Escolhe a primeira tela que o administrador secundário pode visualizar."""
+    try:
+        legacy = light.legacy
+        if legacy.is_admin_master():
+            return "admin_light_summary", {}
+        choices = (
+            ("lancamentos", "admin_light_summary", {}),
+            ("receitas", "admin_v10_finance", {"tab": "receitas"}),
+            ("despesas", "admin_v10_finance", {"tab": "despesas"}),
+            ("coop_receitas", "admin_v10_finance", {"tab": "coop_receitas"}),
+            ("coop_despesas", "admin_v10_finance", {"tab": "coop_despesas"}),
+            ("beneficios", "admin_v10_finance", {"tab": "beneficios"}),
+            ("cooperados", "admin_light_cooperatives", {}),
+            ("restaurantes", "admin_v10_establishments", {}),
+            ("escalas", "admin_light_scale", {}),
+            ("avaliacoes", "admin_light_ratings", {}),
+            ("avisos", "admin_light_notices", {}),
+            ("documentos", "admin_light_documents", {}),
+            ("tabelas", "admin_light_tables", {}),
+        )
+        for permission, endpoint, values in choices:
+            if legacy.admin_has_perm(permission, "ver") and endpoint in app.view_functions:
+                return endpoint, values
+    except Exception:
+        pass
+    return "admin_dashboard", {"legacy": "1"}
+
+
 @app.before_request
 def _admin_light_v8_redirects():
     if request.method != "GET" or (request.headers.get("X-Requested-With") or "").lower() == "xmlhttprequest":
@@ -22,6 +51,10 @@ def _admin_light_v8_redirects():
     endpoint = request.endpoint or ""
     if endpoint == "admin_dashboard" or path == "/admin":
         tab = (request.args.get("tab") or "").strip().lower()
+        if not tab:
+            target, target_values = _first_allowed_admin_target()
+            if target != "admin_dashboard":
+                return redirect(url_for(target, **target_values))
         target = {
             "": "admin_light_summary",
             "resumo": "admin_light_summary",

@@ -25,6 +25,49 @@ AdminPermissao = getattr(legacy, "AdminPermissao", None)
 BUILD = "20260807-1408-v11"
 
 
+@app.context_processor
+def _admin_v11_permission_context():
+    """Disponibiliza as permissões reais para todo o menu/painel V11."""
+    user = legacy._usuario_logado()
+    is_master = bool(user and getattr(user, "is_master", False))
+    permissions = {}
+    if user and (user.tipo or "").strip().lower() == "admin":
+        if is_master:
+            permissions = {
+                aba: {"ver": True, "criar": True, "editar": True, "excluir": True}
+                for aba in legacy.ADMIN_ABAS
+            }
+        else:
+            permissions = legacy.get_admin_permissions_map(user.id)
+    home_url = url_for("admin_light_summary")
+    if not is_master:
+        destinations = (
+            ("lancamentos", "admin_light_summary", {}),
+            ("receitas", "admin_v10_finance", {"tab": "receitas"}),
+            ("despesas", "admin_v10_finance", {"tab": "despesas"}),
+            ("coop_receitas", "admin_v10_finance", {"tab": "coop_receitas"}),
+            ("coop_despesas", "admin_v10_finance", {"tab": "coop_despesas"}),
+            ("beneficios", "admin_v10_finance", {"tab": "beneficios"}),
+            ("cooperados", "admin_light_cooperatives", {}),
+            ("restaurantes", "admin_v10_establishments", {}),
+            ("escalas", "admin_light_scale", {}),
+            ("avaliacoes", "admin_light_ratings", {}),
+            ("avisos", "admin_light_notices", {}),
+            ("documentos", "admin_light_documents", {}),
+            ("tabelas", "admin_light_tables", {}),
+        )
+        for permission, endpoint, values in destinations:
+            if permissions.get(permission, {}).get("ver") and endpoint in app.view_functions:
+                home_url = url_for(endpoint, **values)
+                break
+    return {
+        "admin_nav_master": is_master,
+        "admin_nav_perms": permissions,
+        "admin_can_edit_escalas": is_master or bool(permissions.get("escalas", {}).get("editar")),
+        "admin_nav_home_url": home_url,
+    }
+
+
 def brl(value) -> str:
     try:
         number = float(value or 0.0)
@@ -715,7 +758,7 @@ def _install_template_v11():
             source=_summary_footer(source);source=_launch_footer(source);source=_scale_counts(source);source=_replace_coop_block(source)
             start=source.find("  {% elif view=='trocas' %}");end=source.find("  {% elif view=='historico' %}",start)
             if start>=0 and end>start:
-                simple=r'''  {% elif view=='trocas' %}<div class="alv8-card"><div class="alv8-table-wrap"><table class="alv8-table"><thead><tr><th>Troca</th><th>Status</th><th>Data</th></tr></thead><tbody>{% for t in swap_rows|default([]) %}<tr><td><strong>{{ t.resumo }}</strong></td><td><span class="alv8-badge {{ 'warn' if t.status=='pendente' else 'ok' if t.status in ['aprovada','aceita'] else 'bad' }}">{{ t.status }}</span></td><td>{{ t.aplicada_em.strftime('%d/%m/%Y %H:%M') if t.aplicada_em else (t.criada_em.strftime('%d/%m/%Y %H:%M') if t.criada_em else '—') }}</td></tr>{% else %}<tr><td colspan="3" class="alv8-empty">Nenhuma troca.</td></tr>{% endfor %}</tbody></table></div></div>'''
+                simple=r'''  {% elif view=='trocas' %}<div class="alv8-card"><div class="alv8-table-wrap"><table class="alv8-table"><thead><tr><th>Troca</th><th>Status</th><th>Data</th>{% if admin_can_edit_escalas %}<th>Ações</th>{% endif %}</tr></thead><tbody>{% for t in swap_rows|default([]) %}<tr><td><strong>{{ t.resumo }}</strong></td><td><span class="alv8-badge {{ 'warn' if t.status=='pendente' else 'ok' if t.status in ['aprovada','aceita'] else 'bad' }}">{{ t.status }}</span></td><td>{{ t.aplicada_em.strftime('%d/%m/%Y %H:%M') if t.aplicada_em else (t.criada_em.strftime('%d/%m/%Y %H:%M') if t.criada_em else '—') }}</td>{% if admin_can_edit_escalas %}<td>{% if t.status=='pendente' %}<div class="alv8-inline"><form method="post" action="{{ url_for('admin_aprovar_troca',id=t.id) }}" onsubmit="return confirm('Confirmar aprovação desta troca?');"><button class="alv8-btn ok" type="submit"><i class="bi bi-check-circle"></i> Aprovar</button></form><form method="post" action="{{ url_for('admin_recusar_troca',id=t.id) }}" onsubmit="return confirm('Recusar esta solicitação?');"><button class="alv8-btn danger" type="submit"><i class="bi bi-x-circle"></i> Recusar</button></form></div>{% else %}—{% endif %}</td>{% endif %}</tr>{% else %}<tr><td colspan="{{ 4 if admin_can_edit_escalas else 3 }}" class="alv8-empty">Nenhuma troca.</td></tr>{% endfor %}</tbody></table></div></div>'''
                 source=source[:start]+simple+source[end:]
             source=source.replace("</head>",_READABILITY_CSS+"</head>",1)
         if template in {"admin_partial_shell_v10.html","admin_establishments_v10.html","admin_blitz_v10.html"}:

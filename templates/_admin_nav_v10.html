@@ -1,33 +1,53 @@
+{% set _p = admin_nav_perms|default({}) %}
+{% set _master = admin_nav_master|default(false) %}
+{% set _lanc = _master or _p.get('lancamentos',{}).get('ver',false) %}
+{% set _receitas = _master or _p.get('receitas',{}).get('ver',false) %}
+{% set _despesas = _master or _p.get('despesas',{}).get('ver',false) %}
+{% set _coop_receitas = _master or _p.get('coop_receitas',{}).get('ver',false) %}
+{% set _coop_despesas = _master or _p.get('coop_despesas',{}).get('ver',false) %}
+{% set _beneficios = _master or _p.get('beneficios',{}).get('ver',false) %}
+{% set _cooperados = _master or _p.get('cooperados',{}).get('ver',false) %}
+{% set _restaurantes = _master or _p.get('restaurantes',{}).get('ver',false) %}
+{% set _documentos = _master or _p.get('documentos',{}).get('ver',false) %}
+{% set _tabelas = _master or _p.get('tabelas',{}).get('ver',false) %}
+{% set _escalas = _master or _p.get('escalas',{}).get('ver',false) %}
+{% set _avaliacoes = _master or _p.get('avaliacoes',{}).get('ver',false) %}
+{% set _avisos = _master or _p.get('avisos',{}).get('ver',false) %}
 <header class="alv8-top">
-  <a class="alv8-brand" href="{{ url_for('admin_light_summary') }}">
+  <a class="alv8-brand" href="{{ admin_nav_home_url|default(url_for('admin_light_summary')) }}">
     <span class="alv8-brand-icon"><i class="bi bi-building-gear"></i></span>
     <span class="alv8-brand-copy"><small>PAINEL COOPEX</small><strong>Administração Central</strong></span>
   </a>
   <nav class="alv8-nav">
-    <a class="alv8-direct {{ 'active' if active_tab=='resumo' else '' }}" href="{{ url_for('admin_light_summary') }}"><i class="bi bi-speedometer2"></i> Resumo</a>
+    {% if _lanc %}<a class="alv8-direct {{ 'active' if active_tab=='resumo' else '' }}" href="{{ url_for('admin_light_summary') }}"><i class="bi bi-speedometer2"></i> Resumo</a>{% endif %}
 
+    {% if _lanc or _receitas or _despesas or _coop_receitas or _coop_despesas or _beneficios %}
     <div class="alv8-group">
       <button type="button"><i class="bi bi-cash-stack"></i> Financeiro <i class="bi bi-chevron-down"></i></button>
       <div class="alv8-menu">
-        <a class="{{ 'active' if active_tab=='lancamentos' else '' }}" href="{{ url_for('admin_light_launches') }}"><i class="bi bi-journal-text"></i> Lançamentos</a>
-        <a class="{{ 'active' if active_tab=='receitas' else '' }}" href="{{ url_for('admin_v10_finance', tab='receitas') }}"><i class="bi bi-credit-card"></i> Receitas Coop</a>
-        <a class="{{ 'active' if active_tab=='despesas' else '' }}" href="{{ url_for('admin_v10_finance', tab='despesas') }}"><i class="bi bi-cart-dash"></i> Despesas Coop</a>
-        <a class="{{ 'active' if active_tab=='coop_receitas' else '' }}" href="{{ url_for('admin_v10_finance', tab='coop_receitas') }}"><i class="bi bi-wallet2"></i> Receitas Cooperados</a>
-        <a class="{{ 'active' if active_tab=='coop_despesas' else '' }}" href="{{ url_for('admin_v10_finance', tab='coop_despesas') }}"><i class="bi bi-bag-dash"></i> Despesas Cooperados</a>
-        <a class="{{ 'active' if active_tab=='beneficios' else '' }}" href="{{ url_for('admin_v10_finance', tab='beneficios') }}"><i class="bi bi-heart-pulse"></i> Benefícios</a>
+        {% if _lanc %}<a class="{{ 'active' if active_tab=='lancamentos' else '' }}" href="{{ url_for('admin_light_launches') }}"><i class="bi bi-journal-text"></i> Lançamentos</a>{% endif %}
+        {% if _receitas %}<a class="{{ 'active' if active_tab=='receitas' else '' }}" href="{{ url_for('admin_v10_finance', tab='receitas') }}"><i class="bi bi-credit-card"></i> Receitas Coop</a>{% endif %}
+        {% if _despesas %}<a class="{{ 'active' if active_tab=='despesas' else '' }}" href="{{ url_for('admin_v10_finance', tab='despesas') }}"><i class="bi bi-cart-dash"></i> Despesas Coop</a>{% endif %}
+        {% if _coop_receitas %}<a class="{{ 'active' if active_tab=='coop_receitas' else '' }}" href="{{ url_for('admin_v10_finance', tab='coop_receitas') }}"><i class="bi bi-wallet2"></i> Receitas Cooperados</a>{% endif %}
+        {% if _coop_despesas %}<a class="{{ 'active' if active_tab=='coop_despesas' else '' }}" href="{{ url_for('admin_v10_finance', tab='coop_despesas') }}"><i class="bi bi-bag-dash"></i> Despesas Cooperados</a>{% endif %}
+        {% if _beneficios %}<a class="{{ 'active' if active_tab=='beneficios' else '' }}" href="{{ url_for('admin_v10_finance', tab='beneficios') }}"><i class="bi bi-heart-pulse"></i> Benefícios</a>{% endif %}
       </div>
     </div>
+    {% endif %}
 
+    {% if _cooperados or _restaurantes or _documentos or _tabelas %}
     <div class="alv8-group">
       <button type="button"><i class="bi bi-people"></i> Cadastros <i class="bi bi-chevron-down"></i></button>
       <div class="alv8-menu">
-        <a class="{{ 'active' if active_tab=='cooperados' else '' }}" href="{{ url_for('admin_light_cooperatives') }}"><i class="bi bi-person-badge"></i> Cooperados</a>
-        <a class="{{ 'active' if active_tab=='estabelecimentos' else '' }}" href="{{ url_for('admin_v10_establishments') }}"><i class="bi bi-shop-window"></i> Estabelecimentos</a>
-        <a href="/admin/documentos?legacy=1"><i class="bi bi-folder2"></i> Documentos</a>
-        <a href="{{ url_for('admin_light_tables') }}"><i class="bi bi-table"></i> Tabelas</a>
+        {% if _cooperados %}<a class="{{ 'active' if active_tab=='cooperados' else '' }}" href="{{ url_for('admin_light_cooperatives') }}"><i class="bi bi-person-badge"></i> Cooperados</a>{% endif %}
+        {% if _restaurantes %}<a class="{{ 'active' if active_tab=='estabelecimentos' else '' }}" href="{{ url_for('admin_v10_establishments') }}"><i class="bi bi-shop-window"></i> Estabelecimentos</a>{% endif %}
+        {% if _documentos %}<a href="/admin/documentos?legacy=1"><i class="bi bi-folder2"></i> Documentos</a>{% endif %}
+        {% if _tabelas %}<a href="{{ url_for('admin_light_tables') }}"><i class="bi bi-table"></i> Tabelas</a>{% endif %}
       </div>
     </div>
+    {% endif %}
 
+    {% if _escalas %}
     <div class="alv8-group">
       <button type="button"><i class="bi bi-broadcast-pin"></i> Operação <i class="bi bi-chevron-down"></i></button>
       <div class="alv8-menu">
@@ -37,16 +57,19 @@
         <a class="{{ 'active' if active_tab=='historico' else '' }}" href="{{ url_for('admin_light_history') }}"><i class="bi bi-clock-history"></i> Histórico</a>
       </div>
     </div>
+    {% endif %}
 
+    {% if _avaliacoes or _avisos %}
     <div class="alv8-group">
       <button type="button"><i class="bi bi-bar-chart"></i> Gestão <i class="bi bi-chevron-down"></i></button>
       <div class="alv8-menu">
-        <a href="{{ url_for('admin_light_ratings') }}"><i class="bi bi-stars"></i> Avaliações</a>
-        <a href="{{ url_for('admin_light_notices') }}"><i class="bi bi-megaphone"></i> Avisos</a>
+        {% if _avaliacoes %}<a href="{{ url_for('admin_light_ratings') }}"><i class="bi bi-stars"></i> Avaliações</a>{% endif %}
+        {% if _avisos %}<a href="{{ url_for('admin_light_notices') }}"><i class="bi bi-megaphone"></i> Avisos</a>{% endif %}
       </div>
     </div>
+    {% endif %}
 
-    <a class="alv8-direct" href="/admin?tab=config&legacy=1"><i class="bi bi-gear"></i> Configurações</a>
+    {% if _master %}<a class="alv8-direct" href="/admin?tab=config&legacy=1"><i class="bi bi-gear"></i> Configurações</a>{% endif %}
     <span class="alv8-spacer"></span>
     <a class="alv8-direct" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a>
   </nav>
