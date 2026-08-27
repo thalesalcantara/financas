@@ -454,6 +454,7 @@
 {% set can_config_ver = admin_is_master or _perms.get('config', {}).get('ver', False) %}
 {% set can_config_criar = admin_is_master or _perms.get('config', {}).get('criar', False) %}
 {% set can_config_editar = admin_is_master or _perms.get('config', {}).get('editar', False) %}
+{% set can_resumo_ver = can_lanc_ver or can_receitas_ver or can_despesas_ver or can_coop_receitas_ver or can_coop_despesas_ver or can_beneficios_ver %}
 
 <div class="layout">
 
@@ -470,7 +471,7 @@
       <div class="nav-section-label">Visão Geral</div>
 
       <!-- Resumo (TAB, igual antes) -->
-      {% if can_lanc_ver or can_receitas_ver or can_despesas_ver or can_coop_receitas_ver or can_coop_despesas_ver or can_beneficios_ver %}
+      {% if can_resumo_ver %}
       <a class="nav-link-main {{ 'active' if _tab=='resumo' else '' }}"
          data-bs-toggle="tab"
          data-bs-target="#resumo"
@@ -720,7 +721,7 @@
 
     <!-- === RESUMO (Dashboard Financeiro Completo) === -->
     
-      <!--AJAX_RESUMO_START--><section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
+      <!--AJAX_RESUMO_START-->{% if can_resumo_ver %}<section class="tab-pane fade {{ 'show active' if _tab=='resumo' else '' }}" id="resumo" role="tabpanel">
       <div class="resumo-shell">
 
         {# ---------- Helpers de data ---------- #}
@@ -1401,10 +1402,10 @@
       });
     })();
     </script>
-</section><!--AJAX_RESUMO_END-->
+</section>{% endif %}<!--AJAX_RESUMO_END-->
 
 <!-- LANÇAMENTOS (versão moderna/compacta – drop-in) -->
-<section class="tab-pane fade {{ 'show active' if _tab=='lancamentos' else '' }}" id="lancamentos" role="tabpanel">
+{% if can_lanc_ver %}<section class="tab-pane fade {{ 'show active' if _tab=='lancamentos' else '' }}" id="lancamentos" role="tabpanel">
   {# ====== TOTAIS DO FILTRO (já vem filtrado do backend) ====== #}
 <!--AJAX_LANC_START--><div id="lancamentosAjaxWrap">
   {% set lancamentos = lancamentos if lancamentos is defined else [] %}
@@ -1714,7 +1715,7 @@
     </div>
   </div>
 </div><!--AJAX_LANC_END-->
-</section>
+</section>{% endif %}
 
 <style>
   .text-muted-2 { color: #9aa0ac; }
@@ -1934,7 +1935,7 @@
 
 
 <!-- RECEITAS COOP (versão profissional/compacta – drop-in) -->
-<section class="tab-pane fade {{ 'show active' if _tab=='receitas' else '' }}" id="receitas" role="tabpanel">
+{% if can_receitas_ver %}<section class="tab-pane fade {{ 'show active' if _tab=='receitas' else '' }}" id="receitas" role="tabpanel">
 <!--AJAX_RECEITAS_START--><div id="receitasAjaxWrap">
   {# total defensivo: aceita r.valor OU r.valor_total #}
   {% set ns_total = namespace(v=0) %}
@@ -2166,11 +2167,11 @@
     })();
   </script>
 
-</div><!--AJAX_RECEITAS_END--></section>
+</div><!--AJAX_RECEITAS_END--></section>{% endif %}
 
 
 <!-- DESPESAS COOP (versão profissional/compacta – drop-in) -->
-<section class="tab-pane fade {{ 'show active' if _tab=='despesas' else '' }}" id="despesas" role="tabpanel">
+{% if can_despesas_ver %}<section class="tab-pane fade {{ 'show active' if _tab=='despesas' else '' }}" id="despesas" role="tabpanel">
 <!--AJAX_DESPESAS_START--><div id="despesasAjaxWrap">
   {% set total_despesas_coop_table = (despesas|sum(attribute='valor')) if despesas else 0 %}
   {% set qtd_registros = despesas|length if despesas else 0 %}
@@ -2299,11 +2300,11 @@
     </div>
   </div>
 
-</div><!--AJAX_DESPESAS_END--></section>
+</div><!--AJAX_DESPESAS_END--></section>{% endif %}
 
 
 <!-- RECEITAS COOPERADOS (versão profissional/compacta – drop-in) -->
-<section class="tab-pane fade {{ 'show active' if _tab=='coop_receitas' else '' }}" id="coop_receitas" role="tabpanel">
+{% if can_coop_receitas_ver %}<section class="tab-pane fade {{ 'show active' if _tab=='coop_receitas' else '' }}" id="coop_receitas" role="tabpanel">
 <!--AJAX_COOP_RECEITAS_START--><div id="coopReceitasAjaxWrap">
   {% set total_receitas_coop_table = (receitas_coop|sum(attribute='valor')) if receitas_coop else 0 %}
   {% set qtd_registros = receitas_coop|length if receitas_coop else 0 %}
@@ -2449,11 +2450,11 @@
     </div>
   </div>
 
-</div><!--AJAX_COOP_RECEITAS_END--></section>
+</div><!--AJAX_COOP_RECEITAS_END--></section>{% endif %}
 
 
 <!-- DESPESAS COOPERADOS (versão profissional/compacta – SEM ADIANTAMENTO + PESQUISA) -->
-<section class="tab-pane fade {{ 'show active' if _tab=='coop_despesas' else '' }}" id="coop_despesas" role="tabpanel">
+{% if can_coop_despesas_ver %}<section class="tab-pane fade {{ 'show active' if _tab=='coop_despesas' else '' }}" id="coop_despesas" role="tabpanel">
 <!--AJAX_COOP_DESPESAS_START--><div id="coopDespesasAjaxWrap">
   {% set _despesas = (despesas_coop | default([]) | list) %}
 
@@ -2793,10 +2794,10 @@
     })();
   </script>
 
-</div><!--AJAX_COOP_DESPESAS_END--></section>
+</div><!--AJAX_COOP_DESPESAS_END--></section>{% endif %}
 
      <!-- BENEFÍCIOS (versão profissional / sem alterar backend) -->
-<section class="tab-pane fade {{ 'show active' if _tab=='beneficios' else '' }}" id="beneficios" role="tabpanel">
+{% if can_beneficios_ver %}<section class="tab-pane fade {{ 'show active' if _tab=='beneficios' else '' }}" id="beneficios" role="tabpanel">
 <!--AJAX_BENEFICIOS_START--><div id="beneficiosAjaxWrap">
   <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
     <h5 class="m-0 d-flex align-items-center gap-2">
@@ -3061,7 +3062,7 @@
   </div>
 </div>
 
-</div><!--AJAX_BENEFICIOS_END--></section> <!-- FECHA A ABA BENEFÍCIOS -->
+</div><!--AJAX_BENEFICIOS_END--></section>{% endif %} <!-- FECHA A ABA BENEFÍCIOS -->
 
 <!-- ==== BENEFÍCIOS: prévia + total + seleção em massa (escopado) ==== -->
 <script>
@@ -3180,7 +3181,7 @@
 </script>
       
 <!-- COOPERADOS (versão profissional / drop-in) -->
-<section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
+{% if can_cooperados_ver %}<section class="tab-pane fade {{ 'show active' if _tab=='cooperados' else '' }}" id="cooperados" role="tabpanel">
   {% set qtd_coops = cooperados|length %}
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
     <h5 class="m-0 d-flex align-items-center gap-2">
@@ -3582,10 +3583,11 @@
       </form>
     </div>
   </div>
-</section>
+</section>{% endif %}
 
       <!-- RESTAURANTES (versão profissional / drop-in) -->
-<section class="tab-pane fade {{ 'show active' if _tab=='restaurantes' else '' }}" id="restaurantes" role="tabpanel">
+
+{% if can_restaurantes_ver %}<section class="tab-pane fade {{ 'show active' if _tab=='restaurantes' else '' }}" id="restaurantes" role="tabpanel">
   {% set rest_list = restaurantes_todos|default(restaurantes) %}
   {% set qtd_rest = rest_list|length %}
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
@@ -3872,10 +3874,10 @@
       });
     })();
   </script>
-</section>
+</section>{% endif %}
 
      <!-- ESCALAS -->
-<section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
+{% if can_escalas_ver %}<section class="tab-pane fade {{ 'show active' if _tab=='escalas' else '' }}" id="escalas" role="tabpanel">
   <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 align-items-lg-center mb-3">
     <div>
       <h5 class="mb-0 section-title">Gestão de Escalas</h5>
@@ -4767,11 +4769,11 @@
       </div>
     </div>
   </div>
-</section>
+</section>{% endif %}
 
     <!-- === CONFIGURAÇÕES === -->
 
-<section class="tab-pane fade {{ 'show active' if _tab=='sistemas' else '' }}" id="sistemas" role="tabpanel">
+{% if can_sistemas_ver %}<section class="tab-pane fade {{ 'show active' if _tab=='sistemas' else '' }}" id="sistemas" role="tabpanel">
   <div class="card border-0 shadow-sm mb-3">
     <div class="card-body">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
@@ -4808,9 +4810,9 @@
       </div>
     </div>
   </div>
-</section>
+</section>{% endif %}
 
-<section class="tab-pane fade {{ 'show active' if _tab=='config' else '' }}" id="config" role="tabpanel">
+{% if can_config_ver %}<section class="tab-pane fade {{ 'show active' if _tab=='config' else '' }}" id="config" role="tabpanel">
   <div class="content-shell">
     <div class="page-header">
       <h3><i class="bi bi-gear"></i> Configurações</h3>
@@ -5267,7 +5269,7 @@
     </div>
 
   </div>
-</section>
+</section>{% endif %}
 
 <style>
   .section-title { font-size: 0.95rem; font-weight: 600; }

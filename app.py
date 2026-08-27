@@ -3645,7 +3645,7 @@ import re
 
 
 @app.post("/admin/cooperados/<int:id>/toggle-status")
-@admin_required
+@admin_perm_required("cooperados", "editar")
 def toggle_status_cooperado(id):
     """
     Alterna o status 'ativo' do usuário vinculado ao cooperado.
@@ -3855,6 +3855,28 @@ def admin_dashboard():
     # o bloco solicitado. As regras continuam as mesmas; só evita carregar
     # escala, histórico, configuração e outras abas sem necessidade.
     ajax_partial_fast = (request.args.get("ajax_partial") or "").strip().lower()
+    if ajax_partial_fast:
+        partial_permission = {
+            "lancamentos": "lancamentos",
+            "receitas": "receitas",
+            "despesas": "despesas",
+            "coop_receitas": "coop_receitas",
+            "coop_despesas": "coop_despesas",
+            "beneficios": "beneficios",
+        }.get(ajax_partial_fast)
+        resumo_liberado = any(
+            admin_has_perm(aba, "ver")
+            for aba in (
+                "lancamentos", "receitas", "despesas",
+                "coop_receitas", "coop_despesas", "beneficios",
+            )
+        )
+        if (
+            (ajax_partial_fast == "resumo" and not resumo_liberado)
+            or (partial_permission and not admin_has_perm(partial_permission, "ver"))
+        ):
+            return jsonify({"ok": False, "message": "Você não tem permissão para acessar esta área."}), 403
+
     if ajax_partial_fast in {"resumo", "lancamentos", "receitas", "despesas", "coop_receitas", "coop_despesas"}:
         cfg_fast = get_config()
         restaurantes_fast = Restaurante.query.order_by(Restaurante.nome).all()
@@ -5230,7 +5252,7 @@ def admin_dashboard():
 # Navegação/Export util
 # =========================
 @app.route("/filtrar_lancamentos")
-@admin_required
+@admin_perm_required("lancamentos", "ver")
 def filtrar_lancamentos():
     qs_args = request.args.to_dict(flat=False)
     flat = {}
@@ -5291,7 +5313,7 @@ def _fmt_time(t) -> str:
     return str(t)
 
 @app.route("/exportar_lancamentos")
-@admin_required
+@admin_perm_required("lancamentos", "ver")
 def exportar_lancamentos():
     import io
     from collections import defaultdict
@@ -6661,7 +6683,7 @@ def marcar_aviso_lido_universal(aviso_id: int):
 # CRUD Cooperados / Restaurantes / Senhas (Admin)
 # =========================
 @app.route("/cooperados/add", methods=["POST"])
-@admin_required
+@admin_perm_required("cooperados", "criar")
 def add_cooperado():
     """
     Cadastro de cooperado corrigido.
@@ -9044,14 +9066,52 @@ def admin_aprovar_troca(id):
                   if _weekday_from_data_str(e.data) == wd_o
                   and _turno_bucket(e.turno, e.horario) == buck_o]
 
-    if len(candidatas) != 1:
-        if len(candidatas) == 0:
-            flash("Destino não possui plantões compatíveis (mesmo dia da semana e mesmo turno).", "danger")
-        else:
-            flash("Mais de um plantão compatível encontrado para o destino. Aprove pelo portal do cooperado (onde é possível escolher).", "warning")
+    if len(candidatas) > 1:
+        flash("Mais de um plantão compatível foi encontrado para o destinatário. Ele precisa escolher o plantão pelo portal do cooperado.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    dest_e = candidatas[0]
+    dest_e = candidatas[0] if candidatas else None
+
+    # Sem plantão compatível do destinatário, a solicitação é uma passagem:
+    # o turno do solicitante é transferido sem exigir uma segunda escala.
+    if dest_e is None:
+        linhas = [{
+            "dia": _escala_label(orig_e).split(" • ")[0],
+            "turno_horario": " • ".join([x for x in [(orig_e.turno or "").strip(), (orig_e.horario or "").strip()] if x]),
+            "contrato": (orig_e.contrato or "").strip(),
+            "saiu": solicitante.nome,
+            "entrou": destinatario.nome,
+        }]
+        orig_e.cooperado_id = destinatario.id
+        orig_e.cooperado_nome = None
+        t.status = "aprovada"
+        t.aplicada_em = datetime.utcnow()
+        prefix = "" if not (t.mensagem and t.mensagem.strip()) else (t.mensagem.rstrip() + "\n")
+        t.mensagem = prefix + "__AFETACAO_JSON__:" + json.dumps({"linhas": linhas}, ensure_ascii=False)
+
+        when = datetime.utcnow()
+        _prune_histories()
+        _log_troca_historico_rows(t.id, linhas, solicitante=solicitante, destinatario=destinatario, tipo="passagem", when=when)
+        _log_escala_historico(
+            origem="passagem_aprovada",
+            acao="passagem",
+            escala_ref_id=orig_e.id,
+            troca_ref_id=t.id,
+            grupo_ref=str(uuid.uuid4()),
+            admin_usuario_id=session.get("user_id"),
+            data=linhas[0]["dia"],
+            turno=(orig_e.turno or "").strip(),
+            horario=(orig_e.horario or "").strip(),
+            contrato=linhas[0]["contrato"],
+            cooperado_id=destinatario.id,
+            cooperado_nome=destinatario.nome,
+            saiu_nome=solicitante.nome,
+            entrou_nome=destinatario.nome,
+            snapshot_em=when,
+        )
+        db.session.commit()
+        flash("Passagem de escala aprovada e aplicada com sucesso!", "success")
+        return redirect(url_for("admin_dashboard", tab="escalas"))
 
     linhas = [
         {
@@ -9074,6 +9134,8 @@ def admin_aprovar_troca(id):
     solicitante_id = orig_e.cooperado_id
     destino_id = dest_e.cooperado_id
     orig_e.cooperado_id, dest_e.cooperado_id = destino_id, solicitante_id
+    orig_e.cooperado_nome = None
+    dest_e.cooperado_nome = None
 
     t.status = "aprovada"
     t.aplicada_em = datetime.utcnow()
