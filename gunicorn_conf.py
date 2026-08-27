@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-27.2025-v16"
+BUILD_VERSION = "2026-08-27.2040-v18"
 
 
 def post_worker_init(worker):
@@ -45,18 +45,19 @@ def post_worker_init(worker):
         import launch_permission_hotfix_v13  # noqa: F401
         import admin_identity_v14  # noqa: F401
         import coop_expense_control_v16  # noqa: F401
+        import coop_expense_management_v17  # noqa: F401
 
         if "coopex_build_probe" not in flask_app.view_functions:
             from flask import jsonify
             @flask_app.get("/__coopex_build", endpoint="coopex_build_probe")
             def coopex_build_probe():
-                return jsonify(ok=True, build=BUILD_VERSION, granular_permissions=True, swap_request_restored=True, swap_admin_actions=True, launch_create_permission=True, admin_identity=True, responsive_admin=True, coop_expense_control=True)
+                return jsonify(ok=True, build=BUILD_VERSION, granular_permissions=True, swap_request_restored=True, swap_admin_actions=True, launch_create_permission=True, admin_identity=True, responsive_admin=True, coop_expense_control=True, expense_filter=True, expense_modes=True, expense_recurring=True)
 
         @flask_app.after_request
         def coopex_build_header(response):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Admin V16 carregado. Build %s", BUILD_VERSION)
+        log.info("Admin V18 carregado. Build %s", BUILD_VERSION)
     except Exception:
         log.exception("Melhorias complementares não carregaram; mantendo o aplicativo principal disponível.")
