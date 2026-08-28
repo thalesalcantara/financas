@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-27.2145-v25"
+BUILD_VERSION = "2026-08-27.2200-v26"
 
 
 def post_worker_init(worker):
@@ -50,18 +50,19 @@ def post_worker_init(worker):
         import coop_expense_recurring_fixed_v20  # noqa: F401
         import coop_expense_responsive_v23  # noqa: F401
         import permission_readonly_guard_v24  # noqa: F401
+        import inactive_contract_tax_guard_v26  # noqa: F401
 
         if "coopex_build_probe" not in flask_app.view_functions:
             from flask import jsonify
             @flask_app.get("/__coopex_build", endpoint="coopex_build_probe")
             def coopex_build_probe():
-                return jsonify(ok=True, build=BUILD_VERSION, granular_permissions=True, swap_request_restored=True, swap_admin_actions=True, launch_create_permission=True, admin_identity=True, responsive_admin=True, coop_expense_control=True, expense_filter=True, expense_modes=True, expense_recurring_all_modes=True, expense_totals_exclude_no_rateio=True, expense_checkbox_layout=True, expense_table_responsive=True, readonly_guard_global=True, readonly_all_admin_tabs=True, coop_advance_permissions=True)
+                return jsonify(ok=True, build=BUILD_VERSION, granular_permissions=True, swap_request_restored=True, swap_admin_actions=True, launch_create_permission=True, admin_identity=True, responsive_admin=True, coop_expense_control=True, expense_filter=True, expense_modes=True, expense_recurring_all_modes=True, expense_totals_exclude_no_rateio=True, expense_checkbox_layout=True, expense_table_responsive=True, readonly_guard_global=True, readonly_all_admin_tabs=True, coop_advance_permissions=True, inactive_contract_tax_guard=True)
 
         @flask_app.after_request
         def coopex_build_header(response):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Admin V25 carregado. Build %s", BUILD_VERSION)
+        log.info("Admin V26 carregado. Build %s", BUILD_VERSION)
     except Exception:
         log.exception("Melhorias complementares não carregaram; mantendo o aplicativo principal disponível.")
