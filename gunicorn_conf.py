@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-08-27.2248-v27"
+BUILD_VERSION = "2026-09-10-v28"
 
 
 def post_worker_init(worker):
@@ -31,6 +31,7 @@ def post_worker_init(worker):
         import menu_horizontal_enforcer  # noqa: F401
         import cooperative_notifications_ui  # noqa: F401
         import operational_rules_v5  # noqa: F401
+        import historical_inactive_fix_v28  # noqa: F401
         import approval_rejection_v5  # noqa: F401
         import approval_return_dashboard_v5  # noqa: F401
         import admin_launch_sync_v5  # noqa: F401
@@ -56,13 +57,13 @@ def post_worker_init(worker):
             from flask import jsonify
             @flask_app.get("/__coopex_build", endpoint="coopex_build_probe")
             def coopex_build_probe():
-                return jsonify(ok=True, build=BUILD_VERSION, granular_permissions=True, swap_request_restored=True, swap_admin_actions=True, launch_create_permission=True, admin_identity=True, responsive_admin=True, coop_expense_control=True, expense_filter=True, expense_modes=True, expense_recurring_all_modes=True, expense_totals_exclude_no_rateio=True, expense_checkbox_layout=True, expense_table_responsive=True, readonly_guard_global=True, readonly_all_admin_tabs=True, coop_advance_permissions=True, inactive_contract_tax_guard=True, expense_navigation_fixed=True, receitas_http500_fixed=True)
+                return jsonify(ok=True, build=BUILD_VERSION, granular_permissions=True, swap_request_restored=True, swap_admin_actions=True, launch_create_permission=True, admin_identity=True, responsive_admin=True, coop_expense_control=True, expense_filter=True, expense_modes=True, expense_recurring_all_modes=True, expense_totals_exclude_no_rateio=True, expense_checkbox_layout=True, expense_table_responsive=True, readonly_guard_global=True, readonly_all_admin_tabs=True, coop_advance_permissions=True, inactive_contract_tax_guard=True, expense_navigation_fixed=True, receitas_http500_fixed=True, restaurant_history_inactive_preserved=True)
 
         @flask_app.after_request
         def coopex_build_header(response):
             response.headers["X-COOPEX-Build"] = BUILD_VERSION
             return response
 
-        log.info("Admin V27 carregado. Build %s", BUILD_VERSION)
+        log.info("Admin V28 carregado. Build %s", BUILD_VERSION)
     except Exception:
         log.exception("Melhorias complementares não carregaram; mantendo o aplicativo principal disponível.")
