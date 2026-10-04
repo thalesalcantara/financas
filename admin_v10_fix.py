@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlparse
 
 from flask import flash, redirect, render_template, render_template_string, request, send_file, session, url_for
 from sqlalchemy import event, inspect, or_
+from sqlalchemy.orm import joinedload
 
 import app as legacy
 import admin_light_v8 as light
@@ -385,7 +386,7 @@ def admin_v10_establishments():
     q = _norm(q_raw)
     status = (request.args.get("status") or "todos").strip().lower()
     result = []
-    for r in Restaurante.query.order_by(Restaurante.nome.asc()).all():
+    for r in Restaurante.query.options(joinedload(Restaurante.usuario_ref)).order_by(Restaurante.nome.asc()).all():
         user = getattr(r, "usuario_ref", None)
         active = bool(getattr(r, "ativo", True) is not False and getattr(user, "ativo", True) is not False)
         if status == "ativos" and not active:
