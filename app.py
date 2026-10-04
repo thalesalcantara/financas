@@ -3411,6 +3411,31 @@ def login():
     </form>
     """
 
+@app.errorhandler(404)
+def _admin_light_missing_fallback(error):
+    """Evita Not Found intermitente quando uma rota leve não subiu neste worker."""
+    path = request.path or ""
+    if path.startswith("/admin/leve/"):
+        mapping = {
+            "/admin/leve/resumo": ("resumo", {}),
+            "/admin/leve/lancamentos": ("lancamentos", {}),
+            "/admin/leve/escala": ("escalas", {}),
+            "/admin/leve/trocas": ("escalas", {}),
+            "/admin/leve/historico": ("escalas", {}),
+            "/admin/leve/cooperados": ("cooperados", {}),
+            "/admin/leve/avaliacoes": ("avaliacoes", {}),
+            "/admin/leve/documentos": ("documentos", {}),
+            "/admin/leve/tabelas": ("tabelas", {}),
+            "/admin/leve/avisos": ("avisos", {}),
+        }
+        tab, extra = mapping.get(path, ("lancamentos", {}))
+        values = request.args.to_dict(flat=True)
+        values.update(extra)
+        values["tab"] = tab
+        values["legacy"] = "1"
+        return redirect(url_for("admin_dashboard", **values))
+    return error
+
 @app.route("/logout")
 def logout():
     session.clear()
