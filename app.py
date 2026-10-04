@@ -3382,7 +3382,7 @@ def login():
             session["user_tipo"] = u.tipo
 
             if u.tipo == "admin":
-                return redirect(url_for("admin_dashboard", tab="lancamentos"))
+                return redirect(url_for("admin_light_launches"))
             elif u.tipo == "cooperado":
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
@@ -3413,28 +3413,61 @@ def login():
 
 @app.errorhandler(404)
 def _admin_light_missing_fallback(error):
-    """Evita Not Found intermitente quando uma rota leve não subiu neste worker."""
+    """Rotas administrativas novas nunca caem no painel visual antigo."""
     path = request.path or ""
-    if path.startswith("/admin/leve/"):
-        mapping = {
-            "/admin/leve/resumo": ("resumo", {}),
-            "/admin/leve/lancamentos": ("lancamentos", {}),
-            "/admin/leve/escala": ("escalas", {}),
-            "/admin/leve/trocas": ("escalas", {}),
-            "/admin/leve/historico": ("escalas", {}),
-            "/admin/leve/cooperados": ("cooperados", {}),
-            "/admin/leve/avaliacoes": ("avaliacoes", {}),
-            "/admin/leve/documentos": ("documentos", {}),
-            "/admin/leve/tabelas": ("tabelas", {}),
-            "/admin/leve/avisos": ("avisos", {}),
-        }
-        tab, extra = mapping.get(path, ("lancamentos", {}))
-        values = request.args.to_dict(flat=True)
-        values.update(extra)
-        values["tab"] = tab
-        values["legacy"] = "1"
-        return redirect(url_for("admin_dashboard", **values))
+    if path.startswith("/admin/leve/") and (session.get("user_tipo") or "").strip().lower() == "admin":
+        if "admin_light_launches" in app.view_functions:
+            return redirect(url_for("admin_light_launches"))
     return error
+
+
+@app.before_request
+def _admin_unified_navigation():
+    """Mantém o Admin no layout horizontal atual.
+
+    O painel legado continua disponível apenas quando uma função interna
+    solicitar explicitamente legacy=1.
+    """
+    if request.method != "GET":
+        return None
+    if (session.get("user_tipo") or "").strip().lower() != "admin":
+        return None
+    if request.args.get("legacy") == "1":
+        return None
+    if (request.headers.get("X-Requested-With") or "").lower() == "xmlhttprequest":
+        return None
+
+    path = request.path or ""
+    if path != "/admin":
+        return None
+
+    tab = (request.args.get("tab") or "lancamentos").strip().lower()
+    params = request.args.to_dict(flat=True)
+    params.pop("tab", None)
+    params.pop("legacy", None)
+
+    endpoint_map = {
+        "": "admin_light_launches",
+        "resumo": "admin_light_summary",
+        "lancamentos": "admin_light_launches",
+        "escalas": "admin_light_scale",
+        "cooperados": "admin_light_cooperatives",
+        "avaliacoes": "admin_light_ratings",
+        "documentos": "admin_v10_blitz",
+        "tabelas": "admin_light_tables",
+        "avisos": "admin_light_notices",
+        "restaurantes": "admin_v10_establishments",
+    }
+    finance_tabs = {"receitas", "despesas", "coop_receitas", "coop_despesas", "beneficios"}
+
+    if tab in finance_tabs and "admin_v10_finance" in app.view_functions:
+        return redirect(url_for("admin_v10_finance", tab=tab, **params))
+
+    endpoint = endpoint_map.get(tab)
+    if endpoint and endpoint in app.view_functions:
+        return redirect(url_for(endpoint, **params))
+    return None
+
 
 @app.route("/logout")
 def logout():
@@ -12776,6 +12809,21 @@ def init_db_command():
     with app.app_context():
         init_db()
     click.echo("init_db() concluído.")
+
+# =========================
+# Admin UI principal
+# =========================
+# Carrega as rotas do painel horizontal durante a importação do app.
+# Assim o worker só fica disponível depois que Resumo/Lançamentos e o menu
+# principal estão registrados, evitando 404 intermitente entre deploys.
+try:
+    import admin_light_v8  # noqa: F401
+    import admin_preserve_v9  # noqa: F401
+    import admin_v10_fix  # noqa: F401
+except Exception:
+    app.logger.exception("Falha ao carregar o painel administrativo principal")
+    raise
+
 
 # =========================
 # Main
