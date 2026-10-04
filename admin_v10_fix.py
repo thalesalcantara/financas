@@ -475,6 +475,8 @@ def _admin_light_scale_v11():
     )
 
 
+# Compatibilidade com testes e integrações que ainda referenciam o nome V10.
+_admin_light_scale_v10 = _admin_light_scale_v11
 app.view_functions["admin_light_scale"] = _admin_light_scale_v11
 
 
@@ -515,18 +517,31 @@ def _admin_light_swaps_v11():
     return light._render("trocas","Trocas de escala","Uma linha por troca, sem redundância.",swap_rows=result,trocas=rows,coop_map=coop_map,scale_map=scale_map)
 
 
+# Compatibilidade com testes e integrações que ainda referenciam o nome V10.
+_admin_light_swaps_v10 = _admin_light_swaps_v11
 app.view_functions["admin_light_swaps"] = _admin_light_swaps_v11
 
 
-def _coop_counts_v11():
-    archived = light._archived_ids()
-    rows = Cooperado.query.join(Usuario,Cooperado.usuario_id==Usuario.id).add_entity(Usuario).all()
+def _coop_counts_v11(rows=None, archived=None):
+    # Reaproveita os dados já carregados pela tela quando disponíveis.
+    # Antes a página fazia uma segunda consulta completa só para os contadores.
+    if archived is None:
+        archived = light._archived_ids()
+    if rows is None:
+        rows = Cooperado.query.join(
+            Usuario, Cooperado.usuario_id == Usuario.id
+        ).add_entity(Usuario).all()
     active_count=inactive_count=archived_count=0
+    active_coops=[]
     for coop,user in rows:
-        if coop.id in archived: archived_count+=1
-        elif user.ativo is False: inactive_count+=1
-        else: active_count+=1
-    _, assigned_count = _scale_assignment_counts(_active_coops_v11())
+        if coop.id in archived:
+            archived_count+=1
+        elif user.ativo is False:
+            inactive_count+=1
+        else:
+            active_count+=1
+            active_coops.append(coop)
+    _, assigned_count = _scale_assignment_counts(active_coops)
     return active_count,inactive_count,archived_count,assigned_count
 
 
@@ -547,7 +562,7 @@ def _admin_light_cooperatives_v11():
         if status=="excluidos" and not is_archived:continue
         if q and q not in _norm(f"{coop.nome or ''} {coop.telefone or ''} {user.usuario or ''}"):continue
         result.append(SimpleNamespace(coop=coop,user=user,active=is_active,archived=is_archived,phone=light._fmt_phone(coop.telefone)))
-    ca,ci,ce,cs=_coop_counts_v11()
+    ca,ci,ce,cs=_coop_counts_v11(rows, archived)
     return light._render("cooperados","Cooperados","Desativado sai da operação sem perder histórico.",cooperados=result[:350],q=q_raw,status=status,count_ativos=ca,count_inativos=ci,count_excluidos=ce,count_com_escala=cs)
 
 
