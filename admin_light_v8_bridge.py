@@ -66,13 +66,19 @@ def _admin_light_v8_redirects():
             "tabelas": "admin_light_tables",
             "avisos": "admin_light_notices",
         }.get(tab)
-        if target:
+        if target and target in app.view_functions:
             values = {}
             for key in ("data_inicio", "data_fim", "q", "cooperado_id", "restaurante_id", "status"):
                 value = request.args.get(key)
                 if value not in (None, ""):
                     values[key] = value
             return redirect(url_for(target, **values))
+        if target:
+            # Se uma rota leve não foi registrada, mantém a função no painel
+            # original em vez de devolver erro/Not Found.
+            values = request.args.to_dict(flat=True)
+            values["legacy"] = "1"
+            return redirect(url_for("admin_dashboard", **values))
 
     path_map = {
         "/admin/avaliacoes": "admin_light_ratings",
@@ -82,8 +88,10 @@ def _admin_light_v8_redirects():
         "/admin/rapido": "admin_light_launches",
     }
     target = path_map.get(path)
-    if target:
+    if target and target in app.view_functions:
         return redirect(url_for(target))
+    if target:
+        return None
     return None
 
 
