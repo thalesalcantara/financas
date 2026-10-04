@@ -9,58 +9,9 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_light_v8.css', v=build) }}">
 </head>
 <body>
-<header class="alv8-top">
-  <a class="alv8-brand" href="{{ url_for('admin_light_summary') }}">
-    <span class="alv8-brand-icon"><i class="bi bi-building-gear"></i></span>
-    <span class="alv8-brand-copy"><small>PAINEL COOPEX</small><strong>Administração Central</strong></span>
-  </a>
-  <nav class="alv8-nav">
-    <a class="alv8-direct {{ 'active' if view=='resumo' else '' }}" href="{{ url_for('admin_light_summary') }}"><i class="bi bi-speedometer2"></i> Resumo</a>
+{% set active_tab=view %}
+{% include '_admin_nav_v10.html' %}
 
-    <div class="alv8-group">
-      <button type="button"><i class="bi bi-cash-stack"></i> Financeiro <i class="bi bi-chevron-down"></i></button>
-      <div class="alv8-menu">
-        <a class="{{ 'active' if view=='lancamentos' else '' }}" href="{{ url_for('admin_light_launches') }}"><i class="bi bi-journal-text"></i> Lançamentos</a>
-        <a href="/admin?tab=receitas&legacy=1"><i class="bi bi-credit-card"></i> Receitas Coop</a>
-        <a href="/admin?tab=despesas&legacy=1"><i class="bi bi-cart-dash"></i> Despesas Coop</a>
-        <a href="/admin?tab=coop_receitas&legacy=1"><i class="bi bi-wallet2"></i> Receitas Cooperados</a>
-        <a href="/admin?tab=coop_despesas&legacy=1"><i class="bi bi-bag-dash"></i> Despesas Cooperados</a>
-        <a href="/admin?tab=beneficios&legacy=1"><i class="bi bi-heart-pulse"></i> Benefícios</a>
-      </div>
-    </div>
-
-    <div class="alv8-group">
-      <button type="button"><i class="bi bi-people"></i> Cadastros <i class="bi bi-chevron-down"></i></button>
-      <div class="alv8-menu">
-        <a class="{{ 'active' if view=='cooperados' else '' }}" href="{{ url_for('admin_light_cooperatives') }}"><i class="bi bi-person-badge"></i> Cooperados</a>
-        <a href="/admin?tab=restaurantes&legacy=1"><i class="bi bi-shop-window"></i> Estabelecimentos</a>
-        <a href="/admin/documentos?legacy=1"><i class="bi bi-folder2"></i> Documentos</a>
-        <a href="/admin/tabelas?legacy=1"><i class="bi bi-table"></i> Tabelas</a>
-      </div>
-    </div>
-
-    <div class="alv8-group">
-      <button type="button"><i class="bi bi-broadcast-pin"></i> Operação <i class="bi bi-chevron-down"></i></button>
-      <div class="alv8-menu">
-        <a class="{{ 'active' if view=='escala' else '' }}" href="{{ url_for('admin_light_scale') }}"><i class="bi bi-calendar-week"></i> Escala</a>
-        <a class="{{ 'active' if view=='trocas' else '' }}" href="{{ url_for('admin_light_swaps') }}"><i class="bi bi-arrow-left-right"></i> Trocas</a>
-        <a class="{{ 'active' if view=='historico' else '' }}" href="{{ url_for('admin_light_history') }}"><i class="bi bi-clock-history"></i> Histórico</a>
-      </div>
-    </div>
-
-    <div class="alv8-group">
-      <button type="button"><i class="bi bi-bar-chart"></i> Gestão <i class="bi bi-chevron-down"></i></button>
-      <div class="alv8-menu">
-        <a href="/admin/avaliacoes?legacy=1"><i class="bi bi-stars"></i> Avaliações</a>
-        <a href="/admin/avisos?legacy=1"><i class="bi bi-megaphone"></i> Avisos</a>
-      </div>
-    </div>
-
-    <a class="alv8-direct" href="/admin?tab=config&legacy=1"><i class="bi bi-gear"></i> Configurações</a>
-    <span class="alv8-spacer"></span>
-    <a class="alv8-direct" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a>
-  </nav>
-</header>
 
 <main class="alv8-page">
   <div class="alv8-head">
