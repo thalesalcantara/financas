@@ -8,7 +8,8 @@ from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 
 from flask import flash, redirect, render_template, render_template_string, request, send_file, session, url_for
-from sqlalchemy import event, or_
+from sqlalchemy import event, inspect, or_
+from sqlalchemy.orm import joinedload
 
 import app as legacy
 import admin_light_v8 as light
@@ -130,6 +131,19 @@ _PROTECTED_INACTIVE_USER_IDS: set[int] = set()
 def _reload_protected_users():
     global _PROTECTED_INACTIVE_USER_IDS
     with app.app_context():
+        # Bancos antigos/de teste podem ainda não ter a coluna ativo.
+        # Nesse caso não executamos uma query inválida durante o boot.
+        try:
+            columns = {
+                col.get("name")
+                for col in inspect(db.engine).get_columns(Usuario.__tablename__)
+            }
+        except Exception:
+            columns = set()
+        if "ativo" not in columns:
+            _PROTECTED_INACTIVE_USER_IDS = set()
+            return
+
         rows = (
             db.session.query(Usuario.id)
             .join(Cooperado, Cooperado.usuario_id == Usuario.id)
@@ -372,7 +386,7 @@ def admin_v10_establishments():
     q = _norm(q_raw)
     status = (request.args.get("status") or "todos").strip().lower()
     result = []
-    for r in Restaurante.query.order_by(Restaurante.nome.asc()).all():
+    for r in Restaurante.query.options(joinedload(Restaurante.usuario_ref)).order_by(Restaurante.nome.asc()).all():
         user = getattr(r, "usuario_ref", None)
         active = bool(getattr(r, "ativo", True) is not False and getattr(user, "ativo", True) is not False)
         if status == "ativos" and not active:
@@ -431,13 +445,23 @@ def _admin_light_scale_v11():
     coop_by_id = {c.id: c for c in active_coops}
     active_count, assigned_count = _scale_assignment_counts(active_coops)
     restaurants = Restaurante.query.filter(or_(Restaurante.ativo.is_(True), Restaurante.ativo.is_(None))).order_by(Restaurante.nome.asc()).all()
+    # Pré-carrega nomes uma única vez. Antes havia uma consulta ao banco para
+    # cada linha antiga sem cooperado_id (N+1), o que podia gerar centenas de
+    # queries em uma única abertura da Escala.
+    all_coop_rows = db.session.query(Cooperado.id, Cooperado.nome).all()
+    coop_id_by_name = {
+        _norm(nome): int(coop_id)
+        for coop_id, nome in all_coop_rows
+        if coop_id and (nome or "").strip()
+    }
+
     scales, scale_rows, contracts = [], [], set()
     for s in Escala.query.order_by(Escala.id.asc()).limit(1400).all():
         if s.cooperado_id and s.cooperado_id not in active_ids:
             continue
         if not s.cooperado_id and (s.cooperado_nome or "").strip():
-            known = Cooperado.query.filter(Cooperado.nome.ilike((s.cooperado_nome or "").strip())).first()
-            if known and known.id not in active_ids:
+            known_id = coop_id_by_name.get(_norm(s.cooperado_nome))
+            if known_id and known_id not in active_ids:
                 continue
         coop = coop_by_id.get(s.cooperado_id) if s.cooperado_id else None
         current_name = coop.nome if coop else (s.cooperado_nome or "").strip()
@@ -465,6 +489,8 @@ def _admin_light_scale_v11():
     )
 
 
+# Compatibilidade com testes e integrações que ainda referenciam o nome V10.
+_admin_light_scale_v10 = _admin_light_scale_v11
 app.view_functions["admin_light_scale"] = _admin_light_scale_v11
 
 
@@ -505,18 +531,31 @@ def _admin_light_swaps_v11():
     return light._render("trocas","Trocas de escala","Uma linha por troca, sem redundância.",swap_rows=result,trocas=rows,coop_map=coop_map,scale_map=scale_map)
 
 
+# Compatibilidade com testes e integrações que ainda referenciam o nome V10.
+_admin_light_swaps_v10 = _admin_light_swaps_v11
 app.view_functions["admin_light_swaps"] = _admin_light_swaps_v11
 
 
-def _coop_counts_v11():
-    archived = light._archived_ids()
-    rows = Cooperado.query.join(Usuario,Cooperado.usuario_id==Usuario.id).add_entity(Usuario).all()
+def _coop_counts_v11(rows=None, archived=None):
+    # Reaproveita os dados já carregados pela tela quando disponíveis.
+    # Antes a página fazia uma segunda consulta completa só para os contadores.
+    if archived is None:
+        archived = light._archived_ids()
+    if rows is None:
+        rows = Cooperado.query.join(
+            Usuario, Cooperado.usuario_id == Usuario.id
+        ).add_entity(Usuario).all()
     active_count=inactive_count=archived_count=0
+    active_coops=[]
     for coop,user in rows:
-        if coop.id in archived: archived_count+=1
-        elif user.ativo is False: inactive_count+=1
-        else: active_count+=1
-    _, assigned_count = _scale_assignment_counts(_active_coops_v11())
+        if coop.id in archived:
+            archived_count+=1
+        elif user.ativo is False:
+            inactive_count+=1
+        else:
+            active_count+=1
+            active_coops.append(coop)
+    _, assigned_count = _scale_assignment_counts(active_coops)
     return active_count,inactive_count,archived_count,assigned_count
 
 
@@ -537,7 +576,7 @@ def _admin_light_cooperatives_v11():
         if status=="excluidos" and not is_archived:continue
         if q and q not in _norm(f"{coop.nome or ''} {coop.telefone or ''} {user.usuario or ''}"):continue
         result.append(SimpleNamespace(coop=coop,user=user,active=is_active,archived=is_archived,phone=light._fmt_phone(coop.telefone)))
-    ca,ci,ce,cs=_coop_counts_v11()
+    ca,ci,ce,cs=_coop_counts_v11(rows, archived)
     return light._render("cooperados","Cooperados","Desativado sai da operação sem perder histórico.",cooperados=result[:350],q=q_raw,status=status,count_ativos=ca,count_inativos=ci,count_excluidos=ce,count_com_escala=cs)
 
 
@@ -747,13 +786,13 @@ def _install_template_v11():
             source=source.replace('<a class="alv8-btn" href="/admin/documentos?legacy=1"><i class="bi bi-folder2"></i> Documentos</a>','<a class="alv8-btn" href="{{ url_for(\'admin_v10_blitz\') }}"><i class="bi bi-shield-check"></i> Blitz</a>',1)
             marker='<details class="alv8-card"><summary><strong><i class="bi bi-person-plus"></i> Acrescentar alguém / nova linha na escala</strong></summary>'
             if "Upload da Escala (.xlsx)" not in source:
-                upload=r'''<div class="alv8-card"><div class="alv8-section-head"><div><h3>Upload da Escala (.xlsx)</h3><p>Envie a planilha oficial. O sistema separa a escala de cada cooperado.</p></div></div><form method="post" action="{{ url_for('upload_escala') }}" enctype="multipart/form-data" class="alv8-filter"><div class="alv8-field grow"><label>Planilha XLSX</label><input class="alv8-input" type="file" name="arquivo" accept=".xlsx" required></div><button class="alv8-btn primary" type="submit"><i class="bi bi-file-earmark-spreadsheet"></i> Enviar escala</button></form></div>'''
+                upload=r'''<div class="alv8-card"><div class="alv8-section-head"><div><h3>Upload da Escala (.xlsx)</h3><p>Envie a planilha oficial. O sistema separa a escala de cada cooperado.</p></div></div><form method="post" action="{{ url_for('upload_escala') }}" enctype="multipart/form-data" class="alv8-filter"><div class="alv8-field grow"><label>Planilha XLSX</label><input class="alv8-input" type="file" name="file" accept=".xlsx" required></div><button class="alv8-btn primary" type="submit"><i class="bi bi-file-earmark-spreadsheet"></i> Enviar escala</button></form></div>'''
                 source=source.replace(marker,upload+marker,1)
             old="const coopOptions=[{% for c in cooperados|default([]) %}{id:{{ c.id }},nome:{{ c.nome|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];"
             new="const coopOptions={% if view=='escala' %}[{% for c in cooperados|default([]) %}{id:{{ c.id }},nome:{{ c.nome|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]{% else %}[]{% endif %};"
             source=source.replace(old,new,1)
             oldm="function matches(r){const n=(nameF?.value||'').trim().toLowerCase(),ct=(contractF?.value||'').trim().toLowerCase(),free=!!freeF?.checked;const rn=String(r.cooperado_nome||r.cooperado_nome_livre||'').toLowerCase(),rc=String(r.contrato||'').toLowerCase();if(currentDay!=='all'&&String(r.weekday_num)!==String(currentDay))return false;if(n&&!rn.includes(n))return false;if(ct&&rc!==ct)return false;if(free&&(r.cooperado_id||String(r.cooperado_nome_livre||'').trim()))return false;return true}"
-            newm="function normV11(v){return String(v??'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/_/g,' ').toLowerCase().replace(/\\s+/g,' ').trim()} function matches(r){const n=normV11(nameF?.value||''),ct=normV11(contractF?.value||''),free=!!freeF?.checked;const rn=normV11(r.cooperado_nome||r.cooperado_nome_livre||''),rc=normV11(r.contrato||'');if(currentDay!=='all'&&String(r.weekday_num)!==String(currentDay))return false;if(n&&!rn.includes(n))return false;if(ct&&rc!==ct)return false;if(free&&(r.cooperado_id||String(r.cooperado_nome_livre||'').trim()))return false;return true}"
+            newm="function normV10(v){return String(v??'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/_/g,' ').toLowerCase().replace(/\\s+/g,' ').trim()} function matches(r){const n=normV10(nameF?.value||''),ct=normV10(contractF?.value||''),free=!!freeF?.checked;const rn=normV10(r.cooperado_nome||r.cooperado_nome_livre||''),rc=normV10(r.contrato||'');if(currentDay!=='all'&&String(r.weekday_num)!==String(currentDay))return false;if(n&&!rn.includes(n))return false;if(ct&&rc!==ct)return false;if(free&&(r.cooperado_id||String(r.cooperado_nome_livre||'').trim()))return false;return true}"
             source=source.replace(oldm,newm,1)
             source=_summary_footer(source);source=_launch_footer(source);source=_scale_counts(source);source=_replace_coop_block(source)
             start=source.find("  {% elif view=='trocas' %}");end=source.find("  {% elif view=='historico' %}",start)
