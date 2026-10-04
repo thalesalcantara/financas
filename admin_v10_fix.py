@@ -455,8 +455,26 @@ def _admin_light_scale_v11():
         if coop_id and (nome or "").strip()
     }
 
-    scales, scale_rows, contracts = [], [], set()
-    for s in Escala.query.order_by(Escala.id.asc()).limit(1400).all():
+    # A grade semanal usa somente estes campos. Buscar colunas específicas evita
+    # materializar até 1.400 objetos ORM completos em cada abertura da Escala.
+    candidates = (
+        db.session.query(
+            Escala.id,
+            Escala.data,
+            Escala.turno,
+            Escala.horario,
+            Escala.contrato,
+            Escala.restaurante_id,
+            Escala.cooperado_id,
+            Escala.cooperado_nome,
+        )
+        .order_by(Escala.id.asc())
+        .limit(1400)
+        .all()
+    )
+
+    scale_rows, contracts = [], set()
+    for s in candidates:
         if s.cooperado_id and s.cooperado_id not in active_ids:
             continue
         if not s.cooperado_id and (s.cooperado_nome or "").strip():
@@ -468,7 +486,6 @@ def _admin_light_scale_v11():
         searchable = _norm(" ".join(str(x or "") for x in (s.data, s.turno, s.horario, s.contrato, current_name)))
         if q and q not in searchable:
             continue
-        scales.append(s)
         if (s.contrato or "").strip():
             contracts.add((s.contrato or "").strip())
         scale_rows.append({
@@ -482,7 +499,7 @@ def _admin_light_scale_v11():
     contracts.update((r.nome or "").strip() for r in restaurants if (r.nome or "").strip())
     return light._render(
         "escala","Escala","Upload XLSX e escala semanal. A busca encontra qualquer parte do nome do cooperado.",
-        q=q_raw, scales=scales, scale_rows=scale_rows, contract_options=sorted(contracts,key=_norm),
+        q=q_raw, scales=[], scale_rows=scale_rows, contract_options=sorted(contracts,key=_norm),
         coop_map=coop_by_id, rest_map={r.id:r for r in restaurants}, cooperados=active_coops,
         restaurantes=restaurants, scale_active_count=active_count, scale_assigned_count=assigned_count,
         scale_line_count=len(scale_rows),
