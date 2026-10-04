@@ -140,7 +140,20 @@ def _install_schema() -> None:
             app.logger.exception("Falha ao instalar índices da produção do cooperado")
 
 
-_install_schema()
+try:
+    _install_schema()
+except Exception:
+    # Falha transitória de conexão não pode invalidar o import do módulo.
+    # As classes já estão registradas no SQLAlchemy; abortar aqui faria uma
+    # segunda tentativa de import redefinir as mesmas tabelas e derrubar o boot.
+    try:
+        with app.app_context():
+            db.session.rollback()
+    except Exception:
+        pass
+    app.logger.exception(
+        "Falha transitória ao garantir schema da produção; aplicação continuará subindo."
+    )
 
 
 def _require_role(role: str):
