@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 
 from flask import flash, redirect, render_template, render_template_string, request, send_file, session, url_for
-from sqlalchemy import event, or_
+from sqlalchemy import event, inspect, or_
 
 import app as legacy
 import admin_light_v8 as light
@@ -130,6 +130,19 @@ _PROTECTED_INACTIVE_USER_IDS: set[int] = set()
 def _reload_protected_users():
     global _PROTECTED_INACTIVE_USER_IDS
     with app.app_context():
+        # Bancos antigos/de teste podem ainda não ter a coluna ativo.
+        # Nesse caso não executamos uma query inválida durante o boot.
+        try:
+            columns = {
+                col.get("name")
+                for col in inspect(db.engine).get_columns(Usuario.__tablename__)
+            }
+        except Exception:
+            columns = set()
+        if "ativo" not in columns:
+            _PROTECTED_INACTIVE_USER_IDS = set()
+            return
+
         rows = (
             db.session.query(Usuario.id)
             .join(Cooperado, Cooperado.usuario_id == Usuario.id)
@@ -778,7 +791,7 @@ def _install_template_v11():
             new="const coopOptions={% if view=='escala' %}[{% for c in cooperados|default([]) %}{id:{{ c.id }},nome:{{ c.nome|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]{% else %}[]{% endif %};"
             source=source.replace(old,new,1)
             oldm="function matches(r){const n=(nameF?.value||'').trim().toLowerCase(),ct=(contractF?.value||'').trim().toLowerCase(),free=!!freeF?.checked;const rn=String(r.cooperado_nome||r.cooperado_nome_livre||'').toLowerCase(),rc=String(r.contrato||'').toLowerCase();if(currentDay!=='all'&&String(r.weekday_num)!==String(currentDay))return false;if(n&&!rn.includes(n))return false;if(ct&&rc!==ct)return false;if(free&&(r.cooperado_id||String(r.cooperado_nome_livre||'').trim()))return false;return true}"
-            newm="function normV11(v){return String(v??'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/_/g,' ').toLowerCase().replace(/\\s+/g,' ').trim()} function matches(r){const n=normV11(nameF?.value||''),ct=normV11(contractF?.value||''),free=!!freeF?.checked;const rn=normV11(r.cooperado_nome||r.cooperado_nome_livre||''),rc=normV11(r.contrato||'');if(currentDay!=='all'&&String(r.weekday_num)!==String(currentDay))return false;if(n&&!rn.includes(n))return false;if(ct&&rc!==ct)return false;if(free&&(r.cooperado_id||String(r.cooperado_nome_livre||'').trim()))return false;return true}"
+            newm="function normV10(v){return String(v??'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/_/g,' ').toLowerCase().replace(/\\s+/g,' ').trim()} function matches(r){const n=normV10(nameF?.value||''),ct=normV10(contractF?.value||''),free=!!freeF?.checked;const rn=normV10(r.cooperado_nome||r.cooperado_nome_livre||''),rc=normV10(r.contrato||'');if(currentDay!=='all'&&String(r.weekday_num)!==String(currentDay))return false;if(n&&!rn.includes(n))return false;if(ct&&rc!==ct)return false;if(free&&(r.cooperado_id||String(r.cooperado_nome_livre||'').trim()))return false;return true}"
             source=source.replace(oldm,newm,1)
             source=_summary_footer(source);source=_launch_footer(source);source=_scale_counts(source);source=_replace_coop_block(source)
             start=source.find("  {% elif view=='trocas' %}");end=source.find("  {% elif view=='historico' %}",start)
