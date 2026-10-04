@@ -431,13 +431,23 @@ def _admin_light_scale_v11():
     coop_by_id = {c.id: c for c in active_coops}
     active_count, assigned_count = _scale_assignment_counts(active_coops)
     restaurants = Restaurante.query.filter(or_(Restaurante.ativo.is_(True), Restaurante.ativo.is_(None))).order_by(Restaurante.nome.asc()).all()
+    # Pré-carrega nomes uma única vez. Antes havia uma consulta ao banco para
+    # cada linha antiga sem cooperado_id (N+1), o que podia gerar centenas de
+    # queries em uma única abertura da Escala.
+    all_coop_rows = db.session.query(Cooperado.id, Cooperado.nome).all()
+    coop_id_by_name = {
+        _norm(nome): int(coop_id)
+        for coop_id, nome in all_coop_rows
+        if coop_id and (nome or "").strip()
+    }
+
     scales, scale_rows, contracts = [], [], set()
     for s in Escala.query.order_by(Escala.id.asc()).limit(1400).all():
         if s.cooperado_id and s.cooperado_id not in active_ids:
             continue
         if not s.cooperado_id and (s.cooperado_nome or "").strip():
-            known = Cooperado.query.filter(Cooperado.nome.ilike((s.cooperado_nome or "").strip())).first()
-            if known and known.id not in active_ids:
+            known_id = coop_id_by_name.get(_norm(s.cooperado_nome))
+            if known_id and known_id not in active_ids:
                 continue
         coop = coop_by_id.get(s.cooperado_id) if s.cooperado_id else None
         current_name = coop.nome if coop else (s.cooperado_nome or "").strip()
