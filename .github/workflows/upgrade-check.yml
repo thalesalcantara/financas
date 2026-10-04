@@ -93,9 +93,11 @@ jobs:
 
           source, _, _ = app.jinja_loader.get_source(app.jinja_env, 'admin_light_v8.html')
           assert 'considerar_periodo' not in source
-          assert 'admin_v10_finance' in source
-          assert 'admin_v10_establishments' in source
-          assert 'admin_v10_blitz' in source
+          # Esses destinos vivem no partial de navegação incluído pelo template
+          # principal; valide o arquivo que realmente contém os links.
+          assert 'admin_v10_finance' in nav
+          assert 'admin_v10_establishments' in nav
+          assert 'admin_v10_blitz' in nav
           assert 'swap_rows' in source
           assert 'normV10' in source
           assert 'Blitz' in nav and 'Receitas Coop' in nav
