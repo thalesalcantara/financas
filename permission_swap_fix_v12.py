@@ -123,28 +123,7 @@ for _ep in ("admin_aprovar_troca", "admin_recusar_troca"):
         app.view_functions[_ep] = _make(_original)
 
 
-def _install_template_v12():
-    loader = app.jinja_loader
-    if not loader or getattr(loader, "_readonly_v12", False): return
-    original = loader.get_source
-    def get_source(environment, template):
-        source, filename, uptodate = original(environment, template)
-        if template == "admin_light_v8.html":
-            # Lançamentos: botões respeitam Editar e Excluir.
-            source = source.replace(
-                '<button class="alv8-btn edit js-edit-launch" type="button"><i class="bi bi-pencil"></i> Editar</button><button class="alv8-btn danger js-del-launch" type="button"><i class="bi bi-trash"></i> Excluir</button>',
-                '{% if admin_can_edit_lancamentos %}<button class="alv8-btn edit js-edit-launch" type="button"><i class="bi bi-pencil"></i> Editar</button>{% endif %}{% if admin_can_delete_lancamentos %}<button class="alv8-btn danger js-del-launch" type="button"><i class="bi bi-trash"></i> Excluir</button>{% endif %}{% if not admin_can_edit_lancamentos and not admin_can_delete_lancamentos %}<span class="alv8-badge">Somente leitura</span>{% endif %}', 1)
-            # Escala semanal é montada em JavaScript: desabilita edição e remove ações.
-            source = source.replace("const esc=s=>String(s??'').replace", "const canScaleEdit={{ admin_can_edit_escalas|tojson }},canScaleDelete={{ admin_can_delete_escalas|tojson }};const esc=s=>String(s??'').replace", 1)
-            source = source.replace('<select class="alv8-select js-contract">${optsContract(r.contrato||\'\')}</select>', '<select class="alv8-select js-contract" ${canScaleEdit?\'\':\'disabled\'}>${optsContract(r.contrato||\'\')}</select>', 1)
-            source = source.replace('<select class="alv8-select js-coop">${optsCoop(r.cooperado_id)}</select>', '<select class="alv8-select js-coop" ${canScaleEdit?\'\':\'disabled\'}>${optsCoop(r.cooperado_id)}</select>', 1)
-            source = source.replace(
-                '<div class="alv8-inline"><button type="button" class="alv8-btn primary js-save-scale">Salvar</button><button type="button" class="alv8-btn js-remove-scale">Retirar</button><button type="button" class="alv8-btn danger js-delete-scale">Excluir linha</button></div>',
-                '<div class="alv8-inline">${canScaleEdit?\'<button type="button" class="alv8-btn primary js-save-scale">Salvar</button><button type="button" class="alv8-btn js-remove-scale">Retirar</button>\':\'\'}${canScaleDelete?\'<button type="button" class="alv8-btn danger js-delete-scale">Excluir linha</button>\':\'\'}${(!canScaleEdit&&!canScaleDelete)?\'<span class="alv8-badge">Somente leitura</span>\':\'\'}</div>', 1)
-        return source, filename, uptodate
-    loader.get_source = get_source
-    loader._readonly_v12 = True
-    app.jinja_env.cache.clear()
 
-_install_template_v12()
+# Permissões visuais foram incorporadas diretamente ao template.
+
 app.logger.info("V12: permissões por ação e solicitação de trocas restauradas.")
