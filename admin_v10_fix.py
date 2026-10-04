@@ -782,17 +782,11 @@ def _install_template_v11():
             source=source.replace('href="/admin?tab=config&legacy=1"','href="{{ url_for(\'admin_v11_config\') }}"')
         if template=="admin_light_v8.html":
             for old,new in {
-                '/admin?tab=receitas&legacy=1':"{{ url_for('admin_v10_finance',tab='receitas') }}",
-                '/admin?tab=despesas&legacy=1':"{{ url_for('admin_v10_finance',tab='despesas') }}",
-                '/admin?tab=coop_receitas&legacy=1':"{{ url_for('admin_v10_finance',tab='coop_receitas') }}",
-                '/admin?tab=coop_despesas&legacy=1':"{{ url_for('admin_v10_finance',tab='coop_despesas') }}",
-                '/admin?tab=beneficios&legacy=1':"{{ url_for('admin_v10_finance',tab='beneficios') }}",
-                '/admin?tab=restaurantes&legacy=1':"{{ url_for('admin_v10_establishments') }}",
                 '/admin/avaliacoes?legacy=1':"{{ url_for('admin_light_ratings') }}",
                 '/admin/tabelas?legacy=1':"{{ url_for('admin_light_tables') }}",
                 '/admin/avisos?legacy=1':"{{ url_for('admin_light_notices') }}",
-                '/admin?tab=config&legacy=1':"{{ url_for('admin_v11_config') }}",
-            }.items():source=source.replace(old,new)
+            }.items():
+                source=source.replace(old,new)
             source=source.replace('<a class="alv8-btn" href="/admin/documentos?legacy=1"><i class="bi bi-folder2"></i> Documentos</a>','<a class="alv8-btn" href="{{ url_for(\'admin_v10_blitz\') }}"><i class="bi bi-shield-check"></i> Blitz</a>',1)
             marker='<details class="alv8-card"><summary><strong><i class="bi bi-person-plus"></i> Acrescentar alguém / nova linha na escala</strong></summary>'
             if "Upload da Escala (.xlsx)" not in source:
