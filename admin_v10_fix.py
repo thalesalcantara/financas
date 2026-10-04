@@ -729,12 +729,6 @@ _COOP_BLOCK=r'''  {% elif view=='cooperados' %}
 '''
 
 
-def _same_nav(source):
-    start=source.find('<header class="alv8-top">');end=source.find("</header>",start)
-    if start>=0 and end>=0:return source[:start]+"{% set active_tab=view %}{% include '_admin_nav_v10.html' %}"+source[end+9:]
-    return source
-
-
 def _summary_footer(source):
     start=source.find("{% if view=='resumo' %}");end=source.find("{% elif view=='lancamentos' %}",start)
     if start<0 or end<0:return source
@@ -787,7 +781,6 @@ def _install_template_v11():
         if template=="_admin_nav_v10.html":
             source=source.replace('href="/admin?tab=config&legacy=1"','href="{{ url_for(\'admin_v11_config\') }}"')
         if template=="admin_light_v8.html":
-            source=_same_nav(source)
             for old,new in {
                 '/admin?tab=receitas&legacy=1':"{{ url_for('admin_v10_finance',tab='receitas') }}",
                 '/admin?tab=despesas&legacy=1':"{{ url_for('admin_v10_finance',tab='despesas') }}",
