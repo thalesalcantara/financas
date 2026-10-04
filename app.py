@@ -12811,21 +12811,6 @@ def init_db_command():
     click.echo("init_db() concluído.")
 
 # =========================
-# Admin UI principal
-# =========================
-# Carrega as rotas do painel horizontal durante a importação do app.
-# Assim o worker só fica disponível depois que Resumo/Lançamentos e o menu
-# principal estão registrados, evitando 404 intermitente entre deploys.
-try:
-    import admin_light_v8  # noqa: F401
-    import admin_preserve_v9  # noqa: F401
-    import admin_v10_fix  # noqa: F401
-except Exception:
-    app.logger.exception("Falha ao carregar o painel administrativo principal")
-    raise
-
-
-# =========================
 # Main
 # =========================
 if __name__ == "__main__":
