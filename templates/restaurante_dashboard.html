@@ -2564,6 +2564,14 @@ function setPhone(digits) {
       ordenarLista();
       aplicarFiltro('', false);
 
+      try{
+        const coopFromUrl=new URL(location.href).searchParams.get('coop_id');
+        if(coopFromUrl){
+          const alvo=document.querySelector('.cooperado-item[data-id="'+coopFromUrl+'"]');
+          if(alvo){alvo.style.display='';alvo.click();}
+        }
+      }catch(e){}
+
       const tabs=Array.from(document.querySelectorAll('.rest-list-tab'));
       const pendingList=document.getElementById('listaPendencias');
       tabs.forEach(tab=>tab.addEventListener('click',()=>{
