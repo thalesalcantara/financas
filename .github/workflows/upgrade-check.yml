@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/producao-cooperado-admin-rapido
+      - consolidacao/definitiva
   pull_request:
 
 jobs:
@@ -24,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile Python
-        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py performance_ui_fix.py performance_ui_hotfix.py performance_query_override.py production_shift_time_fix.py performance_ui_finalize.py menu_horizontal_enforcer.py cooperative_notifications_ui.py operational_rules_v5.py approval_rejection_v5.py approval_return_dashboard_v5.py admin_launch_sync_v5.py admin_ui_v6.py admin_runtime_v7.py admin_light_v8.py admin_light_v8_bridge.py admin_preserve_v9.py admin_v10_fix.py gunicorn_conf.py tests/smoke_upgrade.py
+        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py production_ui_finalize.py performance_ui_fix.py performance_ui_hotfix.py performance_query_override.py production_shift_time_fix.py performance_ui_finalize.py menu_horizontal_enforcer.py cooperative_notifications_ui.py operational_rules_v5.py approval_rejection_v5.py approval_return_dashboard_v5.py admin_core.py admin_final.py gunicorn_conf.py tests/smoke_upgrade.py
       - name: Validate Jinja templates
         run: |
           python - <<'PY'
@@ -56,23 +57,17 @@ jobs:
           assert shifts.upgrade._times_from_text('11:00 às 15:00') == ('11:00', '15:00')
           print('exact shift rules ok')
           PY
-      - name: Validate admin V10 consolidation
+      - name: Validate definitive admin
         run: |
           python - <<'PY'
-          from datetime import date
           from pathlib import Path
           import approval_rejection_v5 as rejection
           import approval_return_dashboard_v5 as approval
-          import admin_runtime_v7 as runtime
-          import operational_rules_v5 as ui
-          import admin_light_v8 as light
-          import admin_light_v8_bridge as bridge
-          import admin_preserve_v9 as preserve
-          import admin_v10_fix as v10
+          import admin_core as core
+          import admin_final as final
 
-          app = light.app
-          transformed = ('admin_light_v8.html','admin_dashboard.html','admin_lancamentos.html')
-          for name in transformed:
+          app = core.app
+          for name in ('admin_light_v8.html','admin_dashboard.html','admin_lancamentos.html'):
               source, _, _ = app.jinja_loader.get_source(app.jinja_env, name)
               app.jinja_env.parse(source)
 
@@ -81,38 +76,29 @@ jobs:
           finance = Path('templates/admin_partial_shell_v10.html').read_text(encoding='utf-8')
           establishments = Path('templates/admin_establishments_v10.html').read_text(encoding='utf-8')
           blitz = Path('templates/admin_blitz_v10.html').read_text(encoding='utf-8')
+          admin_template = Path('templates/admin_light_v8.html').read_text(encoding='utf-8')
 
           assert 'Recusar e bloquear' in approvals
           assert app.view_functions['rest_producao_recusar'] is rejection.rest_reject_and_lock
           assert app.view_functions['rest_producao_aprovar'] is approval.rest_approve_return_dashboard
-          assert app.view_functions['admin_light_scale'] is v10._admin_light_scale_v10
-          assert app.view_functions['admin_light_swaps'] is v10._admin_light_swaps_v10
-          assert app.view_functions['admin_light_coop_save'] is preserve._admin_light_coop_save_full
-          assert app.jinja_env.filters['brl'] is v10.brl
-          assert v10.brl(1219.82) == '1.219,82'
-
-          source, _, _ = app.jinja_loader.get_source(app.jinja_env, 'admin_light_v8.html')
-          assert 'considerar_periodo' not in source
-          # Esses destinos vivem no partial de navegação incluído pelo template
-          # principal; valide o arquivo que realmente contém os links.
+          assert app.view_functions['admin_light_scale'] is final._admin_light_scale_v10
+          assert app.view_functions['admin_light_swaps'] is final._admin_light_swaps_v10
+          assert app.jinja_env.filters['brl'] is final.brl
+          assert final.brl(1219.82) == '1.219,82'
           assert 'admin_v10_finance' in nav
           assert 'admin_v10_establishments' in nav
           assert 'admin_v10_blitz' in nav
-          assert 'swap_rows' in source
-          assert 'normV10' in source
-          assert 'Blitz' in nav and 'Receitas Coop' in nav
+          assert 'admin_can_create_lancamentos' in admin_template
+          assert 'admin_can_edit_escalas' in admin_template
           assert 'ajax_partial' in finance
           assert 'Segunda a domingo' in establishments
           assert 'CNH e CRLV' in blitz
+          assert 'solicitar_troca_final' in app.view_functions
+          assert 'admin_lancamentos_latest_final' in app.view_functions
 
-          with app.test_request_context('/admin?tab=resumo'):
-              app.preprocess_request()
-              assert runtime.app is app
-              assert __import__('flask').request.args.get('data_inicio') == date.today().isoformat()
-              assert __import__('flask').request.args.get('data_fim') == date.today().isoformat()
           with app.test_request_context('/admin/leve/cooperados'):
-              assert ui._operational_filter_enabled() is False
-          print('admin v10 consolidation ok')
+              assert core._operational_filter_v8() is False
+          print('definitive admin ok')
           PY
       - name: Validate notification intervals
         run: |
