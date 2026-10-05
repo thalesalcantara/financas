@@ -396,6 +396,7 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/operational_v5.css', v='20260807-1042') }}">
 </head>
 <body>
 
@@ -7067,7 +7068,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   document.addEventListener('DOMContentLoaded', function(){
     bindTabs();
-    warmQueue();
+    /* Abas pesadas carregam somente sob demanda */
   });
   window.CoopexTabCache = {cache, fetchPartial, installPartial};
 })();
