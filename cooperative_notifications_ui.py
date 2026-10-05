@@ -256,15 +256,16 @@ if "rest_pendencia_trocar_cooperado" not in app.view_functions:
         return redirect(url_for("portal_restaurante", view="lancar"))
 
 
-def _week_pending_rows(rest):
+def _week_pending_rows(rest, scales_source=None):
     """Pendências vencidas da semana, separadas por escala/turno."""
     now = datetime.now(TZ)
     today = now.date()
     monday = today - timedelta(days=today.weekday())
 
+    source = scales_source if scales_source is not None else perf._rest_scales_indexed(rest)
     scales = [
         scale
-        for scale in perf._rest_scales_indexed(rest)
+        for scale in source
         if (lambda d: bool(d and monday <= d <= today))(shifts.exact_scale_date(scale, today))
     ]
     if not scales:
@@ -392,13 +393,14 @@ def _shift_period_label(start_time) -> str:
         return "turno"
 
 
-def _today_coop_launch_state(rest, pending_rows):
+def _today_coop_launch_state(rest, pending_rows, scales_source=None):
     """Estado de lançamento de cada cooperado considerando SOMENTE as escalas de hoje."""
     now = datetime.now(TZ)
     today = now.date()
 
     scales = []
-    for scale in perf._rest_scales_indexed(rest):
+    source = scales_source if scales_source is not None else perf._rest_scales_indexed(rest)
+    for scale in source:
         d = shifts.exact_scale_date(scale, today)
         if d == today:
             scales.append(scale)
@@ -507,9 +509,10 @@ def _coopex_week_pending_context():
     try:
         rest = legacy.request_restaurante()
         if rest:
-            pending_rows = _week_pending_rows(rest)
+            indexed_scales = perf._rest_scales_indexed(rest)
+            pending_rows = _week_pending_rows(rest, indexed_scales)
             context["coopex_rest_week_pending_rows"] = pending_rows
-            context["coopex_rest_today_status_map"] = _today_coop_launch_state(rest, pending_rows)
+            context["coopex_rest_today_status_map"] = _today_coop_launch_state(rest, pending_rows, indexed_scales)
             context["coopex_rest_substitute_coops"] = [
                 {"id": int(coop_id), "nome": nome}
                 for coop_id, nome in _active_substitute_rows()
