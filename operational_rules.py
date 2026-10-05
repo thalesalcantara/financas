@@ -116,10 +116,13 @@ def _active_coops_by_id_and_name():
 
 
 def _rest_current_shift_data(rest: Restaurante):
-    """Retorna IDs e dados da escala que está ativa neste exato momento."""
-    now = datetime.now(TZ)
-    today = now.date()
-    yesterday = today - timedelta(days=1)
+    """Retorna todos os cooperados escalados HOJE, independente do horário atual.
+
+    O painel do estabelecimento precisa listar quem trabalha no dia inteiro,
+    mesmo antes do turno começar. O horário da escala é usado para pré-preencher
+    o lançamento e garantir que Produções da Semana reconheça o registro.
+    """
+    today = datetime.now(TZ).date()
     by_id, by_name = _active_coops_by_id_and_name()
 
     ids: set[int] = set()
@@ -127,24 +130,12 @@ def _rest_current_shift_data(rest: Restaurante):
 
     for scale in perf._rest_scales_indexed(rest):
         data_ref = shifts.exact_scale_date(scale, today)
-        if data_ref not in {today, yesterday}:
+        if data_ref != today:
             continue
 
         start_text, end_text = upgrade._times_from_text(scale.horario)
         start_text = upgrade._norm_time(start_text) or ""
         end_text = upgrade._norm_time(end_text) or ""
-        start_minutes = upgrade._minutes(start_text)
-        end_at = flow._end_at(data_ref, start_text, end_text)
-        if start_minutes is None or end_at is None:
-            continue
-
-        start_at = datetime.combine(
-            data_ref,
-            time(start_minutes // 60, start_minutes % 60),
-            tzinfo=TZ,
-        )
-        if not (start_at <= now < end_at):
-            continue
 
         coop_id = int(scale.cooperado_id) if scale.cooperado_id in by_id else None
         if coop_id is None and scale.cooperado_nome:
@@ -153,9 +144,6 @@ def _rest_current_shift_data(rest: Restaurante):
             continue
 
         ids.add(coop_id)
-        # Se houver mais de uma escala ativa do mesmo cooperado, usa a que
-        # começou por último. Isso mantém o preenchimento previsível.
-        previous = shift_map.get(coop_id)
         current = {
             "scale_id": int(scale.id),
             "data": data_ref.isoformat(),
@@ -165,7 +153,8 @@ def _rest_current_shift_data(rest: Restaurante):
             "turno": scale.turno or "",
             "contrato": scale.contrato or rest.nome,
         }
-        if not previous or (current["hora_inicio"] or "") >= (previous["hora_inicio"] or ""):
+        previous = shift_map.get(coop_id)
+        if not previous or (current["hora_inicio"] or "") < (previous["hora_inicio"] or "99:99"):
             shift_map[coop_id] = current
 
     return sorted(ids), shift_map
