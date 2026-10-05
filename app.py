@@ -7798,6 +7798,19 @@ def _json_or_redirect_success(message: str, default_tab: str, payload: dict | No
 
 
 def _compute_coop_debt_snapshot(coop_id, di, df):
+    cache_key = (
+        int(coop_id),
+        di.isoformat() if hasattr(di, "isoformat") and di else str(di or ""),
+        df.isoformat() if hasattr(df, "isoformat") and df else str(df or ""),
+    )
+    if has_request_context():
+        cache = getattr(g, "_coopex_debt_snapshot_cache", None)
+        if cache is None:
+            cache = {}
+            g._coopex_debt_snapshot_cache = cache
+        if cache_key in cache:
+            return cache[cache_key]
+
     CENT = Decimal("0.01")
 
     def D(v):
@@ -8003,7 +8016,7 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
     pago_no_periodo = money(sum((it['pago_auto_periodo'] for it in debt_items), Decimal("0.00")))
     disponivel_auto_restante = money(max(Decimal("0.00"), disponivel_periodo - pago_no_periodo))
 
-    return {
+    result = {
         'bruto': float(money(bruto_prod_view)),
         'inss': float(money(inss_view)),
         'sest': float(money(sest_view)),
@@ -8018,6 +8031,9 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
         'restante_despesa': float(money(total_restante_despesa)),
         'restante_adiant': float(money(total_restante_adiant)),
     }
+    if has_request_context():
+        g._coopex_debt_snapshot_cache[cache_key] = result
+    return result
 
 
 @app.route("/coop/despesas/delete-bulk", methods=["POST"])
