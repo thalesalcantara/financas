@@ -116,18 +116,19 @@ def _active_coops_by_id_and_name():
 
 
 def _rest_current_shift_data(rest: Restaurante):
-    """Retorna todos os cooperados escalados HOJE, independente do horário atual.
+    """Mostra somente o bloco de escala atual (ou o próximo bloco do dia).
 
-    O painel do estabelecimento precisa listar quem trabalha no dia inteiro,
-    mesmo antes do turno começar. O horário da escala é usado para pré-preencher
-    o lançamento e garantir que Produções da Semana reconheça o registro.
+    Regras:
+    - durante um turno, aparecem apenas os cooperados daquele período;
+    - quando o período termina, ele sai da lista normal;
+    - se ainda não houve produção, passa a aparecer em Pendências;
+    - quando não há turno em andamento, mostra somente o próximo horário do dia.
     """
-    today = datetime.now(TZ).date()
+    now = datetime.now(TZ)
+    today = now.date()
     by_id, by_name = _active_coops_by_id_and_name()
 
-    ids: set[int] = set()
-    shift_map: dict[int, dict] = {}
-
+    rows = []
     for scale in perf._rest_scales_indexed(rest):
         data_ref = shifts.exact_scale_date(scale, today)
         if data_ref != today:
@@ -136,6 +137,17 @@ def _rest_current_shift_data(rest: Restaurante):
         start_text, end_text = upgrade._times_from_text(scale.horario)
         start_text = upgrade._norm_time(start_text) or ""
         end_text = upgrade._norm_time(end_text) or ""
+        start_minutes = upgrade._minutes(start_text)
+        end_at = flow._end_at(data_ref, start_text, end_text)
+
+        if start_minutes is None or end_at is None:
+            continue
+
+        start_at = datetime.combine(
+            data_ref,
+            time(start_minutes // 60, start_minutes % 60),
+            tzinfo=TZ,
+        )
 
         coop_id = int(scale.cooperado_id) if scale.cooperado_id in by_id else None
         if coop_id is None and scale.cooperado_nome:
@@ -143,22 +155,53 @@ def _rest_current_shift_data(rest: Restaurante):
         if not coop_id:
             continue
 
+        rows.append({
+            "coop_id": coop_id,
+            "scale": scale,
+            "data": data_ref,
+            "start": start_text,
+            "end": end_text,
+            "start_at": start_at,
+            "end_at": end_at,
+        })
+
+    if not rows:
+        return [], {}
+
+    # 1) Se existe um período ativo, usa apenas o bloco que começou mais recentemente.
+    active = [r for r in rows if r["start_at"] <= now < r["end_at"]]
+    selected = []
+    if active:
+        active_start = max(r["start_at"] for r in active)
+        selected = [r for r in active if r["start_at"] == active_start]
+    else:
+        # 2) Fora de um período, mostra apenas o próximo bloco ainda não iniciado.
+        future = [r for r in rows if r["start_at"] > now]
+        if future:
+            next_start = min(r["start_at"] for r in future)
+            selected = [r for r in future if r["start_at"] == next_start]
+        else:
+            selected = []
+
+    ids: set[int] = set()
+    shift_map: dict[int, dict] = {}
+
+    for row in selected:
+        coop_id = row["coop_id"]
+        scale = row["scale"]
         ids.add(coop_id)
-        current = {
+        shift_map[coop_id] = {
             "scale_id": int(scale.id),
-            "data": data_ref.isoformat(),
-            "hora_inicio": start_text,
-            "hora_fim": end_text,
+            "data": row["data"].isoformat(),
+            "hora_inicio": row["start"],
+            "hora_fim": row["end"],
             "horario": scale.horario or "",
             "turno": scale.turno or "",
             "contrato": scale.contrato or rest.nome,
+            "periodo_ativo": bool(row["start_at"] <= now < row["end_at"]),
         }
-        previous = shift_map.get(coop_id)
-        if not previous or (current["hora_inicio"] or "") < (previous["hora_inicio"] or "99:99"):
-            shift_map[coop_id] = current
 
     return sorted(ids), shift_map
-
 
 def _rest_current_shift_coop_ids(rest: Restaurante) -> list[int]:
     return _rest_current_shift_data(rest)[0]
