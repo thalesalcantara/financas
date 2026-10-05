@@ -398,31 +398,7 @@ def rest_producoes_flow():
     denied = flow._deny("restaurante")
     if denied:
         return denied
-    rest = flow._rest_current()
-    expected = _rest_scale_rows(rest)
-    pending = [
-        row.producao
-        for row in expected
-        if row.producao and row.producao.status == "pendente" and row.producao.valor_total > 0
-    ]
-    recent = (
-        ProducaoCooperado.query.filter(
-            ProducaoCooperado.restaurante_id == rest.id,
-            ProducaoCooperado.status.in_(["aprovada", "recusada"]),
-        )
-        .order_by(ProducaoCooperado.decidido_em.desc(), ProducaoCooperado.id.desc())
-        .limit(50)
-        .all()
-    )
-    display_name = " ".join((rest.nome or "ESTABELECIMENTO").replace("_", " ").split())
-    return render_template(
-        "rest_producoes_pendentes.html",
-        restaurante=rest,
-        display_name=display_name,
-        pendentes=pending,
-        recentes=recent,
-        previstas=expected,
-    )
+    return redirect(url_for("portal_restaurante", view="producoes"))
 
 
 def _rest_scale_row_direct(rest, scale_id: int):
