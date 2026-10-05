@@ -7742,9 +7742,15 @@ def _extrair_dados_tabela_arquivo(tabela):
             "area", "areas", "bairro", "bairros", "valor", "valores", "taxa", "taxas",
             "entrega", "entregas", "garantido", "garantidos", "horario", "horarios",
             "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo",
-            "feriado", "administrativa", "observacao", "observacoes", "tabela"
+            "feriado", "administrativa", "observacao", "observacoes", "tabela",
+            "cnpj", "cpf", "motoqueiro", "base", "motoqueiro base", "horario base",
+            "valor base", "servico", "servicos", "compras", "transferencia", "lojas", "loja"
         )
-        return low in proibidos or low.startswith(("area ", "areas ", "faixa ", "grupo "))
+        return (
+            low in proibidos
+            or low.startswith(("area ", "areas ", "faixa ", "grupo ", "cnpj", "cpf", "motoqueiro base", "horario base", "valor base", "servico ", "transferencia "))
+            or bool(re.search(r"\b\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}\b", str(texto or "")))
+        )
 
     def _quebrar_bairros(texto):
         s = _normalizar_bairro_linha(texto)
@@ -7884,7 +7890,7 @@ def _extrair_dados_tabela_arquivo(tabela):
                             valor_area_atual = valor
                         continue
 
-                    if 0 < valor <= 500:
+                    if 0 < valor <= 500 and not _eh_cabecalho_ou_area(nome_bruto):
                         nomes = _quebrar_bairros(nome_bruto)
                         if nomes:
                             for nome_bairro in nomes:
