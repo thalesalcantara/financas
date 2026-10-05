@@ -11,7 +11,24 @@ import importlib
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-10-05-consolidacao-definitiva"
+BUILD_VERSION = "2026-10-05-performance-final"
+
+# Perfil otimizado para plano de 512 MB:
+# um único processo evita duplicar toda a aplicação em memória; as threads
+# compartilham o mesmo heap e mantêm concorrência para requisições web.
+worker_class = "gthread"
+workers = 1
+threads = 4
+timeout = 120
+graceful_timeout = 30
+keepalive = 15
+max_requests = 800
+max_requests_jitter = 80
+worker_tmp_dir = "/dev/shm"
+accesslog = None
+errorlog = "-"
+loglevel = "info"
+
 
 
 # Ordem preservada para não alterar regras de produção já em uso.
