@@ -563,14 +563,10 @@ def _coopex_fast_context():
             coop = legacy.request_cooperado()
             if coop:
                 today = datetime.now(TZ).date()
-                start = backend.upgrade._parse_date(request.args.get("data_inicio")) or today
-                end = backend.upgrade._parse_date(request.args.get("data_fim")) or start
-                if end < start:
-                    start, end = end, start
                 context.update(
-                    coopex_coop_timeline=_timeline_fast(coop, start, end),
-                    coopex_filter_start=start,
-                    coopex_filter_end=end,
+                    coopex_coop_timeline=_timeline_fast(coop, today, today),
+                    coopex_filter_start=today,
+                    coopex_filter_end=today,
                 )
     except Exception:
         app.logger.exception("Falha ao carregar contexto otimizado dos painéis")
