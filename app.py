@@ -7730,7 +7730,7 @@ def _extrair_dados_tabela_arquivo(tabela):
 
             # Padrão do HTML enviado: ["Alecrim","Natal",11]
             patt = re.compile(
-                r'\[\s*["\\']([^"\\']+)["\\']\s*,\s*["\\']([^"\\']*)["\\']\s*,\s*([0-9]+(?:[.,][0-9]+)?)\s*\]'
+                r"\[\s*[\"']([^\"']+)[\"']\s*,\s*[\"']([^\"']*)[\"']\s*,\s*([0-9]+(?:[.,][0-9]+)?)\s*\]"
             )
             seen = set()
             for bairro, cidade, valor_raw in patt.findall(txt):
