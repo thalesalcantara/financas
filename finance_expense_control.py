@@ -30,9 +30,6 @@ class DespesaCoopControleV16(db.Model):
     atualizado_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
-with app.app_context():
-    DespesaCoopControleV16.__table__.create(bind=db.engine, checkfirst=True)
-
 
 def _allowed(action: str) -> bool:
     if (session.get("user_tipo") or "").strip().lower() != "admin":
