@@ -37,7 +37,7 @@ jobs:
           env = Environment()
           templates = (
               'coop_producao.html','coop_producao_editar.html','coop_agenda.html','painel_cooperado.html',
-              '_coop_timeline.html','_rest_approvals_tabs.html','rest_producoes_pendentes.html',
+              '_coop_timeline.html','_rest_approvals_tabs.html','_rest_producoes_semana.html',
               'restaurante_dashboard.html','restaurantes_tabelas.html','admin_dashboard.html',
               'admin_avaliacoes.html','admin_tabelas.html','admin_documentos.html','admin_avisos.html',
               'admin_light_v8.html','editar_tabelas.html','editar_documentos.html',
