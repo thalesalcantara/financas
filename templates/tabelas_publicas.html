@@ -1,80 +1,176 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Tabelas por Estabelecimento</title>
-  <style>
-    :root{--bg:#eef3f9;--card:#fff;--text:#182335;--muted:#74839a;--border:#e2e8f0;--blue:#0b57e3;--blue2:#17315f}
-    *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
-    body{background:linear-gradient(180deg,#f8fbff 0,#eef3f9 100%)}
-    .app{max-width:430px;margin:0 auto;padding:12px 12px 28px}
-    .hero{background:linear-gradient(135deg,#0b57e3 0%,#153b83 52%,#06275d 100%);color:#fff;border-radius:24px;padding:18px 16px;box-shadow:0 18px 40px rgba(20,35,70,.20)}
-    .hero h1{margin:0;font-size:20px;font-weight:900}.hero p{margin:5px 0 0;font-size:12px;opacity:.84}
-    .section{margin-top:12px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:12px;box-shadow:0 7px 22px rgba(20,40,70,.06)}
-    label{display:block;font-size:11px;color:var(--muted);font-weight:900;text-transform:uppercase;margin-bottom:6px}
-    select{width:100%;height:46px;border:1px solid var(--border);border-radius:14px;background:#fff;padding:0 12px;font-weight:800;color:var(--text)}
-    .guarantees{display:none;margin-top:12px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:12px;box-shadow:0 7px 22px rgba(20,40,70,.06)}
-    .guarantees.show{display:block}.g-title{font-size:12px;font-weight:900;margin-bottom:8px}.g-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-    .g-card{background:linear-gradient(180deg,#eef5ff,#fbfdff);border:1px solid #d7e8ff;border-radius:16px;padding:11px}.g-card .d{font-size:10px;color:var(--muted);font-weight:800}.g-card .h{font-size:13px;font-weight:900;margin-top:4px}.g-card .v{font-size:20px;font-weight:950;color:var(--blue);margin-top:5px}
-    .viewer{margin-top:12px;border:1px solid var(--border);border-radius:20px;overflow:hidden;background:#fff;min-height:540px}
-    iframe{display:block;width:100%;height:72vh;min-height:540px;border:0;background:#fff}
-    .empty{padding:40px 20px;text-align:center;color:var(--muted);font-size:13px}
-    .back{display:inline-flex;margin-top:10px;color:#fff;text-decoration:none;font-size:12px;font-weight:800}
-    @media(min-width:760px){.app{max-width:760px}.viewer{min-height:650px}iframe{min-height:650px;height:76vh}}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Taxas por Bairro</title>
+<style>
+:root{--bg:#eef3f9;--card:#fff;--text:#182335;--muted:#74839a;--border:#e2e8f0;--blue:#0b57e3;--dark:#101828}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+button,input,select{font:inherit}
+body{background:linear-gradient(180deg,#f8fbff 0,#eef3f9 100%)}
+.app{max-width:430px;margin:0 auto;padding:12px 12px 96px}
+.hero{background:linear-gradient(135deg,#0757d9 0%,#103c8d 48%,#06275d 100%);color:#fff;border-radius:24px;padding:17px 16px;box-shadow:0 18px 40px rgba(20,35,70,.20)}
+.hero h1{margin:0;font-size:20px;font-weight:900}.hero p{margin:5px 0 0;font-size:12px;opacity:.82}
+.back{display:inline-flex;margin-top:9px;color:#fff;text-decoration:none;font-size:11px;font-weight:900}
+.section{margin-top:12px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:12px;box-shadow:0 7px 22px rgba(20,40,70,.06)}
+.select-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+select,.clear{height:44px;border:1px solid var(--border);border-radius:14px;background:#fff;padding:0 12px;font-weight:800}
+.clear{background:#fff4f4;color:#bd2b2b;border-color:#ffd1d1;cursor:pointer}
+.mode{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;background:#edf1f7;padding:4px;border-radius:15px}
+.mode button{border:0;background:transparent;min-height:38px;border-radius:12px;font-weight:900;color:#677386;cursor:pointer}
+.mode button.active{background:#fff;color:var(--blue);box-shadow:0 2px 8px rgba(20,40,75,.08)}
+.search-wrap{position:relative;margin-top:10px}.search-wrap span{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#7a879a}
+.search-wrap input{width:100%;height:44px;border:1px solid var(--border);border-radius:14px;padding:0 12px 0 40px;font-size:15px;outline:none;background:#fbfcfe}
+.last{margin-top:10px;background:#f8fbff;border:1px solid var(--border);border-radius:16px;padding:11px}
+.last .label{font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:900;letter-spacing:.05em}.last .name{margin-top:5px;font-size:16px;font-weight:900}.last .price{font-size:27px;font-weight:950;margin-top:6px}.last .meta{font-size:10px;color:var(--muted);margin-top:3px}
+.guarantees{display:none}.guarantees.show{display:block}.g-title{font-size:13px;font-weight:900;margin-bottom:8px}.g-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.g-card{background:linear-gradient(180deg,#eef5ff,#fbfdff);border:1px solid #d7e8ff;border-radius:16px;padding:11px}.g-card .d{font-size:10px;color:var(--muted);font-weight:900}.g-card .h{font-size:12px;font-weight:900;margin-top:3px}.g-card .v{font-size:21px;font-weight:950;color:var(--blue);margin-top:5px}
+.info{display:none}.info.show{display:block}.info div{font-size:11px;line-height:1.45;padding:6px 0;border-bottom:1px solid #eef1f5}.info div:last-child{border-bottom:0}
+.headline{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}.headline strong{font-size:14px}.headline span{font-size:11px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.card{min-height:92px;border:1px solid var(--border);border-radius:18px;padding:12px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;position:relative;box-shadow:0 6px 16px rgba(20,40,70,.05)}
+.card:active{transform:scale(.985)}.card .name{font-size:13px;font-weight:900;line-height:1.2}.card .price{font-size:20px;font-weight:950;margin-top:9px}.card .meta{font-size:10px;color:#617086;margin-top:4px}.card .city{font-size:9px;color:#7b879a;margin-top:2px}.card .pill{position:absolute;right:9px;top:9px;min-width:24px;height:24px;border-radius:999px;padding:0 7px;background:rgba(17,24,39,.09);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900}
+.c0{background:linear-gradient(180deg,#eff6ff,#fbfdff);border-color:#d7e8ff}.c1{background:linear-gradient(180deg,#f0faf2,#fbfdfb);border-color:#d5edd9}.c2{background:linear-gradient(180deg,#fff8e8,#fffdf8);border-color:#f4e0b6}.c3{background:linear-gradient(180deg,#fff1fa,#fffafd);border-color:#f1d1e7}.c4{background:linear-gradient(180deg,#f5f1ff,#fbfaff);border-color:#dfd6ff}.c5{background:linear-gradient(180deg,#fff1ef,#fffafa);border-color:#ffd8d2}
+.drawer{position:fixed;left:0;right:0;bottom:0;max-width:430px;margin:0 auto;padding:0 10px 10px;z-index:30}
+.total-btn{width:100%;border:0;background:#111827;color:#fff;border-radius:18px;padding:12px 14px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;box-shadow:0 18px 36px rgba(17,24,39,.28);cursor:pointer}
+.total-btn span{display:block;font-size:10px;opacity:.72}.total-btn strong{display:block;font-size:22px;margin-top:2px}.total-btn .r{text-align:right}.total-btn .r b{display:block;font-size:13px}.total-btn .r small{font-size:10px;opacity:.72}
+.summary{margin-top:8px;background:#fff;border:1px solid var(--border);border-radius:20px;box-shadow:0 18px 40px rgba(18,35,65,.14);max-height:0;overflow:hidden;transition:max-height .22s ease}.summary.open{max-height:360px}.summary-head{padding:12px 14px;border-bottom:1px solid #edf1f6;font-weight:900;font-size:14px}.summary-list{max-height:295px;overflow:auto;padding:0 14px 10px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:11px 0;border-bottom:1px solid #eef1f5}.row:last-child{border-bottom:0}.row .n{font-size:12px;font-weight:900}.row .m{font-size:10px;color:var(--muted);margin-top:3px}.qty{display:flex;align-items:center;gap:4px}.qty button{width:30px;height:30px;border:1px solid var(--border);background:#fff;border-radius:10px;font-weight:900}.qty b{min-width:22px;text-align:center;font-size:12px}
+.empty{grid-column:1/-1;padding:16px;border:1px dashed var(--border);border-radius:16px;text-align:center;color:var(--muted);font-size:12px}.loading{opacity:.7}
+@media(min-width:760px){.app{max-width:760px}.drawer{max-width:760px}.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+</style>
 </head>
 <body>
 <div class="app">
   <section class="hero">
     <h1>Taxas por Bairro</h1>
-    <p>Selecione o estabelecimento para consultar a tabela de entregas.</p>
+    <p>Consulte os valores e calcule quantas entregas quiser.</p>
     <a class="back" href="{{ back_href or url_for('portal_cooperado') }}">← Voltar</a>
   </section>
 
   <section class="section">
-    <label for="tableSelect">Estabelecimento</label>
-    <select id="tableSelect">
-      <option value="">Selecione um estabelecimento</option>
-      {% for t in tabelas %}
-      <option value="{{ url_for('tabela_abrir', tab_id=t.id) }}" data-table-id="{{ t.id }}">{{ t.titulo }}</option>
-      {% endfor %}
-    </select>
+    <div class="select-row">
+      <select id="contract">
+        <option value="">Selecione o estabelecimento</option>
+        {% for t in tabelas %}<option value="{{ t.id }}">{{ t.titulo }}</option>{% endfor %}
+      </select>
+      <button class="clear" id="clearBtn">Zerar</button>
+    </div>
+
+    <div class="mode">
+      <button id="consultBtn" class="active">Consultar</button>
+      <button id="calcBtn">Calcular</button>
+    </div>
+
+    <div class="search-wrap">
+      <span>⌕</span><input id="search" placeholder="Buscar bairro">
+    </div>
+
+    <div class="last">
+      <div class="label">Última consulta</div>
+      <div class="name" id="consultName">Selecione um estabelecimento</div>
+      <div class="price" id="consultPrice">—</div>
+      <div class="meta" id="consultMeta">Depois toque em um bairro.</div>
+    </div>
   </section>
 
-  <section class="guarantees" id="guarantees">
-    <div class="g-title">Garantidos deste estabelecimento</div>
-    <div class="g-grid" id="guaranteeGrid"></div>
-  </section>
+  <section class="section guarantees" id="guarantees"><div class="g-title">Garantidos</div><div class="g-grid" id="gGrid"></div></section>
+  <section class="section info" id="infoBox"><div class="g-title">Informações da tabela</div><div id="infoList"></div></section>
 
-  <div class="viewer" id="viewer">
-    <div class="empty" id="emptyState">Selecione um estabelecimento para abrir a tabela.</div>
-    <iframe id="frame" hidden title="Tabela de taxas"></iframe>
-  </div>
+  <section class="section">
+    <div class="headline"><strong>Bairros</strong><span id="countLabel">0 bairros</span></div>
+    <div id="grid" class="grid"><div class="empty">Selecione um estabelecimento.</div></div>
+  </section>
 </div>
+
+<div class="drawer">
+  <button class="total-btn" id="summaryToggle"><div><span>Total</span><strong id="totalValue">R$ 0,00</strong></div><div class="r"><b id="totalQty">0</b><small>entregas</small></div></button>
+  <div class="summary" id="summaryPanel"><div class="summary-head">Resumo do cálculo</div><div class="summary-list" id="summaryList"><div class="empty">Nenhuma entrega adicionada.</div></div></div>
+</div>
+
 <script>
-const sel=document.getElementById('tableSelect');
-const frame=document.getElementById('frame');
-const empty=document.getElementById('emptyState');
-const guarantees=document.getElementById('guarantees');
-const guaranteeGrid=document.getElementById('guaranteeGrid');
-const guaranteeData={{ garantidos_map|tojson }};
-const optionIds=[...sel.options].map(o=>o.dataset.tableId||"");
+let contract="";
+let mode="consult";
+let counts={};
+let data=[];
 const money=v=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(v||0));
-sel.addEventListener('change',()=>{
-  const url=sel.value;
-  const tableId=sel.options[sel.selectedIndex]?.dataset.tableId||"";
-  const gs=guaranteeData[tableId]||guaranteeData[Number(tableId)]||[];
-  if(gs.length){
-    guaranteeGrid.innerHTML=gs.map(g=>'<div class="g-card"><div class="d">'+(g.descricao||'Garantido')+'</div><div class="h">'+g.horario+'</div><div class="v">'+money(g.valor)+'</div></div>').join('');
-    guarantees.classList.add('show');
-  }else{
-    guaranteeGrid.innerHTML='';
-    guarantees.classList.remove('show');
+const key=(name,city)=>name+"||"+city;
+
+function colorClass(v){return "c"+(Math.abs(Math.round(Number(v||0)))%6)}
+function sortedData(){return [...data].sort((a,b)=>(a.bairro||"").localeCompare(b.bairro||"","pt-BR"))}
+
+function renderGrid(){
+  const q=document.getElementById("search").value.trim().toLocaleLowerCase("pt-BR");
+  const rows=sortedData().filter(x=>!q||(x.bairro||"").toLocaleLowerCase("pt-BR").includes(q));
+  countLabel.textContent=`${rows.length} bairros`;
+  if(!rows.length){grid.innerHTML='<div class="empty">Nenhum bairro encontrado.</div>';return}
+  grid.innerHTML=rows.map(x=>{
+    const qty=counts[key(x.bairro,x.cidade||"")]||0;
+    const meta=mode==="calc"?(qty?`${qty} entrega${qty>1?"s":""}`:"Toque para somar"):"Toque para consultar";
+    return `<button class="card ${colorClass(x.valor)}" data-name="${x.bairro.replace(/"/g,'&quot;')}" data-city="${(x.cidade||"").replace(/"/g,'&quot;')}" data-price="${x.valor}">
+      ${qty?`<div class="pill">${qty}</div>`:""}
+      <div><div class="name">${x.bairro}</div><div class="city">${x.cidade||""}</div></div>
+      <div><div class="price">${money(x.valor)}</div><div class="meta">${meta}</div></div>
+    </button>`;
+  }).join("");
+
+  grid.querySelectorAll(".card").forEach(btn=>btn.addEventListener("click",()=>{
+    const name=btn.dataset.name, city=btn.dataset.city, price=Number(btn.dataset.price);
+    consultName.textContent=name; consultPrice.textContent=money(price); consultMeta.textContent=city||"";
+    if(mode==="calc"){const k=key(name,city);counts[k]=(counts[k]||0)+1;renderGrid();renderSummary()}
+  }));
+}
+
+function renderSummary(){
+  const rows=[];
+  for(const [k,qty] of Object.entries(counts)){
+    if(qty<=0)continue;
+    const [name,city]=k.split("||");
+    const item=data.find(x=>x.bairro===name&&(x.cidade||"")===city);
+    if(item)rows.push({name,city,price:Number(item.valor||0),qty});
   }
-  if(!url){frame.hidden=true;frame.src='';empty.hidden=false;return}
-  empty.hidden=true;frame.hidden=false;frame.src=url;
-});
+  rows.sort((a,b)=>a.name.localeCompare(b.name,"pt-BR"));
+  totalQty.textContent=rows.reduce((s,r)=>s+r.qty,0);
+  totalValue.textContent=money(rows.reduce((s,r)=>s+r.qty*r.price,0));
+  if(!rows.length){summaryList.innerHTML='<div class="empty">Nenhuma entrega adicionada.</div>';return}
+  summaryList.innerHTML=rows.map(r=>`<div class="row"><div><div class="n">${r.name}</div><div class="m">${r.city?r.city+" • ":""}${money(r.price)} × ${r.qty} = <b>${money(r.price*r.qty)}</b></div></div><div class="qty"><button data-act="minus" data-name="${r.name}" data-city="${r.city}">−</button><b>${r.qty}</b><button data-act="plus" data-name="${r.name}" data-city="${r.city}">+</button></div></div>`).join("");
+  summaryList.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{const k=key(b.dataset.name,b.dataset.city);counts[k]=Math.max(0,(counts[k]||0)+(b.dataset.act==="plus"?1:-1));renderSummary();renderGrid()}));
+}
+
+async function loadContract(id){
+  contract=id; counts={}; data=[]; renderSummary();
+  guarantees.classList.remove("show"); infoBox.classList.remove("show");
+  grid.innerHTML='<div class="empty loading">Lendo a tabela…</div>';
+  if(!id){countLabel.textContent="0 bairros";grid.innerHTML='<div class="empty">Selecione um estabelecimento.</div>';return}
+  try{
+    const r=await fetch(`/tabelas/${id}/dados`,{credentials:"same-origin",cache:"no-store"});
+    const j=await r.json();
+    if(!r.ok||!j.ok)throw new Error(j.erro||"Falha ao ler tabela");
+    data=j.bairros||[];
+    consultName.textContent=j.titulo||"Tabela";
+    consultPrice.textContent="—";
+    consultMeta.textContent=j.descricao||j.arquivo_nome||"Toque em um bairro.";
+
+    const gs=j.garantidos||[];
+    if(gs.length){gGrid.innerHTML=gs.map(g=>`<div class="g-card"><div class="d">${g.descricao||"Garantido"}</div><div class="h">${g.horario||""}</div><div class="v">${money(g.valor)}</div></div>`).join("");guarantees.classList.add("show")}
+
+    const infos=j.informacoes||[];
+    if(infos.length){infoList.innerHTML=infos.map(x=>`<div>${x}</div>`).join("");infoBox.classList.add("show")}
+
+    if(j.erro&&!data.length){grid.innerHTML=`<div class="empty">${j.erro}</div>`;countLabel.textContent="0 bairros";return}
+    renderGrid();
+  }catch(e){grid.innerHTML=`<div class="empty">Não foi possível ler esta tabela: ${e.message}</div>`;countLabel.textContent="0 bairros"}
+}
+
+consultBtn.onclick=()=>{mode="consult";consultBtn.classList.add("active");calcBtn.classList.remove("active");renderGrid()}
+calcBtn.onclick=()=>{mode="calc";calcBtn.classList.add("active");consultBtn.classList.remove("active");renderGrid()}
+clearBtn.onclick=()=>{counts={};renderGrid();renderSummary()}
+search.oninput=renderGrid;
+contract.onchange=e=>loadContract(e.target.value);
+summaryToggle.onclick=()=>summaryPanel.classList.toggle("open");
+renderSummary();
 </script>
 </body>
 </html>
