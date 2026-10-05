@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from flask import flash, jsonify, redirect, request, session, url_for
 from sqlalchemy import text as sa_text
 
-import production_shift_time_fix as shifts
+import production_shift_time as shifts
 
 app = shifts.patch.app
 db = shifts.patch.db
