@@ -100,6 +100,20 @@ def portal_restaurante():
         semana_inicio = ref - timedelta(days=ref.weekday())
         dias_list = [semana_inicio + timedelta(days=i) for i in range(7)]
 
+    # Nomes de cooperados desativados/excluídos também são bloqueados quando
+    # existirem em linhas antigas de escala sem cooperado_id.
+    _inactive_name_rows = (
+        db.session.query(Cooperado.nome)
+        .join(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(Usuario.ativo.is_(False))
+        .all()
+    )
+    _inactive_coop_names = {
+        _norm(nome)
+        for (nome,) in _inactive_name_rows
+        if (nome or "").strip()
+    }
+
     # Escalas do estabelecimento: vínculo por ID + compatibilidade somente
     # para linhas legadas sem restaurante_id. Evita varrer toda a tabela.
     direct_scales = (
@@ -170,6 +184,17 @@ def portal_restaurante():
             coop = coops_escala_map.get(e.cooperado_id) if e.cooperado_id else None
 
             nome_fallback = (e.cooperado_nome or "").strip()
+
+            # Se a linha antiga não tem ID, não deixa reaparecer no painel do
+            # estabelecimento um nome pertencente a cooperado inativo/excluído.
+            if not coop and nome_fallback and _norm(nome_fallback) in _inactive_coop_names:
+                continue
+
+            # Se existe cooperado_id mas ele não foi encontrado no mapa de ativos,
+            # trata como inativo/excluído e não exibe operacionalmente.
+            if e.cooperado_id and not coop:
+                continue
+
             nome_show = (coop.nome if coop else nome_fallback) or "—"
             contrato_eff = (eff_map.get(e.id, e.contrato or "") or "").strip()
 
