@@ -9,7 +9,7 @@ from flask import abort, flash, redirect, render_template, request, send_file, s
 from sqlalchemy import and_, case, func, or_
 
 import app as legacy
-import operational_rules_v5 as operational
+import operational_rules as operational
 
 app = legacy.app
 db = legacy.db
