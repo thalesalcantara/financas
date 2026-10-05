@@ -374,3 +374,54 @@ body{margin:0!important}
   .kpi-value{font-size:1.06rem!important}
   .tab-btn span{font-size:.62rem!important}
 }
+
+
+/* Ocupa toda a largura real do celular */
+@media(max-width:768px){
+  html,body{
+    width:100%!important;
+    max-width:none!important;
+    margin:0!important;
+    padding:0!important;
+  }
+
+  .mobile-wrap{
+    width:100vw!important;
+    max-width:none!important;
+    margin:0!important;
+    border-radius:0!important;
+  }
+
+  .tab-shell{
+    width:100vw!important;
+    max-width:none!important;
+    left:0!important;
+    transform:none!important;
+  }
+
+  .topbar,
+  .app-topbar{
+    width:100%!important;
+    max-width:none!important;
+  }
+
+  .surface,
+  .tab-panel-wrap,
+  .flash-stack{
+    width:100%!important;
+    max-width:none!important;
+    padding-left:6px!important;
+    padding-right:6px!important;
+  }
+
+  .surface-card,
+  .section-card{
+    width:100%!important;
+    max-width:none!important;
+  }
+
+  .tabs-rail{
+    width:100%!important;
+    max-width:none!important;
+  }
+}
