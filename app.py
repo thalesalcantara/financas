@@ -21,11 +21,11 @@ mimetypes.add_type("application/vnd.ms-powerpoint", ".ppt")
 
 # ============ Terceiros ============
 from flask import (
-from flask_compress import Compress
     Flask, render_template, request, redirect, url_for, session,
     flash, send_file, abort, jsonify, current_app, render_template_string,
     g, has_request_context
 )
+from flask_compress import Compress
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
