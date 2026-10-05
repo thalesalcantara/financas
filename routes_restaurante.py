@@ -637,13 +637,13 @@ def portal_restaurante():
             launches_by_day.setdefault((lanc.cooperado_id, lanc.data), []).append(lanc)
 
         week_productions = (
-            production_backend.ProducaoCooperado.query
+            production_backend.production_backend.ProducaoCooperado.query
             .filter(
-                ProducaoCooperado.restaurante_id == rest.id,
-                ProducaoCooperado.data >= week_start,
-                ProducaoCooperado.data <= week_end,
+                production_backend.ProducaoCooperado.restaurante_id == rest.id,
+                production_backend.ProducaoCooperado.data >= week_start,
+                production_backend.ProducaoCooperado.data <= week_end,
             )
-            .order_by(ProducaoCooperado.id.desc())
+            .order_by(production_backend.ProducaoCooperado.id.desc())
             .all()
         )
         prod_by_scale = {p.escala_id: p for p in week_productions if p.escala_id}
@@ -736,12 +736,12 @@ def portal_restaurante():
         )
 
         producoes_semana_recentes = (
-            production_backend.ProducaoCooperado.query
+            production_backend.production_backend.ProducaoCooperado.query
             .filter(
-                ProducaoCooperado.restaurante_id == rest.id,
-                ProducaoCooperado.status.in_(["aprovada", "recusada"]),
+                production_backend.ProducaoCooperado.restaurante_id == rest.id,
+                production_backend.ProducaoCooperado.status.in_(["aprovada", "recusada"]),
             )
-            .order_by(ProducaoCooperado.decidido_em.desc(), ProducaoCooperado.id.desc())
+            .order_by(production_backend.ProducaoCooperado.decidido_em.desc(), production_backend.ProducaoCooperado.id.desc())
             .limit(30)
             .all()
         )
