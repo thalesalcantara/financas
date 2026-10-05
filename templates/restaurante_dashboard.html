@@ -2109,7 +2109,7 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
           </div>
         </div>
         <div id="blocoTabelas" class="rest-bottom-history">
-          {% for coop in _cooperados %}
+          {% for coop in _cooperados if coop.lancamentos %}
             {% set coop_entregas = coop.lancamentos|map(attribute='qtd_entregas')|select('number')|sum %}
             {% set coop_valor = coop.lancamentos|map(attribute='valor')|select('number')|sum %}
             <div id="tabela-{{ coop.id }}" class="lancamentos-table rest-selected-history" style="display:none;">
