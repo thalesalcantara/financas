@@ -1,125 +1,125 @@
-<div class="hero-panel">
-  <div class="hero-title d-flex align-items-center gap-2">
-    <i class="bi bi-clipboard-check"></i>
-    <span>Produções da Semana</span>
-  </div>
-  <p class="hero-subtitle mb-0">Confira, ajuste, aprove ou lance as produções previstas para esta semana.</p>
-</div>
+<style>
+  .week-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 8px;padding:10px 12px;background:#fff;border:1px solid var(--border);border-radius:11px;box-shadow:0 2px 8px rgba(15,38,85,.04)}
+  .week-head-main{min-width:0}.week-head-title{display:flex;align-items:center;gap:7px;font-size:1rem;font-weight:850;color:#0b2f77}.week-head-sub{margin-top:1px;font-size:.76rem;color:var(--muted)}
+  .week-tools{display:flex;align-items:center;gap:6px;flex:0 0 auto}.week-tools .btn{min-height:31px;padding:.28rem .58rem!important;font-size:.76rem!important}
+  .week-rule{margin:0 0 8px;padding:7px 10px;border:1px solid #cbdcff;border-radius:9px;background:#f4f8ff;color:#244a91;font-size:.74rem;line-height:1.3}
+  .week-bulk{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px;padding:7px 10px;background:#fff;border:1px solid var(--border);border-radius:9px;font-size:.78rem}
+  .week-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .week-card{min-width:0;background:#fff;border:1px solid var(--border);border-left:4px solid #d93646;border-radius:11px;padding:10px;box-shadow:0 2px 9px rgba(15,38,85,.04)}
+  .week-card.green{border-left-color:#16924d}.week-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .week-name{font-weight:900;font-size:.86rem;line-height:1.15;color:#101a31}.week-meta{margin-top:3px;color:var(--muted);font-size:.69rem;line-height:1.25}
+  .week-status{flex:0 0 auto;max-width:145px;padding:4px 7px;border-radius:999px;background:#ffeaed;color:#a61f32;font-size:.62rem;font-weight:900;line-height:1.15;text-align:center}
+  .week-card.green .week-status{background:#e5f7ec;color:#126c39}
+  .week-value{display:flex;align-items:baseline;gap:7px;margin-top:7px}.week-value strong{font-size:1.02rem;line-height:1}.week-value span{font-size:.68rem;color:var(--muted)}
+  .week-action{margin-top:8px;padding-top:8px;border-top:1px solid #edf0f5}
+  .week-action-title{margin-bottom:5px;font-size:.68rem;font-weight:850;color:#2453ad}
+  .week-fields{display:grid;grid-template-columns:1fr 1fr;gap:6px}.week-field label{display:block;margin-bottom:2px!important;font-size:.64rem!important;font-weight:850;color:#52627d}
+  .week-field input{width:100%;height:34px!important;min-height:34px!important;border:1px solid var(--border);border-radius:7px!important;padding:0 8px;font-size:.82rem!important;background:#fff}
+  .week-primary{width:100%;height:34px;margin-top:6px;border:0;border-radius:7px;background:#064fc8;color:#fff;font-size:.76rem;font-weight:900}
+  .week-reject{display:grid;grid-template-columns:1fr auto;gap:5px;margin-top:5px}.week-reject input{height:32px!important;min-height:32px!important;border-radius:7px!important;font-size:.74rem!important}.week-reject button{height:32px;padding:0 9px;border:1px solid #ef4444;border-radius:7px;background:#fff;color:#c62828;font-size:.7rem;font-weight:850}
+  .week-note{margin-top:8px;padding:6px 8px;border-radius:7px;font-size:.69rem;font-weight:750;background:#eef9f2;color:#17683b}.week-note.muted{background:#f3f4f6;color:#6b7280}
+  .week-history{margin-top:8px;background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden}.week-history-head{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--border);font-size:.8rem;font-weight:850}.week-history-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:6px 10px;border-top:1px solid #eef1f5;font-size:.73rem}.week-history-row:first-of-type{border-top:0}.week-history-row small{display:block;color:var(--muted);font-size:.65rem}
+  @media(max-width:1250px){.week-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:760px){.week-head{align-items:flex-start;flex-direction:column}.week-tools{width:100%}.week-tools .btn{width:100%}.week-grid{grid-template-columns:1fr}.week-fields{grid-template-columns:1fr 1fr}.week-status{max-width:125px}}
+  @media(max-width:420px){.week-fields{grid-template-columns:1fr}.week-reject{grid-template-columns:1fr}.week-reject button{width:100%}}
+</style>
 
 {% set _previstas_semana = producoes_semana_previstas|default([]) %}
 {% set _pendentes_semana = producoes_semana_pendentes|default([]) %}
 {% set _recentes_semana = producoes_semana_recentes|default([]) %}
 
-<div class="card card-body mb-3">
-  <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
-    <div>
-      <div class="fw-bold text-primary"><i class="bi bi-info-circle-fill me-1"></i> Produção semanal</div>
-      <div class="small text-muted">O estabelecimento pode lançar a produção diretamente. Produções enviadas pelo cooperado podem ser conferidas e ajustadas antes da aprovação.</div>
-    </div>
-    <button id="soundProducoesSemana" class="btn btn-outline-royal btn-sm" type="button">
-      <i class="bi bi-volume-up"></i> Ativar alerta
-    </button>
+<div class="week-head">
+  <div class="week-head-main">
+    <div class="week-head-title"><i class="bi bi-calendar2-check"></i><span>Produções previstas da semana</span></div>
+    <div class="week-head-sub">Confira, ajuste, aprove ou lance sem ocupar a tela com cartões exagerados.</div>
+  </div>
+  <div class="week-tools">
+    <button id="soundProducoesSemana" class="btn btn-outline-royal" type="button"><i class="bi bi-volume-up"></i> Ativar alerta</button>
   </div>
 </div>
+
+<div class="week-rule"><strong>Regra:</strong> o estabelecimento pode lançar em qualquer horário. O cooperado só consegue lançar depois que o horário da escala terminar. Quando o cooperado envia, o estabelecimento pode manter, aumentar ou reduzir a quantidade e o valor antes de aprovar.</div>
 
 <form id="bulkProducoesSemana" method="post" action="/rest/producoes/aprovar-selecionadas"></form>
 
 {% if _pendentes_semana %}
-<div class="card card-body mb-3">
-  <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
-    <strong>{{ _pendentes_semana|length }} produção(ões) aguardando conferência</strong>
-    <button class="btn btn-royal btn-sm" form="bulkProducoesSemana">
-      <i class="bi bi-check2-all"></i> Aprovar selecionadas
-    </button>
-  </div>
+<div class="week-bulk">
+  <strong>{{ _pendentes_semana|length }} produção(ões) aguardando conferência</strong>
+  <button class="btn btn-royal btn-sm" form="bulkProducoesSemana"><i class="bi bi-check2-all"></i> Aprovar selecionadas</button>
 </div>
 {% endif %}
 
-<div class="row g-3">
-  {% for x in _previstas_semana %}
-  <div class="col-xl-6">
-    <div class="card h-100 p-3 {% if x.color=='green' %}border-success{% else %}border-danger{% endif %}" id="escala-{{ x.escala.id }}">
-      <div class="d-flex justify-content-between align-items-start gap-2">
-        <div>
-          <div class="fw-bold">
-            {% if x.producao and x.producao.status=='pendente' %}
-              <input form="bulkProducoesSemana" type="checkbox" name="ids" value="{{ x.producao.id }}" class="form-check-input me-1">
-            {% endif %}
-            {{ x.cooperado.nome if x.cooperado else (x.escala.cooperado_nome or 'Cooperado não vinculado') }}
-          </div>
-          <div class="small text-muted">
-            {{ x.data.strftime('%d/%m/%Y') if x.data else (x.escala.data or 'Sem data') }}
-            {% if x.escala.turno %} · {{ x.escala.turno }}{% endif %}
-            {% if x.escala.horario %} · {{ x.escala.horario }}{% endif %}
-          </div>
+<div class="week-grid">
+{% for x in _previstas_semana %}
+  <article class="week-card {% if x.color=='green' %}green{% endif %}" id="escala-{{ x.escala.id }}">
+    <div class="week-card-top">
+      <div class="min-w-0">
+        <div class="week-name">
+          {% if x.producao and x.producao.status=='pendente' %}
+            <input form="bulkProducoesSemana" type="checkbox" name="ids" value="{{ x.producao.id }}" class="form-check-input me-1">
+          {% endif %}
+          {{ x.cooperado.nome if x.cooperado else (x.escala.cooperado_nome or 'Cooperado não vinculado') }}
         </div>
-        <span class="badge {% if x.color=='green' %}text-bg-success{% else %}text-bg-danger{% endif %}">{{ x.status_label }}</span>
+        <div class="week-meta">
+          {{ x.data.strftime('%d/%m/%Y') if x.data else (x.escala.data or 'Sem data') }}
+          {% if x.escala.turno %} · {{ x.escala.turno }}{% endif %}
+          {% if x.escala.horario %} · {{ x.escala.horario }}{% endif %}
+        </div>
       </div>
-
-      <div class="fs-4 fw-bold mt-3">R$ {{ '%.2f'|format(x.valor_total or 0)|replace('.', ',') }}</div>
-      {% if x.producao and x.producao.qtd_entregas %}
-        <div class="small text-muted">{{ x.producao.qtd_entregas }} entrega(s)</div>
-      {% endif %}
-
-      {% if x.producao and x.producao.status=='pendente' and x.producao.valor_total > 0 %}
-      <div class="bg-light border rounded-3 p-3 mt-3">
-        <div class="small fw-bold text-primary mb-2">Proposta do cooperado — ajuste antes de aprovar</div>
-        <form method="post" action="/rest/producoes/{{ x.producao.id }}/aprovar">
-          <div class="row g-2">
-            <div class="col-md-6">
-              <label class="form-label">Quantidade final</label>
-              <input class="form-control" type="number" min="1" name="qtd_entregas" value="{{ x.producao.qtd_entregas }}" required>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Valor total final</label>
-              <input class="form-control" type="number" min="0.01" step="0.01" name="valor_total" value="{{ '%.2f'|format(x.producao.valor_total) }}" required>
-            </div>
-          </div>
-          <button class="btn btn-royal w-100 mt-2"><i class="bi bi-check-circle-fill"></i> Aprovar valor final</button>
-        </form>
-        <form method="post" action="/rest/producoes/{{ x.producao.id }}/recusar" class="d-flex gap-2 mt-2">
-          <input class="form-control" name="motivo" placeholder="Motivo da recusa" required>
-          <button class="btn btn-outline-danger">Recusar</button>
-        </form>
-      </div>
-      {% elif x.pode_lancar %}
-      <div class="bg-light border rounded-3 p-3 mt-3">
-        <div class="small fw-bold text-primary mb-2">Lançar produção desta escala</div>
-        <form method="post" action="/rest/producoes/escala/{{ x.escala.id }}/lancar" class="js-week-production-form">
-          <div class="row g-2">
-            <div class="col-md-6">
-              <label class="form-label">Quantidade de entregas</label>
-              <input class="form-control" type="number" min="1" name="qtd_entregas" required>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Valor total</label>
-              <input class="form-control" type="number" min="0.01" step="0.01" name="valor_total" required>
-            </div>
-          </div>
-          <button class="btn btn-royal w-100 mt-2"><i class="bi bi-plus-circle-fill"></i> Lançar produção</button>
-        </form>
-      </div>
-      {% elif x.color=='green' %}
-      <div class="alert alert-success py-2 mt-3 mb-0"><i class="bi bi-check-circle-fill"></i> Produção registrada. Duplicidade bloqueada.</div>
-      {% elif not x.cooperado %}
-      <div class="alert alert-secondary py-2 mt-3 mb-0">A escala ainda não está vinculada a um cooperado válido.</div>
-      {% endif %}
+      <span class="week-status">{{ x.status_label }}</span>
     </div>
-  </div>
-  {% else %}
-  <div class="col-12"><div class="card card-body text-center text-muted">Nenhuma escala desta semana foi encontrada para este estabelecimento.</div></div>
-  {% endfor %}
+
+    <div class="week-value">
+      <strong>R$ {{ '%.2f'|format(x.valor_total or 0)|replace('.', ',') }}</strong>
+      {% if x.producao and x.producao.qtd_entregas %}<span>{{ x.producao.qtd_entregas }} entrega(s)</span>{% endif %}
+    </div>
+
+    {% if x.producao and x.producao.status=='pendente' and x.producao.valor_total > 0 %}
+    <div class="week-action">
+      <div class="week-action-title">Proposta do cooperado — ajuste antes de aprovar</div>
+      <form method="post" action="/rest/producoes/{{ x.producao.id }}/aprovar">
+        <div class="week-fields">
+          <div class="week-field"><label>Quantidade final</label><input type="number" min="1" name="qtd_entregas" value="{{ x.producao.qtd_entregas }}" required></div>
+          <div class="week-field"><label>Valor total final</label><input type="number" min="0.01" step="0.01" name="valor_total" value="{{ '%.2f'|format(x.producao.valor_total) }}" required></div>
+        </div>
+        <button class="week-primary" type="submit"><i class="bi bi-check-circle-fill"></i> Aprovar valor final</button>
+      </form>
+      <form method="post" action="/rest/producoes/{{ x.producao.id }}/recusar" class="week-reject">
+        <input class="form-control" name="motivo" placeholder="Motivo da recusa" required>
+        <button type="submit">Recusar</button>
+      </form>
+    </div>
+    {% elif x.pode_lancar %}
+    <div class="week-action">
+      <div class="week-action-title">O estabelecimento pode lançar esta produção agora</div>
+      <form method="post" action="/rest/producoes/escala/{{ x.escala.id }}/lancar" class="js-week-production-form">
+        <div class="week-fields">
+          <div class="week-field"><label>Quantidade de entregas</label><input type="number" min="1" name="qtd_entregas" required></div>
+          <div class="week-field"><label>Valor total</label><input type="number" min="0.01" step="0.01" name="valor_total" required></div>
+        </div>
+        <button class="week-primary" type="submit"><i class="bi bi-plus-circle-fill"></i> Lançar produção</button>
+      </form>
+    </div>
+    {% elif x.color=='green' %}
+      <div class="week-note"><i class="bi bi-check-circle-fill"></i> Produção registrada. Duplicidade bloqueada.</div>
+    {% elif not x.cooperado %}
+      <div class="week-note muted">A escala ainda não está vinculada a um cooperado válido.</div>
+    {% endif %}
+  </article>
+{% else %}
+  <div class="week-card" style="grid-column:1/-1;text-align:center;color:var(--muted)">Nenhuma escala desta semana foi encontrada para este estabelecimento.</div>
+{% endfor %}
 </div>
 
-<div class="card card-body mt-3">
-  <div class="section-title mb-2"><i class="bi bi-clock-history"></i> Histórico recente</div>
+<div class="week-history">
+  <div class="week-history-head"><span><i class="bi bi-clock-history me-1"></i>Histórico recente</span><span>{{ _recentes_semana|length }} registro(s)</span></div>
   {% for p in _recentes_semana %}
-    <div class="d-flex justify-content-between gap-2 py-2 border-top">
-      <div><strong>{{ p.cooperado.nome }}</strong><div class="small text-muted">{{ p.data.strftime('%d/%m/%Y') }} · {{ p.qtd_entregas }} entrega(s)</div></div>
-      <div class="text-end"><strong>R$ {{ '%.2f'|format(p.valor_total or 0)|replace('.', ',') }}</strong><div class="small text-muted">{{ p.status|capitalize }}</div></div>
-    </div>
+  <div class="week-history-row">
+    <div><strong>{{ p.cooperado.nome }}</strong><small>{{ p.data.strftime('%d/%m/%Y') }} · {{ p.qtd_entregas }} entrega(s)</small></div>
+    <div class="text-end"><strong>R$ {{ '%.2f'|format(p.valor_total or 0)|replace('.', ',') }}</strong><small>{{ p.status|capitalize }}</small></div>
+  </div>
   {% else %}
-    <div class="text-muted">Sem histórico recente.</div>
+  <div class="week-history-row"><div style="color:var(--muted)">Sem histórico recente.</div></div>
   {% endfor %}
 </div>
 
