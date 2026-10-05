@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, time, timedelta
 
-from flask import has_request_context, jsonify, render_template, request, session
+from flask import g, has_request_context, jsonify, render_template, request, session
 from sqlalchemy import and_, event, func, or_, select
 from sqlalchemy.orm import Session, with_loader_criteria
 
@@ -97,6 +97,8 @@ if not app.extensions.get("coopex_active_only_orm_v5"):
 
 
 def _active_coops_by_id_and_name():
+    if has_request_context() and hasattr(g, "_operational_active_coops_map"):
+        return g._operational_active_coops_map
     rows = (
         Cooperado.query
         .join(Usuario, Cooperado.usuario_id == Usuario.id)
@@ -107,7 +109,10 @@ def _active_coops_by_id_and_name():
     )
     by_id = {int(cid): name for cid, name in rows}
     by_name = {shifts.patch._norm(name): int(cid) for cid, name in rows if shifts.patch._norm(name)}
-    return by_id, by_name
+    result = (by_id, by_name)
+    if has_request_context():
+        g._operational_active_coops_map = result
+    return result
 
 
 def _rest_current_shift_coop_ids(rest: Restaurante) -> list[int]:
@@ -118,7 +123,7 @@ def _rest_current_shift_coop_ids(rest: Restaurante) -> list[int]:
     by_id, by_name = _active_coops_by_id_and_name()
 
     result: set[int] = set()
-    for scale in shifts.query_override._rest_scales_indexed(rest):
+    for scale in perf._rest_scales_indexed(rest):
         data_ref = shifts.exact_scale_date(scale, today)
         if data_ref not in {today, yesterday}:
             continue
