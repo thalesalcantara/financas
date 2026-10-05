@@ -7,7 +7,7 @@ from sqlalchemy import and_, event, func, or_, select
 from sqlalchemy.orm import Session, with_loader_criteria
 
 import cooperative_notifications_ui as notifications
-import performance_ui as perf
+import production_ui as perf
 import production_shift_time as shifts
 
 app = notifications.app
@@ -171,7 +171,7 @@ def _coopex_v5_context():
         if role == "restaurante" and request.endpoint == "portal_restaurante":
             rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first()
             if rest:
-                context["coopex_rest_display_name"] = notifications.menu.final_ui.perf.ui._norm_name(rest.nome)
+                context["coopex_rest_display_name"] = perf._norm_name(rest.nome)
                 view = (request.args.get("view") or "lancar").strip().lower()
                 if view == "lancar":
                     context["coopex_rest_pending_rows"] = perf._pending_approvals_fast(rest)
