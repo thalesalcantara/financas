@@ -999,6 +999,7 @@
 .content{margin:0 auto!important;width:100%!important;max-width:1720px!important;padding:8px 14px 14px!important}
 @media(max-width:980px){.aside{height:auto!important;min-height:0!important;padding:7px 9px 0!important;flex-wrap:wrap!important;gap:3px!important}.aside .brand.coopex-brand-welcome{width:100%!important;min-width:0!important;height:44px!important}.aside .navmenu{width:100%!important;flex:0 0 100%!important;height:50px!important}.aside .navmenu a{height:50px!important;min-height:50px!important;padding:0 10px!important;font-size:.84rem!important}}
 </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/restaurante_v3.css') }}">
 </head>
 <body>
   <div class="shell">
@@ -1671,6 +1672,7 @@
           </form>
         </div>
 
+                {% include '_rest_approvals_tabs.html' %}
         <div class="row g-4 align-items-start">
           <div class="col-xl-3 col-lg-4">
             <div class="lancar-layout-card h-100">
@@ -3374,5 +3376,6 @@ function setPhone(digits) {
       <img id="coopexExpandedPhoto" src="" alt="Foto ampliada do cooperado" onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='{{ url_for('static', filename='img/default.png') }}';}">
     </div></div></div>
   </div>
+<script src="{{ url_for('static', filename='js/restaurante_v3.js') }}"></script>
 </body>
 </html>
