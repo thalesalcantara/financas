@@ -267,23 +267,92 @@ def admin_light_launches():
     denied = _guard("lancamentos")
     if denied:
         return denied
+
     di, df = _period_from_request(True)
     q = (request.args.get("q") or "").strip()
+    restaurante_id = request.args.get("restaurante_id", type=int)
+    cooperado_id = request.args.get("cooperado_id", type=int)
+
+    # Listas completas para filtros, lançamento novo e edição.
+    # Cooperados ativos aparecem sempre; cooperados históricos do resultado
+    # também entram na lista para que um lançamento antigo possa ser editado.
+    cooperados = _active_coops()
+    restaurantes = (
+        Restaurante.query
+        .order_by(Restaurante.nome.asc())
+        .all()
+    )
+
     query = Lancamento.query
     if di:
         query = query.filter(Lancamento.data >= di)
     if df:
         query = query.filter(Lancamento.data <= df)
+    if restaurante_id:
+        query = query.filter(Lancamento.restaurante_id == restaurante_id)
+    if cooperado_id:
+        query = query.filter(Lancamento.cooperado_id == cooperado_id)
     if q:
         pat = f"%{q}%"
-        query = query.join(Cooperado, Lancamento.cooperado_id == Cooperado.id).join(Restaurante, Lancamento.restaurante_id == Restaurante.id).filter(or_(Cooperado.nome.ilike(pat), Restaurante.nome.ilike(pat), Lancamento.descricao.ilike(pat)))
-    launches = query.order_by(Lancamento.data.desc(), Lancamento.id.desc()).limit(220).all()
-    coop_ids = {l.cooperado_id for l in launches}
-    rest_ids = {l.restaurante_id for l in launches}
-    coops = {c.id: c for c in Cooperado.query.filter(Cooperado.id.in_(coop_ids)).all()} if coop_ids else {}
-    rests = {r.id: r for r in Restaurante.query.filter(Restaurante.id.in_(rest_ids)).all()} if rest_ids else {}
+        query = (
+            query
+            .outerjoin(Cooperado, Lancamento.cooperado_id == Cooperado.id)
+            .outerjoin(Restaurante, Lancamento.restaurante_id == Restaurante.id)
+            .filter(or_(
+                Cooperado.nome.ilike(pat),
+                Restaurante.nome.ilike(pat),
+                Lancamento.descricao.ilike(pat),
+            ))
+        )
+
+    launches = (
+        query.order_by(Lancamento.data.desc(), Lancamento.id.desc())
+        .limit(220)
+        .all()
+    )
+
+    coop_ids = {l.cooperado_id for l in launches if l.cooperado_id}
+    rest_ids = {l.restaurante_id for l in launches if l.restaurante_id}
+
+    historical_coops = (
+        Cooperado.query.filter(Cooperado.id.in_(coop_ids)).all()
+        if coop_ids else []
+    )
+    coop_by_id = {c.id: c for c in cooperados}
+    for coop in historical_coops:
+        coop_by_id.setdefault(coop.id, coop)
+    cooperados = sorted(coop_by_id.values(), key=lambda x: (x.nome or "").casefold())
+
+    coops = {c.id: c for c in historical_coops}
+    rests = (
+        {r.id: r for r in Restaurante.query.filter(Restaurante.id.in_(rest_ids)).all()}
+        if rest_ids else {}
+    )
+
     total = sum(float(l.valor or 0.0) for l in launches)
-    return _render("lancamentos", "Lançamentos", "Consulta leve. Até 220 registros por abertura.", data_inicio=di, data_fim=df, q=q, launches=launches, coop_map=coops, rest_map=rests, launch_total=total)
+    total_inss = round(total * 0.04, 2)
+    total_sest = round(total * 0.005, 2)
+    total_liquido = round(total - total_inss - total_sest, 2)
+
+    return _render(
+        "lancamentos",
+        "Lançamentos",
+        "Consulta leve. Até 220 registros por abertura.",
+        data_inicio=di,
+        data_fim=df,
+        q=q,
+        restaurante_id=restaurante_id,
+        cooperado_id=cooperado_id,
+        restaurantes=restaurantes,
+        cooperados=cooperados,
+        launches=launches,
+        coop_map=coops,
+        rest_map=rests,
+        launch_total=total,
+        launch_total_inss=total_inss,
+        launch_total_sest=total_sest,
+        launch_total_liquido=total_liquido,
+    )
 
 
 @app.get("/admin/leve/escala", endpoint="admin_light_scale")
