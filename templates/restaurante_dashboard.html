@@ -1802,6 +1802,7 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
 
         {% set _pendencias = coopex_rest_week_pending_rows|default([]) %}
         {% set _pending_ids = _pendencias|map(attribute='cooperado_id')|list %}
+        {% set _today_status = coopex_rest_today_status_map|default({}) %}
         <div class="rest-period-bar">
           <form class="rest-period-form" method="GET" action="{{ url_for('portal_restaurante') }}">
             <input type="hidden" name="view" value="lancar">
@@ -1852,7 +1853,7 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
                     <div class="rest-list-tabs">
                       <button type="button" class="rest-list-tab active" data-coop-filter="todos">Todos</button>
                       <button type="button" class="rest-list-tab" data-coop-filter="escalados">Escalados</button>
-                      <button type="button" class="rest-list-tab" data-coop-filter="producao">Com produção</button>
+                      <button type="button" class="rest-list-tab" data-coop-filter="producao">Lançada hoje</button>
                       <button type="button" class="rest-list-tab pending" data-coop-filter="pendencias">Com pendência {% if _pendencias %}<b>{{ _pendencias|length }}</b>{% endif %}</button>
                     </div>
                   </div>
@@ -1881,6 +1882,7 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
                   <div class="coop-list-body" id="listaCooperados">
                     {% for coop in _cooperados %}
                       {% set sh = coopex_rest_current_shift_map.get(coop.id, {}) %}
+                      {% set st = _today_status.get(coop.id, {}) %}
                       <button
                         type="button"
                         class="cooperado-item w-100 text-start"
@@ -1894,8 +1896,11 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
                         data-shift-date="{{ sh.get('data','') }}"
                         data-shift-start="{{ sh.get('hora_inicio','') }}"
                         data-shift-end="{{ sh.get('hora_fim','') }}"
-                        data-pendente="{{ '1' if coop.id in _pending_ids else '0' }}"
-                        data-producao="{{ '1' if coop.lancamentos|length > 0 else '0' }}"
+                        data-pendente="{{ '1' if st.get('pendente_hoje') else '0' }}"
+                        data-producao="{{ '1' if st.get('tem_producao_hoje') else '0' }}"
+                        data-pending-date="{{ st.get('pend_data','') }}"
+                        data-pending-start="{{ st.get('pend_inicio','') }}"
+                        data-pending-end="{{ st.get('pend_fim','') }}"
                         style="{% if coop.id not in coopex_rest_current_coop_ids %}display:none;{% endif %}"
                       >
                         <div class="rest-coop-row">
@@ -1908,10 +1913,14 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
                             <span class="coop-meta">{% if coop.telefone %}{{ coop.telefone }}{% endif %}{% if coop.telefone and sh.get('horario') %} · {% endif %}{% if sh.get('horario') %}<strong>{{ sh.get('horario') }}</strong>{% elif not coop.telefone %}Sem telefone{% endif %}</span>
                           </div>
                           <div class="rest-coop-status">
-                            {% if coop.id in _pending_ids %}
-                              <span class="rest-status-pill danger"><i class="bi bi-exclamation-circle-fill"></i> Com pendência</span>
-                            {% elif coop.lancamentos|length > 0 %}
-                              <span class="rest-status-pill warning"><i class="bi bi-clock-fill"></i> Com produção</span>
+                            {% if st.get('status_label') %}
+                              <span class="rest-status-pill {{ st.get('status_kind','neutral') }}">
+                                {% if st.get('status_kind') == 'danger' %}<i class="bi bi-exclamation-circle-fill"></i>
+                                {% elif st.get('status_label') == 'Lançamento OK' %}<i class="bi bi-check2-circle"></i>
+                                {% elif st.get('tem_producao_hoje') %}<i class="bi bi-clock-fill"></i>
+                                {% else %}<i class="bi bi-check-lg"></i>{% endif %}
+                                {{ st.get('status_label') }}
+                              </span>
                             {% elif coop.id in coopex_rest_current_coop_ids %}
                               <span class="rest-status-pill success"><i class="bi bi-check-lg"></i> Escalado</span>
                             {% else %}
@@ -2491,15 +2500,16 @@ function setPhone(digits) {
         if (!card) return;
         clearSelection();
         card.classList.add('selected');
+        const hasPendingToday = !!card.dataset.pendingDate;
         selectCoop({
           id: card.dataset.id,
           nome: card.dataset.nome,
           foto: card.dataset.foto,
           total: (parseFloat(card.dataset.total || '0') || 0).toFixed(2).replace('.', ','),
           foneDigits: card.dataset.fone || '',
-          shiftDate: card.dataset.shiftDate || '',
-          shiftStart: card.dataset.shiftStart || '',
-          shiftEnd: card.dataset.shiftEnd || ''
+          shiftDate: hasPendingToday ? card.dataset.pendingDate : (card.dataset.shiftDate || ''),
+          shiftStart: hasPendingToday ? card.dataset.pendingStart : (card.dataset.shiftStart || ''),
+          shiftEnd: hasPendingToday ? card.dataset.pendingEnd : (card.dataset.shiftEnd || '')
         });
       });
 
@@ -2522,9 +2532,9 @@ function setPhone(digits) {
           foto: card ? card.dataset.foto : '',
           total: card ? (parseFloat(card.dataset.total || '0').toFixed(2).replace('.', ',')) : '0,00',
           foneDigits: opt.getAttribute('data-fone') || (card ? card.dataset.fone : ''),
-          shiftDate: opt.dataset.shiftDate || (card ? card.dataset.shiftDate : ''),
-          shiftStart: opt.dataset.shiftStart || (card ? card.dataset.shiftStart : ''),
-          shiftEnd: opt.dataset.shiftEnd || (card ? card.dataset.shiftEnd : '')
+          shiftDate: (card?.dataset.pendingDate) || opt.dataset.shiftDate || (card ? card.dataset.shiftDate : ''),
+          shiftStart: (card?.dataset.pendingStart) || opt.dataset.shiftStart || (card ? card.dataset.shiftStart : ''),
+          shiftEnd: (card?.dataset.pendingEnd) || opt.dataset.shiftEnd || (card ? card.dataset.shiftEnd : '')
         });
       });
     })();
@@ -2798,6 +2808,18 @@ function setPhone(digits) {
       const busca = document.getElementById('buscaCoop');
       const select = document.getElementById('selectCoop');
       const itens = Array.from(document.querySelectorAll('.cooperado-item'));
+      const TUTORIAL_KEY='coopex_tutorial_lancamento_v2';
+      if(!localStorage.getItem(TUTORIAL_KEY)){
+        const tutEl=document.getElementById('modalTutorialLancamento');
+        if(tutEl){
+          setTimeout(()=>{ try{ bootstrap.Modal.getOrCreateInstance(tutEl).show(); }catch(e){} },350);
+          tutEl.addEventListener('hidden.bs.modal',()=>localStorage.setItem(TUTORIAL_KEY,'1'),{once:true});
+          document.getElementById('btnTutorialEntendi')?.addEventListener('click',()=>{
+            localStorage.setItem(TUTORIAL_KEY,'1');
+            try{ bootstrap.Modal.getOrCreateInstance(tutEl).hide(); }catch(e){}
+          },{once:true});
+        }
+      }
 
       function ordenarLista(){
         const lista = document.getElementById('listaCooperados');
@@ -3741,6 +3763,27 @@ function setPhone(digits) {
     </div></div></div>
   </div>
 <script src="{{ url_for('static', filename='js/restaurante_v3.js') }}"></script>
+
+  <div class="modal fade" id="modalTutorialLancamento" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header">
+          <div><small class="text-primary fw-bold">NOVIDADE</small><h5 class="modal-title">Lançamento por horário</h5></div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3"><strong>1. Pendência automática</strong><br><span class="text-muted small">Terminou o horário sem lançamento? Ele vira pendência.</span></div>
+          <div class="mb-3"><strong>2. Clique no cooperado</strong><br><span class="text-muted small">Se existir pendência de hoje, o sistema abre primeiro esse horário, mesmo que o cooperado já esteja em outro turno.</span></div>
+          <div class="mb-3"><strong>3. Dois horários no mesmo dia</strong><br><span class="text-muted small">O nome pode mostrar “Lançada dia”, “Lançada noite” ou “Lançamento OK”.</span></div>
+          <div><strong>4. Pendência antiga</strong><br><span class="text-muted small">Dia anterior continua na aba Pendências e só é lançado escolhendo aquela data.</span></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Pular</button>
+          <button type="button" class="btn btn-primary" id="btnTutorialEntendi">Entendi</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="modal fade" id="coopexSubModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
