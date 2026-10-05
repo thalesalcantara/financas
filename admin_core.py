@@ -5,7 +5,7 @@ from io import BytesIO
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
-from flask import abort, flash, redirect, render_template, request, send_file, session, url_for
+from flask import abort, flash, g, has_request_context, redirect, render_template, request, send_file, session, url_for
 from sqlalchemy import and_, case, func, or_
 
 import app as legacy
@@ -124,21 +124,36 @@ def _fmt_phone(value: str | None) -> str:
 
 
 def _active_coops():
-    return (
+    if has_request_context() and hasattr(g, "_admin_active_coops"):
+        return g._admin_active_coops
+    rows = (
         Cooperado.query.join(Usuario, Cooperado.usuario_id == Usuario.id)
         .filter(or_(Usuario.ativo.is_(True), Usuario.ativo.is_(None)))
         .order_by(Cooperado.nome.asc())
         .all()
     )
+    if has_request_context():
+        g._admin_active_coops = rows
+    return rows
 
 
 def _active_coop_ids_names():
+    if has_request_context() and hasattr(g, "_admin_active_coop_ids_names"):
+        return g._admin_active_coop_ids_names
     rows = _active_coops()
-    return {c.id for c in rows}, {(c.nome or "").strip().casefold() for c in rows}, rows
+    result = ({c.id for c in rows}, {(c.nome or "").strip().casefold() for c in rows}, rows)
+    if has_request_context():
+        g._admin_active_coop_ids_names = result
+    return result
 
 
 def _archived_ids() -> set[int]:
-    return {int(x[0]) for x in db.session.query(CooperadoArquivadoV8.cooperado_id).all()}
+    if has_request_context() and hasattr(g, "_admin_archived_ids"):
+        return g._admin_archived_ids
+    result = {int(x[0]) for x in db.session.query(CooperadoArquivadoV8.cooperado_id).all()}
+    if has_request_context():
+        g._admin_archived_ids = result
+    return result
 
 
 def _render(view: str, title: str, subtitle: str = "", **ctx):
