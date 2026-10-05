@@ -3,9 +3,8 @@ from __future__ import annotations
 import re
 from datetime import date, datetime, timedelta
 
-import performance_queries as query_override
 import production_scale_backend as patch
-import performance_ui as perf
+import production_ui as perf
 
 flow = patch.flow
 upgrade = patch.upgrade
@@ -128,7 +127,6 @@ def rest_scales_active_window(rest):
 
 patch._coop_scales = coop_scales_active_window
 patch._rest_scales = rest_scales_active_window
-query_override.perf._matches_day = matches_exact_day
 
 
 def _validate_parser() -> None:
