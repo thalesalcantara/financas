@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile Python
-        run: python -m py_compile app.py routes_cooperado.py routes_restaurante.py routes_farmacia.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_backend.py production_ui.py production_shift_time.py cooperative_notifications_ui.py operational_rules.py approval_rejection.py approval_return_dashboard.py admin_core.py admin_final.py finance_expense_control.py finance_expense_management.py finance_expense_totals.py finance_expense_recurring.py finance_expense_ui.py permission_readonly_guard.py finance_navigation.py finance_expense_delete.py gunicorn_conf.py tests/smoke_upgrade.py
+        run: python -m py_compile app.py routes_admin_dashboard.py routes_cooperado.py routes_restaurante.py routes_farmacia.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_backend.py production_ui.py production_shift_time.py cooperative_notifications_ui.py operational_rules.py approval_rejection.py approval_return_dashboard.py admin_core.py admin_final.py finance_expense_control.py finance_expense_management.py finance_expense_totals.py finance_expense_recurring.py finance_expense_ui.py permission_readonly_guard.py finance_navigation.py finance_expense_delete.py gunicorn_conf.py tests/smoke_upgrade.py
       - name: Validate Jinja templates
         run: |
           python - <<'PY'
