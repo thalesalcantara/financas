@@ -115,20 +115,24 @@ def _active_coops_by_id_and_name():
     return result
 
 
-def _rest_current_shift_coop_ids(rest: Restaurante) -> list[int]:
-    """Cooperados que estão dentro do horário do turno neste exato momento."""
+def _rest_current_shift_data(rest: Restaurante):
+    """Retorna IDs e dados da escala que está ativa neste exato momento."""
     now = datetime.now(TZ)
     today = now.date()
     yesterday = today - timedelta(days=1)
     by_id, by_name = _active_coops_by_id_and_name()
 
-    result: set[int] = set()
+    ids: set[int] = set()
+    shift_map: dict[int, dict] = {}
+
     for scale in perf._rest_scales_indexed(rest):
         data_ref = shifts.exact_scale_date(scale, today)
         if data_ref not in {today, yesterday}:
             continue
 
         start_text, end_text = upgrade._times_from_text(scale.horario)
+        start_text = upgrade._norm_time(start_text) or ""
+        end_text = upgrade._norm_time(end_text) or ""
         start_minutes = upgrade._minutes(start_text)
         end_at = flow._end_at(data_ref, start_text, end_text)
         if start_minutes is None or end_at is None:
@@ -145,11 +149,30 @@ def _rest_current_shift_coop_ids(rest: Restaurante) -> list[int]:
         coop_id = int(scale.cooperado_id) if scale.cooperado_id in by_id else None
         if coop_id is None and scale.cooperado_nome:
             coop_id = by_name.get(shifts.patch._norm(scale.cooperado_nome))
-        if coop_id:
-            result.add(coop_id)
+        if not coop_id:
+            continue
 
-    return sorted(result)
+        ids.add(coop_id)
+        # Se houver mais de uma escala ativa do mesmo cooperado, usa a que
+        # começou por último. Isso mantém o preenchimento previsível.
+        previous = shift_map.get(coop_id)
+        current = {
+            "scale_id": int(scale.id),
+            "data": data_ref.isoformat(),
+            "hora_inicio": start_text,
+            "hora_fim": end_text,
+            "horario": scale.horario or "",
+            "turno": scale.turno or "",
+            "contrato": scale.contrato or rest.nome,
+        }
+        if not previous or (current["hora_inicio"] or "") >= (previous["hora_inicio"] or ""):
+            shift_map[coop_id] = current
 
+    return sorted(ids), shift_map
+
+
+def _rest_current_shift_coop_ids(rest: Restaurante) -> list[int]:
+    return _rest_current_shift_data(rest)[0]
 
 # O contexto anterior calculava a timeline do cooperado até quando a aba aberta
 # era Resumo. Removemos esse custo; a timeline passa a ser carregada via AJAX
@@ -166,6 +189,7 @@ def _coopex_v5_context():
         "coopex_rest_display_name": "ESTABELECIMENTO",
         "coopex_rest_pending_rows": [],
         "coopex_rest_current_coop_ids": [],
+        "coopex_rest_current_shift_map": {},
         "coopex_coop_timeline": [],
         "coopex_filter_start": None,
         "coopex_filter_end": None,
@@ -181,7 +205,9 @@ def _coopex_v5_context():
                 view = (request.args.get("view") or "lancar").strip().lower()
                 if view == "lancar":
                     context["coopex_rest_pending_rows"] = perf._pending_approvals_fast(rest)
-                    context["coopex_rest_current_coop_ids"] = _rest_current_shift_coop_ids(rest)
+                    current_ids, current_map = _rest_current_shift_data(rest)
+                    context["coopex_rest_current_coop_ids"] = current_ids
+                    context["coopex_rest_current_shift_map"] = current_map
     except Exception:
         app.logger.exception("Falha ao montar contexto operacional V5")
 
