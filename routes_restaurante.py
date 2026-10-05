@@ -357,103 +357,6 @@ def portal_restaurante():
         total_lanc_valor = sum(x["valor"] for x in lancamentos_periodo)
         total_lanc_entregas = sum(x["qtd_entregas"] for x in lancamentos_periodo)
 
-    # -------------------- PENDÊNCIAS DE LANÇAMENTO DO DIA --------------------
-    pendencias_lancamento = []
-    hoje = date.today()
-    agora = datetime.now()
-
-    def _hora_inicial_min(horario_txt: str) -> int | None:
-        m = re.search(r"(\d{1,2}):(\d{2})", str(horario_txt or ""))
-        if not m:
-            return None
-        return int(m.group(1)) * 60 + int(m.group(2))
-
-    def _hora_final_min(horario_txt: str) -> int | None:
-        txt = str(horario_txt or "")
-        pares = re.findall(r"(\d{1,2}):(\d{2})", txt)
-        if len(pares) >= 2:
-            hh, mm = pares[-1]
-            return int(hh) * 60 + int(mm)
-
-        m = re.search(r"\b(?:as|às|a)\s*(\d{1,2}):(\d{2})", txt.lower())
-        if m:
-            return int(m.group(1)) * 60 + int(m.group(2))
-
-        return None
-
-    minutos_agora = agora.hour * 60 + agora.minute
-
-    escalas_hoje = agenda.get(hoje, [])
-    lancs_hoje_por_coop = defaultdict(list)
-    for _l in (
-        Lancamento.query
-        .filter(Lancamento.restaurante_id == rest.id, Lancamento.data == hoje)
-        .order_by(Lancamento.cooperado_id.asc(), Lancamento.id.asc())
-        .all()
-    ):
-        lancs_hoje_por_coop[_l.cooperado_id].append(_l)
-    for item in escalas_hoje:
-        coop = item.get("coop")
-        if not coop:
-            continue
-
-        horario_txt = (item.get("horario") or "").strip()
-        turno_txt = (item.get("turno") or "").strip()
-        contrato_txt = (item.get("contrato") or rest.nome).strip()
-
-        hora_ini = _hora_inicial_min(horario_txt)
-        hora_fim = _hora_final_min(horario_txt)
-
-        if hora_fim is None and hora_ini is not None:
-            if "noite" in turno_txt.lower():
-                hora_fim = 23 * 60 + 59
-            else:
-                hora_fim = hora_ini + 240
-
-        if hora_fim is None:
-            continue
-
-        if minutos_agora < hora_fim:
-            continue
-
-        lanc_do_dia = lancs_hoje_por_coop.get(coop.id, [])
-
-        existe_mesmo_horario = False
-        for lanc in lanc_do_dia:
-            hi = (lanc.hora_inicio or "").strip() if isinstance(lanc.hora_inicio, str) else (
-                lanc.hora_inicio.strftime("%H:%M") if lanc.hora_inicio else ""
-            )
-            hf = (lanc.hora_fim or "").strip() if isinstance(lanc.hora_fim, str) else (
-                lanc.hora_fim.strftime("%H:%M") if lanc.hora_fim else ""
-            )
-
-            if hi and hf and horario_txt:
-                if hi in horario_txt and hf in horario_txt:
-                    existe_mesmo_horario = True
-                    break
-
-            if hi and not hf and horario_txt and hi in horario_txt:
-                existe_mesmo_horario = True
-                break
-
-        if not existe_mesmo_horario:
-            pendencias_lancamento.append({
-                "cooperado_id": coop.id,
-                "cooperado_nome": coop.nome,
-                "turno": turno_txt or "—",
-                "horario": horario_txt or "—",
-                "contrato": contrato_txt or "—",
-                "data": hoje.strftime("%d/%m/%Y"),
-            })
-
-    pendencias_lancamento.sort(
-        key=lambda x: (
-            x["cooperado_nome"].lower(),
-            x["horario"].lower(),
-            x["turno"].lower(),
-        )
-    )
-
     # -------------------- URLs auxiliares --------------------
     try:
         url_lancar_producao = url_for("lancar_producao")
@@ -468,7 +371,6 @@ def portal_restaurante():
         rest=rest,
         cooperados=cooperados,
         cooperados_escalados=cooperados_escalados,
-        pendencias_lancamento=pendencias_lancamento,
         filtro_inicio=di,
         filtro_fim=df,
         filtro_mes=(mes or ""),
