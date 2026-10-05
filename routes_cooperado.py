@@ -26,6 +26,10 @@ def portal_cooperado():
     except Exception:
         coop.usuario = ""
 
+    active_tab = (request.args.get("active_tab") or "resumo").strip().lower()
+    if active_tab not in {"resumo", "producoes", "ajustes", "escalas", "trocas", "farmacia"}:
+        active_tab = "resumo"
+
     # ---------- FILTRO POR DATA (padrão = semana atual seg-dom) ----------
     di = _parse_date(request.args.get("data_inicio"))
     df = _parse_date(request.args.get("data_fim"))
@@ -45,81 +49,109 @@ def portal_cooperado():
     # =========================
     # Produções (Lançamentos)
     # =========================
-    producoes = (
-        in_range(
-            Lancamento.query.options(selectinload(Lancamento.restaurante)).filter_by(cooperado_id=coop.id),
-            Lancamento.data,
-        )
-        .order_by(Lancamento.data.desc(), Lancamento.id.desc())
-        .all()
-    )
-
-    ids = [l.id for l in producoes]
-    minhas = {}
-    if ids:
-        rows = (
-            db.session.query(
-                AvaliacaoRestaurante.lancamento_id,
-                AvaliacaoRestaurante.estrelas_geral,
+    producoes = []
+    if active_tab == "producoes":
+        producoes = (
+            in_range(
+                Lancamento.query.options(selectinload(Lancamento.restaurante)).filter_by(cooperado_id=coop.id),
+                Lancamento.data,
             )
-            .filter(
-                AvaliacaoRestaurante.lancamento_id.in_(ids),
-                AvaliacaoRestaurante.cooperado_id == coop.id,
-            )
+            .order_by(Lancamento.data.desc(), Lancamento.id.desc())
             .all()
         )
-        minhas = {lid: nota for lid, nota in rows}
+        ids = [l.id for l in producoes]
+        minhas = {}
+        if ids:
+            rows = (
+                db.session.query(
+                    AvaliacaoRestaurante.lancamento_id,
+                    AvaliacaoRestaurante.estrelas_geral,
+                )
+                .filter(
+                    AvaliacaoRestaurante.lancamento_id.in_(ids),
+                    AvaliacaoRestaurante.cooperado_id == coop.id,
+                )
+                .all()
+            )
+            minhas = {lid: nota for lid, nota in rows}
+        for l in producoes:
+            l.minha_avaliacao = minhas.get(l.id)
 
-    for l in producoes:
-        l.minha_avaliacao = minhas.get(l.id)
+    q_prod_total = db.session.query(func.coalesce(func.sum(Lancamento.valor), 0.0)).filter(
+        Lancamento.cooperado_id == coop.id,
+        Lancamento.data >= di,
+        Lancamento.data <= df,
+    )
+    producao_total_periodo = float(q_prod_total.scalar() or 0.0)
 
     # =========================
     # Receitas / Despesas
     # =========================
-    receitas_coop = (
-        in_range(
-            ReceitaCooperado.query.filter_by(cooperado_id=coop.id),
-            ReceitaCooperado.data,
+    receitas_coop = []
+    despesas_coop = []
+    solicitacoes_adiantamento = []
+    if active_tab == "ajustes":
+        receitas_coop = (
+            in_range(
+                ReceitaCooperado.query.filter_by(cooperado_id=coop.id),
+                ReceitaCooperado.data,
+            )
+            .order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc())
+            .all()
         )
-        .order_by(ReceitaCooperado.data.desc(), ReceitaCooperado.id.desc())
-        .all()
-    )
 
-    qd = DespesaCooperado.query.filter_by(cooperado_id=coop.id)
-    if di and df:
-        qd = qd.filter(
-            DespesaCooperado.data_inicio <= df,
-            DespesaCooperado.data_fim >= di,
+        qd = DespesaCooperado.query.filter_by(cooperado_id=coop.id)
+        if di and df:
+            qd = qd.filter(
+                DespesaCooperado.data_inicio <= df,
+                DespesaCooperado.data_fim >= di,
+            )
+        elif di:
+            qd = qd.filter(DespesaCooperado.data_fim >= di)
+        elif df:
+            qd = qd.filter(DespesaCooperado.data_inicio <= df)
+        despesas_coop = qd.order_by(
+            DespesaCooperado.data_fim.desc().nullslast(),
+            DespesaCooperado.id.desc(),
+        ).all()
+
+        solicitacoes_adiantamento = (
+            SolicitacaoAdiantamento.query
+            .filter_by(cooperado_id=coop.id)
+            .order_by(SolicitacaoAdiantamento.pedido_em.desc(), SolicitacaoAdiantamento.id.desc())
+            .limit(100)
+            .all()
         )
-    elif di:
-        qd = qd.filter(DespesaCooperado.data_fim >= di)
-    elif df:
-        qd = qd.filter(DespesaCooperado.data_inicio <= df)
 
-    despesas_coop = qd.order_by(
-        DespesaCooperado.data_fim.desc().nullslast(),
-        DespesaCooperado.id.desc(),
-    ).all()
-
-    solicitacoes_adiantamento = (
-        SolicitacaoAdiantamento.query
-        .filter_by(cooperado_id=coop.id)
-        .order_by(SolicitacaoAdiantamento.pedido_em.desc(), SolicitacaoAdiantamento.id.desc())
-        .all()
+    receita_total_periodo = float(
+        db.session.query(func.coalesce(func.sum(ReceitaCooperado.valor), 0.0))
+        .filter(
+            ReceitaCooperado.cooperado_id == coop.id,
+            ReceitaCooperado.data >= di,
+            ReceitaCooperado.data <= df,
+        )
+        .scalar() or 0.0
     )
 
     # =========================
     # Totais
     # =========================
-    total_bruto = (
-        sum((l.valor or 0.0) for l in producoes)
-        + sum((r.valor or 0.0) for r in receitas_coop)
-    )
-    inss_valor = sum((l.valor or 0.0) * 0.04 for l in producoes)
-    sest_valor = sum((l.valor or 0.0) * 0.005 for l in producoes)
+    total_bruto = producao_total_periodo + receita_total_periodo
+    inss_valor = producao_total_periodo * 0.04
+    sest_valor = producao_total_periodo * 0.005
     encargos_valor = inss_valor + sest_valor
 
-    debt_snapshot = _compute_coop_debt_snapshot(coop.id, di, df)
+    debt_snapshot = (
+        _compute_coop_debt_snapshot(coop.id, di, df)
+        if active_tab in {"resumo", "ajustes"}
+        else {
+            "descontado_periodo_despesa": 0.0,
+            "descontado_periodo_adiant": 0.0,
+            "saldo_devedor": 0.0,
+            "a_descontar": 0.0,
+            "itens": [],
+        }
+    )
     total_descontos = (
         float(debt_snapshot.get('descontado_periodo_despesa', 0.0) or 0.0)
         + float(debt_snapshot.get('descontado_periodo_adiant', 0.0) or 0.0)
@@ -128,7 +160,11 @@ def portal_cooperado():
     saldo_devedor = float(debt_snapshot.get('saldo_devedor', 0.0) or 0.0)
     total_a_descontar = float(debt_snapshot.get('a_descontar', 0.0) or 0.0)
     despesas_detalhadas = debt_snapshot.get('itens', [])
-    adiantamento_disponivel = _adiantamento_disponivel_cooperado(coop.id, di, df)
+    adiantamento_disponivel = (
+        _adiantamento_disponivel_cooperado(coop.id, di, df)
+        if active_tab == "ajustes"
+        else 0.0
+    )
 
     # =========================
     # Métricas da vida
@@ -175,17 +211,19 @@ def portal_cooperado():
     }
 
     # ---------- ESCALA (dedupe + ordenação cronológica robusta) ----------
-    raw_escala = (
-        Escala.query.filter(
-            or_(
-                Escala.cooperado_id == coop.id,
-                func.lower(func.trim(Escala.cooperado_nome)) == (coop.nome or "").strip().lower(),
+    raw_escala = []
+    if active_tab in {"escalas", "trocas"}:
+        raw_escala = (
+            Escala.query.filter(
+                or_(
+                    Escala.cooperado_id == coop.id,
+                    func.lower(func.trim(Escala.cooperado_nome)) == (coop.nome or "").strip().lower(),
+                )
             )
+            .order_by(Escala.id.asc())
+            .limit(100)
+            .all()
         )
-        .order_by(Escala.id.asc())
-        .limit(100)
-        .all()
-    )
 
     import unicodedata as _u, re as _re
 
@@ -276,12 +314,15 @@ def portal_cooperado():
     ]
 
     # ---------- Trocas / Cooperados / Escalas (sem N+1) ----------
-    coops = (
-        Cooperado.query
-        .filter(Cooperado.id != coop.id)
-        .order_by(Cooperado.nome.asc())
-        .all()
-    )
+    coops = []
+    if active_tab == "trocas":
+        coops = (
+            Cooperado.query
+            .join(Usuario, Cooperado.usuario_id == Usuario.id)
+            .filter(Cooperado.id != coop.id, Usuario.ativo.is_(True))
+            .order_by(Cooperado.nome.asc())
+            .all()
+        )
     cooperados_json = [
         {"id": c.id, "nome": c.nome, "foto_url": (c.foto_url or "")}
         for c in coops
@@ -312,18 +353,23 @@ def portal_cooperado():
     def _escala_desc(e: Escala | None) -> str:
         return _escala_label(e)
 
-    rx = (
-        TrocaSolicitacao.query
-        .filter(TrocaSolicitacao.destino_id == coop.id)
-        .order_by(TrocaSolicitacao.id.desc())
-        .all()
-    )
-    ex = (
-        TrocaSolicitacao.query
-        .filter(TrocaSolicitacao.solicitante_id == coop.id)
-        .order_by(TrocaSolicitacao.id.desc())
-        .all()
-    )
+    rx = []
+    ex = []
+    if active_tab == "trocas":
+        rx = (
+            TrocaSolicitacao.query
+            .filter(TrocaSolicitacao.destino_id == coop.id)
+            .order_by(TrocaSolicitacao.id.desc())
+            .limit(100)
+            .all()
+        )
+        ex = (
+            TrocaSolicitacao.query
+            .filter(TrocaSolicitacao.solicitante_id == coop.id)
+            .order_by(TrocaSolicitacao.id.desc())
+            .limit(100)
+            .all()
+        )
 
     troca_coop_ids = set()
     troca_escala_ids = set()
@@ -393,20 +439,22 @@ def portal_cooperado():
             "linhas_afetadas": linhas_afetadas,
         })
 
-    farmacia_entregas = (
-        FarmaciaEntrega.query
-        .options(selectinload(FarmaciaEntrega.restaurante))
-        .filter(FarmaciaEntrega.cooperado_id == coop.id)
-    )
-    if di:
-        farmacia_entregas = farmacia_entregas.filter(func.date(FarmaciaEntrega.criado_em) >= di)
-    if df:
-        farmacia_entregas = farmacia_entregas.filter(func.date(FarmaciaEntrega.criado_em) <= df)
-    farmacia_entregas = farmacia_entregas.order_by(
-        FarmaciaEntrega.status.asc(),
-        FarmaciaEntrega.ordem_rota.asc(),
-        FarmaciaEntrega.id.asc(),
-    ).all()
+    farmacia_entregas = []
+    if active_tab == "farmacia":
+        farmacia_entregas = (
+            FarmaciaEntrega.query
+            .options(selectinload(FarmaciaEntrega.restaurante))
+            .filter(FarmaciaEntrega.cooperado_id == coop.id)
+        )
+        if di:
+            farmacia_entregas = farmacia_entregas.filter(func.date(FarmaciaEntrega.criado_em) >= di)
+        if df:
+            farmacia_entregas = farmacia_entregas.filter(func.date(FarmaciaEntrega.criado_em) <= df)
+        farmacia_entregas = farmacia_entregas.order_by(
+            FarmaciaEntrega.status.asc(),
+            FarmaciaEntrega.ordem_rota.asc(),
+            FarmaciaEntrega.id.asc(),
+        ).all()
 
     return render_template(
         "painel_cooperado.html",
