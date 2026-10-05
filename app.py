@@ -3947,8 +3947,13 @@ def admin_dashboard():
         )
 
         if ajax_partial_fast == "resumo":
-            # Resumo rápido para troca de aba/filtro em AJAX: evita montar o admin inteiro.
-            qprod = Lancamento.query
+            # O resumo precisa de totais, não dos objetos Lancamento completos.
+            # Agrupa no banco por cooperado/dia e reduz milhares de linhas a poucas dezenas.
+            qprod = db.session.query(
+                Lancamento.cooperado_id,
+                Lancamento.data,
+                func.coalesce(func.sum(Lancamento.valor), 0.0).label("valor_total"),
+            )
             if restaurante_id:
                 qprod = qprod.filter(Lancamento.restaurante_id == restaurante_id)
             if cooperado_id:
@@ -3957,11 +3962,15 @@ def admin_dashboard():
                 qprod = qprod.filter(Lancamento.data >= data_inicio)
             if data_fim:
                 qprod = qprod.filter(Lancamento.data <= data_fim)
-            lancamentos_resumo = qprod.order_by(Lancamento.data.asc(), Lancamento.id.asc()).all()
-            if dows:
-                lancamentos_resumo = [l for l in lancamentos_resumo if l.data and _dow(l.data) in dows]
+            prod_rows = (
+                qprod.group_by(Lancamento.cooperado_id, Lancamento.data)
+                .order_by(Lancamento.data.asc())
+                .all()
+            )
+
+            permitidos = None
             if considerar_periodo and restaurante_id:
-                rest_fast = Restaurante.query.get(restaurante_id)
+                rest_fast = db.session.get(Restaurante, restaurante_id)
                 if rest_fast:
                     mapa = {
                         "seg-dom": {"1", "2", "3", "4", "5", "6", "7"},
@@ -3969,23 +3978,35 @@ def admin_dashboard():
                         "sex-qui": {"5", "6", "7", "1", "2", "3", "4"},
                     }
                     permitidos = mapa.get(rest_fast.periodo, {"1", "2", "3", "4", "5", "6", "7"})
-                    lancamentos_resumo = [l for l in lancamentos_resumo if l.data and _dow(l.data) in permitidos]
 
             prod_by_coop = defaultdict(float)
-            for l in lancamentos_resumo:
-                prod_by_coop[getattr(l, "cooperado_id", None)] += (l.valor or 0.0)
+            chart_sums = defaultdict(float)
+            for cid, data_ref, valor_total in prod_rows:
+                if not data_ref:
+                    continue
+                dia = _dow(data_ref)
+                if dows and dia not in dows:
+                    continue
+                if permitidos and dia not in permitidos:
+                    continue
+                valor = float(valor_total or 0.0)
+                prod_by_coop[cid] += valor
+                chart_sums[data_ref.strftime("%Y-%m")] += valor
 
-            rqcf = ReceitaCooperado.query
+            rqcf = db.session.query(
+                ReceitaCooperado.cooperado_id,
+                func.coalesce(func.sum(ReceitaCooperado.valor), 0.0).label("valor_total"),
+            )
             if data_inicio:
                 rqcf = rqcf.filter(ReceitaCooperado.data >= data_inicio)
             if data_fim:
                 rqcf = rqcf.filter(ReceitaCooperado.data <= data_fim)
             if cooperado_id:
                 rqcf = rqcf.filter(ReceitaCooperado.cooperado_id == cooperado_id)
-            receitas_coop_resumo = rqcf.all()
+            receitas_coop_resumo = rqcf.group_by(ReceitaCooperado.cooperado_id).all()
             rec_by_coop = defaultdict(float)
-            for r in receitas_coop_resumo:
-                rec_by_coop[getattr(r, "cooperado_id", None)] += (r.valor or 0.0)
+            for cid, valor_total in receitas_coop_resumo:
+                rec_by_coop[cid] += float(valor_total or 0.0)
 
             # Limita os snapshots aos cooperados realmente envolvidos no período/dívida.
             ids_relevantes = set(k for k in prod_by_coop.keys() if k) | set(k for k in rec_by_coop.keys() if k)
@@ -4048,18 +4069,17 @@ def admin_dashboard():
                     resumo_totais_fast["saldo_pendente"] += saldo_pendente
                     resumo_totais_fast["pend_programado"] += pend_programado
 
-            sums = defaultdict(float)
-            for l in lancamentos_resumo:
-                if l.data:
-                    sums[l.data.strftime("%Y-%m")] += (l.valor or 0.0)
-            labels_ord = sorted(sums.keys())
-            chart_fast = {"labels": [f"{k.split('-')[1]}/{k.split('-')[0][-2:]}" for k in labels_ord], "values": [round(sums[k], 2) for k in labels_ord]}
+            labels_ord = sorted(chart_sums.keys())
+            chart_fast = {
+                "labels": [f"{k.split('-')[1]}/{k.split('-')[0][-2:]}" for k in labels_ord],
+                "values": [round(chart_sums[k], 2) for k in labels_ord],
+            }
             total_prod_fast = resumo_totais_fast["prod"]
             ctx_fast.update(
-                lancamentos=lancamentos_resumo,
+                lancamentos=[],
                 receitas=[],
                 despesas=[],
-                receitas_coop=receitas_coop_resumo,
+                receitas_coop=[],
                 despesas_coop=[],
                 resumo_coop_rows=resumo_coop_rows_fast,
                 resumo_totais=resumo_totais_fast,
