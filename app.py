@@ -8008,13 +8008,230 @@ def _ensure_tabelas_estruturadas_schema():
         db.session.rollback()
 
 
+
+TABELAS_ESTRUTURADAS_SEED_V1 = {
+    "ZIPPI PIZZA": {
+        "bairros": [
+            ("Lagoa Nova",10,None),("Alecrim",11,None),("Tirol",11,None),("Nova Descoberta",11,None),
+            ("Cidade da Esperança",11,None),("Capim Macio",11,None),("Lagoa Seca",11,None),
+            ("Barro Vermelho",12,None),("Dix Sept Rosado",12,None),("Quintas",12,None),("Neópolis",12,None),
+            ("Cidade Alta",12,None),("Candelária",12,None),("Cidade Nova",12,None),("Nazaré",12,None),
+            ("Petrópolis",12,None),("Bom Pastor",13,None),("Ribeira",13,None),("Mãe Luiza",13,None),
+            ("Pitimbu",13,None),("Pq das Colinas",13,None),("Bairro Nordeste",14,None),("Rocas",14,None),
+            ("Santos Reis",14,None),("Areia Preta",14,None),("Planalto",15,None),("Nova Parnamirim",15,None),
+            ("Ponta Negra",15,None),("Felipe Camarão",15,None)
+        ],
+        "garantidos":[("Segunda a quinta","",80),("Fins de semana e feriados","",110)]
+    },
+    "DDBURGUER_LAGOA_NOVA": {
+        "bairros":[
+            ("Lagoa Nova",8,None),("Nova Descoberta",8,None),
+            ("Barro Vermelho",10,None),("Tirol",10,None),("Candelária",10,None),("Capim Macio",10,None),
+            ("Alecrim",12,None),("Bom Pastor",12,None),("Nazaré",12,None),("Cidade Alta",12,None),
+            ("Dix-Sept Rosado",12,None),("Lagoa Seca",12,None),("Mãe Luiza",12,None),("Petrópolis",12,None),
+            ("Areia Preta",15,None),("Cidade Nova",15,None),("Neópolis",15,None),("Praia do Meio",15,None),
+            ("Ribeira",15,None),("Rocas",15,None),("Ponta Negra",17,None),("Quintas",17,None),
+            ("Santos Reis",17,None),("Pitimbu",17,None),("Bairro Nordeste",17,None),
+            ("Felipe Camarão",20,None),("Planalto",20,None),("Via Costeira",20,None)
+        ],
+        "garantidos":[("Segunda a quinta","",80),("Sexta, sábados, domingos e feriados","",100)]
+    },
+    "DDBURGUER_CID_VERDE": {
+        "bairros":[
+            ("Cidade dos Bosques",8,None),("Nova Parnamirim",10,None),("Neópolis",12,None),
+            ("Capim Macio",15,None),("Ponta Negra",15,None),("Coophab",15,None),
+            ("Emaús",20,None),("Pium",20,None)
+        ],
+        "garantidos":[("Segunda a quinta","",80),("Sexta, sábados, domingos e feriados","",100)]
+    },
+    "BUONGUSTAIO": {
+        "bairros":[
+            ("Petrópolis",8,12),("Tirol",9,12),("Barro Vermelho",9,13),("Lagoa Seca",9,13),
+            ("Alecrim",9,13),("Cidade Alta",9,None),("Mãe Luiza",9,13),("Areia Preta",9,12),
+            ("Rocas",10,13),("Santos Reis",10,14),("Ribeira",10,12),("Praia do Meio",10,15),
+            ("Lagoa Nova",12,14),("Candelária",12,15),("Mirassol",12,15),("Quintas",12,16),
+            ("Capim Macio",15,17),("Neópolis",15,None),("Pitimbu",15,17),("Ponta Negra",15,17),
+            ("Bairro Nordeste",15,17),("Felipe Camarão",18,18),("Nova Parnamirim",18,20),
+            ("Cidade Verde",18,20),("Planalto",18,20),
+            ("Bom Pastor",None,17),("Bairro Nazaré",None,15),("Centro",None,13),("Cidade Nova",None,17),
+            ("Esperança",None,17),("Emaus/Coophab",None,25),("Jardim América",None,18),
+            ("Nova Descoberta",None,14),("Via Costeira",None,19),("Zona Norte",None,27)
+        ],
+        "garantidos":[("Segunda a sexta","",80),("Fins de semana e feriados","",110)]
+    },
+    "TANAKA": {
+        "bairros":[
+            ("Alecrim",9,None),("Areias Pretas",8,None),("B. Vermelho",9,None),("Bairro Nazaré",13,None),
+            ("Bairro Nordeste",13,None),("Bom Pastor",12,None),("Candelária",12,None),("Capim Macio",13,None),
+            ("Centro",8,None),("Cidade Nova",12,None),("Cidade Verde",20,None),("Dix Sept Rosado",12,None),
+            ("Esperança",13,None),("Felipe Camarão",17,None),("Emaus",25,None),("Jardim América",17,None),
+            ("Lagoa Nova",9,None),("Lagoa Seca",9,None),("Mãe Luiza",8,None),("Mirassol",12,None),
+            ("Nova Descoberta",9,None),("Nova Parnamirim",20,None),("Petrópolis",8,None),("Pitimbu",15,None),
+            ("Planalto",17,None),("Ponta Negra",17,None),("Praia do Meio",8,None),("Quintas",12,None),
+            ("Ribeira",8,None),("Rocas",8,None),("Santos Reis",8,None),("Tirol",8,None),
+            ("Via Costeira",12,None),("Zona Norte",30,None)
+        ],
+        "garantidos":[("Segunda a sexta","",80),("Sábado, domingo e feriados","",100)]
+    },
+    "RECRUTA SUSHI": {
+        "bairros":[
+            ("Petrópolis",8,None),("Tirol",9,None),("Barro Vermelho",9,None),("Lagoa Seca",9,None),
+            ("Alecrim",9,None),("Cidade Alta",9,None),("Mãe Luiza",9,None),("Areia Preta",9,None),
+            ("Rocas",10,None),("Santos Reis",10,None),("Ribeira",10,None),("Praia do Meio",10,None),
+            ("Lagoa Nova",12,None),("Candelária",12,None),("Mirassol",12,None),
+            ("Capim Macio",15,None),("Neópolis",15,None),("Pitimbu",15,None),("Ponta Negra",15,None)
+        ],
+        "garantidos":[("Segunda a quinta","",80),("Fins de semana e feriados","",100)]
+    },
+    "IRACHAI": {
+        "bairros":[
+            ("Lagoa Nova",8,None),("Dix-Sept Rosado",9,None),("Nazaré",9,None),("Nova Descoberta",9,None),
+            ("Alecrim",9,None),("Lagoa Seca",9,None),("Petrópolis",9,None),("Tirol",9,None),
+            ("Candelária",9,None),("Cidade Alta (centro)",9,None),("Mirassol",9,None),("Potilândia",9,None),
+            ("Capim Macio",10,None),("Cidade da Esperança",10,None),("Praia do Meio",10,None),("Quintas",10,None),
+            ("Neópolis",13,None),("Pitimbu",13,None),("Cidade Satélite",13,None),("PQ das Colinas",13,None),
+            ("Rocas",13,None),("Mãe Luiza",13,None),("Nordeste",13,None),("Cidade Nova",13,None),
+            ("Ponta Negra",15,None),("Areia Preta",15,None),("Planalto",17,None),("Felipe Camarão",17,None),
+            ("Via Costeira",17,None),("Nova Parnamirim",17,None),("Emaús",20,None),("Igapó",20,None),
+            ("Coophab",20,None),("Potengi",25,None),("N. Sra. Apresentação",25,None),("Redinha",25,None),
+            ("Pajuçara",25,None)
+        ],
+        "garantidos":[("Segunda a sexta","",80),("Fins de semana e feriados","",100)]
+    },
+    "GUSTTO_FORNERIA": {
+        "bairros":[
+            ("Alecrim",10,13),("Areias Pretas",12,15),("B. Vermelho",10,13),("Bairro Nazaré",10,13),
+            ("Bom Pastor",13,16),("Candelária",10,13),("Capim Macio",11,14),("Centro",12,15),
+            ("Cidade da Esperança",13,16),("Cidade Nova",13,16),("Coophab",22,25),("Dix Septo Rosado",10,13),
+            ("Felipe Camarão",15,18),("Lagoa Nova",8,12),("Lagoa Seca",10,13),("Emaus",18,22),
+            ("Parnamirim (Centro)",22,27),("Mãe Luiza",13,16),("Neópolis",13,16),("Nova Descoberta",9,12),
+            ("Nova Parnamirim",17,18),("Petrópolis",12,15),("Planalto",17,20),("Ponta Negra",13,16),
+            ("Praia do Meio",12,15),("Quintas",14,17),("Ribeira",13,16),("Rocas",13,16),
+            ("Santos Reis",14,17),("Tirol",11,14),("Via Costeira",15,18),("Zona Norte (Natal)",25,30),
+            ("Pitimbu",15,17),("Bairro Nordeste",17,20)
+        ],
+        "garantidos":[("Segunda a sexta","",80),("Sábados, domingos e feriados","",110)]
+    },
+    "CHINA_P.NEGRA": {
+        "bairros":[
+            ("Cajupiranga",25,25),("Capim Macio",8.5,12),("Cidade Jardim",8.5,12),("Cohabinal",26,26),
+            ("Cophab",17.5,17.5),("Cotovelo",23,23),("Emaús",18,18),("Jardim Planalto",25,25),
+            ("Jiqui",10.5,12),("Liberdade",25,25),("Mirassol",8.5,12),("Monte Castelo",26,26),
+            ("Neópolis",10.5,12),("Nova Esperança",26,26),("Nova Parnamirim",10.5,12),("Nova Vida",25,25),
+            ("Parnamirim Centro",25,25),("Passagem de Areia",26,26),("Pirangi Praia",25,25),("Pium",18,18),
+            ("Ponta Negra",8,12),("Potilândia",10.5,12),("Rosa dos Ventos",26,26),("Santa Cecília",26,26),
+            ("Santa Tereza",26,26),("Santos Reis",26,26),("Vale do Sol",26,26),("Via Costeira",10,12)
+        ],
+        "garantidos":[
+            ("Segunda a sexta","11h às 15h",80),("Segunda a sexta","11h às 17h",110),
+            ("Segunda a sexta","17h às 23h",95),("Segunda a sexta","18h às 23h",80),
+            ("Sábados, domingos e feriados","11h às 15h",110),("Sábados, domingos e feriados","11h às 17h",130),
+            ("Sábados, domingos e feriados","17h às 23h",110),("Sábados, domingos e feriados","18h às 23h",100)
+        ]
+    },
+    "CHINA_TIROL": {
+        "bairros":[
+            ("Alecrim",8.7,12),("Areias Pretas",10,12),("B. Vermelho",8,12),("Bairro Nazaré",10,12),
+            ("Bairro Nordeste",10.5,12),("Bom Pastor",10,12),("Candelária",9.5,12),("Centro",8.7,12),
+            ("Cidade Nova",11,12),("Dix Sept Rosado",10,12),("Esperança",10,12),("Felipe Camarão",17,17),
+            ("Emaus",19,19),("Jardim América",17,17),("Lagoa Nova",8.7,12),("Lagoa Seca",8,12),
+            ("Mãe Luiza",10,12),("Mirassol",10,12),("Nova Descoberta",8.7,12),("Petrópolis",8.7,12),
+            ("Pitimbu",11.5,12),("Planalto",17,17),("Praia do Meio",10,12),("Quintas",10,12),
+            ("Ribeira",10,12),("Rocas",10,12),("Santos Reis",10.5,12),("Tirol",8,12),
+            ("Via Costeira",10.5,12),("Zona Norte",22,22)
+        ],
+        "garantidos":[
+            ("Segunda a sexta","11h às 15h",80),("Segunda a sexta","11h às 17h",110),
+            ("Segunda a sexta","17h às 23h",95),("Segunda a sexta","18h às 23h",80),
+            ("Sábados, domingos e feriados","11h às 15h",110),("Sábados, domingos e feriados","11h às 17h",130),
+            ("Sábados, domingos e feriados","17h às 23h",110),("Sábados, domingos e feriados","18h às 23h",100)
+        ]
+    },
+    "SUSHI_HOME": {
+        "bairros":[
+            ("Alecrim",13,None),("Areias Pretas",14,None),("B. Vermelho",11,None),("Bairro Nazaré",11,None),
+            ("Bom Pastor",14,None),("Candelária",8,None),("Capim Macio",11,None),("Centro",13,None),
+            ("Cidade da Esperança",13,None),("Cidade Nova",14,None),("Coophab",24,None),("Dix Septo Rosado",11,None),
+            ("Felipe Camarão",17,None),("Lagoa Nova",11,None),("Lagoa Seca",11,None),("Emaus",20,None),
+            ("Parnamirim (Centro)",30,None),("Mãe Luiza",14,None),("Neópolis",12,None),("Nova Descoberta",10,None),
+            ("Nova Parnamirim",17,None),("Petrópolis",13,None),("Planalto",18,None),("Ponta Negra",14,None),
+            ("Praia do Meio",14,None),("Quintas",15,None),("Ribeira",14,None),("Rocas",14,None),
+            ("Santos Reis",15,None),("Tirol",12,None),("Via Costeira",16,None),("Zona Norte (Natal)",30,None),
+            ("Pitimbu",13,None),("Bairro Nordeste",18,None)
+        ],
+        "garantidos":[("Segunda a sexta","",80),("Sábados, domingos e feriados","",110)]
+    },
+    "TAKAMI": {
+        "bairros":[
+            ("Alecrim",13,None),("Areias Pretas",15,None),("B. Vermelho",11,None),("Bairro Nazaré",13,None),
+            ("Bom Pastor",15,None),("Candelária",10,None),("Capim Macio",11,None),("Centro",13,None),
+            ("Cidade da Esperança",15,None),("Cidade Nova",15,None),("Coophab",27,None),("Dix Septo Rosado",13,None),
+            ("Felipe Camarão",18,None),("Lagoa Nova",10,None),("Lagoa Seca",11,None),("Emaus",22,None),
+            ("Parnamirim (Centro)",30,None),("Mãe Luiza",16,None),("Neópolis",12,None),("Nova Descoberta",10,None),
+            ("Nova Parnamirim",17,None),("Petrópolis",12,None),("Planalto",20,None),("Ponta Negra",15,None),
+            ("Praia do Meio",15,None),("Quintas",15,None),("Ribeira",16,None),("Rocas",16,None),
+            ("Santos Reis",17,None),("Tirol",11,None),("Via Costeira",18,None),("Zona Norte (Natal)",30,None),
+            ("Pitimbu",15,None),("Bairro Nordeste",18,None)
+        ],
+        "garantidos":[("Segunda a sexta","",85),("Sábado, domingo e feriado","",105)]
+    },
+    "MAZZANO": {
+        "bairros":[
+            ("Alecrim",15,None),("Areias Pretas",15,None),("B. Vermelho",15,None),("Bairro Nazaré",15,None),
+            ("Bom Pastor",15,None),("Candelária",15,None),("Capim Macio",12,None),("Centro",15,None),
+            ("Cidade da Esperança",15,None),("Cidade Nova",15,None),("Coophab",17,None),("Dix Septo Rosado",15,None),
+            ("Felipe Camarão",20,None),("Lagoa Nova",15,None),("Lagoa Seca",15,None),("Emaus",20,None),
+            ("Parnamirim (Centro)",30,None),("Mãe Luiza",15,None),("Neópolis",13,None),("Nova Descoberta",15,None),
+            ("Nova Parnamirim",15,None),("Petrópolis",15,None),("Planalto",20,None),("Ponta Negra",10,None),
+            ("Praia do Meio",15,None),("Quintas",17,None),("Ribeira",15,None),("Rocas",15,None),
+            ("Santos Reis",15,None),("Tirol",15,None),("Via Costeira",15,None),("Pitimbu",15,None),
+            ("Bairro Nordeste",20,None),("Pium",22,None)
+        ],
+        "garantidos":[("Segunda a sexta","",80),("Sábados, domingos e feriados","",110)]
+    }
+}
+
+
+def _seed_tabelas_estruturadas_v1():
+    """Importação única dos valores conferidos nas tabelas fornecidas pelo usuário.
+    Não sobrescreve tabelas que já possuam bairros/garantidos cadastrados.
+    """
+    _ensure_tabelas_estruturadas_schema()
+    for titulo, payload in TABELAS_ESTRUTURADAS_SEED_V1.items():
+        tab = Tabela.query.filter(func.upper(Tabela.titulo) == titulo.upper()).first()
+        if not tab:
+            continue
+
+        if not TabelaBairro.query.filter_by(tabela_id=tab.id).first():
+            for ordem, (bairro, valor_fixo, valor_base) in enumerate(payload.get("bairros", [])):
+                db.session.add(TabelaBairro(
+                    tabela_id=tab.id,
+                    bairro=bairro,
+                    valor_fixo=valor_fixo,
+                    valor_base=valor_base,
+                    ordem=ordem,
+                    ativo=True,
+                ))
+
+        if not TabelaGarantido.query.filter_by(tabela_id=tab.id).first():
+            for ordem, (descricao, horario, valor) in enumerate(payload.get("garantidos", [])):
+                db.session.add(TabelaGarantido(
+                    tabela_id=tab.id,
+                    descricao=descricao,
+                    horario=horario or None,
+                    valor=valor,
+                    ordem=ordem,
+                ))
+    db.session.commit()
+
+
 # ---------------------------------------------------------------------------
 # Admin: listar / upload / delete
 # ---------------------------------------------------------------------------
 @app.get("/admin/tabelas", endpoint="admin_tabelas")
 @admin_perm_required("tabelas", "ver")
 def admin_tabelas():
-    _ensure_tabelas_estruturadas_schema()
+    _seed_tabelas_estruturadas_v1()
     tabelas = Tabela.query.order_by(Tabela.titulo.asc(), Tabela.id.asc()).all()
     restaurantes = Restaurante.query.order_by(Restaurante.nome.asc()).all()
     garantidos_rows = TabelaGarantido.query.order_by(TabelaGarantido.tabela_id.asc(), TabelaGarantido.ordem.asc(), TabelaGarantido.id.asc()).all()
@@ -8233,7 +8450,7 @@ def admin_delete_tabela(tab_id: int):
 # ---------------------------------------------------------------------------
 @app.get("/tabelas", endpoint="tabelas_publicas")
 def tabelas_publicas():
-    _ensure_tabelas_estruturadas_schema()
+    _seed_tabelas_estruturadas_v1()
     if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
 
@@ -8307,6 +8524,7 @@ def baixar_tabela(tab_id: int):
 # ---------------------------------------------------------------------------
 @app.get("/rest/tabelas", endpoint="rest_tabelas")
 def rest_tabelas():
+    _seed_tabelas_estruturadas_v1()
     if session.get("user_tipo") != "restaurante":
         return redirect(url_for("login"))
 
