@@ -39,13 +39,59 @@ def _first_allowed_admin_target():
 
 @app.before_request
 def _admin_light_v8_redirects():
-    """Não captura mais a navegação normal do Admin.
+    if request.method != "GET" or (request.headers.get("X-Requested-With") or "").lower() == "xmlhttprequest":
+        return None
 
-    As rotas /admin/leve continuam disponíveis para telas que as usam
-    explicitamente, mas /admin e as páginas legadas permanecem no destino
-    solicitado. Isso evita saltos para uma rota leve que possa não ter sido
-    registrada durante uma inicialização parcial.
-    """
+    # legacy=1 significa: manter exatamente a função/modo antigo, alterando
+    # somente o visual/menu pelo bridge. Nunca redireciona esse acesso.
+    if request.args.get("legacy") == "1":
+        return None
+
+    path = request.path or ""
+    endpoint = request.endpoint or ""
+    if endpoint == "admin_dashboard" or path == "/admin":
+        tab = (request.args.get("tab") or "").strip().lower()
+        if not tab:
+            target, target_values = _first_allowed_admin_target()
+            if target != "admin_dashboard":
+                return redirect(url_for(target, **target_values))
+        target = {
+            "": "admin_light_summary",
+            "resumo": "admin_light_summary",
+            "lancamentos": "admin_light_launches",
+            "escalas": "admin_light_scale",
+            "cooperados": "admin_light_cooperatives",
+            "avaliacoes": "admin_light_ratings",
+            "documentos": "admin_light_documents",
+            "tabelas": "admin_light_tables",
+            "avisos": "admin_light_notices",
+        }.get(tab)
+        if target and target in app.view_functions:
+            values = {}
+            for key in ("data_inicio", "data_fim", "q", "cooperado_id", "restaurante_id", "status"):
+                value = request.args.get(key)
+                if value not in (None, ""):
+                    values[key] = value
+            return redirect(url_for(target, **values))
+        if target:
+            # Se uma rota leve não foi registrada, mantém a função no painel
+            # original em vez de devolver erro/Not Found.
+            values = request.args.to_dict(flat=True)
+            values["legacy"] = "1"
+            return redirect(url_for("admin_dashboard", **values))
+
+    path_map = {
+        "/admin/avaliacoes": "admin_light_ratings",
+        "/admin/documentos": "admin_light_documents",
+        "/admin/tabelas": "admin_light_tables",
+        "/admin/avisos": "admin_light_notices",
+        "/admin/rapido": "admin_light_launches",
+    }
+    target = path_map.get(path)
+    if target and target in app.view_functions:
+        return redirect(url_for(target))
+    if target:
+        return None
     return None
 
 
