@@ -1900,7 +1900,7 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
                       >
                         <div class="rest-coop-row">
                           <div class="rest-coop-photo-wrap">
-                            <img loading="lazy" decoding="async" src="{{ url_for('media_coop', coop_id=coop.id) }}" class="rest-coop-photo" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
+                            <img loading="lazy" decoding="async" data-src="{{ url_for('media_coop', coop_id=coop.id) }}" class="rest-coop-photo" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
                             <span class="rest-coop-photo-fallback" style="display:none"><i class="bi bi-person-fill"></i></span>
                           </div>
                           <div class="coop-left">
@@ -2196,7 +2196,7 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
         </div>
       </div>
 
-      <audio id="audioAvisos" preload="auto" src="{{ url_for('static', filename='avisos.mp3') }}"></audio>
+      <audio id="audioAvisos" preload="none" src="{{ url_for('static', filename='avisos.mp3') }}"></audio>
     </main>
   </div>
 
@@ -2914,10 +2914,13 @@ function setPhone(digits) {
       }));
 
       const pendCount={{ _pendencias|length }};
-      const pendingAudio=new Audio('/static/avisos.mp3');
-      pendingAudio.preload='auto';
+      let pendingAudio=null;
       function tocarPendencia(){
         if(!pendCount)return;
+        if(!pendingAudio){
+          pendingAudio=new Audio('/static/avisos.mp3');
+          pendingAudio.preload='none';
+        }
         try{pendingAudio.currentTime=0;pendingAudio.play().catch(()=>{});}catch(e){}
       }
       if(pendCount){
@@ -3679,12 +3682,37 @@ function setPhone(digits) {
       await loadAvisosFromRoute(href);
     });
 
+    function initLazyCoopPhotos(){
+      const imgs=[...document.querySelectorAll('img.rest-coop-photo[data-src]')];
+      if(!imgs.length) return;
+      const load=(img)=>{
+        if(!img.dataset.src || img.src) return;
+        img.src=img.dataset.src;
+        img.removeAttribute('data-src');
+      };
+      if(!('IntersectionObserver' in window)){
+        imgs.slice(0,8).forEach(load);
+        return;
+      }
+      const root=document.getElementById('listaCooperados') || null;
+      const io=new IntersectionObserver((entries)=>{
+        entries.forEach(entry=>{
+          if(entry.isIntersecting){
+            load(entry.target);
+            io.unobserve(entry.target);
+          }
+        });
+      },{root,rootMargin:'120px 0px',threshold:0.01});
+      imgs.forEach(img=>io.observe(img));
+    }
+
     function bootRestPortal(){
       if(window.__restPortalBooted) return;
       window.__restPortalBooted=true;
       const initial=startView();
       showSection(initial);
       hideLancOverlay();
+      initLazyCoopPhotos();
 
       const launchSuccess=document.getElementById('launchSuccessMarker');
       const deleteSuccess=document.getElementById('deleteSuccessMarker');
@@ -3695,7 +3723,7 @@ function setPhone(digits) {
       }
 
       pollAvisos();
-      setInterval(pollAvisos,25000);
+      setInterval(pollAvisos,45000);
     }
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bootRestPortal,{once:true});
     else bootRestPortal();
