@@ -16,6 +16,7 @@ for _name, _value in vars(legacy).items():
 @app.route("/portal/cooperado")
 @role_required("cooperado")
 def portal_cooperado():
+    from sqlalchemy.orm import defer
     u_id = session.get("user_id")
     coop = request_cooperado()
     if not coop:
@@ -298,6 +299,7 @@ def portal_cooperado():
         Cooperado.query
         .join(Usuario, Cooperado.usuario_id == Usuario.id)
         .filter(Cooperado.id != coop.id, Usuario.ativo.is_(True))
+        .options(defer(Cooperado.foto_bytes))
         .order_by(Cooperado.nome.asc())
         .limit(180)
         .all()
