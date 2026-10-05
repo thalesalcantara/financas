@@ -5,7 +5,7 @@ import unicodedata
 from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 
-from flask import abort, flash, redirect, render_template, request, session, url_for
+from flask import abort, flash, g, has_request_context, redirect, render_template, request, session, url_for
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 
@@ -223,6 +223,8 @@ def _coop_scale_rows(coop):
         except Exception:
             db.session.rollback()
     result.sort(key=lambda row: (row.data or date.max, row.inicio or "", row.escala.id))
+    if has_request_context():
+        g._coopex_rest_scale_rows[rest.id] = result
     return result
 
 
@@ -285,6 +287,14 @@ def _rest_scales(rest):
 
 
 def _rest_scale_rows(rest):
+    if has_request_context():
+        cache = getattr(g, "_coopex_rest_scale_rows", None)
+        if cache is None:
+            cache = {}
+            g._coopex_rest_scale_rows = cache
+        if rest.id in cache:
+            return cache[rest.id]
+
     now = datetime.now(TZ)
     today = now.date()
     monday = today - timedelta(days=today.weekday())
