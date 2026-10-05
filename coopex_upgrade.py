@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import os
 import re
 from datetime import date, datetime, timedelta
 from functools import wraps
@@ -140,20 +141,18 @@ def _install_schema() -> None:
             app.logger.exception("Falha ao instalar índices da produção do cooperado")
 
 
-try:
-    _install_schema()
-except Exception:
-    # Falha transitória de conexão não pode invalidar o import do módulo.
-    # As classes já estão registradas no SQLAlchemy; abortar aqui faria uma
-    # segunda tentativa de import redefinir as mesmas tabelas e derrubar o boot.
+if os.getenv("COOPEX_SCHEMA_ON_BOOT", "0") == "1":
     try:
-        with app.app_context():
-            db.session.rollback()
+        _install_schema()
     except Exception:
-        pass
-    app.logger.exception(
-        "Falha transitória ao garantir schema da produção; aplicação continuará subindo."
-    )
+        try:
+            with app.app_context():
+                db.session.rollback()
+        except Exception:
+            pass
+        app.logger.exception(
+            "Falha ao garantir schema da produção; aplicação continuará subindo."
+        )
 
 
 def _require_role(role: str):
