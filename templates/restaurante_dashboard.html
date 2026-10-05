@@ -1000,6 +1000,7 @@
 @media(max-width:980px){.aside{height:auto!important;min-height:0!important;padding:7px 9px 0!important;flex-wrap:wrap!important;gap:3px!important}.aside .brand.coopex-brand-welcome{width:100%!important;min-width:0!important;height:44px!important}.aside .navmenu{width:100%!important;flex:0 0 100%!important;height:50px!important}.aside .navmenu a{height:50px!important;min-height:50px!important;padding:0 10px!important;font-size:.84rem!important}}
 </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/restaurante_v3.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/operational_v5.css', v='20260807-1042') }}">
 </head>
 <body>
   <div class="shell">
@@ -1710,8 +1711,8 @@
                           data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}"
                           data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
                           data-fone-raw="{{ coop.telefone or '' }}"
-                          data-escalado="{{ '1' if (coop.escalado_hoje is defined and coop.escalado_hoje) else '0' }}"
-                          {% if not (coop.escalado_hoje is defined and coop.escalado_hoje) %}hidden{% endif %}
+                          data-escalado="{{ '1' if coop.id in coopex_rest_current_coop_ids else '0' }}"
+                          {% if coop.id not in coopex_rest_current_coop_ids %}hidden{% endif %}
                         >
                           {{ coop.nome }}
                         </option>
@@ -1734,15 +1735,15 @@
                         data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}"
                         data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
                         data-fone-raw="{{ coop.telefone or '' }}"
-                        data-escalado="{{ '1' if (coop.escalado_hoje if coop.escalado_hoje is defined else false) else '0' }}"
-                        style="{% if not (coop.escalado_hoje if coop.escalado_hoje is defined else false) %}display:none;{% endif %}"
+                        data-escalado="{{ '1' if coop.id in coopex_rest_current_coop_ids else '0' }}"
+                        style="{% if coop.id not in coopex_rest_current_coop_ids %}display:none;{% endif %}"
                       >
                         <div class="d-flex justify-content-between align-items-center w-100">
                           <div class="coop-left">
                             <span class="coop-name">{{ coop.nome }}</span>
                             <span class="coop-meta">
-                              {% if coop.escalado_hoje %}
-                                Escalado hoje
+                              {% if coop.id in coopex_rest_current_coop_ids %}
+                                No turno agora
                               {% else %}
                                 Busca manual
                               {% endif %}
