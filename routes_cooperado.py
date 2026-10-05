@@ -112,9 +112,17 @@ def portal_cooperado():
         DespesaCooperado.id.desc(),
     ).limit(120).all()
 
+    # Histórico do cooperado respeita o filtro pela DATA EM QUE O PEDIDO FOI FEITO.
+    # Assim aprovações antigas não ficam acumuladas para sempre na tela.
+    _sol_inicio = datetime.combine(di, datetime.min.time()) if di else None
+    _sol_fim_exclusivo = datetime.combine(df + timedelta(days=1), datetime.min.time()) if df else None
+    _sol_q = SolicitacaoAdiantamento.query.filter_by(cooperado_id=coop.id)
+    if _sol_inicio:
+        _sol_q = _sol_q.filter(SolicitacaoAdiantamento.pedido_em >= _sol_inicio)
+    if _sol_fim_exclusivo:
+        _sol_q = _sol_q.filter(SolicitacaoAdiantamento.pedido_em < _sol_fim_exclusivo)
     solicitacoes_adiantamento = (
-        SolicitacaoAdiantamento.query
-        .filter_by(cooperado_id=coop.id)
+        _sol_q
         .order_by(SolicitacaoAdiantamento.pedido_em.desc(), SolicitacaoAdiantamento.id.desc())
         .limit(60)
         .all()
@@ -280,6 +288,14 @@ def portal_cooperado():
             '#3b82f6' if status in ('tomorrow', 'future') else
             'transparent'
         )
+        _dias_semana = ['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo']
+        if dt:
+            e.data_curta = dt.strftime('%d/%m')
+            e.dia_semana = _dias_semana[dt.weekday()]
+        else:
+            e.data_curta = (e.data or '')[:5]
+            _wd = _weekday_from_data_str(e.data)
+            e.dia_semana = _dias_semana[int(_wd)-1] if _wd in (1,2,3,4,5,6,7) else ''
 
     minha_escala_json = [
         {
@@ -451,6 +467,8 @@ def portal_cooperado():
         despesas_detalhadas=despesas_detalhadas,
         solicitacoes_adiantamento=solicitacoes_adiantamento,
         adiantamento_disponivel=adiantamento_disponivel,
+        adiantamento_semana_inicio=(today - timedelta(days=today.weekday()) - timedelta(days=7)),
+        adiantamento_semana_fim=(today - timedelta(days=today.weekday()) - timedelta(days=1)),
         bloquear_adiantamento=bool(getattr(cfg, "bloquear_adiantamento", False)),
         status_adiantamento_label=_status_adiantamento_label,
         status_adiantamento_badge=_status_adiantamento_badge,
