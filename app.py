@@ -260,6 +260,7 @@ def ajustar_banco():
                 ADD COLUMN IF NOT EXISTS eh_adiantamento BOOLEAN DEFAULT FALSE
             """))
             db.session.commit()
+        _TABELAS_SCHEMA_READY = True
     except Exception:
         db.session.rollback()
 
@@ -7959,7 +7960,7 @@ def tabela_dados(tab_id: int):
         .order_by(TabelaBairro.bairro.asc(), TabelaBairro.id.asc())
         .all()
     )
-    data = _extrair_dados_tabela_arquivo(t) if not bairros_estruturados else {"bairros": [], "informacoes": [], "erro": None, "tipo_arquivo": None, "garantidos_extraidos": []}
+    data = {"bairros": [], "informacoes": [], "erro": None if bairros_estruturados else "Nenhum bairro cadastrado nesta tabela.", "tipo_arquivo": None, "garantidos_extraidos": []}
     garantidos = (
         TabelaGarantido.query
         .filter(TabelaGarantido.tabela_id == t.id)
@@ -7985,7 +7986,7 @@ def tabela_dados(tab_id: int):
         "informacoes": data.get("informacoes", []),
         "erro": data.get("erro"),
         "tipo_arquivo": data.get("tipo_arquivo"),
-        "arquivo_visualizacao": url_for("tabela_abrir", tab_id=t.id),
+        "arquivo_visualizacao": None,
         "garantidos_extraidos": data.get("garantidos_extraidos", []),
         "garantidos": [{
             "descricao": g.descricao or "Garantido",
@@ -7997,8 +7998,14 @@ def tabela_dados(tab_id: int):
 
 
 
+_TABELAS_SCHEMA_READY = False
+_TABELAS_SEED_READY = False
+
 def _ensure_tabelas_estruturadas_schema():
-    """Cria a estrutura nova de bairros/valores sem depender das tabelas em PDF."""
+    """Cria a estrutura nova uma única vez por processo."""
+    global _TABELAS_SCHEMA_READY
+    if _TABELAS_SCHEMA_READY:
+        return
     try:
         TabelaBairro.__table__.create(bind=db.engine, checkfirst=True)
         if db.engine.dialect.name == "postgresql":
@@ -8201,9 +8208,10 @@ TABELAS_ESTRUTURADAS_SEED_V1 = {
 
 
 def _seed_tabelas_estruturadas_v1():
-    """Importação única dos valores conferidos nas tabelas fornecidas pelo usuário.
-    Não sobrescreve tabelas que já possuam bairros/garantidos cadastrados.
-    """
+    """Importação única dos valores conferidos nas tabelas fornecidas pelo usuário."""
+    global _TABELAS_SEED_READY
+    if _TABELAS_SEED_READY:
+        return
     _ensure_tabelas_estruturadas_schema()
     for titulo, payload in TABELAS_ESTRUTURADAS_SEED_V1.items():
         tab = Tabela.query.filter(func.upper(Tabela.titulo) == titulo.upper()).first()
@@ -8231,6 +8239,7 @@ def _seed_tabelas_estruturadas_v1():
                     ordem=ordem,
                 ))
     db.session.commit()
+    _TABELAS_SEED_READY = True
 
 
 # ---------------------------------------------------------------------------
@@ -8256,44 +8265,28 @@ def admin_tabelas():
 @app.post("/admin/tabelas/upload", endpoint="admin_upload_tabela")
 @admin_perm_required("tabelas", "criar")
 def admin_upload_tabela():
-    f = request.form
-    restaurante_id = f.get("restaurante_id", type=int)
-    restaurante = db.session.get(Restaurante, restaurante_id) if restaurante_id else None
-    titulo = ((restaurante.nome if restaurante else None) or f.get("titulo") or "").strip()
-    descricao = (f.get("descricao") or "").strip() or None
-
-    arquivo = (
-        request.files.get("arquivo")
-        or request.files.get("file")
-        or request.files.get("tabela")
-    )
-
-    if not titulo or not (arquivo and arquivo.filename):
-        flash("Preencha o título e selecione o arquivo.", "warning")
+    _ensure_tabelas_estruturadas_schema()
+    titulo = (request.form.get("titulo") or "").strip()
+    descricao = (request.form.get("descricao") or "").strip() or None
+    if not titulo:
+        flash("Informe o nome da tabela/contrato.", "warning")
         return redirect(url_for("admin_tabelas"))
 
-    base_dir = _tabelas_base_dir()
-
-    raw = secure_filename(arquivo.filename)
-    stem, ext = os.path.splitext(raw)
-    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    safe_stem = re.sub(r"[^A-Za-z0-9_.-]+", "-", stem) or "arquivo"
-    final_name = f"{safe_stem}_{ts}{ext or ''}"
-
-    dest = base_dir / final_name
-    arquivo.save(str(dest))
+    existente = Tabela.query.filter(func.upper(Tabela.titulo) == titulo.upper()).first()
+    if existente:
+        flash("Já existe uma tabela com esse nome.", "warning")
+        return redirect(url_for("admin_tabelas"))
 
     t = Tabela(
         titulo=titulo,
         descricao=descricao,
-        arquivo_url=final_name,
-        arquivo_nome=arquivo.filename,
+        arquivo_url=None,
+        arquivo_nome=None,
         enviado_em=datetime.utcnow(),
     )
     db.session.add(t)
     db.session.commit()
-
-    flash("Tabela publicada.", "success")
+    flash("Tabela criada. Agora cadastre bairros, valores e garantidos.", "success")
     return redirect(url_for("admin_tabelas"))
 
 
@@ -8390,37 +8383,8 @@ def admin_delete_tabela_garantido(garantido_id: int):
 @admin_perm_required("tabelas", "editar")
 def admin_replace_tabela(tab_id: int):
     t = Tabela.query.get_or_404(tab_id)
-    f = request.form
-
-    restaurante_id = f.get("restaurante_id", type=int)
-    restaurante = db.session.get(Restaurante, restaurante_id) if restaurante_id else None
-    t.titulo = ((restaurante.nome if restaurante else None) or f.get("titulo") or t.titulo or "").strip()
-    t.descricao = (f.get("descricao") or "").strip() or None
-
-    arquivo = request.files.get("arquivo") or request.files.get("file") or request.files.get("tabela")
-    if arquivo and arquivo.filename:
-        base_dir = _tabelas_base_dir()
-        raw = secure_filename(arquivo.filename)
-        stem, ext = os.path.splitext(raw)
-        ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        safe_stem = re.sub(r"[^A-Za-z0-9_.-]+", "-", stem) or "arquivo"
-        final_name = f"{safe_stem}_{ts}{ext or ''}"
-        arquivo.save(str(base_dir / final_name))
-
-        old_url = (t.arquivo_url or "").strip()
-        if old_url and not old_url.startswith(("http://", "https://")):
-            old_name = old_url.split("?", 1)[0].split("#", 1)[0].split("/")[-1]
-            for old_path in (base_dir / old_name, Path(STATIC_TABLES) / old_name):
-                try:
-                    if old_path.exists() and old_path.is_file():
-                        old_path.unlink()
-                        break
-                except Exception:
-                    pass
-
-        t.arquivo_url = final_name
-        t.arquivo_nome = arquivo.filename
-
+    t.titulo = (request.form.get("titulo") or t.titulo or "").strip()
+    t.descricao = (request.form.get("descricao") or "").strip() or None
     t.enviado_em = datetime.utcnow()
     db.session.commit()
     flash("Tabela atualizada.", "success")
