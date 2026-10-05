@@ -1017,6 +1017,9 @@
         <a data-target="lancar" class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos','tabelas']) else '' }}" href="{{ url_for('portal_restaurante', view='lancar') }}">
           <i class="bi bi-person-lines-fill"></i><span>Lançar Produção</span>
         </a>
+        <a data-coopex-producoes="1" href="{{ url_for('rest_producoes_pendentes') }}">
+          <i class="bi bi-clipboard-check"></i><span>Produções da Semana</span>
+        </a>
         <a data-target="lancamentos" class="{{ 'active' if view=='lancamentos' else '' }}" href="{{ url_for('portal_restaurante', view='lancamentos') }}">
           <i class="bi bi-receipt"></i><span>Histórico de Produção</span>
         </a>
@@ -1041,6 +1044,11 @@
     </aside>
 
     <main class="content">
+      <div class="coopex-welcome-bar mb-3" style="background:#fff;border:1px solid var(--border);border-left:5px solid var(--royal);border-radius:16px;padding:13px 16px;box-shadow:0 6px 18px rgba(33,65,217,.06)">
+        <div style="font-size:.75rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Bem-vindo</div>
+        <div style="font-size:1.05rem;font-weight:800;color:var(--royal)">{{ ((rest.nome if rest is defined and rest else (restaurante.nome if restaurante is defined and restaurante else 'ESTABELECIMENTO'))|replace('_',' ')) }}</div>
+      </div>
+
       {% with msgs = get_flashed_messages(with_categories=True) %}
         {% if msgs %}
           <div class="mb-3">
