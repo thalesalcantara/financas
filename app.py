@@ -3560,8 +3560,8 @@ def admin_add_lancamento():
         descricao=(f.get("descricao") or "").strip(),
         valor=f.get("valor", type=float),
         data=_parse_date(f.get("data")),
-        hora_inicio=f.get("hora_inicio"),
-        hora_fim=f.get("hora_fim"),
+        hora_inicio=hora_inicio,
+        hora_fim=hora_fim,
         qtd_entregas=f.get("qtd_entregas", type=int),
     )
 
@@ -7250,6 +7250,14 @@ def lancar_producao():
     if not rest:
         abort(403)
     f = request.form
+
+    # Horário é obrigatório para lançamento manual/avulso. Quando o lançamento
+    # parte de uma escala ou pendência, o painel já envia o horário da escala.
+    hora_inicio = (f.get("hora_inicio") or "").strip()
+    hora_fim = (f.get("hora_fim") or "").strip()
+    if not hora_inicio or not hora_fim:
+        flash("Informe a hora de início e a hora de fim. Em lançamentos de escala ou pendência, o horário é preenchido automaticamente.", "warning")
+        return redirect(url_for("portal_restaurante", view="lancar"))
 
     # NOVO: captura a descrição do formulário (somente para o estabelecimento)
     desc_raw = (f.get("descricao") or "").strip()
