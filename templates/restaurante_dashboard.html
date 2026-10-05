@@ -1706,7 +1706,7 @@
                         <option
                           value="{{ coop.id }}"
                           data-nome="{{ coop.nome }}"
-                          data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
+                          data-foto="{{ url_for('media_coop', coop_id=coop.id) }}"
                           data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}"
                           data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
                           data-fone-raw="{{ coop.telefone or '' }}"
@@ -1730,7 +1730,7 @@
                         class="cooperado-item w-100 text-start"
                         data-id="{{ coop.id }}"
                         data-nome="{{ coop.nome }}"
-                        data-foto="{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
+                        data-foto="{{ url_for('media_coop', coop_id=coop.id) }}"
                         data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}"
                         data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
                         data-fone-raw="{{ coop.telefone or '' }}"
