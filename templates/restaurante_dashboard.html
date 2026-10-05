@@ -1170,6 +1170,49 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
   section[data-view="lancar"] .rest-production-table thead th{font-size:.76rem!important;padding:.36rem .42rem!important}
   section[data-view="lancar"] .rest-production-table tbody td{font-size:.81rem!important;padding:.34rem .42rem!important}
 }
+
+/* Calibração final para 100% ficar visualmente igual ao 110% preferido */
+@media(min-width:1200px){
+  body{font-size:16.5px!important}
+  .content{padding:7px 10px 12px!important}
+  section[data-view="lancar"]{font-size:1.04em!important}
+  section[data-view="lancar"] .rest-launch-head{padding:9px 14px!important;min-height:52px!important}
+  section[data-view="lancar"] .rest-period-bar{padding:7px 9px!important}
+  section[data-view="lancar"] .rest-period-form{grid-template-columns:185px 185px minmax(210px,1fr) auto auto auto!important;gap:7px!important}
+  section[data-view="lancar"] .rest-period-field .form-control{height:37px!important;min-height:37px!important}
+  section[data-view="lancar"] .rest-btn-primary,
+  section[data-view="lancar"] .rest-btn-light,
+  section[data-view="lancar"] .rest-sound-status{height:37px!important;min-height:37px!important}
+
+  section[data-view="lancar"]>.row.g-4{--bs-gutter-x:8px!important}
+  section[data-view="lancar"] .lancar-layout-card .card-body{padding:9px!important}
+  section[data-view="lancar"] .rest-list-head{padding:7px 9px!important}
+  section[data-view="lancar"] .rest-search-wrap{padding:6px 8px 5px!important}
+  section[data-view="lancar"] .rest-search .form-control,
+  section[data-view="lancar"] .rest-search .input-group-text{height:36px!important;min-height:36px!important}
+  section[data-view="lancar"] .rest-list-tab{padding:7px 5px!important}
+  section[data-view="lancar"] .cooperado-item{min-height:49px!important;padding:5px 7px!important}
+  section[data-view="lancar"] .rest-coop-photo,
+  section[data-view="lancar"] .rest-coop-photo-fallback{width:36px!important;height:36px!important}
+  section[data-view="lancar"] .rest-coop-row{grid-template-columns:38px minmax(0,1fr) auto!important;gap:7px!important}
+  section[data-view="lancar"] .selected-header{min-height:60px!important;grid-template-columns:48px minmax(0,1fr) auto!important}
+  section[data-view="lancar"] .selected-header img.big{width:46px!important;height:46px!important}
+
+  section[data-view="lancar"] .rest-fast-form{padding:7px!important}
+  section[data-view="lancar"] .rest-fast-form .row{--bs-gutter-x:8px!important;--bs-gutter-y:5px!important}
+  section[data-view="lancar"] .rest-fast-form .form-control,
+  section[data-view="lancar"] .rest-field-icon .input-group-text{height:37px!important;min-height:37px!important}
+  section[data-view="lancar"] .rest-fast-form textarea.form-control{height:41px!important;min-height:41px!important}
+  section[data-view="lancar"] #formLancamento .btn-royal{height:37px!important;min-height:37px!important;padding:0 12px!important}
+
+  section[data-view="lancar"] .rest-history-strip{min-height:49px!important;padding:6px 9px!important}
+  section[data-view="lancar"] .rest-mini-kpi{height:40px!important;min-width:132px!important;padding:4px 8px!important}
+  section[data-view="lancar"] .rest-production-table thead th{padding:.40rem .46rem!important}
+  section[data-view="lancar"] .rest-production-table tbody td{padding:.38rem .46rem!important}
+
+  section[data-view="lancar"]>.row.g-4>.rest-coop-column{width:40%!important}
+  section[data-view="lancar"]>.row.g-4>.rest-form-column{width:60%!important}
+}
 </style>
 </head>
 <body>
