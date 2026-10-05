@@ -605,14 +605,34 @@ def portal_restaurante():
         week_end = week_start + timedelta(days=6)
 
         # Fonte robusta usada também na troca de período/escala.
+        # IMPORTANTE: a escala do estabelecimento é semanal/recorrente.
+        # Muitas linhas guardam uma data antiga + o dia da semana. A tela
+        # "Escalados" já projeta essas linhas para a semana atual; fazemos
+        # exatamente a mesma coisa aqui para não sumir a Produção da Semana.
         week_scales = []
         seen_scale_ids = set()
         for scale in production_perf._rest_scales_indexed(rest):
-            scale_day = production_shifts.exact_scale_date(scale, today_local)
-            if not scale_day or not (week_start <= scale_day <= week_end):
-                continue
             if scale.id in seen_scale_ids:
                 continue
+
+            raw_day = _parse_data_escala_str(scale.data)
+            weekday_num = _weekday_from_data_str(scale.data)
+
+            if raw_day and week_start <= raw_day <= week_end:
+                scale_day = raw_day
+            elif weekday_num:
+                try:
+                    scale_day = week_start + timedelta(days=int(weekday_num) - 1)
+                except Exception:
+                    scale_day = None
+            else:
+                # último fallback para formatos antigos sem weekday explícito
+                parsed = production_shifts.exact_scale_date(scale, today_local)
+                scale_day = parsed if parsed and week_start <= parsed <= week_end else None
+
+            if not scale_day:
+                continue
+
             seen_scale_ids.add(scale.id)
             week_scales.append((scale, scale_day))
 
