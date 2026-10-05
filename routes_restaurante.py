@@ -21,7 +21,7 @@ def portal_restaurante():
     from werkzeug.routing import BuildError
 
     u_id = session.get("user_id")
-    rest = Restaurante.query.filter_by(usuario_id=u_id).first()
+    rest = request_restaurante()
     if not rest:
         return (
             "<p style='font-family:Arial;margin:40px'>"
