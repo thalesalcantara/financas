@@ -96,7 +96,11 @@ def portal_restaurante():
     ref = _parse_date(request.args.get("ref")) or date.today()
     modo = request.args.get("modo", "semana")
 
-    if modo == "dia":
+    if view == "lancar":
+        ref = date.today()
+        modo = "dia"
+        dias_list = [ref]
+    elif modo == "dia":
         dias_list = [ref]
     else:
         semana_inicio = ref - timedelta(days=ref.weekday())
@@ -127,7 +131,7 @@ def portal_restaurante():
             or_(Escala.cooperado_id.is_(None), Usuario.ativo.is_(True)),
         )
         .order_by(Escala.id.desc())
-        .limit(350)
+        .limit(180 if view == "lancar" else 350)
         .all()
     )
     # Compatibilidade legada sem varrer centenas de escalas de outros contratos.
@@ -148,7 +152,7 @@ def portal_restaurante():
             ),
         )
         .order_by(Escala.id.desc())
-        .limit(180)
+        .limit(80 if view == "lancar" else 180)
         .all()
     )
     escalas_all = sorted(direct_scales + legacy_scales, key=lambda e: e.id)
@@ -244,6 +248,11 @@ def portal_restaurante():
             )
         )
 
+    try:
+        current_app.logger.info("REST_PORTAL_SCALES %.3fs view=%s rest_id=%s", _time.perf_counter()-_portal_perf_started, view, rest.id)
+    except Exception:
+        pass
+
     # -------------------- COOPERADOS ESCALADOS NO PERÍODO / HOJE --------------------
     hoje = date.today()
 
@@ -264,18 +273,6 @@ def portal_restaurante():
                 nome_pl = (item.get("nome_planilha") or "").strip()
                 if nome_pl:
                     nomes_escalados_sem_cadastro.add(nome_pl)
-
-    cooperados_escalados = (
-        Cooperado.query
-        .join(Usuario, Cooperado.usuario_id == Usuario.id)
-        .filter(
-            Usuario.ativo.is_(True),
-            Cooperado.id.in_(ids_escalados_periodo) if ids_escalados_periodo else literal(False)
-        )
-        .options(defer(Cooperado.foto_bytes))
-        .order_by(Cooperado.nome)
-        .all()
-    )
 
     # todos ativos, para busca manual no lançamento
     cooperados_ativos = (
@@ -301,6 +298,11 @@ def portal_restaurante():
             (c.nome or "").lower()
         )
     )
+    try:
+        current_app.logger.info("REST_PORTAL_COOPS %.3fs view=%s rest_id=%s", _time.perf_counter()-_portal_perf_started, view, rest.id)
+    except Exception:
+        pass
+
     # -------------------- LANÇAMENTOS / TOTAIS POR PERÍODO --------------------
     total_bruto = 0.0
     total_qtd = 0
@@ -334,11 +336,10 @@ def portal_restaurante():
             Lancamento.query
             .filter(
                 Lancamento.restaurante_id == rest.id,
-                Lancamento.data >= di,
-                Lancamento.data <= df,
+                Lancamento.data == date.today(),
             )
             .order_by(Lancamento.data.desc(), Lancamento.id.desc())
-            .limit(120)
+            .limit(80)
             .all()
         )
         for _l in lancamentos_periodo_all:
