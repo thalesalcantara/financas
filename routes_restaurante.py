@@ -581,6 +581,33 @@ def portal_restaurante():
         total_lanc_valor = sum(x["valor"] for x in lancamentos_periodo)
         total_lanc_entregas = sum(x["qtd_entregas"] for x in lancamentos_periodo)
 
+    # -------------------- PRODUÇÕES DA SEMANA --------------------
+    # Carrega este bloco somente quando a aba é aberta. Mantém o painel
+    # principal leve nas demais telas.
+    producoes_semana_previstas = []
+    producoes_semana_pendentes = []
+    producoes_semana_recentes = []
+    if view == "producoes":
+        import production_scale_backend as production_backend
+        producoes_semana_previstas = production_backend._rest_scale_rows(rest)
+        producoes_semana_pendentes = [
+            row.producao
+            for row in producoes_semana_previstas
+            if row.producao
+            and row.producao.status == "pendente"
+            and float(row.producao.valor_total or 0) > 0
+        ]
+        producoes_semana_recentes = (
+            ProducaoCooperado.query
+            .filter(
+                ProducaoCooperado.restaurante_id == rest.id,
+                ProducaoCooperado.status.in_(["aprovada", "recusada"]),
+            )
+            .order_by(ProducaoCooperado.decidido_em.desc(), ProducaoCooperado.id.desc())
+            .limit(50)
+            .all()
+        )
+
     # ---- URLs/flags para template
     from werkzeug.routing import BuildError
     try:
@@ -619,6 +646,9 @@ def portal_restaurante():
         escalados_hoje=escalados_hoje,
         cooperados_busca_manual=cooperados_busca_manual,
         lancamentos_pendentes=lancamentos_pendentes,
+        producoes_semana_previstas=producoes_semana_previstas,
+        producoes_semana_pendentes=producoes_semana_pendentes,
+        producoes_semana_recentes=producoes_semana_recentes,
         hoje=hoje,
     )
 
