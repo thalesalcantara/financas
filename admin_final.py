@@ -22,6 +22,7 @@ Restaurante = legacy.Restaurante
 Escala = legacy.Escala
 TrocaSolicitacao = legacy.TrocaSolicitacao
 AdminPermissao = getattr(legacy, "AdminPermissao", None)
+RastreamentoPermissao = getattr(legacy, "RastreamentoPermissao", None)
 BUILD = "20260807-1408-v11"
 
 
@@ -383,6 +384,16 @@ def admin_v10_establishments():
     q_raw = request.args.get("q") or ""
     q = _norm(q_raw)
     status = (request.args.get("status") or "todos").strip().lower()
+    tracking_allowed_ids = set()
+    if RastreamentoPermissao is not None:
+        try:
+            tracking_allowed_ids = {
+                int(x[0]) for x in db.session.query(RastreamentoPermissao.restaurante_id)
+                .filter(RastreamentoPermissao.autorizado.is_(True)).all()
+            }
+        except Exception:
+            db.session.rollback()
+            tracking_allowed_ids = set()
     result = []
     for r in Restaurante.query.options(joinedload(Restaurante.usuario_ref)).order_by(Restaurante.nome.asc()).all():
         user = getattr(r, "usuario_ref", None)
@@ -393,7 +404,7 @@ def admin_v10_establishments():
             continue
         if q and q not in _norm(f"{r.nome} {getattr(user, 'usuario', '')}"):
             continue
-        result.append(SimpleNamespace(rest=r, active=active))
+        result.append(SimpleNamespace(rest=r, active=active, tracking=(r.id in tracking_allowed_ids)))
     return render_template("admin_establishments_v10.html", page_title="Estabelecimentos", active_tab="estabelecimentos", rows=result, q=q_raw, status=status, build=BUILD)
 
 
