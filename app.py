@@ -944,6 +944,17 @@ class Tabela(db.Model):
     enviado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class TabelaGarantido(db.Model):
+    __tablename__ = "tabela_garantidos"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tabela_id = db.Column(db.Integer, db.ForeignKey("tabelas.id", ondelete="CASCADE"), nullable=False, index=True)
+    descricao = db.Column(db.String(120))
+    horario = db.Column(db.String(80), nullable=False)
+    valor = db.Column(db.Float, nullable=False, default=0.0)
+    ordem = db.Column(db.Integer, nullable=False, default=0)
+
+
 # ---------- AVISOS (NOVO) ----------
 aviso_restaurantes = db.Table(
     "aviso_restaurantes",
@@ -7685,7 +7696,11 @@ def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
 def admin_tabelas():
     tabelas = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
     restaurantes = Restaurante.query.order_by(Restaurante.nome.asc()).all()
-    return render_template("admin_tabelas.html", tabelas=tabelas, restaurantes=restaurantes)
+    garantidos_rows = TabelaGarantido.query.order_by(TabelaGarantido.tabela_id.asc(), TabelaGarantido.ordem.asc(), TabelaGarantido.id.asc()).all()
+    garantidos_map = {}
+    for g in garantidos_rows:
+        garantidos_map.setdefault(g.tabela_id, []).append(g)
+    return render_template("admin_tabelas.html", tabelas=tabelas, restaurantes=restaurantes, garantidos_map=garantidos_map)
 
 
 @app.post("/admin/tabelas/upload", endpoint="admin_upload_tabela")
@@ -7729,6 +7744,33 @@ def admin_upload_tabela():
     db.session.commit()
 
     flash("Tabela publicada.", "success")
+    return redirect(url_for("admin_tabelas"))
+
+
+@app.post("/admin/tabelas/<int:tab_id>/garantidos", endpoint="admin_add_tabela_garantido")
+@admin_perm_required("tabelas", "editar")
+def admin_add_tabela_garantido(tab_id: int):
+    Tabela.query.get_or_404(tab_id)
+    descricao = (request.form.get("descricao") or "").strip() or None
+    horario = (request.form.get("horario") or "").strip()
+    valor = parse_valor_monetario(request.form.get("valor"), 0.0)
+    if not horario or valor <= 0:
+        flash("Informe o horário e o valor do garantido.", "warning")
+        return redirect(url_for("admin_tabelas"))
+    ordem = db.session.query(func.count(TabelaGarantido.id)).filter(TabelaGarantido.tabela_id == tab_id).scalar() or 0
+    db.session.add(TabelaGarantido(tabela_id=tab_id, descricao=descricao, horario=horario, valor=valor, ordem=int(ordem)))
+    db.session.commit()
+    flash("Garantido adicionado.", "success")
+    return redirect(url_for("admin_tabelas"))
+
+
+@app.post("/admin/tabelas/garantidos/<int:garantido_id>/delete", endpoint="admin_delete_tabela_garantido")
+@admin_perm_required("tabelas", "editar")
+def admin_delete_tabela_garantido(garantido_id: int):
+    g = TabelaGarantido.query.get_or_404(garantido_id)
+    db.session.delete(g)
+    db.session.commit()
+    flash("Garantido removido.", "success")
     return redirect(url_for("admin_tabelas"))
 
 
@@ -7809,6 +7851,15 @@ def tabelas_publicas():
 
     tabs = Tabela.query.order_by(Tabela.titulo.asc(), Tabela.enviado_em.desc(), Tabela.id.desc()).all()
 
+    garantidos_rows = TabelaGarantido.query.order_by(TabelaGarantido.tabela_id.asc(), TabelaGarantido.ordem.asc(), TabelaGarantido.id.asc()).all()
+    garantidos_map = {}
+    for g in garantidos_rows:
+        garantidos_map.setdefault(g.tabela_id, []).append({
+            "descricao": g.descricao or "",
+            "horario": g.horario or "",
+            "valor": float(g.valor or 0.0),
+        })
+
     items = [{
         "id": t.id,
         "titulo": t.titulo,
@@ -7828,6 +7879,7 @@ def tabelas_publicas():
         tabelas=tabs,
         items=items,
         back_href=back_href,
+        garantidos_map=garantidos_map,
     )
 
 
