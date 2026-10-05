@@ -319,3 +319,58 @@ body{margin:0!important}
 .esc-date-title{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:2px!important}
 .esc-date-title strong{font-size:.90rem!important;line-height:1!important}
 .esc-weekday{font-size:.64rem!important;color:#667085!important;font-weight:600!important;line-height:1.1!important}
+
+
+/* Acessibilidade visual: tipografia maior sem perder o encaixe mobile */
+@media(max-width:430px){
+  body{font-size:17px!important}
+
+  .app-head-stat strong{font-size:1rem!important}
+  .app-head-stat small{font-size:.66rem!important}
+  .app-head-icon{font-size:1.08rem!important}
+  .app-bell i{font-size:1.18rem!important}
+
+  .filter-mini .form-control{font-size:.90rem!important}
+  .filter-mini .btn-royal{font-size:.90rem!important}
+
+  .section-title{font-size:1.05rem!important}
+  .section-chip{font-size:.74rem!important}
+  .item-title{font-size:.94rem!important;line-height:1.25!important}
+  .item-meta,.item-small{font-size:.80rem!important;line-height:1.38!important}
+  .item-amount{font-size:.94rem!important}
+
+  .kpi-title{font-size:.74rem!important}
+  .kpi-value{font-size:1.14rem!important}
+  .kpi-sub{font-size:.76rem!important;line-height:1.3!important}
+
+  .today-production-form .today-field label{font-size:.74rem!important}
+  .today-production-form .form-control{font-size:.92rem!important}
+  .today-production-form .btn{font-size:.88rem!important}
+  .today-note{font-size:.78rem!important}
+
+  .esc-title{font-size:.96rem!important}
+  .esc-date-title strong{font-size:1rem!important}
+  .esc-weekday{font-size:.76rem!important}
+  .esc-meta{font-size:.80rem!important}
+  .esc-badge{font-size:.68rem!important}
+  .btn-xs{font-size:.76rem!important}
+
+  .status-soft{font-size:.72rem!important}
+  #tab-trocas .btn-sm{font-size:.78rem!important}
+
+  .tab-btn i{font-size:1.12rem!important}
+  .tab-btn span{font-size:.66rem!important}
+  .tab-btn{min-height:58px!important}
+
+  .form-label{font-size:.84rem!important}
+  .form-control,.form-select{font-size:.92rem!important}
+
+  .help-box{font-size:.76rem!important}
+}
+
+@media(max-width:360px){
+  .item-title{font-size:.90rem!important}
+  .item-meta,.item-small{font-size:.76rem!important}
+  .kpi-value{font-size:1.06rem!important}
+  .tab-btn span{font-size:.62rem!important}
+}
