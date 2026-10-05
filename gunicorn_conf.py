@@ -19,8 +19,6 @@ MODULES = (
     "production_scale_flow",
     "production_scale_backend",
     "production_ui",
-    "performance_ui",
-    "performance_queries",
     "production_shift_time",
     "cooperative_notifications_ui",
     "operational_rules",
