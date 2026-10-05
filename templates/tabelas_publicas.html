@@ -3,57 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Taxas por Bairro</title>
+<title>Tabelas</title>
 <style>
-:root{--bg:#eef3f9;--card:#fff;--text:#182335;--muted:#74839a;--border:#e2e8f0;--blue:#0b57e3;--dark:#101828}
-*{box-sizing:border-box}
-html,body{margin:0;min-height:100%;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
-button,input,select{font:inherit}
-body{background:linear-gradient(180deg,#f8fbff 0,#eef3f9 100%)}
-.app{max-width:430px;margin:0 auto;padding:12px 12px 96px}
-.hero{background:linear-gradient(135deg,#0757d9 0%,#103c8d 48%,#06275d 100%);color:#fff;border-radius:24px;padding:17px 16px;box-shadow:0 18px 40px rgba(20,35,70,.20)}
-.hero h1{margin:0;font-size:20px;font-weight:900}.hero p{margin:5px 0 0;font-size:12px;opacity:.82}
-.back{display:inline-flex;margin-top:9px;color:#fff;text-decoration:none;font-size:11px;font-weight:900}
-.section{margin-top:12px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:12px;box-shadow:0 7px 22px rgba(20,40,70,.06)}
-.select-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
-select,.clear{height:44px;border:1px solid var(--border);border-radius:14px;background:#fff;padding:0 12px;font-weight:800}
-.clear{background:#fff4f4;color:#bd2b2b;border-color:#ffd1d1;cursor:pointer}
-.mode{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;background:#edf1f7;padding:4px;border-radius:15px}
-.mode button{border:0;background:transparent;min-height:38px;border-radius:12px;font-weight:900;color:#677386;cursor:pointer}
-.mode button.active{background:#fff;color:var(--blue);box-shadow:0 2px 8px rgba(20,40,75,.08)}
-.search-wrap{position:relative;margin-top:10px}.search-wrap span{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#7a879a}
-.search-wrap input{width:100%;height:44px;border:1px solid var(--border);border-radius:14px;padding:0 12px 0 40px;font-size:15px;outline:none;background:#fbfcfe}
-.last{margin-top:10px;background:#f8fbff;border:1px solid var(--border);border-radius:16px;padding:11px}
-.last .label{font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:900;letter-spacing:.05em}.last .name{margin-top:5px;font-size:16px;font-weight:900}.last .price{font-size:27px;font-weight:950;margin-top:6px}.last .meta{font-size:10px;color:var(--muted);margin-top:3px}
-.guarantees{display:none}.guarantees.show{display:block}.g-title{font-size:13px;font-weight:900;margin-bottom:8px}
-.g-line{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #edf1f6}.g-line:last-child{border-bottom:0}
-.g-line .d{font-size:12px;font-weight:900}.g-line .h{font-size:10px;color:var(--muted);margin-top:2px}.g-line .v{font-size:17px;font-weight:950;color:var(--blue);white-space:nowrap}
-.info{display:none}.info.show{display:block}.info div{font-size:11px;line-height:1.45;padding:6px 0;border-bottom:1px solid #eef1f5}.info div:last-child{border-bottom:0}
-.headline{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}.headline strong{font-size:14px}.headline span{font-size:11px;color:var(--muted)}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
-.card{min-height:64px;border:1px solid var(--border);border-radius:14px;padding:8px 10px;text-align:left;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;position:relative;box-shadow:0 4px 12px rgba(20,40,70,.05)}
-.card:active{transform:scale(.985)}.card .name{font-size:16.5px;font-weight:950;line-height:1.08;padding-right:24px}.card .price{font-size:18px;font-weight:950;margin-top:0;white-space:nowrap}.card .meta{font-size:9px;color:#617086;margin-top:3px;text-align:right}.card .city{font-size:9px;color:#7b879a;margin-top:2px}.card .pill{position:absolute;right:9px;top:9px;min-width:24px;height:24px;border-radius:999px;padding:0 7px;background:rgba(17,24,39,.09);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900}
-.c0{background:linear-gradient(180deg,#eff6ff,#fbfdff);border-color:#d7e8ff}.c1{background:linear-gradient(180deg,#f0faf2,#fbfdfb);border-color:#d5edd9}.c2{background:linear-gradient(180deg,#fff8e8,#fffdf8);border-color:#f4e0b6}.c3{background:linear-gradient(180deg,#fff1fa,#fffafd);border-color:#f1d1e7}.c4{background:linear-gradient(180deg,#f5f1ff,#fbfaff);border-color:#dfd6ff}.c5{background:linear-gradient(180deg,#fff1ef,#fffafa);border-color:#ffd8d2}
-.drawer{position:fixed;left:0;right:0;bottom:0;max-width:430px;margin:0 auto;padding:0 10px 10px;z-index:30}
-.total-btn{width:100%;border:0;background:#111827;color:#fff;border-radius:18px;padding:12px 14px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;box-shadow:0 18px 36px rgba(17,24,39,.28);cursor:pointer}
-.total-btn span{display:block;font-size:10px;opacity:.72}.total-btn strong{display:block;font-size:22px;margin-top:2px}.total-btn .r{text-align:right}.total-btn .r b{display:block;font-size:13px}.total-btn .r small{font-size:10px;opacity:.72}
-.summary{margin-top:8px;background:#fff;border:1px solid var(--border);border-radius:20px;box-shadow:0 18px 40px rgba(18,35,65,.14);max-height:0;overflow:hidden;transition:max-height .22s ease}.summary.open{max-height:360px}.summary-head{padding:12px 14px;border-bottom:1px solid #edf1f6;font-weight:900;font-size:14px}.summary-list{max-height:295px;overflow:auto;padding:0 14px 10px}
-.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:11px 0;border-bottom:1px solid #eef1f5}.row:last-child{border-bottom:0}.row .n{font-size:12px;font-weight:900}.row .m{font-size:10px;color:var(--muted);margin-top:3px}.qty{display:flex;align-items:center;gap:4px}.qty button{width:30px;height:30px;border:1px solid var(--border);background:#fff;border-radius:10px;font-weight:900}.qty b{min-width:22px;text-align:center;font-size:12px}
-.empty{grid-column:1/-1;padding:16px;border:1px dashed var(--border);border-radius:16px;text-align:center;color:var(--muted);font-size:12px}.loading{opacity:.7}
-.original-viewer{display:none;margin-top:12px;background:#fff;border:1px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:0 7px 22px rgba(20,40,70,.06)}
-.original-viewer.show{display:block}.original-viewer iframe{display:block;width:100%;height:72vh;min-height:560px;border:0;background:#fff}
-.original-head{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:900}
-.original-head a{color:var(--blue);text-decoration:none}
-@media(min-width:760px){.app{max-width:760px}.drawer{max-width:760px}.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+:root{--blue:#064fc8;--blue2:#083c9e;--bg:#f4f7fc;--text:#102044;--muted:#6c7890;--line:#cfe0fb;--white:#fff}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+button,input,select{font:inherit}.app{max-width:430px;margin:0 auto;padding:8px 10px 98px}.section{background:#fff;border:1px solid var(--line);border-radius:16px;padding:10px;margin-bottom:8px;box-shadow:0 5px 16px rgba(6,79,200,.06)}
+.topline{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 2px 8px}.back{color:var(--blue);font-weight:900;text-decoration:none;font-size:12px}
+.select-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}select,.clear{height:44px;border:1px solid #bcd4f8;border-radius:12px;background:#fff;padding:0 11px;font-weight:850;color:var(--text)}.clear{color:var(--blue);cursor:pointer}
+.mode{margin-top:8px;display:grid;grid-template-columns:1fr 1fr;background:#e8f0fc;padding:3px;border-radius:12px}.mode button{border:0;background:transparent;min-height:36px;border-radius:10px;font-weight:900;color:#5f6f89;cursor:pointer}.mode button.active{background:var(--blue);color:#fff}
+.search{position:relative;margin-top:8px}.search span{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--blue)}.search input{width:100%;height:42px;border:1px solid #bcd4f8;border-radius:12px;padding:0 12px 0 38px;font-size:15px;outline:none}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.head strong{font-size:14px}.head span{font-size:11px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.card{min-height:84px;border:1.5px solid #bcd4f8;border-radius:13px;padding:9px 10px;text-align:left;background:#fff;display:flex;flex-direction:column;justify-content:space-between;gap:6px;cursor:pointer;position:relative;overflow:hidden}.card:active{background:#f2f7ff}.name{font-size:15.5px;font-weight:950;line-height:1.12;white-space:normal;word-break:normal}.price{font-size:19px;font-weight:950;color:var(--blue);white-space:nowrap}.meta{font-size:10px;color:var(--muted)}.pill{position:absolute;right:7px;bottom:7px;min-width:30px;height:28px;border-radius:999px;padding:0 8px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:950;box-shadow:0 2px 6px rgba(6,79,200,.22)}
+.info-line{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid #e8eef8}.info-line:last-child{border-bottom:0}.info-line b{font-size:12px}.info-line strong{font-size:17px;color:var(--blue);white-space:nowrap}.sub{font-size:10px;color:var(--muted);margin-top:2px}
+.empty{padding:18px;border:1px dashed var(--line);border-radius:12px;text-align:center;color:var(--muted);font-size:12px}.legacy{display:none}.legacy.show{display:block}.legacy iframe{width:100%;height:65vh;border:0;border-radius:12px;background:#fff}
+.drawer{position:fixed;left:0;right:0;bottom:0;max-width:430px;margin:0 auto;padding:0 10px 10px;z-index:40}.total{width:100%;border:0;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;border-radius:16px;padding:11px 14px;display:grid;grid-template-columns:1fr auto;align-items:center;box-shadow:0 12px 28px rgba(6,79,200,.28);cursor:pointer}.total span{display:block;font-size:10px;opacity:.8}.total strong{display:block;font-size:22px;margin-top:2px}.right{text-align:right}.summary{margin-top:8px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 16px 36px rgba(6,79,200,.14);max-height:0;overflow:hidden;transition:max-height .2s}.summary.open{max-height:360px}.summary h3{margin:0;padding:11px 13px;border-bottom:1px solid #edf1f6;font-size:14px}.sumlist{max-height:300px;overflow:auto;padding:0 12px 10px}.row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid #edf1f6}.row:last-child{border-bottom:0}.row .n{font-size:12px;font-weight:900}.row .m{font-size:10px;color:var(--muted);margin-top:2px}.qty{display:flex;align-items:center;gap:4px}.qty button{width:30px;height:30px;border:1px solid var(--line);background:#fff;border-radius:9px;font-weight:900;color:var(--blue)}.qty b{min-width:24px;text-align:center}
+@media(min-width:760px){.app,.drawer{max-width:760px}.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 </style>
 </head>
 <body>
 <div class="app">
-  <section class="hero">
-    <h1>Taxas por Bairro</h1>
-    <p>Consulte os valores e calcule quantas entregas quiser.</p>
-    <a class="back" href="{{ back_href or url_for('portal_cooperado') }}">← Voltar</a>
-  </section>
+  <div class="topline"><a class="back" href="{{ back_href or url_for('portal_cooperado') }}">← Voltar</a></div>
 
   <section class="section">
     <div class="select-row">
@@ -61,383 +30,129 @@ select,.clear{height:44px;border:1px solid var(--border);border-radius:14px;back
         <option value="">Selecione o estabelecimento</option>
         {% for t in tabelas %}<option value="{{ t.id }}">{{ t.titulo }}</option>{% endfor %}
       </select>
-      <button class="clear" id="clearBtn">Zerar</button>
+      <button id="clear" class="clear" type="button">Zerar</button>
     </div>
-
     <div class="mode">
-      <button id="consultBtn" class="active">Consultar</button>
-      <button id="calcBtn">Calcular</button>
+      <button id="consult" type="button">Consultar</button>
+      <button id="calc" type="button" class="active">Calcular</button>
     </div>
-
-    <div class="search-wrap">
-      <span>⌕</span><input id="search" placeholder="Buscar bairro">
-    </div>
-
-    <div class="last">
-      <div class="label">Última consulta</div>
-      <div class="name" id="consultName">Selecione um estabelecimento</div>
-      <div class="price" id="consultPrice">—</div>
-      <div class="meta" id="consultMeta">Depois toque em um bairro.</div>
-    </div>
+    <div class="search"><span>⌕</span><input id="search" placeholder="Buscar bairro"></div>
   </section>
 
   <section class="section">
-    <div class="headline"><strong>Bairros</strong><span id="countLabel">0 bairros</span></div>
-    <div id="grid" class="grid"><div class="empty">Selecione um estabelecimento.</div></div>
+    <div class="head"><strong>Bairros</strong><span id="count">0 bairros</span></div>
+    <div id="grid" class="grid"><div class="empty" style="grid-column:1/-1">Selecione um estabelecimento.</div></div>
   </section>
 
-  <section class="original-viewer" id="originalViewer">
-    <div class="original-head">
-      <span>Tabela original</span>
-      <a id="originalOpen" href="#" target="_blank">Abrir em tela cheia</a>
-    </div>
-    <iframe id="originalFrame" title="Tabela original"></iframe>
+  <section id="extras" class="section" style="display:none">
+    <div class="head"><strong>Outros valores</strong></div>
+    <div id="extraList"></div>
   </section>
 
-  <section class="section info" id="infoBox"><div class="g-title">Informações da tabela</div><div id="infoList"></div></section>
-  <section class="section guarantees" id="guarantees"><div class="g-title">Garantidos</div><div id="gGrid"></div></section>
+  <section id="guarantees" class="section" style="display:none">
+    <div class="head"><strong>Garantidos</strong></div>
+    <div id="guaranteeList"></div>
+  </section>
+
+  <section id="legacy" class="section legacy">
+    <div class="head"><strong>Tabela original</strong></div>
+    <iframe id="legacyFrame" title="Tabela original"></iframe>
+  </section>
 </div>
 
 <div class="drawer">
-  <button class="total-btn" id="summaryToggle"><div><span>Total</span><strong id="totalValue">R$ 0,00</strong></div><div class="r"><b id="totalQty">0</b><small>entregas</small></div></button>
-  <div class="summary" id="summaryPanel"><div class="summary-head">Resumo do cálculo</div><div class="summary-list" id="summaryList"><div class="empty">Nenhuma entrega adicionada.</div></div></div>
+  <button id="totalBtn" class="total" type="button">
+    <div><span>Total</span><strong id="totalValue">R$ 0,00</strong></div>
+    <div class="right"><strong id="totalQty">0</strong><span>entregas</span></div>
+  </button>
+  <div id="summary" class="summary"><h3>Resumo do cálculo</h3><div id="sumList" class="sumlist"><div class="empty">Nenhuma entrega adicionada.</div></div></div>
 </div>
 
 <script>
-let contractId="";
-let mode="consult";
-let counts={};
-let data=[];
-const originalViewer=document.getElementById("originalViewer");
-const originalFrame=document.getElementById("originalFrame");
-const originalOpen=document.getElementById("originalOpen");
-const money=v=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(v||0));
-const key=(name,city)=>name+"||"+city;
-
-function colorClass(v){return "c"+(Math.abs(Math.round(Number(v||0)))%6)}
-function sortedData(){return [...data].sort((a,b)=>(a.bairro||"").localeCompare(b.bairro||"","pt-BR"))}
+const contract=document.getElementById('contract'), search=document.getElementById('search'), grid=document.getElementById('grid'), count=document.getElementById('count');
+const guarantees=document.getElementById('guarantees'), guaranteeList=document.getElementById('guaranteeList'), extras=document.getElementById('extras'), extraList=document.getElementById('extraList');
+const legacy=document.getElementById('legacy'), legacyFrame=document.getElementById('legacyFrame');
+const totalValue=document.getElementById('totalValue'), totalQty=document.getElementById('totalQty'), summary=document.getElementById('summary'), sumList=document.getElementById('sumList');
+let mode='calc', data=[], counts={};
+const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0));
+const key=x=>x.bairro+'||'+(x.cidade||'');
 
 function renderGrid(){
-  const q=document.getElementById("search").value.trim().toLocaleLowerCase("pt-BR");
-  const rows=sortedData().filter(x=>!q||(x.bairro||"").toLocaleLowerCase("pt-BR").includes(q));
-  countLabel.textContent=`${rows.length} bairros`;
-  if(!rows.length){grid.innerHTML='<div class="empty">Nenhum bairro encontrado.</div>';return}
+  const q=search.value.trim().toLocaleLowerCase('pt-BR');
+  const rows=[...data].filter(x=>!q||x.bairro.toLocaleLowerCase('pt-BR').includes(q)).sort((a,b)=>a.bairro.localeCompare(b.bairro,'pt-BR'));
+  count.textContent=rows.length+' bairros';
+  if(!rows.length){grid.innerHTML='<div class="empty" style="grid-column:1/-1">Nenhum bairro encontrado.</div>';return}
   grid.innerHTML=rows.map(x=>{
-    const qty=counts[key(x.bairro,x.cidade||"")]||0;
-    const meta=mode==="calc"?(qty?`${qty} entrega${qty>1?"s":""}`:"Toque para somar"):"Toque para consultar";
-    return `<button class="card ${colorClass(x.valor)}" data-name="${x.bairro.replace(/"/g,'&quot;')}" data-city="${(x.cidade||"").replace(/"/g,'&quot;')}" data-price="${x.valor}">
-      ${qty?`<div class="pill">${qty}</div>`:""}
-      <div><div class="name">${x.bairro}</div><div class="city">${x.cidade||""}</div></div>
-      <div><div class="price">${money(x.valor)}</div><div class="meta">${meta}</div></div>
+    const qty=counts[key(x)]||0;
+    return `<button class="card" data-name="${x.bairro.replace(/"/g,'&quot;')}" data-city="${(x.cidade||'').replace(/"/g,'&quot;')}" data-price="${x.valor}">
+      <div class="name">${x.bairro}</div>
+      <div><div class="price">${money(x.valor)}</div><div class="meta">${mode==='calc'?(qty?'Quantidade: '+qty:'Toque para somar'):'Toque para consultar'}</div></div>
+      ${qty?'<div class="pill">'+qty+'x</div>':''}
     </button>`;
-  }).join("");
-
-  grid.querySelectorAll(".card").forEach(btn=>btn.addEventListener("click",()=>{
-    const name=btn.dataset.name, city=btn.dataset.city, price=Number(btn.dataset.price);
-    consultName.textContent=name; consultPrice.textContent=money(price); consultMeta.textContent=city||"";
-    if(mode==="calc"){const k=key(name,city);counts[k]=(counts[k]||0)+1;renderGrid();renderSummary()}
-  }));
+  }).join('');
+  grid.querySelectorAll('.card').forEach(btn=>btn.onclick=()=>{
+    if(mode!=='calc') return;
+    const k=btn.dataset.name+'||'+btn.dataset.city;
+    counts[k]=(counts[k]||0)+1;
+    renderGrid(); renderSummary();
+  });
 }
 
 function renderSummary(){
   const rows=[];
-  for(const [k,qty] of Object.entries(counts)){
-    if(qty<=0)continue;
-    const [name,city]=k.split("||");
-    const item=data.find(x=>x.bairro===name&&(x.cidade||"")===city);
-    if(item)rows.push({name,city,price:Number(item.valor||0),qty});
-  }
-  rows.sort((a,b)=>a.name.localeCompare(b.name,"pt-BR"));
+  Object.entries(counts).forEach(([k,qty])=>{
+    if(qty<=0)return;
+    const [name,city]=k.split('||');
+    const x=data.find(v=>v.bairro===name&&(v.cidade||'')===city);
+    if(x)rows.push({name,city,price:Number(x.valor||0),qty});
+  });
   totalQty.textContent=rows.reduce((s,r)=>s+r.qty,0);
   totalValue.textContent=money(rows.reduce((s,r)=>s+r.qty*r.price,0));
-  if(!rows.length){summaryList.innerHTML='<div class="empty">Nenhuma entrega adicionada.</div>';return}
-  summaryList.innerHTML=rows.map(r=>`<div class="row"><div><div class="n">${r.name}</div><div class="m">${r.city?r.city+" • ":""}${money(r.price)} × ${r.qty} = <b>${money(r.price*r.qty)}</b></div></div><div class="qty"><button data-act="minus" data-name="${r.name}" data-city="${r.city}">−</button><b>${r.qty}</b><button data-act="plus" data-name="${r.name}" data-city="${r.city}">+</button></div></div>`).join("");
-  summaryList.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{const k=key(b.dataset.name,b.dataset.city);counts[k]=Math.max(0,(counts[k]||0)+(b.dataset.act==="plus"?1:-1));renderSummary();renderGrid()}));
+  if(!rows.length){sumList.innerHTML='<div class="empty">Nenhuma entrega adicionada.</div>';return}
+  sumList.innerHTML=rows.map(r=>`<div class="row"><div><div class="n">${r.name}</div><div class="m">${money(r.price)} × ${r.qty} = <b>${money(r.price*r.qty)}</b></div></div><div class="qty"><button data-a="-" data-k="${r.name}||${r.city}">−</button><b>${r.qty}</b><button data-a="+" data-k="${r.name}||${r.city}">+</button></div></div>`).join('');
+  sumList.querySelectorAll('button').forEach(b=>b.onclick=()=>{counts[b.dataset.k]=Math.max(0,(counts[b.dataset.k]||0)+(b.dataset.a==='+'?1:-1));renderSummary();renderGrid()});
 }
 
-
-function parseRecognizedText(raw){
-  const lines=(raw||"").split(/\r?\n/).map(x=>x.replace(/\s+/g," ").trim()).filter(Boolean);
-  const bairros=[], garantidos=[], infos=[];
-  const seen=new Set();
-  let areaPrice=null;
-
-  const moneyEnd=/^(.*?)\s*(?:R\$\s*)?(\d{1,3}(?:[.,]\d{2})?)$/i;
-  const moneyAny=/(?:R\$\s*)?(\d{2,3}(?:[.,]\d{2})?)/i;
-  const timeAny=/(\d{1,2}\s*h(?:\s*(?:às|as|a|-)\s*\d{1,2}\s*h)?)/i;
-  const areaRx=/^(?:área|area|faixa|grupo)\s*[A-Z0-9ºª.-]*/i;
-  const blocked=/^(?:área|areas|area|bairro|bairros|valor|valores|taxa|taxas|entrega|entregas|garantido|garantidos|horário|horario|tabela|observações|observacoes|cnpj|cpf|motoqueiro|base|motoqueiro base|horário base|horario base|valor base|serviço|servico|serviços|servicos|compras|transferência|transferencia|loja|lojas)$/i;
-
-  const cleanName=s=>(s||"")
-    .replace(/^(?:área|area|faixa|grupo|zona)\s*[A-Z0-9ºª.-]*\s*[:\-–—]?\s*/i,"")
-    .replace(/\s+(?:R\$\s*)?\d{1,3}(?:[.,]\d{2})?\s*$/i,"")
-    .replace(/^[\s\-–—:;|]+|[\s\-–—:;|]+$/g,"")
-    .trim();
-
-  const invalidText=s=>{
-    const n=cleanName(s);
-    return !n || blocked.test(n) || areaRx.test(n) ||
-      /^cnpj\b/i.test(n) ||
-      /\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/.test(n) ||
-      /^(?:motoqueiro\s+base|hor[aá]rio\s+base|valor\s+base)$/i.test(n);
-  };
-
-  const splitNames=s=>{
-    const clean=cleanName(s);
-    if(invalidText(clean))return [];
-    return clean.split(/\s*(?:\/|;|•|\||\s+e\s+)\s*/i)
-      .map(cleanName)
-      .filter(x=>!invalidText(x) && x.length<=70 && x.split(/\s+/).length<=7);
-  };
-
-  const add=(name,price)=>{
-    splitNames(name).forEach(n=>{
-      const k=n.toLocaleLowerCase("pt-BR")+"|"+Number(price).toFixed(2);
-      if(seen.has(k))return;
-      seen.add(k);
-      bairros.push({bairro:n,cidade:"",valor:Number(price)});
-    });
-  };
-
-  lines.forEach((ln,idx)=>{
-    const low=ln.toLocaleLowerCase("pt-BR");
-    const ctx=[lines[idx-1]||"",ln,lines[idx+1]||""].join(" ");
-
-    if(low.includes("garant")){
-      const mv=ctx.match(moneyAny);
-      if(mv){
-        const valor=Number(mv[1].replace(",","."));
-        if(valor>=50&&valor<=500){
-          const mh=ctx.match(timeAny);
-          garantidos.push({
-            descricao:ln.replace(/R\$\s*\d+(?:[.,]\d{2})?/ig,"").trim()||"Garantido",
-            horario:mh?mh[1]:"",
-            valor
-          });
-        }
-      }
-      return;
-    }
-
-    if(/motoqueiro\s+base|hor[aá]rio\s+base|valor\s+base|cnpj|cpf|servi[cç]o\s+de\s+compras|transfer[eê]ncia\s+entre\s+lojas/i.test(low))return;
-
-    if(/hor[aá]rio|taxa administrativa/i.test(low)) return;
-
-    const m=ln.match(moneyEnd);
-    if(m){
-      const price=Number(m[2].replace(",","."));
-      if(areaRx.test(ln)){
-        if(price>=5&&price<=50)areaPrice=price;
-        return;
-      }
-      if(price>=5&&price<=50){
-        const names=splitNames(m[1]);
-        if(names.length){names.forEach(n=>add(n,price));return}
-      }
-    }
-
-    if(areaPrice!==null && !invalidText(ln)){
-      add(ln,areaPrice);
-    }
-  });
-
-  bairros.sort((a,b)=>a.bairro.localeCompare(b.bairro,"pt-BR"));
-  const uniqGarantidos=garantidos.filter((g,i,a)=>a.findIndex(x=>
-    (x.descricao||"")===(g.descricao||"") &&
-    (x.horario||"")===(g.horario||"") &&
-    Number(x.valor||0)===Number(g.valor||0)
-  )===i);
-  return {bairros,garantidos:uniqGarantidos,informacoes:[]};
-}
-
-function loadTesseract(){
-  if(window.Tesseract)return Promise.resolve();
-  return new Promise((resolve,reject)=>{
-    const s=document.createElement("script");
-    s.src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
-    s.onload=resolve;
-    s.onerror=()=>reject(new Error("Não foi possível carregar o leitor da tabela."));
-    document.head.appendChild(s);
-  });
-}
-
-function parseRecognizedLayout(ocrData){
-  const words=(ocrData?.words||[]).filter(w=>{
-    const t=(w.text||"").trim();
-    return t && w.bbox && Number.isFinite(w.bbox.x0) && Number.isFinite(w.bbox.y0);
-  });
-  if(!words.length)return parseRecognizedText(ocrData?.text||"");
-
-  const norm=s=>(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().trim();
-  const center=w=>({x:(w.bbox.x0+w.bbox.x1)/2,y:(w.bbox.y0+w.bbox.y1)/2});
-  const blocked=/^(AREA|AREAS|GARANTIDO|GARANTIDOS|CNPJ|CPF|MOTOQUEIRO|BASE|MOTOQUEIRO BASE|HORARIO BASE|VALOR BASE|SERVICO|SERVICOS|COMPRAS|TRANSFERENCIA|LOJA|LOJAS|SEGUNDA|TERCA|QUARTA|QUINTA|SEXTA|SABADO|DOMINGO|FERIADO|FERIADOS)$/;
-
-  // Detecta os cabeçalhos ÁREA 01...ÁREA 06.
-  const areaHeaders=[];
-  words.forEach(w=>{
-    const n=norm(w.text);
-    if(n!=="AREA")return;
-    const c=center(w);
-    const num=words.filter(v=>{
-      const cv=center(v), nv=norm(v.text);
-      return /^\d{1,2}$/.test(nv) && Math.abs(cv.y-c.y)<22 && cv.x>c.x && cv.x-c.x<100;
-    }).sort((a,b)=>center(a).x-center(b).x)[0];
-    areaHeaders.push({x:num?(c.x+center(num).x)/2:c.x,y:c.y});
-  });
-  areaHeaders.sort((a,b)=>a.x-b.x);
-  if(areaHeaders.length<2)return parseRecognizedText(ocrData?.text||"");
-
-  const parseNum=w=>{
-    const raw=(w.text||"").replace(/[^\d,.]/g,"");
-    if(!raw)return null;
-    const v=Number(raw.replace(/\./g,"").replace(",","."));
-    return Number.isFinite(v)?v:null;
-  };
-
-  const areas=areaHeaders.map((h,i)=>{
-    const left=i===0?-Infinity:(areaHeaders[i-1].x+h.x)/2;
-    const right=i===areaHeaders.length-1?Infinity:(h.x+areaHeaders[i+1].x)/2;
-    const prices=words.filter(w=>{
-      const c=center(w),v=parseNum(w);
-      return c.x>=left&&c.x<right&&c.y>h.y+8&&c.y<h.y+130&&v!==null&&v>=5&&v<=50;
-    }).sort((a,b)=>center(a).y-center(b).y);
-    return {...h,left,right,price:prices.length?parseNum(prices[0]):null,priceY:prices.length?center(prices[0]).y:h.y+80};
-  }).filter(a=>a.price!==null);
-
-  if(areas.length<2)return parseRecognizedText(ocrData?.text||"");
-
-  // Limite inferior: antes do bloco "GARANTIDOS".
-  const gw=words.filter(w=>/^GARANTIDOS?$/.test(norm(w.text)));
-  const bottomCut=gw.length?Math.min(...gw.map(w=>center(w).y))-18:Math.max(...words.map(w=>center(w).y))+1;
-
-  const bairros=[], seen=new Set();
-  areas.forEach(a=>{
-    const colWords=words.filter(w=>{
-      const c=center(w),n=norm(w.text);
-      return c.x>=a.left&&c.x<a.right&&c.y>a.priceY+18&&c.y<bottomCut &&
-        !blocked.test(n)&&!/^R\$?$/.test(n)&&!/^\d+[,.]?\d*$/.test(n);
-    }).sort((u,v)=>center(u).y-center(v).y||center(u).x-center(v).x);
-
-    const lines=[];
-    colWords.forEach(w=>{
-      const c=center(w);
-      let line=lines.find(L=>Math.abs(L.y-c.y)<13);
-      if(!line){line={y:c.y,words:[]};lines.push(line)}
-      line.words.push(w);
-    });
-
-    lines.sort((a,b)=>a.y-b.y).forEach(line=>{
-      line.words.sort((u,v)=>center(u).x-center(v).x);
-      let text=line.words.map(w=>w.text).join(" ").replace(/[•·]/g," ").replace(/\s+/g," ").trim();
-      text=text.replace(/^[-–—:;|]+|[-–—:;|]+$/g,"").trim();
-      const n=norm(text);
-      if(!text||blocked.test(n)||/^CNPJ\b/.test(n)||/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/.test(text))return;
-      if(/MOTOQUEIRO\s+BASE|HORARIO\s+BASE|VALOR\s+BASE/.test(n))return;
-      if(text.length>55||text.split(/\s+/).length>6)return;
-      const k=n+"|"+a.price;
-      if(seen.has(k))return;
-      seen.add(k);
-      bairros.push({bairro:text,cidade:"",valor:a.price});
-    });
-  });
-
-  // Garantidos ficam fora da grade de bairros.
-  const textParsed=parseRecognizedText(ocrData?.text||"");
-  const garantidos=(textParsed.garantidos||[]).filter(g=>Number(g.valor||0)>=50);
-  bairros.sort((a,b)=>a.bairro.localeCompare(b.bairro,"pt-BR"));
-  return {bairros,garantidos,informacoes:[]};
-}
-
-async function recognizeImage(url){
-  await loadTesseract();
-  const result=await Tesseract.recognize(url,"por",{
-    logger:m=>{
-      if(m.status==="recognizing text"){
-        const pct=Math.round((m.progress||0)*100);
-        grid.innerHTML='<div class="empty loading">Lendo a tabela… '+pct+'%</div>';
-      }
-    }
-  });
-  return parseRecognizedLayout(result?.data||{});
-}
-
-async function loadContract(id){
-  contractId=id; counts={}; data=[]; renderSummary();
-  guarantees.classList.remove("show"); infoBox.classList.remove("show");
-  grid.innerHTML='<div class="empty loading">Lendo a tabela…</div>';
-  if(!id){countLabel.textContent="0 bairros";grid.innerHTML='<div class="empty">Selecione um estabelecimento.</div>';return}
+async function load(id){
+  counts={};data=[];renderSummary();guarantees.style.display='none';extras.style.display='none';legacy.classList.remove('show');legacyFrame.src='';
+  if(!id){count.textContent='0 bairros';grid.innerHTML='<div class="empty" style="grid-column:1/-1">Selecione um estabelecimento.</div>';return}
+  grid.innerHTML='<div class="empty" style="grid-column:1/-1">Carregando...</div>';
   try{
-    const r=await fetch(`/tabelas/${id}/dados`,{credentials:"same-origin",cache:"no-store"});
-    const j=await r.json();
-    if(!r.ok||!j.ok)throw new Error(j.erro||"Falha ao ler tabela");
-    const originalUrl=j.arquivo_visualizacao||(`/tabelas/${id}/abrir`);
-    originalOpen.href=originalUrl;
-    data=j.bairros||[];
+    const r=await fetch('/tabelas/'+id+'/dados',{credentials:'same-origin',cache:'no-store'}), j=await r.json();
+    if(!r.ok||!j.ok)throw new Error(j.erro||'Falha ao carregar');
 
-    let autoGarantidos=j.garantidos_extraidos||[];
-    let autoInfos=j.informacoes||[];
-
-    if((j.tipo_arquivo==="imagem" || j.erro==="imagem") && !data.length){
-      const ocr=await recognizeImage(j.arquivo_visualizacao);
-      data=ocr.bairros||[];
-      autoGarantidos=[...autoGarantidos,...(ocr.garantidos||[])];
-      autoInfos=[...autoInfos,...(ocr.informacoes||[])];
+    if(j.estruturada && (j.bairros||[]).length){
+      data=j.bairros||[];renderGrid();
+    }else{
+      grid.innerHTML='<div class="empty" style="grid-column:1/-1">Tabela exibida no formato original.</div>';
+      count.textContent='Tabela original';
+      legacyFrame.src=j.arquivo_visualizacao||('/tabelas/'+id+'/abrir');
+      legacy.classList.add('show');
     }
 
-    consultName.textContent=j.titulo||"Tabela";
-    consultPrice.textContent="—";
-    consultMeta.textContent=j.descricao||j.arquivo_nome||"Toque em um bairro.";
-
-    const manual=j.garantidos||[];
-    const gs=[...manual,...autoGarantidos].filter((g,i,a)=>a.findIndex(x=>(x.descricao||"")=== (g.descricao||"") && (x.horario||"")===(g.horario||"") && Number(x.valor||0)===Number(g.valor||0))===i);
-    if(gs.length){gGrid.innerHTML=gs.map(g=>`<div class="g-line"><div><div class="d">${g.descricao||"Garantido"}</div><div class="h">${g.horario||""}</div></div><div class="v">${money(g.valor)}</div></div>`).join("");guarantees.classList.add("show")}
-
-    const infos=[];
-    infoBox.classList.remove("show")
-
-    // Se a leitura automática não for confiável, não mostra dados errados:
-    // abre a própria tabela original, mantendo o seletor por estabelecimento.
-    const suspicious=data.some(x=>{
-      const n=(x.bairro||"").toLocaleLowerCase("pt-BR");
-      return /^(area|área|cnpj|cpf|motoqueiro|base|horario base|horário base|valor base|feriado|feriados|fim de semana|fins de semana)$/.test(n)
-        || Number(x.valor||0)>50;
-    });
-    if(!data.length || suspicious){
-      data=[];
-      countLabel.textContent="Tabela original";
-      grid.innerHTML='<div class="empty">Esta tabela será exibida no formato original para evitar valores ou bairros incorretos.</div>';
-      originalFrame.src=originalUrl;
-      originalViewer.classList.add("show");
-      return;
+    const gs=j.garantidos||[];
+    if(gs.length){
+      guaranteeList.innerHTML=gs.map(g=>`<div class="info-line"><div><b>${g.descricao||'Garantido'}</b><div class="sub">${g.horario||''}</div></div><strong>${money(g.valor)}</strong></div>`).join('');
+      guarantees.style.display='block';
     }
-    renderGrid();
+
+    const ex=j.extras||{}, rows=[];
+    if(ex.servico_compras!=null) rows.push(['Serviço de compras',ex.servico_compras]);
+    if(ex.transferencia_lojas!=null) rows.push(['Transferência entre lojas',ex.transferencia_lojas]);
+    if(rows.length){
+      extraList.innerHTML=rows.map(([n,v])=>`<div class="info-line"><b>${n}</b><strong>${money(v)}</strong></div>`).join('');
+      extras.style.display='block';
+    }
   }catch(e){
-    const originalUrl=`/tabelas/${id}/abrir`;
-    countLabel.textContent="Tabela original";
-    grid.innerHTML='<div class="empty">Não foi possível reconhecer a tabela com segurança. Abrindo o arquivo original.</div>';
-    originalOpen.href=originalUrl;
-    originalFrame.src=originalUrl;
-    originalViewer.classList.add("show");
+    count.textContent='Erro';grid.innerHTML='<div class="empty" style="grid-column:1/-1">Não foi possível carregar esta tabela.</div>';
   }
 }
 
-consultBtn.onclick=()=>{mode="consult";consultBtn.classList.add("active");calcBtn.classList.remove("active");renderGrid()}
-calcBtn.onclick=()=>{mode="calc";calcBtn.classList.add("active");consultBtn.classList.remove("active");renderGrid()}
-clearBtn.onclick=()=>{counts={};renderGrid();renderSummary()}
-const contractSelect=document.getElementById("contract");
-const searchInput=document.getElementById("search");
-const summaryToggleBtn=document.getElementById("summaryToggle");
-
-searchInput.oninput=renderGrid;
-contractSelect.onchange=e=>loadContract(e.target.value);
-summaryToggleBtn.onclick=()=>summaryPanel.classList.toggle("open");
-renderSummary();
-
-// Safari/iPhone pode restaurar automaticamente a última opção selecionada
-// depois do carregamento. Executa logo após o DOM e novamente em seguida.
-const loadSelected=()=>{ if(contractSelect.value) loadContract(contractSelect.value); };
-loadSelected();
-setTimeout(loadSelected,250);
+document.getElementById('calc').onclick=()=>{mode='calc';document.getElementById('calc').classList.add('active');document.getElementById('consult').classList.remove('active');renderGrid()};
+document.getElementById('consult').onclick=()=>{mode='consult';document.getElementById('consult').classList.add('active');document.getElementById('calc').classList.remove('active');renderGrid()};
+document.getElementById('clear').onclick=()=>{counts={};renderSummary();renderGrid()};
+search.oninput=renderGrid;contract.onchange=e=>load(e.target.value);document.getElementById('totalBtn').onclick=()=>summary.classList.toggle('open');
+renderSummary();if(contract.value)load(contract.value);setTimeout(()=>{if(contract.value)load(contract.value)},250);
 </script>
 </body>
 </html>
