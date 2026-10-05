@@ -7354,10 +7354,23 @@ def excluir_lancamento(id):
 
     db.session.execute(sa_delete(AvaliacaoCooperado).where(AvaliacaoCooperado.lancamento_id == id))
     db.session.execute(sa_delete(AvaliacaoRestaurante).where(AvaliacaoRestaurante.lancamento_id == id))
+    coop_id = l.cooperado_id
+    valor_excluido = float(l.valor or 0)
+    entregas_excluidas = int(l.qtd_entregas or 0)
     db.session.delete(l)
     db.session.commit()
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.args.get("ajax") == "1":
+        return jsonify(
+            ok=True,
+            message="Produção excluída",
+            cooperado_id=coop_id,
+            valor=valor_excluido,
+            entregas=entregas_excluidas,
+        )
+
     flash("Lançamento excluído.", "success")
-    return redirect(url_for("portal_restaurante", view="lancamentos"))
+    return redirect(request.referrer or url_for("portal_restaurante", view="lancar", coop_id=coop_id))
 
 # =========================
 # Compat: Restaurante Avisos
