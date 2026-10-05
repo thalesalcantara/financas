@@ -3,10 +3,11 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta
 
-from flask import flash, jsonify, redirect, request, session, url_for
+from flask import flash, g, has_request_context, jsonify, redirect, request, session, url_for
 from sqlalchemy import text as sa_text
 
 import production_shift_time as shifts
+import production_ui as perf
 
 app = shifts.patch.app
 legacy = shifts.patch.flow.legacy
@@ -81,18 +82,28 @@ def _scale_belongs_to_rest(scale, rest) -> bool:
     return bool(contract and rest_name and (contract == rest_name or rest_name in contract or contract in rest_name))
 
 
+def _coops_by_normalized_name():
+    if has_request_context() and hasattr(g, "_notifications_coops_by_name"):
+        return g._notifications_coops_by_name
+    result = {}
+    for coop in Cooperado.query.order_by(Cooperado.nome.asc()).all():
+        key = shifts.patch._norm(coop.nome)
+        if key:
+            result[key] = coop
+    if has_request_context():
+        g._notifications_coops_by_name = result
+    return result
+
+
 def _scale_coop(scale):
     if scale.cooperado_id:
-        coop = Cooperado.query.get(scale.cooperado_id)
+        coop = db.session.get(Cooperado, scale.cooperado_id)
         if coop:
             return coop
     target = shifts.patch._norm(scale.cooperado_nome)
     if not target:
         return None
-    for coop in Cooperado.query.order_by(Cooperado.nome.asc()).all():
-        if shifts.patch._norm(coop.nome) == target:
-            return coop
-    return None
+    return _coops_by_normalized_name().get(target)
 
 
 def _block_scale_for_coop(rest, scale, coop, reason: str):
@@ -253,7 +264,7 @@ def _week_pending_rows(rest):
 
     scales = [
         scale
-        for scale in shifts.query_override._rest_scales_indexed(rest)
+        for scale in perf._rest_scales_indexed(rest)
         if (lambda d: bool(d and monday <= d <= today))(shifts.exact_scale_date(scale, today))
     ]
     if not scales:
@@ -267,10 +278,7 @@ def _week_pending_rows(rest):
     need_name = any(not s.cooperado_id and s.cooperado_nome for s in scales)
     coops_by_name = {}
     if need_name:
-        for coop in Cooperado.query.order_by(Cooperado.nome.asc()).all():
-            key = shifts.patch._norm(coop.nome)
-            if key:
-                coops_by_name[key] = coop
+        coops_by_name = _coops_by_normalized_name()
 
     productions = (
         ProducaoCooperado.query.filter(
