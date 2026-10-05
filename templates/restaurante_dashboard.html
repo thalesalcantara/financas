@@ -1289,9 +1289,6 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
         <a data-target="lancar" class="{{ 'active' if (view|default('lancar') not in ['producoes','escalas','config','avisos','lancamentos','tabelas']) else '' }}" href="{{ url_for('portal_restaurante', view='lancar') }}">
           <i class="bi bi-person-lines-fill"></i><span>Lançar Produção</span>
         </a>
-        <a data-target="producoes" class="{{ 'active' if view=='producoes' else '' }}" href="{{ url_for('portal_restaurante', view='producoes') }}">
-          <i class="bi bi-clipboard-check"></i><span>Produções da Semana</span>
-        </a>
         <a data-target="lancamentos" class="{{ 'active' if view=='lancamentos' else '' }}" href="{{ url_for('portal_restaurante', view='lancamentos') }}">
           <i class="bi bi-receipt"></i><span>Histórico de Produção</span>
         </a>
@@ -1742,10 +1739,6 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
             <div class="card card-body text-muted">Carregando avisos…</div>
           {% endif %}
         </div>
-      </section>
-
-      <section data-view="producoes">
-        {% include '_rest_producoes_semana.html' %}
       </section>
 
       <section data-view="lancamentos">
