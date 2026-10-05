@@ -956,6 +956,18 @@ class TabelaGarantido(db.Model):
     ordem = db.Column(db.Integer, nullable=False, default=0)
 
 
+class TabelaBairro(db.Model):
+    __tablename__ = "tabela_bairros"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tabela_id = db.Column(db.Integer, db.ForeignKey("tabelas.id", ondelete="CASCADE"), nullable=False, index=True)
+    bairro = db.Column(db.String(140), nullable=False, index=True)
+    valor_fixo = db.Column(db.Float, nullable=True)
+    valor_base = db.Column(db.Float, nullable=True)
+    ordem = db.Column(db.Integer, nullable=False, default=0)
+    ativo = db.Column(db.Boolean, nullable=False, default=True)
+
+
 # ---------- AVISOS (NOVO) ----------
 aviso_restaurantes = db.Table(
     "aviso_restaurantes",
@@ -7940,13 +7952,27 @@ def tabela_dados(tab_id: int):
         rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
         _enforce_restaurante_titulo(t, rest)
 
-    data = _extrair_dados_tabela_arquivo(t)
+    _ensure_tabelas_estruturadas_schema()
+    bairros_estruturados = (
+        TabelaBairro.query
+        .filter(TabelaBairro.tabela_id == t.id, TabelaBairro.ativo.is_(True))
+        .order_by(TabelaBairro.bairro.asc(), TabelaBairro.id.asc())
+        .all()
+    )
+    data = _extrair_dados_tabela_arquivo(t) if not bairros_estruturados else {"bairros": [], "informacoes": [], "erro": None, "tipo_arquivo": None, "garantidos_extraidos": []}
     garantidos = (
         TabelaGarantido.query
         .filter(TabelaGarantido.tabela_id == t.id)
         .order_by(TabelaGarantido.ordem.asc(), TabelaGarantido.id.asc())
         .all()
     )
+    bairros_payload = [{
+        "bairro": b.bairro,
+        "cidade": "",
+        "valor": float(b.valor_fixo or 0.0),
+        "valor_fixo": None if b.valor_fixo is None else float(b.valor_fixo),
+        "valor_base": None if b.valor_base is None else float(b.valor_base),
+    } for b in bairros_estruturados if b.valor_fixo is not None]
 
     return jsonify({
         "ok": True,
@@ -7954,7 +7980,8 @@ def tabela_dados(tab_id: int):
         "titulo": t.titulo,
         "descricao": t.descricao or "",
         "arquivo_nome": t.arquivo_nome or "",
-        "bairros": data.get("bairros", []),
+        "estruturada": bool(bairros_estruturados),
+        "bairros": bairros_payload if bairros_estruturados else data.get("bairros", []),
         "informacoes": data.get("informacoes", []),
         "erro": data.get("erro"),
         "tipo_arquivo": data.get("tipo_arquivo"),
@@ -7968,19 +7995,37 @@ def tabela_dados(tab_id: int):
     })
 
 
+
+def _ensure_tabelas_estruturadas_schema():
+    """Cria a estrutura nova de bairros/valores sem depender das tabelas em PDF."""
+    try:
+        TabelaBairro.__table__.create(bind=db.engine, checkfirst=True)
+        if db.engine.dialect.name == "postgresql":
+            db.session.execute(sa_text("ALTER TABLE tabelas ALTER COLUMN arquivo_url DROP NOT NULL"))
+            db.session.execute(sa_text("ALTER TABLE tabela_garantidos ALTER COLUMN horario DROP NOT NULL"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
 # ---------------------------------------------------------------------------
 # Admin: listar / upload / delete
 # ---------------------------------------------------------------------------
 @app.get("/admin/tabelas", endpoint="admin_tabelas")
 @admin_perm_required("tabelas", "ver")
 def admin_tabelas():
-    tabelas = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
+    _ensure_tabelas_estruturadas_schema()
+    tabelas = Tabela.query.order_by(Tabela.titulo.asc(), Tabela.id.asc()).all()
     restaurantes = Restaurante.query.order_by(Restaurante.nome.asc()).all()
     garantidos_rows = TabelaGarantido.query.order_by(TabelaGarantido.tabela_id.asc(), TabelaGarantido.ordem.asc(), TabelaGarantido.id.asc()).all()
+    bairros_rows = TabelaBairro.query.order_by(TabelaBairro.tabela_id.asc(), TabelaBairro.bairro.asc(), TabelaBairro.id.asc()).all()
     garantidos_map = {}
+    bairros_map = {}
     for g in garantidos_rows:
         garantidos_map.setdefault(g.tabela_id, []).append(g)
-    return render_template("admin_tabelas.html", tabelas=tabelas, restaurantes=restaurantes, garantidos_map=garantidos_map)
+    for b in bairros_rows:
+        bairros_map.setdefault(b.tabela_id, []).append(b)
+    return render_template("admin_tabelas.html", tabelas=tabelas, restaurantes=restaurantes, garantidos_map=garantidos_map, bairros_map=bairros_map)
 
 
 @app.post("/admin/tabelas/upload", endpoint="admin_upload_tabela")
@@ -8027,6 +8072,55 @@ def admin_upload_tabela():
     return redirect(url_for("admin_tabelas"))
 
 
+@app.post("/admin/tabelas/<int:tab_id>/bairros", endpoint="admin_add_tabela_bairro")
+@admin_perm_required("tabelas", "editar")
+def admin_add_tabela_bairro(tab_id: int):
+    _ensure_tabelas_estruturadas_schema()
+    Tabela.query.get_or_404(tab_id)
+    bairro = (request.form.get("bairro") or "").strip()
+    valor_fixo_raw = request.form.get("valor_fixo")
+    valor_base_raw = request.form.get("valor_base")
+    valor_fixo = parse_valor_monetario(valor_fixo_raw, 0.0) if (valor_fixo_raw or "").strip() else None
+    valor_base = parse_valor_monetario(valor_base_raw, 0.0) if (valor_base_raw or "").strip() else None
+    if not bairro:
+        flash("Informe o nome do bairro.", "warning")
+        return redirect(url_for("admin_tabelas"))
+    ordem = db.session.query(func.count(TabelaBairro.id)).filter(TabelaBairro.tabela_id == tab_id).scalar() or 0
+    db.session.add(TabelaBairro(tabela_id=tab_id, bairro=bairro, valor_fixo=valor_fixo, valor_base=valor_base, ordem=int(ordem), ativo=True))
+    db.session.commit()
+    flash("Bairro adicionado.", "success")
+    return redirect(url_for("admin_tabelas"))
+
+
+@app.post("/admin/tabelas/bairros/<int:bairro_id>/edit", endpoint="admin_edit_tabela_bairro")
+@admin_perm_required("tabelas", "editar")
+def admin_edit_tabela_bairro(bairro_id: int):
+    _ensure_tabelas_estruturadas_schema()
+    b = TabelaBairro.query.get_or_404(bairro_id)
+    nome = (request.form.get("bairro") or "").strip()
+    if nome:
+        b.bairro = nome
+    vf = (request.form.get("valor_fixo") or "").strip()
+    vb = (request.form.get("valor_base") or "").strip()
+    b.valor_fixo = parse_valor_monetario(vf, 0.0) if vf else None
+    b.valor_base = parse_valor_monetario(vb, 0.0) if vb else None
+    b.ativo = request.form.get("ativo") in {"1","on","true","True"}
+    db.session.commit()
+    flash("Bairro atualizado.", "success")
+    return redirect(url_for("admin_tabelas"))
+
+
+@app.post("/admin/tabelas/bairros/<int:bairro_id>/delete", endpoint="admin_delete_tabela_bairro")
+@admin_perm_required("tabelas", "editar")
+def admin_delete_tabela_bairro(bairro_id: int):
+    _ensure_tabelas_estruturadas_schema()
+    b = TabelaBairro.query.get_or_404(bairro_id)
+    db.session.delete(b)
+    db.session.commit()
+    flash("Bairro excluído.", "success")
+    return redirect(url_for("admin_tabelas"))
+
+
 @app.post("/admin/tabelas/<int:tab_id>/garantidos", endpoint="admin_add_tabela_garantido")
 @admin_perm_required("tabelas", "editar")
 def admin_add_tabela_garantido(tab_id: int):
@@ -8034,13 +8128,26 @@ def admin_add_tabela_garantido(tab_id: int):
     descricao = (request.form.get("descricao") or "").strip() or None
     horario = (request.form.get("horario") or "").strip()
     valor = parse_valor_monetario(request.form.get("valor"), 0.0)
-    if not horario or valor <= 0:
-        flash("Informe o horário e o valor do garantido.", "warning")
+    if valor <= 0:
+        flash("Informe o valor do garantido.", "warning")
         return redirect(url_for("admin_tabelas"))
     ordem = db.session.query(func.count(TabelaGarantido.id)).filter(TabelaGarantido.tabela_id == tab_id).scalar() or 0
     db.session.add(TabelaGarantido(tabela_id=tab_id, descricao=descricao, horario=horario, valor=valor, ordem=int(ordem)))
     db.session.commit()
     flash("Garantido adicionado.", "success")
+    return redirect(url_for("admin_tabelas"))
+
+
+@app.post("/admin/tabelas/garantidos/<int:garantido_id>/edit", endpoint="admin_edit_tabela_garantido")
+@admin_perm_required("tabelas", "editar")
+def admin_edit_tabela_garantido(garantido_id: int):
+    _ensure_tabelas_estruturadas_schema()
+    g = TabelaGarantido.query.get_or_404(garantido_id)
+    g.descricao = (request.form.get("descricao") or "").strip() or None
+    g.horario = (request.form.get("horario") or "").strip() or None
+    g.valor = parse_valor_monetario(request.form.get("valor"), g.valor or 0.0)
+    db.session.commit()
+    flash("Garantido atualizado.", "success")
     return redirect(url_for("admin_tabelas"))
 
 
@@ -8126,6 +8233,7 @@ def admin_delete_tabela(tab_id: int):
 # ---------------------------------------------------------------------------
 @app.get("/tabelas", endpoint="tabelas_publicas")
 def tabelas_publicas():
+    _ensure_tabelas_estruturadas_schema()
     if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
 
@@ -8215,6 +8323,13 @@ def rest_tabelas():
     candidatos = Tabela.query.order_by(Tabela.enviado_em.desc()).all()
     tabela_exata = next((t for t in candidatos if _norm_txt(t.titulo) == alvo_norm), None)
 
+    _ensure_tabelas_estruturadas_schema()
+    bairros = []
+    garantidos = []
+    if tabela_exata:
+        bairros = TabelaBairro.query.filter_by(tabela_id=tabela_exata.id, ativo=True).order_by(TabelaBairro.bairro.asc()).all()
+        garantidos = TabelaGarantido.query.filter_by(tabela_id=tabela_exata.id).order_by(TabelaGarantido.ordem.asc(), TabelaGarantido.id.asc()).all()
+
     has_portal_restaurante = ("portal_restaurante" in current_app.view_functions)
 
     return render_template(
@@ -8222,6 +8337,8 @@ def rest_tabelas():
         restaurante=rest,
         login_nome=login_nome,
         tabela=tabela_exata,
+        bairros=bairros,
+        garantidos=garantidos,
         has_portal_restaurante=has_portal_restaurante,
         back_href=url_for("portal_restaurante") if has_portal_restaurante else url_for("rest_tabelas"),
         current_year=datetime.utcnow().year,
