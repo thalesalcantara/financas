@@ -1,70 +1,3 @@
-<!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Tabelas — COOPEX</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_light_v8.css') }}">
-</head>
-<body>
-  {% include '_admin_nav_v10.html' %}
-  <main class="alv8-page">
-    <div class="alv8-head">
-      <div>
-        <h1 class="alv8-title">Tabelas</h1>
-        <p class="alv8-sub">Cadastre bairros, valores FIXO/BASE e garantidos diretamente no sistema. PDFs ficam apenas como histórico.</p>
-      </div>
-      <div class="alv8-actions"><a class="alv8-btn" href="{{ url_for('tabelas_publicas') }}" target="_blank"><i class="bi bi-eye"></i> Ver como cooperado</a></div>
-    </div>
-
-    {% with msgs=get_flashed_messages(with_categories=true) %}
-      {% if msgs %}<div class="alv8-card">{% for cat,msg in msgs %}<div class="alv8-note">{{ msg }}</div>{% endfor %}</div>{% endif %}
-    {% endwith %}
-
-    <details class="alv8-card" open>
-      <summary><strong><i class="bi bi-plus-circle"></i> Nova tabela</strong></summary>
-      <form method="post" action="{{ url_for('admin_upload_tabela') }}" enctype="multipart/form-data" class="alv8-filter" style="margin-top:12px">
-        <div class="alv8-field grow">
-          <label>Nome da tabela / contrato</label>
-          <input class="alv8-input" name="titulo" required placeholder="Ex.: ZIPPI PIZZA">
-        </div>
-        <div class="alv8-field grow">
-          <label>Descrição</label>
-          <input class="alv8-input" name="descricao" placeholder="Ex.: TABELA MOTOQUEIRO FIXO">
-        </div>
-        <div class="alv8-field grow">
-          <label>Arquivo da tabela</label>
-          <input class="alv8-input" type="file" name="arquivo" accept=".html,.htm,text/html,.xlsx,.xls,.csv,.pdf,.doc,.docx" required>
-        </div>
-        <button class="alv8-btn primary"><i class="bi bi-upload"></i> Publicar</button>
-      </form>
-    </details>
-
-    <div class="alv8-card">
-      <div class="alv8-section-head"><div><h3>Tabelas publicadas</h3><p>Use “Trocar tabela” para substituir a existente sem precisar excluir primeiro.</p></div></div>
-      <div class="alv8-table-wrap">
-        <table class="alv8-table">
-          <thead><tr><th>Estabelecimento</th><th>Descrição</th><th>Arquivo</th><th>Atualizada</th><th>Ações</th></tr></thead>
-          <tbody>
-          {% for t in tabelas %}
-            <tr>
-              <td><strong>{{ t.titulo }}</strong></td>
-              <td>{{ t.descricao or '—' }}</td>
-              <td>{{ t.arquivo_nome or '—' }}</td>
-              <td>{{ t.enviado_em.strftime('%d/%m/%Y %H:%M') if t.enviado_em else '—' }}</td>
-              <td>
-                <div class="alv8-inline">
-                  <a class="alv8-btn" href="{{ url_for('tabela_abrir', tab_id=t.id) }}" target="_blank"><i class="bi bi-eye"></i> Abrir</a>
-                  <details>
-                    <summary class="alv8-btn edit"><i class="bi bi-arrow-repeat"></i> Trocar tabela</summary>
-                    <form method="post" action="{{ url_for('admin_replace_tabela', tab_id=t.id) }}" enctype="multipart/form-data" class="alv8-filter" style="margin-top:8px;min-width:460px">
-                      <div class="alv8-field grow">
-                        <label>Nome da tabela / contrato</label>
-                        <input class="alv8-input" name="titulo" value="{{ t.titulo }}" required>
-                      </div>
-                      <div class="alv8-field grow"><label>Descrição</label><input class="alv8-input" name="descricao" value="{{ t.descricao or '' }}"></div>
-                      <div class="alv8-field grow"><label>Novo arquivo</label><input class="alv8-input" type="file" name="arquivo" accept=".html,.htm,text/html,.xlsx,.xls,.csv,.pdf,.doc,.docx"></div>
                       <button class="alv8-btn primary">Salvar alteração</button>
                     </form>
                   </details>
@@ -143,7 +76,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="5" class="alv8-empty">Nenhuma tabela publicada.</td></tr>
+            <tr><td colspan="4" class="alv8-empty">Nenhuma tabela publicada.</td></tr>
           {% endfor %}
           </tbody>
         </table>
