@@ -363,42 +363,6 @@ def portal_restaurante():
         total_lanc_valor = sum(x["valor"] for x in lancamentos_periodo)
         total_lanc_entregas = sum(x["qtd_entregas"] for x in lancamentos_periodo)
 
-    # -------------------- URLs auxiliares --------------------
-    try:
-        url_lancar_producao = url_for("lancar_producao")
-    except BuildError:
-        url_lancar_producao = "/restaurante/lancar_producao"
-
-    has_editar_lanc = ("editar_lancamento" in app.view_functions)
-
-    # -------------------- Render --------------------
-    return render_template(
-        "restaurante_dashboard.html",
-        rest=rest,
-        cooperados=cooperados,
-        cooperados_escalados=cooperados_escalados,
-        filtro_inicio=di,
-        filtro_fim=df,
-        filtro_mes=(mes or ""),
-        periodo_desc=periodo_desc,
-        total_bruto=total_bruto,
-        total_inss=total_inss,
-        total_sest=total_sest,
-        total_encargos=total_encargos,
-        total_liquido=total_liquido,
-        total_qtd=total_qtd,
-        total_entregas=total_entregas,
-        view=view,
-        agenda=agenda,
-        dias_list=dias_list,
-        ref_data=ref,
-        modo=modo,
-        lancamentos_periodo=(lancamentos_periodo if view == "lancamentos" else []),
-        total_lanc_valor=total_lanc_valor,
-        total_lanc_entregas=total_lanc_entregas,
-        url_lancar_producao=url_lancar_producao,
-        has_editar_lanc=has_editar_lanc,
-    )
     # =====================================================
     # COOPERADOS ESCALADOS HOJE PARA ESTE RESTAURANTE
     # =====================================================
