@@ -403,9 +403,6 @@ def _coopex_week_pending_context():
         db.session.rollback()
         app.logger.exception("Falha ao montar pendências semanais do estabelecimento")
     return context
-
-
-def _install_coop_ui() -> None:
     loader = app.jinja_loader
     if not loader or getattr(loader, "_coopex_coop_v4_ui", False):
         return
