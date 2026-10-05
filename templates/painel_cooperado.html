@@ -273,6 +273,7 @@
 .help-box.show{display:block}
 </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/cooperado_producao_v3.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/operational_v5.css', v='20260807-1042') }}">
 </head>
 <body>
 {% set _unread = unread if unread is defined else (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else (avisos_unread_count if avisos_unread_count is defined else 0)) %}
@@ -573,7 +574,7 @@
         </div>
       </div>
     
-      {% include '_coop_timeline.html' %}
+      <div id="coopexTimelineDeferred"><div class="coopex-v5-loading">Abra Produções para carregar a escala do período.</div></div>
     </section>
 
     
@@ -1442,5 +1443,37 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 </script>
 
+
+<script id="coopexTimelineDeferredV5">
+(function(){
+  let loaded=false, loading=false;
+  const targetId='coopexTimelineDeferred';
+  async function loadTimeline(){
+    const target=document.getElementById(targetId);
+    if(!target||loaded||loading)return;
+    loading=true;
+    target.innerHTML='<div class="coopex-v5-loading">Carregando escala e produção…</div>';
+    try{
+      const url=new URL('/api/coop/timeline',window.location.origin);
+      const form=document.getElementById('periodoForm');
+      const di=form?.querySelector('[name="data_inicio"]')?.value||'';
+      const df=form?.querySelector('[name="data_fim"]')?.value||'';
+      if(di)url.searchParams.set('data_inicio',di);
+      if(df)url.searchParams.set('data_fim',df);
+      const r=await fetch(url.toString(),{credentials:'same-origin',cache:'no-store'});
+      if(!r.ok)throw new Error('timeline');
+      target.innerHTML=await r.text();
+      loaded=true;
+    }catch(e){
+      target.innerHTML='<div class="coopex-v5-loading">Não foi possível carregar a escala agora. Toque novamente em Produções.</div>';
+    }finally{loading=false;}
+  }
+  document.addEventListener('DOMContentLoaded',function(){
+    document.querySelectorAll('.tab-btn[data-tab="producoes"]').forEach(btn=>btn.addEventListener('click',loadTimeline));
+    const p=new URLSearchParams(location.search);
+    if((p.get('active_tab')||'')==='producoes')loadTimeline();
+  });
+})();
+</script>
 </body>
 </html>
