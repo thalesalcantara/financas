@@ -596,45 +596,47 @@ def portal_restaurante():
 
     if view == "producoes":
         from types import SimpleNamespace
-        import production_ui as production_perf
-        import production_shift_time as production_shifts
         import production_scale_backend as production_backend
 
         today_local = datetime.now(TZ).date() if "TZ" in globals() else date.today()
         week_start = today_local - timedelta(days=today_local.weekday())
         week_end = week_start + timedelta(days=6)
 
-        # Fonte robusta usada também na troca de período/escala.
-        # IMPORTANTE: a escala do estabelecimento é semanal/recorrente.
-        # Muitas linhas guardam uma data antiga + o dia da semana. A tela
-        # "Escalados" já projeta essas linhas para a semana atual; fazemos
-        # exatamente a mesma coisa aqui para não sumir a Produção da Semana.
+        # FONTE ÚNICA: usa exatamente "escalas_rest", já resolvida acima
+        # pelo mesmo portal (restaurante_id + compatibilidade de contrato).
+        # Se a aba Escala enxerga a linha, Produções da Semana também enxerga.
         week_scales = []
         seen_scale_ids = set()
-        for scale in production_perf._rest_scales_indexed(rest):
+        for scale in escalas_rest:
             if scale.id in seen_scale_ids:
                 continue
 
             raw_day = _parse_data_escala_str(scale.data)
             weekday_num = _weekday_from_data_str(scale.data)
 
+            # Escalas da semana atual usam a data real.
             if raw_day and week_start <= raw_day <= week_end:
                 scale_day = raw_day
-            elif weekday_num:
-                try:
-                    scale_day = week_start + timedelta(days=int(weekday_num) - 1)
-                except Exception:
-                    scale_day = None
+            # Compatibilidade com escalas recorrentes/antigas: projeta o dia
+            # da semana para a semana atual.
+            elif weekday_num in (1, 2, 3, 4, 5, 6, 7):
+                scale_day = week_start + timedelta(days=int(weekday_num) - 1)
             else:
-                # último fallback para formatos antigos sem weekday explícito
-                parsed = production_shifts.exact_scale_date(scale, today_local)
-                scale_day = parsed if parsed and week_start <= parsed <= week_end else None
+                scale_day = None
 
             if not scale_day:
                 continue
 
             seen_scale_ids.add(scale.id)
             week_scales.append((scale, scale_day))
+
+        try:
+            current_app.logger.info(
+                "REST_WEEK_PRODUCTIONS rest_id=%s rest=%s escalas_rest=%s week_scales=%s week=%s..%s",
+                rest.id, rest.nome, len(escalas_rest), len(week_scales), week_start, week_end
+            )
+        except Exception:
+            pass
 
         coop_ids = {s.cooperado_id for s, _ in week_scales if s.cooperado_id}
         week_coops = {}
