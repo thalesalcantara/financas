@@ -51,7 +51,7 @@
       {% if _avisos %}<a href="{{ url_for('admin_light_notices') }}"><i class="bi bi-megaphone"></i> Avisos</a>{% endif %}
     </div></div>{% endif %}
 
-    {% if _master %}<a class="alv8-direct" href="/admin?tab=config&legacy=1"><i class="bi bi-gear"></i> Configurações</a>{% endif %}
+    {% if _master %}<a class="alv8-direct" href="{{ url_for('admin_v11_config') }}"><i class="bi bi-gear"></i> Configurações</a>{% endif %}
     <span class="alv8-spacer"></span>
     <a class="alv8-direct" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a>
   </nav>
