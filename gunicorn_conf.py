@@ -29,14 +29,14 @@ MODULES = (
     "approval_return_dashboard",
     # Admin consolidado: substitui V5/V6/V7/V8/V9/V10/V12/V13/V14.
     "admin_final",
-    "coop_expense_control_v16",
-    "coop_expense_management_v17",
-    "coop_expense_totals_v19",
-    "coop_expense_recurring_fixed_v20",
-    "coop_expense_responsive_v23",
-    "permission_readonly_guard_v24",
-    "finance_navigation_fix_v27",
-    "coop_expense_delete_fix_v29",
+    "finance_expense_control",
+    "finance_expense_management",
+    "finance_expense_totals",
+    "finance_expense_recurring",
+    "finance_expense_ui",
+    "permission_readonly_guard",
+    "finance_navigation",
+    "finance_expense_delete",
 )
 
 
