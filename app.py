@@ -5,6 +5,7 @@ import json
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import os, io, csv, re, json, time, difflib, unicodedata
 from datetime import datetime, date, timedelta, time as dtime
+from zoneinfo import ZoneInfo
 from functools import lru_cache
 from collections import defaultdict, namedtuple
 import uuid
@@ -8871,7 +8872,7 @@ def _ensure_tracking_schema():
 
 def _tracking_current_rest_for_coop(coop):
     """Descobre o estabelecimento do turno atual sem manter histórico de GPS."""
-    now_local = datetime.now()
+    now_local = datetime.now(ZoneInfo("America/Fortaleza")).replace(tzinfo=None)
     today = now_local.date()
     hhmm = now_local.strftime("%H:%M")
     rows = Escala.query.filter(
@@ -8940,6 +8941,8 @@ def tracking_update_location():
     if not (-90 <= lat <= 90 and -180 <= lng <= 180):
         return jsonify(ok=False, error="Localização inválida"), 400
     rest_id=_tracking_current_rest_for_coop(coop)
+    if not rest_id:
+        return jsonify(ok=True, ativo=True, restaurante_id=None)
     row=RastreamentoLocalizacao.query.filter_by(cooperado_id=coop.id).first()
     if not row:
         row=RastreamentoLocalizacao(cooperado_id=coop.id, latitude=lat, longitude=lng)
