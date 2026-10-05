@@ -40,6 +40,10 @@ select,.clear{height:44px;border:1px solid var(--border);border-radius:14px;back
 .summary{margin-top:8px;background:#fff;border:1px solid var(--border);border-radius:20px;box-shadow:0 18px 40px rgba(18,35,65,.14);max-height:0;overflow:hidden;transition:max-height .22s ease}.summary.open{max-height:360px}.summary-head{padding:12px 14px;border-bottom:1px solid #edf1f6;font-weight:900;font-size:14px}.summary-list{max-height:295px;overflow:auto;padding:0 14px 10px}
 .row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:11px 0;border-bottom:1px solid #eef1f5}.row:last-child{border-bottom:0}.row .n{font-size:12px;font-weight:900}.row .m{font-size:10px;color:var(--muted);margin-top:3px}.qty{display:flex;align-items:center;gap:4px}.qty button{width:30px;height:30px;border:1px solid var(--border);background:#fff;border-radius:10px;font-weight:900}.qty b{min-width:22px;text-align:center;font-size:12px}
 .empty{grid-column:1/-1;padding:16px;border:1px dashed var(--border);border-radius:16px;text-align:center;color:var(--muted);font-size:12px}.loading{opacity:.7}
+.original-viewer{display:none;margin-top:12px;background:#fff;border:1px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:0 7px 22px rgba(20,40,70,.06)}
+.original-viewer.show{display:block}.original-viewer iframe{display:block;width:100%;height:72vh;min-height:560px;border:0;background:#fff}
+.original-head{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:900}
+.original-head a{color:var(--blue);text-decoration:none}
 @media(min-width:760px){.app{max-width:760px}.drawer{max-width:760px}.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 </style>
 </head>
@@ -82,6 +86,14 @@ select,.clear{height:44px;border:1px solid var(--border);border-radius:14px;back
     <div id="grid" class="grid"><div class="empty">Selecione um estabelecimento.</div></div>
   </section>
 
+  <section class="original-viewer" id="originalViewer">
+    <div class="original-head">
+      <span>Tabela original</span>
+      <a id="originalOpen" href="#" target="_blank">Abrir em tela cheia</a>
+    </div>
+    <iframe id="originalFrame" title="Tabela original"></iframe>
+  </section>
+
   <section class="section info" id="infoBox"><div class="g-title">Informações da tabela</div><div id="infoList"></div></section>
   <section class="section guarantees" id="guarantees"><div class="g-title">Garantidos</div><div id="gGrid"></div></section>
 </div>
@@ -96,6 +108,9 @@ let contractId="";
 let mode="consult";
 let counts={};
 let data=[];
+const originalViewer=document.getElementById("originalViewer");
+const originalFrame=document.getElementById("originalFrame");
+const originalOpen=document.getElementById("originalOpen");
 const money=v=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(v||0));
 const key=(name,city)=>name+"||"+city;
 
@@ -355,6 +370,8 @@ async function loadContract(id){
     const r=await fetch(`/tabelas/${id}/dados`,{credentials:"same-origin",cache:"no-store"});
     const j=await r.json();
     if(!r.ok||!j.ok)throw new Error(j.erro||"Falha ao ler tabela");
+    const originalUrl=j.arquivo_visualizacao||(`/tabelas/${id}/abrir`);
+    originalOpen.href=originalUrl;
     data=j.bairros||[];
 
     let autoGarantidos=j.garantidos_extraidos||[];
@@ -378,10 +395,30 @@ async function loadContract(id){
     const infos=[];
     infoBox.classList.remove("show")
 
-    if(j.erro && j.erro!=="imagem" && !data.length){grid.innerHTML=`<div class="empty">${j.erro}</div>`;countLabel.textContent="0 bairros";return}
-    if(!data.length){grid.innerHTML='<div class="empty">Não consegui reconhecer bairros e valores automaticamente nesta tabela.</div>';countLabel.textContent="0 bairros";return}
+    // Se a leitura automática não for confiável, não mostra dados errados:
+    // abre a própria tabela original, mantendo o seletor por estabelecimento.
+    const suspicious=data.some(x=>{
+      const n=(x.bairro||"").toLocaleLowerCase("pt-BR");
+      return /^(area|área|cnpj|cpf|motoqueiro|base|horario base|horário base|valor base|feriado|feriados|fim de semana|fins de semana)$/.test(n)
+        || Number(x.valor||0)>50;
+    });
+    if(!data.length || suspicious){
+      data=[];
+      countLabel.textContent="Tabela original";
+      grid.innerHTML='<div class="empty">Esta tabela será exibida no formato original para evitar valores ou bairros incorretos.</div>';
+      originalFrame.src=originalUrl;
+      originalViewer.classList.add("show");
+      return;
+    }
     renderGrid();
-  }catch(e){grid.innerHTML=`<div class="empty">Não foi possível ler esta tabela: ${e.message}</div>`;countLabel.textContent="0 bairros"}
+  }catch(e){
+    const originalUrl=`/tabelas/${id}/abrir`;
+    countLabel.textContent="Tabela original";
+    grid.innerHTML='<div class="empty">Não foi possível reconhecer a tabela com segurança. Abrindo o arquivo original.</div>';
+    originalOpen.href=originalUrl;
+    originalFrame.src=originalUrl;
+    originalViewer.classList.add("show");
+  }
 }
 
 consultBtn.onclick=()=>{mode="consult";consultBtn.classList.add("active");calcBtn.classList.remove("active");renderGrid()}
