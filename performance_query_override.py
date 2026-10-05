@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from sqlalchemy import func
 
-import performance_ui_hotfix as hotfix
+import performance_ui_fix as perf
 
-perf = hotfix.perf
+# Compatibilidade que antes vivia no hotfix separado.
+if not hasattr(perf.backend, "legacy"):
+    perf.backend.legacy = perf.flow.legacy
 app = perf.app
 Escala = perf.Escala
 
