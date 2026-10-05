@@ -1014,10 +1014,10 @@
       <button id="btnTheme" class="theme-toggle" type="button"><i class="bi bi-moon"></i><span id="lblTheme">Escuro</span></button>
 
       <nav class="navmenu" id="sideNav">
-        <a data-target="lancar" class="{{ 'active' if (view|default('lancar') not in ['escalas','config','avisos','lancamentos','tabelas']) else '' }}" href="{{ url_for('portal_restaurante', view='lancar') }}">
+        <a data-target="lancar" class="{{ 'active' if (view|default('lancar') not in ['producoes','escalas','config','avisos','lancamentos','tabelas']) else '' }}" href="{{ url_for('portal_restaurante', view='lancar') }}">
           <i class="bi bi-person-lines-fill"></i><span>Lançar Produção</span>
         </a>
-        <a data-coopex-producoes="1" href="{{ url_for('rest_producoes_pendentes') }}">
+        <a data-target="producoes" class="{{ 'active' if view=='producoes' else '' }}" href="{{ url_for('portal_restaurante', view='producoes') }}">
           <i class="bi bi-clipboard-check"></i><span>Produções da Semana</span>
         </a>
         <a data-target="lancamentos" class="{{ 'active' if view=='lancamentos' else '' }}" href="{{ url_for('portal_restaurante', view='lancamentos') }}">
@@ -1453,6 +1453,10 @@
             <div class="card card-body text-muted">Carregando avisos…</div>
           {% endif %}
         </div>
+      </section>
+
+      <section data-view="producoes">
+        {% include '_rest_producoes_semana.html' %}
       </section>
 
       <section data-view="lancamentos">
