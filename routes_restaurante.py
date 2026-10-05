@@ -19,6 +19,7 @@ def portal_restaurante():
     from datetime import date, timedelta, datetime
     import re
     from werkzeug.routing import BuildError
+    from sqlalchemy.orm import defer
 
     u_id = session.get("user_id")
     rest = request_restaurante()
@@ -150,6 +151,7 @@ def portal_restaurante():
                 Cooperado.query
                 .join(Usuario, Cooperado.usuario_id == Usuario.id)
                 .filter(Cooperado.id.in_(coop_ids_escala), Usuario.ativo.is_(True))
+                .options(defer(Cooperado.foto_bytes))
                 .all()
             )
         }
@@ -229,6 +231,7 @@ def portal_restaurante():
             Usuario.ativo.is_(True),
             Cooperado.id.in_(ids_escalados_periodo) if ids_escalados_periodo else literal(False)
         )
+        .options(defer(Cooperado.foto_bytes))
         .order_by(Cooperado.nome)
         .all()
     )
@@ -238,6 +241,7 @@ def portal_restaurante():
         Cooperado.query
         .join(Usuario, Cooperado.usuario_id == Usuario.id)
         .filter(Usuario.ativo.is_(True))
+        .options(defer(Cooperado.foto_bytes))
         .order_by(Cooperado.nome)
         .all()
     )
