@@ -7,7 +7,7 @@ from io import BytesIO
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 
-from flask import flash, redirect, render_template, render_template_string, request, send_file, session, url_for
+from flask import flash, g, has_request_context, redirect, render_template, render_template_string, request, send_file, session, url_for
 from sqlalchemy import event, inspect, or_
 from sqlalchemy.orm import joinedload
 
@@ -158,22 +158,32 @@ def _protect_inactive_coop(target, value, oldvalue, initiator):
 
 
 def _active_coops_v11():
+    if has_request_context() and hasattr(g, "_admin_v11_active_coops"):
+        return g._admin_v11_active_coops
     try:
         archived = light._archived_ids()
     except Exception:
         archived = set()
-    return (
+    rows = (
         Cooperado.query.join(Usuario, Cooperado.usuario_id == Usuario.id)
         .filter(or_(Usuario.ativo.is_(True), Usuario.ativo.is_(None)))
         .filter(~Cooperado.id.in_(archived) if archived else True)
         .order_by(Cooperado.nome.asc())
         .all()
     )
+    if has_request_context():
+        g._admin_v11_active_coops = rows
+    return rows
 
 
 def _active_coop_ids_names_v11():
+    if has_request_context() and hasattr(g, "_admin_v11_active_ids_names"):
+        return g._admin_v11_active_ids_names
     rows = _active_coops_v11()
-    return {c.id for c in rows}, {_norm(c.nome) for c in rows}, rows
+    result = ({c.id for c in rows}, {_norm(c.nome) for c in rows}, rows)
+    if has_request_context():
+        g._admin_v11_active_ids_names = result
+    return result
 
 
 light._active_coops = _active_coops_v11
