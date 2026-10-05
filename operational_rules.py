@@ -13,6 +13,7 @@ import production_shift_time as shifts
 app = notifications.app
 flow = shifts.flow
 upgrade = shifts.upgrade
+legacy = flow.legacy
 TZ = shifts.TZ
 
 Usuario = shifts.patch.flow.Usuario
@@ -169,7 +170,7 @@ def _coopex_v5_context():
 
     try:
         if role == "restaurante" and request.endpoint == "portal_restaurante":
-            rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first()
+            rest = legacy.request_restaurante()
             if rest:
                 context["coopex_rest_display_name"] = perf._norm_name(rest.nome)
                 view = (request.args.get("view") or "lancar").strip().lower()
@@ -188,7 +189,7 @@ if "coop_timeline_v5" not in app.view_functions:
         if (session.get("user_tipo") or "").strip().lower() != "cooperado":
             return jsonify(ok=False), 403
 
-        coop = Cooperado.query.filter_by(usuario_id=session.get("user_id")).first()
+        coop = legacy.request_cooperado()
         if not coop:
             return jsonify(ok=False), 404
 
