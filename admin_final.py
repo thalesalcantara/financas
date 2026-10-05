@@ -53,8 +53,8 @@ def _admin_v11_permission_context():
             ("escalas", "admin_light_scale", {}),
             ("avaliacoes", "admin_light_ratings", {}),
             ("avisos", "admin_light_notices", {}),
-            ("documentos", "admin_light_documents", {}),
-            ("tabelas", "admin_light_tables", {}),
+            ("documentos", "admin_documentos", {}),
+            ("tabelas", "admin_tabelas", {}),
         )
         for permission, endpoint, values in destinations:
             if permissions.get(permission, {}).get("ver") and endpoint in app.view_functions:
@@ -854,8 +854,8 @@ def _admin_final_navigation():
         "cooperados": "admin_light_cooperatives",
         "restaurantes": "admin_v10_establishments",
         "avaliacoes": "admin_light_ratings",
-        "documentos": "admin_v10_blitz",
-        "tabelas": "admin_light_tables",
+        "documentos": "admin_documentos",
+        "tabelas": "admin_tabelas",
         "avisos": "admin_light_notices",
         "config": "admin_v11_config",
     }
