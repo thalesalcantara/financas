@@ -112,17 +112,6 @@ def _rest_period_update(mapper, connection, target):
     target.periodo = "seg-dom"
 
 
-try:
-    with app.app_context():
-        Restaurante.query.filter(
-            or_(Restaurante.periodo != "seg-dom", Restaurante.periodo.is_(None))
-        ).update({Restaurante.periodo: "seg-dom"}, synchronize_session=False)
-        db.session.commit()
-except Exception:
-    db.session.rollback()
-    app.logger.exception("Falha ao normalizar período dos estabelecimentos")
-
-
 # Protege cooperados desativados contra a rotina legada que os reativava.
 _PROTECTED_INACTIVE_USER_IDS: set[int] = set()
 
