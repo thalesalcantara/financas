@@ -716,30 +716,7 @@ def rest_producoes_pendentes():
     denied = _require_role("restaurante")
     if denied:
         return denied
-    rest = _restaurante_current()
-    pending = (
-        ProducaoCooperado.query.filter_by(
-            restaurante_id=rest.id,
-            status="pendente",
-        )
-        .order_by(ProducaoCooperado.criado_em.asc())
-        .all()
-    )
-    recent = (
-        ProducaoCooperado.query.filter(
-            ProducaoCooperado.restaurante_id == rest.id,
-            ProducaoCooperado.status.in_(["aprovada", "recusada"]),
-        )
-        .order_by(ProducaoCooperado.decidido_em.desc(), ProducaoCooperado.id.desc())
-        .limit(80)
-        .all()
-    )
-    return render_template(
-        "rest_producoes_pendentes.html",
-        restaurante=rest,
-        pendentes=pending,
-        recentes=recent,
-    )
+    return redirect(url_for("portal_restaurante", view="producoes"))
 
 
 @app.get(
