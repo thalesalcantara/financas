@@ -5,11 +5,12 @@
   .week-rule{margin:0 0 8px;padding:7px 10px;border:1px solid #cbdcff;border-radius:9px;background:#f4f8ff;color:#244a91;font-size:.74rem;line-height:1.3}
   .week-bulk{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px;padding:7px 10px;background:#fff;border:1px solid var(--border);border-radius:9px;font-size:.78rem}
   .week-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .week-day{margin:0 0 10px}.week-day-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 6px;padding:6px 9px;border-radius:8px;background:#eef5ff;color:#163f7d;font-size:.75rem;font-weight:900}.week-day-head small{font-size:.65rem;color:#61728d;font-weight:750}
   .week-card{min-width:0;background:#fff;border:1px solid var(--border);border-left:4px solid #d93646;border-radius:11px;padding:10px;box-shadow:0 2px 9px rgba(15,38,85,.04)}
-  .week-card.green{border-left-color:#16924d}.week-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .week-card.green{border-left-color:#16924d}.week-card.blue{border-left-color:#0b6ee8}.week-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
   .week-name{font-weight:900;font-size:.86rem;line-height:1.15;color:#101a31}.week-meta{margin-top:3px;color:var(--muted);font-size:.69rem;line-height:1.25}
   .week-status{flex:0 0 auto;max-width:145px;padding:4px 7px;border-radius:999px;background:#ffeaed;color:#a61f32;font-size:.62rem;font-weight:900;line-height:1.15;text-align:center}
-  .week-card.green .week-status{background:#e5f7ec;color:#126c39}
+  .week-card.green .week-status{background:#e5f7ec;color:#126c39}.week-card.blue .week-status{background:#e8f2ff;color:#1458a8}
   .week-value{display:flex;align-items:baseline;gap:7px;margin-top:7px}.week-value strong{font-size:1.02rem;line-height:1}.week-value span{font-size:.68rem;color:var(--muted)}
   .week-action{margin-top:8px;padding-top:8px;border-top:1px solid #edf0f5}
   .week-action-title{margin-bottom:5px;font-size:.68rem;font-weight:850;color:#2453ad}
@@ -49,9 +50,20 @@
 </div>
 {% endif %}
 
-<div class="week-grid">
+{% set ns_day = namespace(last='') %}
 {% for x in _previstas_semana %}
-  <article class="week-card {% if x.color=='green' %}green{% endif %}" id="escala-{{ x.escala.id }}">
+  {% set day_key = x.data.strftime('%Y-%m-%d') if x.data else 'sem-data' %}
+  {% if ns_day.last != day_key %}
+    {% if ns_day.last %}</div></div>{% endif %}
+    <div class="week-day">
+      <div class="week-day-head">
+        <span>{{ ['SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SÁBADO','DOMINGO'][x.data.weekday()] if x.data else 'SEM DATA' }}</span>
+        <small>{{ x.data.strftime('%d/%m/%Y') if x.data else '' }}</small>
+      </div>
+      <div class="week-grid">
+    {% set ns_day.last = day_key %}
+  {% endif %}
+  <article class="week-card {% if x.color=='green' %}green{% elif x.color=='blue' %}blue{% endif %}" id="escala-{{ x.escala.id }}">
     <div class="week-card-top">
       <div class="min-w-0">
         <div class="week-name">
@@ -61,9 +73,8 @@
           {{ x.cooperado.nome if x.cooperado else (x.escala.cooperado_nome or 'Cooperado não vinculado') }}
         </div>
         <div class="week-meta">
-          {{ x.data.strftime('%d/%m/%Y') if x.data else (x.escala.data or 'Sem data') }}
-          {% if x.escala.turno %} · {{ x.escala.turno }}{% endif %}
-          {% if x.escala.horario %} · {{ x.escala.horario }}{% endif %}
+          {{ x.horario or x.escala.horario or 'Sem horário' }}
+          {% if x.turno or x.escala.turno %} · {{ x.turno or x.escala.turno }}{% endif %}
         </div>
       </div>
       <span class="week-status">{{ x.status_label }}</span>
@@ -71,7 +82,8 @@
 
     <div class="week-value">
       <strong>R$ {{ '%.2f'|format(x.valor_total or 0)|replace('.', ',') }}</strong>
-      {% if x.producao and x.producao.qtd_entregas %}<span>{{ x.producao.qtd_entregas }} entrega(s)</span>{% endif %}
+      {% if x.lancamento and x.lancamento.qtd_entregas %}<span>{{ x.lancamento.qtd_entregas }} entrega(s)</span>
+      {% elif x.producao and x.producao.qtd_entregas %}<span>{{ x.producao.qtd_entregas }} entrega(s)</span>{% endif %}
     </div>
 
     {% if x.producao and x.producao.status=='pendente' and x.producao.valor_total > 0 %}
@@ -91,7 +103,7 @@
     </div>
     {% elif x.pode_lancar %}
     <div class="week-action">
-      <div class="week-action-title">O estabelecimento pode lançar esta produção agora</div>
+      <div class="week-action-title">Lançar produção desta escala</div>
       <form method="post" action="/rest/producoes/escala/{{ x.escala.id }}/lancar" class="js-week-production-form">
         <div class="week-fields">
           <div class="week-field"><label>Quantidade de entregas</label><input type="number" min="1" name="qtd_entregas" required></div>
@@ -101,15 +113,14 @@
       </form>
     </div>
     {% elif x.color=='green' %}
-      <div class="week-note"><i class="bi bi-check-circle-fill"></i> Produção registrada. Duplicidade bloqueada.</div>
-    {% elif not x.cooperado %}
-      <div class="week-note muted">A escala ainda não está vinculada a um cooperado válido.</div>
+      <div class="week-note"><i class="bi bi-check-circle-fill"></i> Produção registrada.</div>
     {% endif %}
   </article>
 {% else %}
-  <div class="week-card" style="grid-column:1/-1;text-align:center;color:var(--muted)">Nenhuma escala desta semana foi encontrada para este estabelecimento.</div>
+  <div class="week-card" style="text-align:center;color:var(--muted)">Nenhuma escala desta semana foi encontrada para este estabelecimento.</div>
 {% endfor %}
-</div>
+{% if ns_day.last %}</div></div>{% endif %}
+
 
 <div class="week-history">
   <div class="week-history-head"><span><i class="bi bi-clock-history me-1"></i>Histórico recente</span><span>{{ _recentes_semana|length }} registro(s)</span></div>
