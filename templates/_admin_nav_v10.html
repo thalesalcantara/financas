@@ -46,9 +46,10 @@
       <a class="{{ 'active' if active_tab=='historico' else '' }}" href="{{ url_for('admin_light_history') }}"><i class="bi bi-clock-history"></i> Histórico</a>
     </div></div>{% endif %}
 
-    {% if _avaliacoes or _avisos %}<div class="alv8-group"><button type="button"><i class="bi bi-bar-chart"></i> Gestão <i class="bi bi-chevron-down"></i></button><div class="alv8-menu">
+    {% if _avaliacoes or _avisos or _restaurantes or _master %}<div class="alv8-group"><button type="button"><i class="bi bi-bar-chart"></i> Gestão <i class="bi bi-chevron-down"></i></button><div class="alv8-menu">
       {% if _avaliacoes %}<a href="{{ url_for('admin_light_ratings') }}"><i class="bi bi-stars"></i> Avaliações</a>{% endif %}
       {% if _avisos %}<a href="{{ url_for('admin_light_notices') }}"><i class="bi bi-megaphone"></i> Avisos</a>{% endif %}
+      {% if _restaurantes or _master %}<a class="{{ 'active' if active_tab=='caixa_postal' else '' }}" href="{{ url_for('admin_caixa_postal') }}"><i class="bi bi-inbox"></i> Caixa Postal</a>{% endif %}
     </div></div>{% endif %}
 
     {% if _master %}<a class="alv8-direct" href="{{ url_for('admin_v11_config') }}"><i class="bi bi-gear"></i> Configurações</a>{% endif %}
