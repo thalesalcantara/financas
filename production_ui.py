@@ -306,74 +306,6 @@ if not app.extensions.get("coopex_ui_v3_redirect"):
     app.extensions["coopex_ui_v3_redirect"] = True
 
 
-def _transform_restaurant(source: str) -> str:
-    source = re.sub(
-        r'<a\s+data-coopex-producoes="1".*?</a>\s*',
-        "",
-        source,
-        count=1,
-        flags=re.S,
-    )
-    old_brand = '<div class="brand"><i class="bi bi-building"></i><span>Portal do Estabelecimento</span></div>'
-    new_brand = """<div class="brand coopex-brand-welcome">
-        <i class="bi bi-shop"></i>
-        <span class="coopex-brand-copy">
-          <small>SEJA BEM-VINDO</small>
-          <strong>{{ coopex_rest_display_name|default('ESTABELECIMENTO') }}</strong>
-        </span>
-      </div>"""
-    source = source.replace(old_brand, new_brand, 1)
-
-    css_tag = '<link rel="stylesheet" href="{{ url_for(\'static\', filename=\'css/restaurante_v3.css\') }}">'
-    if "restaurante_v3.css" not in source:
-        source = source.replace("</head>", "  " + css_tag + "\n</head>", 1)
-
-    marker = '<div class="row g-4 align-items-start">'
-    if "_rest_approvals_tabs.html" not in source and marker in source:
-        source = source.replace(
-            marker,
-            "        {% include '_rest_approvals_tabs.html' %}\n        " + marker,
-            1,
-        )
-
-    js_tag = '<script src="{{ url_for(\'static\', filename=\'js/restaurante_v3.js\') }}"></script>'
-    if "restaurante_v3.js" not in source:
-        source = source.replace("</body>", js_tag + "\n</body>", 1)
-    return source
-
-
-def _transform_coop(source: str) -> str:
-    css_tag = '<link rel="stylesheet" href="{{ url_for(\'static\', filename=\'css/cooperado_producao_v3.css\') }}">'
-    if "cooperado_producao_v3.css" not in source:
-        source = source.replace("</head>", "  " + css_tag + "\n</head>", 1)
-
-    marker = '<section class="tab-pane-custom" id="tab-producoes">'
-    if "_coop_timeline.html" not in source and marker in source:
-        source = source.replace(
-            marker,
-            marker + "\n      {% include '_coop_timeline.html' %}",
-            1,
-        )
-    return source
-
-
-if not app.extensions.get("coopex_ui_v3_loader"):
-    loader = app.jinja_loader
-    original_get_source = loader.get_source
-
-    def get_source(environment, template):
-        source, filename, uptodate = original_get_source(environment, template)
-        if template == "restaurante_dashboard.html":
-            source = _transform_restaurant(source)
-        elif template == "painel_cooperado.html":
-            source = _transform_coop(source)
-        return source, filename, uptodate
-
-    loader.get_source = get_source
-    app.extensions["coopex_ui_v3_loader"] = True
-    app.jinja_env.cache.clear()
-
-
 # ============================================================
 # Performance consolidada — antigas camadas performance_ui/queries
 # ============================================================
@@ -710,28 +642,6 @@ def _coopex_fast_context():
     except Exception:
         app.logger.exception("Falha ao carregar contexto otimizado dos painéis")
     return context
-
-
-def _install_template_repairs():
-    loader = app.jinja_loader
-    if not loader or getattr(loader, "_coopex_performance_repairs", False):
-        return
-    original_get_source = loader.get_source
-
-    def get_source(environment, template):
-        source, filename, uptodate = original_get_source(environment, template)
-        if template == "restaurante_dashboard.html":
-            old_photo = "{{ coop.foto_url or url_for('static', filename='img/default.png') }}"
-            new_photo = "{{ url_for('media_coop', coop_id=coop.id) }}"
-            source = source.replace(old_photo, new_photo)
-        return source, filename, uptodate
-
-    loader.get_source = get_source
-    loader._coopex_performance_repairs = True
-    app.jinja_env.cache.clear()
-
-
-_install_template_repairs()
 
 
 def _dedupe(rows):
