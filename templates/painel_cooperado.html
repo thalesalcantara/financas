@@ -638,7 +638,7 @@
         <div class="section-head">
           <div>
             <h2 class="section-title"><i class="bi {{ 'bi-lock-fill' if bloquear_adiantamento else 'bi-unlock-fill' }} me-1"></i> Adiantar produção</h2>
-            <div class="item-small mt-1 js-adiantamento-lock-text">{{ 'Pedido bloqueado pelo administrador no momento.' if bloquear_adiantamento else 'Disponível para solicitar. O limite considera o líquido após todos os descontos.' }}</div>
+            <div class="item-small mt-1 js-adiantamento-lock-text">{{ 'Pedido bloqueado pelo administrador no momento.' if bloquear_adiantamento else 'Disponível para solicitar com base somente no líquido da semana passada (segunda a domingo).' }}</div>
           </div>
           <span class="section-chip js-adiantamento-lock-chip" style="background:{{ '#fee2e2' if bloquear_adiantamento else '#dcfce7' }};color:{{ '#b91c1c' if bloquear_adiantamento else '#166534' }}">{{ 'Fechado' if bloquear_adiantamento else 'Aberto' }}</span>
         </div>
@@ -646,8 +646,11 @@
         <div class="soft-card p-3" style="background:#fff;border-color:rgba(39,71,217,.10)">
           <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-              <div class="item-title">Disponível para pedir agora</div>
-              <div class="item-small mt-1">Somente valor líquido depois de encargos e descontos.</div>
+              <div class="item-title">Saldo da semana passada</div>
+              <div class="item-small mt-1">
+                {{ adiantamento_semana_inicio.strftime('%d/%m/%Y') }} a {{ adiantamento_semana_fim.strftime('%d/%m/%Y') }} · segunda a domingo.
+                Somente o líquido depois de encargos e descontos.
+              </div>
             </div>
             <div class="item-amount mono text-success js-adiantamento-disponivel">R$ {{ '%.2f'|format(adiantamento_disponivel|default(0)) }}</div>
           </div>
@@ -669,7 +672,7 @@
         </div>
 
         <div class="section-head mt-3">
-          <h2 class="section-title">Histórico de solicitações</h2>
+          <h2 class="section-title">Solicitações no período filtrado</h2>
           <span class="section-chip">{{ solicitacoes_adiantamento|length }}</span>
         </div>
         <div class="list-stack" id="listaSolicitacoesAdiantamento">
@@ -850,13 +853,16 @@
           {% for e in minha_escala %}
             {% set stripe = (e.cor or e.status_color or '#dbe4ff') %}
             {% set data_curta = e.data_curta or (e.data_fmt[:5] if e.data_fmt else (e.data[:5] if e.data else '')) %}
-            {% set dow = (e.dia_semana or e.dow or '')|upper %}
+            {% set dow = (e.dia_semana or e.dow or '') %}
             <div class="esc-card" style="--stripe: {{ stripe }}">
               <div class="esc-bar"></div>
               <div class="esc-body">
                 <div class="esc-top">
                   <div class="min-w-0 flex-grow-1">
-                    <div class="esc-title">{{ data_curta }} {% if dow %}<span class="esc-badge ms-1">{{ dow }}</span>{% endif %}</div>
+                    <div class="esc-title esc-date-title">
+  <strong>{{ data_curta }}</strong>
+  {% if dow %}<span class="esc-weekday">{{ dow }}</span>{% endif %}
+</div>
                     <div class="esc-meta">
                       <div><i class="bi bi-sunrise-fill me-1"></i>{{ e.turno or '—' }}</div>
                       <div><i class="bi bi-clock me-1"></i>{{ e.horario_fmt or e.horario or '—' }}</div>
