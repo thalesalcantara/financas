@@ -26,15 +26,12 @@
       <summary><strong><i class="bi bi-plus-circle"></i> Nova tabela</strong></summary>
       <form method="post" action="{{ url_for('admin_upload_tabela') }}" enctype="multipart/form-data" class="alv8-filter" style="margin-top:12px">
         <div class="alv8-field grow">
-          <label>Estabelecimento</label>
-          <select class="alv8-select" name="restaurante_id" required>
-            <option value="">Selecione</option>
-            {% for r in restaurantes %}<option value="{{ r.id }}">{{ r.nome }}</option>{% endfor %}
-          </select>
+          <label>Nome da tabela / contrato</label>
+          <input class="alv8-input" name="titulo" required placeholder="Ex.: ZIPPI PIZZA">
         </div>
         <div class="alv8-field grow">
           <label>Descrição</label>
-          <input class="alv8-input" name="descricao" placeholder="Opcional">
+          <input class="alv8-input" name="descricao" placeholder="Ex.: TABELA MOTOQUEIRO FIXO">
         </div>
         <div class="alv8-field grow">
           <label>Arquivo da tabela</label>
@@ -63,11 +60,8 @@
                     <summary class="alv8-btn edit"><i class="bi bi-arrow-repeat"></i> Trocar tabela</summary>
                     <form method="post" action="{{ url_for('admin_replace_tabela', tab_id=t.id) }}" enctype="multipart/form-data" class="alv8-filter" style="margin-top:8px;min-width:460px">
                       <div class="alv8-field grow">
-                        <label>Estabelecimento</label>
-                        <select class="alv8-select" name="restaurante_id">
-                          <option value="">Manter {{ t.titulo }}</option>
-                          {% for r in restaurantes %}<option value="{{ r.id }}" {{ 'selected' if r.nome==t.titulo else '' }}>{{ r.nome }}</option>{% endfor %}
-                        </select>
+                        <label>Nome da tabela / contrato</label>
+                        <input class="alv8-input" name="titulo" value="{{ t.titulo }}" required>
                       </div>
                       <div class="alv8-field grow"><label>Descrição</label><input class="alv8-input" name="descricao" value="{{ t.descricao or '' }}"></div>
                       <div class="alv8-field grow"><label>Novo arquivo</label><input class="alv8-input" type="file" name="arquivo" accept=".html,.htm,text/html,.xlsx,.xls,.csv,.pdf,.doc,.docx"></div>
