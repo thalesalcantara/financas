@@ -548,46 +548,6 @@ def portal_restaurante():
         key=lambda x: (x["fim_min"], (x["cooperado_nome"] or "").lower())
     )
 
-    # -------------------- Lista de lançamentos (aba "lancamentos") --------------------
-    lancamentos_periodo = []
-    total_lanc_valor = 0.0
-    total_lanc_entregas = 0
-
-    if view == "lancamentos":
-        q = (
-            db.session.query(Lancamento, Cooperado)
-            .join(Cooperado, Cooperado.id == Lancamento.cooperado_id)
-            .filter(
-                Lancamento.restaurante_id == rest.id,
-                Lancamento.data >= di,
-                Lancamento.data <= df,
-            )
-            .order_by(Lancamento.data.asc(), Lancamento.id.asc())
-        )
-        for lanc, coop in q.all():
-            item = {
-                "id": lanc.id,
-                "data": lanc.data.strftime("%d/%m/%Y") if lanc.data else "",
-                "hora_inicio": (
-                    lanc.hora_inicio if isinstance(lanc.hora_inicio, str)
-                    else (lanc.hora_inicio.strftime("%H:%M") if lanc.hora_inicio else "")
-                ),
-                "hora_fim": (
-                    lanc.hora_fim if isinstance(lanc.hora_fim, str)
-                    else (lanc.hora_fim.strftime("%H:%M") if lanc.hora_fim else "")
-                ),
-                "qtd_entregas": lanc.qtd_entregas or 0,
-                "valor": float(lanc.valor or 0.0),
-                "descricao": (lanc.descricao or ""),
-                "cooperado_id": coop.id,
-                "cooperado_nome": coop.nome,
-                "contrato_nome": rest.nome,
-            }
-            lancamentos_periodo.append(item)
-
-        total_lanc_valor = sum(x["valor"] for x in lancamentos_periodo)
-        total_lanc_entregas = sum(x["qtd_entregas"] for x in lancamentos_periodo)
-
     # -------------------- PRODUÇÕES DA SEMANA --------------------
     # Usa a MESMA fonte de escala do painel "Escalados" e das pendências.
     # Isso evita divergência: se existe escala válida no dia, ela aparece aqui.
