@@ -1885,7 +1885,7 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
                       >
                         <div class="rest-coop-row">
                           <div class="rest-coop-photo-wrap">
-                            <img src="{{ url_for('media_coop', coop_id=coop.id) }}" class="rest-coop-photo" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
+                            <img loading="lazy" decoding="async" src="{{ url_for('media_coop', coop_id=coop.id) }}" class="rest-coop-photo" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
                             <span class="rest-coop-photo-fallback" style="display:none"><i class="bi bi-person-fill"></i></span>
                           </div>
                           <div class="coop-left">
@@ -1919,7 +1919,7 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
             <div class="lancar-layout-card" id="blocoLancamento">
               <div class="card-body">
                 <div class="selected-header text-center mb-3" id="selectedHeader" style="display:none;">
-                  <img id="selFoto" src="" class="big mb-2" alt="Foto do cooperado selecionado" onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='{{ url_for('static', filename='img/default.png') }}';}">
+                  <img id="selFoto" src="" decoding="async" class="big mb-2" alt="Foto do cooperado selecionado" onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='{{ url_for('static', filename='img/default.png') }}';}">
 
                   <div class="fw-bold fs-5 d-flex justify-content-center align-items-center gap-2 flex-wrap">
                     <span id="selNome"></span>
