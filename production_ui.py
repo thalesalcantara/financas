@@ -233,77 +233,10 @@ def _timeline(coop, start: date, end: date):
     return result
 
 
-if not app.extensions.get("coopex_ui_v3_context"):
-    @app.context_processor
-    def _coopex_ui_context():
-        role = (session.get("user_tipo") or "").strip().lower()
-        context = {
-            "coopex_rest_display_name": "ESTABELECIMENTO",
-            "coopex_rest_pending_rows": [],
-            "coopex_coop_timeline": [],
-            "coopex_filter_start": None,
-            "coopex_filter_end": None,
-        }
-        try:
-            if role == "restaurante":
-                rest = Restaurante.query.filter_by(
-                    usuario_id=session.get("user_id")
-                ).first()
-                if rest:
-                    context["coopex_rest_display_name"] = _norm_name(rest.nome)
-                    if request.endpoint == "portal_restaurante":
-                        rows = backend._rest_scale_rows(rest)
-                        context["coopex_rest_pending_rows"] = [
-                            row for row in rows
-                            if row.producao
-                            and row.producao.status == "pendente"
-                            and float(row.producao.valor_total or 0) > 0
-                        ]
-
-            elif role == "cooperado" and request.endpoint == "portal_cooperado":
-                coop = Cooperado.query.filter_by(
-                    usuario_id=session.get("user_id")
-                ).first()
-                if coop:
-                    today = datetime.now(TZ).date()
-                    start = backend.upgrade._parse_date(
-                        request.args.get("data_inicio")
-                    ) or today
-                    end = backend.upgrade._parse_date(
-                        request.args.get("data_fim")
-                    ) or start
-                    if end < start:
-                        start, end = end, start
-                    context.update(
-                        coopex_coop_timeline=_timeline(coop, start, end),
-                        coopex_filter_start=start,
-                        coopex_filter_end=end,
-                    )
-        except Exception:
-            app.logger.exception("Falha ao montar a sequência diária de produção")
-        return context
-
-    app.extensions["coopex_ui_v3_context"] = True
-
-
-if not app.extensions.get("coopex_ui_v3_redirect"):
-    original = app.view_functions.get("coop_producao")
-    if original:
-        @wraps(original)
-        def _coop_submit_and_return(*args, **kwargs):
-            response = original(*args, **kwargs)
-            if request.method == "POST" and request.form.get("return_to") == "painel":
-                params = {"active_tab": "producoes"}
-                if request.form.get("data_inicio"):
-                    params["data_inicio"] = request.form["data_inicio"]
-                if request.form.get("data_fim"):
-                    params["data_fim"] = request.form["data_fim"]
-                return redirect(url_for("portal_cooperado", **params))
-            return response
-
-        app.view_functions["coop_producao"] = _coop_submit_and_return
-        app.view_functions["coop_producao_nova"] = _coop_submit_and_return
-    app.extensions["coopex_ui_v3_redirect"] = True
+# O contexto visual pesado foi consolidado em operational_rules.py.
+# Timeline do cooperado é AJAX sob demanda e pendências do estabelecimento
+# são calculadas uma única vez pelo contexto operacional.
+app.extensions["coopex_ui_v3_context"] = True
 
 
 # ============================================================
