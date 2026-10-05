@@ -1286,7 +1286,7 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
       <button id="btnTheme" class="theme-toggle" type="button"><i class="bi bi-moon"></i><span id="lblTheme">Escuro</span></button>
 
       <nav class="navmenu" id="sideNav">
-        <a data-target="lancar" class="{{ 'active' if (view|default('lancar') not in ['producoes','escalas','config','avisos','lancamentos','tabelas']) else '' }}" href="{{ url_for('portal_restaurante', view='lancar') }}">
+        <a data-target="lancar" class="{{ 'active' if (view|default('lancar') not in ['producoes','escalas','config','avisos','lancamentos','tabelas','mapa']) else '' }}" href="{{ url_for('portal_restaurante', view='lancar') }}">
           <i class="bi bi-person-lines-fill"></i><span>Lançar Produção</span>
         </a>
         <a data-target="lancamentos" class="{{ 'active' if view=='lancamentos' else '' }}" href="{{ url_for('portal_restaurante', view='lancamentos') }}">
@@ -1300,6 +1300,10 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
           <i class="bi bi-table"></i><span>Tabelas</span>
         </a>
         {% endif %}
+        <a data-target="mapa" class="{{ 'active' if view=='mapa' else '' }}" href="{{ url_for('portal_restaurante', view='mapa') }}">
+          <i class="bi bi-geo-alt-fill"></i><span>Mapa</span>
+          <span style="margin-left:auto;background:#22c55e;color:#fff;border-radius:999px;padding:2px 6px;font-size:.54rem;font-weight:900">NOVO</span>
+        </a>
         <a data-target="config" class="{{ 'active' if view=='config' else '' }}" href="{{ url_for('portal_restaurante', view='config') }}">
           <i class="bi bi-gear"></i><span>Configuração</span>
         </a>
@@ -1352,6 +1356,29 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
       {% set _ref_data = ref_data if ref_data is defined and ref_data is not none else None %}
       {% set _modo = modo if modo is defined and modo is not none else 'semana' %}
       {% set _url_lancar_producao = url_lancar_producao if url_lancar_producao is defined else url_for('portal_restaurante') %}
+
+
+      <section data-view="mapa">
+        <div class="section-title"><i class="bi bi-geo-alt-fill"></i> Mapa dos cooperados</div>
+        <div class="card card-body" style="border-radius:14px">
+          <div id="trackingMapLoading" class="text-muted small">Carregando rastreamento...</div>
+          <div id="trackingSurvey" style="display:none;max-width:760px">
+            <div style="display:inline-flex;align-items:center;gap:7px;background:#eaf2ff;color:#174ea6;border-radius:999px;padding:6px 10px;font-size:.72rem;font-weight:900;margin-bottom:10px"><i class="bi bi-stars"></i> MELHORIA FUTURA</div>
+            <h3 style="font-size:1.15rem;font-weight:900;color:#0b2853">Gostaria de acompanhar os cooperados em tempo real?</h3>
+            <p class="text-muted mb-3">Responda nossa pesquisa e ajude a COOPEX a priorizar essa melhoria.</p>
+            <form id="trackingSurveyForm">
+              <div class="mb-2"><label class="form-label">Você gostaria de ter rastreamento?</label><select class="form-select" name="gostaria"><option value="sim">Sim</option><option value="nao">Não</option></select></div>
+              <div class="mb-3"><label class="form-label">Por que seria útil?</label><textarea class="form-control" name="motivo" rows="3" placeholder="Conte rapidamente como ajudaria a operação."></textarea></div>
+              <button class="btn btn-royal" type="submit"><i class="bi bi-send"></i> Enviar resposta</button>
+            </form>
+          </div>
+          <div id="trackingThanks" style="display:none;max-width:760px"><div style="background:#eef9f2;border:1px solid #cdebd8;border-radius:12px;padding:14px"><strong style="color:#12713d">Eba! Você respondeu à nossa pesquisa.</strong><div class="text-muted small mt-1">Aguarde contato da COOPEX sobre a disponibilidade do rastreamento para este estabelecimento.</div></div></div>
+          <div id="trackingAuthorized" style="display:none">
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2"><div><strong style="color:#0b2853">Cooperados em tempo real</strong><div class="text-muted small">Atualização automática a cada 15 segundos.</div></div><span id="trackingOnlineCount" style="background:#e7f8ee;color:#12713d;border-radius:999px;padding:6px 10px;font-size:.72rem;font-weight:900">0 online</span></div>
+            <div id="trackingMap" style="height:520px;border-radius:14px;overflow:hidden;border:1px solid #dbe5f4;background:#eef3f8"></div>
+          </div>
+        </div>
+      </section>
 
       <section data-view="config">
         <div class="section-title"><i class="bi bi-shield-lock"></i> Configuração</div>
@@ -2588,6 +2615,7 @@ function setPhone(digits) {
       if(view==='lancamentos') initLancamentos();
       if(view==='lancar') initLancar();
       if(view==='tabelas') initTabelas();
+      if(view==='mapa') initMapa();
     }
 
     function pushView(v){
@@ -3582,6 +3610,82 @@ function setPhone(digits) {
       });
 
       document.querySelectorAll('.stars-static').forEach(paintStaticStars);
+    }
+
+
+    let trackingMap=null, trackingMarkers={}, trackingTimer=null, trackingMapWired=false;
+
+    function loadLeaflet(){
+      if(window.L) return Promise.resolve();
+      return new Promise((resolve,reject)=>{
+        if(!document.querySelector('link[data-leaflet]')){
+          const css=document.createElement('link');
+          css.rel='stylesheet';css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';css.dataset.leaflet='1';document.head.appendChild(css);
+        }
+        const existing=document.querySelector('script[data-leaflet]');
+        if(existing){existing.addEventListener('load',resolve,{once:true});existing.addEventListener('error',reject,{once:true});return;}
+        const s=document.createElement('script');
+        s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';s.dataset.leaflet='1';s.onload=resolve;s.onerror=reject;document.body.appendChild(s);
+      });
+    }
+
+    async function refreshTrackingPositions(){
+      if(!trackingMap || !document.querySelector('section[data-view="mapa"].view-active')) return;
+      try{
+        const r=await fetch('/api/restaurante/rastreamento/posicoes',{credentials:'same-origin',cache:'no-store'});
+        if(!r.ok)return;
+        const j=await r.json(), rows=j.cooperados||[], seen=new Set(), bounds=[];
+        document.getElementById('trackingOnlineCount').textContent=rows.length+' online';
+        rows.forEach(c=>{
+          seen.add(String(c.id)); bounds.push([c.latitude,c.longitude]);
+          const html='<div style="width:46px;height:46px;border-radius:50%;border:3px solid #064fc8;background:#fff;box-shadow:0 3px 10px rgba(0,0,0,.25);overflow:hidden"><img src="'+c.foto+'" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display=\'none\'"></div>';
+          const icon=L.divIcon({html:html,className:'',iconSize:[46,46],iconAnchor:[23,23]});
+          const age=c.segundos<60?(c.segundos+' s'):(Math.floor(c.segundos/60)+' min');
+          const popup='<div style="min-width:160px"><strong>'+c.nome+'</strong><br><span style="font-size:12px;color:#667085">Atualizado há '+age+'</span></div>';
+          if(trackingMarkers[c.id]){
+            trackingMarkers[c.id].setLatLng([c.latitude,c.longitude]).setIcon(icon).setPopupContent(popup);
+          }else{
+            trackingMarkers[c.id]=L.marker([c.latitude,c.longitude],{icon:icon}).addTo(trackingMap).bindPopup(popup);
+          }
+        });
+        Object.keys(trackingMarkers).forEach(id=>{if(!seen.has(String(id))){trackingMap.removeLayer(trackingMarkers[id]);delete trackingMarkers[id];}});
+        if(bounds.length && !trackingMap._coopexFit){trackingMap.fitBounds(bounds,{padding:[35,35],maxZoom:15});trackingMap._coopexFit=true;}
+      }catch(e){}
+    }
+
+    async function initMapa(){
+      const loading=document.getElementById('trackingMapLoading'), survey=document.getElementById('trackingSurvey'), thanks=document.getElementById('trackingThanks'), auth=document.getElementById('trackingAuthorized');
+      if(!loading||!survey||!thanks||!auth)return;
+      try{
+        const r=await fetch('/api/restaurante/rastreamento/estado',{credentials:'same-origin',cache:'no-store'});
+        const j=await r.json();
+        loading.style.display='none';survey.style.display='none';thanks.style.display='none';auth.style.display='none';
+        if(j.autorizado){
+          auth.style.display='';
+          await loadLeaflet();
+          if(!trackingMap){
+            trackingMap=L.map('trackingMap',{zoomControl:true,attributionControl:true}).setView([-5.7945,-35.211],12);
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(trackingMap);
+          }
+          setTimeout(()=>trackingMap.invalidateSize(),80);
+          refreshTrackingPositions();
+          if(!trackingTimer)trackingTimer=setInterval(refreshTrackingPositions,15000);
+        }else if(j.pesquisa_respondida){thanks.style.display='';}
+        else{survey.style.display='';}
+      }catch(e){loading.textContent='Não foi possível carregar o rastreamento agora.';}
+
+      if(!trackingMapWired){
+        trackingMapWired=true;
+        document.getElementById('trackingSurveyForm')?.addEventListener('submit',async ev=>{
+          ev.preventDefault();
+          const fd=new FormData(ev.currentTarget), btn=ev.currentTarget.querySelector('button[type="submit"]');
+          if(btn)btn.disabled=true;
+          try{
+            const r=await fetch('/api/restaurante/rastreamento/pesquisa',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({gostaria:fd.get('gostaria'),motivo:fd.get('motivo')||''})});
+            if(r.ok){document.getElementById('trackingSurvey').style.display='none';document.getElementById('trackingThanks').style.display='';}
+          }finally{if(btn)btn.disabled=false;}
+        });
+      }
     }
 
     function initTabelas(){
