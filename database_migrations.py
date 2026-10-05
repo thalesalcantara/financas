@@ -326,6 +326,16 @@ def run_init_db(namespace: dict):
             ]
         for _sql in idx_sql:
             db.session.execute(sa_text(_sql))
+
+        # Remove índices legados que duplicam exatamente os índices atuais.
+        # A limpeza acontece somente nesta migração explícita, nunca no boot.
+        if not _is_sqlite():
+            for _sql in (
+                "DROP INDEX IF EXISTS public.ix_lanc_data",
+                "DROP INDEX IF EXISTS public.ix_lanc_rest_data",
+                "DROP INDEX IF EXISTS public.ix_lanc_coop_data",
+            ):
+                db.session.execute(sa_text(_sql))
         db.session.commit()
     except Exception:
         db.session.rollback()
