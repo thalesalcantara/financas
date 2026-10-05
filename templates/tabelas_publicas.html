@@ -91,7 +91,7 @@ select,.clear{height:44px;border:1px solid var(--border);border-radius:14px;back
 </div>
 
 <script>
-let contract="";
+let contractId="";
 let mode="consult";
 let counts={};
 let data=[];
@@ -217,7 +217,7 @@ async function recognizeImage(url){
 }
 
 async function loadContract(id){
-  contract=id; counts={}; data=[]; renderSummary();
+  contractId=id; counts={}; data=[]; renderSummary();
   guarantees.classList.remove("show"); infoBox.classList.remove("show");
   grid.innerHTML='<div class="empty loading">Lendo a tabela…</div>';
   if(!id){countLabel.textContent="0 bairros";grid.innerHTML='<div class="empty">Selecione um estabelecimento.</div>';return}
@@ -257,11 +257,20 @@ async function loadContract(id){
 consultBtn.onclick=()=>{mode="consult";consultBtn.classList.add("active");calcBtn.classList.remove("active");renderGrid()}
 calcBtn.onclick=()=>{mode="calc";calcBtn.classList.add("active");consultBtn.classList.remove("active");renderGrid()}
 clearBtn.onclick=()=>{counts={};renderGrid();renderSummary()}
-search.oninput=renderGrid;
-contract.onchange=e=>loadContract(e.target.value);
-summaryToggle.onclick=()=>summaryPanel.classList.toggle("open");
+const contractSelect=document.getElementById("contract");
+const searchInput=document.getElementById("search");
+const summaryToggleBtn=document.getElementById("summaryToggle");
+
+searchInput.oninput=renderGrid;
+contractSelect.onchange=e=>loadContract(e.target.value);
+summaryToggleBtn.onclick=()=>summaryPanel.classList.toggle("open");
 renderSummary();
-if(contract.value){loadContract(contract.value)}
+
+// Safari/iPhone pode restaurar automaticamente a última opção selecionada
+// depois do carregamento. Executa logo após o DOM e novamente em seguida.
+const loadSelected=()=>{ if(contractSelect.value) loadContract(contractSelect.value); };
+loadSelected();
+setTimeout(loadSelected,250);
 </script>
 </body>
 </html>
