@@ -542,40 +542,6 @@ def rest_approve_adjusted(item_id: int):
     return redirect(url_for("rest_producoes_pendentes"))
 
 
-def _install_dashboard_template_patch():
-    loader = app.jinja_loader
-    if not loader or getattr(loader, "_coopex_producao_patched", False):
-        return
-    original_get_source = loader.get_source
-
-    def get_source(environment, template):
-        source, filename, uptodate = original_get_source(environment, template)
-        if template == "restaurante_dashboard.html":
-            nav_marker = '<a data-target="lancamentos"'
-            if 'data-coopex-producoes="1"' not in source and nav_marker in source:
-                production_link = '''<a data-coopex-producoes="1" href="{{ url_for('rest_producoes_pendentes') }}">
-          <i class="bi bi-clipboard-check"></i><span>Produções da Semana</span>
-        </a>
-        '''
-                source = source.replace(nav_marker, production_link + nav_marker, 1)
-            main_marker = '<main class="content">'
-            if 'coopex-welcome-bar' not in source and main_marker in source:
-                welcome = '''
-      <div class="coopex-welcome-bar mb-3" style="background:#fff;border:1px solid var(--border);border-left:5px solid var(--royal);border-radius:16px;padding:13px 16px;box-shadow:0 6px 18px rgba(33,65,217,.06)">
-        <div style="font-size:.75rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Bem-vindo</div>
-        <div style="font-size:1.05rem;font-weight:800;color:var(--royal)">{{ ((rest.nome if rest is defined and rest else (restaurante.nome if restaurante is defined and restaurante else 'ESTABELECIMENTO'))|replace('_',' ')) }}</div>
-      </div>
-'''
-                source = source.replace(main_marker, main_marker + welcome, 1)
-        return source, filename, uptodate
-
-    loader.get_source = get_source
-    loader._coopex_producao_patched = True
-    app.jinja_env.cache.clear()
-
-
-_install_dashboard_template_patch()
-
 flow.coop_producao_flow = coop_producao_locked_flow
 flow.rest_producoes_flow = rest_producoes_flow
 flow.rest_launch_scale = rest_launch_scale_anytime
