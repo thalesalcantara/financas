@@ -124,7 +124,8 @@ def portal_restaurante():
             Escala.restaurante_id == rest.id,
             or_(Escala.cooperado_id.is_(None), Usuario.ativo.is_(True)),
         )
-        .order_by(Escala.id.asc())
+        .order_by(Escala.id.desc())
+        .limit(900)
         .all()
     )
     legacy_scales = (
@@ -136,7 +137,8 @@ def portal_restaurante():
             Escala.contrato.isnot(None),
             or_(Escala.cooperado_id.is_(None), Usuario.ativo.is_(True)),
         )
-        .order_by(Escala.id.asc())
+        .order_by(Escala.id.desc())
+        .limit(600)
         .all()
     )
     escalas_all = sorted(direct_scales + legacy_scales, key=lambda e: e.id)
