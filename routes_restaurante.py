@@ -16,6 +16,8 @@ for _name, _value in vars(legacy).items():
 @app.route("/portal/restaurante")
 @role_required("restaurante")
 def portal_restaurante():
+    import time as _time
+    _portal_perf_started = _time.perf_counter()
     from datetime import date, timedelta, datetime
     import re
     from werkzeug.routing import BuildError
@@ -125,9 +127,12 @@ def portal_restaurante():
             or_(Escala.cooperado_id.is_(None), Usuario.ativo.is_(True)),
         )
         .order_by(Escala.id.desc())
-        .limit(900)
+        .limit(350)
         .all()
     )
+    # Compatibilidade legada sem varrer centenas de escalas de outros contratos.
+    # Filtra no próprio banco apenas nomes compatíveis com este estabelecimento.
+    _rest_name_sql = (rest.nome or "").strip().lower()
     legacy_scales = (
         db.session.query(Escala)
         .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
@@ -136,9 +141,14 @@ def portal_restaurante():
             Escala.restaurante_id.is_(None),
             Escala.contrato.isnot(None),
             or_(Escala.cooperado_id.is_(None), Usuario.ativo.is_(True)),
+            or_(
+                func.lower(func.trim(Escala.contrato)) == _rest_name_sql,
+                func.lower(func.replace(func.trim(Escala.contrato), "_", " ")) == _rest_name_sql,
+                func.lower(func.trim(Escala.contrato)).contains(_rest_name_sql),
+            ),
         )
         .order_by(Escala.id.desc())
-        .limit(600)
+        .limit(180)
         .all()
     )
     escalas_all = sorted(direct_scales + legacy_scales, key=lambda e: e.id)
@@ -328,6 +338,7 @@ def portal_restaurante():
                 Lancamento.data <= df,
             )
             .order_by(Lancamento.data.desc(), Lancamento.id.desc())
+            .limit(120)
             .all()
         )
         for _l in lancamentos_periodo_all:
@@ -781,6 +792,10 @@ def portal_restaurante():
     has_editar_lanc = ("editar_lancamento" in app.view_functions)
 
     # -------------------- Render --------------------
+    try:
+        current_app.logger.info("REST_PORTAL_BUILD %.3fs view=%s rest_id=%s", _time.perf_counter()-_portal_perf_started, view, rest.id)
+    except Exception:
+        pass
     return render_template(
         "restaurante_dashboard.html",
         rest=rest,
