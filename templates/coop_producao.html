@@ -30,7 +30,7 @@
     {% if x.producao and x.producao.status == 'recusada' %}
       <div class="locked refused"><i class="bi bi-lock-fill"></i> Recusada pelo estabelecimento. Esta produção está bloqueada para novo envio.{% if x.producao.motivo_recusa %}<br><small>Motivo: {{ x.producao.motivo_recusa }}</small>{% endif %}</div>
     {% elif x.pode_lancar %}
-      <form method="post" class="form">
+      <form method="post" class="form" data-coopex-production-submit="1">
         <input type="hidden" name="escala_id" value="{{ x.escala.id }}">
         <div><label>Quantidade de entregas</label><input type="number" min="1" name="qtd_entregas" value="{{ x.qtd_entregas or '' }}" required></div>
         <div><label>Valor total da produção</label><input type="number" min="0.01" step="0.01" name="valor_total" value="{{ '%.2f'|format(x.valor_total) if x.valor_total else '' }}" placeholder="0,00" required></div>
@@ -46,5 +46,6 @@
   </article>
   {% else %}<div class="empty">Nenhuma escala encontrada para esta semana.</div>{% endfor %}
 </main>
+<script src="{{ url_for('static', filename='js/cooperado_v4.js', v='20260807-1458') }}"></script>
 </body>
 </html>
