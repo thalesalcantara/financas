@@ -315,3 +315,7 @@ body{margin:0!important}
   .today-production-form{grid-template-columns:1fr!important}
   .today-production-form .btn{grid-column:1!important}
 }
+
+.esc-date-title{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:2px!important}
+.esc-date-title strong{font-size:.90rem!important;line-height:1!important}
+.esc-weekday{font-size:.64rem!important;color:#667085!important;font-weight:600!important;line-height:1.1!important}
