@@ -3382,7 +3382,7 @@ def login():
             session["user_tipo"] = u.tipo
 
             if u.tipo == "admin":
-                return redirect(url_for("admin_light_launches"))
+                return redirect(url_for("admin_dashboard", tab="lancamentos"))
             elif u.tipo == "cooperado":
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
@@ -3410,64 +3410,6 @@ def login():
       <button style="padding:10px 16px">Entrar</button>
     </form>
     """
-
-@app.errorhandler(404)
-def _admin_light_missing_fallback(error):
-    """Rotas administrativas novas nunca caem no painel visual antigo."""
-    path = request.path or ""
-    if path.startswith("/admin/leve/") and (session.get("user_tipo") or "").strip().lower() == "admin":
-        if "admin_light_launches" in app.view_functions:
-            return redirect(url_for("admin_light_launches"))
-    return error
-
-
-@app.before_request
-def _admin_unified_navigation():
-    """Mantém o Admin no layout horizontal atual.
-
-    O painel legado continua disponível apenas quando uma função interna
-    solicitar explicitamente legacy=1.
-    """
-    if request.method != "GET":
-        return None
-    if (session.get("user_tipo") or "").strip().lower() != "admin":
-        return None
-    if request.args.get("legacy") == "1":
-        return None
-    if (request.headers.get("X-Requested-With") or "").lower() == "xmlhttprequest":
-        return None
-
-    path = request.path or ""
-    if path != "/admin":
-        return None
-
-    tab = (request.args.get("tab") or "lancamentos").strip().lower()
-    params = request.args.to_dict(flat=True)
-    params.pop("tab", None)
-    params.pop("legacy", None)
-
-    endpoint_map = {
-        "": "admin_light_launches",
-        "resumo": "admin_light_summary",
-        "lancamentos": "admin_light_launches",
-        "escalas": "admin_light_scale",
-        "cooperados": "admin_light_cooperatives",
-        "avaliacoes": "admin_light_ratings",
-        "documentos": "admin_v10_blitz",
-        "tabelas": "admin_light_tables",
-        "avisos": "admin_light_notices",
-        "restaurantes": "admin_v10_establishments",
-    }
-    finance_tabs = {"receitas", "despesas", "coop_receitas", "coop_despesas", "beneficios"}
-
-    if tab in finance_tabs and "admin_v10_finance" in app.view_functions:
-        return redirect(url_for("admin_v10_finance", tab=tab, **params))
-
-    endpoint = endpoint_map.get(tab)
-    if endpoint and endpoint in app.view_functions:
-        return redirect(url_for(endpoint, **params))
-    return None
-
 
 @app.route("/logout")
 def logout():
