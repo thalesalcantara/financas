@@ -4,6 +4,7 @@ from __future__ import annotations
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import os, io, csv, re, json, time, difflib, unicodedata
 from datetime import datetime, date, timedelta, time as dtime
+from functools import lru_cache
 from collections import defaultdict, namedtuple
 import uuid
 from functools import wraps
@@ -3084,8 +3085,12 @@ from datetime import datetime, date
 
 
 
-def _render_admin_dashboard_partial(partial_name: str, **context):
-    template_src, _, _ = current_app.jinja_loader.get_source(current_app.jinja_env, "admin_dashboard.html")
+@lru_cache(maxsize=8)
+def _admin_dashboard_partial_source(partial_name: str) -> str | None:
+    """Extrai cada bloco AJAX uma única vez por processo/deploy."""
+    template_src, _, _ = current_app.jinja_loader.get_source(
+        current_app.jinja_env, "admin_dashboard.html"
+    )
     marker_name = (partial_name or "").strip().lower()
     marker_map = {
         "resumo": "RESUMO",
@@ -3097,11 +3102,20 @@ def _render_admin_dashboard_partial(partial_name: str, **context):
         "beneficios": "BENEFICIOS",
     }
     marker = marker_map.get(marker_name, marker_name.upper())
-    m = re.search(rf"<!--AJAX_{marker}_START-->(.*?)<!--AJAX_{marker}_END-->", template_src, flags=re.DOTALL)
-    if not m:
+    match = re.search(
+        rf"<!--AJAX_{marker}_START-->(.*?)<!--AJAX_{marker}_END-->",
+        template_src,
+        flags=re.DOTALL,
+    )
+    return match.group(1) if match else None
+
+
+def _render_admin_dashboard_partial(partial_name: str, **context):
+    source = _admin_dashboard_partial_source((partial_name or "").strip().lower())
+    if not source:
         return "", 404
     context.setdefault("fast_mode", True)
-    return render_template_string(m.group(1), **context)
+    return render_template_string(source, **context)
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
