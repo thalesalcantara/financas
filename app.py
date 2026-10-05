@@ -7315,7 +7315,7 @@ def lancar_producao():
 
     db.session.commit()
     flash("Produção lançada" + (" + avaliação salva." if tem_avaliacao else "."), "success")
-    return redirect(url_for("portal_restaurante", view="lancar"))
+    return redirect(url_for("portal_restaurante", view="lancar", coop_id=l.cooperado_id))
 
 @app.route("/lancamentos/<int:id>/editar", methods=["GET", "POST"])
 @role_required("restaurante")
