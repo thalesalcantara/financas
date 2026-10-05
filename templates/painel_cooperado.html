@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Painel — Coopex</title>
+  <title>Painel do Cooperado</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#2747d9">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@600&display=swap" rel="stylesheet">
@@ -275,6 +275,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/cooperado_producao_v3.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/operational_v5.css', v='20260807-1042') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/cooperado_v4.css', v='20260807-1458') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/cooperado_v5.css', v='20261005-1') }}">
 </head>
 <body>
 {% set _unread = unread if unread is defined else (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else (avisos_unread_count if avisos_unread_count is defined else 0)) %}
@@ -314,33 +315,33 @@
     <a href="{{ url_for('documentos_publicos') }}" class="menu-link"><i class="bi bi-folder2-open"></i><span>Documentos</span></a>
     <a href="{{ url_for('tabelas_publicas') }}" class="menu-link"><i class="bi bi-table"></i><span>Tabelas</span></a>
     <a href="{{ url_for('portal_cooperado_avisos') }}" class="menu-link"><i class="bi bi-megaphone"></i><span>Avisos</span>{% if unread>0 %}<span class="badge rounded-pill bg-danger ms-auto">{{ unread }}</span>{% endif %}</a>
+    <a href="{{ url_for('logout') }}" class="menu-link"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
   </div>
 </div>
 <div id="fundoMenu" class="menu-backdrop" aria-hidden="true"></div>
 
 <div class="mobile-wrap">
-  <header class="topbar">
+  <header class="topbar app-topbar">
     <div class="topbar-inner">
-      <div class="top-row">
+      <div class="top-row app-top-row">
         <button class="avatar-btn" id="abrirMenu" title="Abrir menu" aria-label="Abrir menu">
           <img src="{{ cooperado.foto_url or url_for('static', filename='img/default.png') }}" alt="Avatar">
         </button>
-        <div class="brand-block">
-          <div class="brand-kicker">coopex</div>
-          <div class="brand-title">Painel do cooperado</div>
+
+        <div class="app-head-stat" title="{{ _score_title }}">
+          <span class="app-head-icon app-head-star"><i class="bi bi-star-fill"></i></span>
+          <div><strong class="mono">{{ '%.2f'|format(_score_header)|replace('.',',') }}</strong><small>nota</small></div>
         </div>
-        <div class="top-actions">
-          <div class="pill-metric" title="{{ _score_title }}">
-            <span class="score-badge {{ _score_badge_class }}"><i class="bi {{ _score_icon }}"></i></span>
-            <small>NOTA</small>
-            <strong class="mono">{{ '%.2f'|format(_score_header)|replace('.',',') }}</strong>
-          </div>
-          <div class="pill-metric">
-            <small>ENTREGAS</small>
-            <strong class="mono">{{ _qtd_prod }}</strong>
-          </div>
-          <a class="btn btn-sm btn-ghost-light" href="{{ url_for('logout') }}">Sair</a>
+
+        <div class="app-head-stat">
+          <span class="app-head-icon"><i class="bi bi-bicycle"></i></span>
+          <div><strong class="mono">{{ _qtd_prod }}</strong><small>entregas</small></div>
         </div>
+
+        <a class="app-bell" href="{{ url_for('portal_cooperado_avisos') }}" aria-label="Avisos">
+          <i class="bi bi-bell"></i>
+          {% if unread>0 %}<span>{{ unread }}</span>{% endif %}
+        </a>
       </div>
     </div>
   </header>
@@ -394,7 +395,6 @@
       <button class="tab-btn" type="button" data-tab="ajustes"><i class="bi bi-sliders2"></i><span>Ajust. Coop</span></button>
       <button class="tab-btn" type="button" data-tab="escalas"><i class="bi bi-calendar3"></i><span>Escalas</span></button>
       <button class="tab-btn" type="button" data-tab="trocas"><i class="bi bi-arrow-left-right"></i><span>Trocas</span></button>
-      <button class="tab-btn" type="button" data-tab="farmacia"><i class="bi bi-capsule-pill"></i><span>Farmácia</span></button>
     </div>
   </section>
 
@@ -583,7 +583,55 @@
         </div>
       </div>
     
-      <div id="coopexTimelineDeferred"><div class="coopex-v5-loading">Abra Produções para carregar a escala do período.</div></div>
+      <div class="section-card daily-production-card">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Produção de hoje</h2>
+            <div class="item-small mt-1">A solicitação libera automaticamente após o fim do horário da escala.</div>
+          </div>
+          <span class="section-chip">{{ hoje.strftime('%d/%m/%Y') if hoje else '' }}</span>
+        </div>
+
+        {% set ns_today = namespace(count=0) %}
+        <div class="list-stack">
+          {% for x in coopex_coop_timeline|default([]) %}
+            {% if not x.lancamento and not (x.producao and x.producao.status == 'aprovada') %}
+              {% set ns_today.count = ns_today.count + 1 %}
+              <div class="item-card today-production {{ x.color }}">
+                <div class="item-row">
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="item-title">{{ x.restaurante.nome|replace('_',' ') if x.restaurante else 'Estabelecimento' }}</div>
+                    <div class="item-meta mt-1"><i class="bi bi-clock me-1"></i>{{ x.inicio or '--:--' }}{% if x.fim %} às {{ x.fim }}{% endif %} · {{ x.escala.turno or 'Turno' }}</div>
+                  </div>
+                  <span class="status-soft {% if x.pode_lancar %}status-aprovada{% elif x.producao and x.producao.status=='pendente' %}status-pendente{% else %}status-pendente{% endif %}">{{ x.status_label }}</span>
+                </div>
+
+                {% if x.pode_lancar %}
+                <form class="today-production-form mt-3" data-coopex-production-submit="1" method="post" action="{{ url_for('coop_producao') }}">
+                  <input type="hidden" name="return_to" value="painel">
+                  <input type="hidden" name="active_tab" value="producoes">
+                  <input type="hidden" name="escala_id" value="{{ x.escala.id }}">
+                  <input type="hidden" name="data_inicio" value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '' }}">
+                  <input type="hidden" name="data_fim" value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '' }}">
+                  <div class="today-field"><label>Entregas</label><input class="form-control" type="number" min="1" name="qtd_entregas" required></div>
+                  <div class="today-field"><label>Valor total</label><input class="form-control" type="number" min="0.01" step="0.01" name="valor_total" required></div>
+                  <button class="btn btn-royal" type="submit"><i class="bi bi-send-check me-1"></i>Solicitar lançamento</button>
+                </form>
+                {% elif x.producao and x.producao.status == 'pendente' %}
+                  <div class="today-note"><i class="bi bi-hourglass-split"></i> Produção enviada. Aguardando aprovação do estabelecimento.</div>
+                {% elif not x.finalizada %}
+                  <div class="today-note"><i class="bi bi-clock-history"></i> Libera às {{ x.fim or 'fim da escala' }}.</div>
+                {% elif x.producao and x.producao.status == 'recusada' %}
+                  <div class="today-note text-danger"><i class="bi bi-x-circle"></i> Produção recusada.</div>
+                {% endif %}
+              </div>
+            {% endif %}
+          {% endfor %}
+          {% if ns_today.count == 0 %}
+            <div class="item-card today-empty"><i class="bi bi-check2-circle"></i><span>Nenhuma produção pendente hoje.</span></div>
+          {% endif %}
+        </div>
+      </div>
     </section>
 
     
@@ -911,154 +959,7 @@
       </div>
     </section>
 
-    <section class="tab-pane-custom" id="tab-farmacia">
-      <div class="section-card" style="background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);border-color:rgba(39,71,217,.10)">
-        <div class="section-head">
-          <div>
-            <h2 class="section-title"><i class="bi bi-capsule-pill me-1"></i> Entregas da farmácia</h2>
-            <div class="item-small mt-1">Veja o lote, reorganize a sequência e finalize cada entrega com nome de quem recebeu, foto opcional ou motivo da não entrega.</div>
-          </div>
-          <span class="section-chip">{{ farmacia_entregas|default([])|length }} no painel</span>
-        </div>
 
-        <div class="kpi-grid mb-3">
-          <div class="kpi-card">
-            <div class="kpi-title">Em lote</div>
-            <div class="kpi-value mono">{{ farmacia_entregas|selectattr('lote')|list|length if farmacia_entregas is defined else 0 }}</div>
-            <div class="kpi-sub">Pedidos já agrupados</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-title">Valor de entrega</div>
-            <div class="kpi-value mono">
-              R$ {{ '%.2f'|format((farmacia_entregas|sum(attribute='valor_entrega')) if farmacia_entregas is defined else 0) }}
-            </div>
-            <div class="kpi-sub">Somente valor da entrega</div>
-          </div>
-        </div>
-
-        <div class="list-stack">
-          {% for ent in farmacia_entregas|default([]) %}
-          {% set _ent_status = ent.status|default('aguardando') %}
-          <div class="item-card" style="border-color:{% if _ent_status == 'entregue' %}rgba(22,163,74,.16){% elif _ent_status == 'nao_entregue' %}rgba(220,38,38,.16){% else %}rgba(39,71,217,.10){% endif %}">
-            <div class="item-row">
-              <div class="flex-grow-1 min-w-0">
-                <div class="item-title d-flex flex-wrap align-items-center gap-2">
-                  <span>{{ ent.cliente_nome|default(ent.nome_cliente|default('Cliente')) }}</span>
-                  {% if ent.lote %}<span class="esc-badge">Lote {{ ent.lote }}</span>{% endif %}
-                  <span class="esc-badge">Rota #{{ ent.ordem_rota|default(0) }}</span>
-                </div>
-                <div class="item-meta mt-1">
-                  <i class="bi bi-geo-alt me-1"></i>{{ ent.endereco|default(ent.cliente_endereco|default('-')) }}
-                </div>
-                <div class="item-meta mt-1">
-                  <i class="bi bi-telephone me-1"></i>{{ ent.telefone|default(ent.cliente_telefone|default('-')) }}
-                  &nbsp;·&nbsp;
-                  <i class="bi bi-wallet2 me-1"></i>
-                  {% if ent.pago %}Pago{% else %}{{ ent.forma_pagamento|default('Pagamento na entrega')|capitalize }}{% endif %}
-                </div>
-                <div class="item-meta mt-1">
-                  <b>Produto:</b> R$ {{ '%.2f'|format(ent.valor_pedido|default(0)) }}
-                  &nbsp;·&nbsp;
-                  <b>Entrega:</b> R$ {{ '%.2f'|format(ent.valor_entrega|default(0)) }}
-                </div>
-
-                {% set _itens = ent.itens if ent.itens is defined else [] %}
-                <div class="soft-card mt-2 p-2" style="background:#f8fbff">
-                  <div class="title-muted mb-1">Medicamentos / itens</div>
-                  <div class="med-list">
-                    {% if _itens %}
-                      {% for item in _itens %}
-                        <div>
-                          {{ item.descricao|default(item.nome|default('Item')) }}
-                          {% if item.quantidade %} • {{ item.quantidade }}{% endif %}
-                          {% if item.valor_item is defined %} • R$ {{ '%.2f'|format(item.valor_item|default(0)) }}{% endif %}
-                        </div>
-                      {% endfor %}
-                    {% else %}
-                      <div>{{ ent.itens_resumo|default('Sem itens detalhados') }}</div>
-                    {% endif %}
-                  </div>
-                </div>
-
-                {% if ent.observacao %}
-                  <div class="item-small mt-2"><b>Obs.:</b> {{ ent.observacao }}</div>
-                {% endif %}
-              </div>
-
-              <div class="text-end">
-                <div class="item-amount mono {% if _ent_status == 'entregue' %}success{% elif _ent_status == 'nao_entregue' %}danger{% endif %}">
-                  {% if ent.status_label is defined and ent.status_label %}{{ ent.status_label }}{% else %}{{ _ent_status|replace('_',' ')|capitalize }}{% endif %}
-                </div>
-                <div class="item-small mt-1">Status atual</div>
-              </div>
-            </div>
-
-            <div class="d-flex flex-wrap gap-2 mt-3">
-              <form method="post" action="{{ url_for('farmacia_cooperado_reordenar', entrega_id=ent.id) if false else '/farmacia/cooperado/reordenar/' ~ ent.id }}">
-                <input type="hidden" name="acao" value="subir">
-                <input type="hidden" name="active_tab" value="farmacia">
-                <button class="btn btn-outline-secondary btn-xs"><i class="bi bi-arrow-up"></i> Subir</button>
-              </form>
-              <form method="post" action="{{ url_for('farmacia_cooperado_reordenar', entrega_id=ent.id) if false else '/farmacia/cooperado/reordenar/' ~ ent.id }}">
-                <input type="hidden" name="acao" value="descer">
-                <input type="hidden" name="active_tab" value="farmacia">
-                <button class="btn btn-outline-secondary btn-xs"><i class="bi bi-arrow-down"></i> Descer</button>
-              </form>
-            </div>
-
-            <form method="post"
-                  action="{{ url_for('farmacia_cooperado_status', entrega_id=ent.id) if false else '/farmacia/cooperado/status/' ~ ent.id }}"
-                  enctype="multipart/form-data"
-                  class="mt-3 farmacia-status-form">
-              <input type="hidden" name="active_tab" value="farmacia">
-              <div class="row g-2">
-                <div class="col-12">
-                  <label class="form-label">Atualizar status</label>
-                  <select class="form-select farmacia-status-select" name="status">
-                    <option value="aguardando_motoboy" {{ 'selected' if _ent_status == 'aguardando_motoboy' else '' }}>Aguardando motoboy</option>
-                    <option value="em_rota" {{ 'selected' if _ent_status == 'em_rota' else '' }}>Em rota</option>
-                    <option value="indo_ate_voce" {{ 'selected' if _ent_status == 'indo_ate_voce' else '' }}>Indo até você</option>
-                    <option value="entregue" {{ 'selected' if _ent_status == 'entregue' else '' }}>Entregue</option>
-                    <option value="nao_entregue" {{ 'selected' if _ent_status == 'nao_entregue' else '' }}>Não entregue</option>
-                  </select>
-                </div>
-
-                <div class="col-12 farmacia-entregue-wrap" style="display:none;">
-                  <label class="form-label">Entregue a</label>
-                  <input class="form-control" name="entregue_a" value="{{ ent.entregue_a|default('') }}" placeholder="Nome de quem recebeu">
-                </div>
-
-                <div class="col-12 farmacia-entregue-wrap" style="display:none;">
-                  <label class="form-label">Foto do comprovante (opcional)</label>
-                  <input type="file" class="form-control" name="foto_comprovante" accept="image/*">
-                </div>
-
-                <div class="col-12 farmacia-nao-entregue-wrap" style="display:none;">
-                  <label class="form-label">Motivo da não entrega</label>
-                  <textarea class="form-control" rows="2" name="motivo_nao_entrega" placeholder="Descreva o motivo">{{ ent.motivo_nao_entrega|default(ent.nao_entregue_motivo|default('')) }}</textarea>
-                </div>
-
-                {% if ent.foto_url is defined and ent.foto_url %}
-                <div class="col-12">
-                  <div class="soft-card p-2 d-flex align-items-center justify-content-between flex-wrap gap-2" style="background:#f8fbff">
-                    <div class="item-small"><i class="bi bi-image me-1"></i> Já existe um comprovante enviado</div>
-                    <a class="btn btn-xs btn-outline-primary" href="{{ ent.foto_url }}" target="_blank">Ver foto</a>
-                  </div>
-                </div>
-                {% endif %}
-
-                <div class="col-12 d-grid mt-2">
-                  <button class="btn btn-royal"><i class="bi bi-check2-circle me-1"></i> Salvar atualização</button>
-                </div>
-              </div>
-            </form>
-          </div>
-          {% else %}
-          <div class="item-card text-center muted">Nenhuma entrega da farmácia atribuída a você no momento.</div>
-          {% endfor %}
-        </div>
-      </div>
-    </section>
 
   </main>
 
@@ -1179,7 +1080,7 @@ const MY_ESCALA   = {{ minha_escala_json | default([]) | tojson }};
   const panes=[...document.querySelectorAll('.tab-pane-custom')];
   const activeInput=document.getElementById('activeTabInput');
   const params=new URLSearchParams(window.location.search);
-  const valid=['resumo','producoes','ajustes','escalas','trocas','farmacia'];
+  const valid=['resumo','producoes','ajustes','escalas','trocas'];
   let current=params.get('active_tab') || localStorage.getItem('coopex_active_tab') || (activeInput?.value || 'resumo');
   if (!valid.includes(current)) current='resumo';
 
@@ -1198,11 +1099,10 @@ const MY_ESCALA   = {{ minha_escala_json | default([]) | tojson }};
 
   buttons.forEach(btn=>btn.addEventListener('click', ()=>{
     const target=btn.dataset.tab;
-    if(!target || target===current){ showTab(target||current); return; }
-    localStorage.setItem('coopex_active_tab', target);
-    const url=new URL(window.location.href);
-    url.searchParams.set('active_tab', target);
-    window.location.assign(url.toString());
+    if(!target) return;
+    showTab(target, true);
+    document.querySelector('.mobile-wrap')?.scrollTo?.({top:0,behavior:'instant'});
+    window.scrollTo({top:0,behavior:'instant'});
   }));
   showTab(current, false);
 })();
@@ -1441,56 +1341,8 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 </script>
 
-<script>
-(function(){
-  function syncFarmaciaForm(form){
-    const sel = form.querySelector('.farmacia-status-select');
-    const entregue = form.querySelectorAll('.farmacia-entregue-wrap');
-    const naoEntregue = form.querySelectorAll('.farmacia-nao-entregue-wrap');
-    const v = sel ? (sel.value || '') : '';
-    entregue.forEach(el => el.style.display = (v === 'entregue') ? 'block' : 'none');
-    naoEntregue.forEach(el => el.style.display = (v === 'nao_entregue') ? 'block' : 'none');
-  }
-  document.querySelectorAll('.farmacia-status-form').forEach(form => {
-    const sel = form.querySelector('.farmacia-status-select');
-    sel?.addEventListener('change', () => syncFarmaciaForm(form));
-    syncFarmaciaForm(form);
-  });
-})();
-</script>
 
 
-<script id="coopexTimelineDeferredV5">
-(function(){
-  let loaded=false, loading=false;
-  const targetId='coopexTimelineDeferred';
-  async function loadTimeline(){
-    const target=document.getElementById(targetId);
-    if(!target||loaded||loading)return;
-    loading=true;
-    target.innerHTML='<div class="coopex-v5-loading">Carregando escala e produção…</div>';
-    try{
-      const url=new URL('/api/coop/timeline',window.location.origin);
-      const form=document.getElementById('periodoForm');
-      const di=form?.querySelector('[name="data_inicio"]')?.value||'';
-      const df=form?.querySelector('[name="data_fim"]')?.value||'';
-      if(di)url.searchParams.set('data_inicio',di);
-      if(df)url.searchParams.set('data_fim',df);
-      const r=await fetch(url.toString(),{credentials:'same-origin',cache:'no-store'});
-      if(!r.ok)throw new Error('timeline');
-      target.innerHTML=await r.text();
-      loaded=true;
-    }catch(e){
-      target.innerHTML='<div class="coopex-v5-loading">Não foi possível carregar a escala agora. Toque novamente em Produções.</div>';
-    }finally{loading=false;}
-  }
-  document.addEventListener('DOMContentLoaded',function(){
-    document.querySelectorAll('.tab-btn[data-tab="producoes"]').forEach(btn=>btn.addEventListener('click',loadTimeline));
-    const p=new URLSearchParams(location.search);
-    if((p.get('active_tab')||'')==='producoes')loadTimeline();
-  });
-})();
-</script>
 <script src="{{ url_for('static', filename='js/cooperado_v4.js', v='20260807-1458') }}"></script>
 </body>
 </html>
