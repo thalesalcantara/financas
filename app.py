@@ -8707,6 +8707,24 @@ import routes_farmacia as _routes_farmacia  # noqa: F401
 
 
 # =========================
+# Sincronização dos módulos extraídos
+# =========================
+# Alguns módulos são registrados antes de helpers definidos mais abaixo no app.
+# Atualiza o namespace uma única vez ao fim da importação para preservar
+# exatamente as mesmas dependências sem reimportar ou duplicar regras.
+for _routes_module in (
+    globals().get("_routes_admin_dashboard"),
+    globals().get("_routes_cooperado"),
+    globals().get("_routes_restaurante"),
+    globals().get("_routes_farmacia"),
+):
+    if _routes_module is not None:
+        for _name, _value in list(globals().items()):
+            if not _name.startswith("__"):
+                _routes_module.__dict__[_name] = _value
+
+
+# =========================
 # Main
 # =========================
 if __name__ == "__main__":
