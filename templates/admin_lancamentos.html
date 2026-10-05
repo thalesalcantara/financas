@@ -572,19 +572,19 @@
               </div>
               <div class="kpi-chip kpi-info">
                 <span class="kpi-label">Bruto</span>
-                <span class="kpi-value">R$ {{ '%.2f'|format(soma_valor) }}</span>
+                <span class="kpi-value">R$ {{ brl(soma_valor) }}</span>
               </div>
               <div class="kpi-chip kpi-soft">
                 <span class="kpi-label">INSS (4,0%)</span>
-                <span class="kpi-value">R$ {{ '%.2f'|format(soma_inss_4) }}</span>
+                <span class="kpi-value">R$ {{ brl(soma_inss_4) }}</span>
               </div>
               <div class="kpi-chip kpi-soft">
                 <span class="kpi-label">SEST/SENAT (0,5%)</span>
-                <span class="kpi-value">R$ {{ '%.2f'|format(soma_sest_05) }}</span>
+                <span class="kpi-value">R$ {{ brl(soma_sest_05) }}</span>
               </div>
               <div class="kpi-chip {{ 'kpi-success' if soma_liq >= 0 else 'kpi-danger' }}">
                 <span class="kpi-label">Líquido</span>
-                <span class="kpi-value">R$ {{ '%.2f'|format(soma_liq) }}</span>
+                <span class="kpi-value">R$ {{ brl(soma_liq) }}</span>
               </div>
               <div class="kpi-chip kpi-neutral">
                 <span class="kpi-label">Entregas</span>
@@ -874,7 +874,7 @@
             <label class="form-label">Restaurante</label>
             <select class="form-select" name="restaurante_id" required>
               {% for r in restaurantes %}
-                <option value="{{ r.id }}">{{ r.nome }} ({{ r.periodo }})</option>
+                <option value="{{ r.id }}">{{ r.nome }}</option>
               {% endfor %}
             </select>
           </div>
