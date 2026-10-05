@@ -381,10 +381,120 @@ def _week_pending_rows(rest):
     return result
 
 
+
+def _shift_period_label(start_time) -> str:
+    """Rótulo curto para múltiplos horários no mesmo dia."""
+    try:
+        s = shifts.patch.upgrade._norm_time(start_time) or ""
+        hh = int(str(s).split(":", 1)[0])
+        return "dia" if hh < 17 else "noite"
+    except Exception:
+        return "turno"
+
+
+def _today_coop_launch_state(rest, pending_rows):
+    """Estado de lançamento de cada cooperado considerando SOMENTE as escalas de hoje."""
+    now = datetime.now(TZ)
+    today = now.date()
+
+    scales = []
+    for scale in perf._rest_scales_indexed(rest):
+        d = shifts.exact_scale_date(scale, today)
+        if d == today:
+            scales.append(scale)
+
+    if not scales:
+        return {}
+
+    coop_ids = {s.cooperado_id for s in scales if s.cooperado_id}
+    coops_by_id = {
+        c.id: c for c in Cooperado.query.filter(Cooperado.id.in_(coop_ids)).all()
+    } if coop_ids else {}
+    coops_by_name = _coops_by_normalized_name()
+
+    launches = (
+        Lancamento.query.filter(
+            Lancamento.restaurante_id == rest.id,
+            Lancamento.data == today,
+        )
+        .order_by(Lancamento.id.desc())
+        .all()
+    )
+    launches_by_coop = {}
+    for launch in launches:
+        launches_by_coop.setdefault(launch.cooperado_id, []).append(launch)
+
+    pend_today_by_coop = {}
+    for p in pending_rows or []:
+        if p.get("data_iso") == today.isoformat():
+            pend_today_by_coop.setdefault(int(p["cooperado_id"]), []).append(p)
+    for rows in pend_today_by_coop.values():
+        rows.sort(key=lambda x: (x.get("hora_inicio") or "", x.get("hora_fim") or ""))
+
+    per_coop_scales = {}
+    for scale in scales:
+        coop = coops_by_id.get(scale.cooperado_id) if scale.cooperado_id else coops_by_name.get(shifts.patch._norm(scale.cooperado_nome))
+        if not coop:
+            continue
+        start_time, end_time = shifts.patch.upgrade._times_from_text(scale.horario)
+        per_coop_scales.setdefault(coop.id, []).append((scale, start_time, end_time))
+
+    result = {}
+    for coop_id, rows in per_coop_scales.items():
+        rows.sort(key=lambda item: shifts.patch.upgrade._norm_time(item[1]) or "")
+        launched_periods = []
+        for scale, start_time, end_time in rows:
+            found = False
+            for launch in launches_by_coop.get(coop_id, []):
+                if shifts.patch.upgrade._overlap(
+                    launch.hora_inicio,
+                    launch.hora_fim,
+                    start_time,
+                    end_time,
+                ):
+                    found = True
+                    break
+            if found:
+                launched_periods.append(_shift_period_label(start_time))
+
+        pends = pend_today_by_coop.get(coop_id, [])
+        first_pending = pends[0] if pends else None
+
+        if first_pending:
+            status_label = "Com pendência"
+            status_kind = "danger"
+        elif launched_periods:
+            if len(launched_periods) >= len(rows):
+                status_label = "Lançamento OK"
+                status_kind = "success"
+            elif len(set(launched_periods)) == 1:
+                status_label = "Lançada " + launched_periods[0]
+                status_kind = "warning"
+            else:
+                status_label = "Produção lançada"
+                status_kind = "warning"
+        else:
+            status_label = "Escalado"
+            status_kind = "success"
+
+        result[coop_id] = {
+            "status_label": status_label,
+            "status_kind": status_kind,
+            "tem_producao_hoje": bool(launched_periods),
+            "pendente_hoje": bool(first_pending),
+            "pend_data": (first_pending or {}).get("data_iso", ""),
+            "pend_inicio": (first_pending or {}).get("hora_inicio", ""),
+            "pend_fim": (first_pending or {}).get("hora_fim", ""),
+        }
+    return result
+
+
+
 @app.context_processor
 def _coopex_week_pending_context():
     context = {
         "coopex_rest_week_pending_rows": [],
+        "coopex_rest_today_status_map": {},
         "coopex_rest_substitute_coops": [],
     }
     if (session.get("user_tipo") or "").strip().lower() != "restaurante":
@@ -397,7 +507,9 @@ def _coopex_week_pending_context():
     try:
         rest = legacy.request_restaurante()
         if rest:
-            context["coopex_rest_week_pending_rows"] = _week_pending_rows(rest)
+            pending_rows = _week_pending_rows(rest)
+            context["coopex_rest_week_pending_rows"] = pending_rows
+            context["coopex_rest_today_status_map"] = _today_coop_launch_state(rest, pending_rows)
             context["coopex_rest_substitute_coops"] = [
                 {"id": int(coop_id), "nome": nome}
                 for coop_id, nome in _active_substitute_rows()
