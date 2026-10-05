@@ -610,22 +610,4 @@ def _coopex_lifetime_rating_context_v8():
     return {"coopex_lifetime_rating_v8": SimpleNamespace(qtd=int(row[0] or 0), geral=float(row[1] or 5.0), pont=float(row[2] or 0.0), educ=float(row[3] or 0.0), efic=float(row[4] or 0.0), apres=float(row[5] or 0.0))}
 
 
-def _install_template_repairs_v8():
-    loader = app.jinja_loader
-    if not loader or getattr(loader, "_coopex_admin_light_v8", False):
-        return
-    original_get_source = loader.get_source
-
-    def get_source(environment, template):
-        source, filename, uptodate = original_get_source(environment, template)
-        if template == "painel_cooperado.html":
-            source = source.replace("{% set _score_title = 'Sua pontuação geral' %}", "{% set _score_title = 'Sua pontuação vitalícia' %}")
-        return source, filename, uptodate
-
-    loader.get_source = get_source
-    loader._coopex_admin_light_v8 = True
-    app.jinja_env.cache.clear()
-
-
-_install_template_repairs_v8()
 app.logger.info("Admin leve V8 carregado: páginas separadas, avaliações vitalícias e mídia persistente.")
