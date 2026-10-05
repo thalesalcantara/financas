@@ -11,7 +11,7 @@ import importlib
 import logging
 
 log = logging.getLogger("gunicorn.error")
-BUILD_VERSION = "2026-10-04-admin-clean-v1"
+BUILD_VERSION = "2026-10-05-consolidacao-definitiva"
 
 
 # Ordem preservada para não alterar regras de produção já em uso.
@@ -31,17 +31,8 @@ MODULES = (
     "historical_inactive_fix_v28",
     "approval_rejection_v5",
     "approval_return_dashboard_v5",
-    "admin_launch_sync_v5",
-    "admin_ui_v6",
-    "admin_runtime_v7",
-    "admin_light_v8",
-    "admin_light_v8_bridge",
-    "admin_preserve_v9",
-    "admin_v10_fix",
-    # admin_v10_hotfix foi incorporado diretamente ao admin_v10_fix.
-    "permission_swap_fix_v12",
-    "launch_permission_hotfix_v13",
-    "admin_identity_v14",
+    # Admin consolidado: substitui V5/V6/V7/V8/V9/V10/V12/V13/V14.
+    "admin_final",
     "coop_expense_control_v16",
     "coop_expense_management_v17",
     "coop_expense_totals_v19",
