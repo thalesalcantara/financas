@@ -15,7 +15,7 @@ button,input,select{font:inherit}.app{max-width:430px;margin:0 auto;padding:8px 
 .head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.head strong{font-size:14px}.head span{font-size:11px;color:var(--muted)}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.card{min-height:84px;border:1.5px solid #bcd4f8;border-radius:13px;padding:9px 10px;text-align:left;background:#fff;display:flex;flex-direction:column;justify-content:space-between;gap:6px;cursor:pointer;position:relative;overflow:hidden}.card:active{background:#f2f7ff}.name{font-size:15.5px;font-weight:950;line-height:1.12;white-space:normal;word-break:normal}.price{font-size:19px;font-weight:950;color:var(--blue);white-space:nowrap}.meta{font-size:10px;color:var(--muted)}.pill{position:absolute;right:7px;bottom:7px;min-width:30px;height:28px;border-radius:999px;padding:0 8px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:950;box-shadow:0 2px 6px rgba(6,79,200,.22)}
 .info-line{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid #e8eef8}.info-line:last-child{border-bottom:0}.info-line b{font-size:12px}.info-line strong{font-size:17px;color:var(--blue);white-space:nowrap}.sub{font-size:10px;color:var(--muted);margin-top:2px}
-.empty{padding:18px;border:1px dashed var(--line);border-radius:12px;text-align:center;color:var(--muted);font-size:12px}.legacy{display:none}.legacy.show{display:block}.legacy iframe{width:100%;height:65vh;border:0;border-radius:12px;background:#fff}
+.empty{padding:18px;border:1px dashed var(--line);border-radius:12px;text-align:center;color:var(--muted);font-size:12px}
 .drawer{position:fixed;left:0;right:0;bottom:0;max-width:430px;margin:0 auto;padding:0 10px 10px;z-index:40}.total{width:100%;border:0;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;border-radius:16px;padding:11px 14px;display:grid;grid-template-columns:1fr auto;align-items:center;box-shadow:0 12px 28px rgba(6,79,200,.28);cursor:pointer}.total span{display:block;font-size:10px;opacity:.8}.total strong{display:block;font-size:22px;margin-top:2px}.right{text-align:right}.summary{margin-top:8px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 16px 36px rgba(6,79,200,.14);max-height:0;overflow:hidden;transition:max-height .2s}.summary.open{max-height:360px}.summary h3{margin:0;padding:11px 13px;border-bottom:1px solid #edf1f6;font-size:14px}.sumlist{max-height:300px;overflow:auto;padding:0 12px 10px}.row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid #edf1f6}.row:last-child{border-bottom:0}.row .n{font-size:12px;font-weight:900}.row .m{font-size:10px;color:var(--muted);margin-top:2px}.qty{display:flex;align-items:center;gap:4px}.qty button{width:30px;height:30px;border:1px solid var(--line);background:#fff;border-radius:9px;font-weight:900;color:var(--blue)}.qty b{min-width:24px;text-align:center}
 @media(min-width:760px){.app,.drawer{max-width:760px}.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 </style>
@@ -54,11 +54,7 @@ button,input,select{font:inherit}.app{max-width:430px;margin:0 auto;padding:8px 
     <div id="guaranteeList"></div>
   </section>
 
-  <section id="legacy" class="section legacy">
-    <div class="head"><strong>Tabela original</strong></div>
-    <iframe id="legacyFrame" title="Tabela original"></iframe>
-  </section>
-</div>
+  </div>
 
 <div class="drawer">
   <button id="totalBtn" class="total" type="button">
@@ -71,7 +67,6 @@ button,input,select{font:inherit}.app{max-width:430px;margin:0 auto;padding:8px 
 <script>
 const contract=document.getElementById('contract'), search=document.getElementById('search'), grid=document.getElementById('grid'), count=document.getElementById('count');
 const guarantees=document.getElementById('guarantees'), guaranteeList=document.getElementById('guaranteeList'), extras=document.getElementById('extras'), extraList=document.getElementById('extraList');
-const legacy=document.getElementById('legacy'), legacyFrame=document.getElementById('legacyFrame');
 const totalValue=document.getElementById('totalValue'), totalQty=document.getElementById('totalQty'), summary=document.getElementById('summary'), sumList=document.getElementById('sumList');
 let mode='calc', data=[], counts={};
 const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0));
@@ -114,7 +109,7 @@ function renderSummary(){
 }
 
 async function load(id){
-  counts={};data=[];renderSummary();guarantees.style.display='none';extras.style.display='none';legacy.classList.remove('show');legacyFrame.src='';
+  counts={};data=[];renderSummary();guarantees.style.display='none';extras.style.display='none';
   if(!id){count.textContent='0 bairros';grid.innerHTML='<div class="empty" style="grid-column:1/-1">Selecione um estabelecimento.</div>';return}
   grid.innerHTML='<div class="empty" style="grid-column:1/-1">Carregando...</div>';
   try{
@@ -124,10 +119,8 @@ async function load(id){
     if(j.estruturada && (j.bairros||[]).length){
       data=j.bairros||[];renderGrid();
     }else{
-      grid.innerHTML='<div class="empty" style="grid-column:1/-1">Tabela exibida no formato original.</div>';
-      count.textContent='Tabela original';
-      legacyFrame.src=j.arquivo_visualizacao||('/tabelas/'+id+'/abrir');
-      legacy.classList.add('show');
+      grid.innerHTML='<div class="empty" style="grid-column:1/-1">Nenhum bairro cadastrado nesta tabela.</div>';
+      count.textContent='0 bairros';
     }
 
     const gs=j.garantidos||[];
