@@ -7811,23 +7811,29 @@ def _compute_coop_debt_snapshot(coop_id, di, df):
 
     end_date = df or date.today()
 
-    # Produção exibida no filtro atual
-    q_prod_view = Lancamento.query.filter(Lancamento.cooperado_id == coop_id)
+    # Produção exibida no filtro atual: a tela só precisa do total bruto,
+    # então o PostgreSQL soma sem materializar objetos Lancamento completos.
+    q_prod_view = db.session.query(func.coalesce(func.sum(Lancamento.valor), 0.0)).filter(
+        Lancamento.cooperado_id == coop_id
+    )
     if di:
         q_prod_view = q_prod_view.filter(Lancamento.data >= di)
     if df:
         q_prod_view = q_prod_view.filter(Lancamento.data <= df)
-    prods_view = q_prod_view.all()
-    bruto_prod_view = sum((D(p.valor) for p in prods_view), Decimal("0.00"))
+    bruto_prod_view = D(q_prod_view.scalar() or 0.0)
     inss_view = up(bruto_prod_view * D(INSS_ALIQ)) if bruto_prod_view > 0 else Decimal("0.00")
     sest_view = up(bruto_prod_view * D(SEST_ALIQ)) if bruto_prod_view > 0 else Decimal("0.00")
 
-    # Produções históricas até o fim do filtro: usadas para carregar dívida adiante por semana.
-    q_prod_hist = Lancamento.query.filter(
-        Lancamento.cooperado_id == coop_id,
-        Lancamento.data <= end_date,
+    # Histórico: somente data e valor são usados no cálculo semanal.
+    prods_hist = (
+        db.session.query(Lancamento.data, Lancamento.valor)
+        .filter(
+            Lancamento.cooperado_id == coop_id,
+            Lancamento.data <= end_date,
+        )
+        .order_by(Lancamento.data.asc(), Lancamento.id.asc())
+        .all()
     )
-    prods_hist = q_prod_hist.order_by(Lancamento.data.asc(), Lancamento.id.asc()).all()
 
     despesas = (
         DespesaCooperado.query
