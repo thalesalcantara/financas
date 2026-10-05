@@ -6,6 +6,7 @@ on:
       - main
       - feature/producao-cooperado-admin-rapido
       - consolidacao/definitiva
+      - performance/definitiva
   pull_request:
 
 jobs:
