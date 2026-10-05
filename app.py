@@ -7726,6 +7726,43 @@ def _extrair_dados_tabela_arquivo(tabela):
     garantidos_extraidos = []
     texto_linhas = []
 
+    def _normalizar_bairro_linha(texto):
+        s = re.sub(r"\s+", " ", str(texto or "")).strip(" \t-–—:;|")
+        # Remove prefixos de faixa/área que pertencem à tabela, não ao bairro.
+        s = re.sub(r"^(?:área|area|faixa|grupo|zona)\s*[A-Z0-9ºª.-]*\s*[:\-–—]?\s*", "", s, flags=re.I).strip()
+        # Remove valor residual ao final.
+        s = re.sub(r"\s+(?:R\$\s*)?\d{1,3}(?:[.,]\d{2})?\s*$", "", s, flags=re.I).strip()
+        return s
+
+    def _eh_cabecalho_ou_area(texto):
+        low = _norm_txt(texto)
+        if not low:
+            return True
+        proibidos = (
+            "area", "areas", "bairro", "bairros", "valor", "valores", "taxa", "taxas",
+            "entrega", "entregas", "garantido", "garantidos", "horario", "horarios",
+            "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo",
+            "feriado", "administrativa", "observacao", "observacoes", "tabela"
+        )
+        return low in proibidos or low.startswith(("area ", "areas ", "faixa ", "grupo "))
+
+    def _quebrar_bairros(texto):
+        s = _normalizar_bairro_linha(texto)
+        if not s or _eh_cabecalho_ou_area(s):
+            return []
+        # Um preço pode atender vários bairros; cada bairro vira um card separado.
+        partes = re.split(r"\s*(?:/|;|•|\||\s+e\s+)\s*", s, flags=re.I)
+        saida = []
+        for p in partes:
+            p = _normalizar_bairro_linha(p)
+            if not p or _eh_cabecalho_ou_area(p):
+                continue
+            # Evita textos longos/descritivos virarem bairro.
+            if len(p) > 70 or len(p.split()) > 7:
+                continue
+            saida.append(p)
+        return saida
+
     def _capturar_garantidos(linhas):
         encontrados = []
         for idx, ln in enumerate(linhas):
@@ -7778,11 +7815,16 @@ def _extrair_dados_tabela_arquivo(tabela):
                 if key in seen:
                     continue
                 seen.add(key)
-                bairros.append({
-                    "bairro": bairro.strip(),
-                    "cidade": cidade.strip(),
-                    "valor": round(valor, 2),
-                })
+                for bairro_individual in _quebrar_bairros(bairro):
+                    key_individual = (_norm_txt(bairro_individual), _norm_txt(cidade), round(valor, 2))
+                    if key_individual in seen:
+                        continue
+                    seen.add(key_individual)
+                    bairros.append({
+                        "bairro": bairro_individual,
+                        "cidade": cidade.strip(),
+                        "valor": round(valor, 2),
+                    })
 
             # Também tenta capturar informações textuais úteis do HTML.
             plain = re.sub(r"<script\b[^>]*>.*?</script>", " ", txt, flags=re.I | re.S)
@@ -7803,36 +7845,68 @@ def _extrair_dados_tabela_arquivo(tabela):
                 return {"bairros": [], "informacoes": [], "erro": "Leitor de PDF não instalado."}
 
             reader = PdfReader(str(file_path))
-            text_pdf = "\n".join((p.extract_text() or "") for p in reader.pages)
+            textos = []
+            for p in reader.pages:
+                try:
+                    # layout preserva melhor colunas/linhas de tabelas do que extração simples
+                    tx = p.extract_text(extraction_mode="layout") or ""
+                except Exception:
+                    tx = p.extract_text() or ""
+                textos.append(tx)
+            text_pdf = "\n".join(textos)
             linhas = [re.sub(r"\s+", " ", x).strip() for x in text_pdf.splitlines() if x.strip()]
             texto_linhas = linhas
 
-            # Captura linhas do tipo: "Alecrim  R$ 11,00" / "Alecrim - 11,00"
-            money_re = re.compile(r"^(?P<nome>.+?)\s+(?:R\$\s*)?(?P<valor>\d{1,3}(?:[.,]\d{2})?)\s*$", re.I)
+            money_re = re.compile(r"^(?P<nome>.*?)\s*(?:R\$\s*)?(?P<valor>\d{1,3}(?:[.,]\d{2})?)\s*$", re.I)
+            area_re = re.compile(r"^(?:área|area|faixa|grupo)\s*([A-Z0-9ºª.-]*)\b", re.I)
             seen = set()
-            for ln in linhas:
-                m = money_re.match(ln)
-                if not m:
-                    low = ln.casefold()
-                    if any(k in low for k in ("garant", "horário", "horario", "taxa administrativa", "feriado", "segunda", "terça", "terca", "quarta", "quinta", "sexta", "sábado", "sabado", "domingo")):
-                        if ln not in informacoes:
-                            informacoes.append(ln)
-                    continue
+            valor_area_atual = None
 
-                nome_bairro = re.sub(r"[\-–—:]+$", "", m.group("nome")).strip()
-                if not nome_bairro or len(nome_bairro) > 90:
-                    continue
-                try:
-                    valor = float(m.group("valor").replace(",", "."))
-                except Exception:
-                    continue
-                if valor <= 0 or valor > 500:
-                    continue
-                key = (_norm_txt(nome_bairro), round(valor, 2))
-                if key in seen:
-                    continue
-                seen.add(key)
-                bairros.append({"bairro": nome_bairro, "cidade": "", "valor": round(valor, 2)})
+            for ln in linhas:
+                low = ln.casefold()
+
+                # Informações contratuais ficam separadas dos bairros.
+                if any(k in low for k in ("garant", "horário", "horario", "taxa administrativa", "feriado", "segunda", "terça", "terca", "quarta", "quinta", "sexta", "sábado", "sabado", "domingo")):
+                    if ln not in informacoes:
+                        informacoes.append(ln)
+
+                m = money_re.match(ln)
+                if m:
+                    try:
+                        valor = float(m.group("valor").replace(",", "."))
+                    except Exception:
+                        valor = 0.0
+
+                    nome_bruto = _normalizar_bairro_linha(m.group("nome"))
+                    # Linha "Área 1  R$ 10,00": guarda o valor da área, mas NÃO cria card "Área 1".
+                    if area_re.search(ln):
+                        if 0 < valor <= 500:
+                            valor_area_atual = valor
+                        continue
+
+                    if 0 < valor <= 500:
+                        nomes = _quebrar_bairros(nome_bruto)
+                        if nomes:
+                            for nome_bairro in nomes:
+                                key = (_norm_txt(nome_bairro), round(valor, 2))
+                                if key in seen:
+                                    continue
+                                seen.add(key)
+                                bairros.append({"bairro": nome_bairro, "cidade": "", "valor": round(valor, 2)})
+                            continue
+
+                # Em muitas tabelas o PDF vem assim:
+                # "Área 1 - R$ 10,00" e nas linhas seguintes ficam os bairros.
+                if valor_area_atual is not None and not _eh_cabecalho_ou_area(ln):
+                    # Não transforma textos administrativos/garantidos em bairros.
+                    if not any(k in low for k in ("garant", "horário", "horario", "taxa administrativa", "segunda", "terça", "terca", "quarta", "quinta", "sexta", "sábado", "sabado", "domingo", "feriado")):
+                        nomes = _quebrar_bairros(ln)
+                        for nome_bairro in nomes:
+                            key = (_norm_txt(nome_bairro), round(valor_area_atual, 2))
+                            if key in seen:
+                                continue
+                            seen.add(key)
+                            bairros.append({"bairro": nome_bairro, "cidade": "", "valor": round(valor_area_atual, 2)})
 
             garantidos_extraidos = _capturar_garantidos(linhas)
 
