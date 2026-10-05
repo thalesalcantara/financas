@@ -637,7 +637,7 @@ def portal_restaurante():
             launches_by_day.setdefault((lanc.cooperado_id, lanc.data), []).append(lanc)
 
         week_productions = (
-            ProducaoCooperado.query
+            production_backend.ProducaoCooperado.query
             .filter(
                 ProducaoCooperado.restaurante_id == rest.id,
                 ProducaoCooperado.data >= week_start,
@@ -736,7 +736,7 @@ def portal_restaurante():
         )
 
         producoes_semana_recentes = (
-            ProducaoCooperado.query
+            production_backend.ProducaoCooperado.query
             .filter(
                 ProducaoCooperado.restaurante_id == rest.id,
                 ProducaoCooperado.status.in_(["aprovada", "recusada"]),
