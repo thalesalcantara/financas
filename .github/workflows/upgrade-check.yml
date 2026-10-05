@@ -25,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile Python
-        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_patch.py production_ui_patch.py performance_ui_fix.py performance_query_override.py production_shift_time_fix.py cooperative_notifications_ui.py operational_rules_v5.py approval_rejection_v5.py approval_return_dashboard_v5.py admin_core.py admin_final.py gunicorn_conf.py tests/smoke_upgrade.py
+        run: python -m py_compile app.py coopex_upgrade.py enhanced_app.py production_scale_flow.py production_scale_backend.py production_ui.py performance_ui.py performance_queries.py production_shift_time.py cooperative_notifications_ui.py operational_rules.py approval_rejection.py approval_return_dashboard.py admin_core.py admin_final.py gunicorn_conf.py tests/smoke_upgrade.py
       - name: Validate Jinja templates
         run: |
           python - <<'PY'
@@ -50,7 +50,7 @@ jobs:
           python - <<'PY'
           from datetime import date
           from types import SimpleNamespace
-          import production_shift_time_fix as shifts
+          import production_shift_time as shifts
           assert shifts.exact_scale_date(SimpleNamespace(data='07/08/26-SEX')) == date(2026, 8, 7)
           assert shifts.upgrade._times_from_text('18:00 às 22:00') == ('18:00', '22:00')
           assert shifts.upgrade._times_from_text('17:30 às 22:30') == ('17:30', '22:30')
@@ -61,8 +61,8 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import approval_rejection_v5 as rejection
-          import approval_return_dashboard_v5 as approval
+          import approval_rejection as rejection
+          import approval_return_dashboard as approval
           import admin_core as core
           import admin_final as final
 
