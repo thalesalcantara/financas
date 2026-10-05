@@ -54,8 +54,10 @@
     </section>
 
     <section class="table-card">
-      <div class="table-head"><strong><i class="bi bi-folder2-open me-1"></i>Tabela disponível</strong><span class="status-pill">{{ 1 if tabela else 0 }} arquivo</span></div>
-      {% if tabela and bairros %}
+      <div class="table-head"><strong><i class="bi bi-table me-1"></i>Tabela cadastrada</strong><span class="status-pill">{{ bairros|length }} bairros</span></div>
+      {% if not tabela or not bairros %}
+      <div class="empty"><i class="bi bi-inbox fs-2 d-block mb-2"></i>Ainda não há valores cadastrados para <strong>{{ _nome }}</strong>.</div>
+      {% else %}
       <div class="structured">
         <div class="tabs">
           <button class="tabbtn active" type="button" data-mode="fixo">Tabela Fixo</button>
@@ -83,52 +85,9 @@
         {% endif %}
       </div>
       {% endif %}
-      {% if not tabela %}
-      <div class="empty"><i class="bi bi-inbox fs-2 d-block mb-2"></i>Ainda não há tabela publicada para <strong>{{ _nome }}</strong>.</div>
-      {% elif not bairros %}
-        {% set titulo = tabela.titulo or _nome %}
-        {% set nome_arquivo = tabela.arquivo_nome or '' %}
-        {% set ext = nome_arquivo.split('.')[-1]|lower if '.' in nome_arquivo else '' %}
-        <article class="doc">
-          <div>
-            <div class="doc-cat">TABELA DO ESTABELECIMENTO</div>
-            <div class="doc-title"><i class="bi bi-journal-text me-1"></i>{{ titulo }}</div>
-            <div class="doc-meta">{% if tabela.enviado_em %}Atualizada em {{ tabela.enviado_em.strftime('%d/%m/%Y às %H:%M') }}{% endif %}</div>
-            {% if tabela.descricao %}<div class="doc-desc">{{ tabela.descricao }}</div>{% endif %}
-            <div class="chips"><span class="chip"><i class="bi bi-file-earmark"></i>{{ nome_arquivo or 'Arquivo' }}</span>{% if ext %}<span class="chip"><i class="bi bi-tag"></i>{{ ext|upper }}</span>{% endif %}</div>
-          </div>
-          <div class="actions">
-            <button type="button" class="btn btn-royal" data-bs-toggle="modal" data-bs-target="#modalTabela"><i class="bi bi-eye me-1"></i>Visualizar</button>
-            <a class="btn btn-outline-primary" href="{{ url_for('rest_tabela_download', tabela_id=tabela.id) }}"><i class="bi bi-download me-1"></i>Baixar</a>
-          </div>
-        </article>
-      {% endif %}
     </section>
   </main>
 
-  {% if tabela %}
-  <div class="modal fade" id="modalTabela" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-fullscreen">
-      <div class="modal-content">
-        <div class="modal-header">
-          <div><small class="text-primary fw-bold">TABELA</small><h5 class="modal-title">{{ titulo }}</h5></div>
-          <div class="d-flex gap-2">
-            <a class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" href="{{ url_for('rest_tabela_abrir', tabela_id=tabela.id) }}"><i class="bi bi-box-arrow-up-right me-1"></i>Nova aba</a>
-            <a class="btn btn-primary btn-sm" href="{{ url_for('rest_tabela_download', tabela_id=tabela.id) }}"><i class="bi bi-download me-1"></i>Baixar</a>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-        </div>
-        <div class="modal-body p-2">
-          {% if ext in ['png','jpg','jpeg','webp','gif'] %}
-          <img class="reader-img" src="{{ url_for('rest_tabela_abrir', tabela_id=tabela.id) }}" alt="{{ titulo }}">
-          {% else %}
-          <iframe class="reader" src="{{ url_for('rest_tabela_abrir', tabela_id=tabela.id) }}"></iframe>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-  {% endif %}
   <script>
   (()=>{const search=document.getElementById('rateSearch');const grid=document.getElementById('rateGrid');if(!search||!grid)return;let mode='fixo';const fmt=v=>{if(v===''||v==null)return '—';return 'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})};function render(){const q=search.value.trim().toLowerCase();grid.querySelectorAll('.rate-card').forEach(card=>{const val=card.dataset[mode];const ok=card.dataset.name.includes(q) && val!=='' && val!=null;card.style.display=ok?'flex':'none';card.querySelector('.value').textContent=fmt(val);});}document.querySelectorAll('.tabbtn').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabbtn').forEach(x=>x.classList.remove('active'));b.classList.add('active');mode=b.dataset.mode;render();});search.oninput=render;render();})();
   </script>
