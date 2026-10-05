@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 
 # ============ Stdlib ============
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
@@ -7686,6 +7687,159 @@ def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
         download_name=(tabela.arquivo_nome or file_path.name),
         mimetype=_guess_mimetype_from_path(str(file_path)),
     )
+
+
+
+def _extrair_dados_tabela_arquivo(tabela):
+    """
+    Lê a tabela publicada e devolve dados estruturados para o painel do cooperado.
+    Suporta:
+      - HTML no padrão de cards enviado pelo usuário (arrays ["Bairro","Cidade",valor])
+      - PDF com texto selecionável (bairro + valor na mesma linha)
+    Não usa OCR; PDF escaneado sem texto precisa ser convertido antes.
+    """
+    url = (getattr(tabela, "arquivo_url", "") or "").strip()
+    nome = (getattr(tabela, "arquivo_nome", "") or "").strip()
+    ext = os.path.splitext((nome or url).split("?", 1)[0])[1].lower()
+
+    # resolve arquivo local usando as mesmas regras do visualizador
+    tabelas_dir = _tabelas_base_dir()
+    base_dir = Path(BASE_DIR)
+    raw = url.lstrip("/").split("?", 1)[0].split("#", 1)[0]
+    fname = (raw.split("/")[-1] if raw else "").strip()
+    candidates = []
+    if fname:
+        candidates.extend([
+            tabelas_dir / fname,
+            Path(STATIC_TABLES) / fname,
+            base_dir / "uploads" / "tabelas" / fname,
+            base_dir / "static" / "uploads" / "tabelas" / fname,
+        ])
+    if raw:
+        candidates.append(base_dir / raw)
+    file_path = next((p for p in candidates if p.exists() and p.is_file()), None)
+    if not file_path:
+        return {"bairros": [], "informacoes": [], "erro": "Arquivo da tabela não encontrado."}
+
+    bairros = []
+    informacoes = []
+
+    try:
+        if ext in {".html", ".htm"}:
+            txt = file_path.read_text(encoding="utf-8", errors="ignore")
+
+            # Padrão do HTML enviado: ["Alecrim","Natal",11]
+            patt = re.compile(
+                r'\[\s*["\\']([^"\\']+)["\\']\s*,\s*["\\']([^"\\']*)["\\']\s*,\s*([0-9]+(?:[.,][0-9]+)?)\s*\]'
+            )
+            seen = set()
+            for bairro, cidade, valor_raw in patt.findall(txt):
+                try:
+                    valor = float(str(valor_raw).replace(",", "."))
+                except Exception:
+                    continue
+                key = (_norm_txt(bairro), _norm_txt(cidade), round(valor, 2))
+                if key in seen:
+                    continue
+                seen.add(key)
+                bairros.append({
+                    "bairro": bairro.strip(),
+                    "cidade": cidade.strip(),
+                    "valor": round(valor, 2),
+                })
+
+            # Também tenta capturar informações textuais úteis do HTML.
+            plain = re.sub(r"<script\b[^>]*>.*?</script>", " ", txt, flags=re.I | re.S)
+            plain = re.sub(r"<style\b[^>]*>.*?</style>", " ", plain, flags=re.I | re.S)
+            plain = re.sub(r"<[^>]+>", "\n", plain)
+            for ln in [re.sub(r"\s+", " ", x).strip() for x in plain.splitlines()]:
+                low = ln.casefold()
+                if ln and any(k in low for k in ("garant", "horário", "horario", "taxa administrativa", "feriado", "segunda", "terça", "terca", "quarta", "quinta", "sexta", "sábado", "sabado", "domingo")):
+                    if ln not in informacoes:
+                        informacoes.append(ln)
+
+        elif ext == ".pdf":
+            try:
+                from pypdf import PdfReader
+            except Exception:
+                return {"bairros": [], "informacoes": [], "erro": "Leitor de PDF não instalado."}
+
+            reader = PdfReader(str(file_path))
+            text_pdf = "\n".join((p.extract_text() or "") for p in reader.pages)
+            linhas = [re.sub(r"\s+", " ", x).strip() for x in text_pdf.splitlines() if x.strip()]
+
+            # Captura linhas do tipo: "Alecrim  R$ 11,00" / "Alecrim - 11,00"
+            money_re = re.compile(r"^(?P<nome>.+?)\s+(?:R\$\s*)?(?P<valor>\d{1,3}(?:[.,]\d{2})?)\s*$", re.I)
+            seen = set()
+            for ln in linhas:
+                m = money_re.match(ln)
+                if not m:
+                    low = ln.casefold()
+                    if any(k in low for k in ("garant", "horário", "horario", "taxa administrativa", "feriado", "segunda", "terça", "terca", "quarta", "quinta", "sexta", "sábado", "sabado", "domingo")):
+                        if ln not in informacoes:
+                            informacoes.append(ln)
+                    continue
+
+                nome_bairro = re.sub(r"[\-–—:]+$", "", m.group("nome")).strip()
+                if not nome_bairro or len(nome_bairro) > 90:
+                    continue
+                try:
+                    valor = float(m.group("valor").replace(",", "."))
+                except Exception:
+                    continue
+                if valor <= 0 or valor > 500:
+                    continue
+                key = (_norm_txt(nome_bairro), round(valor, 2))
+                if key in seen:
+                    continue
+                seen.add(key)
+                bairros.append({"bairro": nome_bairro, "cidade": "", "valor": round(valor, 2)})
+
+        bairros.sort(key=lambda x: _norm_txt(x.get("bairro")))
+        return {
+            "bairros": bairros,
+            "informacoes": informacoes[:20],
+            "erro": None if bairros else "Não foi possível reconhecer bairros e valores neste arquivo.",
+        }
+    except Exception as exc:
+        current_app.logger.exception("Falha ao extrair tabela %s", getattr(tabela, "id", None))
+        return {"bairros": [], "informacoes": [], "erro": str(exc)}
+
+
+@app.get("/tabelas/<int:tab_id>/dados", endpoint="tabela_dados")
+def tabela_dados(tab_id: int):
+    if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
+        return jsonify({"ok": False, "erro": "Acesso não autorizado."}), 401
+
+    t = Tabela.query.get_or_404(tab_id)
+
+    if session.get("user_tipo") == "restaurante":
+        rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+        _enforce_restaurante_titulo(t, rest)
+
+    data = _extrair_dados_tabela_arquivo(t)
+    garantidos = (
+        TabelaGarantido.query
+        .filter(TabelaGarantido.tabela_id == t.id)
+        .order_by(TabelaGarantido.ordem.asc(), TabelaGarantido.id.asc())
+        .all()
+    )
+
+    return jsonify({
+        "ok": True,
+        "id": t.id,
+        "titulo": t.titulo,
+        "descricao": t.descricao or "",
+        "arquivo_nome": t.arquivo_nome or "",
+        "bairros": data.get("bairros", []),
+        "informacoes": data.get("informacoes", []),
+        "erro": data.get("erro"),
+        "garantidos": [{
+            "descricao": g.descricao or "Garantido",
+            "horario": g.horario or "",
+            "valor": float(g.valor or 0.0),
+        } for g in garantidos],
+    })
 
 
 # ---------------------------------------------------------------------------
