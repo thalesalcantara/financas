@@ -413,6 +413,26 @@
       from{transform:scale(.72);opacity:0}
       to{transform:scale(1);opacity:1}
     }
+    .lanc-overlay-box.deleted{
+      min-width:240px;
+      border:1px solid #fecaca;
+      box-shadow:0 12px 34px rgba(239,68,68,.18);
+    }
+    .lanc-overlay-box.deleted .lanc-overlay-text{
+      color:#b4232c;
+      font-weight:800;
+    }
+    .lanc-delete-check{
+      width:42px;
+      height:42px;
+      border-radius:50%;
+      display:grid;
+      place-items:center;
+      background:#fee2e2;
+      color:#dc2626;
+      font-size:1.35rem;
+      animation:lancSuccessPop .22s ease-out;
+    }
 
     @keyframes lanc-spin{
       to{transform:rotate(360deg);}
@@ -1305,7 +1325,7 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
         {% if msgs %}
           {% set ns_flash = namespace(has_regular=false) %}
           {% for cat, msg in msgs %}
-            {% if not (cat == 'success' and (msg|string).startswith('Produção lançada')) %}
+            {% if not (cat == 'success' and ((msg|string).startswith('Produção lançada') or (msg|string).startswith('Lançamento excluído'))) %}
               {% set ns_flash.has_regular = true %}
             {% endif %}
           {% endfor %}
@@ -1321,6 +1341,8 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
           {% for cat, msg in msgs %}
             {% if cat == 'success' and (msg|string).startswith('Produção lançada') %}
               <div id="launchSuccessMarker" data-message="{{ msg|striptags|e }}" hidden></div>
+            {% elif cat == 'success' and (msg|string).startswith('Lançamento excluído') %}
+              <div id="deleteSuccessMarker" data-message="Produção excluída" hidden></div>
             {% endif %}
           {% endfor %}
         {% endif %}
@@ -1837,7 +1859,7 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
                     <div class="rest-list-tabs">
                       <button type="button" class="rest-list-tab active" data-coop-filter="todos">Todos</button>
                       <button type="button" class="rest-list-tab" data-coop-filter="escalados">Escalados</button>
-                      <button type="button" class="rest-list-tab" data-coop-filter="producao">Em produção</button>
+                      <button type="button" class="rest-list-tab" data-coop-filter="producao">Com produção</button>
                       <button type="button" class="rest-list-tab pending" data-coop-filter="pendencias">Com pendência {% if _pendencias %}<b>{{ _pendencias|length }}</b>{% endif %}</button>
                     </div>
                   </div>
@@ -1890,13 +1912,13 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
                           </div>
                           <div class="coop-left">
                             <span class="coop-name">{{ coop.nome }}</span>
-                            <span class="coop-meta">{{ coop.telefone or ('Escala ' ~ (sh.get('horario','') or 'de hoje')) }}</span>
+                            <span class="coop-meta">{% if coop.telefone %}{{ coop.telefone }}{% endif %}{% if coop.telefone and sh.get('horario') %} · {% endif %}{% if sh.get('horario') %}<strong>{{ sh.get('horario') }}</strong>{% elif not coop.telefone %}Sem telefone{% endif %}</span>
                           </div>
                           <div class="rest-coop-status">
                             {% if coop.id in _pending_ids %}
                               <span class="rest-status-pill danger"><i class="bi bi-exclamation-circle-fill"></i> Com pendência</span>
                             {% elif coop.lancamentos|length > 0 %}
-                              <span class="rest-status-pill warning"><i class="bi bi-clock-fill"></i> Produção</span>
+                              <span class="rest-status-pill warning"><i class="bi bi-clock-fill"></i> Com produção</span>
                             {% elif coop.id in coopex_rest_current_coop_ids %}
                               <span class="rest-status-pill success"><i class="bi bi-check-lg"></i> Escalado</span>
                             {% else %}
@@ -2195,7 +2217,7 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
       const icon = document.getElementById('lancOverlayIcon');
       const overlayTextEl = overlayLanc.querySelector('.lanc-overlay-text');
 
-      box?.classList.remove('success');
+      box?.classList.remove('success','deleted');
       if(icon){
         icon.className='lanc-overlay-icon lanc-spinner';
         icon.innerHTML='';
@@ -2219,6 +2241,25 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
         icon.innerHTML='<i class="bi bi-check-lg"></i>';
       }
       if(overlayTextEl) overlayTextEl.textContent = message || 'Produção lançada';
+      overlayLanc.style.display='flex';
+      clearTimeout(window.__lancSuccessTimer);
+      window.__lancSuccessTimer=setTimeout(()=>hideLancOverlay(),1000);
+    }
+
+    function showDeleteSuccess(message){
+      const overlayLanc = document.getElementById('overlayLancando');
+      if (!overlayLanc) return;
+      const box = overlayLanc.querySelector('.lanc-overlay-box');
+      const icon = document.getElementById('lancOverlayIcon');
+      const overlayTextEl = overlayLanc.querySelector('.lanc-overlay-text');
+
+      box?.classList.remove('success');
+      box?.classList.add('deleted');
+      if(icon){
+        icon.className='lanc-overlay-icon lanc-delete-check';
+        icon.innerHTML='<i class="bi bi-x-lg"></i>';
+      }
+      if(overlayTextEl) overlayTextEl.textContent = message || 'Produção excluída';
       overlayLanc.style.display='flex';
       clearTimeout(window.__lancSuccessTimer);
       window.__lancSuccessTimer=setTimeout(()=>hideLancOverlay(),1000);
@@ -2925,18 +2966,72 @@ function setPhone(digits) {
       wireAvaliacaoFlow();
 
       const blocoTabelas = document.getElementById('blocoTabelas');
-      blocoTabelas?.addEventListener('click', (e) => {
-        const link = e.target.closest('a.btn-outline-danger');
+      blocoTabelas?.addEventListener('click', async (e) => {
+        const link = e.target.closest('a.rest-table-action.delete, a.btn-outline-danger');
         if (!link) return;
 
         e.preventDefault();
-
         if (!confirm('Deseja realmente excluir este lançamento?')) return;
 
         showLancOverlay('delete');
-        setTimeout(() => {
-          window.location.href = link.href;
-        }, 80);
+        try{
+          const url=new URL(link.href,location.origin);
+          url.searchParams.set('ajax','1');
+          const resp=await fetch(url.toString(),{
+            method:'GET',
+            headers:{'X-Requested-With':'XMLHttpRequest'},
+            credentials:'same-origin',
+            cache:'no-store'
+          });
+          const data=await resp.json();
+          if(!resp.ok || !data.ok) throw new Error(data.error||'Falha ao excluir');
+
+          const row=link.closest('tr');
+          const tableBox=link.closest('.rest-selected-history');
+          row?.remove();
+
+          if(tableBox){
+            const rows=Array.from(tableBox.querySelectorAll('tbody tr')).filter(r=>r.querySelector('.rest-table-action.delete'));
+            const kpis=tableBox.querySelectorAll('.rest-mini-kpi strong');
+            if(kpis[0]){
+              let ent=0;
+              rows.forEach(r=>{
+                const cells=r.querySelectorAll('td');
+                const n=parseInt((cells[4]?.textContent||'0').replace(/\D/g,''),10);
+                if(Number.isFinite(n)) ent+=n;
+              });
+              kpis[0].textContent=String(ent);
+            }
+            if(kpis[1]){
+              let total=0;
+              rows.forEach(r=>{
+                const cells=r.querySelectorAll('td');
+                const raw=(cells[3]?.textContent||'').replace(/[^0-9,.-]/g,'').replace(/\./g,'').replace(',','.');
+                total+=Number(raw)||0;
+              });
+              kpis[1].textContent='R$ '+brMoney(total);
+            }
+            if(kpis[2]) kpis[2].textContent=String(rows.length);
+            if(!rows.length){
+              const tbody=tableBox.querySelector('tbody');
+              if(tbody) tbody.innerHTML='<tr><td colspan="8" class="text-center text-muted py-3">Nenhum lançamento no período selecionado.</td></tr>';
+              const coopId=String(data.cooperado_id||'');
+              const card=document.querySelector('.cooperado-item[data-id="'+coopId+'"]');
+              if(card){
+                card.dataset.producao='0';
+                const badge=card.querySelector('.rest-status-pill.warning');
+                if(badge && card.dataset.escalado==='1'){
+                  badge.className='rest-status-pill success';
+                  badge.innerHTML='<i class="bi bi-check-lg"></i> Escalado';
+                }
+              }
+            }
+          }
+          showDeleteSuccess(data.message || 'Produção excluída');
+        }catch(err){
+          hideLancOverlay();
+          alert('Não foi possível excluir agora. Tente novamente.');
+        }
       });
     }
 
@@ -3599,8 +3694,11 @@ function setPhone(digits) {
       hideLancOverlay();
 
       const launchSuccess=document.getElementById('launchSuccessMarker');
+      const deleteSuccess=document.getElementById('deleteSuccessMarker');
       if(launchSuccess){
         showLancSuccess(launchSuccess.dataset.message || 'Produção lançada');
+      }else if(deleteSuccess){
+        showDeleteSuccess(deleteSuccess.dataset.message || 'Produção excluída');
       }
 
       pollAvisos();
