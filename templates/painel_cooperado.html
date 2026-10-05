@@ -336,6 +336,11 @@
           <div><strong class="mono">{{ _qtd_prod }}</strong><small>entregas</small></div>
         </div>
 
+        <div id="trackingStatus" title="Status da localização" style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.20);color:#fff;border-radius:999px;padding:6px 8px;font-size:.62rem;font-weight:800;white-space:nowrap">
+          <span id="trackingDot" style="width:8px;height:8px;border-radius:50%;background:#94a3b8;box-shadow:0 0 0 3px rgba(255,255,255,.12)"></span>
+          <span id="trackingText">GPS</span>
+        </div>
+
         <a class="app-bell" href="{{ url_for('portal_cooperado_avisos') }}" aria-label="Avisos">
           <i class="bi bi-bell"></i>
           {% if unread>0 %}<span>{{ unread }}</span>{% endif %}
@@ -1348,5 +1353,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 <script src="{{ url_for('static', filename='js/cooperado_v4.js', v='20260807-1458') }}"></script>
+
+<script id="coopex_tracking_v1">
+(function(){
+  const dot=document.getElementById('trackingDot'),txt=document.getElementById('trackingText');
+  if(!dot||!txt||!navigator.geolocation)return;
+  let lastSent=0,watchId=null;
+  const state=s=>{
+    if(s==='ok'){dot.style.background='#22c55e';txt.textContent='Ativo';}
+    else if(s==='wait'){dot.style.background='#f59e0b';txt.textContent='GPS';}
+    else{dot.style.background='#ef4444';txt.textContent='GPS';}
+  };
+  async function send(pos){
+    const now=Date.now(); if(now-lastSent<15000)return; lastSent=now;
+    try{
+      const r=await fetch('/api/rastreamento/localizacao',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({latitude:pos.coords.latitude,longitude:pos.coords.longitude,precisao:pos.coords.accuracy||0})});
+      state(r.ok?'ok':'bad');
+    }catch(e){state('bad');}
+  }
+  function start(){
+    if(watchId!==null)return;
+    state('wait');
+    try{
+      watchId=navigator.geolocation.watchPosition(p=>{state('ok');send(p);},()=>{state('bad');watchId=null;},{enableHighAccuracy:true,maximumAge:10000,timeout:12000});
+    }catch(e){state('bad');watchId=null;}
+  }
+  start();
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&watchId===null)start();});
+  window.addEventListener('focus',()=>{if(watchId===null)start();});
+  window.addEventListener('click',()=>{if(watchId===null)start();},{once:true,passive:true});
+})();
+</script>
 </body>
 </html>
