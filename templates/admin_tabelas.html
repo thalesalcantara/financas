@@ -68,6 +68,30 @@
                       <button class="alv8-btn primary">Salvar alteração</button>
                     </form>
                   </details>
+                  <details>
+                    <summary class="alv8-btn"><i class="bi bi-cash-stack"></i> Garantidos</summary>
+                    <div class="alv8-card" style="margin-top:8px;min-width:520px;padding:10px">
+                      {% set gs = garantidos_map.get(t.id, []) %}
+                      {% if gs %}
+                        <div style="display:grid;gap:6px;margin-bottom:10px">
+                          {% for g in gs %}
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid #e8eef8;padding:7px 0">
+                              <div><strong>{{ g.descricao or 'Garantido' }}</strong> · {{ g.horario }} · R$ {{ '%.2f'|format(g.valor)|replace('.', ',') }}</div>
+                              <form method="post" action="{{ url_for('admin_delete_tabela_garantido', garantido_id=g.id) }}" onsubmit="return confirm('Remover este garantido?')">
+                                <button class="alv8-btn danger" type="submit"><i class="bi bi-trash"></i></button>
+                              </form>
+                            </div>
+                          {% endfor %}
+                        </div>
+                      {% endif %}
+                      <form method="post" action="{{ url_for('admin_add_tabela_garantido', tab_id=t.id) }}" class="alv8-filter">
+                        <div class="alv8-field grow"><label>Dias / descrição</label><input class="alv8-input" name="descricao" placeholder="Ex.: Segunda a quinta"></div>
+                        <div class="alv8-field"><label>Horário</label><input class="alv8-input" name="horario" required placeholder="Ex.: 18h às 22h"></div>
+                        <div class="alv8-field"><label>Valor</label><input class="alv8-input" name="valor" required placeholder="90,00"></div>
+                        <button class="alv8-btn primary" type="submit">Adicionar</button>
+                      </form>
+                    </div>
+                  </details>
                   <a class="alv8-btn danger" href="{{ url_for('admin_delete_tabela', tab_id=t.id) }}" onclick="return confirm('Excluir esta tabela?');"><i class="bi bi-trash"></i> Excluir</a>
                 </div>
               </td>
