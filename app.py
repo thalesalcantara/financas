@@ -7992,6 +7992,7 @@ def tabela_dados(tab_id: int):
             "horario": g.horario or "",
             "valor": float(g.valor or 0.0),
         } for g in garantidos],
+        "extras": TABELA_EXTRAS_V1.get(t.titulo, {}),
     })
 
 
@@ -8008,6 +8009,13 @@ def _ensure_tabelas_estruturadas_schema():
         db.session.rollback()
 
 
+
+TABELA_EXTRAS_V1 = {
+    "DDBURGUER_LAGOA_NOVA": {"servico_compras": 25.0, "transferencia_lojas": 20.0},
+    "DDBURGUER_CID_VERDE": {"servico_compras": 25.0, "transferencia_lojas": 20.0},
+    "CHINA_P.NEGRA": {"servico_compras": 15.0, "transferencia_lojas": 15.0},
+    "CHINA_TIROL": {"servico_compras": 15.0, "transferencia_lojas": 15.0},
+}
 
 TABELAS_ESTRUTURADAS_SEED_V1 = {
     "ZIPPI PIZZA": {
