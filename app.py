@@ -9021,7 +9021,7 @@ def tracking_rest_positions():
             "longitude":loc.longitude,
             "precisao":loc.precisao,
             "segundos":age,
-            "foto":url_for("media_coop",coop_id=coop.id),
+            "foto":url_for("admin_light_media_coop",coop_id=coop.id),
         })
     return jsonify(ok=True, autorizado=True, cooperados=payload)
 
