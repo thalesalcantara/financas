@@ -596,7 +596,7 @@ def admin_light_notice_toggle(item_id: int):
 def _coopex_lifetime_rating_context_v8():
     if (session.get("user_tipo") or "").strip().lower() != "cooperado" or request.endpoint != "portal_cooperado":
         return {}
-    coop = Cooperado.query.filter_by(usuario_id=session.get("user_id")).first()
+    coop = legacy.request_cooperado()
     if not coop:
         return {}
     row = db.session.query(
