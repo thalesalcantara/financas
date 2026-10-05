@@ -21,7 +21,8 @@ mimetypes.add_type("application/vnd.ms-powerpoint", ".ppt")
 # ============ Terceiros ============
 from flask import (
     Flask, render_template, request, redirect, url_for, session,
-    flash, send_file, abort, jsonify, current_app, render_template_string
+    flash, send_file, abort, jsonify, current_app, render_template_string,
+    g, has_request_context
 )
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -730,6 +731,46 @@ class BeneficioRegistro(db.Model):
         cascade="all, delete-orphan",
         passive_deletes=True
     )
+
+# =========================
+# Contexto de requisição — cache sem dados obsoletos
+# =========================
+def request_usuario():
+    """Usuário autenticado, consultado no máximo uma vez por requisição."""
+    if not has_request_context():
+        uid = session.get("user_id")
+        return db.session.get(Usuario, int(uid)) if uid else None
+    uid = session.get("user_id")
+    cached_uid = getattr(g, "_coopex_usuario_id", None)
+    if cached_uid != uid or not hasattr(g, "_coopex_usuario"):
+        g._coopex_usuario_id = uid
+        g._coopex_usuario = db.session.get(Usuario, int(uid)) if uid else None
+    return g._coopex_usuario
+
+
+def request_cooperado():
+    """Cooperado do login atual, consultado no máximo uma vez por requisição."""
+    uid = session.get("user_id")
+    if not has_request_context():
+        return Cooperado.query.filter_by(usuario_id=uid).first() if uid else None
+    cached_uid = getattr(g, "_coopex_cooperado_uid", None)
+    if cached_uid != uid or not hasattr(g, "_coopex_cooperado"):
+        g._coopex_cooperado_uid = uid
+        g._coopex_cooperado = Cooperado.query.filter_by(usuario_id=uid).first() if uid else None
+    return g._coopex_cooperado
+
+
+def request_restaurante():
+    """Estabelecimento do login atual, consultado no máximo uma vez por requisição."""
+    uid = session.get("user_id")
+    if not has_request_context():
+        return Restaurante.query.filter_by(usuario_id=uid).first() if uid else None
+    cached_uid = getattr(g, "_coopex_restaurante_uid", None)
+    if cached_uid != uid or not hasattr(g, "_coopex_restaurante"):
+        g._coopex_restaurante_uid = uid
+        g._coopex_restaurante = Restaurante.query.filter_by(usuario_id=uid).first() if uid else None
+    return g._coopex_restaurante
+
 
 # =========================
 # Semana seg→dom + Normalização automática
