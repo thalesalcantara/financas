@@ -31,10 +31,6 @@ class DespesaCoopSerieV18(db.Model):
     serie_key = db.Column(db.String(64), nullable=False, index=True)
 
 
-with app.app_context():
-    DespesaCoopRecorrenciaV17.__table__.create(bind=db.engine, checkfirst=True)
-    DespesaCoopSerieV18.__table__.create(bind=db.engine, checkfirst=True)
-
 
 def _rec(despesa_id, create=False):
     x = DespesaCoopRecorrenciaV17.query.filter_by(despesa_id=despesa_id).first()
