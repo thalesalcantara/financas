@@ -7723,6 +7723,42 @@ def _extrair_dados_tabela_arquivo(tabela):
 
     bairros = []
     informacoes = []
+    garantidos_extraidos = []
+    texto_linhas = []
+
+    def _capturar_garantidos(linhas):
+        encontrados = []
+        for idx, ln in enumerate(linhas):
+            low = ln.casefold()
+            if "garant" not in low:
+                continue
+
+            contexto = " ".join(linhas[max(0, idx-1): min(len(linhas), idx+2)])
+            valores = re.findall(r"(?:R\$\s*)?(\d{2,3}(?:[.,]\d{2})?)", contexto, flags=re.I)
+            horas = re.findall(r"(\d{1,2}\s*h(?:\s*(?:às|as|a|-)\s*\d{1,2}\s*h)?)", contexto, flags=re.I)
+
+            valor = None
+            for raw_v in valores:
+                try:
+                    v = float(raw_v.replace(",", "."))
+                except Exception:
+                    continue
+                if 20 <= v <= 500:
+                    valor = v
+                    break
+            if valor is None:
+                continue
+
+            horario = horas[0] if horas else ""
+            descricao = re.sub(r"R\$\s*\d+(?:[.,]\d{2})?", "", ln, flags=re.I)
+            descricao = re.sub(r"\s+", " ", descricao).strip(" -–—:")
+            if not descricao:
+                descricao = "Garantido"
+
+            chave = (_norm_txt(descricao), _norm_txt(horario), round(valor, 2))
+            if chave not in {( _norm_txt(x["descricao"]), _norm_txt(x["horario"]), round(x["valor"],2)) for x in encontrados}:
+                encontrados.append({"descricao": descricao, "horario": horario, "valor": round(valor, 2)})
+        return encontrados
 
     try:
         if ext in {".html", ".htm"}:
@@ -7752,11 +7788,13 @@ def _extrair_dados_tabela_arquivo(tabela):
             plain = re.sub(r"<script\b[^>]*>.*?</script>", " ", txt, flags=re.I | re.S)
             plain = re.sub(r"<style\b[^>]*>.*?</style>", " ", plain, flags=re.I | re.S)
             plain = re.sub(r"<[^>]+>", "\n", plain)
-            for ln in [re.sub(r"\s+", " ", x).strip() for x in plain.splitlines()]:
+            texto_linhas = [re.sub(r"\s+", " ", x).strip() for x in plain.splitlines() if re.sub(r"\s+", " ", x).strip()]
+            for ln in texto_linhas:
                 low = ln.casefold()
                 if ln and any(k in low for k in ("garant", "horário", "horario", "taxa administrativa", "feriado", "segunda", "terça", "terca", "quarta", "quinta", "sexta", "sábado", "sabado", "domingo")):
                     if ln not in informacoes:
                         informacoes.append(ln)
+            garantidos_extraidos = _capturar_garantidos(texto_linhas)
 
         elif ext == ".pdf":
             try:
@@ -7767,6 +7805,7 @@ def _extrair_dados_tabela_arquivo(tabela):
             reader = PdfReader(str(file_path))
             text_pdf = "\n".join((p.extract_text() or "") for p in reader.pages)
             linhas = [re.sub(r"\s+", " ", x).strip() for x in text_pdf.splitlines() if x.strip()]
+            texto_linhas = linhas
 
             # Captura linhas do tipo: "Alecrim  R$ 11,00" / "Alecrim - 11,00"
             money_re = re.compile(r"^(?P<nome>.+?)\s+(?:R\$\s*)?(?P<valor>\d{1,3}(?:[.,]\d{2})?)\s*$", re.I)
@@ -7795,11 +7834,15 @@ def _extrair_dados_tabela_arquivo(tabela):
                 seen.add(key)
                 bairros.append({"bairro": nome_bairro, "cidade": "", "valor": round(valor, 2)})
 
+            garantidos_extraidos = _capturar_garantidos(linhas)
+
         bairros.sort(key=lambda x: _norm_txt(x.get("bairro")))
         return {
             "bairros": bairros,
             "informacoes": informacoes[:20],
-            "erro": None if bairros else "Não foi possível reconhecer bairros e valores neste arquivo.",
+            "garantidos_extraidos": garantidos_extraidos,
+            "tipo_arquivo": ("imagem" if ext in {".png",".jpg",".jpeg",".webp",".gif",".bmp"} else ("pdf" if ext == ".pdf" else ("html" if ext in {".html",".htm"} else "outro"))),
+            "erro": None if bairros else ("imagem" if ext in {".png",".jpg",".jpeg",".webp",".gif",".bmp"} else "Não foi possível reconhecer bairros e valores neste arquivo."),
         }
     except Exception as exc:
         current_app.logger.exception("Falha ao extrair tabela %s", getattr(tabela, "id", None))
@@ -7834,6 +7877,9 @@ def tabela_dados(tab_id: int):
         "bairros": data.get("bairros", []),
         "informacoes": data.get("informacoes", []),
         "erro": data.get("erro"),
+        "tipo_arquivo": data.get("tipo_arquivo"),
+        "arquivo_visualizacao": url_for("tabela_abrir", tab_id=t.id),
+        "garantidos_extraidos": data.get("garantidos_extraidos", []),
         "garantidos": [{
             "descricao": g.descricao or "Garantido",
             "horario": g.horario or "",
