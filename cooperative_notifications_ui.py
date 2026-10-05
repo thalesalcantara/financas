@@ -6,10 +6,9 @@ from datetime import datetime, timedelta
 from flask import flash, jsonify, redirect, request, session, url_for
 from sqlalchemy import text as sa_text
 
-import menu_horizontal_enforcer as menu
 import production_shift_time_fix as shifts
 
-app = menu.app
+app = shifts.patch.app
 db = shifts.patch.db
 Usuario = shifts.patch.flow.Usuario
 Cooperado = shifts.patch.Cooperado
