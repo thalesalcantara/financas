@@ -2590,10 +2590,13 @@ function setPhone(digits) {
 
           let mostrar = false;
 
+          const activeMode=document.querySelector('.rest-list-tab.active')?.dataset.coopFilter || 'todos';
           if (!q) {
-            mostrar = escalado;
+            if(activeMode==='escalados') mostrar=escalado;
+            else if(activeMode==='producao') mostrar=el.dataset.producao==='1';
+            else mostrar=true;
           } else {
-            mostrar = matchBusca;
+            mostrar=matchBusca;
           }
 
           el.style.display = mostrar ? '' : 'none';
@@ -2611,10 +2614,12 @@ function setPhone(digits) {
             const escalado = opt.dataset.escalado === '1';
             const matchBusca = nome.includes(q);
 
+            const activeMode=document.querySelector('.rest-list-tab.active')?.dataset.coopFilter || 'todos';
             if (!q) {
-              opt.hidden = !escalado;
+              if(activeMode==='escalados') opt.hidden=!escalado;
+              else opt.hidden=false;
             } else {
-              opt.hidden = !matchBusca;
+              opt.hidden=!matchBusca;
             }
           });
         }
@@ -2634,7 +2639,9 @@ function setPhone(digits) {
       }
 
       ordenarLista();
-      aplicarFiltro('', false);
+      // A aba inicial é "Todos": mostra todos sem exigir pesquisa.
+      itens.forEach(el=>el.style.display='');
+      if(select) Array.from(select.options).forEach((opt,idx)=>{ if(idx>0) opt.hidden=false; });
 
       try{
         const coopFromUrl=new URL(location.href).searchParams.get('coop_id');
@@ -2660,11 +2667,12 @@ function setPhone(digits) {
           if(mode==='pendencias'){
             el.style.display='none';
           }else if(mode==='producao'){
-            el.style.display=(el.dataset.escalado==='1' && el.dataset.producao==='1')?'':'none';
-          }else{
-            // "Todos" e "Escalados" respeitam o bloco atual/próximo da escala.
-            // Outros cooperados só aparecem quando pesquisados manualmente.
+            el.style.display=el.dataset.producao==='1'?'':'none';
+          }else if(mode==='escalados'){
             el.style.display=el.dataset.escalado==='1'?'':'none';
+          }else{
+            // "Todos" realmente mostra todos os cooperados.
+            el.style.display='';
           }
         });
       }));
