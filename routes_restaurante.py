@@ -97,32 +97,47 @@ def portal_restaurante():
         semana_inicio = ref - timedelta(days=ref.weekday())
         dias_list = [semana_inicio + timedelta(days=i) for i in range(7)]
 
-    escalas_all = (
+    # Escalas do estabelecimento: vínculo por ID + compatibilidade somente
+    # para linhas legadas sem restaurante_id. Evita varrer toda a tabela.
+    direct_scales = (
         db.session.query(Escala)
         .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
         .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
         .filter(
-            or_(
-                Escala.cooperado_id.is_(None),
-                Usuario.ativo.is_(True)
-            )
+            Escala.restaurante_id == rest.id,
+            or_(Escala.cooperado_id.is_(None), Usuario.ativo.is_(True)),
         )
         .order_by(Escala.id.asc())
         .all()
     )
-
+    legacy_scales = (
+        db.session.query(Escala)
+        .outerjoin(Cooperado, Escala.cooperado_id == Cooperado.id)
+        .outerjoin(Usuario, Cooperado.usuario_id == Usuario.id)
+        .filter(
+            Escala.restaurante_id.is_(None),
+            Escala.contrato.isnot(None),
+            or_(Escala.cooperado_id.is_(None), Usuario.ativo.is_(True)),
+        )
+        .order_by(Escala.id.asc())
+        .all()
+    )
+    escalas_all = sorted(direct_scales + legacy_scales, key=lambda e: e.id)
     eff_map = _carry_forward_contrato(escalas_all)
 
-    escalas_rest = [
-        e for e in escalas_all
-        if contrato_bate_restaurante(eff_map.get(e.id, e.contrato or ""), rest.nome)
-    ]
-
-    if not escalas_rest:
-        escalas_rest = [
-            e for e in escalas_all
-            if (e.contrato or "").strip() == (rest.nome or "").strip()
-        ]
+    direct_ids = {e.id for e in direct_scales}
+    escalas_rest = []
+    seen_scale_ids = set()
+    for e in escalas_all:
+        belongs = e.id in direct_ids
+        if not belongs:
+            belongs = contrato_bate_restaurante(
+                eff_map.get(e.id, e.contrato or ""),
+                rest.nome,
+            )
+        if belongs and e.id not in seen_scale_ids:
+            seen_scale_ids.add(e.id)
+            escalas_rest.append(e)
 
     agenda = {d: [] for d in dias_list}
     seen = {d: set() for d in dias_list}
