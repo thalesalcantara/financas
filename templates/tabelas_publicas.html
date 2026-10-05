@@ -139,6 +139,83 @@ function renderSummary(){
   summaryList.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{const k=key(b.dataset.name,b.dataset.city);counts[k]=Math.max(0,(counts[k]||0)+(b.dataset.act==="plus"?1:-1));renderSummary();renderGrid()}));
 }
 
+
+function parseRecognizedText(raw){
+  const lines=(raw||"").split(/\r?\n/).map(x=>x.replace(/\s+/g," ").trim()).filter(Boolean);
+  const bairros=[];
+  const garantidos=[];
+  const infos=[];
+  const seen=new Set();
+
+  const moneyLine=/^(.+?)\s+(?:R\$\s*)?(\d{1,3}(?:[.,]\d{2})?)$/i;
+  const moneyAny=/(?:R\$\s*)?(\d{2,3}(?:[.,]\d{2})?)/i;
+  const timeAny=/(\d{1,2}\s*h(?:\s*(?:às|as|a|-)\s*\d{1,2}\s*h)?)/i;
+
+  lines.forEach((ln,idx)=>{
+    const low=ln.toLocaleLowerCase("pt-BR");
+    const ctx=[lines[idx-1]||"",ln,lines[idx+1]||""].join(" ");
+
+    if(low.includes("garant")){
+      const mv=ctx.match(moneyAny);
+      if(mv){
+        const valor=Number(mv[1].replace(",","."));
+        if(valor>=20 && valor<=500){
+          const mh=ctx.match(timeAny);
+          garantidos.push({
+            descricao: ln.replace(/R\$\s*\d+(?:[.,]\d{2})?/ig,"").trim()||"Garantido",
+            horario: mh?mh[1]:"",
+            valor
+          });
+        }
+      }
+      infos.push(ln);
+      return;
+    }
+
+    if(/hor[aá]rio|taxa administrativa|segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo|feriado/i.test(low)){
+      infos.push(ln);
+    }
+
+    const m=ln.match(moneyLine);
+    if(!m)return;
+    const nome=m[1].replace(/[-–—:]+$/,"").trim();
+    const valor=Number(m[2].replace(",","."));
+    if(!nome || valor<=0 || valor>500)return;
+    if(/garant|hor[aá]rio|taxa administrativa|total|entrega/i.test(nome))return;
+    const k=nome.toLocaleLowerCase("pt-BR")+"|"+valor;
+    if(seen.has(k))return;
+    seen.add(k);
+    bairros.push({bairro:nome,cidade:"",valor});
+  });
+
+  bairros.sort((a,b)=>a.bairro.localeCompare(b.bairro,"pt-BR"));
+  return {bairros,garantidos,informacoes:[...new Set(infos)]};
+}
+
+function loadTesseract(){
+  if(window.Tesseract)return Promise.resolve();
+  return new Promise((resolve,reject)=>{
+    const s=document.createElement("script");
+    s.src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+    s.onload=resolve;
+    s.onerror=()=>reject(new Error("Não foi possível carregar o leitor de imagem."));
+    document.head.appendChild(s);
+  });
+}
+
+async function recognizeImage(url){
+  await loadTesseract();
+  const result=await Tesseract.recognize(url,"por",{
+    logger:m=>{
+      if(m.status==="recognizing text"){
+        const pct=Math.round((m.progress||0)*100);
+        grid.innerHTML='<div class="empty loading">Lendo a tabela da imagem… '+pct+'%</div>';
+      }
+    }
+  });
+  return parseRecognizedText(result?.data?.text||"");
+}
+
 async function loadContract(id){
   contract=id; counts={}; data=[]; renderSummary();
   guarantees.classList.remove("show"); infoBox.classList.remove("show");
@@ -149,17 +226,30 @@ async function loadContract(id){
     const j=await r.json();
     if(!r.ok||!j.ok)throw new Error(j.erro||"Falha ao ler tabela");
     data=j.bairros||[];
+
+    let autoGarantidos=j.garantidos_extraidos||[];
+    let autoInfos=j.informacoes||[];
+
+    if((j.tipo_arquivo==="imagem" || j.erro==="imagem") && !data.length){
+      const ocr=await recognizeImage(j.arquivo_visualizacao);
+      data=ocr.bairros||[];
+      autoGarantidos=[...autoGarantidos,...(ocr.garantidos||[])];
+      autoInfos=[...autoInfos,...(ocr.informacoes||[])];
+    }
+
     consultName.textContent=j.titulo||"Tabela";
     consultPrice.textContent="—";
     consultMeta.textContent=j.descricao||j.arquivo_nome||"Toque em um bairro.";
 
-    const gs=j.garantidos||[];
+    const manual=j.garantidos||[];
+    const gs=[...manual,...autoGarantidos].filter((g,i,a)=>a.findIndex(x=>(x.descricao||"")=== (g.descricao||"") && (x.horario||"")===(g.horario||"") && Number(x.valor||0)===Number(g.valor||0))===i);
     if(gs.length){gGrid.innerHTML=gs.map(g=>`<div class="g-card"><div class="d">${g.descricao||"Garantido"}</div><div class="h">${g.horario||""}</div><div class="v">${money(g.valor)}</div></div>`).join("");guarantees.classList.add("show")}
 
-    const infos=j.informacoes||[];
+    const infos=[...new Set(autoInfos)];
     if(infos.length){infoList.innerHTML=infos.map(x=>`<div>${x}</div>`).join("");infoBox.classList.add("show")}
 
-    if(j.erro&&!data.length){grid.innerHTML=`<div class="empty">${j.erro}</div>`;countLabel.textContent="0 bairros";return}
+    if(j.erro && j.erro!=="imagem" && !data.length){grid.innerHTML=`<div class="empty">${j.erro}</div>`;countLabel.textContent="0 bairros";return}
+    if(!data.length){grid.innerHTML='<div class="empty">Não consegui reconhecer bairros e valores automaticamente nesta tabela.</div>';countLabel.textContent="0 bairros";return}
     renderGrid();
   }catch(e){grid.innerHTML=`<div class="empty">Não foi possível ler esta tabela: ${e.message}</div>`;countLabel.textContent="0 bairros"}
 }
@@ -171,6 +261,7 @@ search.oninput=renderGrid;
 contract.onchange=e=>loadContract(e.target.value);
 summaryToggle.onclick=()=>summaryPanel.classList.toggle("open");
 renderSummary();
+if(contract.value){loadContract(contract.value)}
 </script>
 </body>
 </html>
