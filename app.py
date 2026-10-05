@@ -40,9 +40,7 @@ from flask_login import (
     current_user,
 )
 
-from sqlalchemy import text
-from sqlalchemy import func, text as sa_text, or_, and_, case
-from sqlalchemy import func, text as sa_text, or_, and_, case, literal
+from sqlalchemy import text, func, text as sa_text, or_, and_, case, literal
 from sqlalchemy.inspection import inspect as sa_inspect
 from sqlalchemy.pool import QueuePool
 from sqlalchemy import event
@@ -51,8 +49,6 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError, Di
 from sqlalchemy import delete as sa_delete
 
 # 👉 Novo: para gerar XLSX em memória
-from openpyxl import Workbook, load_workbook
-from openpyxl.utils import get_column_letter
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 
 # ============ App / Diretórios ============
@@ -4917,6 +4913,8 @@ def _xlsx_cell(v):
 
 
 def _sheet_from_rows(wb: Workbook, title: str, headers: list[str], rows: list[list]):
+    from openpyxl.utils import get_column_letter
+
     ws = wb.create_sheet(title=title)
     ws.append(headers)
     for row in rows:
@@ -5076,6 +5074,8 @@ def _backup_tables_in_order():
 
 
 def _backup_workbook_bytes() -> io.BytesIO:
+    from openpyxl import Workbook
+
     wb = Workbook()
     ws0 = wb.active
     wb.remove(ws0)
@@ -5125,6 +5125,8 @@ def _sheet_rows(ws):
 
 
 def _import_backup_workbook(file_storage):
+    from openpyxl import load_workbook
+
     wb = load_workbook(file_storage, data_only=True)
     tables = _backup_tables_in_order()
     table_map = {table.name: table for table in tables}
