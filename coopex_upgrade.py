@@ -1101,7 +1101,7 @@ def _wrap_legacy_launch() -> None:
                     else:
                         db.session.rollback()
                         flash(message, "warning")
-                    return redirect(url_for("portal_restaurante", view="lancamentos"))
+                    return redirect(url_for("portal_restaurante", view="lancar", coop_id=coop_id))
         return original(*args, **kwargs)
 
     wrapped._coopex_upgrade_wrapped = True
