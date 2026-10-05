@@ -9,6 +9,7 @@ from sqlalchemy import text as sa_text
 import production_shift_time as shifts
 
 app = shifts.patch.app
+legacy = shifts.patch.flow.legacy
 db = shifts.patch.db
 Usuario = shifts.patch.flow.Usuario
 Cooperado = shifts.patch.Cooperado
@@ -29,7 +30,7 @@ if "coop_latest_incoming_evaluation" not in app.view_functions:
         if (session.get("user_tipo") or "").strip().lower() != "cooperado":
             return jsonify(ok=False, latest_id=0), 403
 
-        coop = Cooperado.query.filter_by(usuario_id=session.get("user_id")).first()
+        coop = legacy.request_cooperado()
         if not coop:
             return jsonify(ok=False, latest_id=0), 404
 
@@ -57,7 +58,7 @@ if "coop_latest_incoming_evaluation" not in app.view_functions:
 
 
 def _rest_current():
-    return Restaurante.query.filter_by(usuario_id=session.get("user_id")).first()
+    return legacy.request_restaurante()
 
 
 def _active_substitute_rows():
@@ -383,7 +384,7 @@ def _coopex_week_pending_context():
         return context
 
     try:
-        rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first()
+        rest = legacy.request_restaurante()
         if rest:
             context["coopex_rest_week_pending_rows"] = _week_pending_rows(rest)
             context["coopex_rest_substitute_coops"] = [
