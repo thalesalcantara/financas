@@ -62,7 +62,7 @@ body{font-weight:700!important}.alv8-brand-copy small{font-size:12px!important}.
     </details>
 
     <div class="alv8-card"><div class="alv8-table-wrap"><table class="alv8-table">
-      <thead><tr><th>Estabelecimento</th><th>Usuário</th><th>Período</th><th>Taxa adm.</th><th>Data base</th><th>Tipo</th><th>Status</th><th>Ações</th></tr></thead>
+      <thead><tr><th>Estabelecimento</th><th>Usuário</th><th>Período</th><th>Taxa adm.</th><th>Data base</th><th>Tipo</th><th>Status</th><th>Rastreamento</th><th>Ações</th></tr></thead>
       <tbody>
       {% for row in rows %}{% set r=row.rest %}
         <tr>
@@ -73,6 +73,13 @@ body{font-weight:700!important}.alv8-brand-copy small{font-size:12px!important}.
           <td>{{ r.taxa_admin_data_base.strftime('%d/%m/%Y') if r.taxa_admin_data_base else '—' }}</td>
           <td>{{ 'Farmácia' if r.eh_farmacia else 'Estabelecimento' }}</td>
           <td><span class="alv8-badge {{ 'ok' if row.active else 'bad' }}">{{ 'Ativo' if row.active else 'Inativo' }}</span></td>
+          <td>
+            <form method="post" action="{{ url_for('admin_tracking_toggle', rest_id=r.id) }}" style="display:flex;align-items:center;gap:6px">
+              <input type="hidden" name="autorizado" value="{{ '0' if row.tracking else '1' }}">
+              <span class="alv8-badge {{ 'ok' if row.tracking else '' }}">{{ 'Liberado' if row.tracking else 'Não liberado' }}</span>
+              <button class="alv8-btn {{ 'danger' if row.tracking else 'primary' }}" type="submit">{{ 'Bloquear' if row.tracking else 'Liberar' }}</button>
+            </form>
+          </td>
           <td>
             <div class="v10-est-actions">
               <details class="v10-details"><summary class="alv8-btn edit"><i class="bi bi-pencil"></i> Editar</summary>
@@ -101,7 +108,7 @@ body{font-weight:700!important}.alv8-brand-copy small{font-size:12px!important}.
             </div>
           </td>
         </tr>
-      {% else %}<tr><td colspan="8" class="alv8-empty">Nenhum estabelecimento encontrado.</td></tr>{% endfor %}
+      {% else %}<tr><td colspan="9" class="alv8-empty">Nenhum estabelecimento encontrado.</td></tr>{% endfor %}
       </tbody>
     </table></div></div>
   </main>
