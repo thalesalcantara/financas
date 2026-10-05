@@ -5528,33 +5528,43 @@ def _competencia_humana(comp: str | None) -> str:
     return "Esta semana"
 
 
-def _adiantamento_disponivel_cooperado(coop_id: int, di: date | None, df: date | None) -> float:
+def _adiantamento_disponivel_cooperado(coop_id: int, di: date | None = None, df: date | None = None) -> float:
+    """Saldo disponível para adiantamento = semana passada completa (segunda a domingo).
+
+    O filtro visual do painel não altera a base do adiantamento. O cooperado sempre
+    enxerga somente o líquido da semana imediatamente anterior já encerrada.
+    """
     if not db.session.get(Cooperado, coop_id):
         return 0.0
 
+    hoje = date.today()
+    inicio_semana_atual = hoje - timedelta(days=hoje.weekday())
+    semana_inicio = inicio_semana_atual - timedelta(days=7)
+    semana_fim = inicio_semana_atual - timedelta(days=1)
+
     q_prod = db.session.query(func.coalesce(func.sum(Lancamento.valor), 0.0)).filter(
-        Lancamento.cooperado_id == coop_id
+        Lancamento.cooperado_id == coop_id,
+        Lancamento.data >= semana_inicio,
+        Lancamento.data <= semana_fim,
     )
     q_rec = db.session.query(func.coalesce(func.sum(ReceitaCooperado.valor), 0.0)).filter(
-        ReceitaCooperado.cooperado_id == coop_id
+        ReceitaCooperado.cooperado_id == coop_id,
+        ReceitaCooperado.data >= semana_inicio,
+        ReceitaCooperado.data <= semana_fim,
     )
-    if di:
-        q_prod = q_prod.filter(Lancamento.data >= di)
-        q_rec = q_rec.filter(ReceitaCooperado.data >= di)
-    if df:
-        q_prod = q_prod.filter(Lancamento.data <= df)
-        q_rec = q_rec.filter(ReceitaCooperado.data <= df)
 
     total_producao = float(q_prod.scalar() or 0.0)
     total_receitas = float(q_rec.scalar() or 0.0)
     total_bruto = total_producao + total_receitas
     encargos = total_producao * (INSS_ALIQ + SEST_ALIQ)
 
-    snap = _compute_coop_debt_snapshot(coop_id, di, df)
+    snap = _compute_coop_debt_snapshot(coop_id, semana_inicio, semana_fim)
     descontos = (
         float(snap.get('descontado_periodo_despesa', 0.0) or 0.0)
         + float(snap.get('descontado_periodo_adiant', 0.0) or 0.0)
     )
+
+    # Solicitações ainda em análise continuam reservando saldo para impedir duplicidade.
     pendente_analise = (
         db.session.query(func.coalesce(func.sum(SolicitacaoAdiantamento.valor_solicitado), 0.0))
         .filter(
