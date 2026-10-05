@@ -34,6 +34,8 @@ def portal_restaurante():
 
     # Abas/visões
     view = (request.args.get("view", "lancar") or "lancar").strip().lower()
+    if view == "producoes":
+        return redirect(url_for("portal_restaurante", view="lancar"))
 
     # ---- helper mês YYYY-MM
     def _parse_yyyy_mm_local(s: str):
