@@ -466,6 +466,37 @@ class Restaurante(db.Model):
     eh_farmacia = db.Column(db.Boolean, nullable=False, default=False, server_default=text("false"))
 
 
+
+class RastreamentoPermissao(db.Model):
+    __tablename__ = "rastreamento_permissoes"
+    id = db.Column(db.Integer, primary_key=True)
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    autorizado = db.Column(db.Boolean, nullable=False, default=False)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class RastreamentoPesquisa(db.Model):
+    __tablename__ = "rastreamento_pesquisas"
+    id = db.Column(db.Integer, primary_key=True)
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    gostaria = db.Column(db.Boolean, nullable=False, default=True)
+    motivo = db.Column(db.Text)
+    status = db.Column(db.String(30), nullable=False, default="nova")
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class RastreamentoLocalizacao(db.Model):
+    __tablename__ = "rastreamento_localizacoes"
+    id = db.Column(db.Integer, primary_key=True)
+    cooperado_id = db.Column(db.Integer, db.ForeignKey("cooperados.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id", ondelete="SET NULL"), nullable=True, index=True)
+    latitude = db.Column(db.Float, nullable=False)
+    longitude = db.Column(db.Float, nullable=False)
+    precisao = db.Column(db.Float)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
 class Lancamento(db.Model):
     __tablename__ = "lancamentos"
 
@@ -8819,6 +8850,209 @@ def avisos_unread_count():
         except Exception:
             pass
         return _nocache_json({"ok": False, "unread": 0, "count": 0, "error": str(e)}, 500)
+
+
+
+_TRACKING_SCHEMA_READY = False
+
+def _ensure_tracking_schema():
+    global _TRACKING_SCHEMA_READY
+    if _TRACKING_SCHEMA_READY:
+        return
+    try:
+        RastreamentoPermissao.__table__.create(bind=db.engine, checkfirst=True)
+        RastreamentoPesquisa.__table__.create(bind=db.engine, checkfirst=True)
+        RastreamentoLocalizacao.__table__.create(bind=db.engine, checkfirst=True)
+        _TRACKING_SCHEMA_READY = True
+    except Exception:
+        db.session.rollback()
+        raise
+
+
+def _tracking_current_rest_for_coop(coop):
+    """Descobre o estabelecimento do turno atual sem manter histórico de GPS."""
+    now_local = datetime.now()
+    today = now_local.date()
+    hhmm = now_local.strftime("%H:%M")
+    rows = Escala.query.filter(
+        or_(
+            Escala.cooperado_id == coop.id,
+            func.lower(func.trim(Escala.cooperado_nome)) == (coop.nome or "").strip().lower(),
+        )
+    ).order_by(Escala.id.desc()).limit(80).all()
+
+    import re as _re
+    def _date_from_text(v):
+        s=str(v or "")
+        for pat in (r"(\d{1,2})/(\d{1,2})/(\d{4})", r"(\d{4})-(\d{1,2})-(\d{1,2})"):
+            m=_re.search(pat,s)
+            if m:
+                try:
+                    if pat.startswith("(\\d{4})"):
+                        y,mn,d=map(int,m.groups())
+                    else:
+                        d,mn,y=map(int,m.groups())
+                    return date(y,mn,d)
+                except Exception:
+                    pass
+        return None
+    def _times(v):
+        ts=_re.findall(r"(\d{1,2}):(\d{2})",str(v or ""))
+        if len(ts)>=2:
+            return f"{int(ts[0][0]):02d}:{ts[0][1]}", f"{int(ts[1][0]):02d}:{ts[1][1]}"
+        return None,None
+    for s in rows:
+        if _date_from_text(s.data) != today:
+            continue
+        ini,fim=_times(s.horario)
+        active=True
+        if ini and fim:
+            active = (ini <= hhmm <= fim) if ini <= fim else (hhmm >= ini or hhmm <= fim)
+        if not active:
+            continue
+        if s.restaurante_id:
+            return int(s.restaurante_id)
+        contrato=(s.contrato or "").strip()
+        if contrato:
+            norm=contrato.lower().replace("_"," ")
+            rest=Restaurante.query.filter(func.lower(Restaurante.nome)==norm).first()
+            if not rest:
+                rest=Restaurante.query.filter(func.lower(Restaurante.nome).contains(norm)).first()
+            if rest:
+                return int(rest.id)
+    return None
+
+
+@app.post("/api/rastreamento/localizacao")
+@role_required("cooperado")
+def tracking_update_location():
+    _ensure_tracking_schema()
+    coop=request_cooperado()
+    if not coop:
+        return jsonify(ok=False), 404
+    data=request.get_json(silent=True) or {}
+    try:
+        lat=float(data.get("latitude"))
+        lng=float(data.get("longitude"))
+        acc=float(data.get("precisao") or 0)
+    except Exception:
+        return jsonify(ok=False, error="Localização inválida"), 400
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        return jsonify(ok=False, error="Localização inválida"), 400
+    rest_id=_tracking_current_rest_for_coop(coop)
+    row=RastreamentoLocalizacao.query.filter_by(cooperado_id=coop.id).first()
+    if not row:
+        row=RastreamentoLocalizacao(cooperado_id=coop.id, latitude=lat, longitude=lng)
+        db.session.add(row)
+    row.latitude=lat
+    row.longitude=lng
+    row.precisao=acc
+    row.restaurante_id=rest_id
+    row.atualizado_em=datetime.utcnow()
+    db.session.commit()
+    return jsonify(ok=True, ativo=True, restaurante_id=rest_id)
+
+
+@app.get("/api/restaurante/rastreamento/estado")
+@role_required("restaurante")
+def tracking_rest_state():
+    _ensure_tracking_schema()
+    rest=Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+    perm=RastreamentoPermissao.query.filter_by(restaurante_id=rest.id).first()
+    pesq=RastreamentoPesquisa.query.filter_by(restaurante_id=rest.id).first()
+    return jsonify(
+        ok=True,
+        autorizado=bool(perm and perm.autorizado),
+        pesquisa_respondida=bool(pesq),
+        pesquisa_status=(pesq.status if pesq else None),
+    )
+
+
+@app.post("/api/restaurante/rastreamento/pesquisa")
+@role_required("restaurante")
+def tracking_rest_survey():
+    _ensure_tracking_schema()
+    rest=Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+    data=request.get_json(silent=True) or request.form
+    gostaria=str(data.get("gostaria","sim")).lower() not in {"nao","não","0","false"}
+    motivo=(data.get("motivo") or "").strip()[:2000]
+    row=RastreamentoPesquisa.query.filter_by(restaurante_id=rest.id).first()
+    if not row:
+        row=RastreamentoPesquisa(restaurante_id=rest.id)
+        db.session.add(row)
+    row.gostaria=gostaria
+    row.motivo=motivo
+    row.status="nova"
+    row.atualizado_em=datetime.utcnow()
+    db.session.commit()
+    return jsonify(ok=True)
+
+
+@app.get("/api/restaurante/rastreamento/posicoes")
+@role_required("restaurante")
+def tracking_rest_positions():
+    _ensure_tracking_schema()
+    rest=Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+    perm=RastreamentoPermissao.query.filter_by(restaurante_id=rest.id).first()
+    if not perm or not perm.autorizado:
+        return jsonify(ok=False, autorizado=False, cooperados=[]), 403
+    limite=datetime.utcnow()-timedelta(minutes=5)
+    rows=(
+        db.session.query(RastreamentoLocalizacao, Cooperado)
+        .join(Cooperado, Cooperado.id==RastreamentoLocalizacao.cooperado_id)
+        .filter(
+            RastreamentoLocalizacao.restaurante_id==rest.id,
+            RastreamentoLocalizacao.atualizado_em>=limite,
+        )
+        .order_by(Cooperado.nome.asc())
+        .all()
+    )
+    payload=[]
+    nowu=datetime.utcnow()
+    for loc,coop in rows:
+        age=max(0,int((nowu-loc.atualizado_em).total_seconds()))
+        payload.append({
+            "id":coop.id,
+            "nome":coop.nome,
+            "latitude":loc.latitude,
+            "longitude":loc.longitude,
+            "precisao":loc.precisao,
+            "segundos":age,
+            "foto":url_for("media_coop",coop_id=coop.id),
+        })
+    return jsonify(ok=True, autorizado=True, cooperados=payload)
+
+
+@app.get("/admin/caixa-postal", endpoint="admin_caixa_postal")
+@admin_required
+def admin_caixa_postal():
+    _ensure_tracking_schema()
+    rows=(
+        db.session.query(RastreamentoPesquisa, Restaurante)
+        .join(Restaurante, Restaurante.id==RastreamentoPesquisa.restaurante_id)
+        .order_by(RastreamentoPesquisa.atualizado_em.desc())
+        .all()
+    )
+    return render_template("admin_caixa_postal.html", rows=rows, active_tab="caixa_postal")
+
+
+@app.post("/admin/rastreamento/<int:rest_id>/toggle", endpoint="admin_tracking_toggle")
+@admin_required
+def admin_tracking_toggle(rest_id):
+    _ensure_tracking_schema()
+    Restaurante.query.get_or_404(rest_id)
+    row=RastreamentoPermissao.query.filter_by(restaurante_id=rest_id).first()
+    if not row:
+        row=RastreamentoPermissao(restaurante_id=rest_id, autorizado=False)
+        db.session.add(row)
+    row.autorizado=(request.form.get("autorizado") in {"1","true","on","sim"})
+    row.atualizado_em=datetime.utcnow()
+    pesq=RastreamentoPesquisa.query.filter_by(restaurante_id=rest_id).first()
+    if pesq and row.autorizado:
+        pesq.status="rastreamento_liberado"
+    db.session.commit()
+    flash("Rastreamento atualizado.", "success")
+    return redirect(request.referrer or url_for("admin_v10_establishments"))
 
 
 # =========================
