@@ -1,0 +1,150 @@
+<div class="hero-panel">
+  <div class="hero-title d-flex align-items-center gap-2">
+    <i class="bi bi-clipboard-check"></i>
+    <span>Produções da Semana</span>
+  </div>
+  <p class="hero-subtitle mb-0">Confira, ajuste, aprove ou lance as produções previstas para esta semana.</p>
+</div>
+
+{% set _previstas_semana = producoes_semana_previstas|default([]) %}
+{% set _pendentes_semana = producoes_semana_pendentes|default([]) %}
+{% set _recentes_semana = producoes_semana_recentes|default([]) %}
+
+<div class="card card-body mb-3">
+  <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+    <div>
+      <div class="fw-bold text-primary"><i class="bi bi-info-circle-fill me-1"></i> Produção semanal</div>
+      <div class="small text-muted">O estabelecimento pode lançar a produção diretamente. Produções enviadas pelo cooperado podem ser conferidas e ajustadas antes da aprovação.</div>
+    </div>
+    <button id="soundProducoesSemana" class="btn btn-outline-royal btn-sm" type="button">
+      <i class="bi bi-volume-up"></i> Ativar alerta
+    </button>
+  </div>
+</div>
+
+<form id="bulkProducoesSemana" method="post" action="/rest/producoes/aprovar-selecionadas"></form>
+
+{% if _pendentes_semana %}
+<div class="card card-body mb-3">
+  <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+    <strong>{{ _pendentes_semana|length }} produção(ões) aguardando conferência</strong>
+    <button class="btn btn-royal btn-sm" form="bulkProducoesSemana">
+      <i class="bi bi-check2-all"></i> Aprovar selecionadas
+    </button>
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-3">
+  {% for x in _previstas_semana %}
+  <div class="col-xl-6">
+    <div class="card h-100 p-3 {% if x.color=='green' %}border-success{% else %}border-danger{% endif %}" id="escala-{{ x.escala.id }}">
+      <div class="d-flex justify-content-between align-items-start gap-2">
+        <div>
+          <div class="fw-bold">
+            {% if x.producao and x.producao.status=='pendente' %}
+              <input form="bulkProducoesSemana" type="checkbox" name="ids" value="{{ x.producao.id }}" class="form-check-input me-1">
+            {% endif %}
+            {{ x.cooperado.nome if x.cooperado else (x.escala.cooperado_nome or 'Cooperado não vinculado') }}
+          </div>
+          <div class="small text-muted">
+            {{ x.data.strftime('%d/%m/%Y') if x.data else (x.escala.data or 'Sem data') }}
+            {% if x.escala.turno %} · {{ x.escala.turno }}{% endif %}
+            {% if x.escala.horario %} · {{ x.escala.horario }}{% endif %}
+          </div>
+        </div>
+        <span class="badge {% if x.color=='green' %}text-bg-success{% else %}text-bg-danger{% endif %}">{{ x.status_label }}</span>
+      </div>
+
+      <div class="fs-4 fw-bold mt-3">R$ {{ '%.2f'|format(x.valor_total or 0)|replace('.', ',') }}</div>
+      {% if x.producao and x.producao.qtd_entregas %}
+        <div class="small text-muted">{{ x.producao.qtd_entregas }} entrega(s)</div>
+      {% endif %}
+
+      {% if x.producao and x.producao.status=='pendente' and x.producao.valor_total > 0 %}
+      <div class="bg-light border rounded-3 p-3 mt-3">
+        <div class="small fw-bold text-primary mb-2">Proposta do cooperado — ajuste antes de aprovar</div>
+        <form method="post" action="/rest/producoes/{{ x.producao.id }}/aprovar">
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">Quantidade final</label>
+              <input class="form-control" type="number" min="1" name="qtd_entregas" value="{{ x.producao.qtd_entregas }}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Valor total final</label>
+              <input class="form-control" type="number" min="0.01" step="0.01" name="valor_total" value="{{ '%.2f'|format(x.producao.valor_total) }}" required>
+            </div>
+          </div>
+          <button class="btn btn-royal w-100 mt-2"><i class="bi bi-check-circle-fill"></i> Aprovar valor final</button>
+        </form>
+        <form method="post" action="/rest/producoes/{{ x.producao.id }}/recusar" class="d-flex gap-2 mt-2">
+          <input class="form-control" name="motivo" placeholder="Motivo da recusa" required>
+          <button class="btn btn-outline-danger">Recusar</button>
+        </form>
+      </div>
+      {% elif x.pode_lancar %}
+      <div class="bg-light border rounded-3 p-3 mt-3">
+        <div class="small fw-bold text-primary mb-2">Lançar produção desta escala</div>
+        <form method="post" action="/rest/producoes/escala/{{ x.escala.id }}/lancar" class="js-week-production-form">
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">Quantidade de entregas</label>
+              <input class="form-control" type="number" min="1" name="qtd_entregas" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Valor total</label>
+              <input class="form-control" type="number" min="0.01" step="0.01" name="valor_total" required>
+            </div>
+          </div>
+          <button class="btn btn-royal w-100 mt-2"><i class="bi bi-plus-circle-fill"></i> Lançar produção</button>
+        </form>
+      </div>
+      {% elif x.color=='green' %}
+      <div class="alert alert-success py-2 mt-3 mb-0"><i class="bi bi-check-circle-fill"></i> Produção registrada. Duplicidade bloqueada.</div>
+      {% elif not x.cooperado %}
+      <div class="alert alert-secondary py-2 mt-3 mb-0">A escala ainda não está vinculada a um cooperado válido.</div>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><div class="card card-body text-center text-muted">Nenhuma escala desta semana foi encontrada para este estabelecimento.</div></div>
+  {% endfor %}
+</div>
+
+<div class="card card-body mt-3">
+  <div class="section-title mb-2"><i class="bi bi-clock-history"></i> Histórico recente</div>
+  {% for p in _recentes_semana %}
+    <div class="d-flex justify-content-between gap-2 py-2 border-top">
+      <div><strong>{{ p.cooperado.nome }}</strong><div class="small text-muted">{{ p.data.strftime('%d/%m/%Y') }} · {{ p.qtd_entregas }} entrega(s)</div></div>
+      <div class="text-end"><strong>R$ {{ '%.2f'|format(p.valor_total or 0)|replace('.', ',') }}</strong><div class="small text-muted">{{ p.status|capitalize }}</div></div>
+    </div>
+  {% else %}
+    <div class="text-muted">Sem histórico recente.</div>
+  {% endfor %}
+</div>
+
+<audio id="alertAudioProducoesSemana" preload="none" src="/static/avisos.mp3"></audio>
+<script>
+(function(){
+  let active=localStorage.getItem('coopexProdSound')==='1';
+  let last=Number(sessionStorage.getItem('coopexProdLatest')||0);
+  const btn=document.getElementById('soundProducoesSemana');
+  const audio=document.getElementById('alertAudioProducoesSemana');
+  function label(){if(btn)btn.innerHTML=active?'<i class="bi bi-volume-up-fill"></i> Alerta ativo':'<i class="bi bi-volume-up"></i> Ativar alerta'}
+  function tone(){if(!active||!audio)return;try{audio.currentTime=0;audio.play().catch(()=>{})}catch(e){}}
+  if(btn)btn.addEventListener('click',()=>{active=true;localStorage.setItem('coopexProdSound','1');label();tone()});
+  label();
+  async function poll(){
+    try{
+      const r=await fetch('/api/rest/producoes/pendentes/status',{cache:'no-store'});
+      const j=await r.json();
+      const latest=Number(j.latest||0);
+      if(last&&latest>last){tone();setTimeout(()=>location.reload(),700)}
+      last=Math.max(last,latest);
+      sessionStorage.setItem('coopexProdLatest',String(last));
+    }catch(e){}
+  }
+  poll();
+  setInterval(poll,12000);
+})();
+</script>
