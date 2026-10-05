@@ -21,6 +21,7 @@ mimetypes.add_type("application/vnd.ms-powerpoint", ".ppt")
 
 # ============ Terceiros ============
 from flask import (
+from flask_compress import Compress
     Flask, render_template, request, redirect, url_for, session,
     flash, send_file, abort, jsonify, current_app, render_template_string,
     g, has_request_context
@@ -111,6 +112,13 @@ def _build_db_uri() -> str:
 
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
+app.config["COMPRESS_MIMETYPES"] = [
+    "text/html", "text/css", "application/javascript", "application/json",
+    "image/svg+xml",
+]
+app.config["COMPRESS_MIN_SIZE"] = 1024
+app.config["COMPRESS_LEVEL"] = 6
+Compress(app)
 
 app.secret_key = os.environ.get("SECRET_KEY", "coopex-secret")
 
