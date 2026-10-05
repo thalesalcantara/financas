@@ -272,6 +272,7 @@
 }
 .help-box.show{display:block}
 </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/cooperado_producao_v3.css') }}">
 </head>
 <body>
 {% set _unread = unread if unread is defined else (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else (avisos_unread_count if avisos_unread_count is defined else 0)) %}
