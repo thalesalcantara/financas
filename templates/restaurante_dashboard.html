@@ -389,6 +389,31 @@
       font-size:.95rem;
     }
 
+    .lanc-overlay-box.success{
+      min-width:240px;
+      border:1px solid #bde8cc;
+      box-shadow:0 12px 34px rgba(16,185,129,.20);
+    }
+    .lanc-overlay-box.success .lanc-overlay-text{
+      color:#13743f;
+      font-weight:800;
+    }
+    .lanc-success-check{
+      width:42px;
+      height:42px;
+      border-radius:50%;
+      display:grid;
+      place-items:center;
+      background:#dcfce7;
+      color:#16a34a;
+      font-size:1.45rem;
+      animation:lancSuccessPop .22s ease-out;
+    }
+    @keyframes lancSuccessPop{
+      from{transform:scale(.72);opacity:0}
+      to{transform:scale(1);opacity:1}
+    }
+
     @keyframes lanc-spin{
       to{transform:rotate(360deg);}
     }
@@ -1278,11 +1303,26 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
 
       {% with msgs = get_flashed_messages(with_categories=True) %}
         {% if msgs %}
+          {% set ns_flash = namespace(has_regular=false) %}
+          {% for cat, msg in msgs %}
+            {% if not (cat == 'success' and (msg|string).startswith('Produção lançada')) %}
+              {% set ns_flash.has_regular = true %}
+            {% endif %}
+          {% endfor %}
+          {% if ns_flash.has_regular %}
           <div class="mb-3">
             {% for cat, msg in msgs %}
-              <div class="alert alert-{{ 'danger' if cat=='error' else cat }} py-2 px-3 mb-2">{{ msg|safe }}</div>
+              {% if not (cat == 'success' and (msg|string).startswith('Produção lançada')) %}
+                <div class="alert alert-{{ 'danger' if cat=='error' else cat }} py-2 px-3 mb-2">{{ msg|safe }}</div>
+              {% endif %}
             {% endfor %}
           </div>
+          {% endif %}
+          {% for cat, msg in msgs %}
+            {% if cat == 'success' and (msg|string).startswith('Produção lançada') %}
+              <div id="launchSuccessMarker" data-message="{{ msg|striptags|e }}" hidden></div>
+            {% endif %}
+          {% endfor %}
         {% endif %}
       {% endwith %}
 
@@ -2107,7 +2147,7 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
 
       <div id="overlayLancando" class="lanc-overlay">
         <div class="lanc-overlay-box">
-          <div class="lanc-spinner"></div>
+          <div class="lanc-overlay-icon lanc-spinner" id="lancOverlayIcon"></div>
           <div class="lanc-overlay-text">Lançando…</div>
         </div>
       </div>
@@ -2151,12 +2191,37 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
       const overlayLanc = document.getElementById('overlayLancando');
       if (!overlayLanc) return;
 
+      const box = overlayLanc.querySelector('.lanc-overlay-box');
+      const icon = document.getElementById('lancOverlayIcon');
       const overlayTextEl = overlayLanc.querySelector('.lanc-overlay-text');
+
+      box?.classList.remove('success');
+      if(icon){
+        icon.className='lanc-overlay-icon lanc-spinner';
+        icon.innerHTML='';
+      }
       if (overlayTextEl) {
         overlayTextEl.textContent = (mode === 'delete') ? 'Excluindo…' : 'Lançando…';
       }
-
       overlayLanc.style.display = 'flex';
+    }
+
+    function showLancSuccess(message){
+      const overlayLanc = document.getElementById('overlayLancando');
+      if (!overlayLanc) return;
+      const box = overlayLanc.querySelector('.lanc-overlay-box');
+      const icon = document.getElementById('lancOverlayIcon');
+      const overlayTextEl = overlayLanc.querySelector('.lanc-overlay-text');
+
+      box?.classList.add('success');
+      if(icon){
+        icon.className='lanc-overlay-icon lanc-success-check';
+        icon.innerHTML='<i class="bi bi-check-lg"></i>';
+      }
+      if(overlayTextEl) overlayTextEl.textContent = message || 'Produção lançada';
+      overlayLanc.style.display='flex';
+      clearTimeout(window.__lancSuccessTimer);
+      window.__lancSuccessTimer=setTimeout(()=>hideLancOverlay(),1000);
     }
 
     function hideLancOverlay(){
@@ -3532,6 +3597,12 @@ function setPhone(digits) {
       const initial=startView();
       showSection(initial);
       hideLancOverlay();
+
+      const launchSuccess=document.getElementById('launchSuccessMarker');
+      if(launchSuccess){
+        showLancSuccess(launchSuccess.dataset.message || 'Produção lançada');
+      }
+
       pollAvisos();
       setInterval(pollAvisos,25000);
     }
