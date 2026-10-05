@@ -370,6 +370,9 @@ def _week_pending_rows(rest):
             "horario": scale.horario or (f"{start_time} às {end_time}" if start_time and end_time else "—"),
             "contrato": scale.contrato or rest.nome,
             "data": data_ref.strftime("%d/%m/%Y"),
+            "data_iso": data_ref.isoformat(),
+            "hora_inicio": shifts.patch.upgrade._norm_time(start_time) or "",
+            "hora_fim": shifts.patch.upgrade._norm_time(end_time) or "",
             "escala_id": scale.id,
             "aguardando_aprovacao": sent,
         })
