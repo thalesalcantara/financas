@@ -410,14 +410,10 @@ def portal_restaurante():
 
     escalados_hoje = sorted(escalados_hoje, key=lambda c: (c.nome or "").lower())
 
-    # lista completa apenas para busca manual
-    cooperados_busca_manual = (
-        Cooperado.query
-        .join(Usuario, Cooperado.usuario_id == Usuario.id)
-        .filter(Usuario.ativo.is_(True))
-        .order_by(Cooperado.nome)
-        .all()
-    )
+    # Reaproveita a lista ativa já carregada acima com foto_bytes adiada.
+    # Antes esta segunda consulta materializava novamente todos os cooperados,
+    # inclusive fotos em bytea, deixando o login do estabelecimento muito pesado.
+    cooperados_busca_manual = cooperados_ativos
 
     # =====================================================
     # HELPERS DE HORÁRIO / PENDÊNCIAS
