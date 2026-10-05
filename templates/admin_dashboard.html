@@ -972,7 +972,7 @@
               <div class="d-flex align-items-center justify-content-between">
                 <div>
                   <div class="text-uppercase text-muted small">Total Produções</div>
-                  <div id="kpiTotalProds" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_producoes_f) }}</div>
+                  <div id="kpiTotalProds" class="fw-bold fs-5">R$ {{ brl(total_producoes_f) }}</div>
                   <div class="small text-muted">Bruto no período</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-graph-up"></i></div>
@@ -987,7 +987,7 @@
               <div class="d-flex align-items-center justify-content-between">
                 <div>
                   <div class="text-uppercase text-muted small">Total INSS</div>
-                  <div id="kpiINSS4" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_inss_4_f) }}</div>
+                  <div id="kpiINSS4" class="fw-bold fs-5">R$ {{ brl(total_inss_4_f) }}</div>
                   <div class="small text-muted">4,0% s/ produções</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-shield-check"></i></div>
@@ -1002,7 +1002,7 @@
               <div class="d-flex align-items-center justify-content-between">
                 <div>
                   <div class="text-uppercase text-muted small">Total SEST/SENAT</div>
-                  <div id="kpiSEST05" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_sest_05_f) }}</div>
+                  <div id="kpiSEST05" class="fw-bold fs-5">R$ {{ brl(total_sest_05_f) }}</div>
                   <div class="small text-muted">0,5% s/ produções</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-shield"></i></div>
@@ -1016,7 +1016,7 @@
               <div class="d-flex align-items-center justify-content-between">
                 <div>
                   <div class="text-uppercase text-muted small">Receitas Cooperativa</div>
-                  <div id="kpiRecCoopCorp" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(total_receitas_corp_f) }}</div>
+                  <div id="kpiRecCoopCorp" class="fw-bold fs-5 text-success">R$ {{ brl(total_receitas_corp_f) }}</div>
                   <div class="small text-muted">Entradas da coop</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-cash-coin"></i></div>
@@ -1030,7 +1030,7 @@
               <div class="d-flex align-items-center justify-content-between">
                 <div>
                   <div class="text-uppercase text-muted small">Despesas Cooperativa</div>
-                  <div id="kpiDespCoopCorp" class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_despesas_corp_f) }}</div>
+                  <div id="kpiDespCoopCorp" class="fw-bold fs-5 text-danger">R$ {{ brl(total_despesas_corp_f) }}</div>
                   <div class="small text-muted">Saídas da coop</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-cart-dash"></i></div>
@@ -1044,7 +1044,7 @@
               <div class="d-flex align-items-center justify-content-between">
                 <div>
                   <div class="text-uppercase text-muted small">Receitas Cooperados</div>
-                  <div id="kpiRecCooperadosFull" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(total_receitas_coop_full_f) }}</div>
+                  <div id="kpiRecCooperadosFull" class="fw-bold fs-5 text-success">R$ {{ brl(total_receitas_coop_full_f) }}</div>
                   <div class="small text-muted">Produções + Receitas</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-currency-exchange"></i></div>
@@ -1058,7 +1058,7 @@
               <div class="d-flex align-items-center justify-content-between">
                 <div>
                   <div class="text-uppercase text-muted small">Despesas Cooperados</div>
-                  <div id="kpiDespCooperados" class="fw-bold fs-5 text-danger">R$ {{ '%.2f'|format(total_despesas_coop_f) }}</div>
+                  <div id="kpiDespCooperados" class="fw-bold fs-5 text-danger">R$ {{ brl(total_despesas_coop_f) }}</div>
                   <div class="small text-muted">Débitos/benefícios</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-bank"></i></div>
@@ -1074,7 +1074,7 @@
                   <div class="text-uppercase text-muted small">Resultado Cooperativa</div>
                   <div class="fw-bold fs-5">
                     <span id="kpiResultadoCoop" class="{{ 'text-success' if _resultado_corp >= 0 else 'text-danger' }}">
-                      R$ {{ '%.2f'|format(_resultado_corp) }}
+                      R$ {{ brl(_resultado_corp) }}
                     </span>
                   </div>
                   <div class="small text-muted">Receitas − Despesas (coop)</div>
@@ -1090,7 +1090,7 @@
               <div class="d-flex align-items-center justify-content-between">
                 <div>
                   <div class="text-uppercase text-muted small">Total de Receitas (Geral)</div>
-                  <div id="kpiTotalReceitasGeral" class="fw-bold fs-5 text-success">R$ {{ '%.2f'|format(_total_receitas_geral) }}</div>
+                  <div id="kpiTotalReceitasGeral" class="fw-bold fs-5 text-success">R$ {{ brl(_total_receitas_geral) }}</div>
                   <div class="small text-muted">Coop + (Prod + Rec Cooperados)</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-cash-stack"></i></div>
@@ -1104,7 +1104,7 @@
               <div class="d-flex align-items-center justify-content-between">
                 <div>
                   <div class="text-uppercase text-muted small">Total de Adiantamento</div>
-                  <div id="kpiQtdEntregasPeriodo" class="fw-bold fs-5">R$ {{ '%.2f'|format(total_adiantamentos_coop|default(0)) }}</div>
+                  <div id="kpiQtdEntregasPeriodo" class="fw-bold fs-5">R$ {{ brl(total_adiantamentos_coop|default(0)) }}</div>
                   <div class="small text-muted">Adiantamentos no período</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-bicycle"></i></div>
@@ -1118,7 +1118,7 @@
               <div class="d-flex align-items-center justify-content-between">
                 <div>
                   <div class="text-uppercase text-muted small">Total de Pendências</div>
-                  <div id="kpiTicketMedioPeriodo" class="fw-bold fs-5">R$ {{ '%.2f'|format((resumo_totais.saldo_pendente|default(0)) + (resumo_totais.pend_programado|default(0))) }}</div>
+                  <div id="kpiTicketMedioPeriodo" class="fw-bold fs-5">R$ {{ brl((resumo_totais.saldo_pendente|default(0)) + (resumo_totais.pend_programado|default(0))) }}</div>
                   <div class="small text-muted">Valor ainda não pago</div>
                 </div>
                 <div class="kpi-icon"><i class="bi bi-receipt"></i></div>
@@ -1174,14 +1174,14 @@
                     {% for r in resumo_coop_rows %}
                     <tr>
                       <td>{{ r.nome }}</td>
-                      <td class="text-end">R$ {{ '%.2f'|format(r.prod|default(0)) }}</td>
-                      <td class="text-end">R$ {{ '%.2f'|format(r.inss4|default(0)) }}</td>
-                      <td class="text-end">R$ {{ '%.2f'|format(r.sest05|default(0)) }}</td>
-                      <td class="text-end text-success">R$ {{ '%.2f'|format(r.rec|default(0)) }}</td>
-                      <td class="text-end text-danger">R$ {{ '%.2f'|format(r.des|default(0)) }}</td>
-                      <td class="text-end text-danger">R$ {{ '%.2f'|format(r.adiant|default(0)) }}</td>
-                      <td class="text-end">R$ {{ '%.2f'|format(r.a_receber|default(0)) }}</td>
-                      <td class="text-end text-warning">R$ {{ '%.2f'|format((r.saldo_pendente|default(0)) + (r.pend_programado|default(0))) }}</td>
+                      <td class="text-end">R$ {{ brl(r.prod|default(0)) }}</td>
+                      <td class="text-end">R$ {{ brl(r.inss4|default(0)) }}</td>
+                      <td class="text-end">R$ {{ brl(r.sest05|default(0)) }}</td>
+                      <td class="text-end text-success">R$ {{ brl(r.rec|default(0)) }}</td>
+                      <td class="text-end text-danger">R$ {{ brl(r.des|default(0)) }}</td>
+                      <td class="text-end text-danger">R$ {{ brl(r.adiant|default(0)) }}</td>
+                      <td class="text-end">R$ {{ brl(r.a_receber|default(0)) }}</td>
+                      <td class="text-end text-warning">R$ {{ brl((r.saldo_pendente|default(0)) + (r.pend_programado|default(0))) }}</td>
                     </tr>
                     {% endfor %}
                   {% else %}
@@ -1192,14 +1192,14 @@
                 <tfoot>
                   <tr class="table-light fw-bold">
                     <td>Total</td>
-                    <td class="text-end" id="tProd">R$ {{ '%.2f'|format(resumo_totais.prod|default(0)) }}</td>
-                    <td class="text-end" id="tINSS4">R$ {{ '%.2f'|format(resumo_totais.inss4|default(0)) }}</td>
-                    <td class="text-end" id="tSEST05">R$ {{ '%.2f'|format(resumo_totais.sest05|default(0)) }}</td>
-                    <td class="text-end text-success" id="tRec">R$ {{ '%.2f'|format(resumo_totais.rec|default(0)) }}</td>
-                    <td class="text-end text-danger" id="tDes">R$ {{ '%.2f'|format(resumo_totais.des|default(0)) }}</td>
-                    <td class="text-end text-danger" id="tAdiant">R$ {{ '%.2f'|format(resumo_totais.adiant|default(0)) }}</td>
-                    <td class="text-end fw-bold" id="tLiq">R$ {{ '%.2f'|format(resumo_totais.a_receber|default(0)) }}</td>
-                    <td class="text-end fw-bold text-warning" id="tPend">R$ {{ '%.2f'|format((resumo_totais.saldo_pendente|default(0)) + (resumo_totais.pend_programado|default(0))) }}</td>
+                    <td class="text-end" id="tProd">R$ {{ brl(resumo_totais.prod|default(0)) }}</td>
+                    <td class="text-end" id="tINSS4">R$ {{ brl(resumo_totais.inss4|default(0)) }}</td>
+                    <td class="text-end" id="tSEST05">R$ {{ brl(resumo_totais.sest05|default(0)) }}</td>
+                    <td class="text-end text-success" id="tRec">R$ {{ brl(resumo_totais.rec|default(0)) }}</td>
+                    <td class="text-end text-danger" id="tDes">R$ {{ brl(resumo_totais.des|default(0)) }}</td>
+                    <td class="text-end text-danger" id="tAdiant">R$ {{ brl(resumo_totais.adiant|default(0)) }}</td>
+                    <td class="text-end fw-bold" id="tLiq">R$ {{ brl(resumo_totais.a_receber|default(0)) }}</td>
+                    <td class="text-end fw-bold text-warning" id="tPend">R$ {{ brl((resumo_totais.saldo_pendente|default(0)) + (resumo_totais.pend_programado|default(0))) }}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -1435,22 +1435,22 @@
         </div>
         <div class="kpi-chip kpi-info">
           <span class="kpi-label">Bruto</span>
-          <span class="kpi-value">R$ {{ '%.2f'|format(soma_valor) }}</span>
+          <span class="kpi-value">R$ {{ brl(soma_valor) }}</span>
         </div>
 
         <div class="kpi-chip kpi-soft">
           <span class="kpi-label">INSS (4,0%)</span>
-          <span class="kpi-value">R$ {{ '%.2f'|format(soma_inss_4) }}</span>
+          <span class="kpi-value">R$ {{ brl(soma_inss_4) }}</span>
         </div>
 
         <div class="kpi-chip kpi-soft">
           <span class="kpi-label">SEST/SENAT (0,5%)</span>
-          <span class="kpi-value">R$ {{ '%.2f'|format(soma_sest_05) }}</span>
+          <span class="kpi-value">R$ {{ brl(soma_sest_05) }}</span>
         </div>
 
         <div class="kpi-chip {{ 'kpi-success' if soma_liq >= 0 else 'kpi-danger' }}">
           <span class="kpi-label">Líquido</span>
-          <span class="kpi-value">R$ {{ '%.2f'|format(soma_liq) }}</span>
+          <span class="kpi-value">R$ {{ brl(soma_liq) }}</span>
         </div>
 
         <div class="kpi-chip kpi-neutral">
@@ -1953,7 +1953,7 @@
     </h5>
     <div class="d-flex flex-wrap gap-2">
       <span class="badge bg-light text-dark border">Registros: <b>{{ qtd_registros }}</b></span>
-      <span class="badge bg-success-subtle text-success border">Total: <b>R$ {{ '%.2f'|format(total_receitas_coop_table) }}</b></span>
+      <span class="badge bg-success-subtle text-success border">Total: <b>R$ {{ brl(total_receitas_coop_table) }}</b></span>
     </div>
   </div>
 
@@ -2028,10 +2028,10 @@
           <div class="small text-muted">Multa fixa de 2% e juros de 0,03% ao dia sobre o valor principal. A receita entra no total da cooperativa somente quando estiver paga.</div>
         </div>
         <div class="d-flex flex-wrap gap-2">
-          <span class="badge bg-light text-dark border">Previsto: <b>R$ {{ '%.2f'|format(taxa_admin_totais.previsto|default(0)) }}</b></span>
-          <span class="badge bg-success-subtle text-success border">Recebido: <b>R$ {{ '%.2f'|format(taxa_admin_totais.recebido|default(0)) }}</b></span>
-          <span class="badge bg-warning-subtle text-warning border">Juros/Multa arrec.: <b>R$ {{ '%.2f'|format(juros_arrecadados_total|default(0)) }}</b></span>
-          <span class="badge bg-danger-subtle text-danger border">Em aberto: <b>R$ {{ '%.2f'|format(taxa_admin_totais.em_aberto|default(0)) }}</b></span>
+          <span class="badge bg-light text-dark border">Previsto: <b>R$ {{ brl(taxa_admin_totais.previsto|default(0)) }}</b></span>
+          <span class="badge bg-success-subtle text-success border">Recebido: <b>R$ {{ brl(taxa_admin_totais.recebido|default(0)) }}</b></span>
+          <span class="badge bg-warning-subtle text-warning border">Juros/Multa arrec.: <b>R$ {{ brl(juros_arrecadados_total|default(0)) }}</b></span>
+          <span class="badge bg-danger-subtle text-danger border">Em aberto: <b>R$ {{ brl(taxa_admin_totais.em_aberto|default(0)) }}</b></span>
         </div>
       </div>
 
@@ -2075,11 +2075,11 @@
               <td>{{ tx.restaurante_nome or '-' }}</td>
               <td>{{ tx.competencia or '-' }}</td>
               <td>{{ tx.data_vencimento.strftime('%d/%m/%Y') if tx.data_vencimento else '-' }}</td>
-              <td class="text-end">R$ {{ '%.2f'|format(tx.valor_previsto) }}</td>
-              <td class="text-end">R$ {{ '%.2f'|format(tx.valor_juros) }}</td>
-              <td class="text-end">R$ {{ '%.2f'|format(tx.valor_multa) }}</td>
-              <td class="text-end">R$ {{ '%.2f'|format(tx.valor_recebido) }}</td>
-              <td class="text-end">R$ {{ '%.2f'|format(tx.valor_em_aberto) }}</td>
+              <td class="text-end">R$ {{ brl(tx.valor_previsto) }}</td>
+              <td class="text-end">R$ {{ brl(tx.valor_juros) }}</td>
+              <td class="text-end">R$ {{ brl(tx.valor_multa) }}</td>
+              <td class="text-end">R$ {{ brl(tx.valor_recebido) }}</td>
+              <td class="text-end">R$ {{ brl(tx.valor_em_aberto) }}</td>
               <td>
                 {% if tx.status == 'pago' %}<span class="badge bg-success">Pago</span>
                 {% elif tx.status == 'parcial' %}<span class="badge bg-warning text-dark">Parcial</span>
@@ -2092,7 +2092,7 @@
                     <option value="parcial" {{ 'selected' if tx.status == 'parcial' else '' }}>Parcial</option>
                     <option value="pago" {{ 'selected' if tx.status == 'pago' else '' }}>Pago</option>
                   </select>
-                  <input type="number" step="0.01" name="valor_pago" class="form-control form-control-sm taxa-adm-valor" value="{{ '%.2f'|format(tx.valor_pago) }}" placeholder="Pago">
+                  <input type="number" step="0.01" name="valor_pago" class="form-control form-control-sm taxa-adm-valor" value="{{ brl(tx.valor_pago) }}" placeholder="Pago">
                   <input type="date" name="data_pagamento" class="form-control form-control-sm taxa-adm-data" value="{{ tx.data_pagamento.strftime('%Y-%m-%d') if tx.data_pagamento else '' }}">
                   <button class="btn btn-success btn-sm taxa-adm-save" type="submit"><i class="bi bi-save"></i></button>
                 </form>
@@ -2125,7 +2125,7 @@
               <tr>
                 <td>{{ r.data.strftime('%d/%m/%Y') if r.data else '-' }}</td>
                 <td class="text-break">{{ r.descricao }}{% if r.auto_taxa_adm %}<div class="small text-muted">{{ r.restaurante.nome if r.restaurante else '' }} • {{ r.competencia or '' }} • {{ r.status_pagamento or 'nao_pago' }}</div>{% endif %}</td>
-                <td class="text-end">R$ {{ '%.2f'|format(v_row) }}</td>
+                <td class="text-end">R$ {{ brl(v_row) }}</td>
                 <td class="text-center lanc-col-acoes">
                   {% if can_receitas_editar %}<button class="btn btn-warning btn-sm"
                           data-bs-toggle="modal"
@@ -2150,7 +2150,7 @@
           <tfoot>
             <tr class="table-light">
               <th colspan="2" class="text-end">Total</th>
-              <th class="text-end">R$ {{ '%.2f'|format(total_receitas_coop_table) }}</th>
+              <th class="text-end">R$ {{ brl(total_receitas_coop_table) }}</th>
               <th></th>
             </tr>
           </tfoot>
@@ -2183,7 +2183,7 @@
     </h5>
     <div class="d-flex flex-wrap gap-2">
       <span class="badge bg-light text-dark border">Registros: <b>{{ qtd_registros }}</b></span>
-      <span class="badge bg-danger-subtle text-danger border">Total: <b>R$ {{ '%.2f'|format(total_despesas_coop_table) }}</b></span>
+      <span class="badge bg-danger-subtle text-danger border">Total: <b>R$ {{ brl(total_despesas_coop_table) }}</b></span>
     </div>
   </div>
 
@@ -2292,7 +2292,7 @@
           <tfoot>
             <tr class="table-light">
               <th colspan="2" class="text-end">Total</th>
-              <th class="text-end">R$ {{ '%.2f'|format(total_despesas_coop_table) }}</th>
+              <th class="text-end">R$ {{ brl(total_despesas_coop_table) }}</th>
               <th></th>
             </tr>
           </tfoot>
@@ -2316,7 +2316,7 @@
     </h5>
     <div class="d-flex flex-wrap gap-2">
       <span class="badge bg-light text-dark border">Registros: <b>{{ qtd_registros }}</b></span>
-      <span class="badge bg-success-subtle text-success border">Total: <b>R$ {{ '%.2f'|format(total_receitas_coop_table) }}</b></span>
+      <span class="badge bg-success-subtle text-success border">Total: <b>R$ {{ brl(total_receitas_coop_table) }}</b></span>
     </div>
   </div>
 
@@ -2442,7 +2442,7 @@
           <tfoot>
             <tr class="table-light">
               <th colspan="6" class="text-end">Total</th>
-              <th class="text-end">R$ {{ '%.2f'|format(total_receitas_coop_table) }}</th>
+              <th class="text-end">R$ {{ brl(total_receitas_coop_table) }}</th>
               <th></th>
             </tr>
           </tfoot>
@@ -2478,7 +2478,7 @@
         Registros: <b>{{ _qtd_total }}</b>
       </span>
       <span class="badge bg-danger-subtle text-danger border">
-        Total: <b>R$ {{ '%.2f'|format(_total_geral) }}</b>
+        Total: <b>R$ {{ brl(_total_geral) }}</b>
       </span>
     </div>
   </div>
@@ -2556,14 +2556,14 @@
               <td>#{{ s.id }}</td>
               <td>{{ s.cooperado.nome if s.cooperado else '—' }}</td>
               <td>{{ s.pedido_em.strftime('%d/%m/%Y %H:%M') if s.pedido_em else '—' }}</td>
-              <td class="mono js-sol-valor">R$ {{ '%.2f'|format(s.valor_solicitado or 0) }}</td>
-              <td class="mono js-aprovado">{% if s.valor_aprovado is not none %}R$ {{ '%.2f'|format(s.valor_aprovado or 0) }}{% else %}—{% endif %}</td>
+              <td class="mono js-sol-valor">R$ {{ brl(s.valor_solicitado or 0) }}</td>
+              <td class="mono js-aprovado">{% if s.valor_aprovado is not none %}R$ {{ brl(s.valor_aprovado or 0) }}{% else %}—{% endif %}</td>
               <td><span class="badge bg-{{ status_adiantamento_badge(s.status) }}{% if status_adiantamento_badge(s.status) == 'warning' %} text-dark{% endif %} js-status">{{ status_adiantamento_label(s.status) }}</span></td>
               <td class="js-data-desconto">{% if s.data_desconto %}{{ s.data_desconto.strftime('%d/%m/%Y') }} · {{ competencia_humana(s.competencia_desconto) }}{% else %}—{% endif %}</td>
               <td class="small js-motivo">{{ s.motivo_recusa or '—' }}</td>
               <td>
                 <form method="POST" action="{{ url_for('analisar_adiantamento_admin', id=s.id) }}" class="js-adiantamento-admin-form d-flex align-items-center gap-1 flex-nowrap" data-locked="{{ '1' if _locked_row else '0' }}" style="white-space:nowrap; min-width:max-content;">
-                  <input class="form-control form-control-sm" style="width:82px" type="number" step="0.01" min="0" name="valor_aprovado" value="{{ '%.2f'|format((s.valor_aprovado if s.valor_aprovado is not none else s.valor_solicitado) or 0) }}" {{ 'disabled' if _locked_row else '' }}>
+                  <input class="form-control form-control-sm" style="width:82px" type="number" step="0.01" min="0" name="valor_aprovado" value="{{ brl((s.valor_aprovado if s.valor_aprovado is not none else s.valor_solicitado) or 0) }}" {{ 'disabled' if _locked_row else '' }}>
                   <input class="form-control form-control-sm" style="width:132px" type="date" name="data_desconto" value="{{ s.data_desconto.strftime('%Y-%m-%d') if s.data_desconto else '' }}" {{ 'disabled' if _locked_row else '' }}>
                   <select class="form-select form-select-sm" style="width:148px" name="competencia_desconto" {{ 'disabled' if _locked_row else '' }}>
                     <option value="esta_semana" {{ 'selected' if (s.competencia_desconto or 'esta_semana')=='esta_semana' else '' }}>Esta semana</option>
@@ -2744,7 +2744,7 @@
           <tfoot>
             <tr class="table-light">
               <th colspan="6" class="text-end">Total</th>
-              <th class="text-end">R$ {{ '%.2f'|format(_total_geral) }}</th>
+              <th class="text-end">R$ {{ brl(_total_geral) }}</th>
               <th></th><th></th><th></th>
             </tr>
           </tfoot>
@@ -3013,7 +3013,7 @@
               <td>{% if b.data_lancamento %}{{ b.data_lancamento.strftime('%d/%m/%Y') }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
               <td class="text-capitalize">{{ b.tipo }}</td>
               <td class="text-break">{{ rec.nome }}</td>
-              <td class="text-end">R$ {{ '%.2f'|format(vpb) }}</td>
+              <td class="text-end">R$ {{ brl(vpb) }}</td>
               <td class="text-center">
                 <button
                   type="button"
@@ -3603,7 +3603,7 @@
     <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle-fill"></i> Taxas administrativas vencidas ou parciais</div>
     <div class="small">
       {% for tx in taxa_admin_alertas[:8] %}
-        <div>Contrato <b>{{ tx.restaurante_nome }}</b> — competência <b>{{ tx.competencia }}</b> — falta <b>R$ {{ '%.2f'|format(tx.valor_em_aberto) }}</b>{% if tx.dias_atraso > 0 %} — {{ tx.dias_atraso }} dia(s) de atraso{% endif %}</div>
+        <div>Contrato <b>{{ tx.restaurante_nome }}</b> — competência <b>{{ tx.competencia }}</b> — falta <b>R$ {{ brl(tx.valor_em_aberto) }}</b>{% if tx.dias_atraso > 0 %} — {{ tx.dias_atraso }} dia(s) de atraso{% endif %}</div>
       {% endfor %}
       {% if taxa_admin_alertas|length > 8 %}<div class="mt-1 text-muted">E mais {{ taxa_admin_alertas|length - 8 }} registro(s).</div>{% endif %}
     </div>
@@ -3762,7 +3762,7 @@
                 <td class="text-center">
                   <div class="btn-group btn-group-sm" role="group">
                     {% if can_restaurantes_editar %}<button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalEditRestaurante"
-                            data-id="{{ r.id }}" data-nome="{{ r.nome }}" data-usuario="{{ r.usuario_ref.usuario }}" data-periodo="{{ r.periodo }}" data-taxa-admin-valor="{{ '%.2f'|format(r.taxa_admin_valor|default(0)) }}" data-taxa-admin-data-base="{{ r.taxa_admin_data_base.strftime('%Y-%m-%d') if r.taxa_admin_data_base else '' }}" data-taxa-admin-multa="{{ '%.2f'|format(r.taxa_admin_multa_percentual|default(2)) }}" data-taxa-admin-juros-dia="{{ '%.2f'|format(r.taxa_admin_juros_dia_percentual|default(0.03)) }}"
+                            data-id="{{ r.id }}" data-nome="{{ r.nome }}" data-usuario="{{ r.usuario_ref.usuario }}" data-periodo="{{ r.periodo }}" data-taxa-admin-valor="{{ brl(r.taxa_admin_valor|default(0)) }}" data-taxa-admin-data-base="{{ r.taxa_admin_data_base.strftime('%Y-%m-%d') if r.taxa_admin_data_base else '' }}" data-taxa-admin-multa="{{ brl(r.taxa_admin_multa_percentual|default(2)) }}" data-taxa-admin-juros-dia="{{ brl(r.taxa_admin_juros_dia_percentual|default(0.03)) }}"
                             data-ativo="{{ '1' if ((r.usuario_ref.ativo if (r.usuario_ref is defined and r.usuario_ref and r.usuario_ref.ativo is not none) else r.ativo)|default(true)) else '0' }}"
                             data-eh-farmacia="{{ '1' if r.eh_farmacia else '0' }}"
                             data-url="{{ url_for('edit_restaurante', id=r.id) }}" title="Editar">
@@ -5415,7 +5415,7 @@
           <div class="col-md-4">
             <label class="form-label">Restaurante</label>
             <select class="form-select" name="restaurante_id" required>
-              {% for r in restaurantes %}<option value="{{ r.id }}">{{ r.nome }} ({{ r.periodo }})</option>{% endfor %}
+              {% for r in restaurantes %}<option value="{{ r.id }}">{{ r.nome }}</option>{% endfor %}
             </select>
           </div>
           <div class="col-md-4">
