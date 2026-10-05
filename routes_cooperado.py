@@ -17,7 +17,7 @@ for _name, _value in vars(legacy).items():
 @role_required("cooperado")
 def portal_cooperado():
     u_id = session.get("user_id")
-    coop = Cooperado.query.filter_by(usuario_id=u_id).first()
+    coop = request_cooperado()
     if not coop:
         return "<p style='font-family:Arial;margin:40px'>Seu usuário não está vinculado a um cooperado. Avise o administrador.</p>"
 
@@ -451,7 +451,7 @@ def portal_cooperado():
 @role_required("cooperado")
 def solicitar_adiantamento_cooperado():
     u_id = session.get("user_id")
-    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
+    coop = request_cooperado() or abort(404)
 
     cfg = get_config()
     if bool(getattr(cfg, "bloquear_adiantamento", False)):
@@ -526,7 +526,7 @@ def solicitar_adiantamento_cooperado():
 @role_required("cooperado")
 def cancelar_adiantamento_cooperado(id):
     u_id = session.get("user_id")
-    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
+    coop = request_cooperado() or abort(404)
     sol = SolicitacaoAdiantamento.query.filter_by(id=id, cooperado_id=coop.id).first_or_404()
 
     if (sol.status or "").strip().lower() != "em_analise":
@@ -664,7 +664,7 @@ def analisar_adiantamento_admin(id):
 def producoes_avaliar(lanc_id):
     # 1) Cooperado logado
     u_id = session.get("user_id")
-    coop = Cooperado.query.filter_by(usuario_id=u_id).first_or_404()
+    coop = request_cooperado() or abort(404)
 
     # 2) Lançamento existe e é dele
     lanc = Lancamento.query.get_or_404(lanc_id)
@@ -776,7 +776,7 @@ def _portal_cooperado_redirect_tab(tab: str = "resumo", **extra):
 @role_required("cooperado")
 def solicitar_troca():
     u_id = session.get("user_id")
-    me = Cooperado.query.filter_by(usuario_id=u_id).first()
+    me = request_cooperado()
     if not me:
         abort(403)
 
@@ -930,7 +930,7 @@ def solicitar_troca():
 @role_required("cooperado")
 def aceitar_troca(troca_id):
     u_id = session.get("user_id")
-    me = Cooperado.query.filter_by(usuario_id=u_id).first()
+    me = request_cooperado()
     t = TrocaSolicitacao.query.get_or_404(troca_id)
 
     if not me or t.destino_id != me.id:
@@ -1080,7 +1080,7 @@ def aceitar_troca(troca_id):
 @role_required("cooperado")
 def recusar_troca(troca_id):
     u_id = session.get("user_id")
-    me = Cooperado.query.filter_by(usuario_id=u_id).first()
+    me = request_cooperado()
     t = TrocaSolicitacao.query.get_or_404(troca_id)
 
     if not me or t.destino_id != me.id:
