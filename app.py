@@ -7684,14 +7684,17 @@ def _serve_tabela_or_redirect(tabela, *, as_attachment: bool):
 @admin_perm_required("tabelas", "ver")
 def admin_tabelas():
     tabelas = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
-    return render_template("admin_tabelas.html", tabelas=tabelas)
+    restaurantes = Restaurante.query.order_by(Restaurante.nome.asc()).all()
+    return render_template("admin_tabelas.html", tabelas=tabelas, restaurantes=restaurantes)
 
 
 @app.post("/admin/tabelas/upload", endpoint="admin_upload_tabela")
 @admin_perm_required("tabelas", "criar")
 def admin_upload_tabela():
     f = request.form
-    titulo = (f.get("titulo") or "").strip()
+    restaurante_id = f.get("restaurante_id", type=int)
+    restaurante = db.session.get(Restaurante, restaurante_id) if restaurante_id else None
+    titulo = ((restaurante.nome if restaurante else None) or f.get("titulo") or "").strip()
     descricao = (f.get("descricao") or "").strip() or None
 
     arquivo = (
@@ -7729,6 +7732,47 @@ def admin_upload_tabela():
     return redirect(url_for("admin_tabelas"))
 
 
+@app.post("/admin/tabelas/<int:tab_id>/replace", endpoint="admin_replace_tabela")
+@admin_perm_required("tabelas", "editar")
+def admin_replace_tabela(tab_id: int):
+    t = Tabela.query.get_or_404(tab_id)
+    f = request.form
+
+    restaurante_id = f.get("restaurante_id", type=int)
+    restaurante = db.session.get(Restaurante, restaurante_id) if restaurante_id else None
+    t.titulo = ((restaurante.nome if restaurante else None) or f.get("titulo") or t.titulo or "").strip()
+    t.descricao = (f.get("descricao") or "").strip() or None
+
+    arquivo = request.files.get("arquivo") or request.files.get("file") or request.files.get("tabela")
+    if arquivo and arquivo.filename:
+        base_dir = _tabelas_base_dir()
+        raw = secure_filename(arquivo.filename)
+        stem, ext = os.path.splitext(raw)
+        ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        safe_stem = re.sub(r"[^A-Za-z0-9_.-]+", "-", stem) or "arquivo"
+        final_name = f"{safe_stem}_{ts}{ext or ''}"
+        arquivo.save(str(base_dir / final_name))
+
+        old_url = (t.arquivo_url or "").strip()
+        if old_url and not old_url.startswith(("http://", "https://")):
+            old_name = old_url.split("?", 1)[0].split("#", 1)[0].split("/")[-1]
+            for old_path in (base_dir / old_name, Path(STATIC_TABLES) / old_name):
+                try:
+                    if old_path.exists() and old_path.is_file():
+                        old_path.unlink()
+                        break
+                except Exception:
+                    pass
+
+        t.arquivo_url = final_name
+        t.arquivo_nome = arquivo.filename
+
+    t.enviado_em = datetime.utcnow()
+    db.session.commit()
+    flash("Tabela atualizada.", "success")
+    return redirect(url_for("admin_tabelas"))
+
+
 @app.get("/admin/tabelas/<int:tab_id>/delete", endpoint="admin_delete_tabela")
 @admin_perm_required("tabelas", "excluir")
 def admin_delete_tabela(tab_id: int):
@@ -7763,7 +7807,7 @@ def tabelas_publicas():
     if session.get("user_tipo") not in {"admin", "cooperado", "restaurante"}:
         return redirect(url_for("login"))
 
-    tabs = Tabela.query.order_by(Tabela.enviado_em.desc(), Tabela.id.desc()).all()
+    tabs = Tabela.query.order_by(Tabela.titulo.asc(), Tabela.enviado_em.desc(), Tabela.id.desc()).all()
 
     items = [{
         "id": t.id,
