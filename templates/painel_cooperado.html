@@ -1196,7 +1196,14 @@ const MY_ESCALA   = {{ minha_escala_json | default([]) | tojson }};
     }
   }
 
-  buttons.forEach(btn=>btn.addEventListener('click', ()=>showTab(btn.dataset.tab)));
+  buttons.forEach(btn=>btn.addEventListener('click', ()=>{
+    const target=btn.dataset.tab;
+    if(!target || target===current){ showTab(target||current); return; }
+    localStorage.setItem('coopex_active_tab', target);
+    const url=new URL(window.location.href);
+    url.searchParams.set('active_tab', target);
+    window.location.assign(url.toString());
+  }));
   showTab(current, false);
 })();
 </script>
