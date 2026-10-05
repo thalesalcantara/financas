@@ -71,9 +71,6 @@ class CooperadoArquivadoV8(db.Model):
     excluido_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
 
-with app.app_context():
-    CooperadoArquivadoV8.__table__.create(bind=db.engine, checkfirst=True)
-
 
 # O filtro operacional V5 continua valendo no sistema. Nas páginas administrativas
 # V8 precisamos enxergar também inativos/históricos e aplicar o filtro de forma
