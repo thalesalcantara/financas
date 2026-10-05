@@ -474,15 +474,18 @@ def portal_restaurante():
     agora = datetime.now()
     agora_min = agora.hour * 60 + agora.minute
 
-    lancamentos_hoje_rest = (
-        Lancamento.query
-        .filter(
-            Lancamento.restaurante_id == rest.id,
-            Lancamento.data == hoje
+    if view == "lancar" and "lancamentos_periodo_all" in locals():
+        lancamentos_hoje_rest = lancamentos_periodo_all
+    else:
+        lancamentos_hoje_rest = (
+            Lancamento.query
+            .filter(
+                Lancamento.restaurante_id == rest.id,
+                Lancamento.data == hoje
+            )
+            .order_by(Lancamento.cooperado_id.asc(), Lancamento.id.asc())
+            .all()
         )
-        .order_by(Lancamento.cooperado_id.asc(), Lancamento.id.asc())
-        .all()
-    )
 
     lancs_por_coop_hoje = defaultdict(list)
     for l in lancamentos_hoje_rest:
