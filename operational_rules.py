@@ -215,7 +215,6 @@ if "coop_timeline_v5" not in app.view_functions:
         )
 
 
-def _install_v5_templates() -> None:
     loader = app.jinja_loader
     if not loader or getattr(loader, "_coopex_operational_v5", False):
         return
