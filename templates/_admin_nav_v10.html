@@ -35,8 +35,8 @@
     <div class="alv8-group"><button type="button"><i class="bi bi-people"></i> Cadastros <i class="bi bi-chevron-down"></i></button><div class="alv8-menu">
       {% if _cooperados %}<a class="{{ 'active' if active_tab=='cooperados' else '' }}" href="{{ url_for('admin_light_cooperatives') }}"><i class="bi bi-person-badge"></i> Cooperados</a>{% endif %}
       {% if _restaurantes %}<a class="{{ 'active' if active_tab=='estabelecimentos' else '' }}" href="{{ url_for('admin_v10_establishments') }}"><i class="bi bi-shop-window"></i> Estabelecimentos</a>{% endif %}
-      {% if _documentos %}<a href="/admin/documentos?legacy=1"><i class="bi bi-folder2"></i> Documentos</a>{% endif %}
-      {% if _tabelas %}<a href="{{ url_for('admin_light_tables') }}"><i class="bi bi-table"></i> Tabelas</a>{% endif %}
+      {% if _documentos %}<a class="{{ 'active' if active_tab=='documentos' else '' }}" href="{{ url_for('admin_documentos') }}"><i class="bi bi-folder2"></i> Documentos</a>{% endif %}
+      {% if _tabelas %}<a class="{{ 'active' if active_tab=='tabelas' else '' }}" href="{{ url_for('admin_tabelas') }}"><i class="bi bi-table"></i> Tabelas</a>{% endif %}
     </div></div>{% endif %}
 
     {% if _escalas %}<div class="alv8-group"><button type="button"><i class="bi bi-broadcast-pin"></i> Operação <i class="bi bi-chevron-down"></i></button><div class="alv8-menu">
