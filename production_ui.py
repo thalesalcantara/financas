@@ -14,6 +14,7 @@ import production_scale_backend as backend
 app = backend.app
 db = backend.db
 flow = backend.flow
+legacy = flow.legacy
 Cooperado = backend.Cooperado
 Restaurante = backend.Restaurante
 Lancamento = backend.Lancamento
@@ -686,7 +687,7 @@ def _coopex_fast_context():
     role = (session.get("user_tipo") or "").strip().lower()
     try:
         if role == "restaurante" and request.endpoint == "portal_restaurante":
-            rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first()
+            rest = legacy.request_restaurante()
             if rest:
                 context["coopex_rest_display_name"] = _norm_name(rest.nome)
                 view = (request.args.get("view") or "lancar").strip().lower()
@@ -694,7 +695,7 @@ def _coopex_fast_context():
                     context["coopex_rest_pending_rows"] = _pending_approvals_fast(rest)
 
         elif role == "cooperado" and request.endpoint == "portal_cooperado":
-            coop = Cooperado.query.filter_by(usuario_id=session.get("user_id")).first()
+            coop = legacy.request_cooperado()
             if coop:
                 today = datetime.now(TZ).date()
                 start = backend.upgrade._parse_date(request.args.get("data_inicio")) or today
