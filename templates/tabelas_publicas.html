@@ -31,8 +31,8 @@ select,.clear{height:44px;border:1px solid var(--border);border-radius:14px;back
 .info{display:none}.info.show{display:block}.info div{font-size:11px;line-height:1.45;padding:6px 0;border-bottom:1px solid #eef1f5}.info div:last-child{border-bottom:0}
 .headline{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}.headline strong{font-size:14px}.headline span{font-size:11px;color:var(--muted)}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
-.card{min-height:72px;border:1px solid var(--border);border-radius:15px;padding:9px 10px;text-align:left;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;position:relative;box-shadow:0 4px 12px rgba(20,40,70,.05)}
-.card:active{transform:scale(.985)}.card .name{font-size:15.5px;font-weight:950;line-height:1.12;padding-right:24px}.card .price{font-size:18px;font-weight:950;margin-top:0;white-space:nowrap}.card .meta{font-size:9px;color:#617086;margin-top:3px;text-align:right}.card .city{font-size:9px;color:#7b879a;margin-top:2px}.card .pill{position:absolute;right:9px;top:9px;min-width:24px;height:24px;border-radius:999px;padding:0 7px;background:rgba(17,24,39,.09);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900}
+.card{min-height:64px;border:1px solid var(--border);border-radius:14px;padding:8px 10px;text-align:left;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;position:relative;box-shadow:0 4px 12px rgba(20,40,70,.05)}
+.card:active{transform:scale(.985)}.card .name{font-size:16.5px;font-weight:950;line-height:1.08;padding-right:24px}.card .price{font-size:18px;font-weight:950;margin-top:0;white-space:nowrap}.card .meta{font-size:9px;color:#617086;margin-top:3px;text-align:right}.card .city{font-size:9px;color:#7b879a;margin-top:2px}.card .pill{position:absolute;right:9px;top:9px;min-width:24px;height:24px;border-radius:999px;padding:0 7px;background:rgba(17,24,39,.09);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900}
 .c0{background:linear-gradient(180deg,#eff6ff,#fbfdff);border-color:#d7e8ff}.c1{background:linear-gradient(180deg,#f0faf2,#fbfdfb);border-color:#d5edd9}.c2{background:linear-gradient(180deg,#fff8e8,#fffdf8);border-color:#f4e0b6}.c3{background:linear-gradient(180deg,#fff1fa,#fffafd);border-color:#f1d1e7}.c4{background:linear-gradient(180deg,#f5f1ff,#fbfaff);border-color:#dfd6ff}.c5{background:linear-gradient(180deg,#fff1ef,#fffafa);border-color:#ffd8d2}
 .drawer{position:fixed;left:0;right:0;bottom:0;max-width:430px;margin:0 auto;padding:0 10px 10px;z-index:30}
 .total-btn{width:100%;border:0;background:#111827;color:#fff;border-radius:18px;padding:12px 14px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;box-shadow:0 18px 36px rgba(17,24,39,.28);cursor:pointer}
@@ -151,7 +151,7 @@ function parseRecognizedText(raw){
   const moneyAny=/(?:R\$\s*)?(\d{2,3}(?:[.,]\d{2})?)/i;
   const timeAny=/(\d{1,2}\s*h(?:\s*(?:às|as|a|-)\s*\d{1,2}\s*h)?)/i;
   const areaRx=/^(?:área|area|faixa|grupo)\s*[A-Z0-9ºª.-]*/i;
-  const blocked=/^(?:área|areas|area|bairro|bairros|valor|valores|taxa|taxas|entrega|entregas|garantido|garantidos|horário|horario|tabela|observações|observacoes)$/i;
+  const blocked=/^(?:área|areas|area|bairro|bairros|valor|valores|taxa|taxas|entrega|entregas|garantido|garantidos|horário|horario|tabela|observações|observacoes|cnpj|cpf|motoqueiro|base|motoqueiro base|horário base|horario base|valor base|serviço|servico|serviços|servicos|compras|transferência|transferencia|loja|lojas)$/i;
 
   const cleanName=s=>(s||"")
     .replace(/^(?:área|area|faixa|grupo|zona)\s*[A-Z0-9ºª.-]*\s*[:\-–—]?\s*/i,"")
@@ -159,12 +159,20 @@ function parseRecognizedText(raw){
     .replace(/^[\s\-–—:;|]+|[\s\-–—:;|]+$/g,"")
     .trim();
 
+  const invalidText=s=>{
+    const n=cleanName(s);
+    return !n || blocked.test(n) || areaRx.test(n) ||
+      /^cnpj\b/i.test(n) ||
+      /\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/.test(n) ||
+      /^(?:motoqueiro\s+base|hor[aá]rio\s+base|valor\s+base)$/i.test(n);
+  };
+
   const splitNames=s=>{
     const clean=cleanName(s);
-    if(!clean||blocked.test(clean)||areaRx.test(clean))return [];
+    if(invalidText(clean))return [];
     return clean.split(/\s*(?:\/|;|•|\||\s+e\s+)\s*/i)
       .map(cleanName)
-      .filter(x=>x&&!blocked.test(x)&&!areaRx.test(x)&&x.length<=70&&x.split(/\s+/).length<=7);
+      .filter(x=>!invalidText(x) && x.length<=70 && x.split(/\s+/).length<=7);
   };
 
   const add=(name,price)=>{
@@ -184,7 +192,7 @@ function parseRecognizedText(raw){
       const mv=ctx.match(moneyAny);
       if(mv){
         const valor=Number(mv[1].replace(",","."));
-        if(valor>=20&&valor<=500){
+        if(valor>=50&&valor<=500){
           const mh=ctx.match(timeAny);
           garantidos.push({
             descricao:ln.replace(/R\$\s*\d+(?:[.,]\d{2})?/ig,"").trim()||"Garantido",
@@ -193,30 +201,27 @@ function parseRecognizedText(raw){
           });
         }
       }
-      infos.push(ln);
       return;
     }
 
-    if(/hor[aá]rio|taxa administrativa|segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo|feriado/i.test(low)){
-      infos.push(ln);
-      return;
-    }
+    if(/motoqueiro\s+base|hor[aá]rio\s+base|valor\s+base|cnpj|cpf|servi[cç]o\s+de\s+compras|transfer[eê]ncia\s+entre\s+lojas/i.test(low))return;
+
+    if(/hor[aá]rio|taxa administrativa/i.test(low)) return;
 
     const m=ln.match(moneyEnd);
     if(m){
       const price=Number(m[2].replace(",","."));
       if(areaRx.test(ln)){
-        if(price>0&&price<=500)areaPrice=price;
+        if(price>=5&&price<=50)areaPrice=price;
         return;
       }
-      if(price>0&&price<=500){
+      if(price>=5&&price<=50){
         const names=splitNames(m[1]);
         if(names.length){names.forEach(n=>add(n,price));return}
       }
     }
 
-    // Bairro listado abaixo de uma Área: usa o preço da área sem criar card "Área".
-    if(areaPrice!==null && !areaRx.test(ln) && !blocked.test(ln)){
+    if(areaPrice!==null && !invalidText(ln)){
       add(ln,areaPrice);
     }
   });
@@ -227,17 +232,105 @@ function parseRecognizedText(raw){
     (x.horario||"")===(g.horario||"") &&
     Number(x.valor||0)===Number(g.valor||0)
   )===i);
-  return {bairros,garantidos:uniqGarantidos,informacoes:[...new Set(infos)]};
+  return {bairros,garantidos:uniqGarantidos,informacoes:[]};
 }
+
 function loadTesseract(){
   if(window.Tesseract)return Promise.resolve();
   return new Promise((resolve,reject)=>{
     const s=document.createElement("script");
     s.src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
     s.onload=resolve;
-    s.onerror=()=>reject(new Error("Não foi possível carregar o leitor de imagem."));
+    s.onerror=()=>reject(new Error("Não foi possível carregar o leitor da tabela."));
     document.head.appendChild(s);
   });
+}
+
+function parseRecognizedLayout(ocrData){
+  const words=(ocrData?.words||[]).filter(w=>{
+    const t=(w.text||"").trim();
+    return t && w.bbox && Number.isFinite(w.bbox.x0) && Number.isFinite(w.bbox.y0);
+  });
+  if(!words.length)return parseRecognizedText(ocrData?.text||"");
+
+  const norm=s=>(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().trim();
+  const center=w=>({x:(w.bbox.x0+w.bbox.x1)/2,y:(w.bbox.y0+w.bbox.y1)/2});
+  const blocked=/^(AREA|AREAS|GARANTIDO|GARANTIDOS|CNPJ|CPF|MOTOQUEIRO|BASE|MOTOQUEIRO BASE|HORARIO BASE|VALOR BASE|SERVICO|SERVICOS|COMPRAS|TRANSFERENCIA|LOJA|LOJAS|SEGUNDA|TERCA|QUARTA|QUINTA|SEXTA|SABADO|DOMINGO|FERIADO|FERIADOS)$/;
+
+  // Detecta os cabeçalhos ÁREA 01...ÁREA 06.
+  const areaHeaders=[];
+  words.forEach(w=>{
+    const n=norm(w.text);
+    if(n!=="AREA")return;
+    const c=center(w);
+    const num=words.filter(v=>{
+      const cv=center(v), nv=norm(v.text);
+      return /^\d{1,2}$/.test(nv) && Math.abs(cv.y-c.y)<22 && cv.x>c.x && cv.x-c.x<100;
+    }).sort((a,b)=>center(a).x-center(b).x)[0];
+    areaHeaders.push({x:num?(c.x+center(num).x)/2:c.x,y:c.y});
+  });
+  areaHeaders.sort((a,b)=>a.x-b.x);
+  if(areaHeaders.length<2)return parseRecognizedText(ocrData?.text||"");
+
+  const parseNum=w=>{
+    const raw=(w.text||"").replace(/[^\d,.]/g,"");
+    if(!raw)return null;
+    const v=Number(raw.replace(/\./g,"").replace(",","."));
+    return Number.isFinite(v)?v:null;
+  };
+
+  const areas=areaHeaders.map((h,i)=>{
+    const left=i===0?-Infinity:(areaHeaders[i-1].x+h.x)/2;
+    const right=i===areaHeaders.length-1?Infinity:(h.x+areaHeaders[i+1].x)/2;
+    const prices=words.filter(w=>{
+      const c=center(w),v=parseNum(w);
+      return c.x>=left&&c.x<right&&c.y>h.y+8&&c.y<h.y+130&&v!==null&&v>=5&&v<=50;
+    }).sort((a,b)=>center(a).y-center(b).y);
+    return {...h,left,right,price:prices.length?parseNum(prices[0]):null,priceY:prices.length?center(prices[0]).y:h.y+80};
+  }).filter(a=>a.price!==null);
+
+  if(areas.length<2)return parseRecognizedText(ocrData?.text||"");
+
+  // Limite inferior: antes do bloco "GARANTIDOS".
+  const gw=words.filter(w=>/^GARANTIDOS?$/.test(norm(w.text)));
+  const bottomCut=gw.length?Math.min(...gw.map(w=>center(w).y))-18:Math.max(...words.map(w=>center(w).y))+1;
+
+  const bairros=[], seen=new Set();
+  areas.forEach(a=>{
+    const colWords=words.filter(w=>{
+      const c=center(w),n=norm(w.text);
+      return c.x>=a.left&&c.x<a.right&&c.y>a.priceY+18&&c.y<bottomCut &&
+        !blocked.test(n)&&!/^R\$?$/.test(n)&&!/^\d+[,.]?\d*$/.test(n);
+    }).sort((u,v)=>center(u).y-center(v).y||center(u).x-center(v).x);
+
+    const lines=[];
+    colWords.forEach(w=>{
+      const c=center(w);
+      let line=lines.find(L=>Math.abs(L.y-c.y)<13);
+      if(!line){line={y:c.y,words:[]};lines.push(line)}
+      line.words.push(w);
+    });
+
+    lines.sort((a,b)=>a.y-b.y).forEach(line=>{
+      line.words.sort((u,v)=>center(u).x-center(v).x);
+      let text=line.words.map(w=>w.text).join(" ").replace(/[•·]/g," ").replace(/\s+/g," ").trim();
+      text=text.replace(/^[-–—:;|]+|[-–—:;|]+$/g,"").trim();
+      const n=norm(text);
+      if(!text||blocked.test(n)||/^CNPJ\b/.test(n)||/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/.test(text))return;
+      if(/MOTOQUEIRO\s+BASE|HORARIO\s+BASE|VALOR\s+BASE/.test(n))return;
+      if(text.length>55||text.split(/\s+/).length>6)return;
+      const k=n+"|"+a.price;
+      if(seen.has(k))return;
+      seen.add(k);
+      bairros.push({bairro:text,cidade:"",valor:a.price});
+    });
+  });
+
+  // Garantidos ficam fora da grade de bairros.
+  const textParsed=parseRecognizedText(ocrData?.text||"");
+  const garantidos=(textParsed.garantidos||[]).filter(g=>Number(g.valor||0)>=50);
+  bairros.sort((a,b)=>a.bairro.localeCompare(b.bairro,"pt-BR"));
+  return {bairros,garantidos,informacoes:[]};
 }
 
 async function recognizeImage(url){
@@ -246,11 +339,11 @@ async function recognizeImage(url){
     logger:m=>{
       if(m.status==="recognizing text"){
         const pct=Math.round((m.progress||0)*100);
-        grid.innerHTML='<div class="empty loading">Lendo a tabela da imagem… '+pct+'%</div>';
+        grid.innerHTML='<div class="empty loading">Lendo a tabela… '+pct+'%</div>';
       }
     }
   });
-  return parseRecognizedText(result?.data?.text||"");
+  return parseRecognizedLayout(result?.data||{});
 }
 
 async function loadContract(id){
@@ -282,8 +375,8 @@ async function loadContract(id){
     const gs=[...manual,...autoGarantidos].filter((g,i,a)=>a.findIndex(x=>(x.descricao||"")=== (g.descricao||"") && (x.horario||"")===(g.horario||"") && Number(x.valor||0)===Number(g.valor||0))===i);
     if(gs.length){gGrid.innerHTML=gs.map(g=>`<div class="g-line"><div><div class="d">${g.descricao||"Garantido"}</div><div class="h">${g.horario||""}</div></div><div class="v">${money(g.valor)}</div></div>`).join("");guarantees.classList.add("show")}
 
-    const infos=[...new Set(autoInfos)];
-    if(infos.length){infoList.innerHTML=infos.map(x=>`<div>${x}</div>`).join("");infoBox.classList.add("show")}
+    const infos=[];
+    infoBox.classList.remove("show")
 
     if(j.erro && j.erro!=="imagem" && !data.length){grid.innerHTML=`<div class="empty">${j.erro}</div>`;countLabel.textContent="0 bairros";return}
     if(!data.length){grid.innerHTML='<div class="empty">Não consegui reconhecer bairros e valores automaticamente nesta tabela.</div>';countLabel.textContent="0 bairros";return}
