@@ -262,27 +262,39 @@ def coop_producao_edit_locked(item_id: int):
 
 def _rest_scales(rest):
     rest_name = _norm(rest.nome)
-    candidates = (
-        Escala.query.filter(
-            or_(
-                Escala.restaurante_id == rest.id,
-                Escala.contrato.isnot(None),
-            )
-        )
+
+    # Caminho principal: vínculo por ID, indexável e direto.
+    direct = (
+        Escala.query
+        .filter(Escala.restaurante_id == rest.id)
         .order_by(Escala.id.asc())
-        .limit(1600)
         .all()
     )
-    result = []
-    seen = set()
-    for scale in candidates:
+
+    # Compatibilidade: somente linhas antigas sem restaurante_id precisam
+    # comparar o contrato pelo nome. Antes o sistema trazia quase toda a tabela.
+    legacy_rows = (
+        Escala.query
+        .filter(
+            Escala.restaurante_id.is_(None),
+            Escala.contrato.isnot(None),
+        )
+        .order_by(Escala.id.asc())
+        .all()
+    )
+
+    result = list(direct)
+    seen = {s.id for s in direct}
+    for scale in legacy_rows:
         contract = _norm(scale.contrato)
-        belongs = scale.restaurante_id == rest.id
-        if not belongs and not scale.restaurante_id and contract:
-            belongs = contract == rest_name or rest_name in contract or contract in rest_name
+        if not contract:
+            continue
+        belongs = contract == rest_name or rest_name in contract or contract in rest_name
         if belongs and scale.id not in seen:
             seen.add(scale.id)
             result.append(scale)
+
+    result.sort(key=lambda s: s.id)
     return result
 
 
@@ -413,12 +425,75 @@ def rest_producoes_flow():
     )
 
 
+def _rest_scale_row_direct(rest, scale_id: int):
+    """Resolve uma única escala sem montar a semana inteira."""
+    scale = db.session.get(Escala, scale_id)
+    if not scale:
+        return None
+
+    belongs = scale.restaurante_id == rest.id
+    if not belongs and scale.restaurante_id is None:
+        contract = _norm(scale.contrato)
+        rest_name = _norm(rest.nome)
+        belongs = bool(contract and (contract == rest_name or rest_name in contract or contract in rest_name))
+    if not belongs:
+        return None
+
+    coop = None
+    if scale.cooperado_id:
+        coop = db.session.get(Cooperado, scale.cooperado_id)
+    elif (scale.cooperado_nome or "").strip():
+        target = _norm(scale.cooperado_nome)
+        coop = next(
+            (
+                item for item in Cooperado.query.order_by(Cooperado.nome.asc()).all()
+                if _norm(item.nome) == target
+            ),
+            None,
+        )
+
+    now = datetime.now(TZ)
+    today = now.date()
+    data_ref = _current_week_date(scale, today)
+    start, end = upgrade._times_from_text(scale.horario)
+    end_at = flow._end_at(data_ref, start, end)
+    finished = bool(end_at and now >= end_at)
+
+    production = ProducaoCooperado.query.filter_by(
+        restaurante_id=rest.id,
+        escala_id=scale.id,
+    ).order_by(ProducaoCooperado.id.desc()).first()
+
+    launch = None
+    if coop and data_ref:
+        launch = upgrade._find_existing_launch(rest.id, coop.id, data_ref, start, end)
+
+    total = float(
+        (launch.valor if launch else None)
+        or (production.valor_total if production else 0)
+        or 0
+    )
+
+    return SimpleNamespace(
+        escala=scale,
+        cooperado=coop,
+        data=data_ref,
+        inicio=start,
+        fim=end,
+        fim_em=end_at,
+        finalizada=finished,
+        producao=production,
+        lancamento=launch,
+        valor_total=total,
+    )
+
+
 def rest_launch_scale_anytime(scale_id: int):
     denied = flow._deny("restaurante")
     if denied:
         return denied
     rest = flow._rest_current()
-    row = next((item for item in _rest_scale_rows(rest) if item.escala.id == scale_id), None)
+    row = _rest_scale_row_direct(rest, scale_id)
     if not row:
         abort(404)
     if not row.cooperado:
