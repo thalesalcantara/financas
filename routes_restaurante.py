@@ -191,6 +191,8 @@ def portal_restaurante():
                 "horario": (e.horario or "").strip(),
                 "contrato": contrato_eff,
                 "cor": (e.cor or "").strip(),
+                "escala_id": e.id,
+                "escala": e,
             })
 
             break
@@ -586,21 +588,142 @@ def portal_restaurante():
         total_lanc_entregas = sum(x["qtd_entregas"] for x in lancamentos_periodo)
 
     # -------------------- PRODUÇÕES DA SEMANA --------------------
-    # Carrega este bloco somente quando a aba é aberta. Mantém o painel
-    # principal leve nas demais telas.
+    # Fonte de verdade: a mesma agenda semanal que alimenta a Escala.
+    # Assim troca/substituição de cooperado reflete imediatamente aqui também.
     producoes_semana_previstas = []
     producoes_semana_pendentes = []
     producoes_semana_recentes = []
+
     if view == "producoes":
+        from types import SimpleNamespace
         import production_scale_backend as production_backend
-        producoes_semana_previstas = production_backend._rest_scale_rows(rest)
-        producoes_semana_pendentes = [
-            row.producao
-            for row in producoes_semana_previstas
-            if row.producao
-            and row.producao.status == "pendente"
-            and float(row.producao.valor_total or 0) > 0
-        ]
+
+        week_start = min(dias_list) if dias_list else (date.today() - timedelta(days=date.today().weekday()))
+        week_end = max(dias_list) if dias_list else (week_start + timedelta(days=6))
+
+        week_launches = (
+            Lancamento.query
+            .filter(
+                Lancamento.restaurante_id == rest.id,
+                Lancamento.data >= week_start,
+                Lancamento.data <= week_end,
+            )
+            .order_by(Lancamento.data.asc(), Lancamento.id.asc())
+            .all()
+        )
+        launches_by_slot = {}
+        for lanc in week_launches:
+            key = (
+                int(lanc.cooperado_id),
+                lanc.data,
+                (lanc.hora_inicio or "").strip()[:5],
+                (lanc.hora_fim or "").strip()[:5],
+            )
+            launches_by_slot[key] = lanc
+
+        week_productions = (
+            ProducaoCooperado.query
+            .filter(
+                ProducaoCooperado.restaurante_id == rest.id,
+                ProducaoCooperado.data >= week_start,
+                ProducaoCooperado.data <= week_end,
+            )
+            .order_by(ProducaoCooperado.id.desc())
+            .all()
+        )
+        prod_by_scale = {p.escala_id: p for p in week_productions if p.escala_id}
+        prod_by_slot = {}
+        for p in week_productions:
+            prod_by_slot.setdefault(
+                (
+                    int(p.cooperado_id),
+                    p.data,
+                    (p.hora_inicio or "").strip()[:5],
+                    (p.hora_fim or "").strip()[:5],
+                ),
+                p,
+            )
+
+        now_local = datetime.now(TZ) if "TZ" in globals() else datetime.now()
+        for day in sorted(dias_list):
+            for item in agenda.get(day, []):
+                coop = item.get("coop")
+                if not coop:
+                    continue
+
+                start_time, end_time = production_backend.upgrade._times_from_text(item.get("horario") or "")
+                start_time = (production_backend.upgrade._norm_time(start_time) or "")
+                end_time = (production_backend.upgrade._norm_time(end_time) or "")
+                escala_id = item.get("escala_id")
+                scale = item.get("escala")
+
+                slot_key = (int(coop.id), day, start_time[:5], end_time[:5])
+                launch = launches_by_slot.get(slot_key)
+                production = prod_by_scale.get(escala_id) or prod_by_slot.get(slot_key)
+
+                # Compatibilidade: lançamentos antigos podem ter pequenas diferenças no horário.
+                if not launch:
+                    for cand in week_launches:
+                        if cand.cooperado_id != coop.id or cand.data != day:
+                            continue
+                        if production_backend.upgrade._overlap(
+                            cand.hora_inicio, cand.hora_fim, start_time, end_time
+                        ):
+                            launch = cand
+                            break
+
+                end_at = production_backend.flow._end_at(day, start_time, end_time)
+                finished = bool(end_at and now_local >= end_at)
+                total = float(
+                    (launch.valor if launch else None)
+                    or (production.valor_total if production else 0)
+                    or 0
+                )
+
+                if launch or (production and production.status == "aprovada"):
+                    color, label = "green", "Lançada"
+                elif production and production.status == "pendente" and total > 0:
+                    color, label = "green", "Informada pelo cooperado · confira"
+                elif production and production.status == "recusada":
+                    color, label = "red", "Recusada · lançar pelo estabelecimento"
+                elif finished:
+                    color, label = "red", "Pendente"
+                else:
+                    color, label = "blue", "Prevista"
+
+                can_launch = bool(
+                    not launch
+                    and not (production and production.status == "aprovada")
+                    and not (production and production.status == "pendente" and total > 0)
+                )
+
+                row = SimpleNamespace(
+                    escala=scale,
+                    cooperado=coop,
+                    data=day,
+                    inicio=start_time,
+                    fim=end_time,
+                    fim_em=end_at,
+                    finalizada=finished,
+                    producao=production,
+                    lancamento=launch,
+                    valor_total=total,
+                    color=color,
+                    status_label=label,
+                    pode_lancar=can_launch,
+                    turno=item.get("turno") or "",
+                    horario=item.get("horario") or "",
+                    contrato=item.get("contrato") or rest.nome,
+                )
+                producoes_semana_previstas.append(row)
+
+                if production and production.status == "pendente" and float(production.valor_total or 0) > 0:
+                    producoes_semana_pendentes.append(production)
+
+        producoes_semana_previstas.sort(
+            key=lambda row: (row.data or date.max, row.inicio or "", row.cooperado.nome.lower())
+        )
+
         producoes_semana_recentes = (
             ProducaoCooperado.query
             .filter(
@@ -608,7 +731,7 @@ def portal_restaurante():
                 ProducaoCooperado.status.in_(["aprovada", "recusada"]),
             )
             .order_by(ProducaoCooperado.decidido_em.desc(), ProducaoCooperado.id.desc())
-            .limit(50)
+            .limit(30)
             .all()
         )
 
