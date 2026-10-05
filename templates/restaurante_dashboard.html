@@ -2598,9 +2598,15 @@ function setPhone(digits) {
         if(pendingList) pendingList.style.display='none';
         if(document.getElementById('listaCooperados')) document.getElementById('listaCooperados').style.display='';
         itens.forEach(el=>{
-          if(mode==='escalados') el.style.display=el.dataset.escalado==='1'?'':'none';
-          else if(mode==='producao') el.style.display=el.dataset.producao==='1'?'':'none';
-          else el.style.display='';
+          if(mode==='pendencias'){
+            el.style.display='none';
+          }else if(mode==='producao'){
+            el.style.display=(el.dataset.escalado==='1' && el.dataset.producao==='1')?'':'none';
+          }else{
+            // "Todos" e "Escalados" respeitam o bloco atual/próximo da escala.
+            // Outros cooperados só aparecem quando pesquisados manualmente.
+            el.style.display=el.dataset.escalado==='1'?'':'none';
+          }
         });
       }));
 
