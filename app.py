@@ -8816,6 +8816,137 @@ def rest_tabelas():
     )
 
 
+@app.get("/rest/tabelas/baixar-sistema", endpoint="rest_tabela_download_sistema")
+def rest_tabela_download_sistema():
+    """Baixa a mesma tabela estruturada exibida no sistema, sem usar o PDF antigo."""
+    import os
+    import tempfile
+    from flask import after_this_request, send_file
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    if session.get("user_tipo") != "restaurante":
+        return redirect(url_for("login"))
+
+    rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+    login_nome = (
+        getattr(getattr(rest, "usuario_ref", None), "usuario", None)
+        or getattr(rest, "usuario", None)
+        or (rest.nome or "")
+    )
+    alvo_norm = _norm_txt(login_nome)
+
+    tabela = next(
+        (t for t in Tabela.query.order_by(Tabela.enviado_em.desc()).all()
+         if _norm_txt(t.titulo) == alvo_norm),
+        None,
+    )
+    if not tabela:
+        flash("Não há tabela cadastrada para este estabelecimento.", "warning")
+        return redirect(url_for("rest_tabelas"))
+
+    _ensure_tabelas_estruturadas_schema()
+    bairros = (
+        TabelaBairro.query
+        .filter_by(tabela_id=tabela.id, ativo=True)
+        .order_by(TabelaBairro.bairro.asc())
+        .all()
+    )
+    garantidos = (
+        TabelaGarantido.query
+        .filter_by(tabela_id=tabela.id)
+        .order_by(TabelaGarantido.ordem.asc(), TabelaGarantido.id.asc())
+        .all()
+    )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Tabela"
+
+    blue = "075FD8"
+    light_blue = "EAF3FF"
+    orange = "FF962F"
+    header_font = Font(color="FFFFFF", bold=True)
+    title_font = Font(color="07183E", bold=True, size=16)
+    bold = Font(bold=True)
+
+    ws["A1"] = "Minhas Tabelas"
+    ws["A1"].font = title_font
+    ws["A2"] = (rest.nome or login_nome or "Estabelecimento").replace("_", " ")
+    ws["A4"] = "Bairro"
+    ws["B4"] = "Taxa de entrega"
+    ws["C4"] = "Taxa base"
+    for cell in ws[4]:
+        cell.fill = PatternFill("solid", fgColor=blue)
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+
+    row = 5
+    has_base = False
+    for item in bairros:
+        ws.cell(row, 1, item.bairro or "")
+        if item.valor_fixo is not None:
+            ws.cell(row, 2, float(item.valor_fixo))
+            ws.cell(row, 2).number_format = 'R$ #,##0.00'
+        if item.valor_base is not None:
+            has_base = True
+            ws.cell(row, 3, float(item.valor_base))
+            ws.cell(row, 3).number_format = 'R$ #,##0.00'
+        row += 1
+
+    if not has_base:
+        ws.delete_cols(3, 1)
+
+    row += 2
+    ws.cell(row, 1, "Garantidos")
+    ws.cell(row, 1).font = Font(bold=True, color="FFFFFF")
+    ws.cell(row, 1).fill = PatternFill("solid", fgColor=orange)
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=(2 if not has_base else 3))
+    row += 1
+
+    ws.cell(row, 1, "Descrição")
+    ws.cell(row, 2, "Horário")
+    ws.cell(row, 3, "Valor")
+    for col in range(1, 4):
+        ws.cell(row, col).font = bold
+        ws.cell(row, col).fill = PatternFill("solid", fgColor=light_blue)
+    row += 1
+
+    for g in garantidos:
+        ws.cell(row, 1, g.descricao or "Garantido")
+        ws.cell(row, 2, g.horario or "")
+        ws.cell(row, 3, float(g.valor or 0))
+        ws.cell(row, 3).number_format = 'R$ #,##0.00'
+        row += 1
+
+    ws.column_dimensions["A"].width = 32
+    ws.column_dimensions["B"].width = 20
+    ws.column_dimensions["C"].width = 20
+    ws.freeze_panes = "A5"
+
+    tmp = tempfile.NamedTemporaryFile(prefix="tabela_estabelecimento_", suffix=".xlsx", delete=False)
+    tmp_path = tmp.name
+    tmp.close()
+    wb.save(tmp_path)
+
+    @after_this_request
+    def _cleanup(response):
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+        return response
+
+    safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", (rest.nome or "tabela").strip())
+    return send_file(
+        tmp_path,
+        as_attachment=True,
+        download_name=f"tabela_{safe_name}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        conditional=True,
+    )
+
+
 @app.get("/rest/tabelas/<int:tabela_id>/abrir", endpoint="rest_tabela_abrir")
 def rest_tabela_abrir(tabela_id: int):
     if session.get("user_tipo") != "restaurante":
