@@ -8,38 +8,93 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_light_v8.css') }}">
   <style>
-    .mail-grid{display:grid;grid-template-columns:minmax(180px,1fr) 120px minmax(220px,2fr) 140px 150px;gap:10px;align-items:center}
-    .mail-row{padding:12px 0;border-bottom:1px solid #e6edf7}.mail-row:last-child{border-bottom:0}
-    .mail-reason{font-size:13px;color:#53627a;line-height:1.4}.mail-date{font-size:12px;color:#6b7a90}
-    @media(max-width:900px){.mail-grid{grid-template-columns:1fr}.mail-head{display:none}.mail-row{padding:14px 0}}
+    .mail-headline{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+    .mail-headline h1{margin:0}.mail-kpi{background:#fff;border:1px solid #dce5f1;border-radius:14px;padding:10px 14px;min-width:145px}
+    .mail-kpi span{font-size:11px;color:#6a7890;text-transform:uppercase;font-weight:900;display:block}.mail-kpi strong{font-size:24px;color:#075fd8}
+    .mail-tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}.mail-tabs a{height:38px;padding:0 13px;display:inline-flex;align-items:center;gap:6px;border:1px solid #d4dfed;border-radius:9px;text-decoration:none;color:#24456d;font-size:12px;font-weight:900;background:#fff}.mail-tabs a.active{background:#075fd8;color:#fff;border-color:#075fd8}
+    .mail-table-wrap{overflow:auto}.mail-table{width:100%;border-collapse:collapse;min-width:900px}.mail-table th{background:#f7faff;text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;color:#60708c}.mail-table td{padding:11px 12px;border-top:1px solid #e7edf6;font-size:13px;vertical-align:top}.mail-table tr.unread{background:#f5f9ff}.mail-table tr.unread td:first-child{box-shadow:inset 4px 0 0 #075fd8}.mail-subject{font-weight:950;color:#0b2853}.mail-message{max-width:580px;color:#53627a;white-space:pre-wrap}.mail-status{display:inline-flex;padding:5px 8px;border-radius:999px;font-size:11px;font-weight:900}.mail-status.unread{background:#eaf3ff;color:#075fd8}.mail-status.read{background:#e8f7ed;color:#15824a}.mail-action{border:1px solid #cbd9e9;background:#fff;color:#174b8f;border-radius:8px;padding:6px 9px;font-size:11px;font-weight:900;cursor:pointer}
+    .tracking-grid{display:grid;grid-template-columns:minmax(180px,1fr) 120px minmax(220px,2fr) 140px 150px;gap:10px;align-items:center}.tracking-row{padding:12px 0;border-bottom:1px solid #e6edf7}.tracking-row:last-child{border-bottom:0}.tracking-reason{font-size:13px;color:#53627a;line-height:1.4}.tracking-date{font-size:12px;color:#6b7a90}
+    .section-label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:950;color:#153a72;margin:4px 0 10px}.empty{padding:30px;text-align:center;color:#71809a}
+    .toast-mail{position:fixed;right:18px;bottom:18px;z-index:99999;background:#0c2b66;color:#fff;padding:13px 15px;border-radius:12px;box-shadow:0 14px 30px rgba(4,31,84,.22);display:none;max-width:360px}.toast-mail strong{display:block}.toast-mail small{color:#dbe7ff}
+    @media(max-width:900px){.tracking-grid{grid-template-columns:1fr}.tracking-head{display:none}.tracking-row{padding:14px 0}}
   </style>
 </head>
 <body>
   {% include '_admin_nav_v10.html' %}
   <main class="alv8-page">
-    <div class="alv8-head"><div><h1 class="alv8-title">Caixa Postal</h1><p class="alv8-sub">Respostas dos estabelecimentos sobre o rastreamento.</p></div></div>
+    <div class="mail-headline">
+      <div><h1 class="alv8-title">Caixa Postal</h1><p class="alv8-sub">Mensagens e lembretes enviados pelos estabelecimentos à COOPEX.</p></div>
+      <div class="mail-kpi"><span>Não lidos</span><strong id="mailUnreadKpi">{{ unread|default(0) }}</strong></div>
+    </div>
 
-    {% with msgs=get_flashed_messages(with_categories=true) %}{% if msgs %}
-      <div class="alv8-card">{% for cat,msg in msgs %}<div class="alv8-note">{{ msg }}</div>{% endfor %}</div>
-    {% endif %}{% endwith %}
+    <div class="mail-tabs">
+      <a class="{{ 'active' if request.args.get('status','todos')=='todos' else '' }}" href="{{ url_for('admin_caixa_postal') }}"><i class="bi bi-list-ul"></i> Todos</a>
+      <a class="{{ 'active' if request.args.get('status')=='nao_lidos' else '' }}" href="{{ url_for('admin_caixa_postal',status='nao_lidos') }}"><i class="bi bi-envelope"></i> Não lidos</a>
+      <a class="{{ 'active' if request.args.get('status')=='lidos' else '' }}" href="{{ url_for('admin_caixa_postal',status='lidos') }}"><i class="bi bi-envelope-open"></i> Lidos</a>
+    </div>
 
+    <div class="section-label"><i class="bi bi-calendar-event"></i> Lembretes e solicitações dos estabelecimentos</div>
     <div class="alv8-card">
-      <div class="mail-grid mail-head" style="font-size:12px;font-weight:900;color:#60708c;text-transform:uppercase">
+      <div class="mail-table-wrap">
+        <table class="mail-table">
+          <thead><tr><th>Recebido</th><th>Estabelecimento</th><th>Assunto</th><th>Data do evento</th><th>Mensagem</th><th>Status</th><th>Ação</th></tr></thead>
+          <tbody id="mailRows">
+            {% for m in mail_rows|default([]) %}
+            {% set rest=rest_map.get(m.restaurante_id) %}
+            <tr class="{{ 'unread' if not m.lido_em else '' }}">
+              <td>{{ m.criado_em.strftime('%d/%m/%Y %H:%M') if m.criado_em else '—' }}</td>
+              <td><strong>{{ rest.nome if rest else 'Estabelecimento' }}</strong></td>
+              <td class="mail-subject">{{ m.assunto }}</td>
+              <td>{{ m.data_evento.strftime('%d/%m/%Y') if m.data_evento else '—' }}</td>
+              <td class="mail-message">{{ m.mensagem }}</td>
+              <td><span class="mail-status {{ 'read' if m.lido_em else 'unread' }}">{{ 'Lido' if m.lido_em else 'Não lido' }}</span></td>
+              <td>{% if not m.lido_em %}<button class="mail-action" data-read="{{ url_for('admin_caixa_postal_lido',item_id=m.id) }}">Marcar como lido</button>{% else %}—{% endif %}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="empty">Nenhum lembrete recebido.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-label" style="margin-top:18px"><i class="bi bi-geo-alt"></i> Respostas sobre rastreamento</div>
+    <div class="alv8-card">
+      <div class="tracking-grid tracking-head" style="font-size:12px;font-weight:900;color:#60708c;text-transform:uppercase">
         <div>Estabelecimento</div><div>Quer rastrear?</div><div>Motivo</div><div>Status</div><div>Data</div>
       </div>
-      {% for pesquisa, rest in rows %}
-      <div class="mail-grid mail-row">
+      {% for pesquisa, rest in tracking_rows|default([]) %}
+      <div class="tracking-grid tracking-row">
         <div><strong>{{ rest.nome }}</strong></div>
         <div><span class="alv8-badge {{ 'ok' if pesquisa.gostaria else 'bad' }}">{{ 'Sim' if pesquisa.gostaria else 'Não' }}</span></div>
-        <div class="mail-reason">{{ pesquisa.motivo or 'Sem justificativa.' }}</div>
+        <div class="tracking-reason">{{ pesquisa.motivo or 'Sem justificativa.' }}</div>
         <div><span class="alv8-badge {{ 'ok' if pesquisa.status=='rastreamento_liberado' else '' }}">{{ 'Liberado' if pesquisa.status=='rastreamento_liberado' else 'Nova' }}</span></div>
-        <div class="mail-date">{{ pesquisa.atualizado_em.strftime('%d/%m/%Y %H:%M') if pesquisa.atualizado_em else '—' }}</div>
+        <div class="tracking-date">{{ pesquisa.atualizado_em.strftime('%d/%m/%Y %H:%M') if pesquisa.atualizado_em else '—' }}</div>
       </div>
       {% else %}
-      <div class="alv8-empty">Nenhuma resposta recebida ainda.</div>
+      <div class="empty">Nenhuma resposta de rastreamento recebida.</div>
       {% endfor %}
     </div>
   </main>
-<script id="coopex-v11-nav">(function(){document.querySelectorAll('.alv8-group>button').forEach(btn=>{if(btn.dataset.v11bound)return;btn.dataset.v11bound='1';btn.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();const g=btn.parentElement;document.querySelectorAll('.alv8-group').forEach(x=>{if(x!==g)x.classList.remove('open')});g.classList.toggle('open')})});document.addEventListener('click',()=>document.querySelectorAll('.alv8-group').forEach(x=>x.classList.remove('open')));})();</script>
-</body>
-</html>
+  <div id="mailToast" class="toast-mail"><strong>Nova mensagem recebida</strong><small id="mailToastText"></small></div>
+<script>
+(()=>{
+  document.addEventListener('click',async e=>{
+    const b=e.target.closest('[data-read]');if(!b)return;
+    try{
+      const r=await fetch(b.dataset.read,{method:'POST',credentials:'same-origin',headers:{'X-Requested-With':'fetch'}});
+      const j=await r.json();if(!r.ok)throw new Error();
+      const tr=b.closest('tr');tr.classList.remove('unread');
+      const st=tr.querySelector('.mail-status');st.className='mail-status read';st.textContent='Lido';b.replaceWith(document.createTextNode('—'));
+      document.getElementById('mailUnreadKpi').textContent=j.unread||0;
+      const badge=document.getElementById('adminMailboxBadge');if(badge){badge.textContent=j.unread||0;badge.style.display=(j.unread||0)?'inline-grid':'none'}
+    }catch(_){alert('Não foi possível marcar como lido.')}
+  });
+  window.addEventListener('coopex:new-mail',e=>{
+    const t=document.getElementById('mailToast'),x=document.getElementById('mailToastText');if(!t)return;
+    x.textContent=(e.detail?.restaurante||'Estabelecimento')+' — '+(e.detail?.assunto||'Nova mensagem');
+    t.style.display='block';clearTimeout(window.__mailToastTimer);window.__mailToastTimer=setTimeout(()=>t.style.display='none',5000);
+  });
+})();
+</script>
+</body></html>
