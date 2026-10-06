@@ -211,3 +211,96 @@
     if(tab==='resumo')bindPartialForms('resumo');
   });
 })();
+
+
+/* COOPEX_BENEFIT_PREVIEW_GLOBAL_V1 */
+(function(){
+  'use strict';
+  if (window.__coopexBenefitPreviewGlobalV1) return;
+  window.__coopexBenefitPreviewGlobalV1 = true;
+
+  function money(v){
+    return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
+
+  function num(el){
+    const raw = String(el && el.value != null ? el.value : '').trim().replace(',', '.');
+    const value = parseFloat(raw);
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function selectedIds(el){
+    return Array.from((el && el.selectedOptions) || []).map(function(opt){
+      return String(opt.value);
+    });
+  }
+
+  function calc(prefix){
+    const sec = document.getElementById('beneficios');
+    if (!sec) return;
+
+    const unit = sec.querySelector('#' + prefix + '_valor_unit');
+    const beneficiaries = sec.querySelector('#' + prefix + '_beneficiarios');
+    const exemptions = sec.querySelector('#' + prefix + '_isencoes');
+    const badge = sec.querySelector('#' + prefix + '_badge');
+    const detail = sec.querySelector('#' + prefix + '_preview_detail');
+    const hidden = sec.querySelector('#' + prefix + '_valor_total') ||
+                   sec.querySelector('input[name="' + prefix + '_valor"]');
+
+    if (!unit || !beneficiaries || !exemptions) return;
+
+    const benefitIds = selectedIds(beneficiaries);
+    const exemptIds = selectedIds(exemptions);
+    const excluded = new Set(benefitIds.concat(exemptIds));
+    const totalCoops = beneficiaries.options ? beneficiaries.options.length : 0;
+    const receivers = benefitIds.length;
+    const exemptCount = exemptIds.length;
+    const payers = Math.max(0, totalCoops - excluded.size);
+    const unitValue = Math.max(0, num(unit));
+    const total = unitValue * receivers;
+    const perPayer = payers > 0 ? total / payers : 0;
+
+    if (badge) {
+      badge.textContent = 'Prévia: ' + money(perPayer) + ' por pagante';
+      badge.style.display = '';
+    }
+    if (detail) {
+      detail.textContent =
+        'Recebem: ' + receivers +
+        ' · Isentos: ' + exemptCount +
+        ' · Pagantes: ' + payers +
+        ' · Total: ' + money(total);
+    }
+    if (hidden) hidden.value = total.toFixed(2);
+  }
+
+  function calcAll(){
+    ['hosp','farm','alim'].forEach(calc);
+  }
+
+  function maybeCalcFromEvent(event){
+    const target = event && event.target;
+    const id = target && target.id ? target.id : '';
+    if (id.indexOf('hosp_') === 0) calc('hosp');
+    else if (id.indexOf('farm_') === 0) calc('farm');
+    else if (id.indexOf('alim_') === 0) calc('alim');
+  }
+
+  window.coopexCalcBenefitPreview = calc;
+  document.addEventListener('input', maybeCalcFromEvent, true);
+  document.addEventListener('change', maybeCalcFromEvent, true);
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', calcAll, {once:true});
+  } else {
+    calcAll();
+  }
+
+  const observer = new MutationObserver(function(){
+    if (document.getElementById('form-beneficios')) calcAll();
+  });
+  observer.observe(document.documentElement, {childList:true, subtree:true});
+})();
