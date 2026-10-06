@@ -34,7 +34,7 @@
       <a class="active" href="{{ url_for('rest_tabelas') }}"><i class="bi bi-table"></i> Tabelas</a>
       <a href="{{ url_for('portal_restaurante', view='mapa') }}"><i class="bi bi-geo-alt-fill"></i> Mapa <span class="badge-new">NOVO</span></a>
       <a href="{{ url_for('portal_restaurante', view='config') }}"><i class="bi bi-gear"></i> Configuração</a>
-      <a href="{{ url_for('portal_restaurante_avisos') }}"><i class="bi bi-bell"></i> Avisos {% if _avisos %}<span class="badge-dot">{{ _avisos }}</span>{% endif %}</a>
+      <a href="{{ url_for('portal_restaurante', view='avisos') }}"><i class="bi bi-bell"></i> Avisos {% if _avisos %}<span class="badge-dot">{{ _avisos }}</span>{% endif %}</a>
       <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a>
     </nav>
   </header>
