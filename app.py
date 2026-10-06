@@ -3301,14 +3301,14 @@ def exportar_lancamentos():
         return re.sub(r"\s+", " ", str(value or "").replace("_", " ").strip().casefold())
 
     def _scale_times(value):
-        """Extrai início/fim da faixa da escala sem consulta adicional."""
+        """Usa o primeiro horário como início e o último como fim real da escala."""
         text = str(value or "").strip().lower().replace("às", " a ").replace("–", "-").replace("—", "-")
         times = re.findall(r"(?<!\d)(\d{1,2})(?::|h)(\d{2})(?!\d)", text)
         if not times:
             times = re.findall(r"(?<!\d)(\d{1,2})h(?!\d)", text)
             times = [(h, "00") for h in times]
         normalized = []
-        for hh, mm in times[:2]:
+        for hh, mm in times:
             try:
                 h = int(hh); m = int(mm)
                 if 0 <= h <= 23 and 0 <= m <= 59:
@@ -3316,7 +3316,7 @@ def exportar_lancamentos():
             except Exception:
                 pass
         if len(normalized) >= 2:
-            return normalized[0], normalized[1]
+            return normalized[0], normalized[-1]
         if len(normalized) == 1:
             return normalized[0], ""
         return "", ""
