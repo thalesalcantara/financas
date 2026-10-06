@@ -5992,6 +5992,22 @@ def add_despesa_coop():
         c.id: c for c in Cooperado.query.join(Usuario, Cooperado.usuario_id == Usuario.id)
         .filter(Usuario.ativo.is_(True)).all()
     }
+    # "Todos" deve considerar somente cooperados realmente ativos.
+    # Registros arquivados/excluídos antigos podem ainda ter usuario.ativo=True no banco,
+    # então removemos também tudo que estiver na tabela de arquivados.
+    try:
+        arquivados = {
+            int(row[0])
+            for row in db.session.execute(
+                sa_text("SELECT cooperado_id FROM cooperados_arquivados_v8")
+            ).all()
+            if row and row[0] is not None
+        }
+    except Exception:
+        db.session.rollback()
+        arquivados = set()
+    if arquivados:
+        ativos = {cid: coop for cid, coop in ativos.items() if cid not in arquivados}
 
     ids = []
     if usar_todos:
