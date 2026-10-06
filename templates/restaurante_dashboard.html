@@ -1344,8 +1344,38 @@ body.rest-wide-modern .rest-shift-grid{gap:14px}
 body.rest-wide-modern .rest-shift-card{border-radius:15px}
 @media(max-width:900px){.rest-modern-topbar{height:auto;min-height:0;flex-wrap:wrap;padding:7px 9px 0;margin:0 -18px 12px}.rest-modern-brand{width:100%;min-width:0;height:44px}.rest-modern-nav{height:48px;flex-basis:100%}.rest-modern-nav a{padding:0 11px;font-size:.69rem}}
 </style>
+
+<style>
+/* Padronização definitiva: todas as abas ocupam a tela inteira */
+body.rest-wide-modern .shell{display:block!important;width:100%!important;max-width:none!important}
+body.rest-wide-modern .aside{display:none!important}
+body.rest-wide-modern main.content{width:100%!important;max-width:none!important;margin:0!important;padding:0 12px 24px!important;min-width:0!important}
+body.rest-wide-modern .rest-modern-topbar{width:calc(100% + 24px)!important;max-width:none!important;margin:0 -12px 14px!important;left:auto!important;right:auto!important}
+body.rest-wide-modern main.content>section[data-view]{width:100%!important;max-width:none!important;margin-left:0!important;margin-right:0!important}
+body.rest-wide-modern .coopex-welcome-bar{display:none!important}
+body.rest-wide-modern .rest-map-hero,
+body.rest-wide-modern .rest-map-card,
+body.rest-wide-modern .rest-scale-shell,
+body.rest-wide-modern .rest-history-head,
+body.rest-wide-modern .rest-history-filter,
+body.rest-wide-modern .rest-bottom-history{width:100%!important;max-width:none!important}
+
+/* Configuração — mesmo modelo da referência */
+.rest-config-shell{display:flex;flex-direction:column;gap:16px;width:100%}
+.rest-config-hero{background:linear-gradient(135deg,#fff,#f7fbff 72%);border:1px solid #dbe5f1;border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:15px;box-shadow:0 5px 16px rgba(25,58,99,.05)}
+.rest-config-hero-icon{width:64px;height:64px;border-radius:15px;background:linear-gradient(145deg,#1478ff,#075ad9);color:#fff;display:grid;place-items:center;font-size:1.7rem;box-shadow:0 10px 22px rgba(7,95,216,.22)}
+.rest-config-hero h1{margin:0;color:#0b2152;font-size:1.55rem;font-weight:950}.rest-config-hero p{margin:3px 0 0;color:#526b92;font-size:.84rem}
+.rest-config-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(310px,.82fr);gap:16px}
+.rest-config-card{background:#fff;border:1px solid #dbe5f1;border-radius:16px;box-shadow:0 5px 16px rgba(25,58,99,.045);overflow:hidden}
+.rest-config-main{padding:21px}.rest-config-head{display:flex;align-items:center;gap:13px;margin-bottom:20px}.rest-config-head-icon{width:48px;height:48px;border-radius:50%;background:#eef4ff;color:#173dd7;display:grid;place-items:center;font-size:1.25rem}.rest-config-head h2{margin:0;color:#0b2152;font-size:1.08rem;font-weight:950}.rest-config-head p{margin:2px 0 0;color:#607392;font-size:.78rem}
+.rest-config-form label{font-size:.78rem;font-weight:900;color:#0d2557;margin-bottom:6px}.rest-config-field{position:relative;margin-bottom:15px}.rest-config-field input{height:49px;border-radius:10px;border:1px solid #d4e0ef;padding-left:46px;padding-right:58px;font-size:.82rem}.rest-config-field .field-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:#173568}.rest-config-eye{position:absolute;right:0;top:0;width:54px;height:49px;border:0;border-left:1px solid #dce6f2;border-radius:0 10px 10px 0;background:#eef4ff;color:#1760d9}.rest-config-help{font-size:.72rem;color:#657792;margin-top:-9px;margin-bottom:14px}
+.rest-config-save-row{display:flex;justify-content:flex-end}.rest-config-save{height:47px;min-width:190px;border:0;border-radius:10px;background:linear-gradient(145deg,#1478ff,#075ad9);color:#fff;font-size:.82rem;font-weight:950;box-shadow:0 8px 18px rgba(7,95,216,.18)}
+.rest-config-side{background:#f6fbff;padding:17px;height:100%}.rest-config-side-title{display:flex;align-items:center;gap:10px;margin-bottom:13px}.rest-config-info-icon{width:42px;height:42px;border-radius:50%;background:linear-gradient(145deg,#4aa7ff,#2081ec);display:grid;place-items:center;color:#fff;font-size:1.1rem}.rest-config-side-title h3{margin:0;color:#0b2152;font-size:1rem;font-weight:950}
+.rest-config-tip{display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid #e1ebf5;border-radius:14px;padding:15px}.rest-config-tip+.rest-config-tip{margin-top:14px}.rest-config-tip-icon{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;font-size:1.1rem}.rest-config-tip.secure .rest-config-tip-icon{background:#eef4ff;color:#1765df}.rest-config-tip.private .rest-config-tip-icon{background:#e9f8ed;color:#16a34a}.rest-config-tip.help .rest-config-tip-icon{background:#fff4e6;color:#d88412}.rest-config-tip strong{display:block;color:#0b2152;font-size:.87rem;font-weight:950}.rest-config-tip p{margin:3px 0 0;color:#536c91;font-size:.77rem;line-height:1.4}
+@media(max-width:900px){.rest-config-grid{grid-template-columns:1fr}.rest-config-save{width:100%}.rest-config-save-row{display:block}}
+</style>
 </head>
-<body class="{{ 'rest-wide-modern' if view in ['escalas','mapa'] else '' }}">
+<body class="rest-wide-modern">
   <div class="shell">
     <aside class="aside">
       <div class="brand coopex-brand-welcome"><i class="bi bi-shop"></i><span class="coopex-brand-copy"><small>SEJA BEM-VINDO</small><strong>{{ coopex_rest_display_name|default('ESTABELECIMENTO') }}</strong></span></div>
@@ -1384,23 +1414,21 @@ body.rest-wide-modern .rest-shift-card{border-radius:15px}
 
     
     <main class="content">
-      {% if view in ['escalas','mapa'] %}
       {% set _modern_name = ((rest.nome if rest is defined and rest else 'ESTABELECIMENTO')|replace('_',' ')) %}
       {% set _modern_avisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
       <header class="rest-modern-topbar">
         <div class="rest-modern-brand"><div class="rest-modern-brand-icon"><i class="bi bi-shop"></i></div><div class="rest-modern-brand-copy"><strong>{{ _modern_name }}</strong><small>Estabelecimento</small></div></div>
-        <nav class="rest-modern-nav">
-          <a href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-person-plus"></i> Lançar Produção</a>
-          <a href="{{ url_for('portal_restaurante', view='lancamentos') }}"><i class="bi bi-clock-history"></i> Histórico de Produção</a>
-          <a class="{{ 'active' if view=='escalas' else '' }}" href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-calendar3"></i> Escala</a>
-          <a href="{{ url_for('rest_tabelas') }}"><i class="bi bi-table"></i> Tabelas</a>
-          <a class="{{ 'active' if view=='mapa' else '' }}" href="{{ url_for('portal_restaurante', view='mapa') }}"><i class="bi bi-geo-alt-fill"></i> Mapa <span class="rest-modern-new">NOVO</span></a>
-          <a href="{{ url_for('portal_restaurante', view='config') }}"><i class="bi bi-gear"></i> Configuração</a>
-          <a href="{{ url_for('portal_restaurante', view='avisos') }}"><i class="bi bi-bell"></i> Avisos {% if _modern_avisos %}<span class="rest-modern-badge">{{ _modern_avisos }}</span>{% endif %}</a>
+        <nav class="rest-modern-nav" id="modernNav">
+          <a data-target="lancar" class="{{ 'active' if view=='lancar' else '' }}" href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-person-plus"></i> Lançar Produção</a>
+          <a data-target="lancamentos" class="{{ 'active' if view=='lancamentos' else '' }}" href="{{ url_for('portal_restaurante', view='lancamentos') }}"><i class="bi bi-clock-history"></i> Histórico de Produção</a>
+          <a data-target="escalas" class="{{ 'active' if view=='escalas' else '' }}" href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-calendar3"></i> Escala</a>
+          <a data-prefetch="1" href="{{ url_for('rest_tabelas') }}"><i class="bi bi-table"></i> Tabelas</a>
+          <a data-target="mapa" class="{{ 'active' if view=='mapa' else '' }}" href="{{ url_for('portal_restaurante', view='mapa') }}"><i class="bi bi-geo-alt-fill"></i> Mapa <span class="rest-modern-new">NOVO</span></a>
+          <a data-target="config" class="{{ 'active' if view=='config' else '' }}" href="{{ url_for('portal_restaurante', view='config') }}"><i class="bi bi-gear"></i> Configuração</a>
+          <a data-target="avisos" class="{{ 'active' if view=='avisos' else '' }}" href="{{ url_for('portal_restaurante', view='avisos') }}"><i class="bi bi-bell"></i> Avisos {% if _modern_avisos %}<span class="rest-modern-badge">{{ _modern_avisos }}</span>{% endif %}</a>
           <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a>
         </nav>
       </header>
-      {% endif %}
       <div class="coopex-welcome-bar mb-3" style="background:#fff;border:1px solid var(--border);border-left:5px solid var(--royal);border-radius:16px;padding:13px 16px;box-shadow:0 6px 18px rgba(33,65,217,.06)">
         <div style="font-size:.75rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Bem-vindo</div>
         <div style="font-size:1.05rem;font-weight:800;color:var(--royal)">{{ ((rest.nome if rest is defined and rest else (restaurante.nome if restaurante is defined and restaurante else 'ESTABELECIMENTO'))|replace('_',' ')) }}</div>
@@ -1468,37 +1496,59 @@ body.rest-wide-modern .rest-shift-card{border-radius:15px}
       </section>
 
       <section data-view="config">
-        <div class="section-title"><i class="bi bi-shield-lock"></i> Configuração</div>
-        <div class="card card-body">
-          <form class="row g-3 form-password" method="POST" action="{{ url_for('rest_alterar_senha') }}">
-            <div class="col-md-4">
-              <label class="form-label">Senha atual</label>
-              <div class="input-group">
-                <input type="password" class="form-control" name="senha_atual" required>
-                <button class="btn btn-outline-royal" type="button" onclick="togglePwd(this)"><i class="bi bi-eye"></i></button>
+        <div class="rest-config-shell">
+          <div class="rest-config-hero">
+            <div class="rest-config-hero-icon"><i class="bi bi-gear-fill"></i></div>
+            <div><h1>Configuração</h1><p>Gerencie suas preferências e mantenha sua conta segura.</p></div>
+          </div>
+
+          <div class="rest-config-grid">
+            <div class="rest-config-card">
+              <div class="rest-config-main">
+                <div class="rest-config-head">
+                  <div class="rest-config-head-icon"><i class="bi bi-lock-fill"></i></div>
+                  <div><h2>Alterar senha</h2><p>Defina uma nova senha de acesso para sua conta.</p></div>
+                </div>
+                <form class="rest-config-form" method="POST" action="{{ url_for('rest_alterar_senha') }}">
+                  <label>Senha atual</label>
+                  <div class="rest-config-field">
+                    <i class="bi bi-lock field-icon"></i>
+                    <input type="password" class="form-control" name="senha_atual" placeholder="Digite sua senha atual" required>
+                    <button class="rest-config-eye" type="button" onclick="toggleConfigPwd(this)"><i class="bi bi-eye"></i></button>
+                  </div>
+
+                  <label>Nova senha</label>
+                  <div class="rest-config-field">
+                    <i class="bi bi-lock field-icon"></i>
+                    <input type="password" class="form-control" name="senha_nova" minlength="6" placeholder="Digite a nova senha" required>
+                    <button class="rest-config-eye" type="button" onclick="toggleConfigPwd(this)"><i class="bi bi-eye"></i></button>
+                  </div>
+                  <div class="rest-config-help">Mínimo de 6 caracteres.</div>
+
+                  <label>Confirmar nova senha</label>
+                  <div class="rest-config-field">
+                    <i class="bi bi-lock field-icon"></i>
+                    <input type="password" class="form-control" name="senha_conf" minlength="6" placeholder="Digite novamente a nova senha" required>
+                    <button class="rest-config-eye" type="button" onclick="toggleConfigPwd(this)"><i class="bi bi-eye"></i></button>
+                  </div>
+
+                  <div class="rest-config-save-row"><button class="rest-config-save" type="submit"><i class="bi bi-floppy me-2"></i>Salvar alteração</button></div>
+                </form>
               </div>
             </div>
-            <div class="col-md-4">
-              <label class="form-label">Nova senha</label>
-              <div class="input-group">
-                <input type="password" class="form-control" name="senha_nova" minlength="6" required>
-                <button class="btn btn-outline-royal" type="button" onclick="togglePwd(this)"><i class="bi bi-eye"></i></button>
-              </div>
-              <div class="form-text">Mínimo de 6 caracteres.</div>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Confirmar nova senha</label>
-              <div class="input-group">
-                <input type="password" class="form-control" name="senha_conf" minlength="6" required>
-                <button class="btn btn-outline-royal" type="button" onclick="togglePwd(this)"><i class="bi bi-eye"></i></button>
+
+            <div class="rest-config-card">
+              <div class="rest-config-side">
+                <div class="rest-config-side-title"><div class="rest-config-info-icon"><i class="bi bi-info-lg"></i></div><h3>Informações importantes</h3></div>
+                <div class="rest-config-tip secure"><div class="rest-config-tip-icon"><i class="bi bi-shield-lock-fill"></i></div><div><strong>Mantenha sua conta segura</strong><p>Utilize uma senha forte, com letras, números e símbolos.</p></div></div>
+                <div class="rest-config-tip private"><div class="rest-config-tip-icon"><i class="bi bi-lock-fill"></i></div><div><strong>Não compartilhe sua senha</strong><p>Sua senha é pessoal e intransferível.</p></div></div>
+                <div class="rest-config-tip help"><div class="rest-config-tip-icon"><i class="bi bi-clock-history"></i></div><div><strong>Em caso de dúvidas</strong><p>Entre em contato com a administração do sistema.</p></div></div>
               </div>
             </div>
-            <div class="col-12 text-end"><button class="btn btn-royal"><i class="bi bi-save"></i> Salvar</button></div>
-          </form>
+          </div>
         </div>
       </section>
 
-      
       <section data-view="escalas">
         {% macro render_scale_day(dia, lista, show_label=false) %}
           {% set ns = namespace(day_count=0, night_count=0, first_day_time='', first_night_time='') %}
@@ -2611,15 +2661,13 @@ function setPhone(digits) {
       document.querySelectorAll('section[data-view]').forEach(sec=>{
         sec.classList.toggle('view-active', sec.getAttribute('data-view')===view);
       });
-      document.querySelectorAll('#sideNav a').forEach(a=>{
+      document.querySelectorAll('#sideNav a[data-target], #modernNav a[data-target]').forEach(a=>{
         const t=a.getAttribute('data-target');
         a.classList.toggle('active', t===view);
       });
       if(view==='avisos') initAvisos();
       if(view==='lancamentos') initLancamentos();
       if(view==='lancar') initLancar();
-      if(view==='tabelas') initTabelas();
-      if(view==='mapa') initMapa();
       if(view==='mapa') initMapa();
     }
 
@@ -2638,6 +2686,39 @@ function setPhone(digits) {
         return 'lancar';
       }
     }
+
+    function toggleConfigPwd(btn){
+      const input=btn?.parentElement?.querySelector('input');
+      const icon=btn?.querySelector('i');
+      if(!input)return;
+      input.type=input.type==='password'?'text':'password';
+      icon?.classList.toggle('bi-eye',input.type==='password');
+      icon?.classList.toggle('bi-eye-slash',input.type!=='password');
+    }
+
+    // Mapa, Configuração e Avisos já estão no HTML: troca instantânea sem reload.
+    document.addEventListener('click',function(ev){
+      const a=ev.target.closest('#modernNav a[data-target]');
+      if(!a)return;
+      const target=a.dataset.target;
+      if(!['mapa','config','avisos'].includes(target))return;
+      if(!document.querySelector('section[data-view="'+target+'"]'))return;
+      ev.preventDefault();
+      showSection(target);
+      pushView(target);
+      window.scrollTo({top:0,behavior:'instant'});
+    });
+
+    // Pré-carrega as páginas mais pesadas quando o navegador estiver ocioso.
+    function prefetchPortalTabs(){
+      document.querySelectorAll('#modernNav a[href]').forEach(a=>{
+        const href=a.getAttribute('href')||'';
+        if(!href || href.includes('/logout') || href===location.href)return;
+        prefetch(href);
+      });
+    }
+    if('requestIdleCallback' in window) requestIdleCallback(prefetchPortalTabs,{timeout:1800});
+    else setTimeout(prefetchPortalTabs,900);
 
     function togglePwd(btn){
       const i=btn.previousElementSibling;
