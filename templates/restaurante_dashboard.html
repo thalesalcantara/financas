@@ -1515,6 +1515,11 @@ section[data-view="calendario"] .cal-title{
   }
 }
 </style>
+<style id="calendar-stop-sound-style">
+.cal-alert-toast{min-width:280px}
+.cal-stop-sound{margin-top:10px;width:100%;height:36px;border:0;border-radius:8px;background:#fff;color:#12396f;font-size:.72rem;font-weight:950;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
+.cal-stop-sound:hover{background:#edf4ff}
+</style>
 </head>
 <body class="rest-wide-modern">
   <div class="shell">
@@ -3261,11 +3266,19 @@ function setPhone(digits) {
           const when=Date.parse(item.fire_at),delay=Math.max(0,when-Date.now());
           if(delay>7*24*60*60*1000)continue;
           const tid=setTimeout(async()=>{
+            const stopAlarm=()=>{
+              if(window.__calAlarmTimer){clearInterval(window.__calAlarmTimer);window.__calAlarmTimer=null;}
+              const t=document.getElementById('calAlertToast');if(t)t.style.display='none';
+            };
+            if(window.__calAlarmTimer)clearInterval(window.__calAlarmTimer);
             calendarBeep();
+            window.__calAlarmTimer=setInterval(calendarBeep,4000);
             const t=document.getElementById('calAlertToast');if(t){
               document.getElementById('calAlertTitle').textContent=item.title||'Lembrete';
               document.getElementById('calAlertText').textContent=item.description||'Lembrete do calendário';
-              t.style.display='block';clearTimeout(window.__calToast);window.__calToast=setTimeout(()=>t.style.display='none',8000);
+              t.style.display='block';
+              const b=document.getElementById('calStopSound');
+              if(b)b.onclick=stopAlarm;
             }
             try{await fetch('/api/rest/calendario/'+item.id+'/disparado',{method:'POST',credentials:'same-origin'});}catch(_){}
           },Math.min(delay,2147480000));
@@ -4691,6 +4704,6 @@ function setPhone(digits) {
     });
   </script>
 
-<div id="calAlertToast" class="cal-alert-toast"><strong id="calAlertTitle">Lembrete</strong><small id="calAlertText"></small></div>
+<div id="calAlertToast" class="cal-alert-toast"><strong id="calAlertTitle">Lembrete</strong><small id="calAlertText"></small><button type="button" id="calStopSound" class="cal-stop-sound"><i class="bi bi-volume-mute-fill"></i> Parar som</button></div>
 </body>
 </html>
