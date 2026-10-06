@@ -2712,13 +2712,23 @@ def get_avisos_for_restaurante(rest: Restaurante):
                 ),
             )
         )
-        .order_by(
-            Aviso.fixado.desc(),
-            _PRIORD.asc(),
-            Aviso.criado_em.desc(),
-        )
     )
 
+    # Excluído pelo estabelecimento significa oculto somente para ele.
+    try:
+        _ensure_aviso_restaurante_ocultos_schema()
+        ocultos = db.select(aviso_restaurante_ocultos.c.aviso_id).where(
+            aviso_restaurante_ocultos.c.restaurante_id == rest.id
+        )
+        q = q.filter(~Aviso.id.in_(ocultos))
+    except Exception:
+        db.session.rollback()
+
+    q = q.order_by(
+        Aviso.fixado.desc(),
+        _PRIORD.asc(),
+        Aviso.criado_em.desc(),
+    )
     return q.all()
 
 # =========================
@@ -9241,7 +9251,7 @@ def marcar_todos_avisos_lidos_restaurante():
                 restaurante_id=rest.id, aviso_id=a.id, lido_em=now
             ))
     db.session.commit()
-    return redirect(url_for("portal_restaurante_avisos"))
+    return redirect(url_for("portal_restaurante", view="avisos"))
 
 # =========================
 # Avisos: contagem de não lidos (Cooperado/Restaurante)
