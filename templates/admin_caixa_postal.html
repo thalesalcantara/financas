@@ -107,4 +107,20 @@
   });
 })();
 </script>
+<script id="coopex-mailbox-nav-fix">
+(function(){
+  document.querySelectorAll('.alv8-group>button').forEach(btn=>{
+    if(btn.dataset.mailboxNavBound)return;
+    btn.dataset.mailboxNavBound='1';
+    btn.addEventListener('click',e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const g=btn.parentElement;
+      document.querySelectorAll('.alv8-group').forEach(x=>{if(x!==g)x.classList.remove('open')});
+      g.classList.toggle('open');
+    });
+  });
+  document.addEventListener('click',()=>document.querySelectorAll('.alv8-group').forEach(x=>x.classList.remove('open')));
+})();
+</script>
 </body></html>
