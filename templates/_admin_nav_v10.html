@@ -67,13 +67,20 @@
   box-shadow:0 0 0 2px #fff;
   vertical-align:middle;
 }
+.admin-management-btn{
+  position:relative!important;
+  padding-right:34px!important;
+}
 .admin-management-btn .admin-mail-count{
-  position:absolute;top:5px;right:8px;z-index:5;
-  transform:translate(45%,-45%);
+  position:absolute!important;
+  top:7px!important;
+  right:8px!important;
+  transform:none!important;
+  z-index:5!important;
 }
 #adminMailboxBadge{margin-left:5px}
 #adminMailboxLoginNotice{
-  position:fixed;top:78px;left:50%;transform:translateX(-50%);
+  position:fixed;top:84px;left:50%;transform:translateX(-50%);
   z-index:10050;background:#16a34a;color:#fff;border-radius:8px;
   padding:7px 12px;font-size:12px;font-weight:800;
   box-shadow:0 10px 28px rgba(22,163,74,.28);
@@ -84,6 +91,9 @@
 }
 </style>
 <div id="adminMailboxLoginNotice"><i class="bi bi-envelope-fill"></i> Você tem um novo recado na Caixa Postal COOPEX</div>
+<audio id="adminMailboxAudio" preload="auto">
+  <source src="data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YRAAAAAA////AP//AAD//wAA" type="audio/wav">
+</audio>
 
 
 
@@ -117,12 +127,21 @@
   }
 
   function beep(){
+    const a=document.getElementById('adminMailboxAudio');
+    if(a){
+      try{
+        a.currentTime=0;
+        const p=a.play();
+        if(p&&typeof p.catch==='function'){
+          p.catch(()=>{pendingBeep=true;});
+        }
+        return;
+      }catch(_){}
+    }
     try{
       audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
       if(audioCtx.state==='suspended'){
-        const p=audioCtx.resume();
-        if(p&&typeof p.then==='function')p.then(()=>beep()).catch(()=>{pendingBeep=true});
-        else pendingBeep=true;
+        pendingBeep=true;
         return;
       }
       pendingBeep=false;
@@ -136,6 +155,18 @@
   }
 
   document.addEventListener('pointerdown',()=>{
+    const a=document.getElementById('adminMailboxAudio');
+    if(a){
+      try{
+        a.muted=true;
+        a.currentTime=0;
+        const p=a.play();
+        Promise.resolve(p).then(()=>{
+          a.pause();a.muted=false;a.currentTime=0;
+          if(pendingBeep)beep();
+        }).catch(()=>{a.muted=false;});
+      }catch(_){}
+    }
     try{
       audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
       const p=audioCtx.state==='suspended'?audioCtx.resume():Promise.resolve();
@@ -195,6 +226,7 @@
   if(initialUnread>0 && sessionStorage.getItem('coopex-mailbox-login-notified')!=='1'){
     sessionStorage.setItem('coopex-mailbox-login-notified','1');
     showMailNotice();
+    pendingBeep=true;
     beep();
   }
   document.querySelectorAll('a[href="{{ url_for("logout") }}"]').forEach(a=>a.addEventListener('click',()=>{
