@@ -241,7 +241,11 @@ def _scheduler_loop():
                 now = datetime.utcnow()
                 due = (
                     CalendarioLembrete.query
-                    .filter(CalendarioLembrete.enviado_em.is_(None), CalendarioLembrete.disparar_em <= now)
+                    .filter(
+                        CalendarioLembrete.destino == "coopex",
+                        CalendarioLembrete.enviado_em.is_(None),
+                        CalendarioLembrete.disparar_em <= now,
+                    )
                     .order_by(CalendarioLembrete.disparar_em.asc())
                     .limit(100)
                     .all()
@@ -251,7 +255,10 @@ def _scheduler_loop():
 
                 nxt = (
                     CalendarioLembrete.query
-                    .filter(CalendarioLembrete.enviado_em.is_(None))
+                    .filter(
+                        CalendarioLembrete.destino == "coopex",
+                        CalendarioLembrete.enviado_em.is_(None),
+                    )
                     .order_by(CalendarioLembrete.disparar_em.asc())
                     .first()
                 )
@@ -326,11 +333,13 @@ def rest_calendario_proximos():
     ensure_calendar_schema()
     now=datetime.utcnow()
     end=now+timedelta(days=7)
+    # Inclui lembretes vencidos nas últimas 24h: ao abrir o painel eles disparam
+    # uma vez e são confirmados pelo navegador, sem qualquer polling.
     rows=CalendarioLembrete.query.filter(
         CalendarioLembrete.restaurante_id==rest.id,
         CalendarioLembrete.destino=="pessoal",
         CalendarioLembrete.enviado_em.is_(None),
-        CalendarioLembrete.disparar_em>=now,
+        CalendarioLembrete.disparar_em>=now-timedelta(days=1),
         CalendarioLembrete.disparar_em<=end,
     ).order_by(CalendarioLembrete.disparar_em.asc()).limit(30).all()
     return jsonify(ok=True, reminders=[{
@@ -382,6 +391,20 @@ def rest_calendario_criar():
         _deliver(rem)
     wake_scheduler()
     return jsonify(ok=True,id=rem.id,message="Lembrete salvo.")
+
+
+@app.post("/api/rest/calendario/<int:item_id>/disparado", endpoint="rest_calendario_disparado")
+def rest_calendario_disparado(item_id):
+    rest=_rest_atual()
+    if not rest: abort(403)
+    ensure_calendar_schema()
+    row=CalendarioLembrete.query.filter_by(
+        id=item_id, restaurante_id=rest.id, destino="pessoal"
+    ).first_or_404()
+    if not row.enviado_em:
+        row.enviado_em=datetime.utcnow()
+        db.session.commit()
+    return jsonify(ok=True)
 
 
 @app.post("/api/rest/calendario/<int:item_id>/concluir", endpoint="rest_calendario_concluir")
