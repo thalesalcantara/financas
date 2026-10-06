@@ -1607,6 +1607,45 @@ section[data-view="calendario"] .cal-field textarea{
   }
 }
 </style>
+
+<style id="calendar-section-height-reset">
+/* A aba Calendário deve terminar junto com o conteúdo, sem ocupar o resto da viewport */
+body.rest-wide-modern section[data-view="calendario"],
+body.rest-wide-modern section[data-view="calendario"] .cal-shell,
+body.rest-wide-modern section[data-view="calendario"] .cal-panel,
+body.rest-wide-modern section[data-view="calendario"] .cal-main-layout,
+body.rest-wide-modern section[data-view="calendario"] .cal-main-column,
+body.rest-wide-modern section[data-view="calendario"] .cal-side-column{
+  min-height:0!important;
+  height:auto!important;
+  max-height:none!important;
+}
+
+body.rest-wide-modern section[data-view="calendario"]{
+  display:none;
+  align-self:start!important;
+  overflow:visible!important;
+}
+body.rest-wide-modern section[data-view="calendario"].active{
+  display:block!important;
+}
+
+body.rest-wide-modern section[data-view="calendario"] .cal-panel{
+  overflow:visible!important;
+}
+
+body.rest-wide-modern .main:has(section[data-view="calendario"].active),
+body.rest-wide-modern .content:has(section[data-view="calendario"].active),
+body.rest-wide-modern .page-content:has(section[data-view="calendario"].active){
+  min-height:0!important;
+  height:auto!important;
+}
+
+body.rest-wide-modern section[data-view="calendario"] .cal-main-layout{
+  margin-bottom:0!important;
+  padding-bottom:8px!important;
+}
+</style>
 </head>
 <body class="rest-wide-modern">
   <div class="shell">
