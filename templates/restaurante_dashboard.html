@@ -1374,6 +1374,23 @@ body.rest-wide-modern .rest-bottom-history{width:100%!important;max-width:none!i
 .rest-config-tip{display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid #e1ebf5;border-radius:14px;padding:15px}.rest-config-tip+.rest-config-tip{margin-top:14px}.rest-config-tip-icon{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;font-size:1.1rem}.rest-config-tip.secure .rest-config-tip-icon{background:#eef4ff;color:#1765df}.rest-config-tip.private .rest-config-tip-icon{background:#e9f8ed;color:#16a34a}.rest-config-tip.help .rest-config-tip-icon{background:#fff4e6;color:#d88412}.rest-config-tip strong{display:block;color:#0b2152;font-size:.87rem;font-weight:950}.rest-config-tip p{margin:3px 0 0;color:#536c91;font-size:.77rem;line-height:1.4}
 @media(max-width:900px){.rest-config-grid{grid-template-columns:1fr}.rest-config-save{width:100%}.rest-config-save-row{display:block}}
 </style>
+
+<style>
+/* ===== Avisos do estabelecimento ===== */
+.rest-notices{display:flex;flex-direction:column;gap:14px;width:100%}
+.rest-notices-hero{background:linear-gradient(135deg,#fff,#f7fbff);border:1px solid #dbe5f1;border-radius:16px;padding:15px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 5px 16px rgba(25,58,99,.05)}
+.rest-notices-hero-icon{width:55px;height:55px;border-radius:13px;background:linear-gradient(145deg,#1478ff,#075ad9);color:#fff;display:grid;place-items:center;font-size:1.45rem;box-shadow:0 8px 18px rgba(7,95,216,.2)}
+.rest-notices-hero h1{margin:0;color:#0b2152;font-size:1.45rem;font-weight:950}.rest-notices-hero p{margin:3px 0 0;color:#607392;font-size:.8rem}
+.rest-notices-panel{background:#fff;border:1px solid #dbe5f1;border-radius:16px;box-shadow:0 5px 16px rgba(25,58,99,.045);overflow:hidden}
+.rest-notices-tools{padding:14px 18px;display:flex;align-items:center;gap:10px;justify-content:space-between;border-bottom:1px solid #e7edf5;flex-wrap:wrap}
+.rest-notice-tabs{display:flex;gap:8px}.rest-notice-tab{height:42px;padding:0 18px;border:1px solid #d5e2f1;border-radius:10px;background:#fff;color:#153662;font-size:.75rem;font-weight:900;display:inline-flex;align-items:center;gap:7px}.rest-notice-tab.active{background:linear-gradient(145deg,#1478ff,#075ad9);color:#fff;border-color:#075ad9;box-shadow:0 7px 16px rgba(7,95,216,.16)}
+.rest-notice-search{display:flex;gap:8px;align-items:center}.rest-notice-searchbox{position:relative}.rest-notice-searchbox i{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#244672}.rest-notice-searchbox input{height:42px;width:300px;border:1px solid #d5e2f1;border-radius:10px;padding:0 12px 0 38px;font-size:.76rem}.rest-notice-sort{height:42px;min-width:170px;border:1px solid #d5e2f1;border-radius:10px;padding:0 11px;color:#173963;font-size:.74rem;font-weight:800;background:#fff}
+.rest-notices-bulk{min-height:48px;padding:8px 18px;background:#f8fbff;border-bottom:1px solid #e5edf6;display:flex;align-items:center;justify-content:space-between;gap:10px}.rest-notices-markall{border:0;background:transparent;color:#536b8d;font-size:.73rem;font-weight:850;display:flex;align-items:center;gap:8px}.rest-notices-markall .box{width:16px;height:16px;border:1px solid #a9bdd8;border-radius:4px;background:#fff}.rest-notices-only{display:flex;align-items:center;gap:8px;font-size:.73rem;color:#173963}
+.rest-notice-tablewrap{overflow:auto}.rest-notice-table{width:100%;border-collapse:collapse;min-width:850px}.rest-notice-table th{background:#f7faff;color:#355274;text-transform:uppercase;font-size:.61rem;font-weight:950;padding:11px 14px;border-bottom:1px solid #dce6f1}.rest-notice-table td{padding:11px 14px;border-bottom:1px solid #e8eef5;font-size:.72rem;color:#263f64;vertical-align:middle}.rest-notice-table tbody tr:last-child td{border-bottom:0}.rest-notice-table tbody tr:hover{background:#fbfdff}
+.notice-title{font-weight:950;color:#0b2152}.notice-message{color:#526b8e;max-width:680px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.notice-date{white-space:nowrap;color:#264267}.notice-status{display:inline-flex;align-items:center;gap:6px;border-radius:9px;padding:6px 9px;font-size:.66rem;font-weight:900;border:0}.notice-status:before{content:"";width:7px;height:7px;border-radius:50%}.notice-status.unread{background:#eaf3ff;color:#0865df}.notice-status.unread:before{background:#1478ff}.notice-status.read{background:#e8f8ee;color:#138247}.notice-status.read:before{background:#13a45b}
+.notice-delete{width:34px;height:34px;border-radius:9px;border:1px solid #ffd2d2;background:#fff4f4;color:#e63d3d;display:grid;place-items:center;margin:auto}.notice-delete:hover{background:#ffe9e9}.notice-empty{padding:38px;text-align:center;color:#6d7d96}
+@media(max-width:760px){.rest-notice-tabs{width:100%;overflow:auto}.rest-notice-tab{flex:0 0 auto}.rest-notice-search{width:100%;display:grid;grid-template-columns:1fr}.rest-notice-searchbox input,.rest-notice-sort{width:100%}.rest-notices-bulk{align-items:flex-start;flex-direction:column}.rest-notices-hero-icon{width:48px;height:48px}.rest-notices-hero h1{font-size:1.2rem}}
+</style>
 </head>
 <body class="rest-wide-modern">
   <div class="shell">
@@ -1742,83 +1759,70 @@ body.rest-wide-modern .rest-bottom-history{width:100%!important;max-width:none!i
         </div>
       </section>
 
-<section data-view="avisos">
+<section data-view="avisos" data-notices-loaded="{{ '1' if view == 'avisos' else '0' }}">
         {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
-        {% set _unread_from_list = (_avisos | selectattr('lido','equalto',False) | list | length) %}
-        {% set _unread_from_ctx = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
-        {% set _badgeN = (_unread_from_list if _unread_from_list>0 else _unread_from_ctx) %}
-        <div class="section-title">
-          <i class="bi bi-megaphone-fill"></i> Avisos
-          <span id="badgeTitulo" class="badge {{ 'text-bg-danger' if _badgeN>0 else 'text-bg-success' }} ms-2">
-            {{ _badgeN>0 and (_badgeN ~ ' não lido(s)') or 'Tudo lido' }}
-          </span>
-        </div>
-
-        <div class="card card-body">
-          <div class="d-flex align-items-center gap-2">
-            <form method="POST" action="{{ url_for('marcar_todos_avisos_lidos_restaurante') }}" class="m-0">
-              <button class="btn btn-royal" type="submit" {% if _badgeN == 0 %}disabled{% endif %}><i class="bi bi-check2-circle me-1"></i> Marcar todos como lidos</button>
-            </form>
-            <div class="form-check ms-auto">
-              <input class="form-check-input" type="checkbox" id="toggleNaoLidos">
-              <label class="form-check-label" for="toggleNaoLidos">Mostrar apenas não lidos</label>
-            </div>
+        {% set _unread = (_avisos | selectattr('lido','equalto',False) | list | length) %}
+        <div class="rest-notices">
+          <div class="rest-notices-hero">
+            <div class="rest-notices-hero-icon"><i class="bi bi-megaphone-fill"></i></div>
+            <div><h1>Avisos</h1><p>Acompanhe as informações importantes enviadas pela COOPEX.</p></div>
           </div>
-        </div>
 
-        <div id="avisosListContainer">
-          {% if _avisos and (_avisos | length) > 0 %}
-            {% for a in _avisos %}
-            <div id="aviso-{{ a.id }}" class="card card-body my-2 aviso-card {% if a.lido %}lido{% endif %} {% if a.prioridade_alta %}prioridade{% endif %}" data-lido="{{ '1' if a.lido else '0' }}">
-              <div class="d-flex justify-content-between align-items-start">
-                <div>
-                  <div class="fw-bold">
-                    {{ a.titulo or 'Aviso' }}
-                    {% if a.prioridade_alta %}
-                      <span class="badge text-bg-danger ms-2"><i class="bi bi-exclamation-triangle-fill"></i> Prioridade</span>
-                    {% endif %}
-                  </div>
-                  <div class="text-muted small">
-                    Publicado em {{ a.criado_em.strftime('%d/%m/%Y %H:%M') if a.criado_em }}
-                    {% if a.atualizado_em %} · Atualizado {{ a.atualizado_em.strftime('%d/%m/%Y %H:%M') }}{% endif %}
-                    {% if a.lido %} • <span class="text-success">Lido</span>{% else %} • <span class="text-danger">Não lido</span>{% endif %}
-                  </div>
-                </div>
-                <div class="ms-3">
-                  {% if not a.lido %}
-                  <button class="btn btn-outline-royal btn-sm" data-acao="marcar-lido" data-url="{{ url_for('marcar_aviso_lido_universal', aviso_id=a.id) }}">
-                    <i class="bi bi-check2"></i> Marcar como lido
-                  </button>
-                  {% endif %}
-                </div>
+          <div class="rest-notices-panel">
+            <div class="rest-notices-tools">
+              <div class="rest-notice-tabs" role="tablist">
+                <button type="button" class="rest-notice-tab active" data-notice-filter="all"><i class="bi bi-list-ul"></i> Todos</button>
+                <button type="button" class="rest-notice-tab" data-notice-filter="read"><i class="bi bi-envelope-open"></i> Lidos</button>
+                <button type="button" class="rest-notice-tab" data-notice-filter="unread"><i class="bi bi-circle-fill" style="font-size:.55rem"></i> Não lidos</button>
               </div>
-
-              <hr class="my-2">
-
-              <div class="aviso-body">
-                {% set html = (
-                  a.corpo_html or a.conteudo_html or a.mensagem_html or a.descricao_html or a.body_html or a.recado_html
-                  or (a.dados and (a.dados.corpo_html or a.dados.conteudo_html or a.dados.mensagem_html or a.dados.descricao_html or a.dados.body_html or a.dados.recado_html))
-                ) %}
-                {% if html and html|trim %}
-                  {{ html|safe }}
-                {% else %}
-                  {% set txt = (
-                    a.corpo or a.conteudo or a.mensagem or a.texto or a.descricao or a.body or a.message or a.content or a.recado
-                    or (a.dados and (a.dados.corpo or a.dados.conteudo or a.dados.mensagem or a.dados.texto or a.dados.descricao or a.dados.body or a.dados.message or a.dados.content or a.dados.recado))
-                  ) %}
-                  {% if txt and txt|trim %}
-                    <p class="mb-0">{{ txt|e|replace('\r\n','\n')|replace('\n','<br>')|safe }}</p>
-                  {% else %}
-                    <p class="text-muted mb-0"><em>(sem conteúdo)</em></p>
-                  {% endif %}
-                {% endif %}
+              <div class="rest-notice-search">
+                <div class="rest-notice-searchbox"><i class="bi bi-search"></i><input type="search" id="noticeSearch" placeholder="Buscar avisos..."></div>
+                <select id="noticeSort" class="rest-notice-sort">
+                  <option value="newest">Mais recentes</option>
+                  <option value="oldest">Mais antigos</option>
+                </select>
               </div>
             </div>
-            {% endfor %}
-          {% else %}
-            <div class="card card-body text-muted">Carregando avisos…</div>
-          {% endif %}
+
+            <div class="rest-notices-bulk">
+              <form method="POST" action="{{ url_for('marcar_todos_avisos_lidos_restaurante') }}" id="noticeMarkAllForm" class="m-0">
+                <button type="submit" class="rest-notices-markall" {{ 'disabled' if _unread == 0 else '' }}><span class="box"></span> Marcar todos como lidos</button>
+              </form>
+              <label class="rest-notices-only"><input type="checkbox" id="noticeOnlyUnread"> Mostrar apenas não lidos</label>
+            </div>
+
+            <div class="rest-notice-tablewrap">
+              <table class="rest-notice-table">
+                <thead><tr><th>Título</th><th>Mensagem</th><th>Data</th><th>Status</th><th style="text-align:center">Ações</th></tr></thead>
+                <tbody id="noticeRows">
+                  {% for a in _avisos %}
+                  <tr class="notice-row" id="notice-row-{{ a.id }}"
+                      data-lido="{{ '1' if a.lido else '0' }}"
+                      data-title="{{ (a.titulo or 'Aviso')|lower|e }}"
+                      data-message="{{ (a.corpo or '')|striptags|lower|e }}"
+                      data-date="{{ a.criado_em.isoformat() if a.criado_em else '' }}">
+                    <td><span class="notice-title">{{ a.titulo or 'Aviso' }}</span>{% if a.prioridade_alta %}<span class="badge text-bg-danger ms-1">Prioridade</span>{% endif %}</td>
+                    <td><div class="notice-message" title="{{ (a.corpo or '')|striptags|e }}">{{ (a.corpo or '')|striptags or '—' }}</div></td>
+                    <td class="notice-date">{{ a.criado_em.strftime('%d/%m/%Y') if a.criado_em else '—' }}{% if a.criado_em %}<br><small>{{ a.criado_em.strftime('%H:%M') }}</small>{% endif %}</td>
+                    <td>
+                      {% if a.lido %}
+                        <span class="notice-status read">Lido</span>
+                      {% else %}
+                        <button type="button" class="notice-status unread" data-notice-read="{{ url_for('marcar_aviso_lido_universal', aviso_id=a.id) }}">Não lido</button>
+                      {% endif %}
+                    </td>
+                    <td style="text-align:center">
+                      <button type="button" class="notice-delete" title="Excluir aviso" data-notice-delete="{{ url_for('restaurante_excluir_aviso', aviso_id=a.id) }}"><i class="bi bi-trash"></i></button>
+                    </td>
+                  </tr>
+                  {% else %}
+                  <tr id="noticeEmptyServer"><td colspan="5" class="notice-empty">Nenhum aviso disponível.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <div id="noticeEmptyFiltered" class="notice-empty" style="display:none">Nenhum aviso encontrado com esse filtro.</div>
+          </div>
         </div>
       </section>
 
@@ -2831,59 +2835,99 @@ function setPhone(digits) {
     let avisosWired=false;
     function initAvisos(){
       if(avisosWired) return;
+      const root=document.querySelector('section[data-view="avisos"]');
+      if(!root) return;
       avisosWired=true;
 
-      const toastOKEl = document.getElementById('toastOK');
-      const toastOK = toastOKEl ? new bootstrap.Toast(toastOKEl) : null;
+      let currentFilter='all';
+      const search=root.querySelector('#noticeSearch');
+      const sort=root.querySelector('#noticeSort');
+      const onlyUnread=root.querySelector('#noticeOnlyUnread');
+      const rowsBox=root.querySelector('#noticeRows');
+      const emptyFiltered=root.querySelector('#noticeEmptyFiltered');
 
-      function getUnread(){
-        return document.querySelectorAll('.aviso-card[data-lido="0"]').length;
+      function rows(){
+        return [...root.querySelectorAll('.notice-row')];
+      }
+      function unreadCount(){
+        return rows().filter(r=>r.dataset.lido==='0').length;
+      }
+      function refreshBadge(){
+        setAvisosBadge(unreadCount(),{showToast:false});
+      }
+      function apply(){
+        const q=(search?.value||'').trim().toLowerCase();
+        const forceUnread=!!onlyUnread?.checked;
+        let visible=0;
+        rows().forEach(row=>{
+          const read=row.dataset.lido==='1';
+          const statusOk=forceUnread ? !read : (currentFilter==='all'||(currentFilter==='read'&&read)||(currentFilter==='unread'&&!read));
+          const text=(row.dataset.title||'')+' '+(row.dataset.message||'');
+          const show=statusOk && (!q || text.includes(q));
+          row.style.display=show?'':'none';
+          if(show)visible++;
+        });
+        if(emptyFiltered)emptyFiltered.style.display=(rows().length && !visible)?'block':'none';
+      }
+      function sortRows(){
+        if(!rowsBox)return;
+        const newest=(sort?.value||'newest')==='newest';
+        rows().sort((a,b)=>{
+          const da=Date.parse(a.dataset.date||'')||0, db=Date.parse(b.dataset.date||'')||0;
+          return newest ? db-da : da-db;
+        }).forEach(row=>rowsBox.appendChild(row));
       }
 
-      function refresh(){
-        setAvisosBadge(getUnread(), {showToast:false});
-      }
-
-      document.getElementById('toggleNaoLidos')?.addEventListener('change', (e)=>{
-        const only=e.target.checked;
-        document.querySelectorAll('.aviso-card').forEach(card=>{
-          const lido=card.getAttribute('data-lido')==='1';
-          card.style.display = (only && lido) ? 'none' : '';
+      root.querySelectorAll('[data-notice-filter]').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          currentFilter=btn.dataset.noticeFilter||'all';
+          root.querySelectorAll('[data-notice-filter]').forEach(x=>x.classList.toggle('active',x===btn));
+          if(onlyUnread)onlyUnread.checked=false;
+          apply();
         });
       });
+      search?.addEventListener('input',apply);
+      onlyUnread?.addEventListener('change',apply);
+      sort?.addEventListener('change',()=>{sortRows();apply();});
 
-      (document.getElementById('avisosListContainer')||document).addEventListener('click', async (ev)=>{
-        const btn=ev.target.closest('[data-acao="marcar-lido"]');
-        if(!btn) return;
-        const url=btn.getAttribute('data-url');
-        const card=btn.closest('.aviso-card');
-        try{
-          const resp=await fetch(url,{method:'POST',credentials:'same-origin'});
-          if(resp.ok){
-            card.setAttribute('data-lido','1');
-            card.classList.add('lido');
-            const meta=card.querySelector('.text-muted.small');
-            if(meta && !/Lido/.test(meta.innerHTML)){
-              meta.innerHTML += ' • <span class="text-success">Lido</span>';
+      root.addEventListener('click',async ev=>{
+        const readBtn=ev.target.closest('[data-notice-read]');
+        if(readBtn){
+          const row=readBtn.closest('.notice-row');
+          try{
+            const resp=await fetch(readBtn.dataset.noticeRead,{method:'POST',credentials:'same-origin',headers:{'X-Requested-With':'fetch'}});
+            if(!resp.ok)throw new Error();
+            row.dataset.lido='1';
+            const badge=document.createElement('span');
+            badge.className='notice-status read';
+            badge.textContent='Lido';
+            readBtn.replaceWith(badge);
+            refreshBadge(); apply();
+          }catch(e){ alert('Não foi possível marcar o aviso como lido.'); }
+          return;
+        }
+
+        const delBtn=ev.target.closest('[data-notice-delete]');
+        if(delBtn){
+          if(!confirm('Excluir este aviso da sua lista?'))return;
+          const row=delBtn.closest('.notice-row');
+          delBtn.disabled=true;
+          try{
+            const resp=await fetch(delBtn.dataset.noticeDelete,{method:'POST',credentials:'same-origin',headers:{'X-Requested-With':'fetch'}});
+            if(!resp.ok)throw new Error();
+            row.remove();
+            refreshBadge(); apply();
+            if(!rows().length && rowsBox){
+              rowsBox.innerHTML='<tr><td colspan="5" class="notice-empty">Nenhum aviso disponível.</td></tr>';
             }
-            btn.remove();
-            refresh();
-            toastOK?.show();
-            pollAvisos();
-          }else{
-            alert('Falha ao marcar como lido ('+resp.status+').');
+          }catch(e){
+            delBtn.disabled=false;
+            alert('Não foi possível excluir o aviso.');
           }
-        }catch(e){
-          alert('Erro de rede.');
         }
       });
 
-      refresh();
-
-      if(!document.querySelector('#avisosListContainer .aviso-card')){
-        const href=document.getElementById('linkAvisos')?.href;
-        if(href) loadAvisosFromRoute(href);
-      }
+      refreshBadge(); sortRows(); apply();
     }
 
     async function loadAvisosFromRoute(href){
