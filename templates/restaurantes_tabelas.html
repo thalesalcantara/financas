@@ -43,7 +43,7 @@
     <section class="hero">
       <div class="hero-left"><div class="hero-icon"><i class="bi bi-table"></i></div><div><h1>Minhas Tabelas</h1><p>Consulte e some as taxas de entrega e os garantidos do seu estabelecimento.</p></div></div>
       <div class="hero-actions">
-        {% if tabela %}<a class="btnx" href="{{ url_for('rest_tabela_abrir', tabela_id=tabela.id) }}" target="_blank"><i class="bi bi-file-earmark-text"></i> Documento oficial</a><a class="btnx primary" href="{{ url_for('rest_tabela_download', tabela_id=tabela.id) }}"><i class="bi bi-download"></i> Baixar tabela completa</a>{% endif %}
+        {% if tabela %}<a class="btnx primary" href="{{ url_for('rest_tabela_download_sistema') }}"><i class="bi bi-download"></i> Baixar tabela</a>{% endif %}
       </div>
     </section>
 
