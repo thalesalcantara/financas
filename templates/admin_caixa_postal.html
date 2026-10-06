@@ -42,7 +42,7 @@
             {% for m in mail_rows|default([]) %}
             {% set rest=rest_map.get(m.restaurante_id) %}
             <tr class="{{ 'unread' if not m.lido_em else '' }}">
-              <td>{{ m.criado_em.strftime('%d/%m/%Y %H:%M') if m.criado_em else '—' }}</td>
+              <td>{{ fmt_local_mail_dt(m.criado_em) if fmt_local_mail_dt is defined else (m.criado_em.strftime('%d/%m/%Y %H:%M') if m.criado_em else '—') }}</td>
               <td><strong>{{ rest.nome if rest else 'Estabelecimento' }}</strong></td>
               <td class="mail-subject">{{ m.assunto }}</td>
               <td>{{ m.data_evento.strftime('%d/%m/%Y') if m.data_evento else '—' }}</td>
@@ -64,12 +64,19 @@
         <div>Estabelecimento</div><div>Quer rastrear?</div><div>Motivo</div><div>Status</div><div>Data</div>
       </div>
       {% for pesquisa, rest in tracking_rows|default([]) %}
-      <div class="tracking-grid tracking-row">
+      <div class="tracking-grid tracking-row {{ 'unread' if pesquisa.status=='nova' else '' }}">
         <div><strong>{{ rest.nome }}</strong></div>
         <div><span class="alv8-badge {{ 'ok' if pesquisa.gostaria else 'bad' }}">{{ 'Sim' if pesquisa.gostaria else 'Não' }}</span></div>
         <div class="tracking-reason">{{ pesquisa.motivo or 'Sem justificativa.' }}</div>
-        <div><span class="alv8-badge {{ 'ok' if pesquisa.status=='rastreamento_liberado' else '' }}">{{ 'Liberado' if pesquisa.status=='rastreamento_liberado' else 'Nova' }}</span></div>
-        <div class="tracking-date">{{ pesquisa.atualizado_em.strftime('%d/%m/%Y %H:%M') if pesquisa.atualizado_em else '—' }}</div>
+        <div>
+          <span class="mail-status {{ 'unread' if pesquisa.status=='nova' else 'read' }}">
+            {{ 'Não lido' if pesquisa.status=='nova' else ('Liberado' if pesquisa.status=='rastreamento_liberado' else 'Lido') }}
+          </span>
+          {% if pesquisa.status=='nova' %}
+          <button class="mail-action" style="margin-left:6px" data-read="{{ url_for('admin_tracking_mail_lido',item_id=pesquisa.id) }}">Marcar como lido</button>
+          {% endif %}
+        </div>
+        <div class="tracking-date">{{ fmt_local_mail_dt(pesquisa.atualizado_em) if fmt_local_mail_dt is defined else (pesquisa.atualizado_em.strftime('%d/%m/%Y %H:%M') if pesquisa.atualizado_em else '—') }}</div>
       </div>
       {% else %}
       <div class="empty">Nenhuma resposta de rastreamento recebida.</div>
@@ -84,8 +91,11 @@
     try{
       const r=await fetch(b.dataset.read,{method:'POST',credentials:'same-origin',headers:{'X-Requested-With':'fetch'}});
       const j=await r.json();if(!r.ok)throw new Error();
-      const tr=b.closest('tr');tr.classList.remove('unread');
-      const st=tr.querySelector('.mail-status');st.className='mail-status read';st.textContent='Lido';b.replaceWith(document.createTextNode('—'));
+      const row=b.closest('tr,.tracking-row');
+      if(row) row.classList.remove('unread');
+      const st=row?.querySelector('.mail-status');
+      if(st){st.className='mail-status read';st.textContent='Lido';}
+      b.replaceWith(document.createTextNode(''));
       document.getElementById('mailUnreadKpi').textContent=j.unread||0;
       const badge=document.getElementById('adminMailboxBadge');if(badge){badge.textContent=j.unread||0;badge.style.display=(j.unread||0)?'inline-grid':'none'}
     }catch(_){alert('Não foi possível marcar como lido.')}
