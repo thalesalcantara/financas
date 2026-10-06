@@ -1727,6 +1727,45 @@ section[data-view="calendario"] .cal-field textarea{
   }
 }
 </style>
+
+<style id="calendar-upcoming-fixed-box">
+/* Caixa lateral com tamanho fixo; se exceder, rola por dentro sem mostrar a barra */
+body.rest-wide-modern section[data-view="calendario"] .cal-side-card:first-child{
+  height:320px!important;
+  min-height:320px!important;
+  max-height:320px!important;
+  display:flex!important;
+  flex-direction:column!important;
+}
+
+body.rest-wide-modern section[data-view="calendario"] .cal-side-card:first-child .cal-side-title{
+  flex:0 0 auto!important;
+}
+
+body.rest-wide-modern section[data-view="calendario"] .cal-upcoming{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  scrollbar-width:none!important;
+  -ms-overflow-style:none!important;
+  overscroll-behavior:contain;
+}
+
+body.rest-wide-modern section[data-view="calendario"] .cal-upcoming::-webkit-scrollbar{
+  width:0!important;
+  height:0!important;
+  display:none!important;
+}
+
+body.rest-wide-modern section[data-view="calendario"] .cal-day-empty{
+  min-height:100%!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+</style>
 </head>
 <body class="rest-wide-modern">
   <div class="shell">
