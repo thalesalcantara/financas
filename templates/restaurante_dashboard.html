@@ -2706,7 +2706,13 @@ function setPhone(digits) {
       if(!a)return;
       const target=a.dataset.target;
       if(!['mapa','config','avisos'].includes(target))return;
-      if(!document.querySelector('section[data-view="'+target+'"]'))return;
+      const targetSection=document.querySelector('section[data-view="'+target+'"]');
+      if(!targetSection)return;
+
+      // Avisos só troca instantaneamente quando esta página já carregou a lista real.
+      // Caso contrário deixa o link navegar uma vez e buscar os avisos no servidor.
+      if(target==='avisos' && targetSection.dataset.noticesLoaded!=='1')return;
+
       ev.preventDefault();
       showSection(target);
       pushView(target);
