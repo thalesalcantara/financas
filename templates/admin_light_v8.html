@@ -126,7 +126,7 @@ body{font-weight:700!important}.alv8-brand-copy small{font-size:12px!important}.
               <td>{{ c.telefone or '—' }}</td>
               <td>{{ c.cnh_numero or '—' }}</td>
               <td>{{ c.placa or '—' }}</td>
-              <td class="js-coop-scale-count" data-coop-id="{{ c.id }}">0</td>
+              <td><strong>{{ (scale_count_map|default({})).get(c.id, 0) }}</strong></td>
               <td><a class="alv8-btn" href="{{ url_for('admin_light_scale', q=c.nome) }}">Abrir escala</a></td>
             </tr>
           {% endfor %}</tbody>
