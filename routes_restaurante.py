@@ -551,6 +551,95 @@ def portal_restaurante():
         key=lambda x: (x["fim_min"], (x["cooperado_nome"] or "").lower())
     )
 
+
+    # -------------------- FALTAS DE LANÇAMENTO NO HISTÓRICO --------------------
+    # Se havia escala no período filtrado e nenhum lançamento compatível com
+    # aquele horário, mantém a pessoa visível no histórico como "FALTOU LANÇAR".
+    if view == "lancamentos":
+        def _hm_to_min(v):
+            m = re.search(r"(\d{1,2}):(\d{2})", str(v or ""))
+            if not m:
+                return None
+            return int(m.group(1)) * 60 + int(m.group(2))
+
+        def _interval_overlap(a_ini, a_fim, b_ini, b_fim):
+            ai, af = _hm_to_min(a_ini), _hm_to_min(a_fim)
+            bi, bf = _hm_to_min(b_ini), _hm_to_min(b_fim)
+            if None in (ai, af, bi, bf):
+                return False
+            return max(ai, bi) < min(af, bf) or (ai == bi and af == bf)
+
+        hist_launches = {}
+        for x in lancamentos_periodo:
+            d = x.get("data")
+            if isinstance(d, str):
+                try:
+                    d = datetime.strptime(d, "%d/%m/%Y").date()
+                except Exception:
+                    d = None
+            hist_launches.setdefault((int(x.get("cooperado_id") or 0), d), []).append(x)
+
+        faltas = []
+        faltas_seen = set()
+        for scale in escalas_rest:
+            scale_day = _parse_data_escala_str(scale.data)
+            if not scale_day or scale_day < di or scale_day > df:
+                continue
+
+            coop = coops_escala_map.get(scale.cooperado_id) if scale.cooperado_id else None
+            if not coop:
+                continue
+
+            s_ini, s_fim = _extrair_inicio_fim_intervalo(scale.horario)
+            # converte minutos para HH:MM para comparação com lançamento
+            s_ini_txt = f"{s_ini//60:02d}:{s_ini%60:02d}" if s_ini is not None else ""
+            s_fim_txt = f"{s_fim//60:02d}:{s_fim%60:02d}" if s_fim is not None else ""
+
+            launches = hist_launches.get((coop.id, scale_day), [])
+            matched = False
+            for x in launches:
+                l_ini = x.get("hora_inicio") or ""
+                l_fim = x.get("hora_fim") or ""
+                if s_ini_txt and s_fim_txt and l_ini and l_fim:
+                    if _interval_overlap(s_ini_txt, s_fim_txt, l_ini, l_fim):
+                        matched = True
+                        break
+                elif len(launches) == 1:
+                    matched = True
+                    break
+
+            k = (coop.id, scale_day, s_ini_txt, s_fim_txt)
+            if matched or k in faltas_seen:
+                continue
+            faltas_seen.add(k)
+            faltas.append({
+                "id": None,
+                "data": scale_day.strftime("%d/%m/%Y"),
+                "hora_inicio": s_ini_txt,
+                "hora_fim": s_fim_txt,
+                "qtd_entregas": 0,
+                "valor": 0.0,
+                "descricao": "FALTOU LANÇAR",
+                "cooperado_id": coop.id,
+                "cooperado_nome": coop.nome,
+                "contrato_nome": rest.nome,
+                "faltou_lancar": True,
+            })
+
+        if faltas:
+            lancamentos_periodo.extend(faltas)
+            def _hist_sort_key(x):
+                raw = x.get("data")
+                if isinstance(raw, date):
+                    d = raw
+                else:
+                    try:
+                        d = datetime.strptime(str(raw or ""), "%d/%m/%Y").date()
+                    except Exception:
+                        d = date.min
+                return (d, x.get("hora_inicio") or "", (x.get("cooperado_nome") or "").lower())
+            lancamentos_periodo.sort(key=_hist_sort_key)
+
     # -------------------- PRODUÇÕES DA SEMANA --------------------
     # Usa a MESMA fonte de escala do painel "Escalados" e das pendências.
     # Isso evita divergência: se existe escala válida no dia, ela aparece aqui.
