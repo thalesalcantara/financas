@@ -3541,6 +3541,13 @@ def exportar_lancamentos():
             faltas_por_coop_contrato[(cid, coop_nome, contrato_label)] += 1
             faltas_por_contrato_dia[contrato_label][dt] += 1
 
+            # Garante que contratos sem nenhum lançamento também apareçam
+            # em "Totais por Contrato" com valores zerados e suas faltas.
+            key_contrato_falta = (rid, contrato_label, rest_period or "")
+            tc_falta = totais_contrato[key_contrato_falta]
+            tc_falta["restaurante"] = contrato_label
+            tc_falta["periodo"] = rest_period or ""
+
             ws_det.append([
                 contrato_label,
                 rest_period or "—",
