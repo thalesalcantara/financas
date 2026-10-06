@@ -31,6 +31,7 @@ class CalendarioLembrete(db.Model):
     restaurante_id = db.Column(db.Integer, db.ForeignKey("restaurantes.id"), nullable=False, index=True)
     titulo = db.Column(db.String(140), nullable=False)
     descricao = db.Column(db.Text, nullable=True)
+    categoria = db.Column(db.String(30), nullable=False, default="operacional")
     data_evento = db.Column(db.Date, nullable=False, index=True)
     hora_evento = db.Column(db.String(5), nullable=True)
     destino = db.Column(db.String(20), nullable=False, default="pessoal")  # pessoal | coopex
@@ -316,6 +317,7 @@ def rest_calendario_api():
         for x in rows:
             reminders.append({
                 "id":x.id,"title":x.titulo,"description":x.descricao or "",
+                "category":getattr(x,"categoria",None) or "operacional",
                 "date":x.data_evento.isoformat(),"time":x.hora_evento or "",
                 "target":x.destino,"advance_days":x.antecedencia_dias,
                 "send_at":_local_iso_from_utc(x.disparar_em),
@@ -356,41 +358,52 @@ def rest_calendario_criar():
     rest=_rest_atual()
     if not rest: abort(403)
     ensure_calendar_schema()
+    try:
+        db.session.execute(db.text("ALTER TABLE calendario_lembretes ADD COLUMN IF NOT EXISTS categoria VARCHAR(30) DEFAULT 'operacional' NOT NULL"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     data=request.get_json(silent=True) or request.form
     titulo=(data.get("title") or data.get("titulo") or "").strip()
     descricao=(data.get("description") or data.get("descricao") or "").strip()
     destino=(data.get("target") or data.get("destino") or "pessoal").strip().lower()
+    categoria=(data.get("category") or data.get("categoria") or "operacional").strip().lower()
+    if categoria not in {"operacional","reuniao","financeiro","manutencao","importante"}:
+        categoria="operacional"
     try: event_date=date.fromisoformat(str(data.get("date") or data.get("data_evento")))
     except Exception: return jsonify(ok=False,message="Informe uma data válida."),400
     if not titulo: return jsonify(ok=False,message="Informe o título do lembrete."),400
     if destino not in {"pessoal","coopex"}: destino="pessoal"
     hora=(data.get("time") or data.get("hora_evento") or "09:00").strip()[:5]
-    send_now=str(data.get("send_now") or "").lower() in {"1","true","on","sim"}
-    try: advance=max(0,min(60,int(data.get("advance_days") or 0)))
-    except Exception: advance=0
-
     now_local=datetime.now(TZ)
     if destino=="coopex":
-        if send_now:
-            fire=datetime.utcnow()
-        else:
-            send_date=event_date-timedelta(days=advance)
-            # tempo hábil: precisa programar até o dia anterior ao envio à COOPEX
-            if now_local.date() >= send_date:
-                return jsonify(ok=False,message=f"Prazo insuficiente. Para chegar à COOPEX em {send_date.strftime('%d/%m')}, programe até o dia anterior ou use “Enviar agora”."),400
-            fire=_utc_naive_from_local(send_date,"08:00")
+        # A escala da semana seguinte é montada toda sexta-feira.
+        # Para um evento de segunda a domingo, o limite é a quinta-feira
+        # anterior à sexta em que a escala daquela semana será montada.
+        week_start = event_date - timedelta(days=event_date.weekday())
+        deadline_thursday = week_start - timedelta(days=4)
+        if now_local.date() > deadline_thursday:
+            return jsonify(
+                ok=False,
+                message=(
+                    f"Prazo encerrado. Para a semana de {week_start.strftime('%d/%m')}, "
+                    f"o pedido à COOPEX precisa ser feito até quinta-feira, "
+                    f"{deadline_thursday.strftime('%d/%m')}, pois a escala é montada na sexta-feira."
+                ),
+            ),400
+        fire = datetime.utcnow() if now_local.date() == deadline_thursday else _utc_naive_from_local(deadline_thursday,"08:00")
     else:
         fire=_utc_naive_from_local(event_date,hora)
         if fire <= datetime.utcnow():
             return jsonify(ok=False,message="O lembrete pessoal precisa estar em uma data/horário futuro."),400
 
     rem=CalendarioLembrete(
-        restaurante_id=rest.id,titulo=titulo,descricao=descricao or None,
+        restaurante_id=rest.id,titulo=titulo,descricao=descricao or None,categoria=categoria,
         data_evento=event_date,hora_evento=hora,destino=destino,
-        antecedencia_dias=advance,enviar_agora=send_now,disparar_em=fire,
+        antecedencia_dias=0,enviar_agora=False,disparar_em=fire,
     )
     db.session.add(rem);db.session.commit()
-    if destino=="coopex" and send_now:
+    if destino=="coopex" and fire <= datetime.utcnow():
         _deliver(rem)
     wake_scheduler()
     return jsonify(ok=True,id=rem.id,message="Lembrete salvo.")
