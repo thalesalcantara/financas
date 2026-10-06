@@ -3261,6 +3261,7 @@ def exportar_lancamentos():
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill
     from openpyxl.utils import get_column_letter
+    from sqlalchemy.orm import joinedload
 
     # -----------------------
     # Filtros
@@ -3272,7 +3273,10 @@ def exportar_lancamentos():
     data_fim       = _parse_date(args.get("data_fim"))
     dows           = set(args.getlist("dow"))  # '0'..'6'
 
-    q = Lancamento.query
+    q = Lancamento.query.options(
+        joinedload(Lancamento.restaurante),
+        joinedload(Lancamento.cooperado),
+    )
     if restaurante_id:
         q = q.filter(Lancamento.restaurante_id == restaurante_id)
     if cooperado_id:
@@ -3294,6 +3298,8 @@ def exportar_lancamentos():
     bold        = Font(bold=True)
     center      = Alignment(horizontal="center", vertical="center")
     header_fill = PatternFill("solid", fgColor="DDDDDD")
+    missing_fill = PatternFill("solid", fgColor="FFC7CE")
+    missing_font = Font(color="9C0006", bold=True)
 
     currency_fmt = "#,##0.00"
     date_fmt     = "DD/MM/YYYY"
@@ -3328,7 +3334,7 @@ def exportar_lancamentos():
     header_det = [
         "Restaurante", "Periodo", "Cooperado", "Descricao",
         "Valor", "Data", "HoraInicio", "HoraFim",
-        "INSS", "SEST", "Encargos", "Liquido",
+        "INSS", "SEST", "Encargos", "Liquido", "Status",
     ]
     ws_det.append(header_det)
     _style_header(ws_det, ncols=len(header_det))
@@ -3390,6 +3396,7 @@ def exportar_lancamentos():
             sest,
             encargos,
             liq,
+            "OK",
         ]
         ws_det.append(row)
         r = ws_det.max_row
@@ -3455,9 +3462,127 @@ def exportar_lancamentos():
         total_geral_enc   += encargos
         total_geral_liq   += liq
 
+
+    # ==========================================================
+    # Conferência Escala x Produção no período exportado
+    # ==========================================================
+    if data_inicio and data_fim:
+        from datetime import timedelta as _td
+
+        # Índice dos lançamentos existentes: cooperado + data + restaurante.
+        # O contrato também é usado como fallback quando a escala não tem restaurante_id.
+        launch_keys = set()
+        launch_contract_keys = set()
+        for l in lancs:
+            if not l.data or not l.cooperado_id:
+                continue
+            launch_keys.add((int(l.cooperado_id), l.data, int(l.restaurante_id or 0)))
+            contract_name = ""
+            if getattr(l, "restaurante", None):
+                contract_name = (l.restaurante.nome or "").strip().casefold()
+            launch_contract_keys.add((int(l.cooperado_id), l.data, contract_name))
+
+        scale_q = Escala.query
+        if cooperado_id:
+            scale_q = scale_q.filter(Escala.cooperado_id == cooperado_id)
+        if restaurante_id:
+            scale_q = scale_q.filter(Escala.restaurante_id == restaurante_id)
+
+        scales_export = scale_q.order_by(Escala.id.asc()).all()
+
+        coop_ids_scale = {int(s.cooperado_id) for s in scales_export if s.cooperado_id}
+        coop_names = {}
+        if coop_ids_scale:
+            coop_names = dict(
+                db.session.query(Cooperado.id, Cooperado.nome)
+                .filter(Cooperado.id.in_(coop_ids_scale))
+                .all()
+            )
+
+        rest_ids_scale = {int(s.restaurante_id) for s in scales_export if s.restaurante_id}
+        rest_info = {}
+        if rest_ids_scale:
+            rest_info = {
+                int(rid): (nome or "", periodo or "")
+                for rid, nome, periodo in (
+                    db.session.query(Restaurante.id, Restaurante.nome, Restaurante.periodo)
+                    .filter(Restaurante.id.in_(rest_ids_scale))
+                    .all()
+                )
+            }
+
+        cur = data_inicio
+        period_days = []
+        while cur <= data_fim:
+            period_days.append(cur)
+            cur += _td(days=1)
+
+        missing_seen = set()
+        for s in scales_export:
+            if not s.cooperado_id:
+                continue
+
+            explicit_date = _parse_data_escala_str(s.data)
+            wd = _weekday_from_data_str(s.data)
+
+            dates_for_scale = []
+            if explicit_date:
+                if data_inicio <= explicit_date <= data_fim:
+                    dates_for_scale = [explicit_date]
+            elif wd in (1,2,3,4,5,6,7):
+                dates_for_scale = [d for d in period_days if d.isoweekday() == wd]
+
+            for scale_date in dates_for_scale:
+                if dows and str((scale_date.weekday())) not in dows and str(scale_date.isoweekday()) not in dows:
+                    continue
+
+                rid = int(s.restaurante_id or 0)
+                contract = (s.contrato or "").strip()
+                contract_norm = contract.casefold()
+                cid = int(s.cooperado_id)
+
+                has_launch = (cid, scale_date, rid) in launch_keys if rid else False
+                if not has_launch and contract_norm:
+                    has_launch = (cid, scale_date, contract_norm) in launch_contract_keys
+
+                if has_launch:
+                    continue
+
+                miss_key = (cid, scale_date, rid, contract_norm, (s.horario or "").strip())
+                if miss_key in missing_seen:
+                    continue
+                missing_seen.add(miss_key)
+
+                rest_nome, rest_period = rest_info.get(rid, (contract, ""))
+                coop_nome = coop_names.get(cid, "")
+
+                ws_det.append([
+                    rest_nome or contract or "—",
+                    rest_period or "—",
+                    coop_nome or "—",
+                    "FALTA PRODUÇÃO",
+                    0.0,
+                    scale_date,
+                    "",
+                    "",
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    "FALTA PRODUÇÃO",
+                ])
+                rr = ws_det.max_row
+                for col in range(1, len(header_det) + 1):
+                    ws_det.cell(rr, col).fill = missing_fill
+                    ws_det.cell(rr, col).font = missing_font
+                ws_det.cell(rr, 5).number_format = currency_fmt
+                ws_det.cell(rr, 6).number_format = date_fmt
+                for col in (9, 10, 11, 12):
+                    ws_det.cell(rr, col).number_format = currency_fmt
+
     ws_det.freeze_panes = "A2"
     ws_det.auto_filter.ref = f"A1:{get_column_letter(len(header_det))}{ws_det.max_row}"
-    _autosize(ws_det, max_col=len(header_det), max_row=min(ws_det.max_row, 3000))
+    _autosize(ws_det, max_col=len(header_det), max_row=min(ws_det.max_row, 500))
 
     # ===============================
     # ABA 2 - Totais por Contrato
@@ -3508,7 +3633,7 @@ def exportar_lancamentos():
 
     ws_con.freeze_panes = "A2"
     ws_con.auto_filter.ref = f"A1:{get_column_letter(len(header_contrato))}{ws_con.max_row}"
-    _autosize(ws_con, max_col=len(header_contrato), max_row=ws_con.max_row)
+    _autosize(ws_con, max_col=len(header_contrato), max_row=min(ws_con.max_row, 500))
 
     # ===============================
     # ABA 3 - Contrato x Cooperado
@@ -3543,7 +3668,7 @@ def exportar_lancamentos():
 
     ws_cc.freeze_panes = "A2"
     ws_cc.auto_filter.ref = f"A1:{get_column_letter(len(header_cc))}{ws_cc.max_row}"
-    _autosize(ws_cc, max_col=len(header_cc), max_row=ws_cc.max_row)
+    _autosize(ws_cc, max_col=len(header_cc), max_row=min(ws_cc.max_row, 500))
 
     # ===============================
     # ABA 4 - Cooperado por Dia
@@ -3580,7 +3705,7 @@ def exportar_lancamentos():
 
     ws_cd.freeze_panes = "A2"
     ws_cd.auto_filter.ref = f"A1:{get_column_letter(len(header_cd))}{ws_cd.max_row}"
-    _autosize(ws_cd, max_col=len(header_cd), max_row=ws_cd.max_row)
+    _autosize(ws_cd, max_col=len(header_cd), max_row=min(ws_cd.max_row, 500))
 
     # ===============================
     # ABA 5 - Totais por Cooperado
@@ -3621,7 +3746,7 @@ def exportar_lancamentos():
 
     ws_tc.freeze_panes = "A2"
     ws_tc.auto_filter.ref = f"A1:{get_column_letter(len(header_tc))}{ws_tc.max_row}"
-    _autosize(ws_tc, max_col=len(header_tc), max_row=ws_tc.max_row)
+    _autosize(ws_tc, max_col=len(header_tc), max_row=min(ws_tc.max_row, 500))
 
     # ===============================
     # ABA 6 - Resumo Geral
