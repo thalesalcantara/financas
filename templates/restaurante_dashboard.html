@@ -2988,10 +2988,8 @@ function setPhone(digits) {
               pendingList.querySelectorAll('.js-pending-launch').forEach(function(btn){
                 btn.addEventListener('click',function(){
                   selecionarCooperadoPendente(btn.dataset.id,btn.dataset.date,btn.dataset.start,btn.dataset.end);
-                  if(window.__coopexPendingTutorialAdvance) window.__coopexPendingTutorialAdvance();
                 });
               });
-              if(window.__coopexPendingTutorialRefresh) window.__coopexPendingTutorialRefresh();
             }
           }
 
@@ -3025,7 +3023,6 @@ function setPhone(digits) {
       let pendingLaunchCount=0;
       let pendingSoundStarted=false;
       let pendingUserUnlocked=false;
-      const pendingTutorialKey='coopex_pending_launch_tutorial_v3_{{ (rest.id if rest is defined and rest else 0) }}';
 
       function unlockPendingAudio(){
         if(pendingUserUnlocked)return;
@@ -3119,62 +3116,6 @@ function setPhone(digits) {
       window.addEventListener('pointerdown',unlockPendingAudio,{once:true,passive:true});
       window.addEventListener('keydown',unlockPendingAudio,{once:true});
 
-      // Tutorial contextual: uma única vez por estabelecimento, no próximo
-      // lançamento pendente. Primeiro aponta o botão da pendência e depois o formulário.
-      let pendingCoach=null;
-      let pendingCoachTarget=null;
-      function removePendingCoach(){
-        if(pendingCoach){pendingCoach.remove();pendingCoach=null}
-        if(pendingCoachTarget){
-          pendingCoachTarget.style.removeProperty('box-shadow');
-          pendingCoachTarget.style.removeProperty('position');
-          pendingCoachTarget.style.removeProperty('z-index');
-          pendingCoachTarget=null;
-        }
-      }
-      function placePendingCoach(target,text){
-        if(!target||localStorage.getItem(pendingTutorialKey))return;
-        removePendingCoach();
-        pendingCoachTarget=target;
-        target.style.setProperty('box-shadow','0 0 0 4px rgba(8,117,237,.25)','important');
-        target.style.setProperty('position','relative','important');
-        target.style.setProperty('z-index','1052','important');
-        const bubble=document.createElement('div');
-        bubble.id='coopexPendingCoach';
-        bubble.innerHTML='<div style="font-size:.67rem;font-weight:900;letter-spacing:.04em;color:#0875ed;margin-bottom:3px">NOVO FLUXO</div><div style="font-weight:900">'+text+'</div><div style="font-size:.72rem;color:#5f708d;margin-top:3px">Este guia aparecerá somente neste próximo lançamento.</div>';
-        bubble.style.cssText='position:fixed;z-index:1053;width:min(310px,calc(100vw - 24px));background:#fff;border:1px solid #b9d7ff;border-radius:12px;padding:11px 13px;box-shadow:0 14px 36px rgba(16,51,96,.22);color:#0e2448';
-        document.body.appendChild(bubble);
-        pendingCoach=bubble;
-        const reposition=()=>{
-          if(!pendingCoach||!pendingCoachTarget)return;
-          const r=pendingCoachTarget.getBoundingClientRect();
-          const b=pendingCoach.getBoundingClientRect();
-          let left=Math.min(Math.max(12,r.left),window.innerWidth-b.width-12);
-          let top=r.bottom+10;
-          if(top+b.height>window.innerHeight-12)top=Math.max(12,r.top-b.height-10);
-          pendingCoach.style.left=left+'px';
-          pendingCoach.style.top=top+'px';
-        };
-        reposition();
-        setTimeout(reposition,20);
-      }
-      function showPendingTutorialStart(){
-        if(!pendingLaunchCount||localStorage.getItem(pendingTutorialKey))return;
-        const btn=document.querySelector('#listaPendencias .js-pending-launch');
-        if(btn)placePendingCoach(btn,'Clique aqui para lançar a produção pendente.');
-      }
-      window.__coopexPendingTutorialRefresh=()=>setTimeout(showPendingTutorialStart,80);
-      window.__coopexPendingTutorialAdvance=()=>{
-        if(localStorage.getItem(pendingTutorialKey))return;
-        setTimeout(()=>{
-          const form=document.getElementById('formLancamento');
-          const submit=form?.querySelector('button[type="submit"],input[type="submit"]');
-          placePendingCoach(submit||form,'Confira os dados e clique aqui para concluir o lançamento.');
-          (submit||form)?.scrollIntoView({behavior:'smooth',block:'center'});
-        },120);
-      };
-      setTimeout(showPendingTutorialStart,260);
-
       document.getElementById('formLancamento')?.addEventListener('submit',function(ev){
         const ini=this.querySelector('[name="hora_inicio"]')?.value||'';
         const fim=this.querySelector('[name="hora_fim"]')?.value||'';
@@ -3183,10 +3124,6 @@ function setPhone(digits) {
           alert('Informe a hora de início e a hora de fim. Se selecionar uma escala ou pendência, o horário será preenchido automaticamente.');
           (this.querySelector('[name="hora_inicio"]')||this.querySelector('[name="hora_fim"]'))?.focus();
           return;
-        }
-        if(!ev.defaultPrevented && this.checkValidity()){
-          localStorage.setItem(pendingTutorialKey,'1');
-          removePendingCoach();
         }
       });
 
@@ -4068,27 +4005,6 @@ function setPhone(digits) {
     </div></div></div>
   </div>
 <script src="{{ url_for('static', filename='js/restaurante_v3.js') }}"></script>
-
-  <div class="modal fade" id="modalTutorialLancamento" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content border-0 shadow">
-        <div class="modal-header">
-          <div><small class="text-primary fw-bold">NOVIDADE</small><h5 class="modal-title">Lançamento por horário</h5></div>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3"><strong>1. Pendência automática</strong><br><span class="text-muted small">Terminou o horário sem lançamento? Ele vira pendência.</span></div>
-          <div class="mb-3"><strong>2. Clique no cooperado</strong><br><span class="text-muted small">Se existir pendência de hoje, o sistema abre primeiro esse horário, mesmo que o cooperado já esteja em outro turno.</span></div>
-          <div class="mb-3"><strong>3. Dois horários no mesmo dia</strong><br><span class="text-muted small">O nome pode mostrar “Lançada dia”, “Lançada noite” ou “Lançamento OK”.</span></div>
-          <div><strong>4. Pendência antiga</strong><br><span class="text-muted small">Dia anterior continua na aba Pendências e só é lançado escolhendo aquela data.</span></div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Pular</button>
-          <button type="button" class="btn btn-primary" id="btnTutorialEntendi">Entendi</button>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <div class="modal fade" id="coopexSubModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
