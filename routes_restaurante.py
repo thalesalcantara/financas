@@ -599,7 +599,36 @@ def portal_restaurante():
                 continue
 
             s_ini, s_fim = _extrair_inicio_fim_intervalo(scale.horario)
-            # converte minutos para HH:MM para comparação com lançamento
+
+            # Para o contratante, não acusa falta enquanto o dia ainda está em andamento.
+            # A conferência só começa depois do último horário de escala daquele dia.
+            now_hist = datetime.now(TZ) if "TZ" in globals() else datetime.now()
+            today_hist = now_hist.date()
+
+            if scale_day > today_hist:
+                continue
+
+            if scale_day == today_hist:
+                # Descobre o maior horário de término entre TODAS as escalas do contrato no dia.
+                day_last_end = None
+                for _s in escalas_rest:
+                    _d = _parse_data_escala_str(_s.data)
+                    if _d != scale_day:
+                        continue
+                    _ini, _fim = _extrair_inicio_fim_intervalo(_s.horario)
+                    if _fim is not None and (day_last_end is None or _fim > day_last_end):
+                        day_last_end = _fim
+
+                # Sem fim confiável, não acusa falta antecipadamente.
+                if day_last_end is None:
+                    continue
+
+                now_min = now_hist.hour * 60 + now_hist.minute
+                if now_min < day_last_end:
+                    continue
+
+            # Mantém o texto original da escala na interface.
+            # Estes valores servem apenas para comparação interna com o lançamento.
             s_ini_txt = f"{s_ini//60:02d}:{s_ini%60:02d}" if s_ini is not None else ""
             s_fim_txt = f"{s_fim//60:02d}:{s_fim%60:02d}" if s_fim is not None else ""
 
