@@ -506,12 +506,17 @@ def _admin_light_scale_v11():
             "cooperado_nome_livre": "" if s.cooperado_id else (s.cooperado_nome or ""),
         })
     contracts.update((r.nome or "").strip() for r in restaurants if (r.nome or "").strip())
+    scale_count_map = {}
+    for row in scale_rows:
+        cid = row.get("cooperado_id")
+        if cid:
+            scale_count_map[cid] = scale_count_map.get(cid, 0) + 1
     return light._render(
-        "escala","Escala","Upload XLSX e escala semanal. A busca encontra qualquer parte do nome do cooperado.",
+        "escala","Escala","Escala semanal e conferência separada para manter a tela enxuta.",
         q=q_raw, scales=[], scale_rows=scale_rows, contract_options=sorted(contracts,key=_norm),
         coop_map=coop_by_id, rest_map={r.id:r for r in restaurants}, cooperados=active_coops,
         restaurantes=restaurants, scale_active_count=active_count, scale_assigned_count=assigned_count,
-        scale_line_count=len(scale_rows),
+        scale_line_count=len(scale_rows), scale_count_map=scale_count_map,
     )
 
 
