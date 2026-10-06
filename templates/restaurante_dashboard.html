@@ -3029,6 +3029,7 @@ function setPhone(digits) {
         });
       }
       if(calendarioLoadedYear!==calCursor.getFullYear()) await loadCalendarYear(calCursor.getFullYear()).catch(e=>alert(e.message));
+      schedulePersonalReminders();
     }
 
     let __calendarAudioCtx=null;
@@ -3063,7 +3064,6 @@ function setPhone(digits) {
         }
       }catch(_){}
     }
-    schedulePersonalReminders();
 
     let avisosWired=false;
     function initAvisos(){
