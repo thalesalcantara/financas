@@ -91,171 +91,35 @@
 }
 </style>
 <div id="adminMailboxLoginNotice"><i class="bi bi-envelope-fill"></i> Você tem um novo recado na Caixa Postal COOPEX</div>
-<audio id="adminMailboxAudio" preload="auto">
-  <source src="data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YRAAAAAA////AP//AAD//wAA" type="audio/wav">
-</audio>
 
-
-
-
-<script id="coopex-mailbox-leader">
+<script id="coopex-mailbox-page-load">
 (()=>{
-  if(window.__coopexMailboxLeaderInit)return;
-  window.__coopexMailboxLeaderInit=true;
+  if(window.__coopexMailboxPageLoad)return;
+  window.__coopexMailboxPageLoad=true;
 
-  const KEY='coopex-mailbox-leader-v1';
-  const ID=(crypto?.randomUUID?.()||String(Date.now())+Math.random());
-  const CH='BroadcastChannel' in window ? new BroadcastChannel('coopex-mailbox-events') : null;
-  let es=null, heartbeat=null, reconnect=null, audioCtx=null, pendingBeep=false;
+  const unread=Number({{ admin_mailbox_unread_count|default(0)|tojson }});
 
-  function updateBadge(unread){
-    const n=Number(unread||0);
-    ['adminMailboxBadge','adminManagementBadge'].forEach(id=>{
-      const badge=document.getElementById(id);
-      if(!badge)return;
-      badge.textContent=String(n);
-      badge.style.display=n>0?'inline-grid':'none';
-    });
-  }
-
-  function showMailNotice(){
-    const box=document.getElementById('adminMailboxLoginNotice');
-    if(!box)return;
-    box.style.display='block';
-    clearTimeout(window.__coopexMailNoticeTimer);
-    window.__coopexMailNoticeTimer=setTimeout(()=>box.style.display='none',6500);
-  }
-
-  function beep(){
-    const a=document.getElementById('adminMailboxAudio');
-    if(a){
-      try{
-        a.currentTime=0;
-        const p=a.play();
-        if(p&&typeof p.catch==='function'){
-          p.catch(()=>{pendingBeep=true;});
-        }
-        return;
-      }catch(_){}
-    }
-    try{
-      audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
-      if(audioCtx.state==='suspended'){
-        pendingBeep=true;
-        return;
-      }
-      pendingBeep=false;
-      const o=audioCtx.createOscillator(),g=audioCtx.createGain();
-      o.frequency.value=880;
-      g.gain.setValueAtTime(.0001,audioCtx.currentTime);
-      g.gain.exponentialRampToValueAtTime(.16,audioCtx.currentTime+.015);
-      g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+.22);
-      o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+.23);
-    }catch(_){pendingBeep=true}
-  }
-
-  document.addEventListener('pointerdown',()=>{
-    const a=document.getElementById('adminMailboxAudio');
-    if(a){
-      try{
-        a.muted=true;
-        a.currentTime=0;
-        const p=a.play();
-        Promise.resolve(p).then(()=>{
-          a.pause();a.muted=false;a.currentTime=0;
-          if(pendingBeep)beep();
-        }).catch(()=>{a.muted=false;});
-      }catch(_){}
-    }
-    try{
-      audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
-      const p=audioCtx.state==='suspended'?audioCtx.resume():Promise.resolve();
-      Promise.resolve(p).then(()=>{if(pendingBeep)beep()}).catch(()=>{});
-    }catch(_){}
-  },{once:true,passive:true});
-
-  function dispatch(data,fromChannel=false){
-    updateBadge(data?.unread||0);
-    showMailNotice();
-    beep();
-    window.dispatchEvent(new CustomEvent('coopex:new-mail',{detail:data||{}}));
-    if(!fromChannel && CH) CH.postMessage(data||{});
-  }
-
-  if(CH) CH.onmessage=e=>dispatch(e.data||{},true);
-
-  function readLeader(){
-    try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(_){return null}
-  }
-  function writeLeader(){
-    try{localStorage.setItem(KEY,JSON.stringify({id:ID,ts:Date.now()}))}catch(_){}
-  }
-  function isLeader(){
-    const x=readLeader();
-    return x && x.id===ID && Date.now()-Number(x.ts||0)<25000;
-  }
-
-  function claim(){
-    const x=readLeader();
-    if(!x || Date.now()-Number(x.ts||0)>=25000){
-      writeLeader();
-      setTimeout(()=>{ if(isLeader()) startStream(); },60);
-    }
-  }
-
-  function startStream(){
-    if(es || !isLeader())return;
-    try{
-      es=new EventSource({{ url_for('admin_caixa_postal_eventos')|tojson }});
-      es.addEventListener('mailbox',ev=>{
-        let data={};try{data=JSON.parse(ev.data||'{}')}catch(_){}
-        dispatch(data,false);
-      });
-      es.onerror=()=>{
-        try{es.close()}catch(_){}
-        es=null;
-        clearTimeout(reconnect);
-        reconnect=setTimeout(()=>{if(isLeader())startStream();},3000);
-      };
-    }catch(_){}
-  }
-
-
-  const initialUnread=Number({{ admin_mailbox_unread_count|default(0)|tojson }});
-  updateBadge(initialUnread);
-  if(initialUnread>0 && sessionStorage.getItem('coopex-mailbox-login-notified')!=='1'){
-    sessionStorage.setItem('coopex-mailbox-login-notified','1');
-    showMailNotice();
-    pendingBeep=true;
-    beep();
-  }
-  document.querySelectorAll('a[href="{{ url_for("logout") }}"]').forEach(a=>a.addEventListener('click',()=>{
-    try{sessionStorage.removeItem('coopex-mailbox-login-notified')}catch(_){}
-  }));
-
-  claim();
-  heartbeat=setInterval(()=>{
-    if(isLeader()){
-      writeLeader();
-      if(!es)startStream();
-    }else{
-      claim();
-    }
-  },8000);
-
-  window.addEventListener('storage',e=>{
-    if(e.key===KEY && !isLeader() && es){
-      try{es.close()}catch(_){}
-      es=null;
-    }
+  ['adminMailboxBadge','adminManagementBadge'].forEach(id=>{
+    const badge=document.getElementById(id);
+    if(!badge)return;
+    badge.textContent=String(unread);
+    badge.style.display=unread>0?'inline-grid':'none';
   });
 
-  window.addEventListener('beforeunload',()=>{
-    clearInterval(heartbeat);clearTimeout(reconnect);
-    if(es){try{es.close()}catch(_){}}
-    if(isLeader()){
-      try{localStorage.removeItem(KEY)}catch(_){}
+  if(unread>0 && sessionStorage.getItem('coopex-mailbox-login-notified')!=='1'){
+    sessionStorage.setItem('coopex-mailbox-login-notified','1');
+    const box=document.getElementById('adminMailboxLoginNotice');
+    if(box){
+      box.style.display='block';
+      clearTimeout(window.__coopexMailNoticeTimer);
+      window.__coopexMailNoticeTimer=setTimeout(()=>box.style.display='none',6500);
     }
+  }
+
+  document.querySelectorAll('a[href="{{ url_for("logout") }}"]').forEach(a=>{
+    a.addEventListener('click',()=>{
+      try{sessionStorage.removeItem('coopex-mailbox-login-notified')}catch(_){}
+    });
   });
 })();
 </script>
