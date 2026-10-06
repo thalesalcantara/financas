@@ -2965,6 +2965,7 @@ function setPhone(digits) {
           const pendingList=document.getElementById('listaPendencias');
           const pendingTab=document.querySelector('.rest-list-tab[data-coop-filter="pendencias"]');
           const rows=j.pendencias||[];
+          updatePendingSound(rows.length);
           if(pendingTab){
             const label='Com pendência';
             pendingTab.innerHTML=label+(rows.length?' <b>'+rows.length+'</b>':'');
@@ -3020,36 +3021,103 @@ function setPhone(digits) {
       setTimeout(loadPendingWeekState,120);
 
       let pendingAudio=null;
-      const pendCount={{ _pendencias|length }};
+      let pendingAudioContext=null;
+      let pendingLaunchCount=0;
+      let pendingSoundStarted=false;
+      let pendingUserUnlocked=false;
       const pendingTutorialKey='coopex_pending_launch_tutorial_v3_{{ (rest.id if rest is defined and rest else 0) }}';
 
-      function tocarPendenciaDuplo(){
-        if(!pendCount)return;
+      function unlockPendingAudio(){
+        if(pendingUserUnlocked)return;
+        pendingUserUnlocked=true;
+        try{
+          const Ctx=window.AudioContext||window.webkitAudioContext;
+          if(Ctx){
+            pendingAudioContext=pendingAudioContext||new Ctx();
+            if(pendingAudioContext.state==='suspended')pendingAudioContext.resume().catch(()=>{});
+          }
+        }catch(e){}
+        if(pendingLaunchCount>0)tocarPendenciaDuplo();
+      }
+
+      function fallbackPendingBeep(){
+        if(!pendingUserUnlocked)return;
+        try{
+          const Ctx=window.AudioContext||window.webkitAudioContext;
+          if(!Ctx)return;
+          pendingAudioContext=pendingAudioContext||new Ctx();
+          if(pendingAudioContext.state==='suspended'){
+            pendingAudioContext.resume().then(fallbackPendingBeep).catch(()=>{});
+            return;
+          }
+          const now=pendingAudioContext.currentTime;
+          const osc=pendingAudioContext.createOscillator();
+          const gain=pendingAudioContext.createGain();
+          osc.type='square';
+          osc.frequency.value=920;
+          gain.gain.setValueAtTime(.0001,now);
+          gain.gain.exponentialRampToValueAtTime(.45,now+.02);
+          gain.gain.exponentialRampToValueAtTime(.0001,now+.28);
+          osc.connect(gain);
+          gain.connect(pendingAudioContext.destination);
+          osc.start(now);
+          osc.stop(now+.3);
+        }catch(e){}
+      }
+
+      async function tocarPendenciaUmaVez(){
+        if(pendingLaunchCount<=0)return false;
         if(!pendingAudio){
           pendingAudio=new Audio('/static/avisos.mp3');
           pendingAudio.preload='auto';
           pendingAudio.volume=1;
         }
-        const tocar=()=>{
-          try{
-            pendingAudio.pause();
-            pendingAudio.currentTime=0;
-            const p=pendingAudio.play();
-            if(p&&typeof p.catch==='function')p.catch(()=>{});
-          }catch(e){}
-        };
-        tocar();
-        setTimeout(tocar,900);
+        try{
+          pendingAudio.pause();
+          pendingAudio.currentTime=0;
+          await pendingAudio.play();
+          return true;
+        }catch(e){
+          fallbackPendingBeep();
+          return false;
+        }
       }
 
-      // Browsers podem bloquear áudio automático. Tentamos imediatamente e,
-      // se houver bloqueio, a primeira interação do usuário destrava e toca 2x.
-      if(pendCount){
-        tocarPendenciaDuplo();
-        ['pointerdown','touchstart','keydown'].forEach(evt=>window.addEventListener(evt,tocarPendenciaDuplo,{once:true,passive:true}));
-        if(window.__coopexPendingTimer) clearInterval(window.__coopexPendingTimer);
-        window.__coopexPendingTimer=setInterval(tocarPendenciaDuplo,5*60*1000);
+      function tocarPendenciaDuplo(){
+        if(pendingLaunchCount<=0)return;
+        tocarPendenciaUmaVez();
+        setTimeout(()=>{ if(pendingLaunchCount>0)tocarPendenciaUmaVez(); },1000);
       }
+
+      function updatePendingSound(count){
+        const previous=pendingLaunchCount;
+        pendingLaunchCount=Math.max(0,Number(count)||0);
+
+        if(pendingLaunchCount<=0){
+          pendingSoundStarted=false;
+          if(window.__coopexPendingTimer){
+            clearInterval(window.__coopexPendingTimer);
+            window.__coopexPendingTimer=null;
+          }
+          return;
+        }
+
+        // Toca ao detectar a primeira pendência ou quando surge uma nova.
+        if(!pendingSoundStarted || pendingLaunchCount>previous){
+          pendingSoundStarted=true;
+          tocarPendenciaDuplo();
+        }
+
+        if(!window.__coopexPendingTimer){
+          window.__coopexPendingTimer=setInterval(()=>{
+            if(pendingLaunchCount>0)tocarPendenciaDuplo();
+          },5*60*1000);
+        }
+      }
+
+      // Se o navegador bloquear autoplay, a primeira interação destrava o som.
+      window.addEventListener('pointerdown',unlockPendingAudio,{once:true,passive:true});
+      window.addEventListener('keydown',unlockPendingAudio,{once:true});
 
       // Tutorial contextual: uma única vez por estabelecimento, no próximo
       // lançamento pendente. Primeiro aponta o botão da pendência e depois o formulário.
@@ -3091,7 +3159,7 @@ function setPhone(digits) {
         setTimeout(reposition,20);
       }
       function showPendingTutorialStart(){
-        if(!pendCount||localStorage.getItem(pendingTutorialKey))return;
+        if(!pendingLaunchCount||localStorage.getItem(pendingTutorialKey))return;
         const btn=document.querySelector('#listaPendencias .js-pending-launch');
         if(btn)placePendingCoach(btn,'Clique aqui para lançar a produção pendente.');
       }
