@@ -502,6 +502,13 @@ def rest_pending_week_state():
         indexed_scales = perf._rest_scales_indexed(rest)
         pending_rows = _week_pending_rows(rest, indexed_scales)
         status_map = _today_coop_launch_state(rest, pending_rows, indexed_scales)
+        for p in pending_rows:
+            try:
+                p["nao_compareceu_url"] = url_for("rest_pendencia_nao_compareceu", scale_id=p.get("escala_id"))
+                p["trocar_url"] = url_for("rest_pendencia_trocar_cooperado", scale_id=p.get("escala_id"))
+            except Exception:
+                p["nao_compareceu_url"] = ""
+                p["trocar_url"] = ""
         return jsonify(ok=True, pendencias=pending_rows, status={str(k): v for k, v in status_map.items()})
     except Exception:
         db.session.rollback()
@@ -513,8 +520,18 @@ def rest_pending_week_state():
 def _coopex_week_pending_context():
     # Mantém o primeiro carregamento do estabelecimento leve.
     # Pendências/status são buscados por AJAX logo após a tela aparecer.
+    substitutes = []
+    if (session.get("user_tipo") or "").strip().lower() == "restaurante" and request.endpoint == "portal_restaurante":
+        try:
+            substitutes = [
+                {"id": int(coop_id), "nome": nome}
+                for coop_id, nome in _active_substitute_rows()
+            ]
+        except Exception:
+            db.session.rollback()
+            substitutes = []
     return {
         "coopex_rest_week_pending_rows": [],
         "coopex_rest_today_status_map": {},
-        "coopex_rest_substitute_coops": [],
+        "coopex_rest_substitute_coops": substitutes,
     }
