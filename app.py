@@ -9459,6 +9459,18 @@ def tracking_rest_survey():
     row.status="nova"
     row.atualizado_em=datetime.utcnow()
     db.session.commit()
+    try:
+        mailbox_mod = globals().get("_calendar_mailbox")
+        if mailbox_mod is not None:
+            mailbox_mod._emit_admin({
+                "type": "tracking",
+                "id": row.id,
+                "restaurante": rest.nome or "Estabelecimento",
+                "assunto": "Novo recado na Caixa Postal",
+                "unread": mailbox_mod._mailbox_unread(),
+            })
+    except Exception:
+        app.logger.exception("Falha ao emitir aviso da Caixa Postal")
     return jsonify(ok=True)
 
 
