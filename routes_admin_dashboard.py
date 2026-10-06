@@ -281,7 +281,11 @@ def admin_dashboard():
         cooperados_fast = (
             Cooperado.query
             .join(Usuario, Cooperado.usuario_id == Usuario.id)
-            .filter(Usuario.tipo == "cooperado", or_(Usuario.ativo.is_(True), Usuario.ativo.is_(None)))
+            .filter(
+                Cooperado.id.in_(active_finance_ids),
+                Usuario.tipo == "cooperado",
+                or_(Usuario.ativo.is_(True), Usuario.ativo.is_(None)),
+            )
             .order_by(Cooperado.nome.asc())
             .all()
         )
@@ -837,8 +841,9 @@ def admin_dashboard():
         Cooperado.query
         .join(Usuario, Cooperado.usuario_id == Usuario.id)
         .filter(
+            Cooperado.id.in_(active_finance_ids),
             Usuario.tipo == "cooperado",
-            or_(Usuario.ativo.is_(True), Usuario.ativo.is_(None))
+            or_(Usuario.ativo.is_(True), Usuario.ativo.is_(None)),
         )
         .order_by(Cooperado.nome.asc())
         .all()
