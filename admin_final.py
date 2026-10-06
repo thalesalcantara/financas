@@ -721,6 +721,66 @@ def _wrap_final(endpoint: str, aba: str, action):
     app.view_functions[endpoint] = secured
 
 
+# Fallback definitivo da API de edição da escala.
+# A tela V11 usa PATCH /api/admin/escalas/<id>. Em alguns boots o módulo legado
+# coopex_upgrade pode não registrar essa rota; o admin_final precisa continuar funcional.
+if "api_admin_escala" not in app.view_functions:
+    @app.route(
+        "/api/admin/escalas/<int:item_id>",
+        methods=["PATCH", "DELETE"],
+        endpoint="api_admin_escala",
+    )
+    def api_admin_escala_fallback(item_id: int):
+        item = db.session.get(Escala, item_id)
+        if item is None:
+            return jsonify({"ok": False, "message": "Escala não encontrada."}), 404
+
+        if request.method == "DELETE":
+            try:
+                TrocaSolicitacao.query.filter_by(origem_escala_id=item.id).delete(
+                    synchronize_session=False
+                )
+            except Exception:
+                db.session.rollback()
+                item = db.session.get(Escala, item_id)
+                if item is None:
+                    return jsonify({"ok": False, "message": "Escala não encontrada."}), 404
+            db.session.delete(item)
+            db.session.commit()
+            return jsonify({"ok": True, "message": "Escala excluída."})
+
+        payload = request.get_json(silent=True) or {}
+
+        for field in ("data", "turno", "horario", "contrato", "cooperado_nome"):
+            if field in payload:
+                value = str(payload.get(field) or "").strip()
+                setattr(item, field, value or None)
+
+        if "cooperado_id" in payload:
+            raw = payload.get("cooperado_id")
+            if raw in (None, ""):
+                item.cooperado_id = None
+                if "cooperado_nome" not in payload:
+                    item.cooperado_nome = None
+            else:
+                try:
+                    coop_id = int(raw)
+                except (TypeError, ValueError):
+                    return jsonify({"ok": False, "message": "Cooperado inválido."}), 400
+                coop = db.session.get(Cooperado, coop_id)
+                if coop is None:
+                    return jsonify({"ok": False, "message": "Cooperado não encontrado."}), 404
+                item.cooperado_id = coop_id
+                item.cooperado_nome = None
+
+        if "restaurante_id" in payload:
+            raw = payload.get("restaurante_id")
+            item.restaurante_id = int(raw) if raw not in (None, "") else None
+
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Escala atualizada."})
+
+
 def _edit_or_delete_final():
     return "excluir" if request.method == "DELETE" else "editar"
 
