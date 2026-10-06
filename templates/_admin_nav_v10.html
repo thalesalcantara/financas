@@ -58,10 +58,6 @@
   </nav>
 </header>
 <style id="coopex-admin-nav-fix">
-.alv8-group>button,.alv8-direct{font-size:16px!important;font-weight:800!important}
-.alv8-menu a{font-size:15px!important;font-weight:800!important}
-.alv8-brand-copy small{font-size:12px!important}
-.alv8-brand-copy strong{font-size:17px!important}
 .alv8-group>button{position:relative}
 .admin-mail-count{
   place-items:center;
@@ -72,13 +68,14 @@
   vertical-align:middle;
 }
 .admin-management-btn .admin-mail-count{
-  position:absolute;top:-7px;right:13px;z-index:5;
+  position:absolute;top:5px;right:8px;z-index:5;
+  transform:translate(45%,-45%);
 }
 #adminMailboxBadge{margin-left:5px}
 #adminMailboxLoginNotice{
-  position:fixed;top:76px;left:50%;transform:translateX(-50%);
-  z-index:10050;background:#16a34a;color:#fff;border-radius:10px;
-  padding:10px 15px;font-size:13px;font-weight:900;
+  position:fixed;top:78px;left:50%;transform:translateX(-50%);
+  z-index:10050;background:#16a34a;color:#fff;border-radius:8px;
+  padding:7px 12px;font-size:12px;font-weight:800;
   box-shadow:0 10px 28px rgba(22,163,74,.28);
   display:none;white-space:nowrap;max-width:calc(100vw - 24px);
 }
@@ -192,22 +189,6 @@
     }catch(_){}
   }
 
-
-  // O componente do menu passa a ser autossuficiente em todas as telas do Admin.
-  document.querySelectorAll('.alv8-group>button').forEach(btn=>{
-    if(btn.dataset.navBound)return;
-    btn.dataset.navBound='1';
-    btn.addEventListener('click',e=>{
-      e.preventDefault();e.stopPropagation();
-      const g=btn.parentElement;
-      document.querySelectorAll('.alv8-group').forEach(x=>{if(x!==g)x.classList.remove('open')});
-      g.classList.toggle('open');
-    });
-  });
-  if(!window.__adminNavOutsideBound){
-    window.__adminNavOutsideBound=true;
-    document.addEventListener('click',()=>document.querySelectorAll('.alv8-group').forEach(x=>x.classList.remove('open')));
-  }
 
   const initialUnread=Number({{ admin_mailbox_unread_count|default(0)|tojson }});
   updateBadge(initialUnread);
