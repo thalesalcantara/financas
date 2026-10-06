@@ -113,7 +113,66 @@ body{font-weight:700!important}.alv8-brand-copy small{font-size:12px!important}.
       }
     }
 
+    function bindBenefitPreview(){
+      if ({{ active_tab|tojson }} !== 'beneficios') return;
+      const sec = mount.querySelector('#beneficios');
+      if (!sec) return;
+
+      const money = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+      const valueOf = el => {
+        const n = parseFloat(String(el?.value ?? '').replace(',', '.'));
+        return Number.isFinite(n) ? Math.max(0, n) : 0;
+      };
+      const ids = el => Array.from(el?.selectedOptions || []).map(o => String(o.value));
+
+      function calc(prefix){
+        const unit = sec.querySelector('#'+prefix+'_valor_unit');
+        const bens = sec.querySelector('#'+prefix+'_beneficiarios');
+        const isen = sec.querySelector('#'+prefix+'_isencoes');
+        const badge = sec.querySelector('#'+prefix+'_badge');
+        const detail = sec.querySelector('#'+prefix+'_preview_detail');
+        const hidden = sec.querySelector('#'+prefix+'_valor_total') ||
+                       sec.querySelector('input[name="'+prefix+'_valor"]');
+        if (!unit || !bens || !isen) return;
+
+        const recebedores = ids(bens);
+        const isentos = ids(isen);
+        const naoPagam = new Set(recebedores.concat(isentos));
+        const totalAtivos = bens.options.length;
+        const pagantes = Math.max(0, totalAtivos - naoPagam.size);
+        const total = valueOf(unit) * recebedores.length;
+        const porPagante = pagantes > 0 ? total / pagantes : 0;
+
+        if (badge) badge.textContent = 'Prévia: ' + money(porPagante) + ' por pagante';
+        if (detail) detail.textContent =
+          'Recebem: ' + recebedores.length +
+          ' · Isentos: ' + isentos.length +
+          ' · Pagantes: ' + pagantes +
+          ' · Total: ' + money(total);
+        if (hidden) hidden.value = total.toFixed(2);
+      }
+
+      ['hosp','farm','alim'].forEach(prefix=>{
+        const unit = sec.querySelector('#'+prefix+'_valor_unit');
+        const bens = sec.querySelector('#'+prefix+'_beneficiarios');
+        const isen = sec.querySelector('#'+prefix+'_isencoes');
+        unit?.addEventListener('input', ()=>calc(prefix));
+        bens?.addEventListener('change', ()=>calc(prefix));
+        isen?.addEventListener('change', ()=>calc(prefix));
+        calc(prefix);
+      });
+
+      const form = sec.querySelector('#form-beneficios');
+      form?.addEventListener('submit', ()=>{
+        ['hosp','farm','alim'].forEach(calc);
+      });
+    }
+
     function bind(){
+      bindBenefitPreview();
       mount.querySelectorAll('form').forEach(form=>{
         if(form.dataset.v10Bound)return;
         form.dataset.v10Bound='1';
