@@ -408,6 +408,75 @@ def admin_light_scale_create():
     return redirect(url_for("admin_light_scale"))
 
 
+@app.post("/admin/leve/escala/<int:item_id>/editar", endpoint="admin_light_scale_update")
+def admin_light_scale_update(item_id: int):
+    denied = _guard("escalas")
+    if denied:
+        return denied
+
+    item = db.session.get(Escala, item_id)
+    if not item:
+        return {"ok": False, "message": "Escala não encontrada."}, 404
+
+    payload = request.get_json(silent=True) or request.form.to_dict()
+
+    if "contrato" in payload:
+        item.contrato = (str(payload.get("contrato") or "").strip() or None)
+
+    if "cooperado_id" in payload:
+        raw = payload.get("cooperado_id")
+        if raw in (None, ""):
+            item.cooperado_id = None
+            item.cooperado_nome = None
+        else:
+            try:
+                cid = int(raw)
+            except Exception:
+                return {"ok": False, "message": "Cooperado inválido."}, 400
+            active_ids, _, _ = _active_coop_ids_names()
+            if cid not in active_ids:
+                return {"ok": False, "message": "Cooperado inativo ou excluído."}, 400
+            item.cooperado_id = cid
+            item.cooperado_nome = None
+
+    if "cooperado_nome" in payload and not item.cooperado_id:
+        item.cooperado_nome = (str(payload.get("cooperado_nome") or "").strip() or None)
+
+    db.session.commit()
+    return {"ok": True, "message": "Escala atualizada."}
+
+
+@app.post("/admin/leve/escala/<int:item_id>/excluir", endpoint="admin_light_scale_delete")
+def admin_light_scale_delete(item_id: int):
+    denied = _guard("escalas")
+    if denied:
+        return denied
+
+    item = db.session.get(Escala, item_id)
+    if not item:
+        return {"ok": False, "message": "Escala não encontrada."}, 404
+
+    try:
+        TrocaSolicitacao.query.filter_by(origem_escala_id=item.id).delete(synchronize_session=False)
+        try:
+            db.session.execute(
+                legacy.sa_text("UPDATE producoes_cooperado SET escala_id=NULL WHERE escala_id=:id"),
+                {"id": item.id},
+            )
+        except Exception:
+            db.session.rollback()
+            item = db.session.get(Escala, item_id)
+            TrocaSolicitacao.query.filter_by(origem_escala_id=item.id).delete(synchronize_session=False)
+        db.session.delete(item)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Falha ao excluir linha da escala")
+        return {"ok": False, "message": "Não foi possível excluir a linha da escala."}, 500
+
+    return {"ok": True, "message": "Linha da escala excluída."}
+
+
 @app.get("/admin/leve/trocas", endpoint="admin_light_swaps")
 def admin_light_swaps():
     denied = _guard("escalas")
