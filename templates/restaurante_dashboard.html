@@ -1608,6 +1608,55 @@ section[data-view="calendario"] .cal-field textarea{
 }
 </style>
 
+
+<style id="calendar-fill-viewport">
+/* Usa a altura útil da tela sem criar área vazia abaixo */
+@media (min-width:1051px){
+  body.rest-wide-modern section[data-view="calendario"] .cal-main-layout{
+    min-height:calc(100vh - 190px)!important;
+  }
+  body.rest-wide-modern section[data-view="calendario"] .cal-main-column{
+    display:flex!important;
+    flex-direction:column!important;
+    min-height:calc(100vh - 210px)!important;
+  }
+  body.rest-wide-modern section[data-view="calendario"] #calMonthView{
+    display:flex;
+    flex-direction:column;
+    flex:1 1 auto;
+    min-height:0!important;
+  }
+  body.rest-wide-modern section[data-view="calendario"] .cal-grid{
+    flex:1 1 auto;
+    min-height:0!important;
+    grid-auto-rows:minmax(86px,1fr)!important;
+  }
+  body.rest-wide-modern section[data-view="calendario"] .cal-day{
+    height:auto!important;
+    min-height:86px!important;
+  }
+  body.rest-wide-modern section[data-view="calendario"] .cal-side-column{
+    min-height:calc(100vh - 210px)!important;
+  }
+}
+
+/* Em telas mais baixas, reduz só a altura das células, não o texto */
+@media (min-width:1051px) and (max-height:760px){
+  body.rest-wide-modern section[data-view="calendario"] .cal-main-layout{
+    min-height:calc(100vh - 170px)!important;
+  }
+  body.rest-wide-modern section[data-view="calendario"] .cal-main-column,
+  body.rest-wide-modern section[data-view="calendario"] .cal-side-column{
+    min-height:calc(100vh - 190px)!important;
+  }
+  body.rest-wide-modern section[data-view="calendario"] .cal-grid{
+    grid-auto-rows:minmax(72px,1fr)!important;
+  }
+  body.rest-wide-modern section[data-view="calendario"] .cal-day{
+    min-height:72px!important;
+  }
+}
+</style>
 </head>
 <body class="rest-wide-modern">
   <div class="shell">
@@ -3216,6 +3265,9 @@ function setPhone(digits) {
       let html='';
       const daysInMonth=new Date(y,m+1,0).getDate();
       const totalCells=Math.ceil((first.getDay()+daysInMonth)/7)*7;
+      const totalWeeks=totalCells/7;
+      grid.style.setProperty('--cal-weeks',String(totalWeeks));
+      grid.dataset.weeks=String(totalWeeks);
       for(let i=0;i<totalCells;i++){
         const d=new Date(start);d.setDate(start.getDate()+i);
         const iso=calDateOnly(d),out=d.getMonth()!==m;
