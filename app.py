@@ -2809,6 +2809,55 @@ def media_rest(rest_id: int):
     # 3) Fallback final
     return redirect(url_for("static", filename="img/default.png"))
 # =========================
+# Destino inicial do administrador conforme permissões
+# =========================
+def _admin_home_redirect(user=None):
+    u = user
+    if u is None:
+        try:
+            uid = session.get("user_id")
+            u = Usuario.query.get(uid) if uid else None
+        except Exception:
+            u = None
+
+    if u and getattr(u, "is_master", False):
+        if "admin_light_summary" in app.view_functions:
+            return redirect(url_for("admin_light_summary"))
+        return redirect(url_for("admin_dashboard", tab="lancamentos"))
+
+    try:
+        perms = get_admin_permissions_map(u.id) if u else {}
+    except Exception:
+        perms = {}
+
+    destinations = (
+        ("lancamentos", "admin_light_summary", {}, "lancamentos"),
+        ("receitas", "admin_v10_finance", {"tab": "receitas"}, "receitas"),
+        ("despesas", "admin_v10_finance", {"tab": "despesas"}, "despesas"),
+        ("coop_receitas", "admin_v10_finance", {"tab": "coop_receitas"}, "coop_receitas"),
+        ("coop_despesas", "admin_v10_finance", {"tab": "coop_despesas"}, "coop_despesas"),
+        ("beneficios", "admin_v10_finance", {"tab": "beneficios"}, "beneficios"),
+        ("cooperados", "admin_light_cooperatives", {}, "cooperados"),
+        ("restaurantes", "admin_v10_establishments", {}, "restaurantes"),
+        ("escalas", "admin_light_scale", {}, "escalas"),
+        ("avaliacoes", "admin_light_ratings", {}, "avaliacoes"),
+        ("avisos", "admin_light_notices", {}, "avisos"),
+        ("documentos", "admin_documentos", {}, "documentos"),
+        ("tabelas", "admin_tabelas", {}, "tabelas"),
+        ("config", "admin_v11_config", {}, "config"),
+    )
+    for aba, endpoint, values, legacy_tab in destinations:
+        if perms.get(aba, {}).get("ver"):
+            if endpoint in app.view_functions:
+                return redirect(url_for(endpoint, **values))
+            return redirect(url_for("admin_dashboard", tab=legacy_tab))
+
+    session.clear()
+    flash("Este administrador não possui nenhuma aba liberada.", "warning")
+    return redirect(url_for("login"))
+
+
+# =========================
 # Rota raiz
 # =========================
 @app.route("/")
@@ -2820,7 +2869,7 @@ def index():
     if not u:
         return redirect(url_for("login"))
     if u.tipo == "admin":
-        return redirect(url_for("admin_dashboard", tab="lancamentos"))
+        return _admin_home_redirect(u)
     if u.tipo == "cooperado":
         return redirect(url_for("portal_cooperado"))
     if u.tipo == "restaurante":
@@ -2869,7 +2918,7 @@ def login():
             session["user_tipo"] = u.tipo
 
             if u.tipo == "admin":
-                return redirect(url_for("admin_dashboard", tab="lancamentos"))
+                return _admin_home_redirect(u)
             elif u.tipo == "cooperado":
                 return redirect(url_for("portal_cooperado"))
             elif u.tipo == "restaurante":
