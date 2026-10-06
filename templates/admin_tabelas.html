@@ -1,9 +1,84 @@
-                      <button class="alv8-btn primary">Salvar alteração</button>
-                    </form>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Tabelas — COOPEX</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_light_v8.css') }}">
+  <style>
+    .tbl-details summary{list-style:none;cursor:pointer}
+    .tbl-details summary::-webkit-details-marker{display:none}
+    .tbl-box{margin-top:8px;padding:10px;border:1px solid #dfe7f4;border-radius:10px;background:#f8fbff}
+    .tbl-grid{display:grid;grid-template-columns:minmax(180px,1.5fr) 130px 130px 80px auto;gap:8px;align-items:end}
+    .tbl-guar{display:grid;grid-template-columns:minmax(180px,1.4fr) minmax(130px,1fr) 110px auto;gap:8px;align-items:end}
+    @media(max-width:900px){.tbl-grid,.tbl-guar{grid-template-columns:1fr 1fr}.tbl-actions{grid-column:1/-1}}
+  </style>
+</head>
+<body>
+  {% include '_admin_nav_v10.html' %}
+  <main class="alv8-page">
+    <div class="alv8-head">
+      <div>
+        <h1 class="alv8-title">Tabelas</h1>
+        <p class="alv8-sub">Cadastre bairros, valores FIXO/BASE e garantidos diretamente no sistema.</p>
+      </div>
+    </div>
+
+    {% with msgs=get_flashed_messages(with_categories=true) %}
+      {% if msgs %}
+        <div class="alv8-card">{% for cat,msg in msgs %}<div class="alv8-note">{{ msg }}</div>{% endfor %}</div>
+      {% endif %}
+    {% endwith %}
+
+    <details class="alv8-card" open>
+      <summary><strong><i class="bi bi-plus-circle"></i> Nova tabela</strong></summary>
+      <form method="post" action="{{ url_for('admin_upload_tabela') }}" class="alv8-filter" style="margin-top:12px">
+        <div class="alv8-field grow">
+          <label>Estabelecimento / contrato</label>
+          <input class="alv8-input" name="titulo" required placeholder="Ex.: ZIPPI PIZZA">
+        </div>
+        <div class="alv8-field grow">
+          <label>Descrição</label>
+          <input class="alv8-input" name="descricao" placeholder="Descrição opcional">
+        </div>
+        <button class="alv8-btn primary" type="submit"><i class="bi bi-plus-circle"></i> Criar tabela</button>
+      </form>
+    </details>
+
+    <div class="alv8-card">
+      <div class="alv8-section-head">
+        <div>
+          <h3>Tabelas cadastradas</h3>
+          <p>{{ tabelas|length }} tabela(s)</p>
+        </div>
+      </div>
+
+      <div class="alv8-table-wrap">
+        <table class="alv8-table">
+          <thead><tr><th>Estabelecimento</th><th>Descrição</th><th>Atualizada</th><th>Ações</th></tr></thead>
+          <tbody>
+          {% for t in tabelas %}
+            <tr>
+              <td><strong>{{ t.titulo }}</strong></td>
+              <td>{{ t.descricao or '—' }}</td>
+              <td>{{ t.enviado_em.strftime('%d/%m/%Y %H:%M') if t.enviado_em else '—' }}</td>
+              <td>
+                <div class="alv8-inline" style="flex-wrap:wrap">
+                  <details class="tbl-details">
+                    <summary class="alv8-btn edit"><i class="bi bi-pencil"></i> Editar</summary>
+                    <div class="tbl-box" style="min-width:420px">
+                      <form method="post" action="{{ url_for('admin_replace_tabela', tab_id=t.id) }}" class="alv8-filter">
+                        <div class="alv8-field grow"><label>Nome</label><input class="alv8-input" name="titulo" value="{{ t.titulo }}" required></div>
+                        <div class="alv8-field grow"><label>Descrição</label><input class="alv8-input" name="descricao" value="{{ t.descricao or '' }}"></div>
+                        <button class="alv8-btn primary" type="submit">Salvar</button>
+                      </form>
+                    </div>
                   </details>
-                  <details>
+
+                  <details class="tbl-details">
                     <summary class="alv8-btn"><i class="bi bi-geo-alt"></i> Bairros e valores</summary>
-                    <div class="alv8-card" style="margin-top:8px;min-width:720px;padding:10px">
+                    <div class="tbl-box" style="min-width:760px">
                       {% set bs = bairros_map.get(t.id, []) %}
                       {% if bs %}
                         <div class="alv8-table-wrap" style="margin-bottom:10px">
@@ -13,7 +88,7 @@
                             {% for b in bs %}
                               <tr>
                                 <form method="post" action="{{ url_for('admin_edit_tabela_bairro', bairro_id=b.id) }}">
-                                  <td><input class="alv8-input" name="bairro" value="{{ b.bairro }}"></td>
+                                  <td><input class="alv8-input" name="bairro" value="{{ b.bairro }}" required></td>
                                   <td><input class="alv8-input" name="valor_fixo" value="{{ ('%.2f'|format(b.valor_fixo)|replace('.', ',')) if b.valor_fixo is not none else '' }}" placeholder="0,00"></td>
                                   <td><input class="alv8-input" name="valor_base" value="{{ ('%.2f'|format(b.valor_base)|replace('.', ',')) if b.valor_base is not none else '' }}" placeholder="0,00"></td>
                                   <td style="text-align:center"><input type="checkbox" name="ativo" value="1" {{ 'checked' if b.ativo else '' }}></td>
@@ -31,28 +106,32 @@
                             </tbody>
                           </table>
                         </div>
+                      {% else %}
+                        <div class="alv8-note" style="margin-bottom:10px">Nenhum bairro cadastrado.</div>
                       {% endif %}
 
-                      <form method="post" action="{{ url_for('admin_add_tabela_bairro', tab_id=t.id) }}" class="alv8-filter">
-                        <div class="alv8-field grow"><label>Bairro</label><input class="alv8-input" name="bairro" required placeholder="Ex.: Lagoa Nova"></div>
+                      <form method="post" action="{{ url_for('admin_add_tabela_bairro', tab_id=t.id) }}" class="tbl-grid">
+                        <div class="alv8-field"><label>Bairro</label><input class="alv8-input" name="bairro" required placeholder="Ex.: Lagoa Nova"></div>
                         <div class="alv8-field"><label>Valor FIXO</label><input class="alv8-input" name="valor_fixo" placeholder="10,00"></div>
                         <div class="alv8-field"><label>Valor BASE</label><input class="alv8-input" name="valor_base" placeholder="14,00"></div>
-                        <button class="alv8-btn primary" type="submit"><i class="bi bi-plus-circle"></i> Adicionar bairro</button>
+                        <div class="alv8-field"><label>&nbsp;</label><span class="alv8-badge ok">Novo</span></div>
+                        <button class="alv8-btn primary tbl-actions" type="submit"><i class="bi bi-plus-circle"></i> Adicionar</button>
                       </form>
                     </div>
                   </details>
-                  <details>
+
+                  <details class="tbl-details">
                     <summary class="alv8-btn"><i class="bi bi-cash-stack"></i> Garantidos</summary>
-                    <div class="alv8-card" style="margin-top:8px;min-width:520px;padding:10px">
+                    <div class="tbl-box" style="min-width:680px">
                       {% set gs = garantidos_map.get(t.id, []) %}
                       {% if gs %}
-                        <div style="display:grid;gap:6px;margin-bottom:10px">
+                        <div style="display:grid;gap:8px;margin-bottom:10px">
                           {% for g in gs %}
-                            <div style="display:grid;grid-template-columns:1.5fr 1fr .7fr auto;gap:8px;align-items:end;border-bottom:1px solid #e8eef8;padding:7px 0">
+                            <div class="tbl-guar" style="border-bottom:1px solid #e8eef8;padding-bottom:8px">
                               <form method="post" action="{{ url_for('admin_edit_tabela_garantido', garantido_id=g.id) }}" style="display:contents">
                                 <div class="alv8-field"><label>Descrição</label><input class="alv8-input" name="descricao" value="{{ g.descricao or '' }}"></div>
                                 <div class="alv8-field"><label>Horário</label><input class="alv8-input" name="horario" value="{{ g.horario or '' }}" placeholder="Ex.: 18h às 22h"></div>
-                                <div class="alv8-field"><label>Valor</label><input class="alv8-input" name="valor" value="{{ '%.2f'|format(g.valor)|replace('.', ',') }}"></div>
+                                <div class="alv8-field"><label>Valor</label><input class="alv8-input" name="valor" value="{{ '%.2f'|format(g.valor)|replace('.', ',') }}" required></div>
                                 <button class="alv8-btn primary" type="submit"><i class="bi bi-check2"></i> Salvar</button>
                               </form>
                               <div></div><div></div><div></div>
@@ -62,21 +141,25 @@
                             </div>
                           {% endfor %}
                         </div>
+                      {% else %}
+                        <div class="alv8-note" style="margin-bottom:10px">Nenhum garantido cadastrado.</div>
                       {% endif %}
-                      <form method="post" action="{{ url_for('admin_add_tabela_garantido', tab_id=t.id) }}" class="alv8-filter">
-                        <div class="alv8-field grow"><label>Dias / descrição</label><input class="alv8-input" name="descricao" placeholder="Ex.: Segunda a quinta"></div>
+
+                      <form method="post" action="{{ url_for('admin_add_tabela_garantido', tab_id=t.id) }}" class="tbl-guar">
+                        <div class="alv8-field"><label>Dias / descrição</label><input class="alv8-input" name="descricao" placeholder="Ex.: Segunda a quinta"></div>
                         <div class="alv8-field"><label>Horário</label><input class="alv8-input" name="horario" placeholder="Ex.: 18h às 22h"></div>
                         <div class="alv8-field"><label>Valor</label><input class="alv8-input" name="valor" required placeholder="90,00"></div>
-                        <button class="alv8-btn primary" type="submit">Adicionar</button>
+                        <button class="alv8-btn primary" type="submit"><i class="bi bi-plus-circle"></i> Adicionar</button>
                       </form>
                     </div>
                   </details>
+
                   <a class="alv8-btn danger" href="{{ url_for('admin_delete_tabela', tab_id=t.id) }}" onclick="return confirm('Excluir esta tabela?');"><i class="bi bi-trash"></i> Excluir</a>
                 </div>
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="4" class="alv8-empty">Nenhuma tabela publicada.</td></tr>
+            <tr><td colspan="4" class="alv8-empty">Nenhuma tabela cadastrada.</td></tr>
           {% endfor %}
           </tbody>
         </table>
