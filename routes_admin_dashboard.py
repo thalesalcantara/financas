@@ -231,10 +231,12 @@ def admin_dashboard():
             )
         )
         ids = {int(x[0]) for x in q.all()}
+        archived_ids = set()
         try:
-            archived_ids = set(light._archived_ids()) if 'light' in globals() else set()
+            rows_arch = db.session.execute(text("SELECT cooperado_id FROM cooperados_arquivados_v8")).all()
+            archived_ids = {int(x[0]) for x in rows_arch if x and x[0] is not None}
         except Exception:
-            archived_ids = set()
+            db.session.rollback()
         return ids - archived_ids
 
     active_finance_ids = _active_coop_ids_finance()
@@ -830,26 +832,7 @@ def admin_dashboard():
 
     cfg = get_config()
 
-    # Corrige registros antigos: todo registro em cooperados precisa ter usuário do tipo cooperado e ativo.
-    # Sem isso, a aba Cooperados pode esconder cadastros feitos anteriormente.
-    try:
-        _coops_para_corrigir = (
-            Cooperado.query
-            .join(Usuario, Cooperado.usuario_id == Usuario.id)
-            .filter(or_(Usuario.tipo != "cooperado", Usuario.ativo.is_(False), Usuario.ativo.is_(None), Usuario.nome.is_(None)))
-            .all()
-        )
-        if _coops_para_corrigir:
-            for _cfix in _coops_para_corrigir:
-                if _cfix.usuario_ref:
-                    _cfix.usuario_ref.tipo = "cooperado"
-                    _cfix.usuario_ref.ativo = True
-                    if not (_cfix.usuario_ref.nome or "").strip():
-                        _cfix.usuario_ref.nome = _cfix.nome
-            db.session.commit()
-    except Exception:
-        db.session.rollback()
-
+    # Cooperados inativos/excluídos permanecem fora do financeiro e dos benefícios.
     cooperados = (
         Cooperado.query
         .join(Usuario, Cooperado.usuario_id == Usuario.id)
