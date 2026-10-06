@@ -1417,6 +1417,65 @@ body.rest-wide-modern .rest-bottom-history{width:100%!important;max-width:none!i
 @media(max-width:760px){.cal-weekdays div{font-size:.53rem;padding:7px 2px}.cal-day{min-height:84px;padding:4px}.cal-event{font-size:.53rem;padding:4px}.cal-form-grid{grid-template-columns:1fr 1fr}.cal-span2{grid-column:1/-1}.cal-reminder-row{grid-template-columns:1fr}.cal-row-actions{justify-content:flex-start}}
 </style>
 <style>.cal-main-layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;padding:12px}.cal-main-column{min-width:0;border:1px solid #e3eaf4;border-radius:13px;overflow:hidden;background:#fff}.cal-side-column{display:flex;flex-direction:column;gap:12px}.cal-side-card{background:#fff;border:1px solid #dfe7f2;border-radius:13px;padding:12px}.cal-side-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.78rem;font-weight:950;color:#173a6b;margin-bottom:10px}.cal-side-title span{display:flex;align-items:center;gap:7px}.cal-side-title i{color:#0967de}.cal-side-title button{border:1px solid #cfe0f6;background:#f7fbff;color:#0967de;border-radius:999px;padding:5px 9px;font-size:.62rem;font-weight:900}.cal-toolbar-right{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.cal-view-tabs{display:flex;border:1px solid #d9e4f2;border-radius:9px;overflow:hidden}.cal-view-tab{height:36px;border:0;border-right:1px solid #e1e8f2;background:#fff;color:#3d5678;padding:0 10px;font-size:.65rem;font-weight:900}.cal-view-tab:last-child{border-right:0}.cal-view-tab.active{background:#0870ed;color:#fff}.cal-upcoming{display:grid;gap:5px}.cal-up-item{display:grid;grid-template-columns:48px 1fr 18px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #edf1f6}.cal-up-item:last-child{border-bottom:0}.cal-up-date{background:#f3f7fd;border-radius:9px;text-align:center;padding:6px 3px;color:#173a6b}.cal-up-date strong{display:block;font-size:1rem;line-height:1}.cal-up-date small{font-size:.52rem;font-weight:900;text-transform:uppercase}.cal-up-body strong{display:block;font-size:.69rem;color:#183960;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cal-up-body small{font-size:.6rem;color:#71809a}.cal-up-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px}.cal-up-arrow{color:#8da0b8}.cal-form-side{display:block!important;padding:0!important;border:0!important;background:transparent!important}.cal-side-form-grid{display:grid;gap:8px}.cal-side-split{display:grid;grid-template-columns:1fr 1fr;gap:8px}.cal-save-wide{width:100%;justify-content:center}.cal-alt-view{padding:12px}.cal-alt-title{font-size:.85rem;font-weight:950;color:#163a70;margin-bottom:10px}.cal-week-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid #e3eaf4;border-radius:10px;overflow:hidden}.cal-week-col{min-height:260px;border-right:1px solid #e5ebf3;padding:8px}.cal-week-col:last-child{border-right:0}.cal-week-col-head{text-align:center;padding-bottom:7px;margin-bottom:7px;border-bottom:1px solid #edf1f6;color:#60718c;font-size:.62rem;font-weight:900}.cal-week-col-head strong{display:block;color:#173a6b;font-size:.92rem}.cal-agenda-list{display:grid;gap:7px}.cal-agenda-item{display:grid;grid-template-columns:70px 1fr auto;gap:10px;align-items:center;border:1px solid #e2e9f3;border-radius:10px;padding:10px;background:#fff}.cal-agenda-date{font-size:.65rem;font-weight:900;color:#174b8e}.cal-agenda-item strong{font-size:.73rem;color:#173a6b}.cal-agenda-item small{display:block;color:#738199;font-size:.61rem}.cal-day-empty{padding:30px;text-align:center;color:#76859b;font-size:.72rem}@media(max-width:1050px){.cal-main-layout{grid-template-columns:1fr}.cal-side-column{display:grid;grid-template-columns:1fr 1fr}.cal-week-col{min-height:190px}}@media(max-width:720px){.cal-side-column{grid-template-columns:1fr}.cal-toolbar-right{width:100%}.cal-view-tabs{width:100%}.cal-view-tab{flex:1;padding:0 5px}.cal-week-grid{grid-template-columns:1fr}.cal-week-col{min-height:auto;border-right:0;border-bottom:1px solid #e5ebf3}.cal-side-split{grid-template-columns:1fr 1fr}}</style>
+
+<style id="calendar-viewport-fix">
+/* Calendário compacto: cabe inteiro no desktop e só usa 6 semanas quando o mês exige */
+.cal-day{min-height:82px!important;height:auto;padding:5px 6px!important}
+.cal-weekdays div{padding:7px 6px!important}
+.cal-daynum{margin-bottom:3px!important;font-size:.68rem!important}
+.cal-event{
+  margin:2px 0!important;
+  padding:4px 6px!important;
+  font-size:.58rem!important;
+  line-height:1.18!important;
+  white-space:normal!important;
+  overflow:hidden!important;
+  text-overflow:clip!important;
+  display:-webkit-box!important;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  max-height:30px
+}
+.cal-main-layout{grid-template-columns:minmax(0,1fr) 360px!important;gap:10px!important;padding:10px!important}
+.cal-toolbar{padding:9px 10px!important}
+.cal-nav button{width:34px!important;height:34px!important}
+.cal-btn{height:34px!important}
+.cal-filter{height:34px!important}
+.cal-view-tab{height:34px!important;padding:0 8px!important}
+.cal-side-card{padding:10px!important}
+.cal-side-column{gap:9px!important;min-width:0}
+.cal-up-item{grid-template-columns:44px minmax(0,1fr) 14px!important;padding:6px 0!important;gap:7px!important}
+.cal-up-body{min-width:0}
+.cal-up-body strong{
+  white-space:normal!important;
+  overflow:hidden!important;
+  text-overflow:clip!important;
+  display:-webkit-box!important;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  line-height:1.2!important;
+  max-height:34px
+}
+.cal-up-body small{display:block;margin-top:2px}
+.cal-side-form-grid{gap:6px!important}
+.cal-field label{margin-bottom:3px!important}
+.cal-field input,.cal-field select,.cal-field textarea{padding:7px 9px!important}
+.cal-field textarea{min-height:34px!important;max-height:55px}
+.cal-hero{padding:11px 14px!important}
+.cal-hero-icon{width:48px!important;height:48px!important}
+.cal-hero h1{font-size:1.25rem!important}
+.cal-shell{gap:9px!important}
+@media(max-width:1050px){
+  .cal-main-layout{grid-template-columns:1fr!important}
+  .cal-side-column{display:grid!important;grid-template-columns:1fr 1fr!important}
+}
+@media(max-width:720px){
+  .cal-day{min-height:72px!important;padding:4px!important}
+  .cal-event{font-size:.53rem!important;max-height:28px}
+  .cal-main-layout{padding:6px!important}
+  .cal-side-column{grid-template-columns:1fr!important}
+}
+</style>
 </head>
 <body class="rest-wide-modern">
   <div class="shell">
@@ -3002,7 +3061,9 @@ function setPhone(digits) {
       (calendarioData.holidays||[]).forEach(x=>(eventsBy[x.date]||(eventsBy[x.date]=[])).push({...x,kind:'holiday'}));
       (calendarioData.reminders||[]).forEach(x=>(eventsBy[x.date]||(eventsBy[x.date]=[])).push({...x,kind:'reminder'}));
       let html='';
-      for(let i=0;i<42;i++){
+      const daysInMonth=new Date(y,m+1,0).getDate();
+      const totalCells=Math.ceil((first.getDay()+daysInMonth)/7)*7;
+      for(let i=0;i<totalCells;i++){
         const d=new Date(start);d.setDate(start.getDate()+i);
         const iso=calDateOnly(d),out=d.getMonth()!==m;
         const dayEvents=eventsBy[iso]||[];
