@@ -1416,6 +1416,7 @@ body.rest-wide-modern .rest-bottom-history{width:100%!important;max-width:none!i
 @media(max-width:1100px){.cal-form-grid{grid-template-columns:1fr 1fr 1fr}.cal-span2{grid-column:span 2}.cal-reminder-row{grid-template-columns:85px 1fr 100px 80px}}
 @media(max-width:760px){.cal-weekdays div{font-size:.53rem;padding:7px 2px}.cal-day{min-height:84px;padding:4px}.cal-event{font-size:.53rem;padding:4px}.cal-form-grid{grid-template-columns:1fr 1fr}.cal-span2{grid-column:1/-1}.cal-reminder-row{grid-template-columns:1fr}.cal-row-actions{justify-content:flex-start}}
 </style>
+<style>.cal-main-layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;padding:12px}.cal-main-column{min-width:0;border:1px solid #e3eaf4;border-radius:13px;overflow:hidden;background:#fff}.cal-side-column{display:flex;flex-direction:column;gap:12px}.cal-side-card{background:#fff;border:1px solid #dfe7f2;border-radius:13px;padding:12px}.cal-side-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.78rem;font-weight:950;color:#173a6b;margin-bottom:10px}.cal-side-title span{display:flex;align-items:center;gap:7px}.cal-side-title i{color:#0967de}.cal-side-title button{border:1px solid #cfe0f6;background:#f7fbff;color:#0967de;border-radius:999px;padding:5px 9px;font-size:.62rem;font-weight:900}.cal-toolbar-right{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.cal-view-tabs{display:flex;border:1px solid #d9e4f2;border-radius:9px;overflow:hidden}.cal-view-tab{height:36px;border:0;border-right:1px solid #e1e8f2;background:#fff;color:#3d5678;padding:0 10px;font-size:.65rem;font-weight:900}.cal-view-tab:last-child{border-right:0}.cal-view-tab.active{background:#0870ed;color:#fff}.cal-upcoming{display:grid;gap:5px}.cal-up-item{display:grid;grid-template-columns:48px 1fr 18px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #edf1f6}.cal-up-item:last-child{border-bottom:0}.cal-up-date{background:#f3f7fd;border-radius:9px;text-align:center;padding:6px 3px;color:#173a6b}.cal-up-date strong{display:block;font-size:1rem;line-height:1}.cal-up-date small{font-size:.52rem;font-weight:900;text-transform:uppercase}.cal-up-body strong{display:block;font-size:.69rem;color:#183960;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cal-up-body small{font-size:.6rem;color:#71809a}.cal-up-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px}.cal-up-arrow{color:#8da0b8}.cal-form-side{display:block!important;padding:0!important;border:0!important;background:transparent!important}.cal-side-form-grid{display:grid;gap:8px}.cal-side-split{display:grid;grid-template-columns:1fr 1fr;gap:8px}.cal-save-wide{width:100%;justify-content:center}.cal-alt-view{padding:12px}.cal-alt-title{font-size:.85rem;font-weight:950;color:#163a70;margin-bottom:10px}.cal-week-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid #e3eaf4;border-radius:10px;overflow:hidden}.cal-week-col{min-height:260px;border-right:1px solid #e5ebf3;padding:8px}.cal-week-col:last-child{border-right:0}.cal-week-col-head{text-align:center;padding-bottom:7px;margin-bottom:7px;border-bottom:1px solid #edf1f6;color:#60718c;font-size:.62rem;font-weight:900}.cal-week-col-head strong{display:block;color:#173a6b;font-size:.92rem}.cal-agenda-list{display:grid;gap:7px}.cal-agenda-item{display:grid;grid-template-columns:70px 1fr auto;gap:10px;align-items:center;border:1px solid #e2e9f3;border-radius:10px;padding:10px;background:#fff}.cal-agenda-date{font-size:.65rem;font-weight:900;color:#174b8e}.cal-agenda-item strong{font-size:.73rem;color:#173a6b}.cal-agenda-item small{display:block;color:#738199;font-size:.61rem}.cal-day-empty{padding:30px;text-align:center;color:#76859b;font-size:.72rem}@media(max-width:1050px){.cal-main-layout{grid-template-columns:1fr}.cal-side-column{display:grid;grid-template-columns:1fr 1fr}.cal-week-col{min-height:190px}}@media(max-width:720px){.cal-side-column{grid-template-columns:1fr}.cal-toolbar-right{width:100%}.cal-view-tabs{width:100%}.cal-view-tab{flex:1;padding:0 5px}.cal-week-grid{grid-template-columns:1fr}.cal-week-col{min-height:auto;border-right:0;border-bottom:1px solid #e5ebf3}.cal-side-split{grid-template-columns:1fr 1fr}}</style>
 </head>
 <body class="rest-wide-modern">
   <div class="shell">
@@ -1532,45 +1533,72 @@ body.rest-wide-modern .rest-bottom-history{width:100%!important;max-width:none!i
           </div>
 
           <div class="cal-panel">
-            <div class="cal-form" id="calFormWrap">
-              <form id="calForm">
-                <div class="cal-form-grid">
-                  <div class="cal-field"><label>Título</label><input name="title" maxlength="140" required placeholder="Ex.: pedir reforço para sexta"></div>
-                  <div class="cal-field cal-span2"><label>Observação</label><textarea name="description" placeholder="Detalhes do lembrete"></textarea></div>
-                  <div class="cal-field"><label>Data do evento</label><input type="date" name="date" required></div>
-                  <div class="cal-field"><label>Hora</label><input type="time" name="time" value="09:00"></div>
-                  <div class="cal-field"><label>Destino</label><select name="target" id="calTarget"><option value="pessoal">Só para mim</option><option value="coopex">Lembrar a COOPEX</option></select></div>
-                  <div class="cal-field"><label>Categoria</label><select name="category"><option value="operacional">Operacional</option><option value="reuniao">Reunião</option><option value="financeiro">Financeiro</option><option value="manutencao">Manutenção</option><option value="importante">Importante</option></select></div>
-                  <div class="cal-form-actions"><button class="cal-btn primary" type="submit"><i class="bi bi-check2"></i> Salvar</button><button class="cal-btn" id="calCancelBtn" type="button">Cancelar</button></div>
+            <div class="cal-main-layout">
+              <div class="cal-main-column">
+                <div class="cal-toolbar">
+                  <div class="cal-nav">
+                    <button id="calPrev" type="button" aria-label="Anterior"><i class="bi bi-chevron-left"></i></button>
+                    <button id="calNext" type="button" aria-label="Próximo"><i class="bi bi-chevron-right"></i></button>
+                    <button class="cal-btn" id="calToday" type="button">Hoje</button>
+                    <div class="cal-title" id="calTitle">Calendário</div>
+                  </div>
+                  <div class="cal-toolbar-right">
+                    <div class="cal-view-tabs">
+                      <button type="button" class="cal-view-tab active" data-cal-view="month"><i class="bi bi-calendar3"></i> Mês</button>
+                      <button type="button" class="cal-view-tab" data-cal-view="week"><i class="bi bi-calendar-week"></i> Semana</button>
+                      <button type="button" class="cal-view-tab" data-cal-view="day"><i class="bi bi-calendar-day"></i> Dia</button>
+                      <button type="button" class="cal-view-tab" data-cal-view="agenda"><i class="bi bi-list-ul"></i> Agenda</button>
+                    </div>
+                    <select class="cal-filter" id="calYear"></select>
+                    <select class="cal-filter" id="calStatus">
+                      <option value="todos">Todos</option>
+                      <option value="pendentes">Pendentes</option>
+                      <option value="concluidos">Concluídos</option>
+                      <option value="coopex">COOPEX</option>
+                    </select>
+                  </div>
                 </div>
-              </form>
-            </div>
 
-            <div class="cal-toolbar">
-              <div class="cal-nav">
-                <button id="calPrev" type="button" aria-label="Mês anterior"><i class="bi bi-chevron-left"></i></button>
-                <div class="cal-title" id="calTitle">Calendário</div>
-                <button id="calNext" type="button" aria-label="Próximo mês"><i class="bi bi-chevron-right"></i></button>
-                <button class="cal-btn" id="calToday" type="button">Hoje</button>
+                <div id="calMonthView">
+                  <div class="cal-weekdays"><div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div></div>
+                  <div class="cal-grid" id="calGrid"></div>
+                  <div class="cal-legend">
+                    <span><i class="cal-dot nat"></i>Nacional</span>
+                    <span><i class="cal-dot rn"></i>Estadual — RN</span>
+                    <span><i class="cal-dot city"></i>Municipal — Natal</span>
+                    <span><i class="cal-dot me"></i>Meu lembrete</span>
+                    <span><i class="cal-dot cx"></i>COOPEX</span>
+                  </div>
+                </div>
+
+                <div id="calAltView" class="cal-alt-view" style="display:none"></div>
               </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <select class="cal-filter" id="calYear"></select>
-                <select class="cal-filter" id="calStatus">
-                  <option value="todos">Todos os lembretes</option>
-                  <option value="pendentes">Pendentes</option>
-                  <option value="concluidos">Concluídos</option>
-                  <option value="coopex">Enviados à COOPEX</option>
-                </select>
-              </div>
-            </div>
-            <div class="cal-weekdays"><div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div></div>
-            <div class="cal-grid" id="calGrid"></div>
-            <div class="cal-legend">
-              <span><i class="cal-dot nat"></i>Nacional</span>
-              <span><i class="cal-dot rn"></i>Estadual — RN</span>
-              <span><i class="cal-dot city"></i>Municipal — Natal</span>
-              <span><i class="cal-dot me"></i>Meu lembrete</span>
-              <span><i class="cal-dot cx"></i>COOPEX</span>
+
+              <aside class="cal-side-column">
+                <div class="cal-side-card">
+                  <div class="cal-side-title"><span><i class="bi bi-bell-fill"></i> Próximos lembretes</span><button type="button" id="calSeeAll">Ver todos</button></div>
+                  <div id="calUpcoming" class="cal-upcoming"></div>
+                </div>
+
+                <div class="cal-side-card">
+                  <div class="cal-side-title"><span><i class="bi bi-plus-circle-fill"></i> Novo lembrete</span></div>
+                  <div class="cal-form cal-form-side open" id="calFormWrap">
+                    <form id="calForm">
+                      <div class="cal-side-form-grid">
+                        <div class="cal-field"><label>Título</label><input name="title" maxlength="140" required placeholder="Digite o título do lembrete..."></div>
+                        <div class="cal-field"><label>Descrição (opcional)</label><textarea name="description" placeholder="Digite uma descrição..."></textarea></div>
+                        <div class="cal-side-split">
+                          <div class="cal-field"><label>Data</label><input type="date" name="date" required></div>
+                          <div class="cal-field"><label>Hora (opcional)</label><input type="time" name="time" value="09:00"></div>
+                        </div>
+                        <div class="cal-field"><label>Destino</label><select name="target" id="calTarget"><option value="pessoal">Só para mim</option><option value="coopex">Lembrar a COOPEX</option></select></div>
+                        <div class="cal-field"><label>Categoria</label><select name="category"><option value="reuniao">Reunião</option><option value="financeiro">Financeiro</option><option value="manutencao">Manutenção</option><option value="importante">Importante</option><option value="operacional">Operacional</option></select></div>
+                        <button class="cal-btn primary cal-save-wide" type="submit"><i class="bi bi-calendar-check"></i> Salvar lembrete</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </aside>
             </div>
 
             <div class="cal-list">
@@ -2948,6 +2976,8 @@ function setPhone(digits) {
     let calendarioLoadedYear=null;
     let calendarioData={holidays:[],reminders:[]};
     let calCursor=new Date();
+    let calSelectedDate=calDateOnly(new Date());
+    let calViewMode='month';
     const calMonthNames=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 
     function calEsc(s){return String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
@@ -2965,7 +2995,7 @@ function setPhone(digits) {
       const grid=document.getElementById('calGrid'),title=document.getElementById('calTitle'),list=document.getElementById('calReminderList'),count=document.getElementById('calCount');
       if(!grid||!title||!list)return;
       const y=calCursor.getFullYear(),m=calCursor.getMonth();
-      title.textContent=calMonthNames[m]+' de '+y;
+      title.textContent=calViewMode==='day'?calFmt(calSelectedDate):(calViewMode==='week'?'Semana · '+calMonthNames[m]+' '+y:calMonthNames[m]+' de '+y);
       const first=new Date(y,m,1),start=new Date(y,m,1-first.getDay());
       const today=calDateOnly(new Date());
       const eventsBy={};
@@ -2998,6 +3028,68 @@ function setPhone(digits) {
       const rows=calendarioData.reminders||[];
       count.textContent=rows.length+' lembrete(s)';
       list.innerHTML=rows.length?rows.map(x=>'<div class="cal-reminder-row '+(x.completed?'done':'')+'" data-row-id="'+x.id+'"><div><strong>'+calFmt(x.date)+'</strong><br><small>'+(calEsc(x.time)||'')+'</small></div><div><strong>'+calEsc(x.title)+'</strong><br><small>'+calEsc(x.description||'Sem observação')+'</small></div><div><span class="badge '+(x.target==='coopex'?'text-bg-danger':'text-bg-success')+'">'+(x.target==='coopex'?'COOPEX':'Pessoal')+'</span><br><small>'+(x.sent_at?'Disparado':'Pendente')+'</small></div><div class="cal-row-actions"><button class="cal-icon-btn" title="'+(x.completed?'Reabrir':'Concluir')+'" data-cal-complete="'+x.id+'"><i class="bi '+(x.completed?'bi-arrow-counterclockwise':'bi-check2')+'"></i></button><button class="cal-icon-btn danger" title="Excluir" data-cal-delete="'+x.id+'"><i class="bi bi-trash"></i></button></div></div>').join(''):'<div class="cal-empty">Nenhum lembrete neste filtro.</div>';
+      renderCalendarUpcoming(eventsBy);
+      renderCalendarMode(eventsBy);
+    }
+
+    function eventColorClass(ev){
+      if(ev.kind==='holiday') return ev.scope==='nacional'?'holiday-national':(ev.scope==='estadual'?'holiday-state':'holiday-city');
+      return ev.target==='coopex'?'coopex':'cat-'+(ev.category||'operacional');
+    }
+
+    function renderCalendarUpcoming(eventsBy){
+      const box=document.getElementById('calUpcoming');if(!box)return;
+      const today=calDateOnly(new Date());
+      const upcoming=[];
+      Object.keys(eventsBy).sort().forEach(date=>{
+        if(date<today)return;
+        (eventsBy[date]||[]).forEach(ev=>upcoming.push({date,...ev}));
+      });
+      const top=upcoming.slice(0,5);
+      const monthNames=['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+      box.innerHTML=top.length?top.map(ev=>{
+        const d=new Date(ev.date+'T12:00:00');
+        const label=ev.kind==='holiday'?ev.title:ev.title;
+        const detail=ev.kind==='holiday'?'Todo o dia':(ev.time||'Todo o dia');
+        const dot=ev.kind==='holiday'?'#7c3aed':(ev.target==='coopex'?'#ef4444':(ev.category==='financeiro'?'#16a36a':ev.category==='manutencao'?'#f2b400':ev.category==='importante'?'#ef4444':ev.category==='reuniao'?'#1685f8':'#7c3aed'));
+        return '<div class="cal-up-item" data-up-date="'+ev.date+'"><div class="cal-up-date"><strong>'+String(d.getDate()).padStart(2,'0')+'</strong><small>'+monthNames[d.getMonth()]+'</small></div><div class="cal-up-body"><strong><i class="cal-up-dot" style="background:'+dot+'"></i>'+calEsc(label)+'</strong><small><i class="bi bi-clock me-1"></i>'+calEsc(detail)+'</small></div><i class="bi bi-chevron-right cal-up-arrow"></i></div>';
+      }).join(''):'<div class="cal-day-empty">Nenhum próximo lembrete.</div>';
+    }
+
+    function renderCalendarMode(eventsBy){
+      const month=document.getElementById('calMonthView'),alt=document.getElementById('calAltView');
+      if(!month||!alt)return;
+      document.querySelectorAll('.cal-view-tab').forEach(b=>b.classList.toggle('active',b.dataset.calView===calViewMode));
+      if(calViewMode==='month'){month.style.display='';alt.style.display='none';return;}
+      month.style.display='none';alt.style.display='block';
+
+      if(calViewMode==='week'){
+        const sel=new Date(calSelectedDate+'T12:00:00');
+        const start=new Date(sel);start.setDate(sel.getDate()-sel.getDay());
+        let html='<div class="cal-alt-title">Semana de '+calFmt(calDateOnly(start))+'</div><div class="cal-week-grid">';
+        for(let i=0;i<7;i++){
+          const d=new Date(start);d.setDate(start.getDate()+i);const iso=calDateOnly(d);
+          html+='<div class="cal-week-col" data-cal-date="'+iso+'"><div class="cal-week-col-head">'+['DOM','SEG','TER','QUA','QUI','SEX','SÁB'][i]+'<strong>'+d.getDate()+'</strong></div>';
+          const es=eventsBy[iso]||[];
+          html+=es.length?es.map(ev=>'<button type="button" class="cal-event '+eventColorClass(ev)+'">'+calEsc(ev.title)+'</button>').join(''):'<div class="cal-day-empty" style="padding:12px 0">—</div>';
+          html+='</div>';
+        }
+        alt.innerHTML=html+'</div>';
+        return;
+      }
+
+      if(calViewMode==='day'){
+        const es=eventsBy[calSelectedDate]||[];
+        alt.innerHTML='<div class="cal-alt-title">'+calFmt(calSelectedDate)+'</div><div class="cal-agenda-list">'+(es.length?es.map(ev=>'<div class="cal-agenda-item"><div class="cal-agenda-date">'+(ev.kind==='holiday'?'FERIADO':calEsc(ev.time||'Todo o dia'))+'</div><div><strong>'+calEsc(ev.title)+'</strong><small>'+calEsc(ev.description||ev.scope_label||'')+'</small></div><span class="cal-event '+eventColorClass(ev)+'" style="width:auto;margin:0">'+(ev.kind==='holiday'?'Feriado':(ev.target==='coopex'?'COOPEX':'Pessoal'))+'</span></div>').join(''):'<div class="cal-day-empty">Nenhum compromisso neste dia.</div>')+'</div>';
+        return;
+      }
+
+      const y=calCursor.getFullYear(),m=calCursor.getMonth();
+      const startKey=y+'-'+String(m+1).padStart(2,'0')+'-01';
+      const endKey=y+'-'+String(m+2).padStart(2,'0')+'-01';
+      const all=[];
+      Object.keys(eventsBy).sort().forEach(date=>{if(date>=startKey&&date<endKey)(eventsBy[date]||[]).forEach(ev=>all.push({date,...ev}));});
+      alt.innerHTML='<div class="cal-alt-title">Agenda — '+calMonthNames[m]+' de '+y+'</div><div class="cal-agenda-list">'+(all.length?all.map(ev=>'<div class="cal-agenda-item"><div class="cal-agenda-date">'+calFmt(ev.date)+'</div><div><strong>'+calEsc(ev.title)+'</strong><small>'+calEsc(ev.kind==='holiday'?(ev.scope_label||'Feriado'):(ev.time||'Todo o dia'))+'</small></div><span class="cal-event '+eventColorClass(ev)+'" style="width:auto;margin:0">'+(ev.kind==='holiday'?'Feriado':(ev.target==='coopex'?'COOPEX':'Pessoal'))+'</span></div>').join(''):'<div class="cal-day-empty">Nenhum item neste mês.</div>')+'</div>';
     }
 
     async function initCalendario(){
@@ -3009,15 +3101,19 @@ function setPhone(digits) {
           for(let y=now.getFullYear()-1;y<=now.getFullYear()+6;y++){const o=document.createElement('option');o.value=y;o.textContent=y;if(y===now.getFullYear())o.selected=true;yr.appendChild(o);}
           yr.addEventListener('change',()=>{calCursor=new Date(Number(yr.value),calCursor.getMonth(),1);loadCalendarYear(Number(yr.value)).catch(e=>alert(e.message));});
         }
-        document.getElementById('calPrev')?.addEventListener('click',()=>{calCursor.setMonth(calCursor.getMonth()-1);if(yr){yr.value=calCursor.getFullYear();}loadCalendarYear(calCursor.getFullYear()).catch(e=>alert(e.message));});
-        document.getElementById('calNext')?.addEventListener('click',()=>{calCursor.setMonth(calCursor.getMonth()+1);if(yr){yr.value=calCursor.getFullYear();}loadCalendarYear(calCursor.getFullYear()).catch(e=>alert(e.message));});
-        document.getElementById('calToday')?.addEventListener('click',()=>{const n=new Date();calCursor=new Date(n.getFullYear(),n.getMonth(),1);if(yr)yr.value=n.getFullYear();loadCalendarYear(n.getFullYear()).catch(e=>alert(e.message));});
+        document.getElementById('calPrev')?.addEventListener('click',()=>{if(calViewMode==='day'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()-1);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else if(calViewMode==='week'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()-7);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else{calCursor.setMonth(calCursor.getMonth()-1);calSelectedDate=calDateOnly(new Date(calCursor.getFullYear(),calCursor.getMonth(),1));}if(yr)yr.value=calCursor.getFullYear();loadCalendarYear(calCursor.getFullYear()).catch(e=>alert(e.message));});
+        document.getElementById('calNext')?.addEventListener('click',()=>{if(calViewMode==='day'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()+1);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else if(calViewMode==='week'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()+7);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else{calCursor.setMonth(calCursor.getMonth()+1);calSelectedDate=calDateOnly(new Date(calCursor.getFullYear(),calCursor.getMonth(),1));}if(yr)yr.value=calCursor.getFullYear();loadCalendarYear(calCursor.getFullYear()).catch(e=>alert(e.message));});
+        document.getElementById('calToday')?.addEventListener('click',()=>{const n=new Date();calSelectedDate=calDateOnly(n);calCursor=new Date(n.getFullYear(),n.getMonth(),1);if(yr)yr.value=n.getFullYear();loadCalendarYear(n.getFullYear()).catch(e=>alert(e.message));});
         document.getElementById('calStatus')?.addEventListener('change',()=>loadCalendarYear(calCursor.getFullYear()).catch(e=>alert(e.message)));
-        document.getElementById('calNewBtn')?.addEventListener('click',()=>document.getElementById('calFormWrap')?.classList.toggle('open'));
+        document.getElementById('calNewBtn')?.addEventListener('click',()=>{document.getElementById('calFormWrap')?.classList.add('open');document.querySelector('#calForm input[name="title"]')?.focus();});
+        document.querySelectorAll('.cal-view-tab').forEach(btn=>btn.addEventListener('click',()=>{calViewMode=btn.dataset.calView||'month';renderCalendar();}));
+        document.getElementById('calSeeAll')?.addEventListener('click',()=>{calViewMode='agenda';renderCalendar();});
+        document.getElementById('calUpcoming')?.addEventListener('click',e=>{const row=e.target.closest('[data-up-date]');if(!row)return;calSelectedDate=row.dataset.upDate;calViewMode='day';renderCalendar();});
         document.getElementById('calGrid')?.addEventListener('click',e=>{
           const day=e.target.closest('.cal-day[data-cal-date]');
           if(!day)return;
           const date=day.dataset.calDate;
+          calSelectedDate=date;
           const input=document.querySelector('#calForm input[name="date"]');
           if(input)input.value=date;
           document.getElementById('calFormWrap')?.classList.add('open');
@@ -3309,9 +3405,8 @@ function setPhone(digits) {
 
       const tabs=Array.from(document.querySelectorAll('.rest-list-tab'));
       const pendingList=document.getElementById('listaPendencias');
-      tabs.forEach(tab=>tab.addEventListener('click',()=>{
-        tabs.forEach(x=>x.classList.remove('active')); tab.classList.add('active');
-        const mode=tab.dataset.coopFilter;
+
+      function aplicarModoCooperados(mode){
         if(mode==='pendencias'){
           if(pendingList) pendingList.style.display='';
           if(document.getElementById('listaCooperados')) document.getElementById('listaCooperados').style.display='none';
@@ -3320,18 +3415,30 @@ function setPhone(digits) {
         if(pendingList) pendingList.style.display='none';
         if(document.getElementById('listaCooperados')) document.getElementById('listaCooperados').style.display='';
         itens.forEach(el=>{
-          if(mode==='pendencias'){
-            el.style.display='none';
-          }else if(mode==='producao'){
-            el.style.display=el.dataset.producao==='1'?'':'none';
-          }else if(mode==='escalados'){
-            el.style.display=el.dataset.escalado==='1'?'':'none';
-          }else{
-            // "Todos" realmente mostra todos os cooperados.
-            el.style.display='';
-          }
+          if(mode==='producao') el.style.display=el.dataset.producao==='1'?'':'none';
+          else if(mode==='escalados') el.style.display=el.dataset.escalado==='1'?'':'none';
+          else el.style.display='';
         });
+      }
+
+      tabs.forEach(tab=>tab.addEventListener('click',()=>{
+        tabs.forEach(x=>x.classList.remove('active')); tab.classList.add('active');
+        aplicarModoCooperados(tab.dataset.coopFilter);
       }));
+
+      async function loadLancadosHoje(){
+        try{
+          const r=await fetch('/api/rest/lancados-hoje',{credentials:'same-origin',cache:'no-store'});
+          if(!r.ok)return;
+          const j=await r.json();
+          if(!j.ok)return;
+          const ids=new Set((j.cooperados||[]).map(String));
+          itens.forEach(card=>{ card.dataset.producao=ids.has(String(card.dataset.id))?'1':'0'; });
+          const activeMode=document.querySelector('.rest-list-tab.active')?.dataset.coopFilter||'todos';
+          if(activeMode==='producao') aplicarModoCooperados('producao');
+        }catch(e){}
+      }
+      loadLancadosHoje();
 
 
       async function loadPendingWeekState(){
@@ -3393,6 +3500,8 @@ function setPhone(digits) {
               old.innerHTML=icon+' '+(st.status_label||'Escalado');
             }
           });
+          const activeMode=document.querySelector('.rest-list-tab.active')?.dataset.coopFilter||'todos';
+          if(activeMode==='producao') aplicarModoCooperados('producao');
         }catch(e){}
       }
       setTimeout(loadPendingWeekState,120);
