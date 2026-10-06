@@ -92,6 +92,50 @@ def portal_restaurante():
             return False
         return a == b or a in b or b in a
 
+    # Abas informativas não precisam montar escala, cooperados, totais ou produção.
+    # Mantém o mesmo template/menu, mas responde com contexto mínimo.
+    if view in {"config", "mapa", "avisos"}:
+        try:
+            current_app.logger.info(
+                "REST_PORTAL_FAST %.3fs view=%s rest_id=%s",
+                _time.perf_counter() - _portal_perf_started, view, rest.id
+            )
+        except Exception:
+            pass
+        return render_template(
+            "restaurante_dashboard.html",
+            rest=rest,
+            cooperados=[],
+            filtro_inicio=di,
+            filtro_fim=df,
+            filtro_mes=(mes or ""),
+            periodo_desc=periodo_desc,
+            total_bruto=0.0,
+            total_inss=0.0,
+            total_sest=0.0,
+            total_encargos=0.0,
+            total_liquido=0.0,
+            total_qtd=0,
+            total_entregas=0,
+            view=view,
+            agenda={},
+            dias_list=[],
+            ref_data=date.today(),
+            modo="dia",
+            lancamentos_periodo=[],
+            total_lanc_valor=0.0,
+            total_lanc_entregas=0,
+            url_lancar_producao="/restaurante/lancar_producao",
+            has_editar_lanc=("editar_lancamento" in app.view_functions),
+            escalados_hoje=[],
+            cooperados_busca_manual=[],
+            lancamentos_pendentes=[],
+            producoes_semana_previstas=[],
+            producoes_semana_pendentes=[],
+            producoes_semana_recentes=[],
+            hoje=date.today(),
+        )
+
     # -------------------- ESCALA (Quem trabalha) --------------------
     ref = _parse_date(request.args.get("ref")) or date.today()
     # Ao entrar na aba Escala, abre sempre o dia atual. "Semana completa"
@@ -254,6 +298,223 @@ def portal_restaurante():
         current_app.logger.info("REST_PORTAL_SCALES %.3fs view=%s rest_id=%s", _time.perf_counter()-_portal_perf_started, view, rest.id)
     except Exception:
         pass
+
+    # Histórico usa somente lançamentos + escalas necessárias para detectar FALTOU LANÇAR.
+    # Evita carregar lista completa de cooperados, totais da tela de lançamento e pendências.
+    if view == "lancamentos":
+        qtxt = (request.args.get("q") or "").strip().lower()
+        launch_rows = (
+            db.session.query(Lancamento, Cooperado)
+            .join(Cooperado, Cooperado.id == Lancamento.cooperado_id)
+            .filter(
+                Lancamento.restaurante_id == rest.id,
+                Lancamento.data >= di,
+                Lancamento.data <= df,
+            )
+            .order_by(Lancamento.data.asc(), Lancamento.id.asc())
+            .all()
+        )
+
+        lancamentos_periodo = []
+        hist_launches = {}
+        for lanc, coop in launch_rows:
+            if qtxt and qtxt not in (coop.nome or "").lower():
+                continue
+            h_ini = (
+                lanc.hora_inicio if isinstance(lanc.hora_inicio, str)
+                else (lanc.hora_inicio.strftime("%H:%M") if lanc.hora_inicio else "")
+            )
+            h_fim = (
+                lanc.hora_fim if isinstance(lanc.hora_fim, str)
+                else (lanc.hora_fim.strftime("%H:%M") if lanc.hora_fim else "")
+            )
+            item = {
+                "id": lanc.id,
+                "data": lanc.data.strftime("%d/%m/%Y") if lanc.data else "",
+                "hora_inicio": h_ini,
+                "hora_fim": h_fim,
+                "qtd_entregas": lanc.qtd_entregas or 0,
+                "valor": float(lanc.valor or 0.0),
+                "descricao": lanc.descricao or "",
+                "cooperado_id": coop.id,
+                "cooperado_nome": coop.nome,
+                "contrato_nome": rest.nome,
+            }
+            lancamentos_periodo.append(item)
+            hist_launches.setdefault((coop.id, lanc.data), []).append(item)
+
+        def _hist_times(raw):
+            found = re.findall(r"(?<!\d)(\d{1,2})(?::|h)(\d{2})(?!\d)", str(raw or "").lower())
+            vals = []
+            for hh, mm in found:
+                try:
+                    h, m = int(hh), int(mm)
+                    if 0 <= h <= 23 and 0 <= m <= 59:
+                        vals.append(h * 60 + m)
+                except Exception:
+                    pass
+            if len(vals) >= 2:
+                return vals[0], vals[-1]
+            return (vals[0], None) if vals else (None, None)
+
+        def _overlap_minutes(ai, af, bi, bf):
+            if None in (ai, af, bi, bf):
+                return False
+            return max(ai, bi) < min(af, bf) or (ai == bi and af == bf)
+
+        today_hist = datetime.now(TZ).date() if "TZ" in globals() else date.today()
+        now_hist = datetime.now(TZ) if "TZ" in globals() else datetime.now()
+        now_min = now_hist.hour * 60 + now_hist.minute
+
+        # Maior fim de expediente por dia: hoje só acusa falta depois que o contrato encerrou o dia.
+        last_end_by_day = {}
+        for scale in escalas_rest:
+            sd = _parse_data_escala_str(scale.data)
+            if not sd:
+                continue
+            _, sf = _hist_times(scale.horario)
+            if sf is not None:
+                last_end_by_day[sd] = max(last_end_by_day.get(sd, sf), sf)
+
+        faltas_seen = set()
+        for scale in escalas_rest:
+            sd = _parse_data_escala_str(scale.data)
+            if not sd or sd < di or sd > df or sd > today_hist:
+                continue
+            if sd == today_hist:
+                last_end = last_end_by_day.get(sd)
+                if last_end is None or now_min < last_end:
+                    continue
+
+            coop = coops_escala_map.get(scale.cooperado_id) if scale.cooperado_id else None
+            if not coop or (qtxt and qtxt not in (coop.nome or "").lower()):
+                continue
+
+            si, sf = _hist_times(scale.horario)
+            candidates = hist_launches.get((coop.id, sd), [])
+            matched = False
+            for item in candidates:
+                li, _ = _hist_times(item.get("hora_inicio"))
+                _, lf = _hist_times(item.get("hora_fim"))
+                # hora isolada não passa pelo parser de faixa; converte direto.
+                def _one(v):
+                    m = re.search(r"(\d{1,2}):(\d{2})", str(v or ""))
+                    return int(m.group(1))*60 + int(m.group(2)) if m else None
+                li, lf = _one(item.get("hora_inicio")), _one(item.get("hora_fim"))
+                if si is not None and sf is not None and li is not None and lf is not None:
+                    if _overlap_minutes(si, sf, li, lf):
+                        matched = True
+                        break
+                elif len(candidates) == 1:
+                    matched = True
+                    break
+
+            key = (coop.id, sd, si, sf)
+            if matched or key in faltas_seen:
+                continue
+            faltas_seen.add(key)
+            lancamentos_periodo.append({
+                "id": None,
+                "data": sd.strftime("%d/%m/%Y"),
+                "hora_inicio": f"{si//60:02d}:{si%60:02d}" if si is not None else "",
+                "hora_fim": f"{sf//60:02d}:{sf%60:02d}" if sf is not None else "",
+                "qtd_entregas": 0,
+                "valor": 0.0,
+                "descricao": "FALTOU LANÇAR",
+                "cooperado_id": coop.id,
+                "cooperado_nome": coop.nome,
+                "contrato_nome": rest.nome,
+                "faltou_lancar": True,
+            })
+
+        def _sort_hist(x):
+            try:
+                d = datetime.strptime(str(x.get("data") or ""), "%d/%m/%Y").date()
+            except Exception:
+                d = date.min
+            return (d, x.get("hora_inicio") or "", (x.get("cooperado_nome") or "").lower())
+
+        lancamentos_periodo.sort(key=_sort_hist)
+        total_lanc_valor = sum(float(x.get("valor") or 0) for x in lancamentos_periodo if not x.get("faltou_lancar"))
+        total_lanc_entregas = sum(int(x.get("qtd_entregas") or 0) for x in lancamentos_periodo if not x.get("faltou_lancar"))
+
+        try:
+            current_app.logger.info(
+                "REST_PORTAL_HISTORY_FAST %.3fs rest_id=%s rows=%s",
+                _time.perf_counter() - _portal_perf_started, rest.id, len(lancamentos_periodo)
+            )
+        except Exception:
+            pass
+
+        return render_template(
+            "restaurante_dashboard.html",
+            rest=rest,
+            cooperados=[],
+            filtro_inicio=di,
+            filtro_fim=df,
+            filtro_mes=(mes or ""),
+            periodo_desc=periodo_desc,
+            total_bruto=0.0,
+            total_inss=0.0,
+            total_sest=0.0,
+            total_encargos=0.0,
+            total_liquido=0.0,
+            total_qtd=0,
+            total_entregas=0,
+            view=view,
+            agenda=agenda,
+            dias_list=dias_list,
+            ref_data=ref,
+            modo=modo,
+            lancamentos_periodo=lancamentos_periodo,
+            total_lanc_valor=total_lanc_valor,
+            total_lanc_entregas=total_lanc_entregas,
+            url_lancar_producao="/restaurante/lancar_producao",
+            has_editar_lanc=("editar_lancamento" in app.view_functions),
+            escalados_hoje=[],
+            cooperados_busca_manual=[],
+            lancamentos_pendentes=[],
+            producoes_semana_previstas=[],
+            producoes_semana_pendentes=[],
+            producoes_semana_recentes=[],
+            hoje=date.today(),
+        )
+
+    # A aba Escala termina aqui: não precisa calcular lançamentos, totais ou pendências.
+    if view == "escalas":
+        return render_template(
+            "restaurante_dashboard.html",
+            rest=rest,
+            cooperados=[],
+            filtro_inicio=di,
+            filtro_fim=df,
+            filtro_mes=(mes or ""),
+            periodo_desc=periodo_desc,
+            total_bruto=0.0,
+            total_inss=0.0,
+            total_sest=0.0,
+            total_encargos=0.0,
+            total_liquido=0.0,
+            total_qtd=0,
+            total_entregas=0,
+            view=view,
+            agenda=agenda,
+            dias_list=dias_list,
+            ref_data=ref,
+            modo=modo,
+            lancamentos_periodo=[],
+            total_lanc_valor=0.0,
+            total_lanc_entregas=0,
+            url_lancar_producao="/restaurante/lancar_producao",
+            has_editar_lanc=("editar_lancamento" in app.view_functions),
+            escalados_hoje=[],
+            cooperados_busca_manual=[],
+            lancamentos_pendentes=[],
+            producoes_semana_previstas=[],
+            producoes_semana_pendentes=[],
+            producoes_semana_recentes=[],
+            hoje=date.today(),
+        )
 
     # -------------------- COOPERADOS ESCALADOS NO PERÍODO / HOJE --------------------
     hoje = date.today()
