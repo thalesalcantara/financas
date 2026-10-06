@@ -8791,15 +8791,47 @@ def rest_tabelas():
     )
     alvo_norm = _norm_txt(login_nome)
 
-    candidatos = Tabela.query.order_by(Tabela.enviado_em.desc()).all()
-    tabela_exata = next((t for t in candidatos if _norm_txt(t.titulo) == alvo_norm), None)
+    # Evita carregar todas as tabelas do sistema a cada clique.
+    # Primeiro tenta os nomes mais prováveis e só usa uma busca curta como fallback.
+    possiveis_titulos = {
+        (login_nome or "").strip(),
+        (rest.nome or "").strip(),
+        (login_nome or "").replace("_", " ").strip(),
+        (rest.nome or "").replace("_", " ").strip(),
+    }
+    possiveis_titulos = {x for x in possiveis_titulos if x}
+
+    tabela_exata = None
+    if possiveis_titulos:
+        candidatos = (
+            Tabela.query
+            .filter(Tabela.titulo.in_(list(possiveis_titulos)))
+            .order_by(Tabela.enviado_em.desc())
+            .limit(8)
+            .all()
+        )
+        tabela_exata = next((t for t in candidatos if _norm_txt(t.titulo) == alvo_norm), None)
+
+    if tabela_exata is None:
+        candidatos = Tabela.query.order_by(Tabela.enviado_em.desc()).limit(40).all()
+        tabela_exata = next((t for t in candidatos if _norm_txt(t.titulo) == alvo_norm), None)
 
     _ensure_tabelas_estruturadas_schema()
     bairros = []
     garantidos = []
     if tabela_exata:
-        bairros = TabelaBairro.query.filter_by(tabela_id=tabela_exata.id, ativo=True).order_by(TabelaBairro.bairro.asc()).all()
-        garantidos = TabelaGarantido.query.filter_by(tabela_id=tabela_exata.id).order_by(TabelaGarantido.ordem.asc(), TabelaGarantido.id.asc()).all()
+        bairros = (
+            TabelaBairro.query
+            .filter_by(tabela_id=tabela_exata.id, ativo=True)
+            .order_by(TabelaBairro.bairro.asc())
+            .all()
+        )
+        garantidos = (
+            TabelaGarantido.query
+            .filter_by(tabela_id=tabela_exata.id)
+            .order_by(TabelaGarantido.ordem.asc(), TabelaGarantido.id.asc())
+            .all()
+        )
 
     has_portal_restaurante = ("portal_restaurante" in current_app.view_functions)
 
