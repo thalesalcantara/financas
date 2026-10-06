@@ -11,6 +11,7 @@ import production_ui as perf
 
 app = shifts.patch.app
 legacy = shifts.patch.flow.legacy
+role_required = legacy.role_required
 db = shifts.patch.db
 Usuario = shifts.patch.flow.Usuario
 Cooperado = shifts.patch.Cooperado
