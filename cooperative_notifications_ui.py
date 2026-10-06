@@ -492,32 +492,29 @@ def _today_coop_launch_state(rest, pending_rows, scales_source=None):
 
 
 
+@app.get("/api/rest/pendencias-semana", endpoint="rest_pending_week_state")
+@role_required("restaurante")
+def rest_pending_week_state():
+    try:
+        rest = legacy.request_restaurante()
+        if not rest:
+            return jsonify(ok=False, pendencias=[], status={}), 404
+        indexed_scales = perf._rest_scales_indexed(rest)
+        pending_rows = _week_pending_rows(rest, indexed_scales)
+        status_map = _today_coop_launch_state(rest, pending_rows, indexed_scales)
+        return jsonify(ok=True, pendencias=pending_rows, status={str(k): v for k, v in status_map.items()})
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Falha ao carregar pendências assíncronas")
+        return jsonify(ok=False, pendencias=[], status={}), 500
+
+
 @app.context_processor
 def _coopex_week_pending_context():
-    context = {
+    # Mantém o primeiro carregamento do estabelecimento leve.
+    # Pendências/status são buscados por AJAX logo após a tela aparecer.
+    return {
         "coopex_rest_week_pending_rows": [],
         "coopex_rest_today_status_map": {},
         "coopex_rest_substitute_coops": [],
     }
-    if (session.get("user_tipo") or "").strip().lower() != "restaurante":
-        return context
-    if request.endpoint != "portal_restaurante":
-        return context
-    if (request.args.get("view") or "lancar").strip().lower() != "lancar":
-        return context
-
-    try:
-        rest = legacy.request_restaurante()
-        if rest:
-            indexed_scales = perf._rest_scales_indexed(rest)
-            pending_rows = _week_pending_rows(rest, indexed_scales)
-            context["coopex_rest_week_pending_rows"] = pending_rows
-            context["coopex_rest_today_status_map"] = _today_coop_launch_state(rest, pending_rows, indexed_scales)
-            context["coopex_rest_substitute_coops"] = [
-                {"id": int(coop_id), "nome": nome}
-                for coop_id, nome in _active_substitute_rows()
-            ]
-    except Exception:
-        db.session.rollback()
-        app.logger.exception("Falha ao montar pendências semanais do estabelecimento")
-    return context
