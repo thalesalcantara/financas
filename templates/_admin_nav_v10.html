@@ -46,10 +46,10 @@
       <a class="{{ 'active' if active_tab=='historico' else '' }}" href="{{ url_for('admin_light_history') }}"><i class="bi bi-clock-history"></i> Histórico</a>
     </div></div>{% endif %}
 
-    {% if _avaliacoes or _avisos or _restaurantes or _master %}<div class="alv8-group"><button type="button"><i class="bi bi-bar-chart"></i> Gestão <i class="bi bi-chevron-down"></i></button><div class="alv8-menu">
+    {% if _avaliacoes or _avisos or _restaurantes or _master %}<div class="alv8-group"><button type="button" class="admin-management-btn"><i class="bi bi-bar-chart"></i> Gestão <span id="adminManagementBadge" class="admin-mail-count" style="display:{{ 'inline-grid' if (admin_mailbox_unread_count|default(0)) else 'none' }}">{{ admin_mailbox_unread_count|default(0) }}</span> <i class="bi bi-chevron-down"></i></button><div class="alv8-menu">
       {% if _avaliacoes %}<a href="{{ url_for('admin_light_ratings') }}"><i class="bi bi-stars"></i> Avaliações</a>{% endif %}
       {% if _avisos %}<a href="{{ url_for('admin_light_notices') }}"><i class="bi bi-megaphone"></i> Avisos</a>{% endif %}
-      {% if _restaurantes or _master %}<a class="{{ 'active' if active_tab=='caixa_postal' else '' }}" href="{{ url_for('admin_caixa_postal') }}"><i class="bi bi-inbox"></i> Caixa Postal <span id="adminMailboxBadge" style="display:{{ 'inline-grid' if (admin_mailbox_unread_count|default(0)) else 'none' }};place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#ff3b30;color:#fff;font-size:10px;font-weight:950">{{ admin_mailbox_unread_count|default(0) }}</span></a>{% endif %}
+      {% if _restaurantes or _master %}<a class="{{ 'active' if active_tab=='caixa_postal' else '' }}" href="{{ url_for('admin_caixa_postal') }}"><i class="bi bi-inbox"></i> Caixa Postal <span id="adminMailboxBadge" class="admin-mail-count" style="display:{{ 'inline-grid' if (admin_mailbox_unread_count|default(0)) else 'none' }}">{{ admin_mailbox_unread_count|default(0) }}</span></a>{% endif %}
     </div></div>{% endif %}
 
     {% if _master %}<a class="alv8-direct" href="{{ url_for('admin_v11_config') }}"><i class="bi bi-gear"></i> Configurações</a>{% endif %}
@@ -57,6 +57,35 @@
     <a class="alv8-direct" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a>
   </nav>
 </header>
+<style id="coopex-admin-nav-fix">
+.alv8-group>button,.alv8-direct{font-size:16px!important;font-weight:800!important}
+.alv8-menu a{font-size:15px!important;font-weight:800!important}
+.alv8-brand-copy small{font-size:12px!important}
+.alv8-brand-copy strong{font-size:17px!important}
+.alv8-group>button{position:relative}
+.admin-mail-count{
+  place-items:center;
+  min-width:19px;height:19px;padding:0 5px;
+  border-radius:999px;background:#ff3b30;color:#fff;
+  font-size:10px!important;font-weight:950!important;line-height:19px;
+  box-shadow:0 0 0 2px #fff;
+  vertical-align:middle;
+}
+.admin-management-btn .admin-mail-count{
+  position:absolute;top:-7px;right:13px;z-index:5;
+}
+#adminMailboxBadge{margin-left:5px}
+#adminMailboxLoginNotice{
+  position:fixed;top:76px;left:50%;transform:translateX(-50%);
+  z-index:10050;background:#16a34a;color:#fff;border-radius:10px;
+  padding:10px 15px;font-size:13px;font-weight:900;
+  box-shadow:0 10px 28px rgba(22,163,74,.28);
+  display:none;white-space:nowrap;max-width:calc(100vw - 24px);
+}
+@media(max-width:900px){#adminMailboxLoginNotice{top:68px;font-size:12px;white-space:normal;text-align:center}}
+</style>
+<div id="adminMailboxLoginNotice"><i class="bi bi-envelope-fill"></i> Você tem um novo recado na Caixa Postal COOPEX</div>
+
 
 
 
@@ -68,38 +97,56 @@
   const KEY='coopex-mailbox-leader-v1';
   const ID=(crypto?.randomUUID?.()||String(Date.now())+Math.random());
   const CH='BroadcastChannel' in window ? new BroadcastChannel('coopex-mailbox-events') : null;
-  let es=null, heartbeat=null, reconnect=null, audioCtx=null;
+  let es=null, heartbeat=null, reconnect=null, audioCtx=null, pendingBeep=false;
 
   function updateBadge(unread){
-    const badge=document.getElementById('adminMailboxBadge');
-    if(!badge)return;
     const n=Number(unread||0);
-    badge.textContent=String(n);
-    badge.style.display=n>0?'inline-grid':'none';
+    ['adminMailboxBadge','adminManagementBadge'].forEach(id=>{
+      const badge=document.getElementById(id);
+      if(!badge)return;
+      badge.textContent=String(n);
+      badge.style.display=n>0?'inline-grid':'none';
+    });
+  }
+
+  function showMailNotice(){
+    const box=document.getElementById('adminMailboxLoginNotice');
+    if(!box)return;
+    box.style.display='block';
+    clearTimeout(window.__coopexMailNoticeTimer);
+    window.__coopexMailNoticeTimer=setTimeout(()=>box.style.display='none',6500);
   }
 
   function beep(){
     try{
       audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
-      if(audioCtx.state==='suspended')audioCtx.resume();
+      if(audioCtx.state==='suspended'){
+        const p=audioCtx.resume();
+        if(p&&typeof p.then==='function')p.then(()=>beep()).catch(()=>{pendingBeep=true});
+        else pendingBeep=true;
+        return;
+      }
+      pendingBeep=false;
       const o=audioCtx.createOscillator(),g=audioCtx.createGain();
       o.frequency.value=880;
       g.gain.setValueAtTime(.0001,audioCtx.currentTime);
       g.gain.exponentialRampToValueAtTime(.16,audioCtx.currentTime+.015);
       g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+.22);
       o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+.23);
-    }catch(_){}
+    }catch(_){pendingBeep=true}
   }
 
   document.addEventListener('pointerdown',()=>{
     try{
       audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
-      if(audioCtx.state==='suspended')audioCtx.resume();
+      const p=audioCtx.state==='suspended'?audioCtx.resume():Promise.resolve();
+      Promise.resolve(p).then(()=>{if(pendingBeep)beep()}).catch(()=>{});
     }catch(_){}
   },{once:true,passive:true});
 
   function dispatch(data,fromChannel=false){
     updateBadge(data?.unread||0);
+    showMailNotice();
     beep();
     window.dispatchEvent(new CustomEvent('coopex:new-mail',{detail:data||{}}));
     if(!fromChannel && CH) CH.postMessage(data||{});
@@ -142,6 +189,34 @@
       };
     }catch(_){}
   }
+
+
+  // O componente do menu passa a ser autossuficiente em todas as telas do Admin.
+  document.querySelectorAll('.alv8-group>button').forEach(btn=>{
+    if(btn.dataset.navBound)return;
+    btn.dataset.navBound='1';
+    btn.addEventListener('click',e=>{
+      e.preventDefault();e.stopPropagation();
+      const g=btn.parentElement;
+      document.querySelectorAll('.alv8-group').forEach(x=>{if(x!==g)x.classList.remove('open')});
+      g.classList.toggle('open');
+    });
+  });
+  if(!window.__adminNavOutsideBound){
+    window.__adminNavOutsideBound=true;
+    document.addEventListener('click',()=>document.querySelectorAll('.alv8-group').forEach(x=>x.classList.remove('open')));
+  }
+
+  const initialUnread=Number({{ admin_mailbox_unread_count|default(0)|tojson }});
+  updateBadge(initialUnread);
+  if(initialUnread>0 && sessionStorage.getItem('coopex-mailbox-login-notified')!=='1'){
+    sessionStorage.setItem('coopex-mailbox-login-notified','1');
+    showMailNotice();
+    beep();
+  }
+  document.querySelectorAll('a[href="{{ url_for("logout") }}"]').forEach(a=>a.addEventListener('click',()=>{
+    try{sessionStorage.removeItem('coopex-mailbox-login-notified')}catch(_){}
+  }));
 
   claim();
   heartbeat=setInterval(()=>{
