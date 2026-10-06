@@ -2833,7 +2833,7 @@
             <i class="bi bi-heart-pulse"></i> Benefício Hospitalar
           </h6>
           <div class="d-flex flex-wrap gap-2">
-            <span class="badge-soft" id="hosp_badge">Prévia: —</span>
+            <span class="badge-soft" id="hosp_badge">Prévia: —</span><div id="hosp_preview_detail" class="small text-muted mt-1"></div>
           </div>
         </div>
         <div class="col-md-3">
@@ -2863,7 +2863,7 @@
             <i class="bi bi-capsule"></i> Benefício Farmacêutico
           </h6>
           <div class="d-flex flex-wrap gap-2">
-            <span class="badge-soft" id="farm_badge">Prévia: —</span>
+            <span class="badge-soft" id="farm_badge">Prévia: —</span><div id="farm_preview_detail" class="small text-muted mt-1"></div>
           </div>
         </div>
         <div class="col-md-3">
@@ -2891,7 +2891,7 @@
             <i class="bi bi-basket"></i> Benefício Alimentar
           </h6>
         <div class="d-flex flex-wrap gap-2">
-            <span class="badge-soft" id="alim_badge">Prévia: —</span>
+            <span class="badge-soft" id="alim_badge">Prévia: —</span><div id="alim_preview_detail" class="small text-muted mt-1"></div>
           </div>
         </div>
         <div class="col-md-3">
@@ -3072,8 +3072,8 @@
   if (!sec) return;
 
   // ===== Utils =====
-  const TOTAL_COOPS = {{ cooperados|length or 0 }};
   const q = (sel) => sec.querySelector(sel);
+  const TOTAL_COOPS = q('#hosp_beneficiarios') ? q('#hosp_beneficiarios').options.length : {{ cooperados|length or 0 }};
   function idsFromSelect(sel){ return Array.from(sel?.selectedOptions || []).map(o => String(o.value)); }
   function valNum(inp){ const n = parseFloat(String(inp?.value ?? '').replace(',','.')); return isFinite(n)?n:0; }
   function money(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -3096,10 +3096,27 @@
     const total = vUnit * numBens;
     const porPag = pagantes > 0 ? (total / pagantes) : 0;
 
-    badge.textContent =
-      `Recebem: ${numBens} · Isentos: ${numIsen} · Pagantes: ${pagantes} · ` +
-      `Total a ratear: ${money(total)} · Cobrança por pagante: ${money(porPag)}`;
+    badge.textContent = `Prévia: ${money(porPag)} por pagante`;
+    const detail=q(`#${prefix}_preview_detail`);
+    if(detail){
+      detail.textContent =
+        `Recebem: ${numBens} · Isentos: ${numIsen} · Pagantes: ${pagantes} · Total: ${money(total)}`;
+    }
   }
+
+  sec.dataset.benefitPreviewDelegatedV2='1';
+  sec.addEventListener('input', function(e){
+    const id=e.target && e.target.id || '';
+    if(id.startsWith('hosp_')) calcPreview('hosp');
+    else if(id.startsWith('farm_')) calcPreview('farm');
+    else if(id.startsWith('alim_')) calcPreview('alim');
+  });
+  sec.addEventListener('change', function(e){
+    const id=e.target && e.target.id || '';
+    if(id.startsWith('hosp_')) calcPreview('hosp');
+    else if(id.startsWith('farm_')) calcPreview('farm');
+    else if(id.startsWith('alim_')) calcPreview('alim');
+  });
 
   ['hosp','farm','alim'].forEach(p=>{
     q(`#${p}_valor_unit`)?.addEventListener('input', ()=>calcPreview(p));
