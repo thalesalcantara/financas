@@ -243,9 +243,24 @@ def _emit_admin(payload: dict):
             pass
 
 
+def _fmt_local_mail_dt(dt):
+    if not dt:
+        return "—"
+    try:
+        aware = dt.replace(tzinfo=ZoneInfo("UTC"))
+        return aware.astimezone(TZ).strftime("%d/%m/%Y %H:%M")
+    except Exception:
+        return dt.strftime("%d/%m/%Y %H:%M")
+
+
 def _mailbox_unread():
     ensure_calendar_schema()
-    return int(CaixaPostalMensagem.query.filter(CaixaPostalMensagem.lido_em.is_(None)).count())
+    total = int(CaixaPostalMensagem.query.filter(CaixaPostalMensagem.lido_em.is_(None)).count())
+    try:
+        total += int(legacy.RastreamentoPesquisa.query.filter_by(status="nova").count())
+    except Exception:
+        db.session.rollback()
+    return total
 
 
 @app.get("/api/admin/caixa-postal/eventos", endpoint="admin_caixa_postal_eventos")
@@ -570,6 +585,7 @@ def admin_caixa_postal_calendar():
         tracking_rows=tracking_rows,
         rest_map=rest_map,
         unread=_mailbox_unread(),
+        fmt_local_mail_dt=_fmt_local_mail_dt,
         active_tab="caixa_postal",
     )
 
@@ -577,6 +593,40 @@ def admin_caixa_postal_calendar():
 # A URL /admin/caixa-postal já existe no sistema para respostas do rastreamento.
 # Troca somente a função da rota, preservando o mesmo endpoint usado pelo menu.
 legacy.app.view_functions["admin_caixa_postal"] = admin_caixa_postal_calendar
+
+
+@app.get("/api/admin/caixa-postal/status", endpoint="admin_mailbox_status")
+def admin_mailbox_status():
+    if not _is_admin():
+        abort(403)
+    try:
+        latest_mail = CaixaPostalMensagem.query.order_by(CaixaPostalMensagem.criado_em.desc()).first()
+        latest_tracking = legacy.RastreamentoPesquisa.query.order_by(legacy.RastreamentoPesquisa.atualizado_em.desc()).first()
+        stamps = []
+        if latest_mail and latest_mail.criado_em:
+            stamps.append(("mail", latest_mail.id, latest_mail.criado_em.isoformat()))
+        if latest_tracking and latest_tracking.atualizado_em:
+            stamps.append(("tracking", latest_tracking.id, latest_tracking.atualizado_em.isoformat()))
+        latest = max(stamps, key=lambda x:x[2]) if stamps else None
+        return jsonify(ok=True, unread=_mailbox_unread(), latest=latest)
+    except Exception:
+        db.session.rollback()
+        return jsonify(ok=True, unread=0, latest=None)
+
+
+@app.post("/admin/caixa-postal/rastreamento/<int:item_id>/lido", endpoint="admin_tracking_mail_lido")
+def admin_tracking_mail_lido(item_id):
+    if not _is_admin():
+        abort(403)
+    try:
+        legacy._ensure_tracking_schema()
+    except Exception:
+        pass
+    row = legacy.RastreamentoPesquisa.query.get_or_404(item_id)
+    if row.status == "nova":
+        row.status = "lida"
+        db.session.commit()
+    return jsonify(ok=True, unread=_mailbox_unread())
 
 
 @app.post("/admin/caixa-postal/<int:item_id>/lido", endpoint="admin_caixa_postal_lido")
