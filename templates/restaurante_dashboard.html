@@ -1402,16 +1402,18 @@ body.rest-wide-modern .rest-bottom-history{width:100%!important;max-width:none!i
 .cal-toolbar{padding:12px 14px;border-bottom:1px solid #e5ecf5;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.cal-nav{display:flex;align-items:center;gap:7px}.cal-nav button{width:38px;height:38px;border:1px solid #d7e2ef;background:#fff;border-radius:9px;color:#183d70}.cal-title{font-size:1rem;font-weight:950;color:#0b2555;min-width:160px;text-align:center;text-transform:capitalize}.cal-filter{height:38px;border:1px solid #d7e2ef;border-radius:9px;padding:0 10px;background:#fff;color:#21436f;font-size:.72rem;font-weight:850}
 .cal-weekdays,.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}.cal-weekdays div{padding:9px 8px;text-align:center;background:#f7faff;border-bottom:1px solid #e4ebf4;color:#58708f;font-size:.62rem;font-weight:950;text-transform:uppercase}
 .cal-day{min-height:116px;border-right:1px solid #e9eef5;border-bottom:1px solid #e9eef5;padding:7px;background:#fff;overflow:hidden}.cal-day:nth-child(7n){border-right:0}.cal-day.out{background:#fafbfd}.cal-day.today{box-shadow:inset 0 0 0 2px #1478ff}.cal-daynum{font-size:.72rem;font-weight:950;color:#203d68;margin-bottom:5px}.cal-day.out .cal-daynum{color:#b6c0ce}
-.cal-event{display:block;width:100%;border:0;border-radius:7px;padding:5px 6px;margin:3px 0;text-align:left;font-size:.61rem;font-weight:800;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}.cal-event.holiday-national{background:#eaf3ff;color:#095ecb}.cal-event.holiday-state{background:#fff2dc;color:#9b5b00}.cal-event.holiday-city{background:#efeaff;color:#6741c7}.cal-event.personal{background:#eaf8ef;color:#167844}.cal-event.coopex{background:#fff0f0;color:#c63434}.cal-event.done{text-decoration:line-through;opacity:.62}
+.cal-day.has-reminder{background:#f3f9ff;box-shadow:inset 0 0 0 1px #9fc6ff}.cal-day.has-reminder .cal-daynum{display:inline-grid;place-items:center;min-width:25px;height:25px;padding:0 5px;border-radius:999px;background:#0b63d8;color:#fff}.cal-day.has-coopex{background:#fff6f6}.cal-day.has-coopex .cal-daynum{background:#d94444}.cal-day.has-personal:not(.has-coopex){background:#f4fbf7}.cal-day.has-personal:not(.has-coopex) .cal-daynum{background:#299a60}
+.rest-reinforce-menu{background:#16a65a!important;color:#fff!important;border-radius:8px!important}.rest-reinforce-menu:hover{background:#11884a!important;color:#fff!important}
+.cal-event{display:block;width:100%;border:0;border-radius:7px;padding:5px 6px;margin:3px 0;text-align:left;font-size:.61rem;font-weight:800;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}.cal-event.holiday-national{background:#eaf3ff;color:#095ecb}.cal-event.holiday-state{background:#fff2dc;color:#9b5b00}.cal-event.holiday-city{background:#efeaff;color:#6741c7}.cal-event.personal{background:#eaf8ef;color:#167844}.cal-event.coopex{background:#fff0f0;color:#c63434}.cal-event.cat-reuniao{background:#efeaff;color:#6741c7}.cal-event.cat-financeiro{background:#fff4d8;color:#966000}.cal-event.cat-manutencao{background:#e9f4ff;color:#1268ae}.cal-event.cat-importante{background:#ffeaea;color:#bd2929}.cal-event.done{text-decoration:line-through;opacity:.62}
 .cal-legend{padding:9px 14px;display:flex;gap:14px;flex-wrap:wrap;border-top:1px solid #edf1f6;color:#61718b;font-size:.65rem;font-weight:800}.cal-legend span{display:flex;align-items:center;gap:5px}.cal-dot{width:9px;height:9px;border-radius:50%;display:inline-block}.cal-dot.nat{background:#1478ff}.cal-dot.rn{background:#efa82e}.cal-dot.city{background:#7a5bd7}.cal-dot.me{background:#31a96a}.cal-dot.cx{background:#e35353}
 .cal-form{padding:14px;display:none;border-bottom:1px solid #e5ecf5;background:#fbfdff}.cal-form.open{display:block}.cal-form-grid{display:grid;grid-template-columns:1.3fr 1.7fr 150px 110px 170px 150px;gap:9px}.cal-field label{display:block;font-size:.65rem;font-weight:900;color:#314f73;margin-bottom:5px}.cal-field input,.cal-field select,.cal-field textarea{width:100%;border:1px solid #d5e1ef;border-radius:9px;padding:9px 10px;font-size:.73rem;background:#fff}.cal-field textarea{min-height:39px;resize:vertical}.cal-span2{grid-column:span 2}.cal-form-actions{display:flex;align-items:end;gap:8px}
 .cal-list{border-top:1px solid #e9eef5}.cal-list-head{padding:11px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center}.cal-list-head strong{font-size:.82rem;color:#173a6b}.cal-reminders{padding:0 14px 14px;display:grid;gap:7px}.cal-reminder-row{border:1px solid #e0e8f3;border-radius:10px;padding:10px 11px;display:grid;grid-template-columns:95px minmax(130px,1fr) 110px 90px;align-items:center;gap:10px;font-size:.69rem}.cal-reminder-row.done{opacity:.65}.cal-reminder-row small{color:#6a7890}.cal-row-actions{display:flex;gap:5px;justify-content:flex-end}.cal-icon-btn{width:31px;height:31px;border:1px solid #d6e1ef;border-radius:8px;background:#fff;color:#28517f;display:grid;place-items:center}.cal-icon-btn.danger{color:#d94747;border-color:#ffd0d0;background:#fff8f8}
 .cal-empty{padding:22px;text-align:center;color:#74829a;font-size:.75rem}
 .cal-dialog{border:0;border-radius:14px;box-shadow:0 20px 60px rgba(13,42,88,.22);max-width:560px;width:calc(100% - 24px);padding:0}.cal-dialog::backdrop{background:rgba(8,24,54,.36)}.cal-dialog-head{padding:14px 16px;background:#f7faff;border-bottom:1px solid #e4ebf4;display:flex;justify-content:space-between;align-items:center}.cal-dialog-body{padding:15px 17px;font-size:.76rem;line-height:1.55;color:#465e7d}.cal-dialog-body strong{color:#163a70}.cal-dialog-x{border:0;background:transparent;font-size:1.3rem;color:#60708c}
-.reinforce-float{position:fixed;right:16px;bottom:16px;z-index:1035;height:44px;padding:0 15px;border-radius:999px;background:#18a957;color:#fff!important;display:flex;align-items:center;gap:8px;text-decoration:none;font-size:.72rem;font-weight:950;box-shadow:0 10px 28px rgba(24,169,87,.28)}
+
 .cal-alert-toast{position:fixed;right:16px;bottom:72px;z-index:1090;background:#0e2c65;color:#fff;border-radius:12px;padding:12px 14px;display:none;max-width:330px;box-shadow:0 15px 35px rgba(5,30,82,.25)}.cal-alert-toast strong{display:block}.cal-alert-toast small{color:#d7e5ff}
 @media(max-width:1100px){.cal-form-grid{grid-template-columns:1fr 1fr 1fr}.cal-span2{grid-column:span 2}.cal-reminder-row{grid-template-columns:85px 1fr 100px 80px}}
-@media(max-width:760px){.cal-weekdays div{font-size:.53rem;padding:7px 2px}.cal-day{min-height:84px;padding:4px}.cal-event{font-size:.53rem;padding:4px}.cal-form-grid{grid-template-columns:1fr 1fr}.cal-span2{grid-column:1/-1}.cal-reminder-row{grid-template-columns:1fr}.cal-row-actions{justify-content:flex-start}.reinforce-float{right:10px;bottom:10px;height:40px;padding:0 12px}.reinforce-float span{display:none}}
+@media(max-width:760px){.cal-weekdays div{font-size:.53rem;padding:7px 2px}.cal-day{min-height:84px;padding:4px}.cal-event{font-size:.53rem;padding:4px}.cal-form-grid{grid-template-columns:1fr 1fr}.cal-span2{grid-column:1/-1}.cal-reminder-row{grid-template-columns:1fr}.cal-row-actions{justify-content:flex-start}}
 </style>
 </head>
 <body class="rest-wide-modern">
@@ -1450,6 +1452,7 @@ body.rest-wide-modern .rest-bottom-history{width:100%!important;max-width:none!i
           {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
           <span class="badge-dot" id="badgeAvisos" {% if _cntAvisos == 0 %}style="display:none"{% endif %}>{{ _cntAvisos }}</span>
         </a>
+        <a class="rest-reinforce-menu" target="_blank" rel="noopener" href="https://wa.me/5584981110706?text=Ol%C3%A1%2C%20COOPEX%21%20Gostaria%20de%20solicitar%20um%20entregador%20para%20refor%C3%A7o."><i class="bi bi-whatsapp"></i><span>Pedir reforço</span></a>
         <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
       </nav>
     </aside>
@@ -1469,6 +1472,7 @@ body.rest-wide-modern .rest-bottom-history{width:100%!important;max-width:none!i
           <a data-target="calendario" class="{{ 'active' if view=='calendario' else '' }}" href="{{ url_for('portal_restaurante', view='calendario') }}"><i class="bi bi-calendar-event"></i> Calendário</a>
           <a data-target="config" class="{{ 'active' if view=='config' else '' }}" href="{{ url_for('portal_restaurante', view='config') }}"><i class="bi bi-gear"></i> Configuração</a>
           <a data-target="avisos" class="{{ 'active' if view=='avisos' else '' }}" href="{{ url_for('portal_restaurante', view='avisos') }}"><i class="bi bi-bell"></i> Avisos {% if _modern_avisos %}<span class="rest-modern-badge">{{ _modern_avisos }}</span>{% endif %}</a>
+          <a class="rest-reinforce-menu" target="_blank" rel="noopener" href="https://wa.me/5584981110706?text=Ol%C3%A1%2C%20COOPEX%21%20Gostaria%20de%20solicitar%20um%20entregador%20para%20refor%C3%A7o."><i class="bi bi-whatsapp"></i> Pedir reforço</a>
           <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a>
         </nav>
       </header>
@@ -1535,8 +1539,7 @@ body.rest-wide-modern .rest-bottom-history{width:100%!important;max-width:none!i
                   <div class="cal-field"><label>Data do evento</label><input type="date" name="date" required></div>
                   <div class="cal-field"><label>Hora</label><input type="time" name="time" value="09:00"></div>
                   <div class="cal-field"><label>Destino</label><select name="target" id="calTarget"><option value="pessoal">Só para mim</option><option value="coopex">Lembrar a COOPEX</option></select></div>
-                  <div class="cal-field" id="calAdvanceField" style="display:none"><label>Avisar a COOPEX antes</label><select name="advance_days"><option value="1">1 dia antes</option><option value="2">2 dias antes</option><option value="3">3 dias antes</option><option value="5" selected>5 dias antes</option><option value="7">7 dias antes</option><option value="10">10 dias antes</option><option value="15">15 dias antes</option><option value="30">30 dias antes</option></select></div>
-                  <div class="cal-field" id="calNowField" style="display:none"><label>Envio</label><select name="send_now"><option value="">Programar</option><option value="1">Enviar agora</option></select></div>
+                  <div class="cal-field"><label>Categoria</label><select name="category"><option value="operacional">Operacional</option><option value="reuniao">Reunião</option><option value="financeiro">Financeiro</option><option value="manutencao">Manutenção</option><option value="importante">Importante</option></select></div>
                   <div class="cal-form-actions"><button class="cal-btn primary" type="submit"><i class="bi bi-check2"></i> Salvar</button><button class="cal-btn" id="calCancelBtn" type="button">Cancelar</button></div>
                 </div>
               </form>
@@ -1582,7 +1585,7 @@ body.rest-wide-modern .rest-bottom-history{width:100%!important;max-width:none!i
         <div class="cal-dialog-body">
           <p><strong>Lembretes pessoais são privados.</strong> Nenhum outro estabelecimento tem acesso e a COOPEX também não vê esses lembretes.</p>
           <p><strong>A COOPEX só recebe o que você marcar como “Lembrar a COOPEX”.</strong> Esses itens entram na Caixa Postal da cooperativa na data programada.</p>
-          <p>Para aviso programado à COOPEX, é necessário cadastrar com tempo hábil. Exemplo: evento dia 20 e aviso 5 dias antes → o aviso chega dia 15 e deve ser programado até dia 14.</p>
+          <p><strong>Pedidos para a COOPEX precisam ser feitos até quinta-feira.</strong> A escala da semana seguinte é montada toda sexta-feira. Se o evento estiver na semana seguinte, o pedido deve estar cadastrado até a quinta-feira anterior.</p>
           <p>Você pode marcar lembretes como concluídos e filtrá-los depois sem precisar apagar o histórico.</p>
         </div>
       </dialog>
@@ -2971,14 +2974,19 @@ function setPhone(digits) {
       for(let i=0;i<42;i++){
         const d=new Date(start);d.setDate(start.getDate()+i);
         const iso=calDateOnly(d),out=d.getMonth()!==m;
-        html+='<div class="cal-day '+(out?'out ':'')+(iso===today?'today':'')+'" data-cal-date="'+iso+'"><div class="cal-daynum">'+d.getDate()+'</div>';
+        const dayEvents=eventsBy[iso]||[];
+        const hasPersonal=dayEvents.some(ev=>ev.kind==='reminder'&&ev.target!=='coopex');
+        const hasCoopex=dayEvents.some(ev=>ev.kind==='reminder'&&ev.target==='coopex');
+        const markClass=(hasPersonal||hasCoopex?' has-reminder':'')+(hasPersonal?' has-personal':'')+(hasCoopex?' has-coopex':'');
+        html+='<div class="cal-day '+(out?'out ':'')+(iso===today?'today':'')+markClass+'" data-cal-date="'+iso+'"><div class="cal-daynum">'+d.getDate()+'</div>';
         for(const ev of (eventsBy[iso]||[]).slice(0,4)){
           if(ev.kind==='holiday'){
             const cls=ev.scope==='nacional'?'holiday-national':(ev.scope==='estadual'?'holiday-state':'holiday-city');
             html+='<button type="button" class="cal-event '+cls+'" title="'+calEsc(ev.scope_label)+' — '+calEsc(ev.title)+'">'+calEsc(ev.title)+'</button>';
           }else{
             const cls=ev.target==='coopex'?'coopex':'personal';
-            html+='<button type="button" class="cal-event '+cls+(ev.completed?' done':'')+'" data-reminder-id="'+ev.id+'" title="'+calEsc(ev.description||ev.title)+'">'+calEsc(ev.title)+'</button>';
+            const cat=' cat-'+(ev.category||'operacional');
+            html+='<button type="button" class="cal-event '+cls+cat+(ev.completed?' done':'')+'" data-reminder-id="'+ev.id+'" title="'+calEsc(ev.description||ev.title)+'">'+calEsc(ev.title)+'</button>';
           }
         }
         html+='</div>';
@@ -3006,16 +3014,13 @@ function setPhone(digits) {
         document.getElementById('calNewBtn')?.addEventListener('click',()=>document.getElementById('calFormWrap')?.classList.toggle('open'));
         document.getElementById('calCancelBtn')?.addEventListener('click',()=>document.getElementById('calFormWrap')?.classList.remove('open'));
         document.getElementById('calRulesBtn')?.addEventListener('click',()=>document.getElementById('calRulesDialog')?.showModal());
-        document.getElementById('calTarget')?.addEventListener('change',e=>{
-          const co=e.target.value==='coopex';document.getElementById('calAdvanceField').style.display=co?'block':'none';document.getElementById('calNowField').style.display=co?'block':'none';
-        });
-        document.getElementById('calForm')?.addEventListener('submit',async e=>{
+                document.getElementById('calForm')?.addEventListener('submit',async e=>{
           e.preventDefault();const f=new FormData(e.currentTarget),payload=Object.fromEntries(f.entries());
           try{
             const r=await fetch('/api/rest/calendario',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Requested-With':'fetch'},body:JSON.stringify(payload)});
             const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.message||'Não foi possível salvar.');
             e.currentTarget.reset();e.currentTarget.querySelector('[name=time]').value='09:00';
-            document.getElementById('calAdvanceField').style.display='none';document.getElementById('calNowField').style.display='none';document.getElementById('calFormWrap').classList.remove('open');
+            document.getElementById('calFormWrap').classList.remove('open');
             await loadCalendarYear(calCursor.getFullYear());
             schedulePersonalReminders();
           }catch(err){alert(err.message);}
@@ -4469,7 +4474,6 @@ function setPhone(digits) {
     });
   </script>
 
-<a class="reinforce-float" target="_blank" rel="noopener" href="https://wa.me/5584981110706?text=Ol%C3%A1%2C%20COOPEX%21%20Gostaria%20de%20solicitar%20um%20entregador%20para%20refor%C3%A7o."><i class="bi bi-whatsapp"></i><span>Pedir reforço</span></a>
 <div id="calAlertToast" class="cal-alert-toast"><strong id="calAlertTitle">Lembrete</strong><small id="calAlertText"></small></div>
 </body>
 </html>
