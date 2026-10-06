@@ -104,7 +104,7 @@ body{font-weight:700!important}.alv8-brand-copy small{font-size:12px!important}.
                   <button class="alv8-btn primary">Alterar senha</button>
                 </form>
               </details>
-              <form method="post" action="{{ url_for('delete_restaurante', id=r.id) }}" onsubmit="return confirm('Excluir este estabelecimento e os vínculos relacionados?');"><button class="alv8-btn danger"><i class="bi bi-trash"></i> Excluir</button></form>
+              <form method="post" action="{{ url_for('delete_restaurante', id=r.id) }}" onsubmit="return confirm('Excluir este estabelecimento? O acesso será desativado e todo o histórico anterior será preservado.');"><button class="alv8-btn danger"><i class="bi bi-trash"></i> Excluir</button></form>
             </div>
           </td>
         </tr>
