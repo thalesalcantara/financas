@@ -94,7 +94,9 @@ def portal_restaurante():
 
     # -------------------- ESCALA (Quem trabalha) --------------------
     ref = _parse_date(request.args.get("ref")) or date.today()
-    modo = request.args.get("modo", "semana")
+    # Ao entrar na aba Escala, abre sempre o dia atual. "Semana completa"
+    # continua disponível quando solicitada explicitamente.
+    modo = (request.args.get("modo") or ("dia" if view == "escalas" else "semana")).strip().lower()
 
     if view == "lancar":
         ref = date.today()
