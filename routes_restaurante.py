@@ -883,3 +883,123 @@ def portal_restaurante():
         hoje=hoje,
     )
 
+
+
+@app.get("/portal/restaurante/exportar-lancamentos.xlsx", endpoint="rest_export_lancamentos_xlsx")
+@role_required("restaurante")
+def rest_export_lancamentos_xlsx():
+    import io, re as _re
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+
+    rest = request_restaurante()
+    if not rest:
+        abort(404)
+
+    di = _parse_date(request.args.get("data_inicio"))
+    df = _parse_date(request.args.get("data_fim"))
+    mes = (request.args.get("mes") or "").strip()
+    if mes and _re.fullmatch(r"\d{4}-\d{2}", mes):
+        y, m = map(int, mes.split("-"))
+        di = date(y, m, 1)
+        df = date(y + (1 if m == 12 else 0), 1 if m == 12 else m + 1, 1) - timedelta(days=1)
+    if not di or not df:
+        hoje = date.today()
+        di = hoje - timedelta(days=hoje.weekday())
+        df = di + timedelta(days=6)
+
+    qtxt = (request.args.get("q") or "").strip().lower()
+    launches = (
+        Lancamento.query.options(selectinload(Lancamento.cooperado))
+        .filter(Lancamento.restaurante_id == rest.id, Lancamento.data >= di, Lancamento.data <= df)
+        .order_by(Lancamento.data.asc(), Lancamento.hora_inicio.asc(), Lancamento.id.asc())
+        .all()
+    )
+
+    def _mins(v):
+        m = _re.search(r"(\d{1,2}):(\d{2})", str(v or ""))
+        return int(m.group(1))*60 + int(m.group(2)) if m else None
+
+    def _times(v):
+        found = _re.findall(r"(\d{1,2})(?::|h)(\d{2})", str(v or "").lower())
+        if len(found) >= 2:
+            return f"{int(found[0][0]):02d}:{found[0][1]}", f"{int(found[1][0]):02d}:{found[1][1]}"
+        return "", ""
+
+    def _overlap(ai, af, bi, bf):
+        vals = [_mins(ai), _mins(af), _mins(bi), _mins(bf)]
+        if any(v is None for v in vals):
+            return False
+        a1,a2,b1,b2 = vals
+        return max(a1,b1) < min(a2,b2) or (a1 == b1 and a2 == b2)
+
+    launch_map = {}
+    rows = []
+    for l in launches:
+        launch_map.setdefault((l.cooperado_id, l.data), []).append(l)
+        nome = l.cooperado.nome if getattr(l, "cooperado", None) else ""
+        if qtxt and qtxt not in nome.lower():
+            continue
+        rows.append({
+            "data": l.data,
+            "nome": nome,
+            "horario": f"{_fmt_time(l.hora_inicio)} às {_fmt_time(l.hora_fim)}" if (l.hora_inicio or l.hora_fim) else "",
+            "descricao": l.descricao or "",
+            "entregas": int(l.qtd_entregas or 0),
+            "valor": float(l.valor or 0),
+            "faltou": False,
+        })
+
+    scales = Escala.query.filter(Escala.restaurante_id == rest.id).order_by(Escala.id.asc()).limit(2500).all()
+    coop_ids = {s.cooperado_id for s in scales if s.cooperado_id}
+    coop_map = {c.id:c for c in Cooperado.query.filter(Cooperado.id.in_(coop_ids)).all()} if coop_ids else {}
+    seen = set()
+    for s in scales:
+        sd = _parse_data_escala_str(s.data)
+        if not sd or sd < di or sd > df or not s.cooperado_id:
+            continue
+        coop = coop_map.get(s.cooperado_id)
+        if not coop or (qtxt and qtxt not in (coop.nome or "").lower()):
+            continue
+        ini,fim = _times(s.horario)
+        cand = launch_map.get((s.cooperado_id, sd), [])
+        matched = any(_overlap(ini,fim,_fmt_time(l.hora_inicio),_fmt_time(l.hora_fim)) for l in cand) if (ini and fim) else bool(cand)
+        key=(s.cooperado_id,sd,ini,fim)
+        if matched or key in seen:
+            continue
+        seen.add(key)
+        rows.append({"data":sd,"nome":coop.nome,"horario":f"{ini} às {fim}" if (ini or fim) else (s.horario or ""),"descricao":"FALTOU LANÇAR","entregas":0,"valor":0.0,"faltou":True})
+
+    rows.sort(key=lambda x:(x["data"] or date.min,x["horario"] or "",(x["nome"] or "").lower()))
+
+    wb=Workbook()
+    ws=wb.active
+    ws.title="Lançamentos"
+    ws.append(["Data","Cooperado","Horário","Descrição","Entregas","Valor (R$)"])
+    blue=PatternFill("solid",fgColor="064FC8")
+    white=Font(color="FFFFFF",bold=True)
+    redfill=PatternFill("solid",fgColor="FDE2E2")
+    red=Font(color="C1121F",bold=True)
+    for c in ws[1]:
+        c.fill=blue;c.font=white;c.alignment=Alignment(horizontal="center")
+    te=0;tv=0.0
+    for item in rows:
+        ws.append([item["data"],item["nome"],item["horario"],item["descricao"],item["entregas"],item["valor"]])
+        rr=ws.max_row
+        ws.cell(rr,1).number_format="DD/MM/YYYY"
+        ws.cell(rr,6).number_format='#,##0.00'
+        if item["faltou"]:
+            for cc in range(1,7):
+                ws.cell(rr,cc).fill=redfill;ws.cell(rr,cc).font=red
+        else:
+            te+=item["entregas"];tv+=item["valor"]
+    ws.append(["TOTAL","","","",te,tv])
+    for c in ws[ws.max_row]: c.font=Font(bold=True)
+    ws.cell(ws.max_row,6).number_format='#,##0.00'
+    ws.freeze_panes="A2"
+    ws.auto_filter.ref=f"A1:F{ws.max_row}"
+    for i,w in enumerate([13,28,19,32,12,15],1): ws.column_dimensions[get_column_letter(i)].width=w
+
+    out=io.BytesIO();wb.save(out);out.seek(0)
+    return send_file(out,as_attachment=True,download_name=f"lancamentos_{di.isoformat()}_{df.isoformat()}.xlsx",mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
