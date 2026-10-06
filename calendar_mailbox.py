@@ -294,7 +294,8 @@ def rest_calendario_api():
     status = (request.args.get("status") or "todos").lower()
     q = CalendarioLembrete.query.filter(
         CalendarioLembrete.restaurante_id == rest.id,
-        db.extract("year", CalendarioLembrete.data_evento) == year,
+        CalendarioLembrete.data_evento >= date(year, 1, 1),
+        CalendarioLembrete.data_evento <= date(year, 12, 31),
     )
     if status == "pendentes":
         q = q.filter(CalendarioLembrete.concluido_em.is_(None))
