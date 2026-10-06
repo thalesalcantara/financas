@@ -6285,11 +6285,41 @@ def ratear_beneficios():
 
     dl = _parse_date(f.get("data_lancamento")) or date.today()
 
+    def _active_benefit_coop_ids():
+        q = (
+            db.session.query(Cooperado.id)
+            .join(Usuario, Cooperado.usuario_id == Usuario.id)
+            .filter(
+                Usuario.tipo == "cooperado",
+                or_(Usuario.ativo.is_(True), Usuario.ativo.is_(None)),
+            )
+        )
+        ids = {int(row[0]) for row in q.all()}
+        try:
+            rows_arch = db.session.execute(
+                sa_text("SELECT cooperado_id FROM cooperados_arquivados_v8")
+            ).all()
+            ids -= {int(row[0]) for row in rows_arch if row and row[0] is not None}
+        except Exception:
+            db.session.rollback()
+        return ids
+
+    active_benefit_ids = _active_benefit_coop_ids()
+
     def _coops_by_ids(ids):
         ids = [int(x) for x in ids if str(x).isdigit()]
+        ids = [cid for cid in ids if cid in active_benefit_ids]
         if not ids:
             return []
-        return Cooperado.query.filter(Cooperado.id.in_(ids)).order_by(Cooperado.nome.asc()).all()
+        return (
+            Cooperado.query
+            .filter(
+                Cooperado.id.in_(ids),
+                Cooperado.id.in_(active_benefit_ids),
+            )
+            .order_by(Cooperado.nome.asc())
+            .all()
+        )
 
     def _add_beneficio(tipo: str, valor_total: float, recebedores_ids: list[int], isentos_ids: list[int]):
         recebedores = _coops_by_ids(recebedores_ids)
@@ -6311,8 +6341,20 @@ def ratear_beneficios():
         db.session.add(b)
         db.session.flush()
 
-        bloqueados = set(rec_ids) | {int(x) for x in isentos_ids if str(x).isdigit()}
-        pagantes = [c for c in Cooperado.query.order_by(Cooperado.nome.asc()).all() if c.id not in bloqueados]
+        isentos_ativos = {
+            int(x) for x in isentos_ids
+            if str(x).isdigit() and int(x) in active_benefit_ids
+        }
+        bloqueados = set(rec_ids) | isentos_ativos
+        pagantes = (
+            Cooperado.query
+            .filter(
+                Cooperado.id.in_(active_benefit_ids),
+                ~Cooperado.id.in_(bloqueados),
+            )
+            .order_by(Cooperado.nome.asc())
+            .all()
+        )
         valor_por_pagante = round(valor_total / len(pagantes), 2) if pagantes else 0.0
 
         if valor_por_pagante > 0:
