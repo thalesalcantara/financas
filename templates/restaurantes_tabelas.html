@@ -20,6 +20,11 @@
     .empty{padding:35px;text-align:center;color:#6d7c94}.base-note{display:none;margin:7px 0 11px;padding:9px 11px;border-radius:9px;background:#eef5ff;color:#25558c;font-size:.71rem}
     @media(max-width:1050px){.layout{grid-template-columns:1fr}.rates{grid-template-columns:1fr 1fr}}@media(max-width:720px){.topbar{height:auto;flex-wrap:wrap;padding:7px 9px 0}.welcome{width:100%;min-width:0;height:44px}.nav{height:48px;flex-basis:100%}.nav a{padding:0 11px;font-size:.69rem}main{padding:9px}.hero{align-items:flex-start}.hero-actions{width:100%}.hero{flex-wrap:wrap}.rates{grid-template-columns:1fr}.tools{grid-template-columns:1fr 1fr}.tools .search{grid-column:1/-1}.selected-row{grid-template-columns:28px minmax(90px,1fr) 70px 80px 30px}.selected-row .selected-price{display:none}.layout{display:block}.side{margin-top:10px}.hero-icon{width:46px;height:46px}.hero h1{font-size:1.18rem}}
   </style>
+
+<style>
+.reinforce-float{position:fixed;right:16px;bottom:16px;z-index:1050;height:44px;padding:0 15px;border-radius:999px;background:#18a957;color:#fff!important;display:flex;align-items:center;gap:8px;text-decoration:none;font-size:.72rem;font-weight:950;box-shadow:0 10px 28px rgba(24,169,87,.28)}
+@media(max-width:720px){.reinforce-float{right:10px;bottom:10px;height:40px;padding:0 12px}.reinforce-float span{display:none}}
+</style>
 </head>
 <body>
   {% set _nome = ((restaurante.nome if restaurante else login_nome)|default('ESTABELECIMENTO'))|replace('_',' ') %}
@@ -33,6 +38,7 @@
       <a href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-calendar3"></i> Escala</a>
       <a class="active" href="{{ url_for('rest_tabelas') }}"><i class="bi bi-table"></i> Tabelas</a>
       <a href="{{ url_for('portal_restaurante', view='mapa') }}"><i class="bi bi-geo-alt-fill"></i> Mapa <span class="badge-new">NOVO</span></a>
+      <a href="{{ url_for('portal_restaurante', view='calendario') }}"><i class="bi bi-calendar-event"></i> Calendário</a>
       <a href="{{ url_for('portal_restaurante', view='config') }}"><i class="bi bi-gear"></i> Configuração</a>
       <a href="{{ url_for('portal_restaurante', view='avisos') }}"><i class="bi bi-bell"></i> Avisos {% if _avisos %}<span class="badge-dot">{{ _avisos }}</span>{% endif %}</a>
       <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a>
@@ -137,4 +143,5 @@
 })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<a class="reinforce-float" target="_blank" rel="noopener" href="https://wa.me/5584981110706?text=Ol%C3%A1%2C%20COOPEX%21%20Gostaria%20de%20solicitar%20um%20entregador%20para%20refor%C3%A7o."><i class="bi bi-whatsapp"></i><span>Pedir reforço</span></a>
 </body></html>
