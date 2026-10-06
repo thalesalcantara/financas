@@ -794,6 +794,8 @@ for _ep, _aba, _acao in (
     ("api_admin_escala", "escalas", _edit_or_delete_final),
     ("api_admin_escalas_bulk", "escalas", "excluir"),
     ("admin_light_scale_create", "escalas", "criar"),
+    ("admin_light_scale_update", "escalas", "editar"),
+    ("admin_light_scale_delete", "escalas", "excluir"),
     ("admin_light_coop_save", "cooperados", "editar"),
     ("admin_light_coop_status", "cooperados", _coop_action_final),
     ("admin_v11_coop_status_batch", "cooperados", _coop_action_final),
