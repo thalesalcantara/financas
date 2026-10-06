@@ -454,16 +454,24 @@ def portal_restaurante():
         if not s:
             return (None, None)
 
-        s = s.replace("às", "as")
-        s = s.replace("á", "a")
+        # Escalas podem ter pausa no meio, por exemplo:
+        # 11:00-14:00/15:00-17:00
+        # Nesse caso o expediente termina às 17:00, não às 14:00.
+        encontrados = re.findall(r"(?<!\d)(\d{1,2})(?::|h)(\d{2})(?!\d)", s)
+        minutos = []
+        for hh, mm in encontrados:
+            try:
+                h = int(hh)
+                m = int(mm)
+                if 0 <= h <= 23 and 0 <= m <= 59:
+                    minutos.append(h * 60 + m)
+            except Exception:
+                pass
 
-        partes = re.split(r"\s+as\s+|\s*-\s*|\s*a\s*", s)
-        partes = [p.strip() for p in partes if p.strip()]
-
-        if len(partes) >= 2:
-            ini = _parse_hora_min(partes[0])
-            fim = _parse_hora_min(partes[1])
-            return ini, fim
+        if len(minutos) >= 2:
+            return minutos[0], minutos[-1]
+        if len(minutos) == 1:
+            return minutos[0], None
 
         unico = _parse_hora_min(s)
         return unico, None
