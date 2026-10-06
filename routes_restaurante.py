@@ -95,6 +95,48 @@ def portal_restaurante():
     # Abas informativas não precisam montar escala, cooperados, totais ou produção.
     # Mantém o mesmo template/menu, mas responde com contexto mínimo.
     if view in {"config", "mapa", "avisos"}:
+        avisos_view = []
+        avisos_unread = 0
+
+        if view == "avisos":
+            try:
+                legacy._ensure_aviso_restaurante_ocultos_schema()
+            except Exception:
+                pass
+
+            avisos_db = list(legacy.get_avisos_for_restaurante(rest) or [])
+
+            hidden_ids = set()
+            try:
+                hidden_ids = {
+                    row[0]
+                    for row in db.session.execute(
+                        db.select(legacy.aviso_restaurante_ocultos.c.aviso_id).where(
+                            legacy.aviso_restaurante_ocultos.c.restaurante_id == rest.id
+                        )
+                    ).all()
+                }
+            except Exception:
+                db.session.rollback()
+
+            lidos_ids = {
+                row[0]
+                for row in (
+                    db.session.query(AvisoLeitura.aviso_id)
+                    .filter(AvisoLeitura.restaurante_id == rest.id)
+                    .all()
+                )
+            }
+
+            for aviso in avisos_db:
+                if aviso.id in hidden_ids:
+                    continue
+                aviso.lido = aviso.id in lidos_ids
+                aviso.prioridade_alta = str(getattr(aviso, "prioridade", "") or "").lower() == "alta"
+                avisos_view.append(aviso)
+
+            avisos_unread = sum(1 for aviso in avisos_view if not aviso.lido)
+
         try:
             current_app.logger.info(
                 "REST_PORTAL_FAST %.3fs view=%s rest_id=%s",
@@ -134,6 +176,8 @@ def portal_restaurante():
             producoes_semana_pendentes=[],
             producoes_semana_recentes=[],
             hoje=date.today(),
+            avisos=avisos_view,
+            avisos_nao_lidos_count=avisos_unread,
         )
 
     # -------------------- ESCALA (Quem trabalha) --------------------
