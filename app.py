@@ -3254,7 +3254,7 @@ def _fmt_time(t) -> str:
 @app.route("/exportar_lancamentos")
 @admin_perm_required("lancamentos", "ver")
 def exportar_lancamentos():
-    """Exportação leve: detalhamento + resumo, com conferência Escala x Produção."""
+    """Exportação completa em baixa memória, com todas as abas financeiras."""
     import os
     import tempfile
     from collections import defaultdict
@@ -3263,7 +3263,7 @@ def exportar_lancamentos():
     from flask import after_this_request, request, send_file
     from openpyxl import Workbook
     from openpyxl.cell import WriteOnlyCell
-    from openpyxl.styles import Font, PatternFill
+    from openpyxl.styles import Font
 
     args = request.args
     restaurante_id = args.get("restaurante_id", type=int)
@@ -3272,8 +3272,6 @@ def exportar_lancamentos():
     data_fim = _parse_date(args.get("data_fim"))
     dows = set(args.getlist("dow"))
 
-    # A tela de Lançamentos abre no dia atual. A exportação segue a mesma regra
-    # para não puxar todo o histórico quando a URL estiver sem datas.
     if not data_inicio and not data_fim:
         data_inicio = data_fim = date.today()
     elif data_inicio and not data_fim:
@@ -3283,16 +3281,69 @@ def exportar_lancamentos():
     if data_fim < data_inicio:
         data_inicio, data_fim = data_fim, data_inicio
 
+    currency_fmt = 'R$ #,##0.00'
+    date_fmt = 'DD/MM/YYYY'
+    red_font = Font(color="FF0000", bold=True)
+    bold_font = Font(bold=True)
+
+    def _cell(ws, value, fmt=None, font=None):
+        cell = WriteOnlyCell(ws, value=value)
+        if fmt:
+            cell.number_format = fmt
+        if font:
+            cell.font = font
+        return cell
+
+    def _append_header(ws, values):
+        ws.append([_cell(ws, v, font=bold_font) for v in values])
+
     def _norm_contract(value):
         return re.sub(r"\s+", " ", str(value or "").replace("_", " ").strip().casefold())
 
     def _dow_ok(dt):
         if not dows:
             return True
-        # Compatibilidade com filtros antigos 0..6 e 1..7.
         return str(dt.weekday()) in dows or str(dt.isoweekday()) in dows
 
-    # Consulta enxuta: somente colunas necessárias, sem materializar objetos ORM.
+    wb = Workbook(write_only=True)
+
+    # ============================================================
+    # ABA 1 - Lançamentos
+    # ============================================================
+    ws_det = wb.create_sheet("Lançamentos")
+    header_det = [
+        "Restaurante", "Periodo", "Cooperado", "Descricao",
+        "Valor", "Data", "HoraInicio", "HoraFim",
+        "INSS", "SEST", "Encargos", "Liquido", "Status",
+    ]
+    _append_header(ws_det, header_det)
+
+    totais_contrato = defaultdict(lambda: {
+        "restaurante": "", "periodo": "",
+        "bruto": 0.0, "inss": 0.0, "sest": 0.0, "enc": 0.0, "liq": 0.0,
+    })
+    totais_contrato_coop = defaultdict(lambda: {
+        "restaurante": "", "periodo": "", "cooperado": "",
+        "bruto": 0.0, "inss": 0.0, "sest": 0.0, "enc": 0.0, "liq": 0.0,
+    })
+    totais_coop = defaultdict(lambda: {
+        "cooperado": "",
+        "bruto": 0.0, "inss": 0.0, "sest": 0.0, "enc": 0.0, "liq": 0.0,
+    })
+    totais_coop_dia = defaultdict(lambda: {
+        "cooperado": "", "data": None, "restaurante": "", "periodo": "",
+        "bruto": 0.0, "inss": 0.0, "sest": 0.0, "enc": 0.0, "liq": 0.0,
+    })
+
+    total_geral_bruto = 0.0
+    total_geral_inss = 0.0
+    total_geral_sest = 0.0
+    total_geral_enc = 0.0
+    total_geral_liq = 0.0
+
+    launch_keys_id = set()
+    launch_keys_contract = set()
+
     launch_q = (
         db.session.query(
             Lancamento.id,
@@ -3306,7 +3357,6 @@ def exportar_lancamentos():
             Lancamento.data,
             Lancamento.hora_inicio,
             Lancamento.hora_fim,
-            Lancamento.qtd_entregas,
         )
         .outerjoin(Restaurante, Lancamento.restaurante_id == Restaurante.id)
         .outerjoin(Cooperado, Lancamento.cooperado_id == Cooperado.id)
@@ -3317,23 +3367,93 @@ def exportar_lancamentos():
     if cooperado_id:
         launch_q = launch_q.filter(Lancamento.cooperado_id == cooperado_id)
 
-    launch_rows = launch_q.order_by(Lancamento.data.asc(), Lancamento.id.asc()).all()
-    if dows:
-        launch_rows = [x for x in launch_rows if x.data and _dow_ok(x.data)]
-
-    # Índices para detectar rapidamente se uma escala já possui produção.
-    launch_keys_id = set()
-    launch_keys_contract = set()
-    for x in launch_rows:
-        if not x.data or not x.cooperado_id:
+    for l in launch_q.order_by(Lancamento.data.asc(), Lancamento.id.asc()).yield_per(500):
+        if not l.data or not _dow_ok(l.data):
             continue
-        cid = int(x.cooperado_id)
-        rid = int(x.restaurante_id or 0)
-        launch_keys_id.add((cid, x.data, rid))
-        launch_keys_contract.add((cid, x.data, _norm_contract(x.rest_nome)))
 
-    # Escala atual do período. Uma linha semanal é expandida somente para os dias
-    # dentro do período solicitado.
+        v = float(l.valor or 0.0)
+        inss = round(v * 0.04, 2)
+        sest = round(v * 0.005, 2)
+        encargos = round(inss + sest, 2)
+        liq = round(v - encargos, 2)
+
+        rest_nome = l.rest_nome or ""
+        rest_period = l.rest_periodo or ""
+        rest_id = int(l.restaurante_id or 0)
+        coop_nome = l.coop_nome or ""
+        coop_id = int(l.cooperado_id or 0)
+
+        ws_det.append([
+            rest_nome,
+            rest_period,
+            coop_nome,
+            l.descricao or "",
+            _cell(ws_det, v, currency_fmt),
+            _cell(ws_det, l.data, date_fmt),
+            _fmt_time(l.hora_inicio),
+            _fmt_time(l.hora_fim),
+            _cell(ws_det, inss, currency_fmt),
+            _cell(ws_det, sest, currency_fmt),
+            _cell(ws_det, encargos, currency_fmt),
+            _cell(ws_det, liq, currency_fmt),
+            "OK",
+        ])
+
+        if coop_id and l.data:
+            launch_keys_id.add((coop_id, l.data, rest_id))
+            launch_keys_contract.add((coop_id, l.data, _norm_contract(rest_nome)))
+
+        key_contrato = (rest_id, rest_nome, rest_period)
+        tc = totais_contrato[key_contrato]
+        tc["restaurante"] = rest_nome
+        tc["periodo"] = rest_period
+        tc["bruto"] += v
+        tc["inss"] += inss
+        tc["sest"] += sest
+        tc["enc"] += encargos
+        tc["liq"] += liq
+
+        key_cc = (rest_id, rest_nome, rest_period, coop_id, coop_nome)
+        tcc = totais_contrato_coop[key_cc]
+        tcc["restaurante"] = rest_nome
+        tcc["periodo"] = rest_period
+        tcc["cooperado"] = coop_nome
+        tcc["bruto"] += v
+        tcc["inss"] += inss
+        tcc["sest"] += sest
+        tcc["enc"] += encargos
+        tcc["liq"] += liq
+
+        key_coop = (coop_id, coop_nome)
+        tcg = totais_coop[key_coop]
+        tcg["cooperado"] = coop_nome
+        tcg["bruto"] += v
+        tcg["inss"] += inss
+        tcg["sest"] += sest
+        tcg["enc"] += encargos
+        tcg["liq"] += liq
+
+        key_cd = (coop_id, coop_nome, l.data, rest_id, rest_nome, rest_period)
+        tcd = totais_coop_dia[key_cd]
+        tcd["cooperado"] = coop_nome
+        tcd["data"] = l.data
+        tcd["restaurante"] = rest_nome
+        tcd["periodo"] = rest_period
+        tcd["bruto"] += v
+        tcd["inss"] += inss
+        tcd["sest"] += sest
+        tcd["enc"] += encargos
+        tcd["liq"] += liq
+
+        total_geral_bruto += v
+        total_geral_inss += inss
+        total_geral_sest += sest
+        total_geral_enc += encargos
+        total_geral_liq += liq
+
+    # ============================================================
+    # Escala x Produção: inclui somente "FALTA PRODUÇÃO" em vermelho
+    # ============================================================
     scale_q = (
         db.session.query(
             Escala.id,
@@ -3351,46 +3471,45 @@ def exportar_lancamentos():
         scale_q = scale_q.filter(Escala.restaurante_id == restaurante_id)
     if cooperado_id:
         scale_q = scale_q.filter(Escala.cooperado_id == cooperado_id)
+
     scales = scale_q.order_by(Escala.id.asc()).all()
 
-    scale_coop_ids = {int(s.cooperado_id) for s in scales if s.cooperado_id}
+    coop_ids = {int(s.cooperado_id) for s in scales if s.cooperado_id}
     coop_names = {}
-    if scale_coop_ids:
+    if coop_ids:
         coop_names = dict(
             db.session.query(Cooperado.id, Cooperado.nome)
-            .filter(Cooperado.id.in_(scale_coop_ids))
+            .filter(Cooperado.id.in_(coop_ids))
             .all()
         )
 
-    scale_rest_ids = {int(s.restaurante_id) for s in scales if s.restaurante_id}
+    rest_ids = {int(s.restaurante_id) for s in scales if s.restaurante_id}
     rest_info = {}
-    if scale_rest_ids:
+    if rest_ids:
         rest_info = {
             int(rid): (nome or "", periodo or "")
             for rid, nome, periodo in (
                 db.session.query(Restaurante.id, Restaurante.nome, Restaurante.periodo)
-                .filter(Restaurante.id.in_(scale_rest_ids))
+                .filter(Restaurante.id.in_(rest_ids))
                 .all()
             )
         }
 
     period_days = []
-    cur = data_inicio
-    while cur <= data_fim:
-        if _dow_ok(cur):
-            period_days.append(cur)
-        cur += _td(days=1)
+    current_day = data_inicio
+    while current_day <= data_fim:
+        if _dow_ok(current_day):
+            period_days.append(current_day)
+        current_day += _td(days=1)
 
-    # Produz pendências sem duplicar a mesma escala/data.
-    missing_rows = []
     missing_seen = set()
     for s in scales:
         cid = int(s.cooperado_id)
-        explicit = _parse_data_escala_str(s.data)
+        explicit_date = _parse_data_escala_str(s.data)
         wd = _weekday_from_data_str(s.data)
 
-        if explicit:
-            dates_for_scale = [explicit] if data_inicio <= explicit <= data_fim and _dow_ok(explicit) else []
+        if explicit_date:
+            dates_for_scale = [explicit_date] if data_inicio <= explicit_date <= data_fim and _dow_ok(explicit_date) else []
         elif wd in (1, 2, 3, 4, 5, 6, 7):
             dates_for_scale = [d for d in period_days if d.isoweekday() == wd]
         else:
@@ -3399,8 +3518,8 @@ def exportar_lancamentos():
         rid = int(s.restaurante_id or 0)
         contract = (s.contrato or "").strip()
         contract_norm = _norm_contract(contract)
-        coop_nome = coop_names.get(cid, (s.cooperado_nome or "").strip())
-        rest_nome, rest_periodo = rest_info.get(rid, (contract, ""))
+        coop_nome = coop_names.get(cid, (s.cooperado_nome or "").strip()) or "—"
+        rest_nome, rest_period = rest_info.get(rid, (contract, ""))
 
         for dt in dates_for_scale:
             has_launch = bool(rid and (cid, dt, rid) in launch_keys_id)
@@ -3409,129 +3528,148 @@ def exportar_lancamentos():
             if has_launch:
                 continue
 
-            key = (cid, dt, rid, contract_norm, (s.horario or "").strip(), (s.turno or "").strip())
-            if key in missing_seen:
+            miss_key = (cid, dt, rid, contract_norm, (s.horario or "").strip(), (s.turno or "").strip())
+            if miss_key in missing_seen:
                 continue
-            missing_seen.add(key)
-            missing_rows.append({
-                "rest_nome": rest_nome or contract or "—",
-                "periodo": rest_periodo or "—",
-                "coop_nome": coop_nome or "—",
-                "descricao": "FALTA PRODUÇÃO",
-                "valor": 0.0,
-                "data": dt,
-                "hora_inicio": "",
-                "hora_fim": "",
-                "qtd": 0,
-                "status": "FALTA PRODUÇÃO",
-            })
+            missing_seen.add(miss_key)
 
-    # Workbook em write_only evita manter milhares de células na RAM.
-    wb = Workbook(write_only=True)
-    ws = wb.create_sheet("Lançamentos e Pendências")
+            ws_det.append([
+                rest_nome or contract or "—",
+                rest_period or "—",
+                coop_nome,
+                _cell(ws_det, "FALTA PRODUÇÃO", font=red_font),
+                _cell(ws_det, 0.0, currency_fmt),
+                _cell(ws_det, dt, date_fmt),
+                "",
+                "",
+                _cell(ws_det, 0.0, currency_fmt),
+                _cell(ws_det, 0.0, currency_fmt),
+                _cell(ws_det, 0.0, currency_fmt),
+                _cell(ws_det, 0.0, currency_fmt),
+                _cell(ws_det, "FALTA PRODUÇÃO", font=red_font),
+            ])
 
-    header = [
-        "Estabelecimento", "Período", "Cooperado", "Descrição",
-        "Valor Bruto", "Data", "Hora Início", "Hora Fim", "Entregas",
-        "INSS", "SEST", "Líquido", "Status",
-    ]
-    header_cells = []
-    for value in header:
-        cell = WriteOnlyCell(ws, value=value)
-        cell.font = Font(bold=True)
-        header_cells.append(cell)
-    ws.append(header_cells)
+    # ============================================================
+    # ABA 2 - Totais por Contrato
+    # ============================================================
+    ws_con = wb.create_sheet("Totais por Contrato")
+    _append_header(ws_con, [
+        "Restaurante", "Periodo",
+        "Total Bruto", "Total INSS", "Total SEST", "Total Encargos", "Total Líquido"
+    ])
 
-    summary = defaultdict(lambda: {
-        "bruto": 0.0, "inss": 0.0, "sest": 0.0, "liquido": 0.0,
-        "lancamentos": 0, "entregas": 0, "faltas": 0,
-    })
+    soma_b = soma_i = soma_s = soma_e = soma_l = 0.0
+    for _, tc in sorted(totais_contrato.items(), key=lambda x: (x[1]["restaurante"], x[1]["periodo"])):
+        ws_con.append([
+            tc["restaurante"] or "—",
+            tc["periodo"] or "—",
+            _cell(ws_con, round(tc["bruto"], 2), currency_fmt),
+            _cell(ws_con, round(tc["inss"], 2), currency_fmt),
+            _cell(ws_con, round(tc["sest"], 2), currency_fmt),
+            _cell(ws_con, round(tc["enc"], 2), currency_fmt),
+            _cell(ws_con, round(tc["liq"], 2), currency_fmt),
+        ])
+        soma_b += tc["bruto"]; soma_i += tc["inss"]; soma_s += tc["sest"]; soma_e += tc["enc"]; soma_l += tc["liq"]
 
-    for x in launch_rows:
-        v = float(x.valor or 0.0)
-        inss = round(v * 0.04, 2)
-        sest = round(v * 0.005, 2)
-        liquido = round(v - inss - sest, 2)
-        qtd = int(x.qtd_entregas or 0)
-        rest_nome = x.rest_nome or "—"
-        periodo = x.rest_periodo or "—"
-        coop_nome = x.coop_nome or "—"
+    ws_con.append([
+        _cell(ws_con, "TOTAL GERAL", font=bold_font), "",
+        _cell(ws_con, round(soma_b, 2), currency_fmt, bold_font),
+        _cell(ws_con, round(soma_i, 2), currency_fmt, bold_font),
+        _cell(ws_con, round(soma_s, 2), currency_fmt, bold_font),
+        _cell(ws_con, round(soma_e, 2), currency_fmt, bold_font),
+        _cell(ws_con, round(soma_l, 2), currency_fmt, bold_font),
+    ])
 
-        ws.append([
-            rest_nome, periodo, coop_nome, x.descricao or "",
-            v, x.data, _fmt_time(x.hora_inicio), _fmt_time(x.hora_fim), qtd,
-            inss, sest, liquido, "OK",
+    # ============================================================
+    # ABA 3 - Contrato x Cooperado
+    # ============================================================
+    ws_cc = wb.create_sheet("Contrato x Cooperado")
+    _append_header(ws_cc, [
+        "Restaurante", "Periodo", "Cooperado",
+        "Total Bruto", "Total INSS", "Total SEST", "Total Encargos", "Total Líquido"
+    ])
+
+    for _, tcc in sorted(
+        totais_contrato_coop.items(),
+        key=lambda x: (x[1]["restaurante"], x[1]["periodo"], x[1]["cooperado"])
+    ):
+        ws_cc.append([
+            tcc["restaurante"] or "—",
+            tcc["periodo"] or "—",
+            tcc["cooperado"] or "—",
+            _cell(ws_cc, round(tcc["bruto"], 2), currency_fmt),
+            _cell(ws_cc, round(tcc["inss"], 2), currency_fmt),
+            _cell(ws_cc, round(tcc["sest"], 2), currency_fmt),
+            _cell(ws_cc, round(tcc["enc"], 2), currency_fmt),
+            _cell(ws_cc, round(tcc["liq"], 2), currency_fmt),
         ])
 
-        key = (coop_nome, rest_nome, periodo)
-        s = summary[key]
-        s["bruto"] += v
-        s["inss"] += inss
-        s["sest"] += sest
-        s["liquido"] += liquido
-        s["lancamentos"] += 1
-        s["entregas"] += qtd
+    # ============================================================
+    # ABA 4 - Cooperado por Dia
+    # ============================================================
+    ws_cd = wb.create_sheet("Cooperado por Dia")
+    _append_header(ws_cd, [
+        "Cooperado", "Data", "Restaurante", "Periodo",
+        "Total Bruto", "Total INSS", "Total SEST", "Total Encargos", "Total Líquido"
+    ])
 
-    red_fill = PatternFill("solid", fgColor="FFC7CE")
-    red_font = Font(color="9C0006", bold=True)
-    for m in missing_rows:
-        values = [
-            m["rest_nome"], m["periodo"], m["coop_nome"], m["descricao"],
-            0.0, m["data"], "", "", 0, 0.0, 0.0, 0.0, m["status"],
-        ]
-        styled = []
-        for value in values:
-            cell = WriteOnlyCell(ws, value=value)
-            cell.fill = red_fill
-            cell.font = red_font
-            styled.append(cell)
-        ws.append(styled)
-
-        key = (m["coop_nome"], m["rest_nome"], m["periodo"])
-        summary[key]["faltas"] += 1
-
-    # Segunda e única aba de consolidação.
-    ws_sum = wb.create_sheet("Resumo")
-    sum_header = [
-        "Cooperado", "Estabelecimento", "Período", "Lançamentos", "Entregas",
-        "Faltas de Produção", "Bruto", "INSS", "SEST", "Líquido",
-    ]
-    sum_header_cells = []
-    for value in sum_header:
-        cell = WriteOnlyCell(ws_sum, value=value)
-        cell.font = Font(bold=True)
-        sum_header_cells.append(cell)
-    ws_sum.append(sum_header_cells)
-
-    totals = {"lanc": 0, "ent": 0, "faltas": 0, "bruto": 0.0, "inss": 0.0, "sest": 0.0, "liq": 0.0}
-    for (coop_nome, rest_nome, periodo), s in sorted(summary.items(), key=lambda x: (x[0][0].casefold(), x[0][1].casefold())):
-        ws_sum.append([
-            coop_nome, rest_nome, periodo,
-            s["lancamentos"], s["entregas"], s["faltas"],
-            round(s["bruto"], 2), round(s["inss"], 2), round(s["sest"], 2), round(s["liquido"], 2),
+    for _, tcd in sorted(
+        totais_coop_dia.items(),
+        key=lambda x: (x[1]["cooperado"], x[1]["data"] or date.min, x[1]["restaurante"], x[1]["periodo"])
+    ):
+        ws_cd.append([
+            tcd["cooperado"] or "—",
+            _cell(ws_cd, tcd["data"], date_fmt),
+            tcd["restaurante"] or "—",
+            tcd["periodo"] or "—",
+            _cell(ws_cd, round(tcd["bruto"], 2), currency_fmt),
+            _cell(ws_cd, round(tcd["inss"], 2), currency_fmt),
+            _cell(ws_cd, round(tcd["sest"], 2), currency_fmt),
+            _cell(ws_cd, round(tcd["enc"], 2), currency_fmt),
+            _cell(ws_cd, round(tcd["liq"], 2), currency_fmt),
         ])
-        totals["lanc"] += s["lancamentos"]
-        totals["ent"] += s["entregas"]
-        totals["faltas"] += s["faltas"]
-        totals["bruto"] += s["bruto"]
-        totals["inss"] += s["inss"]
-        totals["sest"] += s["sest"]
-        totals["liq"] += s["liquido"]
 
-    total_cells = [
-        "TOTAL GERAL", "", "",
-        totals["lanc"], totals["ent"], totals["faltas"],
-        round(totals["bruto"], 2), round(totals["inss"], 2),
-        round(totals["sest"], 2), round(totals["liq"], 2),
-    ]
-    styled_total = []
-    for value in total_cells:
-        cell = WriteOnlyCell(ws_sum, value=value)
-        cell.font = Font(bold=True)
-        styled_total.append(cell)
-    ws_sum.append(styled_total)
+    # ============================================================
+    # ABA 5 - Totais por Cooperado
+    # ============================================================
+    ws_tc = wb.create_sheet("Totais por Cooperado")
+    _append_header(ws_tc, [
+        "Cooperado", "Total Bruto", "Total INSS", "Total SEST", "Total Encargos", "Total Líquido"
+    ])
 
-    # Salva em arquivo temporário em disco em vez de BytesIO, reduzindo o pico de RAM.
+    total_b = total_i = total_s = total_e = total_l = 0.0
+    for _, tcg in sorted(totais_coop.items(), key=lambda x: x[1]["cooperado"]):
+        ws_tc.append([
+            tcg["cooperado"] or "—",
+            _cell(ws_tc, round(tcg["bruto"], 2), currency_fmt),
+            _cell(ws_tc, round(tcg["inss"], 2), currency_fmt),
+            _cell(ws_tc, round(tcg["sest"], 2), currency_fmt),
+            _cell(ws_tc, round(tcg["enc"], 2), currency_fmt),
+            _cell(ws_tc, round(tcg["liq"], 2), currency_fmt),
+        ])
+        total_b += tcg["bruto"]; total_i += tcg["inss"]; total_s += tcg["sest"]; total_e += tcg["enc"]; total_l += tcg["liq"]
+
+    ws_tc.append([
+        _cell(ws_tc, "TOTAL GERAL", font=bold_font),
+        _cell(ws_tc, round(total_b, 2), currency_fmt, bold_font),
+        _cell(ws_tc, round(total_i, 2), currency_fmt, bold_font),
+        _cell(ws_tc, round(total_s, 2), currency_fmt, bold_font),
+        _cell(ws_tc, round(total_e, 2), currency_fmt, bold_font),
+        _cell(ws_tc, round(total_l, 2), currency_fmt, bold_font),
+    ])
+
+    # ============================================================
+    # ABA 6 - Resumo Geral
+    # ============================================================
+    ws_rg = wb.create_sheet("Resumo Geral")
+    ws_rg.append([_cell(ws_rg, "Resumo Geral", font=bold_font), "Valor"])
+    ws_rg.append(["Total Geral Bruto", _cell(ws_rg, round(total_geral_bruto, 2), currency_fmt)])
+    ws_rg.append(["Total Geral INSS", _cell(ws_rg, round(total_geral_inss, 2), currency_fmt)])
+    ws_rg.append(["Total Geral SEST", _cell(ws_rg, round(total_geral_sest, 2), currency_fmt)])
+    ws_rg.append(["Total Geral Encargos", _cell(ws_rg, round(total_geral_enc, 2), currency_fmt)])
+    ws_rg.append(["Total Geral Líquido", _cell(ws_rg, round(total_geral_liq, 2), currency_fmt)])
+
+    # Salva em disco para não duplicar o XLSX na memória.
     tmp = tempfile.NamedTemporaryFile(prefix="coopex_lancamentos_", suffix=".xlsx", delete=False)
     tmp_path = tmp.name
     tmp.close()
