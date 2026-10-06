@@ -1008,6 +1008,22 @@ aviso_restaurantes = db.Table(
     db.Column("restaurante_id", db.Integer, db.ForeignKey("restaurantes.id"), primary_key=True),
 )
 
+# Avisos que um estabelecimento removeu apenas da própria caixa de entrada.
+# Não apaga o aviso global nem afeta outros estabelecimentos.
+aviso_restaurante_ocultos = db.Table(
+    "aviso_restaurante_ocultos",
+    db.Column("aviso_id", db.Integer, db.ForeignKey("avisos.id"), primary_key=True),
+    db.Column("restaurante_id", db.Integer, db.ForeignKey("restaurantes.id"), primary_key=True),
+    db.Column("ocultado_em", db.DateTime, default=datetime.utcnow, nullable=False),
+)
+
+def _ensure_aviso_restaurante_ocultos_schema():
+    try:
+        aviso_restaurante_ocultos.create(bind=db.engine, checkfirst=True)
+    except Exception:
+        db.session.rollback()
+        raise
+
 aviso_cooperados = db.Table(
     "aviso_cooperados",
     db.Column("aviso_id", db.Integer, db.ForeignKey("avisos.id"), primary_key=True),
@@ -4674,6 +4690,39 @@ def admin_avisos_excluir(aviso_id):
     db.session.commit()
     flash("Aviso excluído.", "success")
     return redirect(url_for("admin_avisos"))
+
+
+@app.post("/avisos-restaurante/<int:aviso_id>/excluir", endpoint="restaurante_excluir_aviso")
+@role_required("restaurante")
+def restaurante_excluir_aviso(aviso_id: int):
+    """Remove um aviso apenas da caixa de entrada do estabelecimento logado."""
+    rest = Restaurante.query.filter_by(usuario_id=session.get("user_id")).first_or_404()
+    aviso = Aviso.query.get_or_404(aviso_id)
+
+    # Só permite ocultar avisos que realmente pertencem a este estabelecimento.
+    permitidos = {a.id for a in (get_avisos_for_restaurante(rest) or [])}
+    if aviso.id not in permitidos:
+        abort(403)
+
+    _ensure_aviso_restaurante_ocultos_schema()
+    exists_hidden = db.session.execute(
+        db.select(aviso_restaurante_ocultos.c.aviso_id).where(
+            aviso_restaurante_ocultos.c.aviso_id == aviso.id,
+            aviso_restaurante_ocultos.c.restaurante_id == rest.id,
+        )
+    ).first()
+
+    if not exists_hidden:
+        db.session.execute(
+            aviso_restaurante_ocultos.insert().values(
+                aviso_id=aviso.id,
+                restaurante_id=rest.id,
+                ocultado_em=datetime.utcnow(),
+            )
+        )
+        db.session.commit()
+
+    return ("", 204)
 
 
 @app.route("/avisos/<int:aviso_id>/lido", methods=["POST", "GET"])
