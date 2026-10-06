@@ -3300,6 +3300,27 @@ def exportar_lancamentos():
     def _norm_contract(value):
         return re.sub(r"\s+", " ", str(value or "").replace("_", " ").strip().casefold())
 
+    def _scale_times(value):
+        """Extrai início/fim da faixa da escala sem consulta adicional."""
+        text = str(value or "").strip().lower().replace("às", " a ").replace("–", "-").replace("—", "-")
+        times = re.findall(r"(?<!\d)(\d{1,2})(?::|h)(\d{2})(?!\d)", text)
+        if not times:
+            times = re.findall(r"(?<!\d)(\d{1,2})h(?!\d)", text)
+            times = [(h, "00") for h in times]
+        normalized = []
+        for hh, mm in times[:2]:
+            try:
+                h = int(hh); m = int(mm)
+                if 0 <= h <= 23 and 0 <= m <= 59:
+                    normalized.append(f"{h:02d}:{m:02d}")
+            except Exception:
+                pass
+        if len(normalized) >= 2:
+            return normalized[0], normalized[1]
+        if len(normalized) == 1:
+            return normalized[0], ""
+        return "", ""
+
     def _dow_ok(dt):
         if not dows:
             return True
@@ -3548,6 +3569,7 @@ def exportar_lancamentos():
             tc_falta["restaurante"] = contrato_label
             tc_falta["periodo"] = rest_period or ""
 
+            escala_inicio, escala_fim = _scale_times(s.horario)
             ws_det.append([
                 contrato_label,
                 rest_period or "—",
@@ -3555,8 +3577,8 @@ def exportar_lancamentos():
                 _cell(ws_det, "FALTA PRODUÇÃO", font=red_font),
                 _cell(ws_det, 0.0, currency_fmt),
                 _cell(ws_det, dt, date_fmt),
-                "",
-                "",
+                escala_inicio,
+                escala_fim,
                 _cell(ws_det, 0.0, currency_fmt),
                 _cell(ws_det, 0.0, currency_fmt),
                 _cell(ws_det, 0.0, currency_fmt),
