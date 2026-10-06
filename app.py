@@ -9535,6 +9535,12 @@ def admin_tracking_toggle(rest_id):
 # Rotas extraídas para reduzir o tamanho e acoplamento do app principal.
 import routes_farmacia as _routes_farmacia  # noqa: F401
 
+# =========================
+# CALENDÁRIO + CAIXA POSTAL
+# =========================
+import calendar_mailbox as _calendar_mailbox  # noqa: F401
+
+
 
 # =========================
 # Sincronização dos módulos extraídos
