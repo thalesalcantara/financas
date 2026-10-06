@@ -672,6 +672,9 @@ def _admin_v11_redirect_light(response):
         if tab in _FINANCE:response.headers["Location"]=url_for("admin_v10_finance",tab=tab)
         elif tab=="restaurantes":response.headers["Location"]=url_for("admin_v10_establishments")
         elif tab=="cooperados":response.headers["Location"]=url_for("admin_light_cooperatives")
+        elif tab=="escalas":response.headers["Location"]=url_for("admin_light_scale")
+        elif tab=="avaliacoes":response.headers["Location"]=url_for("admin_light_ratings")
+        elif tab=="avisos":response.headers["Location"]=url_for("admin_light_notices")
         elif tab=="config":response.headers["Location"]=url_for("admin_v11_config")
     except Exception:
         app.logger.exception("Falha ao redirecionar retorno do Admin V11")
