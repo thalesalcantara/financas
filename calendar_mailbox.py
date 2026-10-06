@@ -141,6 +141,93 @@ def holidays_for_year(year: int):
     return [{"date":d.isoformat(),"title":t,"scope":s,"scope_label":labels[s]} for d,t,s in sorted(rows)]
 
 
+
+def commemorative_dates_for_year(year: int):
+    """Datas comemorativas recorrentes no Brasil. Não são feriados."""
+    year = max(2024, min(2100, int(year)))
+
+    fixed = [
+        (1, 4, "Dia Mundial do Braille"),
+        (1, 7, "Dia do Leitor"),
+        (1, 20, "Dia Nacional do Farmacêutico"),
+        (1, 24, "Dia Internacional da Educação"),
+        (1, 30, "Dia da Saudade"),
+        (2, 4, "Dia Mundial de Combate ao Câncer"),
+        (2, 11, "Dia Internacional das Mulheres e Meninas na Ciência"),
+        (2, 20, "Dia Mundial da Justiça Social"),
+        (3, 8, "Dia Internacional da Mulher"),
+        (3, 15, "Dia Mundial do Consumidor"),
+        (3, 20, "Dia Internacional da Felicidade"),
+        (3, 21, "Dia Internacional contra a Discriminação Racial"),
+        (3, 22, "Dia Mundial da Água"),
+        (3, 27, "Dia Mundial do Teatro"),
+        (4, 2, "Dia Mundial de Conscientização do Autismo"),
+        (4, 6, "Dia Mundial da Atividade Física"),
+        (4, 7, "Dia Mundial da Saúde"),
+        (4, 13, "Dia do Beijo"),
+        (4, 18, "Dia Nacional do Livro Infantil"),
+        (4, 22, "Dia da Terra"),
+        (4, 23, "Dia Mundial do Livro"),
+        (5, 12, "Dia Internacional da Enfermagem"),
+        (5, 15, "Dia Internacional da Família"),
+        (5, 18, "Dia Nacional de Combate ao Abuso e à Exploração Sexual Infantil"),
+        (5, 25, "Dia da Indústria"),
+        (6, 5, "Dia Mundial do Meio Ambiente"),
+        (6, 12, "Dia dos Namorados"),
+        (6, 14, "Dia Mundial do Doador de Sangue"),
+        (6, 24, "Dia de São João"),
+        (7, 10, "Dia Mundial da Pizza"),
+        (7, 13, "Dia Mundial do Rock"),
+        (7, 20, "Dia do Amigo"),
+        (7, 25, "Dia do Motorista"),
+        (7, 26, "Dia dos Avós"),
+        (8, 5, "Dia Nacional da Saúde"),
+        (8, 11, "Dia do Estudante"),
+        (8, 19, "Dia Mundial da Fotografia"),
+        (8, 27, "Dia do Psicólogo"),
+        (8, 29, "Dia Nacional de Combate ao Fumo"),
+        (9, 5, "Dia da Amazônia"),
+        (9, 8, "Dia Mundial da Alfabetização"),
+        (9, 10, "Dia Mundial de Prevenção ao Suicídio"),
+        (9, 21, "Dia da Árvore"),
+        (9, 22, "Dia Mundial sem Carro"),
+        (9, 27, "Dia Mundial do Turismo"),
+        (10, 1, "Dia Internacional da Pessoa Idosa"),
+        (10, 4, "Dia Mundial dos Animais"),
+        (10, 12, "Dia das Crianças"),
+        (10, 15, "Dia dos Professores"),
+        (10, 18, "Dia do Médico"),
+        (10, 25, "Dia do Dentista"),
+        (10, 29, "Dia Nacional do Livro"),
+        (10, 31, "Halloween"),
+        (11, 5, "Dia Nacional da Língua Portuguesa"),
+        (11, 14, "Dia Mundial do Diabetes"),
+        (11, 19, "Dia Internacional do Homem"),
+        (11, 25, "Dia Internacional pela Eliminação da Violência contra as Mulheres"),
+        (12, 1, "Dia Mundial de Luta contra a AIDS"),
+        (12, 3, "Dia Internacional da Pessoa com Deficiência"),
+        (12, 5, "Dia Internacional do Voluntário"),
+        (12, 10, "Dia Internacional dos Direitos Humanos"),
+        (12, 24, "Véspera de Natal"),
+        (12, 31, "Véspera de Ano-Novo"),
+    ]
+
+    def nth_weekday(month: int, weekday: int, nth: int):
+        d = date(year, month, 1)
+        shift = (weekday - d.weekday()) % 7
+        return d + timedelta(days=shift + 7 * (nth - 1))
+
+    rows = [
+        {"date": date(year, month, day).isoformat(), "title": title, "kind": "commemorative"}
+        for month, day, title in fixed
+    ]
+    rows.extend([
+        {"date": nth_weekday(5, 6, 2).isoformat(), "title": "Dia das Mães", "kind": "commemorative"},
+        {"date": nth_weekday(8, 6, 2).isoformat(), "title": "Dia dos Pais", "kind": "commemorative"},
+    ])
+    return sorted(rows, key=lambda x: (x["date"], x["title"]))
+
+
 # -------- Eventos em tempo real somente para Admin (sem polling) --------
 _admin_subscribers: list[queue.Queue] = []
 _sub_lock = threading.Lock()
@@ -327,7 +414,7 @@ def rest_calendario_api():
     except Exception:
         db.session.rollback()
         app.logger.exception("Calendário: lembretes indisponíveis; exibindo feriados.")
-    return jsonify(ok=True, year=year, holidays=holidays_for_year(year), reminders=reminders)
+    return jsonify(ok=True, year=year, holidays=holidays_for_year(year), commemoratives=commemorative_dates_for_year(year), reminders=reminders)
 
 
 @app.get("/api/rest/calendario/proximos", endpoint="rest_calendario_proximos")
