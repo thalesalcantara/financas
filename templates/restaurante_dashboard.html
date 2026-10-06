@@ -1782,7 +1782,7 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
           <div class="grow"><label>Cooperado</label><input type="text" class="form-control" name="q" placeholder="Buscar por cooperado..."></div>
           <button class="btn rest-btn-primary" type="submit"><i class="bi bi-funnel"></i> Aplicar</button>
           <a class="btn rest-btn-light" href="{{ url_for('portal_restaurante', view='lancamentos') }}"><i class="bi bi-arrow-counterclockwise"></i> Limpar</a>
-          <button class="btn rest-btn-light" type="button" id="btnExportCsv"><i class="bi bi-download"></i> Exportar</button>
+          <a class="btn rest-btn-light" href="{{ url_for('rest_export_lancamentos_xlsx', data_inicio=(filtro_inicio.strftime('%Y-%m-%d') if filtro_inicio else ''), data_fim=(filtro_fim.strftime('%Y-%m-%d') if filtro_fim else ''), mes=(filtro_mes or ''), q=request.args.get('q','')) }}"><i class="bi bi-file-earmark-excel"></i> Exportar XLSX</a>
         </form>
 
         <div class="rest-history-kpis">
