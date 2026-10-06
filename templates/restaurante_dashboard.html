@@ -3191,10 +3191,15 @@ function setPhone(digits) {
     function renderCalendarUpcoming(eventsBy){
       const box=document.getElementById('calUpcoming');if(!box)return;
       const today=calDateOnly(new Date());
+      const y=calCursor.getFullYear(),m=calCursor.getMonth();
+      const monthPrefix=y+'-'+String(m+1).padStart(2,'0')+'-';
       const upcoming=[];
       Object.keys(eventsBy).sort().forEach(date=>{
+        if(!date.startsWith(monthPrefix))return;
         if(date<today)return;
-        (eventsBy[date]||[]).forEach(ev=>upcoming.push({date,...ev}));
+        (eventsBy[date]||[]).forEach(ev=>{
+          if(ev.kind==='holiday' || ev.kind==='reminder') upcoming.push({date,...ev});
+        });
       });
       const top=upcoming.slice(0,5);
       const monthNames=['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
@@ -3205,7 +3210,7 @@ function setPhone(digits) {
         const dot=ev.kind==='holiday'?'#7c3aed':(ev.target==='coopex'?'#ef4444':(ev.category==='financeiro'?'#16a36a':ev.category==='manutencao'?'#f2b400':ev.category==='importante'?'#ef4444':ev.category==='reuniao'?'#1685f8':'#7c3aed'));
         const typeLabel=ev.kind==='holiday'?'Feriado':(ev.kind==='commemorative'?'Data comemorativa':(ev.target==='coopex'?'Lembrete · COOPEX':'Lembrete pessoal'));
         return '<div class="cal-up-item" data-up-date="'+ev.date+'"><div class="cal-up-date"><strong>'+String(d.getDate()).padStart(2,'0')+'</strong><small>'+monthNames[d.getMonth()]+'</small></div><div class="cal-up-body"><strong><i class="cal-up-dot" style="background:'+dot+'"></i>'+calEsc(label)+'</strong><small>'+calEsc(typeLabel)+' · '+calEsc(detail)+'</small></div><i class="bi bi-chevron-right cal-up-arrow"></i></div>';
-      }).join(''):'<div class="cal-day-empty">Nenhum próximo lembrete.</div>';
+      }).join(''):'<div class="cal-day-empty">Nenhum feriado ou lembrete neste mês.</div>';
     }
 
     function renderCalendarMode(eventsBy){
@@ -3240,8 +3245,14 @@ function setPhone(digits) {
       const startKey=y+'-'+String(m+1).padStart(2,'0')+'-01';
       const endKey=y+'-'+String(m+2).padStart(2,'0')+'-01';
       const all=[];
-      Object.keys(eventsBy).sort().forEach(date=>{if(date>=startKey&&date<endKey)(eventsBy[date]||[]).forEach(ev=>all.push({date,...ev}));});
-      alt.innerHTML='<div class="cal-alt-title">Agenda — '+calMonthNames[m]+' de '+y+'</div><div class="cal-agenda-list">'+(all.length?all.map(ev=>'<div class="cal-agenda-item"><div class="cal-agenda-date">'+calFmt(ev.date)+'</div><div><strong>'+calEsc(ev.title)+'</strong><small>'+calEsc(ev.kind==='holiday'?(ev.scope_label||'Feriado'):(ev.kind==='commemorative'?'Data comemorativa':(ev.time||'Todo o dia')))+'</small></div><div class="cal-agenda-actions"><span class="cal-event '+eventColorClass(ev)+'" style="width:auto;margin:0">'+(ev.kind==='holiday'?'Feriado':(ev.kind==='commemorative'?'Data comemorativa':(ev.target==='coopex'?'COOPEX':'Pessoal')))+'</span>'+(ev.kind==='reminder'?'<button type="button" class="cal-icon-btn danger" data-cal-delete="'+ev.id+'" title="Excluir lembrete"><i class="bi bi-trash"></i></button>':'')+'</div></div>').join(''):'<div class="cal-day-empty">Nenhum item neste mês.</div>')+'</div>';
+      Object.keys(eventsBy).sort().forEach(date=>{
+        if(date>=startKey&&date<endKey){
+          (eventsBy[date]||[]).forEach(ev=>{
+            if(ev.kind==='reminder') all.push({date,...ev});
+          });
+        }
+      });
+      alt.innerHTML='<div class="cal-alt-title">Agenda de lembretes — '+calMonthNames[m]+' de '+y+'</div><div class="cal-agenda-list">'+(all.length?all.map(ev=>'<div class="cal-agenda-item"><div class="cal-agenda-date">'+calFmt(ev.date)+'</div><div><strong>'+calEsc(ev.title)+'</strong><small>'+calEsc(ev.time||'Todo o dia')+'</small></div><div class="cal-agenda-actions"><span class="cal-event '+eventColorClass(ev)+'" style="width:auto;margin:0">'+(ev.kind==='holiday'?'Feriado':(ev.kind==='commemorative'?'Data comemorativa':(ev.target==='coopex'?'COOPEX':'Pessoal')))+'</span>'+(ev.kind==='reminder'?'<button type="button" class="cal-icon-btn danger" data-cal-delete="'+ev.id+'" title="Excluir lembrete"><i class="bi bi-trash"></i></button>':'')+'</div></div>').join(''):'<div class="cal-day-empty">Nenhum lembrete agendado neste mês.</div>')+'</div>';
     }
 
     async function initCalendario(){
