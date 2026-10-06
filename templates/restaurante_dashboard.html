@@ -1373,7 +1373,7 @@ body.rest-wide-modern .rest-shift-card{border-radius:15px}
         <a data-target="config" class="{{ 'active' if view=='config' else '' }}" href="{{ url_for('portal_restaurante', view='config') }}">
           <i class="bi bi-gear"></i><span>Configuração</span>
         </a>
-        <a id="linkAvisos" data-target="avisos" class="{{ 'active' if view=='avisos' else '' }}" href="{{ url_for('portal_restaurante_avisos') }}">
+        <a id="linkAvisos" data-target="avisos" class="{{ 'active' if view=='avisos' else '' }}" href="{{ url_for('portal_restaurante', view='avisos') }}">
           <i class="bi bi-megaphone"></i><span>Avisos</span>
           {% set _cntAvisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
           <span class="badge-dot" id="badgeAvisos" {% if _cntAvisos == 0 %}style="display:none"{% endif %}>{{ _cntAvisos }}</span>
@@ -1396,7 +1396,7 @@ body.rest-wide-modern .rest-shift-card{border-radius:15px}
           <a href="{{ url_for('rest_tabelas') }}"><i class="bi bi-table"></i> Tabelas</a>
           <a class="{{ 'active' if view=='mapa' else '' }}" href="{{ url_for('portal_restaurante', view='mapa') }}"><i class="bi bi-geo-alt-fill"></i> Mapa <span class="rest-modern-new">NOVO</span></a>
           <a href="{{ url_for('portal_restaurante', view='config') }}"><i class="bi bi-gear"></i> Configuração</a>
-          <a href="{{ url_for('portal_restaurante_avisos') }}"><i class="bi bi-bell"></i> Avisos {% if _modern_avisos %}<span class="rest-modern-badge">{{ _modern_avisos }}</span>{% endif %}</a>
+          <a href="{{ url_for('portal_restaurante', view='avisos') }}"><i class="bi bi-bell"></i> Avisos {% if _modern_avisos %}<span class="rest-modern-badge">{{ _modern_avisos }}</span>{% endif %}</a>
           <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a>
         </nav>
       </header>
@@ -2218,7 +2218,7 @@ body.rest-wide-modern .rest-shift-card{border-radius:15px}
           <div class="toast-body">
             Você tem um novo aviso.
             <div class="mt-2 pt-2 border-top d-flex gap-2">
-              <a id="toastVerAgora" class="btn btn-royal btn-sm" href="{{ url_for('portal_restaurante_avisos') }}">
+              <a id="toastVerAgora" class="btn btn-royal btn-sm" href="{{ url_for('portal_restaurante', view='avisos') }}">
                 <i class="bi bi-eye"></i> Ver agora
               </a>
               <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="toast">Depois</button>
