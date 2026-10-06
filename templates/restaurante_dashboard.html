@@ -1797,14 +1797,14 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
               <thead><tr><th>Data</th><th>Cooperado</th><th>Contrato</th><th>Horário</th><th>Descrição</th><th class="text-center">Entregas</th><th class="text-end">Valor</th><th class="text-center">Ações</th></tr></thead>
               <tbody id="tbodyLanc">
               {% for x in _lancamentos_periodo %}
-                <tr data-coop="{{ x.cooperado_id or x.coop_id }}" data-coopnome="{{ x.cooperado_nome or x.coop_nome }}" data-contrato="{{ x.contrato_nome or x.contrato }}">
+                <tr data-coop="{{ x.cooperado_id or x.coop_id }}" data-coopnome="{{ x.cooperado_nome or x.coop_nome }}" data-contrato="{{ x.contrato_nome or x.contrato }}" class="{{ 'table-danger' if x.faltou_lancar else '' }}">
                   <td><strong>{{ (x.data.strftime('%d/%m/%Y') if x.data) if x.data is not string else x.data }}</strong></td>
-                  <td class="fw-semibold coop-name">{{ x.cooperado_nome or x.coop_nome }}</td>
+                  <td class="fw-semibold coop-name" {% if x.faltou_lancar %}style="color:#c1121f;font-weight:900"{% endif %}>{{ x.cooperado_nome or x.coop_nome }}{% if x.faltou_lancar %}<div style="font-size:.65rem;color:#c1121f;font-weight:900">FALTOU LANÇAR</div>{% endif %}</td>
                   <td>{{ x.contrato_nome or x.contrato or '—' }}</td>
                   <td>{% if x.hora_inicio or x.hora_fim %}{{ x.hora_inicio or '' }}{% if x.hora_inicio or x.hora_fim %} às {% endif %}{{ x.hora_fim or '' }}{% else %}—{% endif %}</td>
-                  <td class="desc">{{ x.descricao or '—' }}</td>
-                  <td class="text-center entregas">{{ x.qtd_entregas if x.qtd_entregas is not none else '—' }}</td>
-                  <td class="text-end valor" data-valor="{{ '%.2f'|format(x.valor or 0) }}"><strong>R$ {{ '%.2f'|format(x.valor or 0)|replace('.', ',') }}</strong></td>
+                  <td class="desc" {% if x.faltou_lancar %}style="color:#c1121f;font-weight:900"{% endif %}>{{ x.descricao or '—' }}</td>
+                  <td class="text-center entregas">{{ 0 if x.faltou_lancar else (x.qtd_entregas if x.qtd_entregas is not none else '—') }}</td>
+                  <td class="text-end valor" data-valor="{{ '%.2f'|format(x.valor or 0) }}">{% if x.faltou_lancar %}<strong style="color:#c1121f">FALTOU LANÇAR</strong>{% else %}<strong>R$ {{ '%.2f'|format(x.valor or 0)|replace('.', ',') }}</strong>{% endif %}</td>
                   <td class="text-center">{% if x.id %}{% if has_editar_lanc %}<a href="{{ url_for('editar_lancamento', id=x.id) }}" class="rest-icon-btn" title="Editar"><i class="bi bi-pencil"></i></a>{% endif %}<a href="{{ url_for('excluir_lancamento', id=x.id) }}" class="rest-icon-btn danger" title="Excluir" onclick="return confirm('Excluir este lançamento?');"><i class="bi bi-trash"></i></a>{% endif %}</td>
                 </tr>
               {% else %}
