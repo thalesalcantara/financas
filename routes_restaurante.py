@@ -94,7 +94,7 @@ def portal_restaurante():
 
     # Abas informativas não precisam montar escala, cooperados, totais ou produção.
     # Mantém o mesmo template/menu, mas responde com contexto mínimo.
-    if view in {"config", "mapa", "avisos"}:
+    if view in {"config", "mapa", "avisos", "calendario"}:
         avisos_view = []
         avisos_unread = 0
 
