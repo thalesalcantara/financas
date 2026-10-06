@@ -221,6 +221,24 @@ def admin_dashboard():
             data_inicio = hoje_ref - timedelta(days=hoje_ref.weekday())
             data_fim = data_inicio + timedelta(days=6)
 
+    def _active_coop_ids_finance():
+        q = (
+            db.session.query(Cooperado.id)
+            .join(Usuario, Cooperado.usuario_id == Usuario.id)
+            .filter(
+                Usuario.tipo == "cooperado",
+                or_(Usuario.ativo.is_(True), Usuario.ativo.is_(None)),
+            )
+        )
+        ids = {int(x[0]) for x in q.all()}
+        try:
+            archived_ids = set(light._archived_ids()) if 'light' in globals() else set()
+        except Exception:
+            archived_ids = set()
+        return ids - archived_ids
+
+    active_finance_ids = _active_coop_ids_finance()
+
     restaurante_id = args.get("restaurante_id", type=int)
     cooperado_id = args.get("cooperado_id", type=int)
     considerar_periodo = bool(args.get("considerar_periodo"))
@@ -333,7 +351,7 @@ def admin_dashboard():
             rqcf = db.session.query(
                 ReceitaCooperado.cooperado_id,
                 func.coalesce(func.sum(ReceitaCooperado.valor), 0.0).label("valor_total"),
-            )
+            ).filter(ReceitaCooperado.cooperado_id.in_(active_finance_ids))
             if data_inicio:
                 rqcf = rqcf.filter(ReceitaCooperado.data >= data_inicio)
             if data_fim:
@@ -347,7 +365,7 @@ def admin_dashboard():
 
             # Limita os snapshots aos cooperados realmente envolvidos no período/dívida.
             ids_relevantes = set(k for k in prod_by_coop.keys() if k) | set(k for k in rec_by_coop.keys() if k)
-            dq_ids = DespesaCooperado.query.with_entities(DespesaCooperado.cooperado_id)
+            dq_ids = DespesaCooperado.query.with_entities(DespesaCooperado.cooperado_id).filter(DespesaCooperado.cooperado_id.in_(active_finance_ids))
             if cooperado_id:
                 dq_ids = dq_ids.filter(DespesaCooperado.cooperado_id == cooperado_id)
             elif data_fim:
@@ -503,7 +521,7 @@ def admin_dashboard():
             return _render_admin_dashboard_partial("despesas", **ctx_fast)
 
         if ajax_partial_fast == "coop_receitas":
-            rqcf = ReceitaCooperado.query
+            rqcf = ReceitaCooperado.query.filter(ReceitaCooperado.cooperado_id.in_(active_finance_ids))
             if data_inicio:
                 rqcf = rqcf.filter(ReceitaCooperado.data >= data_inicio)
             if data_fim:
@@ -515,7 +533,7 @@ def admin_dashboard():
             return _render_admin_dashboard_partial("coop_receitas", **ctx_fast)
 
         if ajax_partial_fast == "coop_despesas":
-            dqcf = DespesaCooperado.query
+            dqcf = DespesaCooperado.query.filter(DespesaCooperado.cooperado_id.in_(active_finance_ids))
             if data_inicio and data_fim:
                 dqcf = dqcf.filter(DespesaCooperado.data_inicio <= data_fim, DespesaCooperado.data_fim >= data_inicio)
             elif data_inicio:
@@ -530,7 +548,7 @@ def admin_dashboard():
                 _snap = _compute_coop_debt_snapshot(_cid, data_inicio, data_fim)
                 for _it in _snap.get("itens", []):
                     despesa_snapshot_map_fast[_it["id"]] = _it
-            adiantamentos_q_fast = SolicitacaoAdiantamento.query.join(Cooperado, SolicitacaoAdiantamento.cooperado_id == Cooperado.id)
+            adiantamentos_q_fast = SolicitacaoAdiantamento.query.join(Cooperado, SolicitacaoAdiantamento.cooperado_id == Cooperado.id).filter(SolicitacaoAdiantamento.cooperado_id.in_(active_finance_ids))
             if cooperado_id:
                 adiantamentos_q_fast = adiantamentos_q_fast.filter(SolicitacaoAdiantamento.cooperado_id == cooperado_id)
             solicitacoes_fast = adiantamentos_q_fast.order_by(SolicitacaoAdiantamento.pedido_em.desc(), SolicitacaoAdiantamento.id.desc()).all()
@@ -749,8 +767,8 @@ def admin_dashboard():
     total_adiantamentos_coop = 0.0
 
     if True:
-        rq2 = ReceitaCooperado.query
-        dq2 = DespesaCooperado.query
+        rq2 = ReceitaCooperado.query.filter(ReceitaCooperado.cooperado_id.in_(active_finance_ids))
+        dq2 = DespesaCooperado.query.filter(DespesaCooperado.cooperado_id.in_(active_finance_ids))
 
         if data_inicio:
             rq2 = rq2.filter(ReceitaCooperado.data >= data_inicio)
@@ -804,7 +822,7 @@ def admin_dashboard():
             for _it in _snap["itens"]:
                 despesa_snapshot_map[_it["id"]] = _it
 
-    adiantamentos_q = SolicitacaoAdiantamento.query.join(Cooperado, SolicitacaoAdiantamento.cooperado_id == Cooperado.id)
+    adiantamentos_q = SolicitacaoAdiantamento.query.join(Cooperado, SolicitacaoAdiantamento.cooperado_id == Cooperado.id).filter(SolicitacaoAdiantamento.cooperado_id.in_(active_finance_ids))
     if cooperado_id:
         adiantamentos_q = adiantamentos_q.filter(SolicitacaoAdiantamento.cooperado_id == cooperado_id)
     solicitacoes_adiantamento = adiantamentos_q.order_by(SolicitacaoAdiantamento.pedido_em.desc(), SolicitacaoAdiantamento.id.desc()).all()
@@ -1150,7 +1168,10 @@ def admin_dashboard():
                     except Exception:
                         rid = None
 
-                if coop_filter and (rid is not None) and (rid != coop_filter):
+                # Benefícios e prévia consideram somente cooperados ativos e não excluídos.
+                if rid is None or rid not in active_finance_ids:
+                    continue
+                if coop_filter and rid != coop_filter:
                     continue
 
                 recs.append({
@@ -1158,8 +1179,11 @@ def admin_dashboard():
                     "nome": nome,
                 })
 
-            if coop_filter and not recs:
+            if not recs:
                 continue
+
+            valor_total = float(b.valor_total or 0.0)
+            valor_por_recebedor = round(valor_total / len(recs), 2) if recs else 0.0
 
             beneficios_view.append({
                 "id": b.id,
@@ -1167,7 +1191,9 @@ def admin_dashboard():
                 "data_final": b.data_final,
                 "data_lancamento": b.data_lancamento,
                 "tipo": b.tipo,
-                "valor_total": b.valor_total or 0.0,
+                "valor_total": valor_total,
+                "valor_por_recebedor": valor_por_recebedor,
+                "qtd_recebedores": len(recs),
                 "recebedores": recs,
             })
 
