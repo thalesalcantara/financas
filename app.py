@@ -5086,41 +5086,29 @@ def edit_restaurante(id):
 @app.route("/restaurantes/<int:id>/delete", methods=["POST"])
 @admin_perm_required("restaurantes", "excluir")
 def delete_restaurante(id):
+    """
+    Exclusão lógica do estabelecimento.
+
+    O registro-base é preservado para que produções, históricos, relatórios,
+    escalas antigas e demais vínculos continuem íntegros. Apenas o acesso e o
+    uso operacional do estabelecimento são desativados.
+    """
     r = Restaurante.query.get_or_404(id)
     u = r.usuario_ref
 
     try:
-        escala_ids = [
-            e.id for e in Escala.query.with_entities(Escala.id)
-            .filter(Escala.restaurante_id == id)
-            .all()
-        ]
-
-        if escala_ids:
-            db.session.execute(
-                sa_delete(TrocaSolicitacao)
-                .where(TrocaSolicitacao.origem_escala_id.in_(escala_ids))
-            )
-            db.session.execute(
-                sa_delete(Escala)
-                .where(Escala.restaurante_id == id)
-            )
-
-        db.session.execute(
-            sa_delete(Lancamento).where(Lancamento.restaurante_id == id)
-        )
-
-        db.session.delete(r)
-        if u:
-            db.session.delete(u)
+        if hasattr(r, "ativo"):
+            r.ativo = False
+        if u is not None and hasattr(u, "ativo"):
+            u.ativo = False
 
         db.session.commit()
-        flash("Estabelecimento excluído.", "success")
+        flash("Estabelecimento excluído. O histórico e as produções anteriores foram preservados.", "success")
 
-    except IntegrityError as e:
+    except Exception as e:
         db.session.rollback()
         current_app.logger.exception(e)
-        flash("Não foi possível excluir: existem vínculos ativos.", "danger")
+        flash("Não foi possível excluir o estabelecimento.", "danger")
 
     return redirect(url_for("admin_dashboard", tab="restaurantes"))
 
