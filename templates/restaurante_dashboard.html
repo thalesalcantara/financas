@@ -3325,8 +3325,44 @@ function setPhone(digits) {
           for(let y=now.getFullYear()-1;y<=now.getFullYear()+6;y++){const o=document.createElement('option');o.value=y;o.textContent=y;if(y===now.getFullYear())o.selected=true;yr.appendChild(o);}
           yr.addEventListener('change',()=>{calCursor=new Date(Number(yr.value),calCursor.getMonth(),1);loadCalendarYear(Number(yr.value)).catch(()=>{});});
         }
-        document.getElementById('calPrev')?.addEventListener('click',()=>{if(calViewMode==='day'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()-1);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else if(calViewMode==='week'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()-7);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else{calCursor.setMonth(calCursor.getMonth()-1);calSelectedDate=calDateOnly(new Date(calCursor.getFullYear(),calCursor.getMonth(),1));}if(yr)yr.value=calCursor.getFullYear();loadCalendarYear(calCursor.getFullYear()).catch(()=>{});});
-        document.getElementById('calNext')?.addEventListener('click',()=>{if(calViewMode==='day'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()+1);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else if(calViewMode==='week'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()+7);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else{calCursor.setMonth(calCursor.getMonth()+1);calSelectedDate=calDateOnly(new Date(calCursor.getFullYear(),calCursor.getMonth(),1));}if(yr)yr.value=calCursor.getFullYear();loadCalendarYear(calCursor.getFullYear()).catch(()=>{});});
+        document.getElementById('calPrev')?.addEventListener('click',async()=>{
+          const oldYear=calCursor.getFullYear();
+          if(calViewMode==='day'){
+            const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()-1);
+            calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);
+          }else if(calViewMode==='week'){
+            const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()-7);
+            calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);
+          }else{
+            calCursor=new Date(calCursor.getFullYear(),calCursor.getMonth()-1,1);
+            calSelectedDate=calDateOnly(calCursor);
+          }
+          if(yr)yr.value=calCursor.getFullYear();
+          if(calCursor.getFullYear()!==oldYear || calendarioLoadedYear!==calCursor.getFullYear()){
+            await loadCalendarYear(calCursor.getFullYear()).catch(()=>{renderCalendar();});
+          }else{
+            renderCalendar();
+          }
+        });
+        document.getElementById('calNext')?.addEventListener('click',async()=>{
+          const oldYear=calCursor.getFullYear();
+          if(calViewMode==='day'){
+            const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()+1);
+            calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);
+          }else if(calViewMode==='week'){
+            const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()+7);
+            calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);
+          }else{
+            calCursor=new Date(calCursor.getFullYear(),calCursor.getMonth()+1,1);
+            calSelectedDate=calDateOnly(calCursor);
+          }
+          if(yr)yr.value=calCursor.getFullYear();
+          if(calCursor.getFullYear()!==oldYear || calendarioLoadedYear!==calCursor.getFullYear()){
+            await loadCalendarYear(calCursor.getFullYear()).catch(()=>{renderCalendar();});
+          }else{
+            renderCalendar();
+          }
+        });
         document.getElementById('calToday')?.addEventListener('click',()=>{const n=new Date();calSelectedDate=calDateOnly(n);calCursor=new Date(n.getFullYear(),n.getMonth(),1);if(yr)yr.value=n.getFullYear();loadCalendarYear(n.getFullYear()).catch(()=>{});});
         document.getElementById('calStatus')?.addEventListener('change',()=>loadCalendarYear(calCursor.getFullYear()).catch(()=>{}));
         document.getElementById('calNewBtn')?.addEventListener('click',()=>{document.getElementById('calFormWrap')?.classList.add('open');document.querySelector('#calForm input[name="title"]')?.focus();});
