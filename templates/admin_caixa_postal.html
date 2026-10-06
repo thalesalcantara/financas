@@ -97,7 +97,7 @@
       if(st){st.className='mail-status read';st.textContent='Lido';}
       b.replaceWith(document.createTextNode(''));
       document.getElementById('mailUnreadKpi').textContent=j.unread||0;
-      const badge=document.getElementById('adminMailboxBadge');if(badge){badge.textContent=j.unread||0;badge.style.display=(j.unread||0)?'inline-grid':'none'}
+      ['adminMailboxBadge','adminManagementBadge'].forEach(id=>{const badge=document.getElementById(id);if(badge){badge.textContent=j.unread||0;badge.style.display=(j.unread||0)?'inline-grid':'none'}})
     }catch(_){alert('Não foi possível marcar como lido.')}
   });
   window.addEventListener('coopex:new-mail',e=>{
