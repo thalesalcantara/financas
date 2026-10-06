@@ -254,8 +254,12 @@ def _fmt_local_mail_dt(dt):
 
 
 def _mailbox_unread():
-    ensure_calendar_schema()
-    total = int(CaixaPostalMensagem.query.filter(CaixaPostalMensagem.lido_em.is_(None)).count())
+    """Contagem leve usada no menu do Admin; não faz DDL nem verificação de schema."""
+    total = 0
+    try:
+        total += int(CaixaPostalMensagem.query.filter(CaixaPostalMensagem.lido_em.is_(None)).count())
+    except Exception:
+        db.session.rollback()
     try:
         total += int(legacy.RastreamentoPesquisa.query.filter_by(status="nova").count())
     except Exception:
@@ -552,12 +556,6 @@ def admin_caixa_postal_calendar():
     """Amplia a Caixa Postal existente sem perder as respostas do rastreamento."""
     if not _is_admin():
         abort(403)
-    ensure_calendar_schema()
-    try:
-        legacy._ensure_tracking_schema()
-    except Exception:
-        pass
-
     filtro=(request.args.get("status") or "todos").lower()
     q=CaixaPostalMensagem.query.order_by(CaixaPostalMensagem.criado_em.desc())
     if filtro=="nao_lidos":
@@ -574,6 +572,7 @@ def admin_caixa_postal_calendar():
             db.session.query(legacy.RastreamentoPesquisa, Restaurante)
             .join(Restaurante, Restaurante.id==legacy.RastreamentoPesquisa.restaurante_id)
             .order_by(legacy.RastreamentoPesquisa.atualizado_em.desc())
+            .limit(300)
             .all()
         )
     except Exception:
