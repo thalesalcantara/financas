@@ -115,8 +115,11 @@ body{font-weight:700!important}.alv8-brand-copy small{font-size:12px!important}.
 
     function bindBenefitPreview(){
       if ({{ active_tab|tojson }} !== 'beneficios') return;
-      const sec = mount.querySelector('#beneficios');
-      if (!sec) return;
+      // A resposta AJAX contém somente o conteúdo entre os marcadores
+      // AJAX_BENEFICIOS_START/END, portanto o <section id="beneficios"> não vem junto.
+      // Usa o wrapper real da parcial (ou o próprio mount como fallback).
+      const sec = mount.querySelector('#beneficiosAjaxWrap') || mount;
+      if (!sec.querySelector('#form-beneficios')) return;
 
       const money = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', {
         minimumFractionDigits: 2,
