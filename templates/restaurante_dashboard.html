@@ -1520,6 +1520,32 @@ section[data-view="calendario"] .cal-title{
 .cal-stop-sound{margin-top:10px;width:100%;height:36px;border:0;border-radius:8px;background:#fff;color:#12396f;font-size:.72rem;font-weight:950;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
 .cal-stop-sound:hover{background:#edf4ff}
 </style>
+
+<style id="calendar-commemorative-fit">
+.cal-event.commemorative{
+  background:#f2f4f8!important;
+  color:#4e6079!important;
+  border-left:3px solid #8d9bb0!important;
+}
+.cal-main-column{
+  align-self:start!important;
+}
+#calMonthView{
+  height:auto!important;
+  min-height:0!important;
+}
+.cal-grid{
+  align-content:start!important;
+}
+.cal-panel,
+.cal-main-layout,
+.cal-main-column{
+  min-height:0!important;
+}
+section[data-view="calendario"]{
+  min-height:0!important;
+}
+</style>
 </head>
 <body class="rest-wide-modern">
   <div class="shell">
@@ -3123,6 +3149,7 @@ function setPhone(digits) {
       const today=calDateOnly(new Date());
       const eventsBy={};
       (calendarioData.holidays||[]).forEach(x=>(eventsBy[x.date]||(eventsBy[x.date]=[])).push({...x,kind:'holiday'}));
+      (calendarioData.commemoratives||[]).forEach(x=>(eventsBy[x.date]||(eventsBy[x.date]=[])).push({...x,kind:'commemorative'}));
       (calendarioData.reminders||[]).forEach(x=>(eventsBy[x.date]||(eventsBy[x.date]=[])).push({...x,kind:'reminder'}));
       let html='';
       const daysInMonth=new Date(y,m+1,0).getDate();
@@ -3140,6 +3167,8 @@ function setPhone(digits) {
           if(ev.kind==='holiday'){
             const cls=ev.scope==='nacional'?'holiday-national':(ev.scope==='estadual'?'holiday-state':'holiday-city');
             html+='<button type="button" class="cal-event '+cls+'" title="'+calEsc(ev.scope_label)+' — '+calEsc(ev.title)+'">'+calEsc(ev.title)+'</button>';
+          }else if(ev.kind==='commemorative'){
+            html+='<button type="button" class="cal-event commemorative" title="Data comemorativa — '+calEsc(ev.title)+'">'+calEsc(ev.title)+'</button>';
           }else{
             const cls=ev.target==='coopex'?'coopex':'personal';
             const cat=' cat-'+(ev.category||'operacional');
@@ -3155,6 +3184,7 @@ function setPhone(digits) {
 
     function eventColorClass(ev){
       if(ev.kind==='holiday') return ev.scope==='nacional'?'holiday-national':(ev.scope==='estadual'?'holiday-state':'holiday-city');
+      if(ev.kind==='commemorative') return 'commemorative';
       return ev.target==='coopex'?'coopex':'cat-'+(ev.category||'operacional');
     }
 
@@ -3171,9 +3201,9 @@ function setPhone(digits) {
       box.innerHTML=top.length?top.map(ev=>{
         const d=new Date(ev.date+'T12:00:00');
         const label=ev.kind==='holiday'?ev.title:ev.title;
-        const detail=ev.kind==='holiday'?'Todo o dia':(ev.time||'Todo o dia');
+        const detail=(ev.kind==='holiday'||ev.kind==='commemorative')?'Todo o dia':(ev.time||'Todo o dia');
         const dot=ev.kind==='holiday'?'#7c3aed':(ev.target==='coopex'?'#ef4444':(ev.category==='financeiro'?'#16a36a':ev.category==='manutencao'?'#f2b400':ev.category==='importante'?'#ef4444':ev.category==='reuniao'?'#1685f8':'#7c3aed'));
-        const typeLabel=ev.kind==='holiday'?'Feriado':(ev.target==='coopex'?'Lembrete · COOPEX':'Lembrete pessoal');
+        const typeLabel=ev.kind==='holiday'?'Feriado':(ev.kind==='commemorative'?'Data comemorativa':(ev.target==='coopex'?'Lembrete · COOPEX':'Lembrete pessoal'));
         return '<div class="cal-up-item" data-up-date="'+ev.date+'"><div class="cal-up-date"><strong>'+String(d.getDate()).padStart(2,'0')+'</strong><small>'+monthNames[d.getMonth()]+'</small></div><div class="cal-up-body"><strong><i class="cal-up-dot" style="background:'+dot+'"></i>'+calEsc(label)+'</strong><small>'+calEsc(typeLabel)+' · '+calEsc(detail)+'</small></div><i class="bi bi-chevron-right cal-up-arrow"></i></div>';
       }).join(''):'<div class="cal-day-empty">Nenhum próximo lembrete.</div>';
     }
@@ -3202,7 +3232,7 @@ function setPhone(digits) {
 
       if(calViewMode==='day'){
         const es=eventsBy[calSelectedDate]||[];
-        alt.innerHTML='<div class="cal-alt-title">'+calFmt(calSelectedDate)+'</div><div class="cal-agenda-list">'+(es.length?es.map(ev=>'<div class="cal-agenda-item"><div class="cal-agenda-date">'+(ev.kind==='holiday'?'FERIADO':calEsc(ev.time||'Todo o dia'))+'</div><div><strong>'+calEsc(ev.title)+'</strong><small>'+calEsc(ev.description||ev.scope_label||'')+'</small></div><div class="cal-agenda-actions"><span class="cal-event '+eventColorClass(ev)+'" style="width:auto;margin:0">'+(ev.kind==='holiday'?'Feriado':(ev.target==='coopex'?'COOPEX':'Pessoal'))+'</span>'+(ev.kind==='reminder'?'<button type="button" class="cal-icon-btn danger" data-cal-delete="'+ev.id+'" title="Excluir lembrete"><i class="bi bi-trash"></i></button>':'')+'</div></div>').join(''):'<div class="cal-day-empty">Nenhum compromisso neste dia.</div>')+'</div>';
+        alt.innerHTML='<div class="cal-alt-title">'+calFmt(calSelectedDate)+'</div><div class="cal-agenda-list">'+(es.length?es.map(ev=>'<div class="cal-agenda-item"><div class="cal-agenda-date">'+(ev.kind==='holiday'?'FERIADO':(ev.kind==='commemorative'?'DATA':calEsc(ev.time||'Todo o dia')))+'</div><div><strong>'+calEsc(ev.title)+'</strong><small>'+calEsc(ev.description||ev.scope_label||'')+'</small></div><div class="cal-agenda-actions"><span class="cal-event '+eventColorClass(ev)+'" style="width:auto;margin:0">'+(ev.kind==='holiday'?'Feriado':(ev.kind==='commemorative'?'Data comemorativa':(ev.target==='coopex'?'COOPEX':'Pessoal')))+'</span>'+(ev.kind==='reminder'?'<button type="button" class="cal-icon-btn danger" data-cal-delete="'+ev.id+'" title="Excluir lembrete"><i class="bi bi-trash"></i></button>':'')+'</div></div>').join(''):'<div class="cal-day-empty">Nenhum compromisso neste dia.</div>')+'</div>';
         return;
       }
 
@@ -3211,7 +3241,7 @@ function setPhone(digits) {
       const endKey=y+'-'+String(m+2).padStart(2,'0')+'-01';
       const all=[];
       Object.keys(eventsBy).sort().forEach(date=>{if(date>=startKey&&date<endKey)(eventsBy[date]||[]).forEach(ev=>all.push({date,...ev}));});
-      alt.innerHTML='<div class="cal-alt-title">Agenda — '+calMonthNames[m]+' de '+y+'</div><div class="cal-agenda-list">'+(all.length?all.map(ev=>'<div class="cal-agenda-item"><div class="cal-agenda-date">'+calFmt(ev.date)+'</div><div><strong>'+calEsc(ev.title)+'</strong><small>'+calEsc(ev.kind==='holiday'?(ev.scope_label||'Feriado'):(ev.time||'Todo o dia'))+'</small></div><div class="cal-agenda-actions"><span class="cal-event '+eventColorClass(ev)+'" style="width:auto;margin:0">'+(ev.kind==='holiday'?'Feriado':(ev.target==='coopex'?'COOPEX':'Pessoal'))+'</span>'+(ev.kind==='reminder'?'<button type="button" class="cal-icon-btn danger" data-cal-delete="'+ev.id+'" title="Excluir lembrete"><i class="bi bi-trash"></i></button>':'')+'</div></div>').join(''):'<div class="cal-day-empty">Nenhum item neste mês.</div>')+'</div>';
+      alt.innerHTML='<div class="cal-alt-title">Agenda — '+calMonthNames[m]+' de '+y+'</div><div class="cal-agenda-list">'+(all.length?all.map(ev=>'<div class="cal-agenda-item"><div class="cal-agenda-date">'+calFmt(ev.date)+'</div><div><strong>'+calEsc(ev.title)+'</strong><small>'+calEsc(ev.kind==='holiday'?(ev.scope_label||'Feriado'):(ev.kind==='commemorative'?'Data comemorativa':(ev.time||'Todo o dia')))+'</small></div><div class="cal-agenda-actions"><span class="cal-event '+eventColorClass(ev)+'" style="width:auto;margin:0">'+(ev.kind==='holiday'?'Feriado':(ev.kind==='commemorative'?'Data comemorativa':(ev.target==='coopex'?'COOPEX':'Pessoal')))+'</span>'+(ev.kind==='reminder'?'<button type="button" class="cal-icon-btn danger" data-cal-delete="'+ev.id+'" title="Excluir lembrete"><i class="bi bi-trash"></i></button>':'')+'</div></div>').join(''):'<div class="cal-day-empty">Nenhum item neste mês.</div>')+'</div>';
     }
 
     async function initCalendario(){
