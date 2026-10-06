@@ -1487,6 +1487,34 @@ body.rest-wide-modern .rest-bottom-history{width:100%!important;max-width:none!i
   .cal-main-column,.cal-side-column{max-height:none}
 }
 </style>
+
+<style id="calendar-today-fit">
+/* Garante que "Hoje" nunca seja espremido */
+section[data-view="calendario"] #calToday{
+  width:auto!important;
+  min-width:54px!important;
+  padding:0 11px!important;
+  white-space:nowrap!important;
+  justify-content:center!important;
+  flex:0 0 auto!important;
+}
+section[data-view="calendario"] .cal-nav{
+  flex-wrap:nowrap!important;
+}
+section[data-view="calendario"] .cal-title{
+  min-width:145px!important;
+}
+@media (max-width:1180px) and (min-width:1051px){
+  section[data-view="calendario"] .cal-title{
+    min-width:125px!important;
+    font-size:.92rem!important;
+  }
+  section[data-view="calendario"] #calToday{
+    min-width:50px!important;
+    padding:0 9px!important;
+  }
+}
+</style>
 </head>
 <body class="rest-wide-modern">
   <div class="shell">
