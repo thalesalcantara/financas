@@ -3344,6 +3344,10 @@ def exportar_lancamentos():
     launch_keys_id = set()
     launch_keys_contract = set()
 
+    # Agregações leves das faltas detectadas na escala.
+    faltas_por_coop_contrato = defaultdict(int)
+    faltas_por_contrato_dia = defaultdict(lambda: defaultdict(int))
+
     launch_q = (
         db.session.query(
             Lancamento.id,
@@ -3533,8 +3537,12 @@ def exportar_lancamentos():
                 continue
             missing_seen.add(miss_key)
 
+            contrato_label = rest_nome or contract or "—"
+            faltas_por_coop_contrato[(cid, coop_nome, contrato_label)] += 1
+            faltas_por_contrato_dia[contrato_label][dt] += 1
+
             ws_det.append([
-                rest_nome or contract or "—",
+                contrato_label,
                 rest_period or "—",
                 coop_nome,
                 _cell(ws_det, "FALTA PRODUÇÃO", font=red_font),
@@ -3555,22 +3563,35 @@ def exportar_lancamentos():
     ws_con = wb.create_sheet("Totais por Contrato")
     _append_header(ws_con, [
         "Restaurante", "Periodo",
-        "Total Bruto", "Total INSS", "Total SEST", "Total Encargos", "Total Líquido"
+        "Total Bruto", "Total INSS", "Total SEST", "Total Encargos", "Total Líquido",
+        "Faltas de Produção", "Faltas por Dia"
     ])
 
     soma_b = soma_i = soma_s = soma_e = soma_l = 0.0
     for _, tc in sorted(totais_contrato.items(), key=lambda x: (x[1]["restaurante"], x[1]["periodo"])):
+        contrato_label = tc["restaurante"] or "—"
+        faltas_dias = faltas_por_contrato_dia.get(contrato_label, {})
+        faltas_total = sum(faltas_dias.values())
+        faltas_texto = " | ".join(
+            f"{dia.strftime('%d/%m')}: {qtd}"
+            for dia, qtd in sorted(faltas_dias.items())
+        ) or "—"
         ws_con.append([
-            tc["restaurante"] or "—",
+            contrato_label,
             tc["periodo"] or "—",
             _cell(ws_con, round(tc["bruto"], 2), currency_fmt),
             _cell(ws_con, round(tc["inss"], 2), currency_fmt),
             _cell(ws_con, round(tc["sest"], 2), currency_fmt),
             _cell(ws_con, round(tc["enc"], 2), currency_fmt),
             _cell(ws_con, round(tc["liq"], 2), currency_fmt),
+            faltas_total,
+            faltas_texto,
         ])
         soma_b += tc["bruto"]; soma_i += tc["inss"]; soma_s += tc["sest"]; soma_e += tc["enc"]; soma_l += tc["liq"]
 
+    total_faltas_contrato = sum(
+        sum(dias.values()) for dias in faltas_por_contrato_dia.values()
+    )
     ws_con.append([
         _cell(ws_con, "TOTAL GERAL", font=bold_font), "",
         _cell(ws_con, round(soma_b, 2), currency_fmt, bold_font),
@@ -3578,6 +3599,8 @@ def exportar_lancamentos():
         _cell(ws_con, round(soma_s, 2), currency_fmt, bold_font),
         _cell(ws_con, round(soma_e, 2), currency_fmt, bold_font),
         _cell(ws_con, round(soma_l, 2), currency_fmt, bold_font),
+        _cell(ws_con, total_faltas_contrato, font=bold_font),
+        "",
     ])
 
     # ============================================================
@@ -3633,22 +3656,44 @@ def exportar_lancamentos():
     # ABA 5 - Totais por Cooperado
     # ============================================================
     ws_tc = wb.create_sheet("Totais por Cooperado")
+    contratos_falta = sorted({
+        contrato
+        for (_cid, _nome, contrato), qtd in faltas_por_coop_contrato.items()
+        if qtd > 0
+    }, key=lambda x: x.casefold())
     _append_header(ws_tc, [
-        "Cooperado", "Total Bruto", "Total INSS", "Total SEST", "Total Encargos", "Total Líquido"
+        "Cooperado", "Total Bruto", "Total INSS", "Total SEST", "Total Encargos", "Total Líquido",
+        "Total Faltas", *[f"Falta - {contrato}" for contrato in contratos_falta]
     ])
 
     total_b = total_i = total_s = total_e = total_l = 0.0
     for _, tcg in sorted(totais_coop.items(), key=lambda x: x[1]["cooperado"]):
+        coop_nome = tcg["cooperado"] or "—"
+        coop_id = _[0] if isinstance(_, tuple) and len(_) > 0 else 0
+        faltas_contratos = [
+            faltas_por_coop_contrato.get((coop_id, coop_nome, contrato), 0)
+            for contrato in contratos_falta
+        ]
         ws_tc.append([
-            tcg["cooperado"] or "—",
+            coop_nome,
             _cell(ws_tc, round(tcg["bruto"], 2), currency_fmt),
             _cell(ws_tc, round(tcg["inss"], 2), currency_fmt),
             _cell(ws_tc, round(tcg["sest"], 2), currency_fmt),
             _cell(ws_tc, round(tcg["enc"], 2), currency_fmt),
             _cell(ws_tc, round(tcg["liq"], 2), currency_fmt),
+            sum(faltas_contratos),
+            *faltas_contratos,
         ])
         total_b += tcg["bruto"]; total_i += tcg["inss"]; total_s += tcg["sest"]; total_e += tcg["enc"]; total_l += tcg["liq"]
 
+    faltas_totais_por_contrato = [
+        sum(
+            qtd
+            for (_cid, _nome, contrato_key), qtd in faltas_por_coop_contrato.items()
+            if contrato_key == contrato
+        )
+        for contrato in contratos_falta
+    ]
     ws_tc.append([
         _cell(ws_tc, "TOTAL GERAL", font=bold_font),
         _cell(ws_tc, round(total_b, 2), currency_fmt, bold_font),
@@ -3656,6 +3701,8 @@ def exportar_lancamentos():
         _cell(ws_tc, round(total_s, 2), currency_fmt, bold_font),
         _cell(ws_tc, round(total_e, 2), currency_fmt, bold_font),
         _cell(ws_tc, round(total_l, 2), currency_fmt, bold_font),
+        _cell(ws_tc, sum(faltas_totais_por_contrato), font=bold_font),
+        *[_cell(ws_tc, qtd, font=bold_font) for qtd in faltas_totais_por_contrato],
     ])
 
     # ============================================================
