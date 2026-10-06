@@ -1327,8 +1327,25 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
 @media(max-width:1100px){.rest-scale-toolbar{grid-template-columns:1fr 1fr}.rest-scale-mode{grid-column:1/-1;justify-content:flex-start}.rest-scale-days{grid-template-columns:repeat(4,1fr)}.rest-scale-summary{grid-column:1/-1}.rest-shift-grid{grid-template-columns:1fr}}
 @media(max-width:700px){.rest-scale-toolbar{grid-template-columns:1fr}.rest-scale-days{grid-template-columns:repeat(2,1fr)}.rest-scale-summary{flex-wrap:wrap}.rest-scale-summary-kpis{width:100%;margin-left:0}.rest-scale-kpi{flex:1;min-width:0}.rest-shift-head{padding:13px}.rest-scale-table th:nth-child(1),.rest-scale-table td:nth-child(1){display:none}.rest-scale-person strong{max-width:155px}.rest-scale-time{white-space:normal}.rest-scale-mode a{flex:1}.rest-scale-reset{width:100%}}
 </style>
+
+<style>
+/* Escala + Mapa no mesmo padrão superior das Tabelas */
+body.rest-wide-modern .shell{display:block;min-height:100vh}
+body.rest-wide-modern .aside{display:none!important}
+body.rest-wide-modern .content{padding:0 18px 22px!important;max-width:1580px!important;margin:0 auto!important}
+body.rest-wide-modern .coopex-welcome-bar{display:none!important}
+.rest-modern-topbar{height:67px;margin:0 -18px 18px;padding:0 18px;background:linear-gradient(90deg,#072d85,#075fd8 58%,#0643a7);color:#fff;display:flex;align-items:stretch;box-shadow:0 4px 18px rgba(4,45,126,.2);position:sticky;top:0;z-index:1040}
+.rest-modern-brand{width:255px;min-width:255px;display:flex;align-items:center;gap:10px;color:#fff}.rest-modern-brand-icon{width:42px;height:42px;border:2px solid rgba(255,255,255,.8);border-radius:9px;display:grid;place-items:center;font-size:1.25rem}.rest-modern-brand-copy strong{display:block;font-size:.98rem;white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis}.rest-modern-brand-copy small{display:block;font-size:.65rem;color:#cddcff}
+.rest-modern-nav{display:flex;align-items:stretch;flex:1;overflow:auto;scrollbar-width:none}.rest-modern-nav::-webkit-scrollbar{display:none}.rest-modern-nav a{color:#fff;display:flex;align-items:center;gap:7px;padding:0 16px;font-size:.78rem;font-weight:800;white-space:nowrap;position:relative}.rest-modern-nav a:hover,.rest-modern-nav a.active{background:rgba(255,255,255,.11)}.rest-modern-nav a.active:after{content:"";position:absolute;left:12px;right:12px;bottom:0;height:4px;background:#fff;border-radius:4px 4px 0 0}.rest-modern-new{background:#35c759;border-radius:999px;padding:2px 6px;font-size:.55rem}.rest-modern-badge{background:#ff3b30;color:#fff;border-radius:999px;min-width:18px;height:18px;display:grid;place-items:center;font-size:.62rem}
+.rest-map-hero{background:#fff;border:1px solid #dbe5f1;border-radius:15px;padding:16px 19px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 5px 16px rgba(25,58,99,.05);margin-bottom:14px}.rest-map-hero-left{display:flex;align-items:center;gap:14px}.rest-map-hero-icon{width:55px;height:55px;border-radius:13px;background:linear-gradient(145deg,#1478ff,#075ad9);display:grid;place-items:center;color:#fff;font-size:1.4rem;box-shadow:0 8px 20px rgba(7,95,216,.25)}.rest-map-hero h1{margin:0;font-size:1.42rem;font-weight:950;color:#07183e}.rest-map-hero p{margin:3px 0 0;color:#61708c;font-size:.82rem}.rest-map-card{background:#fff;border:1px solid #dbe5f1;border-radius:15px;padding:16px;box-shadow:0 5px 16px rgba(25,58,99,.045)}
+body.rest-wide-modern .rest-scale-shell{max-width:none!important}
+body.rest-wide-modern .rest-scale-toolbar{border-radius:15px;margin-top:0}
+body.rest-wide-modern .rest-shift-grid{gap:14px}
+body.rest-wide-modern .rest-shift-card{border-radius:15px}
+@media(max-width:900px){.rest-modern-topbar{height:auto;min-height:0;flex-wrap:wrap;padding:7px 9px 0;margin:0 -18px 12px}.rest-modern-brand{width:100%;min-width:0;height:44px}.rest-modern-nav{height:48px;flex-basis:100%}.rest-modern-nav a{padding:0 11px;font-size:.69rem}}
+</style>
 </head>
-<body>
+<body class="{{ 'rest-wide-modern' if view in ['escalas','mapa'] else '' }}">
   <div class="shell">
     <aside class="aside">
       <div class="brand coopex-brand-welcome"><i class="bi bi-shop"></i><span class="coopex-brand-copy"><small>SEJA BEM-VINDO</small><strong>{{ coopex_rest_display_name|default('ESTABELECIMENTO') }}</strong></span></div>
@@ -1365,7 +1382,25 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
       </nav>
     </aside>
 
+    
     <main class="content">
+      {% if view in ['escalas','mapa'] %}
+      {% set _modern_name = ((rest.nome if rest is defined and rest else 'ESTABELECIMENTO')|replace('_',' ')) %}
+      {% set _modern_avisos = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
+      <header class="rest-modern-topbar">
+        <div class="rest-modern-brand"><div class="rest-modern-brand-icon"><i class="bi bi-shop"></i></div><div class="rest-modern-brand-copy"><strong>{{ _modern_name }}</strong><small>Estabelecimento</small></div></div>
+        <nav class="rest-modern-nav">
+          <a href="{{ url_for('portal_restaurante', view='lancar') }}"><i class="bi bi-person-plus"></i> Lançar Produção</a>
+          <a href="{{ url_for('portal_restaurante', view='lancamentos') }}"><i class="bi bi-clock-history"></i> Histórico de Produção</a>
+          <a class="{{ 'active' if view=='escalas' else '' }}" href="{{ url_for('portal_restaurante', view='escalas') }}"><i class="bi bi-calendar3"></i> Escala</a>
+          <a href="{{ url_for('rest_tabelas') }}"><i class="bi bi-table"></i> Tabelas</a>
+          <a class="{{ 'active' if view=='mapa' else '' }}" href="{{ url_for('portal_restaurante', view='mapa') }}"><i class="bi bi-geo-alt-fill"></i> Mapa <span class="rest-modern-new">NOVO</span></a>
+          <a href="{{ url_for('portal_restaurante', view='config') }}"><i class="bi bi-gear"></i> Configuração</a>
+          <a href="{{ url_for('portal_restaurante_avisos') }}"><i class="bi bi-bell"></i> Avisos {% if _modern_avisos %}<span class="rest-modern-badge">{{ _modern_avisos }}</span>{% endif %}</a>
+          <a href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a>
+        </nav>
+      </header>
+      {% endif %}
       <div class="coopex-welcome-bar mb-3" style="background:#fff;border:1px solid var(--border);border-left:5px solid var(--royal);border-radius:16px;padding:13px 16px;box-shadow:0 6px 18px rgba(33,65,217,.06)">
         <div style="font-size:.75rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Bem-vindo</div>
         <div style="font-size:1.05rem;font-weight:800;color:var(--royal)">{{ ((rest.nome if rest is defined and rest else (restaurante.nome if restaurante is defined and restaurante else 'ESTABELECIMENTO'))|replace('_',' ')) }}</div>
@@ -1408,8 +1443,11 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
 
 
       <section data-view="mapa">
-        <div class="section-title"><i class="bi bi-geo-alt-fill"></i> Mapa dos cooperados</div>
-        <div class="card card-body" style="border-radius:14px">
+        <div class="rest-map-hero">
+          <div class="rest-map-hero-left"><div class="rest-map-hero-icon"><i class="bi bi-geo-alt-fill"></i></div><div><h1>Mapa</h1><p>Acompanhe os recursos de localização disponíveis para o estabelecimento.</p></div></div>
+          <span style="background:#eaf3ff;color:#075fd8;border-radius:999px;padding:7px 11px;font-size:.7rem;font-weight:900"><i class="bi bi-shield-check me-1"></i>Área do estabelecimento</span>
+        </div>
+        <div class="rest-map-card">
           <div id="trackingMapLoading" class="text-muted small">Carregando rastreamento...</div>
           <div id="trackingSurvey" style="display:none;max-width:760px">
             <div style="display:inline-flex;align-items:center;gap:7px;background:#eaf2ff;color:#174ea6;border-radius:999px;padding:6px 10px;font-size:.72rem;font-weight:900;margin-bottom:10px"><i class="bi bi-stars"></i> MELHORIA FUTURA</div>
@@ -1418,13 +1456,13 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
             <form id="trackingSurveyForm">
               <div class="mb-2"><label class="form-label">Você gostaria de ter rastreamento?</label><select class="form-select" name="gostaria"><option value="sim">Sim</option><option value="nao">Não</option></select></div>
               <div class="mb-3"><label class="form-label">Por que seria útil?</label><textarea class="form-control" name="motivo" rows="3" placeholder="Conte rapidamente como ajudaria a operação."></textarea></div>
-              <button class="btn btn-royal" type="submit"><i class="bi bi-send"></i> Enviar resposta</button>
+              <button class="btn btn-primary" type="submit"><i class="bi bi-send"></i> Enviar resposta</button>
             </form>
           </div>
           <div id="trackingThanks" style="display:none;max-width:760px"><div style="background:#eef9f2;border:1px solid #cdebd8;border-radius:12px;padding:14px"><strong style="color:#12713d">Eba! Você respondeu à nossa pesquisa.</strong><div class="text-muted small mt-1">Aguarde contato da COOPEX sobre a disponibilidade do rastreamento para este estabelecimento.</div></div></div>
           <div id="trackingAuthorized" style="display:none">
             <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2"><div><strong style="color:#0b2853">Cooperados em tempo real</strong><div class="text-muted small">Atualização automática a cada 15 segundos.</div></div><span id="trackingOnlineCount" style="background:#e7f8ee;color:#12713d;border-radius:999px;padding:6px 10px;font-size:.72rem;font-weight:900">0 online</span></div>
-            <div id="trackingMap" style="height:520px;border-radius:14px;overflow:hidden;border:1px solid #dbe5f4;background:#eef3f8"></div>
+            <div id="trackingMap" style="height:560px;border-radius:13px;overflow:hidden;border:1px solid #dbe5f4;background:#eef3f8"></div>
           </div>
         </div>
       </section>
@@ -1482,19 +1520,6 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
               <span>{{ dia.strftime('%d/%m/%Y') }}</span>
             </div>
             {% endif %}
-
-            <div class="rest-scale-summary">
-              <div class="rest-scale-summary-icon"><i class="bi bi-calendar2-check"></i></div>
-              <div class="rest-scale-summary-copy">
-                <strong>Resumo do dia</strong>
-                <span>{{ ['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'][dia.weekday()] }}, {{ dia.strftime('%d/%m/%Y') }}</span>
-              </div>
-              <div class="rest-scale-summary-kpis">
-                <div class="rest-scale-kpi total"><b>{{ ns.day_count + ns.night_count }}</b><small>Total escala</small></div>
-                <div class="rest-scale-kpi day"><b>{{ ns.day_count }}</b><small>Turno de dia</small></div>
-                <div class="rest-scale-kpi night"><b>{{ ns.night_count }}</b><small>Turno de noite</small></div>
-              </div>
-            </div>
 
             <div class="rest-shift-grid">
               <div class="rest-shift-card">
