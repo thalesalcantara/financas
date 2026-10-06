@@ -6905,7 +6905,40 @@ def upload_escala():
         except Exception:
             db.session.rollback()
 
-        flash(f"Escala substituída com sucesso. {len(linhas_novas)} linha(s) importada(s) (de {total_linhas_planilha}).", "success")
+        # Resumo da cobertura logo após o upload.
+        active_ids = {
+            int(cid)
+            for (cid,) in (
+                db.session.query(Cooperado.id)
+                .join(Usuario, Cooperado.usuario_id == Usuario.id)
+                .filter(or_(Usuario.ativo.is_(True), Usuario.ativo.is_(None)))
+                .all()
+            )
+        }
+        try:
+            archived_ids = {
+                int(row[0])
+                for row in db.session.execute(
+                    sa_text("SELECT cooperado_id FROM cooperados_arquivados_v8")
+                ).all()
+                if row and row[0] is not None
+            }
+            active_ids -= archived_ids
+        except Exception:
+            db.session.rollback()
+
+        assigned_active_ids = {
+            int(row["cooperado_id"])
+            for row in linhas_novas
+            if row.get("cooperado_id") and int(row["cooperado_id"]) in active_ids
+        }
+
+        flash(
+            f"Escala substituída com sucesso. {len(linhas_novas)} linha(s) importada(s). "
+            f"{len(active_ids)} cooperado(s) ativo(s) · "
+            f"{len(assigned_active_ids)} receberam escala semanal.",
+            "success",
+        )
 
     except Exception as e:
         db.session.rollback()
