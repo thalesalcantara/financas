@@ -1657,6 +1657,76 @@ section[data-view="calendario"] .cal-field textarea{
   }
 }
 </style>
+
+<style id="calendar-internal-scroll">
+/* Mantém o calendário dentro da altura útil da tela.
+   Se houver muitos itens, a rolagem acontece dentro da área necessária. */
+@media (min-width:1051px){
+  body.rest-wide-modern section[data-view="calendario"] .cal-main-layout{
+    max-height:calc(100vh - 175px)!important;
+    overflow:hidden!important;
+  }
+
+  body.rest-wide-modern section[data-view="calendario"] .cal-main-column{
+    max-height:calc(100vh - 195px)!important;
+    overflow:hidden!important;
+  }
+
+  body.rest-wide-modern section[data-view="calendario"] #calMonthView{
+    min-height:0!important;
+    overflow:hidden!important;
+  }
+
+  body.rest-wide-modern section[data-view="calendario"] .cal-grid{
+    min-height:0!important;
+    overflow:hidden!important;
+  }
+
+  body.rest-wide-modern section[data-view="calendario"] .cal-day{
+    overflow-x:hidden!important;
+    overflow-y:auto!important;
+    scrollbar-width:thin;
+    overscroll-behavior:contain;
+  }
+
+  body.rest-wide-modern section[data-view="calendario"] .cal-day::-webkit-scrollbar{
+    width:5px;
+  }
+
+  body.rest-wide-modern section[data-view="calendario"] .cal-day::-webkit-scrollbar-thumb{
+    background:#c6d3e5;
+    border-radius:999px;
+  }
+
+  body.rest-wide-modern section[data-view="calendario"] .cal-side-column{
+    max-height:calc(100vh - 195px)!important;
+    overflow:hidden!important;
+  }
+
+  body.rest-wide-modern section[data-view="calendario"] .cal-side-card:first-child{
+    min-height:0!important;
+    overflow:hidden!important;
+  }
+
+  body.rest-wide-modern section[data-view="calendario"] .cal-upcoming{
+    max-height:220px!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    scrollbar-width:thin;
+    overscroll-behavior:contain;
+    padding-right:3px;
+  }
+
+  body.rest-wide-modern section[data-view="calendario"] .cal-upcoming::-webkit-scrollbar{
+    width:5px;
+  }
+
+  body.rest-wide-modern section[data-view="calendario"] .cal-upcoming::-webkit-scrollbar-thumb{
+    background:#c6d3e5;
+    border-radius:999px;
+  }
+}
+</style>
 </head>
 <body class="rest-wide-modern">
   <div class="shell">
