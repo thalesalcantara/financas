@@ -2837,18 +2837,8 @@ function setPhone(digits) {
       const busca = document.getElementById('buscaCoop');
       const select = document.getElementById('selectCoop');
       const itens = Array.from(document.querySelectorAll('.cooperado-item'));
-      const TUTORIAL_KEY='coopex_tutorial_lancamento_v2';
-      if(!localStorage.getItem(TUTORIAL_KEY)){
-        const tutEl=document.getElementById('modalTutorialLancamento');
-        if(tutEl){
-          setTimeout(()=>{ try{ bootstrap.Modal.getOrCreateInstance(tutEl).show(); }catch(e){} },350);
-          tutEl.addEventListener('hidden.bs.modal',()=>localStorage.setItem(TUTORIAL_KEY,'1'),{once:true});
-          document.getElementById('btnTutorialEntendi')?.addEventListener('click',()=>{
-            localStorage.setItem(TUTORIAL_KEY,'1');
-            try{ bootstrap.Modal.getOrCreateInstance(tutEl).hide(); }catch(e){}
-          },{once:true});
-        }
-      }
+      // O tutorial antigo em modal foi substituído por uma orientação contextual
+      // exibida somente quando existe uma pendência de lançamento.
 
       function ordenarLista(){
         const lista = document.getElementById('listaCooperados');
@@ -2997,8 +2987,10 @@ function setPhone(digits) {
               pendingList.querySelectorAll('.js-pending-launch').forEach(function(btn){
                 btn.addEventListener('click',function(){
                   selecionarCooperadoPendente(btn.dataset.id,btn.dataset.date,btn.dataset.start,btn.dataset.end);
+                  if(window.__coopexPendingTutorialAdvance) window.__coopexPendingTutorialAdvance();
                 });
               });
+              if(window.__coopexPendingTutorialRefresh) window.__coopexPendingTutorialRefresh();
             }
           }
 
@@ -3029,19 +3021,91 @@ function setPhone(digits) {
 
       let pendingAudio=null;
       const pendCount={{ _pendencias|length }};
-      function tocarPendencia(){
+      const pendingTutorialKey='coopex_pending_launch_tutorial_v3_{{ (rest.id if rest is defined and rest else 0) }}';
+
+      function tocarPendenciaDuplo(){
         if(!pendCount)return;
         if(!pendingAudio){
           pendingAudio=new Audio('/static/avisos.mp3');
-          pendingAudio.preload='none';
+          pendingAudio.preload='auto';
+          pendingAudio.volume=1;
         }
-        try{pendingAudio.currentTime=0;pendingAudio.play().catch(()=>{});}catch(e){}
+        const tocar=()=>{
+          try{
+            pendingAudio.pause();
+            pendingAudio.currentTime=0;
+            const p=pendingAudio.play();
+            if(p&&typeof p.catch==='function')p.catch(()=>{});
+          }catch(e){}
+        };
+        tocar();
+        setTimeout(tocar,900);
       }
+
+      // Browsers podem bloquear áudio automático. Tentamos imediatamente e,
+      // se houver bloqueio, a primeira interação do usuário destrava e toca 2x.
       if(pendCount){
-        tocarPendencia();
-        ['click','touchstart','keydown'].forEach(evt=>window.addEventListener(evt,tocarPendencia,{once:true,passive:true}));
-        window.__coopexPendingTimer=window.__coopexPendingTimer||setInterval(tocarPendencia,7000);
+        tocarPendenciaDuplo();
+        ['pointerdown','touchstart','keydown'].forEach(evt=>window.addEventListener(evt,tocarPendenciaDuplo,{once:true,passive:true}));
+        if(window.__coopexPendingTimer) clearInterval(window.__coopexPendingTimer);
+        window.__coopexPendingTimer=setInterval(tocarPendenciaDuplo,5*60*1000);
       }
+
+      // Tutorial contextual: uma única vez por estabelecimento, no próximo
+      // lançamento pendente. Primeiro aponta o botão da pendência e depois o formulário.
+      let pendingCoach=null;
+      let pendingCoachTarget=null;
+      function removePendingCoach(){
+        if(pendingCoach){pendingCoach.remove();pendingCoach=null}
+        if(pendingCoachTarget){
+          pendingCoachTarget.style.removeProperty('box-shadow');
+          pendingCoachTarget.style.removeProperty('position');
+          pendingCoachTarget.style.removeProperty('z-index');
+          pendingCoachTarget=null;
+        }
+      }
+      function placePendingCoach(target,text){
+        if(!target||localStorage.getItem(pendingTutorialKey))return;
+        removePendingCoach();
+        pendingCoachTarget=target;
+        target.style.setProperty('box-shadow','0 0 0 4px rgba(8,117,237,.25)','important');
+        target.style.setProperty('position','relative','important');
+        target.style.setProperty('z-index','1052','important');
+        const bubble=document.createElement('div');
+        bubble.id='coopexPendingCoach';
+        bubble.innerHTML='<div style="font-size:.67rem;font-weight:900;letter-spacing:.04em;color:#0875ed;margin-bottom:3px">NOVO FLUXO</div><div style="font-weight:900">'+text+'</div><div style="font-size:.72rem;color:#5f708d;margin-top:3px">Este guia aparecerá somente neste próximo lançamento.</div>';
+        bubble.style.cssText='position:fixed;z-index:1053;width:min(310px,calc(100vw - 24px));background:#fff;border:1px solid #b9d7ff;border-radius:12px;padding:11px 13px;box-shadow:0 14px 36px rgba(16,51,96,.22);color:#0e2448';
+        document.body.appendChild(bubble);
+        pendingCoach=bubble;
+        const reposition=()=>{
+          if(!pendingCoach||!pendingCoachTarget)return;
+          const r=pendingCoachTarget.getBoundingClientRect();
+          const b=pendingCoach.getBoundingClientRect();
+          let left=Math.min(Math.max(12,r.left),window.innerWidth-b.width-12);
+          let top=r.bottom+10;
+          if(top+b.height>window.innerHeight-12)top=Math.max(12,r.top-b.height-10);
+          pendingCoach.style.left=left+'px';
+          pendingCoach.style.top=top+'px';
+        };
+        reposition();
+        setTimeout(reposition,20);
+      }
+      function showPendingTutorialStart(){
+        if(!pendCount||localStorage.getItem(pendingTutorialKey))return;
+        const btn=document.querySelector('#listaPendencias .js-pending-launch');
+        if(btn)placePendingCoach(btn,'Clique aqui para lançar a produção pendente.');
+      }
+      window.__coopexPendingTutorialRefresh=()=>setTimeout(showPendingTutorialStart,80);
+      window.__coopexPendingTutorialAdvance=()=>{
+        if(localStorage.getItem(pendingTutorialKey))return;
+        setTimeout(()=>{
+          const form=document.getElementById('formLancamento');
+          const submit=form?.querySelector('button[type="submit"],input[type="submit"]');
+          placePendingCoach(submit||form,'Confira os dados e clique aqui para concluir o lançamento.');
+          (submit||form)?.scrollIntoView({behavior:'smooth',block:'center'});
+        },120);
+      };
+      setTimeout(showPendingTutorialStart,260);
 
       document.getElementById('formLancamento')?.addEventListener('submit',function(ev){
         const ini=this.querySelector('[name="hora_inicio"]')?.value||'';
@@ -3050,6 +3114,11 @@ function setPhone(digits) {
           ev.preventDefault();
           alert('Informe a hora de início e a hora de fim. Se selecionar uma escala ou pendência, o horário será preenchido automaticamente.');
           (this.querySelector('[name="hora_inicio"]')||this.querySelector('[name="hora_fim"]'))?.focus();
+          return;
+        }
+        if(!ev.defaultPrevented && this.checkValidity()){
+          localStorage.setItem(pendingTutorialKey,'1');
+          removePendingCoach();
         }
       });
 
