@@ -1278,6 +1278,55 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
   section[data-view="lancar"] .rest-bottom-history{width:100%!important;max-width:none!important}
 }
 </style>
+
+<style>
+/* ===== Escala do estabelecimento — modelo operacional ===== */
+.rest-scale-shell{display:flex;flex-direction:column;gap:14px}
+.rest-scale-toolbar{background:linear-gradient(135deg,#fff,#f7fbff);border:1px solid #dbe6f4;border-radius:16px;padding:15px 17px;box-shadow:0 7px 20px rgba(26,73,130,.06);display:grid;grid-template-columns:minmax(260px,1fr) minmax(250px,310px) auto;gap:14px;align-items:center}
+.rest-scale-title{display:flex;align-items:center;gap:13px}
+.rest-scale-title-icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:#eaf3ff;color:#0969e8;font-size:1.4rem;border:1px solid #cae0ff}
+.rest-scale-title h2{margin:0;color:#0c2b64;font-size:1.42rem;font-weight:900}
+.rest-scale-title p{margin:2px 0 0;color:#6b7d98;font-size:.78rem}
+.rest-scale-date label{display:block;margin-bottom:4px;font-size:.68rem;font-weight:900;color:#516580}
+.rest-scale-date .input-group{height:40px}
+.rest-scale-date .input-group-text{background:#fff;border-color:#d7e3f1;color:#0d58bd}
+.rest-scale-date .form-control{border-color:#d7e3f1;font-weight:800;color:#173a69}
+.rest-scale-mode{display:flex;gap:7px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.rest-scale-mode a{height:40px;min-width:48px;padding:0 13px;border-radius:999px;border:1px solid #d5e2f1;background:#fff;color:#173a69;display:inline-flex;align-items:center;justify-content:center;font-size:.74rem;font-weight:900;box-shadow:0 3px 10px rgba(27,63,105,.04)}
+.rest-scale-mode a.active{background:linear-gradient(135deg,#0875ed,#0758d5);color:#fff;border-color:#0875ed;box-shadow:0 8px 18px rgba(8,117,237,.22)}
+.rest-scale-reset{height:40px!important;border-radius:10px!important;font-weight:900!important}
+.rest-scale-days{display:grid;grid-template-columns:repeat(7,minmax(90px,1fr)) minmax(180px,1.3fr);gap:10px}
+.rest-scale-day-link{border:1px solid #d7e4f2;background:#f8fbff;border-radius:10px;min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#233d66;transition:.16s}
+.rest-scale-day-link strong{font-size:.75rem;font-weight:950}.rest-scale-day-link span{font-size:.72rem;font-weight:800;color:#526d92;margin-top:2px}
+.rest-scale-day-link.active{background:linear-gradient(150deg,#1576ee,#0759df);border-color:#0b67e7;color:#fff;box-shadow:0 8px 18px rgba(12,103,230,.22)}
+.rest-scale-day-link.active span{color:#fff}
+.rest-scale-summary{background:#fff;border:1px solid #d8e4f2;border-radius:14px;padding:11px 13px;display:flex;align-items:center;gap:12px}
+.rest-scale-summary-icon{width:38px;height:38px;border-radius:50%;background:#eaf3ff;color:#0865dc;display:grid;place-items:center;font-size:1.05rem}
+.rest-scale-summary-copy{min-width:180px}.rest-scale-summary-copy strong{display:block;color:#12336b;font-size:.92rem;font-weight:950}.rest-scale-summary-copy span{display:block;color:#6e7f99;font-size:.7rem}
+.rest-scale-summary-kpis{margin-left:auto;display:flex;gap:7px}
+.rest-scale-kpi{min-width:92px;padding:7px 9px;border-radius:9px;text-align:center;border:1px solid #dbe6f2;background:#f7fbff}.rest-scale-kpi b{display:block;font-size:1rem}.rest-scale-kpi small{font-size:.65rem;font-weight:800}
+.rest-scale-kpi.total{background:#effbf2;color:#11713d;border-color:#d5efdc}.rest-scale-kpi.day{background:#fff8e8;color:#b76c00;border-color:#ffe3a7}.rest-scale-kpi.night{background:#f3efff;color:#6740d8;border-color:#ded4ff}
+.rest-scale-day-wrap{display:flex;flex-direction:column;gap:12px}
+.rest-scale-day-label{display:flex;justify-content:space-between;align-items:center;padding:0 2px}.rest-scale-day-label strong{color:#11356f;font-size:.9rem}.rest-scale-day-label span{color:#71819b;font-size:.72rem}
+.rest-shift-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.rest-shift-card{background:#fff;border:1px solid #d7e4f2;border-radius:15px;overflow:hidden;box-shadow:0 7px 20px rgba(28,62,104,.06)}
+.rest-shift-head{min-height:92px;padding:16px 18px;display:flex;align-items:center;gap:14px;position:relative;overflow:hidden}
+.rest-shift-head.day{background:linear-gradient(135deg,#fff9e8,#fff 72%);border-bottom:1px solid #f5d999}
+.rest-shift-head.night{background:linear-gradient(135deg,#173f92,#243a82);color:#fff}
+.rest-shift-icon{width:50px;height:50px;border-radius:14px;display:grid;place-items:center;font-size:1.55rem;flex:0 0 auto}
+.rest-shift-head.day .rest-shift-icon{background:linear-gradient(145deg,#ffc74a,#ff9200);color:#fff;box-shadow:0 8px 16px rgba(255,153,0,.25)}
+.rest-shift-head.night .rest-shift-icon{background:linear-gradient(145deg,#7450ff,#4935cf);color:#fff;box-shadow:0 8px 16px rgba(73,53,207,.3)}
+.rest-shift-copy h3{font-size:1.05rem;font-weight:950;margin:0;color:#0e2c64}.rest-shift-head.night .rest-shift-copy h3{color:#fff}.rest-shift-copy p{margin:2px 0 0;font-size:.72rem;color:#657b9c}.rest-shift-head.night .rest-shift-copy p{color:#dbe7ff}
+.rest-shift-head-meta{margin-left:auto;text-align:right}.rest-shift-count{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 10px;font-size:.7rem;font-weight:950}.rest-shift-head.day .rest-shift-count{background:#ffe8a8;color:#a76100}.rest-shift-head.night .rest-shift-count{background:#7052d8;color:#fff}.rest-shift-range{display:block;margin-top:7px;font-size:.69rem;font-weight:800}
+.rest-scale-table{width:100%;border-collapse:collapse}.rest-scale-table th{padding:10px 9px;background:#f8fbff;color:#27456f;font-size:.64rem;font-weight:950;text-transform:uppercase;border-bottom:1px solid #dbe5f0}.rest-scale-table td{padding:10px 9px;border-bottom:1px solid #edf1f6;font-size:.72rem;color:#1d365d;vertical-align:middle}.rest-scale-table tr:last-child td{border-bottom:0}
+.rest-scale-num{width:34px;text-align:center;font-weight:900}.rest-scale-person{display:flex;align-items:center;gap:9px;min-width:0}.rest-scale-avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#2c93ff,#246ddc);color:#fff;font-weight:900;font-size:.7rem;flex:0 0 auto}.rest-scale-person strong{font-size:.72rem;color:#142f5e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:260px}
+.rest-scale-time{white-space:nowrap;font-weight:750;color:#36557e}.rest-scale-status{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:#eaf8ee;color:#087a37;font-size:.64rem;font-weight:950}.rest-scale-status:before{content:"";width:7px;height:7px;border-radius:50%;background:#0ca442}
+.rest-scale-menu .btn{border:0;background:transparent;color:#12335e;padding:4px 8px}.rest-scale-menu .dropdown-menu{font-size:.75rem;border-radius:10px;border-color:#dce5ef;box-shadow:0 12px 28px rgba(23,54,94,.14)}
+.rest-scale-add{margin:9px;border:1px dashed #bad3f3;border-radius:10px;min-height:58px;display:flex;align-items:center;justify-content:center;gap:8px;background:#fbfdff;color:#60799e;font-size:.7rem;font-weight:800;cursor:pointer}.rest-scale-add:hover{background:#f1f7ff;color:#1167d9}
+.rest-scale-empty{padding:24px;text-align:center;color:#7a8ba6;font-size:.75rem}
+@media(max-width:1100px){.rest-scale-toolbar{grid-template-columns:1fr 1fr}.rest-scale-mode{grid-column:1/-1;justify-content:flex-start}.rest-scale-days{grid-template-columns:repeat(4,1fr)}.rest-scale-summary{grid-column:1/-1}.rest-shift-grid{grid-template-columns:1fr}}
+@media(max-width:700px){.rest-scale-toolbar{grid-template-columns:1fr}.rest-scale-days{grid-template-columns:repeat(2,1fr)}.rest-scale-summary{flex-wrap:wrap}.rest-scale-summary-kpis{width:100%;margin-left:0}.rest-scale-kpi{flex:1;min-width:0}.rest-shift-head{padding:13px}.rest-scale-table th:nth-child(1),.rest-scale-table td:nth-child(1){display:none}.rest-scale-person strong{max-width:155px}.rest-scale-time{white-space:normal}.rest-scale-mode a{flex:1}.rest-scale-reset{width:100%}}
+</style>
 </head>
 <body>
   <div class="shell">
@@ -1411,284 +1460,214 @@ section[data-view="lancamentos"] .rest-history-table tbody td{font-size:.78rem!i
         </div>
       </section>
 
+      
       <section data-view="escalas">
-        <div class="section-title"><i class="bi bi-calendar-week"></i> Escala semanal</div>
-        <div class="card card-body">
-          <div class="escala-topbar">
-            <div>
-              <div class="escala-title-main">Visualização da escala</div>
-              <div class="escala-subtitle">Mais clara para ler: veja a semana inteira ou abra um dia específico com um clique.</div>
-            </div>
-            <div class="escala-legend">
-              <span class="legend-pill legend-dia"><i class="bi bi-sun"></i> Dia</span>
-              <span class="legend-pill legend-noite"><i class="bi bi-moon-stars"></i> Noite</span>
-                          </div>
-          </div>
-
-          <form class="row g-2 align-items-end" method="GET" action="{{ url_for('portal_restaurante') }}">
-            <input type="hidden" name="view" value="escalas">
-            <div class="col-lg-3 col-md-4">
-              <label class="form-label">Visualização</label>
-              <select name="modo" class="form-select">
-                <option value="semana" {{ 'selected' if (_modo=='semana') }}>Semana completa</option>
-                <option value="dia" {{ 'selected' if (_modo=='dia') }}>Somente 1 dia</option>
-              </select>
-            </div>
-            <div class="col-lg-3 col-md-4">
-              <label class="form-label">Data de referência</label>
-              <input type="date" name="ref" class="form-control" value="{{ _ref_data and _ref_data.strftime('%Y-%m-%d') }}">
-            </div>
-            <div class="col-lg-6 col-md-4 text-md-end">
-              <button class="btn btn-royal"><i class="bi bi-funnel"></i> Aplicar</button>
-              <a class="btn btn-outline-secondary" href="{{ url_for('portal_restaurante', view='escalas') }}">
-                <i class="bi bi-arrow-counterclockwise"></i> Semana atual
-              </a>
-            </div>
-          </form>
-
-          <div class="escala-switch mt-3">
-            <a class="escala-switch-btn {{ 'active' if _modo == 'semana' else '' }}"
-               href="{{ url_for('portal_restaurante', view='escalas', modo='semana', ref=_ref_data and _ref_data.strftime('%Y-%m-%d')) }}">
-              <i class="bi bi-calendar-week"></i> Escala completa
-            </a>
-            {% for dia in _dias_list %}
-            <a class="escala-switch-btn {{ 'active' if _modo == 'dia' and _ref_data == dia else '' }}"
-               href="{{ url_for('portal_restaurante', view='escalas', modo='dia', ref=dia.strftime('%Y-%m-%d')) }}">
-              {{ ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'][dia.weekday()] }}
-            </a>
-            {% endfor %}
-          </div>
-
-          {% if _modo == 'semana' %}
-          <div class="escala-week-list mt-3">
-            {% for dia in _dias_list %}
-              {% set lista = _agenda.get(dia, []) %}
-              {% set ns = namespace(dia_total=0, noite_total=0, indef_total=0) %}
-              {% for item in lista %}
-                {% set t = (item.turno or '')|lower %}
-                {% if 'noite' not in t and ('dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
-                  {% set ns.dia_total = ns.dia_total + 1 %}
-                {% elif 'noite' in t %}
-                  {% set ns.noite_total = ns.noite_total + 1 %}
-                {% else %}
-                  {% set ns.indef_total = ns.indef_total + 1 %}
-                {% endif %}
-              {% endfor %}
-
-            <div class="escala-day-card mb-3">
-              <div class="escala-day-head">
-                <div>
-                  <div class="escala-day-badge">{{ ['SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SÁBADO','DOMINGO'][dia.weekday()] }}</div>
-                  <div class="escala-day-date">{{ dia.strftime('%d/%m/%Y') }}</div>
-                </div>
-                <div class="escala-day-stats">
-                  <span class="escala-stat stat-dia"><strong>{{ ns.dia_total }}</strong> Dia</span>
-                  <span class="escala-stat stat-noite"><strong>{{ ns.noite_total }}</strong> Noite</span>
-                                    <a class="btn btn-outline-royal btn-sm" href="{{ url_for('portal_restaurante', view='escalas', modo='dia', ref=dia.strftime('%Y-%m-%d')) }}">
-                    <i class="bi bi-eye"></i> Ver só este dia
-                  </a>
-                </div>
-              </div>
-
-              {% if lista %}
-              <div class="row g-3">
-                <div class="col-lg-6">
-                  <div class="escala-turno-box turno-dia escala-turno-box-wide">
-                    <div class="escala-turno-title"><i class="bi bi-sun"></i> Turno de dia</div>
-                    {% set tem_dia = false %}
-                    {% for grupo in (lista | groupby('contrato')) %}
-                      {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                      {% set gns = namespace(tem=false) %}
-                      {% for item in grupo.list %}
-                        {% set t = (item.turno or '')|lower %}
-                        {% if 'noite' not in t and ('dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
-                          {% if not gns.tem %}
-                            <div class="escala-contract">{{ contrato_nome }}</div>
-                            {% set gns.tem = true %}
-                            {% set tem_dia = true %}
-                          {% endif %}
-                          <div class="escala-item">
-                            <div class="escala-item-name">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
-                            <div class="escala-item-meta">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
-                          </div>
-                        {% endif %}
-                      {% endfor %}
-                    {% endfor %}
-                    {% if not tem_dia %}<div class="escala-empty">Sem escala de dia.</div>{% endif %}
-                  </div>
-                </div>
-
-                <div class="col-lg-6">
-                  <div class="escala-turno-box turno-noite escala-turno-box-wide">
-                    <div class="escala-turno-title"><i class="bi bi-moon-stars"></i> Turno de noite</div>
-                    {% set tem_noite = false %}
-                    {% for grupo in (lista | groupby('contrato')) %}
-                      {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                      {% set gns = namespace(tem=false) %}
-                      {% for item in grupo.list %}
-                        {% set t = (item.turno or '')|lower %}
-                        {% if 'noite' in t %}
-                          {% if not gns.tem %}
-                            <div class="escala-contract">{{ contrato_nome }}</div>
-                            {% set gns.tem = true %}
-                            {% set tem_noite = true %}
-                          {% endif %}
-                          <div class="escala-item">
-                            <div class="escala-item-name">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
-                            <div class="escala-item-meta">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
-                          </div>
-                        {% endif %}
-                      {% endfor %}
-                    {% endfor %}
-                    {% if not tem_noite %}<div class="escala-empty">Sem escala de noite.</div>{% endif %}
-                  </div>
-                </div>
-
-                <div class="col-12 d-none">
-                  <div class="escala-turno-box turno-indef">
-                    <div class="escala-turno-title"><i class="bi bi-question-circle"></i> Apoio</div>
-                    {% if ns.indef_total > 0 %}
-                      {% set tem_indef = false %}
-                      {% for grupo in (lista | groupby('contrato')) %}
-                        {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                        {% set gns = namespace(tem=false) %}
-                        {% for item in grupo.list %}
-                          {% set t = (item.turno or '')|lower %}
-                          {% if not ('noite' in t or 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
-                            {% if not gns.tem %}
-                              <div class="escala-contract">{{ contrato_nome }}</div>
-                              {% set gns.tem = true %}
-                              {% set tem_indef = true %}
-                            {% endif %}
-                            <div class="escala-item">
-                              <div class="escala-item-name">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
-                              <div class="escala-item-meta">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
-                            </div>
-                          {% endif %}
-                        {% endfor %}
-                      {% endfor %}
-                      {% if not tem_indef %}<div class="escala-empty"></div>{% endif %}
-                    {% else %}
-                      <div class="escala-empty"></div>
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-              {% else %}
-                <div class="escala-empty mt-3">Sem escala registrada neste dia.</div>
-              {% endif %}
-            </div>
-            {% endfor %}
-          </div>
-
-          {% else %}
-            {% set lista = _agenda.get(_ref_data, []) if _ref_data else [] %}
-            {% set ns = namespace(dia_total=0, noite_total=0, indef_total=0) %}
-            {% for item in lista %}
-              {% set t = (item.turno or '')|lower %}
-              {% if 'noite' not in t and ('dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
-                {% set ns.dia_total = ns.dia_total + 1 %}
-              {% elif 'noite' in t %}
-                {% set ns.noite_total = ns.noite_total + 1 %}
-              {% else %}
-                {% set ns.indef_total = ns.indef_total + 1 %}
-              {% endif %}
-            {% endfor %}
-
-          <div class="escala-day-focus mt-3">
-            <div class="escala-day-head mb-3">
-              <div>
-                <div class="escala-day-badge">{{ _ref_data and ['SEGUNDA','TERÇA','QUARTA','QUINTA','SEXTA','SÁBADO','DOMINGO'][_ref_data.weekday()] }}</div>
-                <div class="escala-day-date">{{ _ref_data and _ref_data.strftime('%d/%m/%Y') }}</div>
-              </div>
-              <div class="escala-day-stats">
-                <span class="escala-stat stat-dia"><strong>{{ ns.dia_total }}</strong> Dia</span>
-                <span class="escala-stat stat-noite"><strong>{{ ns.noite_total }}</strong> Noite</span>
-                                <a class="btn btn-outline-royal btn-sm" href="{{ url_for('portal_restaurante', view='escalas', modo='semana', ref=_ref_data and _ref_data.strftime('%Y-%m-%d')) }}">
-                  <i class="bi bi-calendar-week"></i> Voltar para semana completa
-                </a>
-              </div>
-            </div>
-
-            {% if lista %}
-            <div class="row g-3">
-              <div class="col-xl-4 col-md-6">
-                <div class="escala-turno-box turno-dia h-100">
-                  <div class="escala-turno-title"><i class="bi bi-sun"></i> Turno de dia</div>
-                  {% set tem_dia = false %}
-                  {% for grupo in (lista | groupby('contrato')) %}
-                    {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                    {% set gns = namespace(tem=false) %}
-                    {% for item in grupo.list %}
-                      {% set t = (item.turno or '')|lower %}
-                      {% if 'noite' not in t and ('dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
-                        {% if not gns.tem %}<div class="escala-contract">{{ contrato_nome }}</div>{% set gns.tem = true %}{% set tem_dia = true %}{% endif %}
-                        <div class="escala-item">
-                          <div class="escala-item-name">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
-                          <div class="escala-item-meta">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
-                        </div>
-                      {% endif %}
-                    {% endfor %}
-                  {% endfor %}
-                  {% if not tem_dia %}<div class="escala-empty">Sem escala de dia.</div>{% endif %}
-                </div>
-              </div>
-              <div class="col-xl-4 col-md-6">
-                <div class="escala-turno-box turno-noite h-100">
-                  <div class="escala-turno-title"><i class="bi bi-moon-stars"></i> Turno de noite</div>
-                  {% set tem_noite = false %}
-                  {% for grupo in (lista | groupby('contrato')) %}
-                    {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                    {% set gns = namespace(tem=false) %}
-                    {% for item in grupo.list %}
-                      {% set t = (item.turno or '')|lower %}
-                      {% if 'noite' in t %}
-                        {% if not gns.tem %}<div class="escala-contract">{{ contrato_nome }}</div>{% set gns.tem = true %}{% set tem_noite = true %}{% endif %}
-                        <div class="escala-item">
-                          <div class="escala-item-name">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
-                          <div class="escala-item-meta">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
-                        </div>
-                      {% endif %}
-                    {% endfor %}
-                  {% endfor %}
-                  {% if not tem_noite %}<div class="escala-empty">Sem escala de noite.</div>{% endif %}
-                </div>
-              </div>
-              <div class="col-xl-4 col-md-12">
-                <div class="escala-turno-box turno-indef h-100">
-                  <div class="escala-turno-title"><i class="bi bi-question-circle"></i> Apoio</div>
-                  {% if ns.indef_total > 0 %}
-                    {% set tem_indef = false %}
-                    {% for grupo in (lista | groupby('contrato')) %}
-                      {% set contrato_nome = grupo.grouper or 'Sem contrato' %}
-                      {% set gns = namespace(tem=false) %}
-                      {% for item in grupo.list %}
-                        {% set t = (item.turno or '')|lower %}
-                        {% if not ('noite' in t or 'dia' in t or 'manhã' in t or 'manha' in t or 'tarde' in t or 'diurno' in t or 'comercial' in t) %}
-                          {% if not gns.tem %}<div class="escala-contract">{{ contrato_nome }}</div>{% set gns.tem = true %}{% set tem_indef = true %}{% endif %}
-                          <div class="escala-item">
-                            <div class="escala-item-name">{{ item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') }}</div>
-                            <div class="escala-item-meta">{{ item.turno or '—' }}{% if item.horario %} • {{ item.horario }}{% endif %}</div>
-                          </div>
-                        {% endif %}
-                      {% endfor %}
-                    {% endfor %}
-                    {% if not tem_indef %}<div class="escala-empty"></div>{% endif %}
-                  {% else %}
-                    <div class="escala-empty"></div>
-                  {% endif %}
-                </div>
-              </div>
-            </div>
+        {% macro render_scale_day(dia, lista, show_label=false) %}
+          {% set ns = namespace(day_count=0, night_count=0, first_day_time='', first_night_time='') %}
+          {% for item in lista %}
+            {% set t = (item.turno or '')|lower %}
+            {% if 'noite' in t or 'noturn' in t %}
+              {% set ns.night_count = ns.night_count + 1 %}
+              {% if not ns.first_night_time and item.horario %}{% set ns.first_night_time = item.horario %}{% endif %}
             {% else %}
-              <div class="escala-empty mt-3">Sem escala registrada para esta data.</div>
+              {% set ns.day_count = ns.day_count + 1 %}
+              {% if not ns.first_day_time and item.horario %}{% set ns.first_day_time = item.horario %}{% endif %}
+            {% endif %}
+          {% endfor %}
+
+          <div class="rest-scale-day-wrap">
+            {% if show_label %}
+            <div class="rest-scale-day-label">
+              <strong>{{ ['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'][dia.weekday()] }}</strong>
+              <span>{{ dia.strftime('%d/%m/%Y') }}</span>
+            </div>
+            {% endif %}
+
+            <div class="rest-scale-summary">
+              <div class="rest-scale-summary-icon"><i class="bi bi-calendar2-check"></i></div>
+              <div class="rest-scale-summary-copy">
+                <strong>Resumo do dia</strong>
+                <span>{{ ['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'][dia.weekday()] }}, {{ dia.strftime('%d/%m/%Y') }}</span>
+              </div>
+              <div class="rest-scale-summary-kpis">
+                <div class="rest-scale-kpi total"><b>{{ ns.day_count + ns.night_count }}</b><small>Total escala</small></div>
+                <div class="rest-scale-kpi day"><b>{{ ns.day_count }}</b><small>Turno de dia</small></div>
+                <div class="rest-scale-kpi night"><b>{{ ns.night_count }}</b><small>Turno de noite</small></div>
+              </div>
+            </div>
+
+            <div class="rest-shift-grid">
+              <div class="rest-shift-card">
+                <div class="rest-shift-head day">
+                  <div class="rest-shift-icon"><i class="bi bi-sun"></i></div>
+                  <div class="rest-shift-copy"><h3>Turno de dia</h3><p>Cooperados escalados para o período diurno</p></div>
+                  <div class="rest-shift-head-meta">
+                    <span class="rest-shift-count"><i class="bi bi-people-fill"></i> {{ ns.day_count }} escalado{{ '' if ns.day_count == 1 else 's' }}</span>
+                    {% if ns.first_day_time %}<span class="rest-shift-range"><i class="bi bi-clock"></i> {{ ns.first_day_time }}</span>{% endif %}
+                  </div>
+                </div>
+                {% if ns.day_count %}
+                <div class="table-responsive">
+                  <table class="rest-scale-table">
+                    <thead><tr><th>#</th><th>Cooperado</th><th>Horário</th><th>Status</th><th class="text-center">Ações</th></tr></thead>
+                    <tbody>
+                    {% set dns = namespace(n=0) %}
+                    {% for item in lista %}
+                      {% set t = (item.turno or '')|lower %}
+                      {% if not ('noite' in t or 'noturn' in t) %}
+                        {% set dns.n = dns.n + 1 %}
+                        {% set nm = item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') %}
+                        <tr>
+                          <td class="rest-scale-num">{{ dns.n }}</td>
+                          <td><div class="rest-scale-person"><span class="rest-scale-avatar">{{ (nm[:2])|upper }}</span><strong title="{{ nm }}">{{ nm }}</strong></div></td>
+                          <td class="rest-scale-time"><i class="bi bi-clock me-1"></i>{{ item.horario or '—' }}</td>
+                          <td><span class="rest-scale-status">Escalado</span></td>
+                          <td class="text-center">
+                            <div class="dropdown rest-scale-menu">
+                              <button class="btn" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-three-dots-vertical"></i></button>
+                              <ul class="dropdown-menu dropdown-menu-end">
+                                <li><button type="button" class="dropdown-item coopex-btn-substituir"
+                                  data-action="{{ url_for('rest_escala_trocar_cooperado', scale_id=item.escala_id) }}"
+                                  data-original-id="{{ item.coop.id if item.coop else '' }}"
+                                  data-original-nome="{{ nm|e }}"
+                                  data-ref="{{ dia.strftime('%Y-%m-%d') }}"
+                                  data-modo="{{ _modo }}"><i class="bi bi-arrow-left-right me-2"></i>Trocar cooperado</button></li>
+                              </ul>
+                            </div>
+                          </td>
+                        </tr>
+                      {% endif %}
+                    {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+                {% else %}<div class="rest-scale-empty">Nenhum cooperado escalado para o turno de dia.</div>{% endif %}
+                <button type="button" class="rest-scale-add js-add-scale"
+                  data-bs-toggle="modal" data-bs-target="#coopexAddScaleModal"
+                  data-date="{{ dia.strftime('%Y-%m-%d') }}" data-turno="Dia"
+                  data-horario="{{ ns.first_day_time }}"><i class="bi bi-plus-circle"></i> Adicionar cooperado ao turno de dia</button>
+              </div>
+
+              <div class="rest-shift-card">
+                <div class="rest-shift-head night">
+                  <div class="rest-shift-icon"><i class="bi bi-moon-stars"></i></div>
+                  <div class="rest-shift-copy"><h3>Turno de noite</h3><p>Cooperados escalados para o período noturno</p></div>
+                  <div class="rest-shift-head-meta">
+                    <span class="rest-shift-count"><i class="bi bi-people-fill"></i> {{ ns.night_count }} escalado{{ '' if ns.night_count == 1 else 's' }}</span>
+                    {% if ns.first_night_time %}<span class="rest-shift-range"><i class="bi bi-clock"></i> {{ ns.first_night_time }}</span>{% endif %}
+                  </div>
+                </div>
+                {% if ns.night_count %}
+                <div class="table-responsive">
+                  <table class="rest-scale-table">
+                    <thead><tr><th>#</th><th>Cooperado</th><th>Horário</th><th>Status</th><th class="text-center">Ações</th></tr></thead>
+                    <tbody>
+                    {% set nns = namespace(n=0) %}
+                    {% for item in lista %}
+                      {% set t = (item.turno or '')|lower %}
+                      {% if 'noite' in t or 'noturn' in t %}
+                        {% set nns.n = nns.n + 1 %}
+                        {% set nm = item.coop.nome if item.coop else (item.nome_planilha or item.cooperado_nome or '—') %}
+                        <tr>
+                          <td class="rest-scale-num">{{ nns.n }}</td>
+                          <td><div class="rest-scale-person"><span class="rest-scale-avatar">{{ (nm[:2])|upper }}</span><strong title="{{ nm }}">{{ nm }}</strong></div></td>
+                          <td class="rest-scale-time"><i class="bi bi-clock me-1"></i>{{ item.horario or '—' }}</td>
+                          <td><span class="rest-scale-status">Escalado</span></td>
+                          <td class="text-center">
+                            <div class="dropdown rest-scale-menu">
+                              <button class="btn" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-three-dots-vertical"></i></button>
+                              <ul class="dropdown-menu dropdown-menu-end">
+                                <li><button type="button" class="dropdown-item coopex-btn-substituir"
+                                  data-action="{{ url_for('rest_escala_trocar_cooperado', scale_id=item.escala_id) }}"
+                                  data-original-id="{{ item.coop.id if item.coop else '' }}"
+                                  data-original-nome="{{ nm|e }}"
+                                  data-ref="{{ dia.strftime('%Y-%m-%d') }}"
+                                  data-modo="{{ _modo }}"><i class="bi bi-arrow-left-right me-2"></i>Trocar cooperado</button></li>
+                              </ul>
+                            </div>
+                          </td>
+                        </tr>
+                      {% endif %}
+                    {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+                {% else %}<div class="rest-scale-empty">Nenhum cooperado escalado para o turno de noite.</div>{% endif %}
+                <button type="button" class="rest-scale-add js-add-scale"
+                  data-bs-toggle="modal" data-bs-target="#coopexAddScaleModal"
+                  data-date="{{ dia.strftime('%Y-%m-%d') }}" data-turno="Noite"
+                  data-horario="{{ ns.first_night_time }}"><i class="bi bi-plus-circle"></i> Adicionar cooperado ao turno de noite</button>
+              </div>
+            </div>
+          </div>
+        {% endmacro %}
+
+        <div class="rest-scale-shell">
+          <div class="rest-scale-toolbar">
+            <div class="rest-scale-title">
+              <div class="rest-scale-title-icon"><i class="bi bi-calendar-week"></i></div>
+              <div><h2>Escala semanal</h2><p>Visualize a escala completa da semana ou um dia específico.</p></div>
+            </div>
+            <form class="rest-scale-date" method="GET" action="{{ url_for('portal_restaurante') }}">
+              <input type="hidden" name="view" value="escalas">
+              <input type="hidden" name="modo" value="dia">
+              <label>Data de referência</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-calendar3"></i></span>
+                <input type="date" class="form-control" name="ref" value="{{ _ref_data.strftime('%Y-%m-%d') if _ref_data else '' }}" onchange="this.form.submit()">
+              </div>
+            </form>
+            <div class="rest-scale-mode">
+              <a class="{{ 'active' if _modo == 'semana' else '' }}" href="{{ url_for('portal_restaurante', view='escalas', modo='semana', ref=_ref_data.strftime('%Y-%m-%d') if _ref_data else '') }}"><i class="bi bi-calendar3 me-1"></i> Semana completa</a>
+              {% for dia in _dias_list %}
+              <a class="{{ 'active' if _modo == 'dia' and _ref_data == dia else '' }}" href="{{ url_for('portal_restaurante', view='escalas', modo='dia', ref=dia.strftime('%Y-%m-%d')) }}">{{ ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'][dia.weekday()] }}</a>
+              {% endfor %}
+              <a class="btn btn-outline-primary rest-scale-reset" href="{{ url_for('portal_restaurante', view='escalas', modo='dia') }}"><i class="bi bi-arrow-repeat me-1"></i> Semana atual</a>
+            </div>
+          </div>
+
+          <div class="rest-scale-days">
+            {% for dia in _dias_list %}
+            <a class="rest-scale-day-link {{ 'active' if _modo == 'dia' and _ref_data == dia else '' }}" href="{{ url_for('portal_restaurante', view='escalas', modo='dia', ref=dia.strftime('%Y-%m-%d')) }}">
+              <strong>{{ ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'][dia.weekday()] }}</strong>
+              <span>{{ dia.strftime('%d/%m') }}</span>
+            </a>
+            {% endfor %}
+            {% if _modo == 'dia' and _ref_data %}
+              {% set active_list = _agenda.get(_ref_data, []) %}
+              {% set quick = namespace(day=0, night=0) %}
+              {% for item in active_list %}
+                {% set t=(item.turno or '')|lower %}
+                {% if 'noite' in t or 'noturn' in t %}{% set quick.night=quick.night+1 %}{% else %}{% set quick.day=quick.day+1 %}{% endif %}
+              {% endfor %}
+              <div class="rest-scale-summary">
+                <div class="rest-scale-summary-icon"><i class="bi bi-calendar2-check"></i></div>
+                <div class="rest-scale-summary-copy"><strong>Resumo do dia</strong><span>{{ _ref_data.strftime('%d/%m/%Y') }}</span></div>
+                <div class="rest-scale-summary-kpis">
+                  <div class="rest-scale-kpi total"><b>{{ quick.day+quick.night }}</b><small>Total</small></div>
+                  <div class="rest-scale-kpi day"><b>{{ quick.day }}</b><small>Dia</small></div>
+                  <div class="rest-scale-kpi night"><b>{{ quick.night }}</b><small>Noite</small></div>
+                </div>
+              </div>
+            {% else %}
+              <div class="rest-scale-summary">
+                <div class="rest-scale-summary-icon"><i class="bi bi-calendar-week"></i></div>
+                <div class="rest-scale-summary-copy"><strong>Semana completa</strong><span>{{ _dias_list[0].strftime('%d/%m') if _dias_list else '' }} a {{ _dias_list[-1].strftime('%d/%m/%Y') if _dias_list else '' }}</span></div>
+              </div>
             {% endif %}
           </div>
+
+          {% if _modo == 'dia' and _ref_data %}
+            {{ render_scale_day(_ref_data, _agenda.get(_ref_data, []), false) }}
+          {% else %}
+            {% for dia in _dias_list %}
+              {{ render_scale_day(dia, _agenda.get(dia, []), true) }}
+            {% endfor %}
           {% endif %}
         </div>
       </section>
 
-      <section data-view="avisos">
+<section data-view="avisos">
         {% set _avisos = avisos if avisos is defined and avisos is not none else [] %}
         {% set _unread_from_list = (_avisos | selectattr('lido','equalto',False) | list | length) %}
         {% set _unread_from_ctx = (avisos_nao_lidos_count if avisos_nao_lidos_count is defined else avisos_unread_count) or 0 %}
@@ -4006,15 +3985,53 @@ function setPhone(digits) {
   </div>
 <script src="{{ url_for('static', filename='js/restaurante_v3.js') }}"></script>
 
+
+  <div class="modal fade" id="coopexAddScaleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form method="post" action="{{ url_for('rest_escala_adicionar_cooperado') }}" id="coopexAddScaleForm">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-person-plus"></i> Adicionar cooperado à escala</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" name="data" id="coopexAddScaleDate">
+            <input type="hidden" name="turno" id="coopexAddScaleTurno">
+            <div class="mb-3">
+              <label class="form-label">Cooperado</label>
+              <select class="form-select" name="cooperado_id" required>
+                <option value="">Selecione...</option>
+                {% for c in coopex_rest_substitute_coops|default([]) %}
+                  <option value="{{ c.id }}">{{ c.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Horário</label>
+              <input class="form-control" type="text" name="horario" id="coopexAddScaleHorario" placeholder="Ex.: 11:00 às 17:00" required>
+              <div class="form-text">Use o mesmo formato exibido na escala. Também aceita horários com pausa, como 11:00-14:00/15:00-17:00.</div>
+            </div>
+            <div class="alert alert-light border mb-0"><i class="bi bi-info-circle me-1"></i> Essa inclusão entra na escala real e também aparecerá para o cooperado.</div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check2-circle"></i> Adicionar à escala</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <div class="modal fade" id="coopexSubModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <form id="coopexSubForm" method="post">
           <div class="modal-header">
-            <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Trocar cooperado</h5>
+            <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Trocar cooperado da escala</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
           </div>
           <div class="modal-body">
+            <input type="hidden" name="ref" id="coopexSubRef"><input type="hidden" name="modo" id="coopexSubModo" value="dia">
             <div class="mb-2 text-muted">Escala de <strong id="coopexSubOriginal"></strong></div>
             <label class="form-label" for="coopexSubSelect">Cooperado que trabalhou no lugar</label>
             <select class="form-select" id="coopexSubSelect" name="cooperado_id" required>
@@ -4023,7 +4040,7 @@ function setPhone(digits) {
                 <option value="{{ c.id }}">{{ c.nome }}</option>
               {% endfor %}
             </select>
-            <div class="form-text mt-2">A data, o horário e o estabelecimento permanecem os mesmos. A produção passa a ser lançada para o substituto.</div>
+            <div class="form-text mt-2">A data, o horário e o estabelecimento permanecem os mesmos. A escala passa para o cooperado escolhido.</div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -4039,11 +4056,15 @@ function setPhone(digits) {
     const form=document.getElementById('coopexSubForm');
     const select=document.getElementById('coopexSubSelect');
     const original=document.getElementById('coopexSubOriginal');
+    const subRef=document.getElementById('coopexSubRef');
+    const subModo=document.getElementById('coopexSubModo');
     if(!modalEl||!form||!select)return;
     document.querySelectorAll('.coopex-btn-substituir').forEach(function(btn){
       btn.addEventListener('click',function(){
         form.action=btn.dataset.action||'';
         if(original)original.textContent=btn.dataset.originalNome||'';
+        if(subRef)subRef.value=btn.dataset.ref||'';
+        if(subModo)subModo.value=btn.dataset.modo||'dia';
         select.value='';
         Array.from(select.options).forEach(function(opt){
           opt.disabled=!!opt.value && String(opt.value)===String(btn.dataset.originalId||'');
@@ -4052,6 +4073,17 @@ function setPhone(digits) {
       });
     });
   });
+
+    document.querySelectorAll('.js-add-scale').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        const d=document.getElementById('coopexAddScaleDate');
+        const t=document.getElementById('coopexAddScaleTurno');
+        const h=document.getElementById('coopexAddScaleHorario');
+        if(d)d.value=btn.dataset.date||'';
+        if(t)t.value=btn.dataset.turno||'';
+        if(h)h.value=btn.dataset.horario||'';
+      });
+    });
   </script>
 </body>
 </html>
