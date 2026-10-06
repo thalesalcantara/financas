@@ -3082,10 +3082,35 @@ function setPhone(digits) {
     function calDateOnly(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return y+'-'+m+'-'+day;}
     function calFmt(iso){if(!iso)return '—';const p=String(iso).slice(0,10).split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:iso;}
 
+    async function calFetchJson(url,options={},retry=true){
+      let resp;
+      try{
+        resp=await fetch(url,options);
+      }catch(err){
+        if(retry){
+          await new Promise(r=>setTimeout(r,700));
+          return calFetchJson(url,options,false);
+        }
+        throw new Error('Calendário temporariamente indisponível. Tente novamente.');
+      }
+      const type=(resp.headers.get('content-type')||'').toLowerCase();
+      if(!type.includes('application/json')){
+        if(retry){
+          await new Promise(r=>setTimeout(r,700));
+          return calFetchJson(url,options,false);
+        }
+        throw new Error('Calendário temporariamente indisponível. Tente novamente.');
+      }
+      let data;
+      try{ data=await resp.json(); }
+      catch(_){ throw new Error('Calendário temporariamente indisponível. Tente novamente.'); }
+      if(!resp.ok || !data?.ok) throw new Error(data?.message||'Não foi possível concluir a operação.');
+      return data;
+    }
+
     async function loadCalendarYear(year){
       const status=document.getElementById('calStatus')?.value||'todos';
-      const r=await fetch('/api/rest/calendario?year='+encodeURIComponent(year)+'&status='+encodeURIComponent(status),{credentials:'same-origin',cache:'no-store'});
-      const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.message||'Falha ao carregar calendário');
+      const j=await calFetchJson('/api/rest/calendario?year='+encodeURIComponent(year)+'&status='+encodeURIComponent(status),{credentials:'same-origin',cache:'no-store'});
       calendarioData=j;calendarioLoadedYear=year;renderCalendar();
     }
 
@@ -3196,12 +3221,12 @@ function setPhone(digits) {
         const yr=document.getElementById('calYear');
         if(yr){
           for(let y=now.getFullYear()-1;y<=now.getFullYear()+6;y++){const o=document.createElement('option');o.value=y;o.textContent=y;if(y===now.getFullYear())o.selected=true;yr.appendChild(o);}
-          yr.addEventListener('change',()=>{calCursor=new Date(Number(yr.value),calCursor.getMonth(),1);loadCalendarYear(Number(yr.value)).catch(e=>alert(e.message));});
+          yr.addEventListener('change',()=>{calCursor=new Date(Number(yr.value),calCursor.getMonth(),1);loadCalendarYear(Number(yr.value)).catch(()=>{});});
         }
-        document.getElementById('calPrev')?.addEventListener('click',()=>{if(calViewMode==='day'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()-1);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else if(calViewMode==='week'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()-7);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else{calCursor.setMonth(calCursor.getMonth()-1);calSelectedDate=calDateOnly(new Date(calCursor.getFullYear(),calCursor.getMonth(),1));}if(yr)yr.value=calCursor.getFullYear();loadCalendarYear(calCursor.getFullYear()).catch(e=>alert(e.message));});
-        document.getElementById('calNext')?.addEventListener('click',()=>{if(calViewMode==='day'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()+1);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else if(calViewMode==='week'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()+7);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else{calCursor.setMonth(calCursor.getMonth()+1);calSelectedDate=calDateOnly(new Date(calCursor.getFullYear(),calCursor.getMonth(),1));}if(yr)yr.value=calCursor.getFullYear();loadCalendarYear(calCursor.getFullYear()).catch(e=>alert(e.message));});
-        document.getElementById('calToday')?.addEventListener('click',()=>{const n=new Date();calSelectedDate=calDateOnly(n);calCursor=new Date(n.getFullYear(),n.getMonth(),1);if(yr)yr.value=n.getFullYear();loadCalendarYear(n.getFullYear()).catch(e=>alert(e.message));});
-        document.getElementById('calStatus')?.addEventListener('change',()=>loadCalendarYear(calCursor.getFullYear()).catch(e=>alert(e.message)));
+        document.getElementById('calPrev')?.addEventListener('click',()=>{if(calViewMode==='day'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()-1);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else if(calViewMode==='week'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()-7);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else{calCursor.setMonth(calCursor.getMonth()-1);calSelectedDate=calDateOnly(new Date(calCursor.getFullYear(),calCursor.getMonth(),1));}if(yr)yr.value=calCursor.getFullYear();loadCalendarYear(calCursor.getFullYear()).catch(()=>{});});
+        document.getElementById('calNext')?.addEventListener('click',()=>{if(calViewMode==='day'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()+1);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else if(calViewMode==='week'){const d=new Date(calSelectedDate+'T12:00:00');d.setDate(d.getDate()+7);calSelectedDate=calDateOnly(d);calCursor=new Date(d.getFullYear(),d.getMonth(),1);}else{calCursor.setMonth(calCursor.getMonth()+1);calSelectedDate=calDateOnly(new Date(calCursor.getFullYear(),calCursor.getMonth(),1));}if(yr)yr.value=calCursor.getFullYear();loadCalendarYear(calCursor.getFullYear()).catch(()=>{});});
+        document.getElementById('calToday')?.addEventListener('click',()=>{const n=new Date();calSelectedDate=calDateOnly(n);calCursor=new Date(n.getFullYear(),n.getMonth(),1);if(yr)yr.value=n.getFullYear();loadCalendarYear(n.getFullYear()).catch(()=>{});});
+        document.getElementById('calStatus')?.addEventListener('change',()=>loadCalendarYear(calCursor.getFullYear()).catch(()=>{}));
         document.getElementById('calNewBtn')?.addEventListener('click',()=>{document.getElementById('calFormWrap')?.classList.add('open');document.querySelector('#calForm input[name="title"]')?.focus();});
         document.querySelectorAll('.cal-view-tab').forEach(btn=>btn.addEventListener('click',()=>{calViewMode=btn.dataset.calView||'month';renderCalendar();}));
         document.getElementById('calSeeAll')?.addEventListener('click',()=>{calViewMode='agenda';renderCalendar();});
@@ -3222,8 +3247,7 @@ function setPhone(digits) {
                 document.getElementById('calForm')?.addEventListener('submit',async e=>{
           e.preventDefault();const f=new FormData(e.currentTarget),payload=Object.fromEntries(f.entries());
           try{
-            const r=await fetch('/api/rest/calendario',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Requested-With':'fetch'},body:JSON.stringify(payload)});
-            const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.message||'Não foi possível salvar.');
+            const j=await calFetchJson('/api/rest/calendario',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Requested-With':'fetch'},body:JSON.stringify(payload)},false);
             e.currentTarget.reset();e.currentTarget.querySelector('[name=time]').value='09:00';
             document.getElementById('calFormWrap').classList.remove('open');
             await loadCalendarYear(calCursor.getFullYear());
@@ -3235,14 +3259,12 @@ function setPhone(digits) {
           if(!del)return;
           try{
             if(!confirm('Excluir este lembrete?'))return;
-            const r=await fetch('/api/rest/calendario/'+del.dataset.calDelete,{method:'DELETE',credentials:'same-origin'});
-            const j=await r.json();
-            if(!r.ok)throw new Error(j.message||'Não foi possível excluir.');
+            await calFetchJson('/api/rest/calendario/'+del.dataset.calDelete,{method:'DELETE',credentials:'same-origin'},false);
             await loadCalendarYear(calCursor.getFullYear());
           }catch(err){alert(err.message||'Não foi possível excluir o lembrete.');}
         });
       }
-      if(calendarioLoadedYear!==calCursor.getFullYear()) await loadCalendarYear(calCursor.getFullYear()).catch(e=>alert(e.message));
+      if(calendarioLoadedYear!==calCursor.getFullYear()) await loadCalendarYear(calCursor.getFullYear()).catch(()=>{});
       schedulePersonalReminders();
     }
 
@@ -3260,7 +3282,7 @@ function setPhone(digits) {
 
     async function schedulePersonalReminders(){
       try{
-        const r=await fetch('/api/rest/calendario/proximos',{credentials:'same-origin',cache:'no-store'}),j=await r.json();if(!r.ok||!j.ok)return;
+        const j=await calFetchJson('/api/rest/calendario/proximos',{credentials:'same-origin',cache:'no-store'},false);
         (window.__calTimers||[]).forEach(clearTimeout);window.__calTimers=[];
         for(const item of (j.reminders||[])){
           const when=Date.parse(item.fire_at),delay=Math.max(0,when-Date.now());
