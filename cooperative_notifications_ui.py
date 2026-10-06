@@ -616,6 +616,32 @@ def _today_coop_launch_state(rest, pending_rows, scales_source=None):
 
 
 
+@app.get("/api/rest/lancados-hoje", endpoint="rest_launched_today_state")
+@role_required("restaurante")
+def rest_launched_today_state():
+    """Consulta mínima para atualizar imediatamente a aba 'Lançada hoje'."""
+    try:
+        rest = legacy.request_restaurante()
+        if not rest:
+            return jsonify(ok=False, cooperados=[]), 404
+        today = datetime.now(TZ).date()
+        rows = (
+            db.session.query(Lancamento.cooperado_id)
+            .filter(
+                Lancamento.restaurante_id == rest.id,
+                Lancamento.data == today,
+                Lancamento.cooperado_id.isnot(None),
+            )
+            .distinct()
+            .all()
+        )
+        return jsonify(ok=True, cooperados=[int(row[0]) for row in rows if row[0] is not None])
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Falha ao carregar lançados de hoje")
+        return jsonify(ok=False, cooperados=[]), 500
+
+
 @app.get("/api/rest/pendencias-semana", endpoint="rest_pending_week_state")
 @role_required("restaurante")
 def rest_pending_week_state():
