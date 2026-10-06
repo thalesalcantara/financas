@@ -257,6 +257,129 @@ if "rest_pendencia_trocar_cooperado" not in app.view_functions:
         return redirect(url_for("portal_restaurante", view="lancar"))
 
 
+
+if "rest_escala_trocar_cooperado" not in app.view_functions:
+    @app.post(
+        "/portal/restaurante/escala/<int:scale_id>/trocar-cooperado",
+        endpoint="rest_escala_trocar_cooperado",
+    )
+    def rest_escala_trocar_cooperado(scale_id: int):
+        if (session.get("user_tipo") or "").strip().lower() != "restaurante":
+            return redirect(url_for("login"))
+
+        rest = _rest_current()
+        scale = Escala.query.get(scale_id)
+        if not rest or not scale or not _scale_belongs_to_rest(scale, rest):
+            flash("Escala não localizada para este estabelecimento.", "warning")
+            return redirect(url_for("portal_restaurante", view="escalas"))
+
+        new_id = request.form.get("cooperado_id", type=int)
+        substitute = (
+            Cooperado.query.join(Usuario, Cooperado.usuario_id == Usuario.id)
+            .filter(Cooperado.id == new_id, Usuario.ativo.is_(True))
+            .first()
+            if new_id else None
+        )
+        if not substitute:
+            flash("Selecione um cooperado ativo.", "warning")
+            return redirect(url_for("portal_restaurante", view="escalas"))
+
+        original = _scale_coop(scale)
+        if original and substitute.id == original.id:
+            flash("Esse cooperado já está nesta escala.", "info")
+        else:
+            try:
+                scale.cooperado_id = substitute.id
+                scale.cooperado_nome = substitute.nome
+                db.session.commit()
+                flash(
+                    f"Escala atualizada para {substitute.nome}. A alteração também aparecerá para o cooperado.",
+                    "success",
+                )
+            except Exception:
+                db.session.rollback()
+                app.logger.exception("Falha ao trocar cooperado da escala %s", scale_id)
+                flash("Não foi possível atualizar a escala.", "danger")
+
+        ref = (request.form.get("ref") or "").strip()
+        modo = (request.form.get("modo") or "dia").strip()
+        return redirect(url_for("portal_restaurante", view="escalas", modo=modo, ref=ref or None))
+
+
+if "rest_escala_adicionar_cooperado" not in app.view_functions:
+    @app.post(
+        "/portal/restaurante/escala/adicionar-cooperado",
+        endpoint="rest_escala_adicionar_cooperado",
+    )
+    def rest_escala_adicionar_cooperado():
+        if (session.get("user_tipo") or "").strip().lower() != "restaurante":
+            return redirect(url_for("login"))
+
+        rest = _rest_current()
+        if not rest:
+            return redirect(url_for("login"))
+
+        new_id = request.form.get("cooperado_id", type=int)
+        data_iso = (request.form.get("data") or "").strip()
+        turno = (request.form.get("turno") or "").strip()
+        horario = (request.form.get("horario") or "").strip()
+
+        substitute = (
+            Cooperado.query.join(Usuario, Cooperado.usuario_id == Usuario.id)
+            .filter(Cooperado.id == new_id, Usuario.ativo.is_(True))
+            .first()
+            if new_id else None
+        )
+        try:
+            data_ref = datetime.strptime(data_iso, "%Y-%m-%d").date()
+        except Exception:
+            data_ref = None
+
+        if not substitute or not data_ref or not turno or not horario:
+            flash("Informe cooperado, data, turno e horário.", "warning")
+            return redirect(url_for("portal_restaurante", view="escalas", modo="dia", ref=data_iso or None))
+
+        data_txt = data_ref.strftime("%d/%m/%Y")
+        duplicate = (
+            Escala.query
+            .filter(
+                Escala.restaurante_id == rest.id,
+                Escala.cooperado_id == substitute.id,
+                Escala.data == data_txt,
+                Escala.turno == turno,
+                Escala.horario == horario,
+            )
+            .first()
+        )
+        if duplicate:
+            flash(f"{substitute.nome} já está nessa escala.", "info")
+            return redirect(url_for("portal_restaurante", view="escalas", modo="dia", ref=data_iso))
+
+        try:
+            scale = Escala(
+                cooperado_id=substitute.id,
+                cooperado_nome=substitute.nome,
+                restaurante_id=rest.id,
+                data=data_txt,
+                turno=turno,
+                horario=horario,
+                contrato=rest.nome,
+                cor="",
+            )
+            db.session.add(scale)
+            db.session.commit()
+            flash(
+                f"{substitute.nome} foi adicionado à escala de {data_ref.strftime('%d/%m/%Y')}.",
+                "success",
+            )
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Falha ao adicionar cooperado extra na escala do restaurante %s", rest.id)
+            flash("Não foi possível adicionar o cooperado à escala.", "danger")
+
+        return redirect(url_for("portal_restaurante", view="escalas", modo="dia", ref=data_iso))
+
+
 def _week_pending_rows(rest, scales_source=None):
     """Pendências vencidas da semana, separadas por escala/turno."""
     now = datetime.now(TZ)
