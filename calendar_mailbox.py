@@ -296,7 +296,6 @@ def rest_calendario_api():
     rest = _rest_atual()
     if not rest:
         abort(403)
-    ensure_calendar_schema()
     year = request.args.get("year", type=int) or datetime.now(TZ).year
     status = (request.args.get("status") or "todos").lower()
     q = CalendarioLembrete.query.filter(
@@ -312,15 +311,20 @@ def rest_calendario_api():
         q = q.filter(CalendarioLembrete.destino == "coopex")
 
     reminders=[]
-    for x in q.order_by(CalendarioLembrete.data_evento.asc(), CalendarioLembrete.id.asc()).all():
-        reminders.append({
-            "id":x.id,"title":x.titulo,"description":x.descricao or "",
-            "date":x.data_evento.isoformat(),"time":x.hora_evento or "",
-            "target":x.destino,"advance_days":x.antecedencia_dias,
-            "send_at":_local_iso_from_utc(x.disparar_em),
-            "sent_at":_local_iso_from_utc(x.enviado_em),
-            "completed":bool(x.concluido_em),
-        })
+    try:
+        rows = q.order_by(CalendarioLembrete.data_evento.asc(), CalendarioLembrete.id.asc()).all()
+        for x in rows:
+            reminders.append({
+                "id":x.id,"title":x.titulo,"description":x.descricao or "",
+                "date":x.data_evento.isoformat(),"time":x.hora_evento or "",
+                "target":x.destino,"advance_days":x.antecedencia_dias,
+                "send_at":_local_iso_from_utc(x.disparar_em),
+                "sent_at":_local_iso_from_utc(x.enviado_em),
+                "completed":bool(x.concluido_em),
+            })
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Calendário: lembretes indisponíveis; exibindo feriados.")
     return jsonify(ok=True, year=year, holidays=holidays_for_year(year), reminders=reminders)
 
 
@@ -330,7 +334,6 @@ def rest_calendario_proximos():
     rest = _rest_atual()
     if not rest:
         abort(403)
-    ensure_calendar_schema()
     now=datetime.utcnow()
     end=now+timedelta(days=7)
     # Inclui lembretes vencidos nas últimas 24h: ao abrir o painel eles disparam
@@ -495,4 +498,3 @@ def _calendar_mailbox_context():
         return {"admin_mailbox_unread_count":0}
 
 
-start_scheduler()
