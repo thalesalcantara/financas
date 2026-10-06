@@ -406,20 +406,50 @@ def rest_calendario_excluir(item_id):
     return jsonify(ok=True)
 
 
-@app.get("/admin/caixa-postal", endpoint="admin_caixa_postal")
-def admin_caixa_postal():
-    if not _is_admin(): abort(403)
+def admin_caixa_postal_calendar():
+    """Amplia a Caixa Postal existente sem perder as respostas do rastreamento."""
+    if not _is_admin():
+        abort(403)
     ensure_calendar_schema()
+    try:
+        legacy._ensure_tracking_schema()
+    except Exception:
+        pass
+
     filtro=(request.args.get("status") or "todos").lower()
     q=CaixaPostalMensagem.query.order_by(CaixaPostalMensagem.criado_em.desc())
-    if filtro=="nao_lidos": q=q.filter(CaixaPostalMensagem.lido_em.is_(None))
-    elif filtro=="lidos": q=q.filter(CaixaPostalMensagem.lido_em.isnot(None))
-    rows=q.limit(500).all()
-    rest_ids={x.restaurante_id for x in rows}
+    if filtro=="nao_lidos":
+        q=q.filter(CaixaPostalMensagem.lido_em.is_(None))
+    elif filtro=="lidos":
+        q=q.filter(CaixaPostalMensagem.lido_em.isnot(None))
+    mail_rows=q.limit(500).all()
+    rest_ids={x.restaurante_id for x in mail_rows}
     rest_map={r.id:r for r in Restaurante.query.filter(Restaurante.id.in_(rest_ids)).all()} if rest_ids else {}
-    return render_template("admin_caixa_postal.html",rows=rows,rest_map=rest_map,
-        unread=_mailbox_unread(),active_tab="caixa_postal",
-        admin_nav_master=True,admin_nav_perms={},admin_nav_home_url=url_for("admin_light_summary"))
+
+    tracking_rows=[]
+    try:
+        tracking_rows=(
+            db.session.query(legacy.RastreamentoPesquisa, Restaurante)
+            .join(Restaurante, Restaurante.id==legacy.RastreamentoPesquisa.restaurante_id)
+            .order_by(legacy.RastreamentoPesquisa.atualizado_em.desc())
+            .all()
+        )
+    except Exception:
+        db.session.rollback()
+
+    return render_template(
+        "admin_caixa_postal.html",
+        mail_rows=mail_rows,
+        tracking_rows=tracking_rows,
+        rest_map=rest_map,
+        unread=_mailbox_unread(),
+        active_tab="caixa_postal",
+    )
+
+
+# A URL /admin/caixa-postal já existe no sistema para respostas do rastreamento.
+# Troca somente a função da rota, preservando o mesmo endpoint usado pelo menu.
+legacy.app.view_functions["admin_caixa_postal"] = admin_caixa_postal_calendar
 
 
 @app.post("/admin/caixa-postal/<int:item_id>/lido", endpoint="admin_caixa_postal_lido")
