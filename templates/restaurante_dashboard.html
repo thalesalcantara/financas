@@ -1546,6 +1546,67 @@ section[data-view="calendario"]{
   min-height:0!important;
 }
 </style>
+
+<style id="calendar-viewport-height-balance">
+/* Equilibra o calendário para caber em 100% de zoom sem achatar demais */
+section[data-view="calendario"] .cal-shell{
+  gap:8px!important;
+}
+section[data-view="calendario"] .cal-hero{
+  padding:10px 14px!important;
+}
+section[data-view="calendario"] .cal-main-layout{
+  padding:8px!important;
+  gap:10px!important;
+  align-items:start!important;
+}
+section[data-view="calendario"] .cal-main-column{
+  min-height:0!important;
+  height:auto!important;
+}
+section[data-view="calendario"] #calMonthView{
+  min-height:0!important;
+  height:auto!important;
+}
+section[data-view="calendario"] .cal-grid{
+  min-height:0!important;
+  height:auto!important;
+}
+section[data-view="calendario"] .cal-day{
+  min-height:86px!important;
+  height:86px!important;
+}
+section[data-view="calendario"] .cal-weekdays div{
+  padding:6px 5px!important;
+}
+section[data-view="calendario"] .cal-legend{
+  padding:7px 10px!important;
+}
+section[data-view="calendario"] .cal-toolbar{
+  padding:8px 10px!important;
+}
+section[data-view="calendario"] .cal-side-column{
+  align-self:start!important;
+}
+section[data-view="calendario"] .cal-side-card{
+  padding:9px!important;
+}
+section[data-view="calendario"] .cal-up-item{
+  padding:5px 0!important;
+}
+section[data-view="calendario"] .cal-side-form-grid{
+  gap:5px!important;
+}
+section[data-view="calendario"] .cal-field textarea{
+  min-height:32px!important;
+  max-height:46px!important;
+}
+@media (min-width:1200px){
+  section[data-view="calendario"] .cal-main-layout{
+    grid-template-columns:minmax(0,1fr) 340px!important;
+  }
+}
+</style>
 </head>
 <body class="rest-wide-modern">
   <div class="shell">
