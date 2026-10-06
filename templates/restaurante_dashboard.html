@@ -2964,8 +2964,71 @@ function setPhone(digits) {
         });
       }));
 
-      const pendCount={{ _pendencias|length }};
+
+      async function loadPendingWeekState(){
+        try{
+          const r=await fetch('/api/rest/pendencias-semana',{credentials:'same-origin',cache:'no-store'});
+          if(!r.ok)return;
+          const j=await r.json();
+          if(!j.ok)return;
+
+          const pendingList=document.getElementById('listaPendencias');
+          const pendingTab=document.querySelector('.rest-list-tab[data-coop-filter="pendencias"]');
+          const rows=j.pendencias||[];
+          if(pendingTab){
+            const label='Com pendência';
+            pendingTab.innerHTML=label+(rows.length?' <b>'+rows.length+'</b>':'');
+          }
+          if(pendingList){
+            if(!rows.length){
+              pendingList.innerHTML='<div class="rest-pending-empty"><i class="bi bi-check2-circle"></i> Nenhuma pendência.</div>';
+            }else{
+              pendingList.innerHTML=rows.map(function(p){
+                const safeName=String(p.cooperado_nome||'Cooperado').replace(/"/g,'&quot;');
+                return '<div class="rest-pending-item">'+
+                  '<div class="rest-pending-main"><strong>'+safeName+'</strong><small>'+String(p.data||'')+' · '+String(p.horario||'')+(p.turno?' · '+String(p.turno):'')+'</small></div>'+
+                  '<div class="rest-pending-actions">'+
+                    '<span class="rest-pending-pill"><i class="bi bi-exclamation-circle-fill"></i> Pendente</span>'+
+                    '<button type="button" class="rest-pending-action primary js-pending-launch" data-id="'+p.cooperado_id+'" data-date="'+String(p.data_iso||'')+'" data-start="'+String(p.hora_inicio||'')+'" data-end="'+String(p.hora_fim||'')+'"><i class="bi bi-plus-circle"></i> Lançar</button>'+
+                    (p.nao_compareceu_url?'<form method="post" action="'+p.nao_compareceu_url+'" class="m-0" onsubmit="return confirm(\'Confirmar que '+safeName+' não compareceu nesta escala?\');"><button type="submit" class="rest-pending-action danger" title="Não compareceu"><i class="bi bi-person-x"></i></button></form>':'')+
+                    (p.trocar_url?'<button type="button" class="rest-pending-action warning coopex-btn-substituir" data-action="'+p.trocar_url+'" data-original-id="'+p.cooperado_id+'" data-original-nome="'+safeName+'" title="Trocar cooperado"><i class="bi bi-arrow-left-right"></i></button>':'')+
+                  '</div></div>';
+              }).join('');
+              pendingList.querySelectorAll('.js-pending-launch').forEach(function(btn){
+                btn.addEventListener('click',function(){
+                  selecionarCooperadoPendente(btn.dataset.id,btn.dataset.date,btn.dataset.start,btn.dataset.end);
+                });
+              });
+            }
+          }
+
+          const status=j.status||{};
+          itens.forEach(function(card){
+            const st=status[String(card.dataset.id)]||null;
+            if(!st)return;
+            card.dataset.producao=st.tem_producao_hoje?'1':'0';
+            card.dataset.pendente=st.pendente_hoje?'1':'0';
+            card.dataset.pendingDate=st.pend_data||'';
+            card.dataset.pendingStart=st.pend_inicio||'';
+            card.dataset.pendingEnd=st.pend_fim||'';
+            const box=card.querySelector('.rest-coop-status');
+            if(!box)return;
+            const old=box.querySelector('.rest-status-pill');
+            if(old){
+              let icon='<i class="bi bi-check-lg"></i>';
+              if(st.status_kind==='danger')icon='<i class="bi bi-exclamation-circle-fill"></i>';
+              else if(st.status_label==='Lançamento OK')icon='<i class="bi bi-check2-circle"></i>';
+              else if(st.tem_producao_hoje)icon='<i class="bi bi-clock-fill"></i>';
+              old.className='rest-status-pill '+(st.status_kind||'neutral');
+              old.innerHTML=icon+' '+(st.status_label||'Escalado');
+            }
+          });
+        }catch(e){}
+      }
+      setTimeout(loadPendingWeekState,120);
+
       let pendingAudio=null;
+      const pendCount={{ _pendencias|length }};
       function tocarPendencia(){
         if(!pendCount)return;
         if(!pendingAudio){
