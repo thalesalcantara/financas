@@ -49,7 +49,7 @@
     {% if _avaliacoes or _avisos or _restaurantes or _master %}<div class="alv8-group"><button type="button"><i class="bi bi-bar-chart"></i> Gestão <i class="bi bi-chevron-down"></i></button><div class="alv8-menu">
       {% if _avaliacoes %}<a href="{{ url_for('admin_light_ratings') }}"><i class="bi bi-stars"></i> Avaliações</a>{% endif %}
       {% if _avisos %}<a href="{{ url_for('admin_light_notices') }}"><i class="bi bi-megaphone"></i> Avisos</a>{% endif %}
-      {% if _restaurantes or _master %}<a class="{{ 'active' if active_tab=='caixa_postal' else '' }}" href="{{ url_for('admin_caixa_postal') }}"><i class="bi bi-inbox"></i> Caixa Postal</a>{% endif %}
+      {% if _restaurantes or _master %}<a class="{{ 'active' if active_tab=='caixa_postal' else '' }}" href="{{ url_for('admin_caixa_postal') }}"><i class="bi bi-inbox"></i> Caixa Postal <span id="adminMailboxBadge" style="display:{{ 'inline-grid' if (admin_mailbox_unread_count|default(0)) else 'none' }};place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#ff3b30;color:#fff;font-size:10px;font-weight:950">{{ admin_mailbox_unread_count|default(0) }}</span></a>{% endif %}
     </div></div>{% endif %}
 
     {% if _master %}<a class="alv8-direct" href="{{ url_for('admin_v11_config') }}"><i class="bi bi-gear"></i> Configurações</a>{% endif %}
@@ -57,3 +57,30 @@
     <a class="alv8-direct" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a>
   </nav>
 </header>
+
+<script id="coopex-mailbox-events">
+(()=>{
+  if(window.__coopexMailboxEvents)return;window.__coopexMailboxEvents=true;
+  let audioCtx=null;
+  const unlock=()=>{try{audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume()}catch(_){}};
+  document.addEventListener('pointerdown',unlock,{once:true,passive:true});
+  function beep(){
+    try{
+      unlock();if(!audioCtx||audioCtx.state!=='running')return;
+      const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+      o.frequency.value=880;g.gain.setValueAtTime(.0001,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.18,audioCtx.currentTime+.015);g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+.18);
+      o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+.2);
+    }catch(_){}
+  }
+  try{
+    const es=new EventSource({{ url_for('admin_caixa_postal_eventos')|tojson }});
+    es.addEventListener('mailbox',ev=>{
+      let data={};try{data=JSON.parse(ev.data||'{}')}catch(_){}
+      const badge=document.getElementById('adminMailboxBadge');
+      if(badge){badge.textContent=data.unread||1;badge.style.display='inline-grid'}
+      beep();
+      window.dispatchEvent(new CustomEvent('coopex:new-mail',{detail:data}));
+    });
+  }catch(_){}
+})();
+</script>
