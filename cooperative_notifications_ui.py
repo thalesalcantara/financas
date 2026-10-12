@@ -661,9 +661,10 @@ def rest_pending_week_state():
         rest = legacy.request_restaurante()
         if not rest:
             return jsonify(ok=False, pendencias=[], status={}), 404
-        indexed_scales = perf._rest_scales_indexed(rest)
-        pending_rows = _week_pending_rows(rest, indexed_scales)
-        status_map = _today_coop_launch_state(rest, pending_rows, indexed_scales)
+        # Pendências consultam todas as datas existentes, não a lista
+        # limitada de escalados usada somente no painel do dia.
+        pending_rows = _week_pending_rows(rest)
+        status_map = _today_coop_launch_state(rest, pending_rows)
         for p in pending_rows:
             try:
                 p["nao_compareceu_url"] = url_for("rest_pendencia_nao_compareceu", scale_id=p.get("escala_id"))
@@ -675,7 +676,7 @@ def rest_pending_week_state():
     except Exception:
         db.session.rollback()
         app.logger.exception("Falha ao carregar pendências assíncronas")
-        return jsonify(ok=False, pendencias=[], status={}), 500
+        return jsonify(ok=False, pendencias=[], status={}, erro="Falha ao consultar pendências. Os registros não foram apagados."), 500
 
 
 @app.context_processor
