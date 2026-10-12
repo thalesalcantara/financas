@@ -100,7 +100,7 @@ def _filter_active_window(rows):
     today = datetime.now(TZ).date()
     monday = today - timedelta(days=today.weekday())
     sunday = monday + timedelta(days=6)
-    start = today - timedelta(days=31)
+    start = today - timedelta(days=38)
     result = []
     for scale in rows:
         d = exact_scale_date(scale, today)
