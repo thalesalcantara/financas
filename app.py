@@ -7022,29 +7022,111 @@ def upload_escala():
         flash("Nada importado: nenhum registro válido encontrado. Verifique a linha dos cabeçalhos e os nomes das colunas.", "warning")
         return redirect(url_for("admin_dashboard", tab="escalas"))
 
-    # ------- SUBSTITUIÇÃO TOTAL -------
+    # ------- IMPORTAÇÃO POR DATA (SEM APAGAR SEMANAS ANTERIORES) -------
     try:
-        from sqlalchemy import text as sa_text, delete as sa_delete
+        from sqlalchemy import text as sa_text
 
-        # Remove todas as escalas antigas de forma segura (sem violar FKs de trocas)
-        if _is_sqlite():
-            # Em dev/local com SQLite não há TRUNCATE CASCADE — apaga dependentes e depois escalas
-            db.session.execute(sa_delete(TrocaSolicitacao))
-            db.session.execute(sa_delete(Escala))
-        else:
-            # Em produção (Postgres): TRUNCATE com CASCADE limpa escalas e dependentes de uma vez
-            db.session.execute(sa_text("TRUNCATE TABLE escalas RESTART IDENTITY CASCADE"))
-
-        # insere novas linhas
+        # Datas são locais de Natal/Fortaleza. Uma escala publicada no domingo
+        # não pode apagar o domingo em andamento nem os lançamentos ainda pendentes.
+        hoje_local = _brasil_now().date()
+        incoming_by_date = {}
+        invalid_dates = []
         for row in linhas_novas:
-            db.session.add(Escala(**row))
+            day = _parse_data_escala_str(row["data"])
+            if day is None:
+                invalid_dates.append(row["data"])
+                continue
+            incoming_by_date.setdefault(day, []).append(row)
 
-        # marca atualização para cooperados reconhecidos
-        ids_reconhecidos = {int(r["cooperado_id"]) for r in linhas_novas if r.get("cooperado_id")}
+        if invalid_dates:
+            raise ValueError(
+                "A planilha contém datas inválidas ou ausentes: "
+                + ", ".join(str(v) for v in invalid_dates[:5])
+            )
+
+        # Não permitir substituir uma data que já começou. O administrador pode
+        # corrigir registros individualmente, sem destruir vínculos financeiros.
+        futuras = {day: rows for day, rows in incoming_by_date.items() if day > hoje_local}
+        preservadas = sum(len(rows) for day, rows in incoming_by_date.items() if day <= hoje_local)
+
+        # Carrega somente datas presentes no novo arquivo: escalas das semanas
+        # seguintes, lançadas antecipadamente, permanecem armazenadas.
+        dates_target = set(futuras)
+        existentes = {}
+        if dates_target:
+            for antiga in Escala.query.all():
+                day = _parse_data_escala_str(antiga.data)
+                if day in dates_target:
+                    existentes.setdefault(day, []).append(antiga)
+
+        # Vinculações antigas devem permanecer intactas quando já existem
+        # produções/trocas; isso também impede cascades sobre registros financeiros.
+        old_ids = [x.id for group in existentes.values() for x in group]
+        escala_com_producao = set()
+        escala_com_troca = set()
+        if old_ids:
+            from production_scale_backend import ProducaoCooperado
+            escala_com_producao = {
+                item[0] for item in db.session.query(ProducaoCooperado.escala_id)
+                .filter(ProducaoCooperado.escala_id.in_(old_ids)).all()
+                if item[0] is not None
+            }
+            escala_com_troca = {
+                item[0] for item in db.session.query(TrocaSolicitacao.origem_escala_id)
+                .filter(TrocaSolicitacao.origem_escala_id.in_(old_ids)).all()
+                if item[0] is not None
+            }
+
+        fields = ("cooperado_id", "cooperado_nome", "data", "turno",
+                  "horario", "contrato", "cor", "restaurante_id")
+        def slot_key(row):
+            # Não usar o ID do cooperado: uma substituição dentro do mesmo
+            # turno deve preservar o registro e seus vínculos existentes.
+            return (
+                _norm_local(row.get("contrato")),
+                _norm_local(row.get("turno")),
+                str(row.get("horario") or "").strip().casefold(),
+                str(row.get("data") or "").strip(),
+            )
+
+        criadas = alteradas = removidas = mantidas_vinculadas = 0
+        for day, rows in futuras.items():
+            available = {}
+            for old in existentes.get(day, []):
+                key = slot_key({name: getattr(old, name) for name in fields})
+                available.setdefault(key, []).append(old)
+
+            used = set()
+            for row in rows:
+                key = slot_key(row)
+                pool = available.get(key, [])
+                old = next((x for x in pool if x.id not in used), None)
+                if old is None:
+                    db.session.add(Escala(**row))
+                    criadas += 1
+                else:
+                    used.add(old.id)
+                    for name in fields:
+                        setattr(old, name, row[name])
+                    alteradas += 1
+
+            for old in existentes.get(day, []):
+                if old.id in used:
+                    continue
+                if old.id in escala_com_producao or old.id in escala_com_troca:
+                    mantidas_vinculadas += 1
+                    continue
+                db.session.delete(old)
+                removidas += 1
+
+        ids_reconhecidos = {
+            int(row["cooperado_id"])
+            for rows in futuras.values() for row in rows if row.get("cooperado_id")
+        }
         for cid in ids_reconhecidos:
-            c = Cooperado.query.get(cid)
-            if c:
-                c.ultima_atualizacao = datetime.now()
+            coop = db.session.get(Cooperado, cid)
+            if coop:
+                coop.ultima_atualizacao = datetime.now()
 
         db.session.commit()
 
@@ -7090,7 +7172,9 @@ def upload_escala():
         }
 
         flash(
-            f"Escala substituída com sucesso. {len(linhas_novas)} linha(s) importada(s). "
+            f"Escalas futuras salvas por data: {criadas} nova(s), {alteradas} atualizada(s), "
+            f"{removidas} substituída(s), {preservadas} linha(s) de hoje/passado preservada(s), "
+            f"{mantidas_vinculadas} vínculo(s) histórico(s) mantido(s). "
             f"{len(active_ids)} cooperado(s) ativo(s) · "
             f"{len(assigned_active_ids)} receberam escala semanal.",
             "success",
