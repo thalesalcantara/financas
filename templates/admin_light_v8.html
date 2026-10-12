@@ -51,6 +51,7 @@ body{font-weight:700!important}.alv8-brand-copy small{font-size:12px!important}.
       <div class="alv8-field"><label>Data final</label><input class="alv8-input" type="date" name="data_fim" value="{{ data_fim.isoformat() if data_fim else '' }}"></div>
       <button class="alv8-btn primary"><i class="bi bi-funnel"></i> Aplicar</button>
       <a class="alv8-btn" href="{{ url_for('admin_light_summary') }}">Hoje</a>
+      <button class="alv8-btn" type="submit" formaction="{{ url_for('exportar_lancamentos') }}" formmethod="get"><i class="bi bi-file-earmark-spreadsheet"></i> Exportar Excel</button>
     </form>
     <div class="alv8-grid">
       <div class="alv8-kpi"><span>Produção</span><strong>R$ {{ brl(totals.prod) }}</strong></div>
