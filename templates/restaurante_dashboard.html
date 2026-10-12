@@ -1078,6 +1078,29 @@ section[data-view="lancar"]>.row.g-4{--bs-gutter-x:8px!important}.lancar-layout-
 .rest-history-head{justify-content:space-between}.rest-history-head .eyebrow{font-size:.62rem;font-weight:900;color:#58708f;letter-spacing:.06em}.rest-history-total{padding:8px 13px;border-radius:10px;background:#eef6ff;text-align:right}.rest-history-total span{display:block;color:#60708c;font-size:.65rem;font-weight:800}.rest-history-total strong{display:block;color:#0a397d;font-size:1rem}.rest-history-filter{display:grid;grid-template-columns:150px 150px 150px minmax(180px,1fr) auto auto auto;gap:7px;align-items:end;background:#fff;border:1px solid #dbe4f1;border-radius:11px;padding:9px 10px;margin-bottom:8px}.rest-history-filter .grow{min-width:0}.rest-history-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:8px}.rest-history-kpis>div{background:#fff;border:1px solid #dbe4f1;border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:9px}.rest-history-kpis i{font-size:1rem;color:#0c6de5}.rest-history-kpis span{font-size:.64rem;color:#60708c}.rest-history-kpis strong{display:block;color:#102a54;font-size:.82rem;margin-top:1px}.rest-history-table{background:#fff;border:1px solid #dbe4f1;border-radius:11px;overflow:hidden}.rest-history-table thead th{background:#0866ca!important;color:#fff!important;text-transform:none!important;font-size:.7rem!important;padding:.48rem .5rem!important;border-color:rgba(255,255,255,.15)!important}.rest-history-table tbody td{font-size:.72rem!important;padding:.42rem .5rem!important;border-color:#e7edf5!important}.rest-history-table tbody tr:hover{background:#f6faff}.rest-history-table tfoot th{font-size:.72rem!important;background:#f2f6fb!important}.rest-icon-btn{display:inline-grid;place-items:center;width:28px;height:28px;border:0;border-radius:7px;color:#0875ed;background:#eef6ff;margin:0 2px}.rest-icon-btn.danger{color:#e12838;background:#fff0f1}
 .rest-selected-history{border-radius:10px!important;overflow:hidden!important;border:1px solid #d8e2ef!important;background:#fff}
 .rest-bottom-history{width:100%;margin-top:8px}
+/* Histórico do cooperado: a tabela precisa rolar independentemente da altura
+   disponível no painel, sem cortar os registros depois das primeiras linhas. */
+section[data-view="lancar"] .coopex-period-records-scroll{
+  max-height:440px!important;
+  overflow-y:auto!important;
+  overflow-x:auto!important;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+}
+section[data-view="lancar"] .coopex-period-records-scroll .rest-production-table{
+  height:auto!important;
+  max-height:none!important;
+}
+section[data-view="lancar"] .coopex-period-records-scroll tbody{
+  height:auto!important;
+  max-height:none!important;
+}
+section[data-view="lancar"] .coopex-period-records-scroll thead th{
+  position:sticky;
+  top:0;
+  z-index:2;
+}
+
 .rest-history-strip{min-height:58px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #dbe4ef;background:#fff}
 .rest-history-title{display:flex;align-items:center;gap:8px;min-width:0}.rest-history-icon{width:28px;height:28px;border:2px solid #0875ed;border-radius:6px;display:grid;place-items:center;color:#0875ed;flex:0 0 auto}.rest-history-title strong{display:block;text-transform:none;font-size:.78rem;color:#0b2853}.rest-history-title small{display:block;font-size:.62rem;color:#6a7a92;margin-top:1px}
 .rest-mini-kpis{display:flex;gap:7px;flex:0 0 auto}.rest-mini-kpi{min-width:126px;height:42px;border-radius:8px;padding:5px 9px;display:flex;align-items:center;gap:7px}.rest-mini-kpi>i{font-size:1rem}.rest-mini-kpi span{font-size:.57rem;line-height:1.05}.rest-mini-kpi strong{display:block;font-size:.8rem;margin-top:2px}.rest-mini-kpi.blue{background:#eaf6ff;color:#0b5fae}.rest-mini-kpi.green{background:#eaf9f1;color:#08753e}.rest-mini-kpi.orange{background:#fff5df;color:#9a5b00}
@@ -2668,7 +2691,7 @@ body.rest-wide-modern section[data-view="calendario"] .cal-day-empty{
                   <div class="rest-mini-kpi orange"><i class="bi bi-calendar3"></i><span>Lançamentos<strong>{{ coop.lancamentos|length }}</strong></span></div>
                 </div>
               </div>
-              <div class="table-responsive">
+              <div class="table-responsive coopex-period-records-scroll" tabindex="0" aria-label="Todos os lançamentos do período, role para visualizar">
                 <table class="table rest-production-table align-middle mb-0">
                   <thead>
                     <tr>
