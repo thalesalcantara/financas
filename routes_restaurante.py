@@ -1228,6 +1228,52 @@ def portal_restaurante():
 
 
 
+@app.get("/api/restaurante/lancamentos-cooperado", endpoint="rest_lancamentos_cooperado_periodo")
+@role_required("restaurante")
+def rest_lancamentos_cooperado_periodo():
+    """Histórico completo do cooperado no período, independente da escala do dia."""
+    from flask import jsonify
+    rest = request_restaurante()
+    if not rest:
+        return jsonify(ok=False, erro="Estabelecimento não encontrado"), 404
+    coop_id = request.args.get("cooperado_id", type=int)
+    di = _parse_date(request.args.get("data_inicio"))
+    df = _parse_date(request.args.get("data_fim"))
+    if not coop_id or not di or not df:
+        return jsonify(ok=False, erro="Informe cooperado e período"), 400
+    if di > df:
+        di, df = df, di
+    if (df - di).days > 366:
+        return jsonify(ok=False, erro="Período máximo de 367 dias"), 400
+    registros = (
+        Lancamento.query
+        .filter(
+            Lancamento.restaurante_id == rest.id,
+            Lancamento.cooperado_id == coop_id,
+            Lancamento.data >= di,
+            Lancamento.data <= df,
+        )
+        .order_by(Lancamento.data.desc(), Lancamento.id.desc())
+        .all()
+    )
+    return jsonify(
+        ok=True, quantidade=len(registros),
+        entregas=sum(int(item.qtd_entregas or 0) for item in registros),
+        total=round(sum(float(item.valor or 0) for item in registros), 2),
+        registros=[{
+            "id": item.id,
+            "data": item.data.strftime("%d/%m/%Y") if item.data else "",
+            "inicio": str(item.hora_inicio or ""),
+            "fim": str(item.hora_fim or ""),
+            "valor": float(item.valor or 0),
+            "entregas": int(item.qtd_entregas or 0),
+            "descricao": item.descricao or "",
+            "editar": url_for("editar_lancamento", id=item.id) if "editar_lancamento" in app.view_functions else "",
+            "excluir": url_for("excluir_lancamento", id=item.id) if "excluir_lancamento" in app.view_functions else "",
+        } for item in registros],
+    )
+
+
 @app.get("/portal/restaurante/exportar-lancamentos.xlsx", endpoint="rest_export_lancamentos_xlsx")
 @role_required("restaurante")
 def rest_export_lancamentos_xlsx():
