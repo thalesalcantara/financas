@@ -7079,45 +7079,58 @@ def upload_escala():
 
         fields = ("cooperado_id", "cooperado_nome", "data", "turno",
                   "horario", "contrato", "cor", "restaurante_id")
-        def slot_key(row):
-            # Não usar o ID do cooperado: uma substituição dentro do mesmo
-            # turno deve preservar o registro e seus vínculos existentes.
+
+        def _scale_signature(row):
+            # Identidade completa para impedir duplicações na própria planilha.
             return (
-                _norm_local(row.get("contrato")),
+                row.get("cooperado_id"),
+                _norm_local(row.get("cooperado_nome")),
+                _parse_data_escala_str(row.get("data")),
                 _norm_local(row.get("turno")),
-                str(row.get("horario") or "").strip().casefold(),
-                str(row.get("data") or "").strip(),
+                _norm_local(row.get("horario")),
+                _norm_local(row.get("contrato")),
+                row.get("restaurante_id"),
             )
 
         criadas = alteradas = removidas = mantidas_vinculadas = 0
         for day, rows in futuras.items():
-            available = {}
-            for old in existentes.get(day, []):
-                key = slot_key({name: getattr(old, name) for name in fields})
-                available.setdefault(key, []).append(old)
-
-            used = set()
+            old_rows = existentes.get(day, [])
+            incoming = []
+            signatures = set()
             for row in rows:
-                key = slot_key(row)
-                pool = available.get(key, [])
-                old = next((x for x in pool if x.id not in used), None)
-                if old is None:
-                    db.session.add(Escala(**row))
-                    criadas += 1
-                else:
-                    used.add(old.id)
-                    for name in fields:
-                        setattr(old, name, row[name])
-                    alteradas += 1
+                signature = _scale_signature(row)
+                if signature in signatures:
+                    continue
+                signatures.add(signature)
+                incoming.append(row)
 
-            for old in existentes.get(day, []):
-                if old.id in used:
-                    continue
-                if old.id in escala_com_producao or old.id in escala_com_troca:
-                    mantidas_vinculadas += 1
-                    continue
+            # Nunca apagar nem recriar escalas que já tenham vínculos
+            # financeiros ou de troca: a operação é cancelada integralmente.
+            linked = [old for old in old_rows
+                      if old.id in escala_com_producao or old.id in escala_com_troca]
+            if linked:
+                old_signatures = {_scale_signature(
+                    {field: getattr(old, field) for field in fields}
+                ) for old in old_rows}
+                if old_signatures != signatures or len(old_rows) != len(incoming):
+                    raise ValueError(
+                        f"A escala de {day.strftime('%d/%m/%Y')} tem produção ou troca "
+                        "vinculada. Não foi substituída para evitar perda de histórico; "
+                        "corrija os registros individualmente."
+                    )
+                mantidas_vinculadas += len(linked)
+                continue
+
+            # Substituição completa SOMENTE da data presente no arquivo.
+            # Ao corrigir cooperado, contrato ou horário, a versão anterior
+            # desaparece e não gera uma segunda escala.
+            for old in old_rows:
                 db.session.delete(old)
                 removidas += 1
+            db.session.flush()
+            for row in incoming:
+                db.session.add(Escala(**row))
+                criadas += 1
 
         ids_reconhecidos = {
             int(row["cooperado_id"])
