@@ -311,10 +311,14 @@ def admin_light_launches():
     ).order_by(None).one()
     total = float(total or 0.0)
     count_all = int(count_all or 0)
+    page_size = 220
+    page_count = max(1, (count_all + page_size - 1) // page_size)
+    page = max(1, min(request.args.get("page", default=1, type=int) or 1, page_count))
 
     launches = (
         query.order_by(Lancamento.data.desc(), Lancamento.id.desc())
-        .limit(220)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
         .all()
     )
 
@@ -343,7 +347,7 @@ def admin_light_launches():
     return _render(
         "lancamentos",
         "Lançamentos",
-        f"Total do período: {count_all} registros. Exibindo até 220 por abertura; os valores incluem todos.",
+        f"Total do período: {count_all} registros. Página {page} de {page_count}; os totais incluem todos.",
         data_inicio=di,
         data_fim=df,
         q=q,
@@ -354,6 +358,10 @@ def admin_light_launches():
         launches=launches,
         coop_map=coops,
         rest_map=rests,
+        launch_page=page,
+        launch_pages=page_count,
+        launch_count=count_all,
+        launch_page_size=page_size,
         launch_total=total,
         launch_total_inss=total_inss,
         launch_total_sest=total_sest,
