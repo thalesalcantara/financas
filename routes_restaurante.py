@@ -647,7 +647,6 @@ def portal_restaurante():
                 Lancamento.data <= df,
             )
             .order_by(Lancamento.data.desc(), Lancamento.id.desc())
-            .limit(1200)
             .all()
         )
         for _l in lancamentos_periodo_all:
