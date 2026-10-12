@@ -3043,6 +3043,47 @@ function setPhone(digits) {
         cooperadoCards.forEach(c => c.classList.remove('selected'));
       }
 
+      // Consulta completa sob demanda: os valores e as linhas usam a mesma
+      // origem, inclusive para semanas anteriores.
+      async function carregarLancamentosDoPeriodo(coopId){
+        const table=document.getElementById('tabela-'+coopId);
+        if(!table)return;
+        const inputs=document.querySelectorAll('.rest-period-form input[name="data_inicio"], .rest-period-form input[name="data_fim"]');
+        const di=inputs[0]?.value||'';
+        const df=inputs[1]?.value||'';
+        if(!di||!df)return;
+        const escapeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const params=new URLSearchParams({cooperado_id:String(coopId),data_inicio:di,data_fim:df});
+        try{
+          const resp=await fetch('/api/restaurante/lancamentos-cooperado?'+params,{credentials:'same-origin',cache:'no-store'});
+          const data=await resp.json();
+          if(!resp.ok||!data.ok)throw new Error(data.erro||'Consulta indisponível');
+          if(String(document.getElementById('inputCooperadoId')?.value)!==String(coopId))return;
+          const tbody=table.querySelector('tbody');
+          if(tbody){
+            tbody.innerHTML=data.registros.length?data.registros.map((x,index)=>
+              '<tr><td class="text-center">'+(index+1)+'</td>'+
+              '<td><strong>'+escapeHtml(x.data)+'</strong></td>'+
+              '<td>'+escapeHtml(x.inicio||'—')+' - '+escapeHtml(x.fim||'—')+'</td>'+
+              '<td class="text-end">R$ '+Number(x.valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td>'+
+              '<td class="text-center">'+Number(x.entregas||0)+'</td>'+
+              '<td><span class="rest-payment-demo">Comanda</span></td>'+
+              '<td>'+escapeHtml(x.descricao||'—')+'</td>'+
+              '<td class="text-center">'+(x.editar?'<a class="rest-table-action edit" title="Editar" href="'+escapeHtml(x.editar)+'"><i class="bi bi-pencil"></i></a>':'')+
+              (x.excluir?'<a class="rest-table-action delete" title="Excluir" href="'+escapeHtml(x.excluir)+'" onclick="return confirm(\'Excluir este lançamento?\')"><i class="bi bi-trash"></i></a>':'')+'</td></tr>'
+            ).join(''):'<tr><td colspan="8" class="text-center text-muted py-3">Nenhum lançamento no período selecionado.</td></tr>';
+          }
+          const kpis=table.querySelectorAll('.rest-mini-kpi strong');
+          if(kpis[0])kpis[0].textContent=String(data.entregas);
+          if(kpis[1])kpis[1].textContent='R$ '+Number(data.total).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+          if(kpis[2])kpis[2].textContent=String(data.quantidade);
+        }catch(err){
+          console.error('Não foi possível carregar todos os lançamentos do período',err);
+          const tbody=table.querySelector('tbody');
+          if(tbody)tbody.insertAdjacentHTML('afterbegin','<tr><td colspan="8" class="text-center text-danger">Não foi possível atualizar os registros. A lista abaixo pode estar incompleta; consulte Histórico de Produção.</td></tr>');
+        }
+      }
+
       function selectCoop({id, nome, foto, total, foneDigits, shiftDate, shiftStart, shiftEnd}) {
         if (!id) return;
 
@@ -3084,7 +3125,10 @@ function setPhone(digits) {
 
         document.querySelectorAll('.lancamentos-table').forEach(t => t.style.display = 'none');
         const table = document.getElementById('tabela-' + id);
-        if (table) table.style.display = '';
+        if (table) {
+          table.style.display = '';
+          carregarLancamentosDoPeriodo(id);
+        }
 
         const campoData = form ? form.querySelector('input[name="data"]') : null;
         const campoInicio = form ? form.querySelector('input[name="hora_inicio"]') : null;
