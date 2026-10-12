@@ -5003,18 +5003,21 @@ function setPhone(digits) {
     const subRef=document.getElementById('coopexSubRef');
     const subModo=document.getElementById('coopexSubModo');
     if(!modalEl||!form||!select)return;
-    document.querySelectorAll('.coopex-btn-substituir').forEach(function(btn){
-      btn.addEventListener('click',function(){
-        form.action=btn.dataset.action||'';
-        if(original)original.textContent=btn.dataset.originalNome||'';
-        if(subRef)subRef.value=btn.dataset.ref||'';
-        if(subModo)subModo.value=btn.dataset.modo||'dia';
-        select.value='';
-        Array.from(select.options).forEach(function(opt){
-          opt.disabled=!!opt.value && String(opt.value)===String(btn.dataset.originalId||'');
-        });
-        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    // As pendências chegam por AJAX: delegação funciona também nos botões novos.
+    document.addEventListener('click',function(event){
+      const btn=event.target.closest('.coopex-btn-substituir');
+      if(!btn)return;
+      event.preventDefault();
+      if(!btn.dataset.action)return;
+      form.action=btn.dataset.action;
+      if(original)original.textContent=btn.dataset.originalNome||'';
+      if(subRef)subRef.value=btn.dataset.ref||'';
+      if(subModo)subModo.value=btn.dataset.modo||'dia';
+      select.value='';
+      Array.from(select.options).forEach(function(opt){
+        opt.disabled=!!opt.value && String(opt.value)===String(btn.dataset.originalId||'');
       });
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
     });
   });
 
