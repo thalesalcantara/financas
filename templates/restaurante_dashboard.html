@@ -2405,6 +2405,9 @@ body.rest-wide-modern section[data-view="calendario"] .cal-day-empty{
                           data-total="{{ '%.2f'|format(coop.total_periodo or 0) }}"
                           data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
                           data-escalado="{{ '1' if coop.id in coopex_rest_current_coop_ids else '0' }}"
+                          data-scale-id="{{ sh.get('scale_id','') }}"
+                          data-trocar-url="{{ url_for('rest_escala_trocar_cooperado', scale_id=sh.get('scale_id') or 0) }}"
+                          data-nao-compareceu-url="{{ url_for('rest_pendencia_nao_compareceu', scale_id=sh.get('scale_id') or 0) }}"
                           data-shift-date="{{ sh.get('data','') }}"
                           data-shift-start="{{ sh.get('hora_inicio','') }}"
                           data-shift-end="{{ sh.get('hora_fim','') }}"
@@ -2454,7 +2457,10 @@ body.rest-wide-modern section[data-view="calendario"] .cal-day-empty{
                         data-fone="{{ (coop.telefone or '')|replace('(','')|replace(')','')|replace('-','')|replace(' ','')|replace('+','') }}"
                         data-fone-raw="{{ coop.telefone or '' }}"
                         data-escalado="{{ '1' if coop.id in coopex_rest_current_coop_ids else '0' }}"
-                        data-shift-date="{{ sh.get('data','') }}"
+                        data-scale-id="{{ sh.get('scale_id','') }}"
+                          data-trocar-url="{{ url_for('rest_escala_trocar_cooperado', scale_id=sh.get('scale_id') or 0) }}"
+                          data-nao-compareceu-url="{{ url_for('rest_pendencia_nao_compareceu', scale_id=sh.get('scale_id') or 0) }}"
+                          data-shift-date="{{ sh.get('data','') }}"
                         data-shift-start="{{ sh.get('hora_inicio','') }}"
                         data-shift-end="{{ sh.get('hora_fim','') }}"
                         data-pendente="{{ '1' if st.get('pendente_hoje') else '0' }}"
@@ -2511,6 +2517,10 @@ body.rest-wide-modern section[data-view="calendario"] .cal-day-empty{
                     <a id="selPhone" class="badge bg-light text-dark border text-decoration-none" style="font-weight:500;" href="javascript:void(0)">
                       <span class="text-muted">Sem telefone</span>
                     </a>
+                    <button type="button" id="selTrocarCoop" class="btn btn-sm btn-outline-primary coopex-btn-substituir" style="display:none" title="Selecionar quem realmente trabalhou"><i class="bi bi-arrow-left-right"></i> Trocar cooperado</button>
+                    <form id="selNaoCompareceu" method="post" style="display:none" onsubmit="return confirm('Confirmar que este cooperado não compareceu ao turno selecionado?');">
+                      <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-person-x"></i> Não compareceu</button>
+                    </form>
                   </div>
 
                   <div class="text-muted">
@@ -3025,6 +3035,20 @@ function setPhone(digits) {
         if (totalEl) totalEl.textContent = (total || '0,00');
 
         setPhone(foneDigits);
+        const selectedCard = document.querySelector('.cooperado-item[data-id="'+String(id)+'"]');
+        const swapButton = document.getElementById('selTrocarCoop');
+        const absentForm = document.getElementById('selNaoCompareceu');
+        const scaleId = selectedCard?.dataset.scaleId || '';
+        if (swapButton) {
+          swapButton.style.display = scaleId ? '' : 'none';
+          swapButton.dataset.action = scaleId ? (selectedCard.dataset.trocarUrl || '') : '';
+          swapButton.dataset.originalId = String(id);
+          swapButton.dataset.originalNome = nome || '';
+        }
+        if (absentForm) {
+          absentForm.style.display = scaleId ? '' : 'none';
+          absentForm.action = scaleId ? (selectedCard.dataset.naoCompareceuUrl || '') : '';
+        }
         if (inputId) inputId.value = id || '';
 
         if (changed) {
