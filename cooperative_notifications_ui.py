@@ -386,11 +386,23 @@ def _week_pending_rows(rest, scales_source=None):
     today = now.date()
     history_start = today - timedelta(days=31)
 
-    source = scales_source if scales_source is not None else perf._rest_scales_indexed(rest)
+    # Não depender da lista de escalados (limitada aos 320 registros mais
+    # recentes): ela pode omitir dias anteriores quando várias semanas são
+    # publicadas de uma vez. Busca todas as escalas do estabelecimento.
+    from sqlalchemy import or_
+    source = (
+        Escala.query.filter(
+            or_(Escala.restaurante_id == rest.id,
+                Escala.restaurante_id.is_(None))
+        )
+        .order_by(Escala.id.desc())
+        .all()
+    )
     scales = [
-        scale
-        for scale in source
-        if (lambda d: bool(d and history_start <= d <= today))(shifts.exact_scale_date(scale, today))
+        scale for scale in source
+        if _scale_belongs_to_rest(scale, rest)
+        and (day := shifts.exact_scale_date(scale, today)) is not None
+        and history_start <= day <= today
     ]
     if not scales:
         return []
