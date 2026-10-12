@@ -643,10 +643,11 @@ def portal_restaurante():
             Lancamento.query
             .filter(
                 Lancamento.restaurante_id == rest.id,
-                Lancamento.data == date.today(),
+                Lancamento.data >= di,
+                Lancamento.data <= df,
             )
             .order_by(Lancamento.data.desc(), Lancamento.id.desc())
-            .limit(80)
+            .limit(1200)
             .all()
         )
         for _l in lancamentos_periodo_all:
