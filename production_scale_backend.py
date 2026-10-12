@@ -313,7 +313,7 @@ def _rest_scale_rows(rest):
     sunday = monday + timedelta(days=6)
     # Domingo anterior e demais pendências recentes continuam acessíveis
     # mesmo após publicar escalas novas ou virar a segunda-feira.
-    history_start = today - timedelta(days=31)
+    history_start = today - timedelta(days=38)
     scales = [s for s in _rest_scales(rest)
               if (day := _current_week_date(s, today)) is not None
               and history_start <= day <= sunday]
