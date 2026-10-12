@@ -381,16 +381,16 @@ if "rest_escala_adicionar_cooperado" not in app.view_functions:
 
 
 def _week_pending_rows(rest, scales_source=None):
-    """Pendências vencidas da semana, separadas por escala/turno."""
+    """Pendências vencidas dos últimos 31 dias, inclusive da semana anterior."""
     now = datetime.now(TZ)
     today = now.date()
-    monday = today - timedelta(days=today.weekday())
+    history_start = today - timedelta(days=31)
 
     source = scales_source if scales_source is not None else perf._rest_scales_indexed(rest)
     scales = [
         scale
         for scale in source
-        if (lambda d: bool(d and monday <= d <= today))(shifts.exact_scale_date(scale, today))
+        if (lambda d: bool(d and history_start <= d <= today))(shifts.exact_scale_date(scale, today))
     ]
     if not scales:
         return []
@@ -408,7 +408,7 @@ def _week_pending_rows(rest, scales_source=None):
     productions = (
         ProducaoCooperado.query.filter(
             ProducaoCooperado.restaurante_id == rest.id,
-            ProducaoCooperado.data >= monday,
+            ProducaoCooperado.data >= history_start,
             ProducaoCooperado.data <= today,
         )
         .order_by(ProducaoCooperado.id.desc())
@@ -430,7 +430,7 @@ def _week_pending_rows(rest, scales_source=None):
     launches = (
         Lancamento.query.filter(
             Lancamento.restaurante_id == rest.id,
-            Lancamento.data >= monday,
+            Lancamento.data >= history_start,
             Lancamento.data <= today,
         )
         .order_by(Lancamento.id.desc())
@@ -502,7 +502,7 @@ def _week_pending_rows(rest, scales_source=None):
             "aguardando_aprovacao": sent,
         })
 
-    result.sort(key=lambda item: (item["data"], item["horario"], item["cooperado_nome"].lower()))
+    result.sort(key=lambda item: (item["data_iso"], item["horario"], item["cooperado_nome"].lower()))
     return result
 
 
