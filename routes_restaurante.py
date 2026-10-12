@@ -1009,17 +1009,16 @@ def portal_restaurante():
                 continue
 
             raw_day = _parse_data_escala_str(scale.data)
-            weekday_num = _weekday_from_data_str(scale.data)
-
-            # Escalas da semana atual usam a data real.
-            if raw_day and week_start <= raw_day <= week_end:
-                scale_day = raw_day
-            # Compatibilidade com escalas recorrentes/antigas: projeta o dia
-            # da semana para a semana atual.
-            elif weekday_num in (1, 2, 3, 4, 5, 6, 7):
-                scale_day = week_start + timedelta(days=int(weekday_num) - 1)
+            # A data real prevalece. Escalas futuras não entram na semana atual.
+            if raw_day is not None:
+                scale_day = raw_day if week_start <= raw_day <= week_end else None
             else:
-                scale_day = None
+                # Somente escalas antigas sem data explícita usam dia da semana.
+                weekday_num = _weekday_from_data_str(scale.data)
+                scale_day = (
+                    week_start + timedelta(days=int(weekday_num) - 1)
+                    if weekday_num in (1, 2, 3, 4, 5, 6, 7) else None
+                )
 
             if not scale_day:
                 continue
