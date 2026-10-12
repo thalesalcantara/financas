@@ -311,7 +311,12 @@ def _rest_scale_rows(rest):
     today = now.date()
     monday = today - timedelta(days=today.weekday())
     sunday = monday + timedelta(days=6)
-    scales = _rest_scales(rest)
+    # Domingo anterior e demais pendências recentes continuam acessíveis
+    # mesmo após publicar escalas novas ou virar a segunda-feira.
+    history_start = today - timedelta(days=31)
+    scales = [s for s in _rest_scales(rest)
+              if (day := _current_week_date(s, today)) is not None
+              and history_start <= day <= sunday]
 
     coops = Cooperado.query.order_by(Cooperado.nome.asc()).all()
     coops_by_id = {c.id: c for c in coops}
@@ -320,7 +325,7 @@ def _rest_scale_rows(rest):
     productions = (
         ProducaoCooperado.query.filter(
             ProducaoCooperado.restaurante_id == rest.id,
-            ProducaoCooperado.data >= monday,
+            ProducaoCooperado.data >= history_start,
             ProducaoCooperado.data <= sunday,
         )
         .order_by(ProducaoCooperado.id.desc())
@@ -330,7 +335,7 @@ def _rest_scale_rows(rest):
     launches = (
         Lancamento.query.filter(
             Lancamento.restaurante_id == rest.id,
-            Lancamento.data >= monday,
+            Lancamento.data >= history_start,
             Lancamento.data <= sunday,
         )
         .order_by(Lancamento.id.desc())
