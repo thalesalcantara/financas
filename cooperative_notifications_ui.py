@@ -384,7 +384,7 @@ def _week_pending_rows(rest, scales_source=None):
     """Pendências vencidas dos últimos 31 dias, inclusive da semana anterior."""
     now = datetime.now(TZ)
     today = now.date()
-    history_start = today - timedelta(days=31)
+    history_start = today - timedelta(days=38)
 
     # Não depender da lista de escalados (limitada aos 320 registros mais
     # recentes): ela pode omitir dias anteriores quando várias semanas são
