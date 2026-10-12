@@ -305,6 +305,13 @@ def admin_light_launches():
             ))
         )
 
+    # Agregados SQL sobre TODOS os lançamentos filtrados, não apenas a página.
+    total, count_all = query.with_entities(
+        func.coalesce(func.sum(Lancamento.valor), 0.0), func.count(Lancamento.id)
+    ).order_by(None).one()
+    total = float(total or 0.0)
+    count_all = int(count_all or 0)
+
     launches = (
         query.order_by(Lancamento.data.desc(), Lancamento.id.desc())
         .limit(220)
@@ -329,7 +336,6 @@ def admin_light_launches():
         if rest_ids else {}
     )
 
-    total = sum(float(l.valor or 0.0) for l in launches)
     total_inss = round(total * 0.04, 2)
     total_sest = round(total * 0.005, 2)
     total_liquido = round(total - total_inss - total_sest, 2)
@@ -337,7 +343,7 @@ def admin_light_launches():
     return _render(
         "lancamentos",
         "Lançamentos",
-        "Consulta leve. Até 220 registros por abertura.",
+        f"Total do período: {count_all} registros. Exibindo até 220 por abertura; os valores incluem todos.",
         data_inicio=di,
         data_fim=df,
         q=q,
