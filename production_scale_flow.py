@@ -291,10 +291,37 @@ def coop_agenda_flow():
     if denied:
         return denied
     coop = _coop_current()
+    now = datetime.now(TZ)
+    today = now.date()
+    monday = today - timedelta(days=today.weekday())
+    sunday = monday + timedelta(days=6)
+    following_monday = monday + timedelta(days=7)
+    following_sunday = following_monday + timedelta(days=6)
+
+    # As escalas futuras ficam salvas, mas só são publicadas ao cooperado
+    # a partir do domingo anterior. Nesse domingo, a escala do dia continua
+    # visível até 1 hora após o INÍCIO individual do expediente.
     rows = _coop_scale_rows(coop)
+    filtered = []
+    for row in rows:
+        day = row.data
+        if day is None:
+            continue
+        if monday <= day <= sunday:
+            if today.weekday() == 6 and day == today:
+                start_text = upgrade._norm_time(row.inicio)
+                if start_text:
+                    hh, mm = map(int, start_text.split(":"))
+                    start_at = datetime.combine(day, datetime.min.time(), tzinfo=TZ) + timedelta(hours=hh, minutes=mm)
+                    if now > start_at + timedelta(hours=1):
+                        continue
+            filtered.append(row)
+        elif today.weekday() == 6 and following_monday <= day <= following_sunday:
+            filtered.append(row)
+
     selected_day = (request.args.get("dia") or "").strip().lower()
     days, items, seen = [], [], set()
-    for row in rows:
+    for row in filtered:
         label = str(row.escala.data or "Sem dia").strip() or "Sem dia"
         key = label.lower()
         if key not in seen:
@@ -313,7 +340,7 @@ def coop_agenda_flow():
         "coop_agenda.html", cooperado=coop, itens=items, dias=days,
         selected_day=selected_day, outros_cooperados=other_coops,
         trocas_enviadas=sent, trocas_recebidas_count=received_count,
-        today=datetime.now(TZ).date(),
+        today=today,
     )
 
 
