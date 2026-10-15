@@ -3586,7 +3586,6 @@ def exportar_lancamentos():
     from openpyxl.styles import PatternFill
     dias_pt = ("Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo")
     verde = PatternFill(fill_type="solid", fgColor="C6EFCE")
-    azul = PatternFill(fill_type="solid", fgColor="BDD7EE")
     black_bold = Font(bold=True, color="000000")
     horarios_escala = defaultdict(list)
     for es in scales:
@@ -3606,10 +3605,10 @@ def exportar_lancamentos():
             if es.contrato:
                 horarios_escala[(dt, _norm_contract(es.contrato), cid)].append((ini, fim))
 
-    def export_cell(value, money=False, subtotal=False, date_value=False, semanal=False):
-        c = _cell(ws_det, value, date_fmt if date_value else (currency_fmt if money else None), black_bold if (subtotal or semanal) else None)
-        if subtotal or semanal:
-            c.fill = azul if semanal else verde
+    def export_cell(value, money=False, subtotal=False, date_value=False):
+        c = _cell(ws_det, value, date_fmt if date_value else (currency_fmt if money else None), black_bold if subtotal else None)
+        if subtotal:
+            c.fill = verde
         return c
 
     def detail_row(item):
@@ -3626,121 +3625,21 @@ def exportar_lancamentos():
                 _cell(ws_det, item["liq"], currency_fmt),
                 _cell(ws_det, item["status"], font=red_font if item["status"] != "OK" else None)]
 
-    # A primeira aba mostra o total azul antes dos detalhes do contrato.
-    # Grupos de linhas Excel recolhidos por padrão: + / - na margem esquerda.
-    ws_det.sheet_properties.outlinePr.summaryBelow = False
-    ws_det.sheet_view.showOutlineSymbols = True
-    ws_det.sheet_format.outlineLevelRow = 2
-    ws_det.freeze_panes = "E2"
-    ws_det.column_dimensions["A"].width = 16
-    ws_det.column_dimensions["B"].width = 19
-    ws_det.column_dimensions["C"].width = 37
-    ws_det.column_dimensions["D"].width = 29
-    ws_det.column_dimensions["E"].width = 20
-    ws_det.column_dimensions["F"].width = 22
-    for coluna in "GHIJKL":
-        ws_det.column_dimensions[coluna].width = 20
-    ws_det.column_dimensions["M"].width = 21
-
-    # Segunda visao com filtros combinaveis (contrato, dia, cooperado e status).
-    # Excel oferece apenas um AutoFiltro nativo por planilha: esta aba permite
-    # aplicar o filtro geral e depois refinar por cada contrato, sem criar
-    # centenas de planilhas e sem prejudicar a memoria do servidor.
-    ws_filtro = wb.create_sheet("Filtro por Contrato")
-    _append_header(ws_filtro, header_det)
-    ws_filtro.freeze_panes = "E2"
-    for coluna, largura in {"A":16, "B":19, "C":37, "D":29, "E":20, "F":22,
-                            "G":20, "H":20, "I":17, "J":18, "K":19,
-                            "L":19, "M":22}.items():
-        ws_filtro.column_dimensions[coluna].width = largura
-
-    export_details.sort(key=lambda x: (
-        (x["contrato"] or "").casefold(), x["data"],
-        (x["cooperado"] or "").casefold(), x["inicio"]
-    ))
-    campos_soma = ("valor", "qtd", "inss", "sest", "enc", "liq")
-    geral = {campo: sum(item[campo] for item in export_details) for campo in campos_soma}
-    valores_gerais = ["", "", "TOTAL GERAL DO PERÍODO", "TODOS OS CONTRATOS",
-                     geral["valor"], geral["qtd"], "", "", geral["inss"],
-                     geral["sest"], geral["enc"], geral["liq"], ""]
-    ws_det.row_dimensions[2].collapsed = True
-    ws_det.append([export_cell(valor, money=i in (4, 8, 9, 10, 11), semanal=True)
-                   for i, valor in enumerate(valores_gerais)])
+    export_details.sort(key=lambda x: (x["data"], (x["contrato"] or "").casefold(), (x["cooperado"] or "").casefold(), x["inicio"]))
     pos = 0
-    numero_linha = 3
-    numero_filtro = 1
     while pos < len(export_details):
-        contrato = export_details[pos]["contrato"]
-        inicio_contrato = pos
-        fim_contrato = pos
-        periodo_soma = {campo: 0 for campo in campos_soma}
-        while fim_contrato < len(export_details) and export_details[fim_contrato]["contrato"] == contrato:
-            registro = export_details[fim_contrato]
-            for campo in campos_soma:
-                periodo_soma[campo] += registro[campo]
-            fim_contrato += 1
-
-        # Linha principal, sempre visivel: contrato e total do periodo azul.
-        valores_periodo = [
-            "", "", "TOTAL DO PERÍODO", contrato,
-            periodo_soma["valor"], periodo_soma["qtd"], "", "",
-            periodo_soma["inss"], periodo_soma["sest"], periodo_soma["enc"],
-            periodo_soma["liq"], ""
-        ]
-        ws_det.append([
-            export_cell(valor, money=i in (4, 8, 9, 10, 11), semanal=True)
-            for i, valor in enumerate(valores_periodo)
-        ])
-        ws_det.row_dimensions[numero_linha].outlineLevel = 1
-        ws_det.row_dimensions[numero_linha].hidden = True
-        ws_det.row_dimensions[numero_linha].collapsed = True
-        numero_linha += 1
-        pos = inicio_contrato
-
-        while pos < fim_contrato:
-            dia = export_details[pos]["data"]
-            dia_soma = {campo: 0 for campo in campos_soma}
-            inicio_dia = pos
-            while pos < fim_contrato and export_details[pos]["data"] == dia:
-                registro = export_details[pos]
-                for campo in campos_soma:
-                    dia_soma[campo] += registro[campo]
-                pos += 1
-
-            # Verde: subtotal do dia, apresentado antes da lista de cooperados.
-            valores_dia = [
-                dia, dias_pt[dia.weekday()], "TOTAL DO DIA", contrato,
-                dia_soma["valor"], dia_soma["qtd"], "", "",
-                dia_soma["inss"], dia_soma["sest"], dia_soma["enc"],
-                dia_soma["liq"], ""
-            ]
-            ws_det.row_dimensions[numero_linha].outlineLevel = 2
-            ws_det.row_dimensions[numero_linha].hidden = True
-            ws_det.append([
-                export_cell(valor, money=i in (4, 8, 9, 10, 11),
-                            subtotal=True, date_value=i == 0)
-                for i, valor in enumerate(valores_dia)
-            ])
-            numero_linha += 1
-            for registro in export_details[inicio_dia:pos]:
-                ws_det.row_dimensions[numero_linha].outlineLevel = 2
-                ws_det.row_dimensions[numero_linha].hidden = True
-                ws_det.append(detail_row(registro))
-                # Para a consulta filtravel, recriar celulas pertencentes
-                # a planilha, pois WriteOnlyCell nao pode ser compartilhada.
-                row_original = detail_row(registro)
-                linha_filtro = [
-                    _cell(ws_filtro, cel.value,
-                          cel.number_format if cel.number_format != "General" else None,
-                          None)
-                    if hasattr(cel, "value") else cel
-                    for cel in row_original
-                ]
-                ws_filtro.append(linha_filtro)
-                numero_filtro += 1
-                numero_linha += 1
-
-    ws_filtro.auto_filter.ref = f"A1:M{numero_filtro}"
+        current = export_details[pos]
+        key = (current["data"], current["contrato"])
+        sums = dict(valor=0.0, qtd=0, inss=0.0, sest=0.0, enc=0.0, liq=0.0)
+        while pos < len(export_details) and (export_details[pos]["data"], export_details[pos]["contrato"]) == key:
+            entry = export_details[pos]
+            ws_det.append(detail_row(entry))
+            for field in sums:
+                sums[field] += entry[field]
+            pos += 1
+        values = [key[0], dias_pt[key[0].weekday()], "TOTAL DO DIA", key[1], sums["valor"],
+                  sums["qtd"], "", "", sums["inss"], sums["sest"], sums["enc"], sums["liq"], ""]
+        ws_det.append([export_cell(val, money=i in (4,8,9,10,11), subtotal=True, date_value=i==0) for i, val in enumerate(values)])
 
     # ============================================================
     # ABA 2 - Totais por Contrato
