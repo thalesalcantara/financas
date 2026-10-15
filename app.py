@@ -3732,7 +3732,7 @@ def exportar_lancamentos():
                 linha_filtro = [
                     _cell(ws_filtro, cel.value,
                           cel.number_format if cel.number_format != "General" else None,
-                          cel.font if cel.font and cel.font.bold else None)
+                          None)
                     if hasattr(cel, "value") else cel
                     for cel in row_original
                 ]
