@@ -3612,6 +3612,18 @@ def exportar_lancamentos():
             c.fill = verde
         return c
 
+    # Não exportar contratos sem nenhuma produção efetiva no intervalo.
+    # Se houve produção em algum dia, as faltas dos demais dias permanecem.
+    contratos_com_producao = {
+        (r["contrato"] or "").casefold()
+        for r in export_details
+        if r["status"] == "OK" and (r["valor"] != 0 or r["qtd"] > 0)
+    }
+    export_details = [
+        r for r in export_details
+        if (r["contrato"] or "").casefold() in contratos_com_producao
+    ]
+
     # Ordenação por turno/escala: o mesmo cooperado no mesmo horário mantém
     # o número mesmo quando sua produção foi lançada em duas parcelas.
     # A numeração reinicia em cada contrato, data e turno.
@@ -3666,8 +3678,13 @@ def exportar_lancamentos():
                 _cell(ws_det, item["liq"], currency_fmt),
                 _cell(ws_det, item["status"], font=red_font if item["status"] != "OK" else None)]
 
-    export_details.sort(key=lambda x: ((x["contrato"] or "").casefold(), x["data"], x["_horario"][0], (x["cooperado"] or "").casefold(), x["inicio"]))
+    export_details.sort(key=lambda x: (
+        (x["contrato"] or "").casefold(), x["data"],
+        1 if (x["_horario"][0] and x["_horario"][0] >= "16:00") else 0,
+        x["_numero"], x["_horario"][0], (x["cooperado"] or "").casefold(), x["inicio"]
+    ))
     pos = 0
+    linhas_excel = 1
     while pos < len(export_details):
         current = export_details[pos]
         key = (current["data"], current["contrato"])
@@ -3675,12 +3692,17 @@ def exportar_lancamentos():
         while pos < len(export_details) and (export_details[pos]["data"], export_details[pos]["contrato"]) == key:
             entry = export_details[pos]
             ws_det.append(detail_row(entry))
+            linhas_excel += 1
             for field in sums:
                 sums[field] += entry[field]
             pos += 1
         values = [key[0], dias_pt[key[0].weekday()], "", "TOTAL DO DIA", key[1], sums["valor"],
                   sums["qtd"], "", "", sums["inss"], sums["sest"], sums["enc"], sums["liq"], ""]
         ws_det.append([export_cell(val, money=i in (5,9,10,11,12), subtotal=True, date_value=i==0) for i, val in enumerate(values)])
+        linhas_excel += 1
+
+    # Autofiltro já habilitado ao abrir o XLSX; inclui contrato, dia e Nº.
+    ws_det.auto_filter.ref = f"A1:N{linhas_excel}"
 
     # ============================================================
     # ABA 2 - Totais por Contrato
