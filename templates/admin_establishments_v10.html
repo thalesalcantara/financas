@@ -38,7 +38,7 @@ body{font-weight:700!important}.alv8-brand-copy small{font-size:12px!important}.
 
     <form class="alv8-card alv8-filter" method="get">
       <div class="alv8-field grow"><label>Buscar</label><input class="alv8-input" name="q" value="{{ q }}" placeholder="Nome ou usuário do estabelecimento"></div>
-      <div class="alv8-field"><label>Status</label><select class="alv8-select" name="status"><option value="todos" {{ 'selected' if status=='todos' else '' }}>Todos</option><option value="ativos" {{ 'selected' if status=='ativos' else '' }}>Ativos</option><option value="inativos" {{ 'selected' if status=='inativos' else '' }}>Inativos</option></select></div>
+      <div class="alv8-field"><label>Status</label><select class="alv8-select" name="status"><option value="todos" {{ 'selected' if status=='todos' else '' }}>Todos</option><option value="ativos" {{ 'selected' if status=='ativos' else '' }}>Ativos</option><option value="inativos" {{ 'selected' if status=='inativos' else '' }}>Inativos</option><option value="excluidos" {{ 'selected' if status=='excluidos' else '' }}>Excluídos (histórico)</option></select></div>
       <button class="alv8-btn primary"><i class="bi bi-search"></i> Buscar</button>
       <a class="alv8-btn" href="{{ url_for('admin_v10_establishments') }}">Limpar</a>
     </form>
