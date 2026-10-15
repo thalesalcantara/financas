@@ -3666,7 +3666,7 @@ def exportar_lancamentos():
                 _cell(ws_det, item["liq"], currency_fmt),
                 _cell(ws_det, item["status"], font=red_font if item["status"] != "OK" else None)]
 
-    export_details.sort(key=lambda x: (x["data"], (x["contrato"] or "").casefold(), (x["cooperado"] or "").casefold(), x["inicio"]))
+    export_details.sort(key=lambda x: ((x["contrato"] or "").casefold(), x["data"], x["_horario"][0], (x["cooperado"] or "").casefold(), x["inicio"]))
     pos = 0
     while pos < len(export_details):
         current = export_details[pos]
