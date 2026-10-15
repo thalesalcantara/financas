@@ -394,8 +394,28 @@ def admin_v10_establishments():
         except Exception:
             db.session.rollback()
             tracking_allowed_ids = set()
+    # Registros excluidos ficam fora da lista operacional, inclusive do filtro
+    # "Todos". Podem ser consultados exclusivamente em "Excluidos".
+    try:
+        from sqlalchemy import text as _sa_text
+        excluidos_ids = {
+            int(row[0]) for row in db.session.execute(
+                _sa_text("SELECT restaurante_id FROM finance_restaurant_cutoffs")
+            ).all()
+        }
+    except Exception:
+        db.session.rollback()
+        excluidos_ids = set()
+    if status not in ("todos", "ativos", "inativos", "excluidos"):
+        status = "todos"
     result = []
     for r in Restaurante.query.options(joinedload(Restaurante.usuario_ref)).order_by(Restaurante.nome.asc()).all():
+        foi_excluido = r.id in excluidos_ids
+        if status == "excluidos":
+            if not foi_excluido:
+                continue
+        elif foi_excluido:
+            continue
         user = getattr(r, "usuario_ref", None)
         active = bool(getattr(r, "ativo", True) is not False and getattr(user, "ativo", True) is not False)
         if status == "ativos" and not active:
