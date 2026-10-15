@@ -3358,11 +3358,7 @@ def exportar_lancamentos():
     # ABA 1 - Lançamentos
     # ============================================================
     ws_det = wb.create_sheet("Lançamentos")
-    header_det = [
-        "Restaurante", "Periodo", "Cooperado", "Descricao",
-        "Valor", "Data", "HoraInicio", "HoraFim",
-        "INSS", "SEST", "Encargos", "Liquido", "Status",
-    ]
+    header_det = ["Data", "Dia", "Cooperado", "Contrato", "Valor por dia", "Quantidade de entregas", "Hora início da escala", "Hora fim da escala", "INSS", "SEST/SENAT", "Descontos", "Líquido", "Status"]
     _append_header(ws_det, header_det)
 
     totais_contrato = defaultdict(lambda: {
@@ -3388,6 +3384,7 @@ def exportar_lancamentos():
     total_geral_enc = 0.0
     total_geral_liq = 0.0
 
+    export_details = []
     launch_keys_id = set()
     launch_keys_contract = set()
 
@@ -3405,6 +3402,7 @@ def exportar_lancamentos():
             Cooperado.nome.label("coop_nome"),
             Lancamento.descricao,
             Lancamento.valor,
+            Lancamento.qtd_entregas,
             Lancamento.data,
             Lancamento.hora_inicio,
             Lancamento.hora_fim,
@@ -3434,21 +3432,7 @@ def exportar_lancamentos():
         coop_nome = l.coop_nome or ""
         coop_id = int(l.cooperado_id or 0)
 
-        ws_det.append([
-            rest_nome,
-            rest_period,
-            coop_nome,
-            l.descricao or "",
-            _cell(ws_det, v, currency_fmt),
-            _cell(ws_det, l.data, date_fmt),
-            _fmt_time(l.hora_inicio),
-            _fmt_time(l.hora_fim),
-            _cell(ws_det, inss, currency_fmt),
-            _cell(ws_det, sest, currency_fmt),
-            _cell(ws_det, encargos, currency_fmt),
-            _cell(ws_det, liq, currency_fmt),
-            "OK",
-        ])
+        export_details.append(dict(data=l.data, contrato=rest_nome, rid=rest_id, cid=coop_id, cooperado=coop_nome, qtd=int(l.qtd_entregas or 0), valor=v, inicio=_fmt_time(l.hora_inicio), fim=_fmt_time(l.hora_fim), inss=inss, sest=sest, enc=encargos, liq=liq, status="OK"))
 
         if coop_id and l.data:
             launch_keys_id.add((coop_id, l.data, rest_id))
@@ -3596,21 +3580,66 @@ def exportar_lancamentos():
             tc_falta["periodo"] = rest_period or ""
 
             escala_inicio, escala_fim = _scale_times(s.horario)
-            ws_det.append([
-                contrato_label,
-                rest_period or "—",
-                coop_nome,
-                _cell(ws_det, "FALTA PRODUÇÃO", font=red_font),
-                _cell(ws_det, 0.0, currency_fmt),
-                _cell(ws_det, dt, date_fmt),
-                escala_inicio,
-                escala_fim,
-                _cell(ws_det, 0.0, currency_fmt),
-                _cell(ws_det, 0.0, currency_fmt),
-                _cell(ws_det, 0.0, currency_fmt),
-                _cell(ws_det, 0.0, currency_fmt),
-                _cell(ws_det, "FALTA PRODUÇÃO", font=red_font),
-            ])
+            export_details.append(dict(data=dt, contrato=contrato_label, rid=rid, cid=cid, cooperado=coop_nome, qtd=0, valor=0.0, inicio=escala_inicio, fim=escala_fim, inss=0.0, sest=0.0, enc=0.0, liq=0.0, status="FALTA PRODUÇÃO"))
+
+    # Linhas por dia/contrato, com subtotais: a mesma exportação é usada pelo Resumo e Lançamentos.
+    from openpyxl.styles import PatternFill
+    dias_pt = ("Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo")
+    verde = PatternFill(fill_type="solid", fgColor="C6EFCE")
+    black_bold = Font(bold=True, color="000000")
+    horarios_escala = defaultdict(list)
+    for es in scales:
+        dt_exp = _parse_data_escala_str(es.data)
+        wd = _weekday_from_data_str(es.data)
+        ini, fim = _scale_times(es.horario)
+        if not (ini or fim):
+            continue
+        for dt in period_days:
+            if dt_exp is not None and dt != dt_exp:
+                continue
+            if dt_exp is None and dt.isoweekday() != wd:
+                continue
+            rid = int(es.restaurante_id or 0)
+            cid = int(es.cooperado_id or 0)
+            horarios_escala[(dt, rid, cid)].append((ini, fim))
+            if es.contrato:
+                horarios_escala[(dt, _norm_contract(es.contrato), cid)].append((ini, fim))
+
+    def export_cell(value, money=False, subtotal=False, date_value=False):
+        c = _cell(ws_det, value, date_fmt if date_value else (currency_fmt if money else None), black_bold if subtotal else None)
+        if subtotal:
+            c.fill = verde
+        return c
+
+    def detail_row(item):
+        options = (horarios_escala.get((item["data"], item["rid"], item["cid"]))
+                   or horarios_escala.get((item["data"], _norm_contract(item["contrato"]), item["cid"])) or [])
+        if options and item["status"] == "OK":
+            inicio, fim = min(options, key=lambda pair: (pair[0] != item["inicio"], pair[0]))
+        else:
+            inicio, fim = item["inicio"], item["fim"]
+        return [_cell(ws_det, item["data"], date_fmt), dias_pt[item["data"].weekday()],
+                item["cooperado"], item["contrato"], _cell(ws_det, item["valor"], currency_fmt),
+                item["qtd"], inicio, fim, _cell(ws_det, item["inss"], currency_fmt),
+                _cell(ws_det, item["sest"], currency_fmt), _cell(ws_det, item["enc"], currency_fmt),
+                _cell(ws_det, item["liq"], currency_fmt),
+                _cell(ws_det, item["status"], font=red_font if item["status"] != "OK" else None)]
+
+    export_details.sort(key=lambda x: (x["data"], (x["contrato"] or "").casefold(), (x["cooperado"] or "").casefold(), x["inicio"]))
+    pos = 0
+    while pos < len(export_details):
+        current = export_details[pos]
+        key = (current["data"], current["contrato"])
+        sums = dict(valor=0.0, qtd=0, inss=0.0, sest=0.0, enc=0.0, liq=0.0)
+        while pos < len(export_details) and (export_details[pos]["data"], export_details[pos]["contrato"]) == key:
+            entry = export_details[pos]
+            ws_det.append(detail_row(entry))
+            for field in sums:
+                sums[field] += entry[field]
+            pos += 1
+        values = [key[0], dias_pt[key[0].weekday()], "TOTAL DO DIA", key[1], sums["valor"],
+                  sums["qtd"], "", "", sums["inss"], sums["sest"], sums["enc"], sums["liq"], ""]
+        ws_det.append([export_cell(val, money=i in (4,8,9,10,11), subtotal=True, date_value=i==0) for i, val in enumerate(values)])
 
     # ============================================================
     # ABA 2 - Totais por Contrato
@@ -3627,9 +3656,11 @@ def exportar_lancamentos():
         contrato_label = tc["restaurante"] or "—"
         faltas_dias = faltas_por_contrato_dia.get(contrato_label, {})
         faltas_total = sum(faltas_dias.values())
+        faltas_semana = defaultdict(int)
+        for dia, qtd in faltas_dias.items():
+            faltas_semana[dia.weekday()] += qtd
         faltas_texto = " | ".join(
-            f"{dia.strftime('%d/%m')}: {qtd}"
-            for dia, qtd in sorted(faltas_dias.items())
+            f"{dias_pt[wd]}: {faltas_semana[wd]}" for wd in sorted(faltas_semana)
         ) or "—"
         ws_con.append([
             contrato_label,
