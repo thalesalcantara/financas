@@ -1,7 +1,7 @@
 """Exclusão financeira por competência, sem perda do histórico."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, date
 from zoneinfo import ZoneInfo
 
 
@@ -20,6 +20,13 @@ db = legacy.db
 with app.app_context():
     with db.engine.begin() as connection:
         connection.execute(text("""
+            CREATE TABLE IF NOT EXISTS finance_restaurant_pauses (
+                restaurante_id INTEGER PRIMARY KEY,
+                inicio DATE NOT NULL,
+                retomada DATE
+            )
+        """))
+        connection.execute(text("""
             CREATE TABLE IF NOT EXISTS finance_restaurant_cutoffs (
                 restaurante_id INTEGER PRIMARY KEY,
                 competencia VARCHAR(7) NOT NULL
@@ -34,6 +41,27 @@ def _cutoffs():
         )).all()
         g._finance_cutoffs_v31 = {int(r[0]): str(r[1]) for r in rows}
     return g._finance_cutoffs_v31
+
+
+def _pauses():
+    if not hasattr(g, "_finance_pauses_v32"):
+        rows = db.session.execute(text(
+            "SELECT restaurante_id, inicio, retomada FROM finance_restaurant_pauses"
+        )).all()
+        def parse(v):
+            return v if isinstance(v, date) else date.fromisoformat(str(v)[:10]) if v else None
+        g._finance_pauses_v32 = {int(r[0]): (parse(r[1]), parse(r[2])) for r in rows}
+    return g._finance_pauses_v32
+
+
+def _paid_before_pause(receita, inicio):
+    venc = getattr(receita, "data_vencimento", None) or getattr(receita, "data", None)
+    pago_em = getattr(receita, "data_pagamento", None)
+    return (
+        (getattr(receita, "status_pagamento", "") or "").lower() == "pago"
+        and venc is not None and venc < inicio
+        and pago_em is not None and pago_em <= inicio
+    )
 
 
 def _month_of_receipt(receita):
@@ -61,6 +89,15 @@ def _visible(receita):
     if rest_id is None:
         # Receita manual sem contrato identificado: não eliminar receita legítima.
         return True
+    pause = _pauses().get(int(rest_id))
+    if pause:
+        inicio, retomada = pause
+        venc = getattr(receita, "data_vencimento", None) or getattr(receita, "data", None)
+        if venc is not None and venc >= inicio and (retomada is None or venc < retomada):
+            return False
+        if venc is not None and venc < inicio and _month_of_receipt(receita) == inicio.strftime("%Y-%m"):
+            return _paid_before_pause(receita, inicio)
+        # Reativação não recupera cobranças do período suspenso.
     cutoff = _cutoffs().get(int(rest_id))
     if cutoff:
         competencia = _month_of_receipt(receita)
@@ -70,7 +107,10 @@ def _visible(receita):
     rest = getattr(receita, "restaurante", None)
     if rest is not None and getattr(rest, "ativo", True) is False:
         competencia = _month_of_receipt(receita)
-        return bool(competencia and competencia < _today_local().strftime("%Y-%m"))
+        mes_atual = _today_local().strftime("%Y-%m")
+        if competencia == mes_atual:
+            return _paid_before_pause(receita, _today_local())
+        return bool(competencia and competencia < mes_atual)
     return True
 
 
@@ -137,6 +177,38 @@ def _render_template_with_cutoff(template_name, **context):
 
 
 dashboard.render_template = _render_template_with_cutoff
+
+# Guardar a data da desativação sem alterar o cadastro e o histórico original.
+_original_edit = app.view_functions.get("edit_restaurante")
+if _original_edit:
+    @legacy.admin_perm_required("restaurantes", "editar")
+    @wraps(_original_edit)
+    def _edit_with_pause(id):
+        from flask import request
+        restaurante = db.session.get(legacy.Restaurante, id)
+        if restaurante is None:
+            return _original_edit(id)
+        old_active = getattr(restaurante, "ativo", True) is not False
+        raw = (request.form.get("ativo") or "1").strip().lower()
+        new_active = raw in ("1", "true", "ativo", "on", "sim")
+        if old_active != new_active:
+            hoje = _today_local()
+            if not new_active:
+                db.session.execute(text("""
+                    INSERT INTO finance_restaurant_pauses (restaurante_id, inicio, retomada)
+                    VALUES (:id, :hoje, NULL)
+                    ON CONFLICT (restaurante_id) DO UPDATE SET
+                    inicio = excluded.inicio, retomada = NULL
+                """), {"id": id, "hoje": hoje})
+            else:
+                db.session.execute(text("""
+                    UPDATE finance_restaurant_pauses
+                    SET retomada = :hoje
+                    WHERE restaurante_id = :id AND retomada IS NULL
+                """), {"id": id, "hoje": hoje})
+        return _original_edit(id)
+    app.view_functions["edit_restaurante"] = _edit_with_pause
+
 
 # A permissão original permanece intacta: chamamos o endpoint original,
 # que aplica @admin_perm_required e confirma a transação.
