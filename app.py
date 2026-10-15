@@ -3684,6 +3684,7 @@ def exportar_lancamentos():
             export_cell(valor, money=i in (4, 8, 9, 10, 11), semanal=True)
             for i, valor in enumerate(valores_periodo)
         ])
+        ws_det.row_dimensions[numero_linha].collapsed = True
         numero_linha += 1
         pos = inicio_contrato
 
@@ -3729,8 +3730,6 @@ def exportar_lancamentos():
                 ws_filtro.append(linha_filtro)
                 numero_filtro += 1
                 numero_linha += 1
-        # O + fica na linha azul acima dos detalhes deste contrato.
-        ws_det.row_dimensions[numero_linha - 1].collapsed = True
 
     ws_filtro.auto_filter.ref = f"A1:M{numero_filtro}"
 
