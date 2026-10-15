@@ -3358,7 +3358,7 @@ def exportar_lancamentos():
     # ABA 1 - Lançamentos
     # ============================================================
     ws_det = wb.create_sheet("Lançamentos")
-    header_det = ["Data", "Dia", "Cooperado", "Contrato", "Valor por dia", "Quantidade de entregas", "Hora início da escala", "Hora fim da escala", "INSS", "SEST/SENAT", "Descontos", "Líquido", "Status"]
+    header_det = ["Data", "Dia", "Nº", "Cooperado", "Contrato", "Valor por dia", "Quantidade de entregas", "Hora início da escala", "Hora fim da escala", "INSS", "SEST/SENAT", "Descontos", "Líquido", "Status"]
     _append_header(ws_det, header_det)
 
     totais_contrato = defaultdict(lambda: {
@@ -3587,6 +3587,7 @@ def exportar_lancamentos():
     dias_pt = ("Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo")
     verde = PatternFill(fill_type="solid", fgColor="C6EFCE")
     black_bold = Font(bold=True, color="000000")
+    blue_number_font = Font(color="0000FF", bold=True)
     horarios_escala = defaultdict(list)
     for es in scales:
         dt_exp = _parse_data_escala_str(es.data)
@@ -3611,6 +3612,37 @@ def exportar_lancamentos():
             c.fill = verde
         return c
 
+    # Ordenação por turno/escala: o mesmo cooperado no mesmo horário mantém
+    # o número mesmo quando sua produção foi lançada em duas parcelas.
+    # A numeração reinicia em cada contrato, data e turno.
+    numero_por_pessoa = {}
+    contagem_por_turno = defaultdict(int)
+    qtd_lancamentos = defaultdict(int)
+
+    def horario_registro(item):
+        options = (horarios_escala.get((item["data"], item["rid"], item["cid"]))
+                   or horarios_escala.get((item["data"], _norm_contract(item["contrato"]), item["cid"])) or [])
+        if options and item["status"] == "OK":
+            return min(options, key=lambda pair: (pair[0] != item["inicio"], pair[0]))
+        return item["inicio"], item["fim"]
+
+    for registro in export_details:
+        registro["_horario"] = horario_registro(registro)
+        chave = (registro["data"], registro["contrato"], registro["cid"] or registro["cooperado"], registro["_horario"])
+        registro["_numero_chave"] = chave
+        if registro["status"] == "OK":
+            qtd_lancamentos[chave] += 1
+
+    # Primeiro os horários (ex.: tarde e noite); dentro de cada horário,
+    # numera as pessoas e não os lançamentos.
+    for registro in sorted(export_details, key=lambda x: (x["data"], x["contrato"].casefold(), x["_horario"][0], x["_horario"][1], x["cooperado"].casefold())):
+        chave = registro["_numero_chave"]
+        turno = (registro["data"], registro["contrato"], registro["_horario"][0], registro["_horario"][1])
+        if chave not in numero_por_pessoa:
+            contagem_por_turno[turno] += 1
+            numero_por_pessoa[chave] = contagem_por_turno[turno]
+        registro["_numero"] = numero_por_pessoa[chave]
+
     def detail_row(item):
         options = (horarios_escala.get((item["data"], item["rid"], item["cid"]))
                    or horarios_escala.get((item["data"], _norm_contract(item["contrato"]), item["cid"])) or [])
@@ -3618,7 +3650,8 @@ def exportar_lancamentos():
             inicio, fim = min(options, key=lambda pair: (pair[0] != item["inicio"], pair[0]))
         else:
             inicio, fim = item["inicio"], item["fim"]
-        return [_cell(ws_det, item["data"], date_fmt), dias_pt[item["data"].weekday()],
+        numero = _cell(ws_det, item["_numero"], font=blue_number_font if qtd_lancamentos[item["_numero_chave"]] > 1 else None)
+        return [_cell(ws_det, item["data"], date_fmt), dias_pt[item["data"].weekday()], numero,
                 item["cooperado"], item["contrato"], _cell(ws_det, item["valor"], currency_fmt),
                 item["qtd"], inicio, fim, _cell(ws_det, item["inss"], currency_fmt),
                 _cell(ws_det, item["sest"], currency_fmt), _cell(ws_det, item["enc"], currency_fmt),
@@ -3637,9 +3670,9 @@ def exportar_lancamentos():
             for field in sums:
                 sums[field] += entry[field]
             pos += 1
-        values = [key[0], dias_pt[key[0].weekday()], "TOTAL DO DIA", key[1], sums["valor"],
+        values = [key[0], dias_pt[key[0].weekday()], "", "TOTAL DO DIA", key[1], sums["valor"],
                   sums["qtd"], "", "", sums["inss"], sums["sest"], sums["enc"], sums["liq"], ""]
-        ws_det.append([export_cell(val, money=i in (4,8,9,10,11), subtotal=True, date_value=i==0) for i, val in enumerate(values)])
+        ws_det.append([export_cell(val, money=i in (5,9,10,11,12), subtotal=True, date_value=i==0) for i, val in enumerate(values)])
 
     # ============================================================
     # ABA 2 - Totais por Contrato
