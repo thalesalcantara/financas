@@ -45,6 +45,18 @@ def _month_of_receipt(receita):
 
 
 def _visible(receita):
+    # Receitas automáticas sem contrato real e identificável são registros
+    # órfãos; não devem aparecer como "Estabelecimento -" nem somar valores.
+    if getattr(receita, "auto_taxa_adm", False):
+        rest = getattr(receita, "restaurante", None)
+        nome = (getattr(rest, "nome", "") or "").strip()
+        descricao = (getattr(receita, "descricao", "") or "").strip()
+        if not nome:
+            # Histórico com nome recuperável da descrição permanece visível.
+            prefixo = "Taxa administrativa - "
+            extraido = descricao[len(prefixo):].rsplit(" - ", 1)[0].strip() if descricao.startswith(prefixo) else ""
+            if not extraido or extraido in ("-", "Estabelecimento", "Sem estabelecimento"):
+                return False
     rest_id = getattr(receita, "restaurante_id", None)
     if rest_id is None:
         # Receita manual sem contrato identificado: não eliminar receita legítima.
