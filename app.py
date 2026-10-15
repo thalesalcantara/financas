@@ -3586,6 +3586,7 @@ def exportar_lancamentos():
     from openpyxl.styles import PatternFill
     dias_pt = ("Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo")
     verde = PatternFill(fill_type="solid", fgColor="C6EFCE")
+    azul = PatternFill(fill_type="solid", fgColor="BDD7EE")
     black_bold = Font(bold=True, color="000000")
     horarios_escala = defaultdict(list)
     for es in scales:
@@ -3605,10 +3606,10 @@ def exportar_lancamentos():
             if es.contrato:
                 horarios_escala[(dt, _norm_contract(es.contrato), cid)].append((ini, fim))
 
-    def export_cell(value, money=False, subtotal=False, date_value=False):
-        c = _cell(ws_det, value, date_fmt if date_value else (currency_fmt if money else None), black_bold if subtotal else None)
-        if subtotal:
-            c.fill = verde
+    def export_cell(value, money=False, subtotal=False, date_value=False, semanal=False):
+        c = _cell(ws_det, value, date_fmt if date_value else (currency_fmt if money else None), black_bold if (subtotal or semanal) else None)
+        if subtotal or semanal:
+            c.fill = azul if semanal else verde
         return c
 
     def detail_row(item):
@@ -3625,21 +3626,50 @@ def exportar_lancamentos():
                 _cell(ws_det, item["liq"], currency_fmt),
                 _cell(ws_det, item["status"], font=red_font if item["status"] != "OK" else None)]
 
-    export_details.sort(key=lambda x: (x["data"], (x["contrato"] or "").casefold(), (x["cooperado"] or "").casefold(), x["inicio"]))
+    # Organiza cada contrato por todo o intervalo filtrado (normalmente segunda
+    # a domingo). O total azul encerra o contrato antes do próximo começar.
+    export_details.sort(key=lambda x: (
+        (x["contrato"] or "").casefold(), x["data"],
+        (x["cooperado"] or "").casefold(), x["inicio"]
+    ))
+    campos_soma = ("valor", "qtd", "inss", "sest", "enc", "liq")
     pos = 0
     while pos < len(export_details):
-        current = export_details[pos]
-        key = (current["data"], current["contrato"])
-        sums = dict(valor=0.0, qtd=0, inss=0.0, sest=0.0, enc=0.0, liq=0.0)
-        while pos < len(export_details) and (export_details[pos]["data"], export_details[pos]["contrato"]) == key:
-            entry = export_details[pos]
-            ws_det.append(detail_row(entry))
-            for field in sums:
-                sums[field] += entry[field]
-            pos += 1
-        values = [key[0], dias_pt[key[0].weekday()], "TOTAL DO DIA", key[1], sums["valor"],
-                  sums["qtd"], "", "", sums["inss"], sums["sest"], sums["enc"], sums["liq"], ""]
-        ws_det.append([export_cell(val, money=i in (4,8,9,10,11), subtotal=True, date_value=i==0) for i, val in enumerate(values)])
+        contrato = export_details[pos]["contrato"]
+        periodo_soma = {campo: 0 for campo in campos_soma}
+        while pos < len(export_details) and export_details[pos]["contrato"] == contrato:
+            dia = export_details[pos]["data"]
+            dia_soma = {campo: 0 for campo in campos_soma}
+            while (pos < len(export_details) and
+                   export_details[pos]["contrato"] == contrato and
+                   export_details[pos]["data"] == dia):
+                registro = export_details[pos]
+                ws_det.append(detail_row(registro))
+                for campo in campos_soma:
+                    dia_soma[campo] += registro[campo]
+                    periodo_soma[campo] += registro[campo]
+                pos += 1
+            valores_dia = [
+                dia, dias_pt[dia.weekday()], "TOTAL DO DIA", contrato,
+                dia_soma["valor"], dia_soma["qtd"], "", "",
+                dia_soma["inss"], dia_soma["sest"], dia_soma["enc"],
+                dia_soma["liq"], ""
+            ]
+            ws_det.append([
+                export_cell(valor, money=i in (4, 8, 9, 10, 11),
+                            subtotal=True, date_value=i == 0)
+                for i, valor in enumerate(valores_dia)
+            ])
+        valores_periodo = [
+            "", "", "TOTAL DO PERÍODO", contrato,
+            periodo_soma["valor"], periodo_soma["qtd"], "", "",
+            periodo_soma["inss"], periodo_soma["sest"], periodo_soma["enc"],
+            periodo_soma["liq"], ""
+        ]
+        ws_det.append([
+            export_cell(valor, money=i in (4, 8, 9, 10, 11), semanal=True)
+            for i, valor in enumerate(valores_periodo)
+        ])
 
     # ============================================================
     # ABA 2 - Totais por Contrato
