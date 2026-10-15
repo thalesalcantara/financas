@@ -3693,42 +3693,52 @@ def exportar_lancamentos():
     ))
     pos = 0
     linhas_excel = 1
+    campos_soma = ("valor", "qtd", "inss", "sest", "enc", "liq")
     while pos < len(export_details):
         contrato_atual = export_details[pos]["contrato"]
         possui_producao = (contrato_atual or "").casefold() in contratos_com_producao
         filtro_producao = "Com produção" if possui_producao else "Sem produção"
-        soma_contrato = dict(valor=0.0, qtd=0, inss=0.0, sest=0.0, enc=0.0, liq=0.0)
-        current = export_details[pos]
-        key = (current["data"], current["contrato"])
-        sums = dict(valor=0.0, qtd=0, inss=0.0, sest=0.0, enc=0.0, liq=0.0)
-        while pos < len(export_details) and (export_details[pos]["data"], export_details[pos]["contrato"]) == key:
-            entry = export_details[pos]
+        soma_contrato = {campo: 0 for campo in campos_soma}
+
+        # Percorre TODOS os dias deste contrato, sem zerar o acumulador.
+        while pos < len(export_details) and export_details[pos]["contrato"] == contrato_atual:
+            dia_atual = export_details[pos]["data"]
+            soma_dia = {campo: 0 for campo in campos_soma}
+
+            while (pos < len(export_details)
+                   and export_details[pos]["contrato"] == contrato_atual
+                   and export_details[pos]["data"] == dia_atual):
+                entry = export_details[pos]
+                if not possui_producao:
+                    ws_det.row_dimensions[linhas_excel + 1].hidden = True
+                ws_det.append(detail_row(entry))
+                linhas_excel += 1
+                for campo in campos_soma:
+                    soma_dia[campo] += entry[campo]
+                    soma_contrato[campo] += entry[campo]
+                pos += 1
+
+            values = [dia_atual, dias_pt[dia_atual.weekday()], "", "TOTAL DO DIA",
+                      contrato_atual, soma_dia["valor"], soma_dia["qtd"], "", "",
+                      soma_dia["inss"], soma_dia["sest"], soma_dia["enc"],
+                      soma_dia["liq"], "", filtro_producao]
             if not possui_producao:
                 ws_det.row_dimensions[linhas_excel + 1].hidden = True
-            ws_det.append(detail_row(entry))
+            ws_det.append([export_cell(val, money=i in (5,9,10,11,12),
+                                       subtotal=True, date_value=i == 0)
+                           for i, val in enumerate(values)])
             linhas_excel += 1
-            for field in sums:
-                sums[field] += entry[field]
-                soma_contrato[field] += entry[field]
-            pos += 1
-        values = [key[0], dias_pt[key[0].weekday()], "", "TOTAL DO DIA", key[1], sums["valor"],
-                  sums["qtd"], "", "", sums["inss"], sums["sest"], sums["enc"], sums["liq"], "", filtro_producao]
+
+        # Uma única linha azul depois do último dia do contrato.
+        total = ["", "", "", "TOTAL DO CONTRATO", contrato_atual,
+                 soma_contrato["valor"], soma_contrato["qtd"], "", "",
+                 soma_contrato["inss"], soma_contrato["sest"],
+                 soma_contrato["enc"], soma_contrato["liq"], "", filtro_producao]
         if not possui_producao:
             ws_det.row_dimensions[linhas_excel + 1].hidden = True
-        ws_det.append([export_cell(val, money=i in (5,9,10,11,12), subtotal=True, date_value=i==0) for i, val in enumerate(values)])
+        ws_det.append([export_cell(v, money=i in (5,9,10,11,12), contrato_total=True)
+                       for i, v in enumerate(total)])
         linhas_excel += 1
-
-    # Autofiltro já habilitado ao abrir o XLSX; inclui contrato, dia e Nº.
-        if pos >= len(export_details) or export_details[pos]["contrato"] != contrato_atual:
-            total = ["", "", "", "TOTAL DO CONTRATO", contrato_atual,
-                     soma_contrato["valor"], soma_contrato["qtd"], "", "",
-                     soma_contrato["inss"], soma_contrato["sest"],
-                     soma_contrato["enc"], soma_contrato["liq"], "", filtro_producao]
-            if not possui_producao:
-                ws_det.row_dimensions[linhas_excel + 1].hidden = True
-            ws_det.append([export_cell(v, money=i in (5,9,10,11,12), contrato_total=True)
-                           for i,v in enumerate(total)])
-            linhas_excel += 1
 
     # Deixar pré-selecionado "Com produção"; o usuário pode marcar
     # "Sem produção" no filtro para exibir os contratos finais.
