@@ -3076,7 +3076,7 @@ def _ensure_taxas_admin_receitas(restaurantes: list[Restaurante], months_back: i
         valor = _safe_float(getattr(rest, 'taxa_admin_valor', 0.0))
         data_base = getattr(rest, 'taxa_admin_data_base', None)
         ativo_rest = bool(getattr(rest, 'ativo', True)) if hasattr(rest, 'ativo') else True
-        if (not ativo_rest) or valor <= 0 or not data_base:
+        if (not ativo_rest) or not (getattr(rest, 'nome', '') or '').strip() or valor <= 0 or not data_base:
             continue
         comps = _taxa_competencia_iter(data_base, months_back=months_back)
         if not comps:
