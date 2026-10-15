@@ -22,9 +22,9 @@ def _rest_is_active(rest) -> bool:
 
 
 def _receita_visivel(receita) -> bool:
-    if not getattr(receita, "auto_taxa_adm", False):
-        return True
-    return _rest_is_active(getattr(receita, "restaurante", None))
+    # O filtro mensal de encerramento é aplicado pelo finance_restaurant_cutoff.
+    # Uma inativação não pode ocultar competências já encerradas.
+    return True
 
 
 # Regra financeira sem tocar no HTML/Jinja: contratos inativos não geram taxa.
