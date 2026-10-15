@@ -3678,7 +3678,7 @@ def exportar_lancamentos():
                 _cell(ws_det, item["sest"], currency_fmt), _cell(ws_det, item["enc"], currency_fmt),
                 _cell(ws_det, item["liq"], currency_fmt),
                 _cell(ws_det, item["status"], font=red_font if item["status"] != "OK" else None),
-                "Com produção" if (item["contrato"] or "").casefold() in contratos_com_producao else "Sem produção"]
+                "Com produção" if item["status"] == "OK" else "Sem produção"]
         color = azul_noite if (item["_horario"][0] or "") >= "16:00" else amarelo_dia
         for cell in row:
             if hasattr(cell, "fill"):
@@ -3718,10 +3718,11 @@ def exportar_lancamentos():
                     soma_contrato[campo] += entry[campo]
                 pos += 1
 
+            filtro_dia = "Com produção" if soma_dia["valor"] != 0 or soma_dia["qtd"] > 0 else "Sem produção"
             values = [dia_atual, dias_pt[dia_atual.weekday()], "", "TOTAL DO DIA",
                       contrato_atual, soma_dia["valor"], soma_dia["qtd"], "", "",
                       soma_dia["inss"], soma_dia["sest"], soma_dia["enc"],
-                      soma_dia["liq"], "", filtro_producao]
+                      soma_dia["liq"], "", filtro_dia]
             if not possui_producao:
                 ws_det.row_dimensions[linhas_excel + 1].hidden = True
             ws_det.append([export_cell(val, money=i in (5,9,10,11,12),
