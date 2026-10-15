@@ -3637,7 +3637,15 @@ def exportar_lancamentos():
     # numera as pessoas e não os lançamentos.
     for registro in sorted(export_details, key=lambda x: (x["data"], x["contrato"].casefold(), x["_horario"][0], x["_horario"][1], x["cooperado"].casefold())):
         chave = registro["_numero_chave"]
-        turno = (registro["data"], registro["contrato"], registro["_horario"][0], registro["_horario"][1])
+        # Turnos diurnos e noturnos usam contagens independentes, mesmo
+        # quando os horários de início/fim diferem entre cooperados.
+        inicio_txt = registro["_horario"][0] or ""
+        try:
+            hora_inicio = int(inicio_txt.split(":")[0])
+        except (ValueError, IndexError):
+            hora_inicio = -1
+        faixa = "noturno" if hora_inicio >= 16 else "diurno"
+        turno = (registro["data"], registro["contrato"], faixa)
         if chave not in numero_por_pessoa:
             contagem_por_turno[turno] += 1
             numero_por_pessoa[chave] = contagem_por_turno[turno]
