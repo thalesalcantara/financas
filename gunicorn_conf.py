@@ -52,6 +52,7 @@ MODULES = (
     "permission_readonly_guard",
     "finance_navigation",
     "finance_expense_delete",
+    "finance_restaurant_cutoff",
 )
 
 
