@@ -2124,7 +2124,7 @@
               {% set v_row = r.valor|default(r.valor_total, true)|default(0, true) %}
               <tr>
                 <td>{{ r.data.strftime('%d/%m/%Y') if r.data else '-' }}</td>
-                <td class="text-break">{{ r.descricao }}{% if r.auto_taxa_adm %}<div class="small text-muted">{{ r.restaurante.nome if r.restaurante else '' }} • {{ r.competencia or '' }} • {{ r.status_pagamento or 'nao_pago' }}</div>{% endif %}</td>
+                <td class="text-break">{{ r.descricao }}{% if r.auto_taxa_adm %}<div class="small text-muted">{{ r.restaurante.nome if r.restaurante else 'Estabelecimento não identificado' }} • {{ r.competencia or '' }} • {{ r.status_pagamento or 'nao_pago' }}</div>{% endif %}</td>
                 <td class="text-end">R$ {{ brl(v_row) }}</td>
                 <td class="text-center lanc-col-acoes">
                   {% if can_receitas_editar %}<button class="btn btn-warning btn-sm"
