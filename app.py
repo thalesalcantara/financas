@@ -3586,6 +3586,9 @@ def exportar_lancamentos():
     from openpyxl.styles import PatternFill
     dias_pt = ("Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo")
     verde = PatternFill(fill_type="solid", fgColor="C6EFCE")
+    amarelo_dia = PatternFill(fill_type="solid", fgColor="FFFDF2")
+    azul_noite = PatternFill(fill_type="solid", fgColor="F3F8FF")
+    azul_total = PatternFill(fill_type="solid", fgColor="DCEAF9")
     black_bold = Font(bold=True, color="000000")
     blue_number_font = Font(color="0000FF", bold=True)
     horarios_escala = defaultdict(list)
@@ -3606,10 +3609,12 @@ def exportar_lancamentos():
             if es.contrato:
                 horarios_escala[(dt, _norm_contract(es.contrato), cid)].append((ini, fim))
 
-    def export_cell(value, money=False, subtotal=False, date_value=False):
-        c = _cell(ws_det, value, date_fmt if date_value else (currency_fmt if money else None), black_bold if subtotal else None)
+    def export_cell(value, money=False, subtotal=False, date_value=False, contrato_total=False):
+        c = _cell(ws_det, value, date_fmt if date_value else (currency_fmt if money else None), black_bold if (subtotal or contrato_total) else None)
         if subtotal:
             c.fill = verde
+        elif contrato_total:
+            c.fill = azul_total
         return c
 
     # Não exportar contratos sem nenhuma produção efetiva no intervalo.
@@ -3671,12 +3676,17 @@ def exportar_lancamentos():
         else:
             inicio, fim = item["inicio"], item["fim"]
         numero = _cell(ws_det, item["_numero"], font=blue_number_font if qtd_lancamentos[item["_numero_chave"]] > 1 else None)
-        return [_cell(ws_det, item["data"], date_fmt), dias_pt[item["data"].weekday()], numero,
+        row = [_cell(ws_det, item["data"], date_fmt), dias_pt[item["data"].weekday()], numero,
                 item["cooperado"], item["contrato"], _cell(ws_det, item["valor"], currency_fmt),
                 item["qtd"], inicio, fim, _cell(ws_det, item["inss"], currency_fmt),
                 _cell(ws_det, item["sest"], currency_fmt), _cell(ws_det, item["enc"], currency_fmt),
                 _cell(ws_det, item["liq"], currency_fmt),
                 _cell(ws_det, item["status"], font=red_font if item["status"] != "OK" else None)]
+        color = azul_noite if (item["_horario"][0] or "") >= "16:00" else amarelo_dia
+        for cell in row:
+            if hasattr(cell, "fill"):
+                cell.fill = color
+        return row
 
     export_details.sort(key=lambda x: (
         (x["contrato"] or "").casefold(), x["data"],
@@ -3686,6 +3696,8 @@ def exportar_lancamentos():
     pos = 0
     linhas_excel = 1
     while pos < len(export_details):
+        contrato_atual = export_details[pos]["contrato"]
+        soma_contrato = dict(valor=0.0, qtd=0, inss=0.0, sest=0.0, enc=0.0, liq=0.0)
         current = export_details[pos]
         key = (current["data"], current["contrato"])
         sums = dict(valor=0.0, qtd=0, inss=0.0, sest=0.0, enc=0.0, liq=0.0)
@@ -3695,6 +3707,7 @@ def exportar_lancamentos():
             linhas_excel += 1
             for field in sums:
                 sums[field] += entry[field]
+                soma_contrato[field] += entry[field]
             pos += 1
         values = [key[0], dias_pt[key[0].weekday()], "", "TOTAL DO DIA", key[1], sums["valor"],
                   sums["qtd"], "", "", sums["inss"], sums["sest"], sums["enc"], sums["liq"], ""]
@@ -3702,6 +3715,15 @@ def exportar_lancamentos():
         linhas_excel += 1
 
     # Autofiltro já habilitado ao abrir o XLSX; inclui contrato, dia e Nº.
+        if pos >= len(export_details) or export_details[pos]["contrato"] != contrato_atual:
+            total = ["", "", "", "TOTAL DO CONTRATO", contrato_atual,
+                     soma_contrato["valor"], soma_contrato["qtd"], "", "",
+                     soma_contrato["inss"], soma_contrato["sest"],
+                     soma_contrato["enc"], soma_contrato["liq"], ""]
+            ws_det.append([export_cell(v, money=i in (5,9,10,11,12), contrato_total=True)
+                           for i,v in enumerate(total)])
+            linhas_excel += 1
+
     ws_det.auto_filter.ref = f"A1:N{linhas_excel}"
 
     # ============================================================
