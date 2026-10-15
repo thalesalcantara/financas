@@ -3617,17 +3617,13 @@ def exportar_lancamentos():
             c.fill = azul_total
         return c
 
-    # Não exportar contratos sem nenhuma produção efetiva no intervalo.
-    # Se houve produção em algum dia, as faltas dos demais dias permanecem.
+    # Contratos sem produção não são excluídos: aparecem após todos
+    # os contratos com produção, ainda agrupados por contrato e data.
     contratos_com_producao = {
         (r["contrato"] or "").casefold()
         for r in export_details
         if r["status"] == "OK" and (r["valor"] != 0 or r["qtd"] > 0)
     }
-    export_details = [
-        r for r in export_details
-        if (r["contrato"] or "").casefold() in contratos_com_producao
-    ]
 
     # Ordenação por turno/escala: o mesmo cooperado no mesmo horário mantém
     # o número mesmo quando sua produção foi lançada em duas parcelas.
@@ -3689,6 +3685,7 @@ def exportar_lancamentos():
         return row
 
     export_details.sort(key=lambda x: (
+        0 if (x["contrato"] or "").casefold() in contratos_com_producao else 1,
         (x["contrato"] or "").casefold(), x["data"],
         1 if (x["_horario"][0] and x["_horario"][0] >= "16:00") else 0,
         x["_numero"], x["_horario"][0], (x["cooperado"] or "").casefold(), x["inicio"]
