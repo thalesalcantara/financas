@@ -125,26 +125,18 @@ dashboard.render_template = _render_template_with_cutoff
 # que aplica @admin_perm_required e confirma a transação.
 _original_delete = app.view_functions.get("delete_restaurante")
 if _original_delete:
+    @legacy.admin_perm_required("restaurantes", "excluir")
     @wraps(_original_delete)
     def _delete_with_cutoff(id):
-        # O decorator original valida a autorização quando acionado.
-        # Inserir antes da chamada garante uma única transação com a inativação.
-        from flask import session
-        user_id = session.get("user_id")
-        usuario = db.session.get(legacy.Usuario, user_id) if user_id else None
-        # Não persistir alterações antes da autenticação/autorização do endpoint.
-        # A autorização é revalidada pelo handler original; se negada, rollback.
-        if usuario is not None:
-            cutoff = date.today().strftime("%Y-%m")
-            db.session.execute(text("""
-                INSERT INTO finance_restaurant_cutoffs (restaurante_id, competencia)
-                VALUES (:id, :competencia)
-                ON CONFLICT (restaurante_id) DO NOTHING
-            """), {"id": id, "competencia": cutoff})
-        response = _original_delete(id)
-        if usuario is None:
-            db.session.rollback()
-        return response
+        # Confirma a competência no mesmo commit que desativa o estabelecimento.
+        # A rotina original ainda faz a verificação de permissão e o commit.
+        cutoff = date.today().strftime("%Y-%m")
+        db.session.execute(text("""
+            INSERT INTO finance_restaurant_cutoffs (restaurante_id, competencia)
+            VALUES (:id, :competencia)
+            ON CONFLICT (restaurante_id) DO NOTHING
+        """), {"id": id, "competencia": cutoff})
+        return _original_delete(id)
 
     app.view_functions["delete_restaurante"] = _delete_with_cutoff
 
