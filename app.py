@@ -3630,7 +3630,7 @@ def exportar_lancamentos():
     # Grupos de linhas Excel recolhidos por padrão: + / - na margem esquerda.
     ws_det.sheet_properties.outlinePr.summaryBelow = False
     ws_det.sheet_view.showOutlineSymbols = True
-    ws_det.sheet_format.outlineLevelRow = 1
+    ws_det.sheet_format.outlineLevelRow = 2
     ws_det.freeze_panes = "E2"
     ws_det.column_dimensions["A"].width = 16
     ws_det.column_dimensions["B"].width = 19
@@ -3659,8 +3659,15 @@ def exportar_lancamentos():
         (x["cooperado"] or "").casefold(), x["inicio"]
     ))
     campos_soma = ("valor", "qtd", "inss", "sest", "enc", "liq")
+    geral = {campo: sum(item[campo] for item in export_details) for campo in campos_soma}
+    valores_gerais = ["", "", "TOTAL GERAL DO PERÍODO", "TODOS OS CONTRATOS",
+                     geral["valor"], geral["qtd"], "", "", geral["inss"],
+                     geral["sest"], geral["enc"], geral["liq"], ""]
+    ws_det.row_dimensions[2].collapsed = True
+    ws_det.append([export_cell(valor, money=i in (4, 8, 9, 10, 11), semanal=True)
+                   for i, valor in enumerate(valores_gerais)])
     pos = 0
-    numero_linha = 2
+    numero_linha = 3
     numero_filtro = 1
     while pos < len(export_details):
         contrato = export_details[pos]["contrato"]
@@ -3684,6 +3691,8 @@ def exportar_lancamentos():
             export_cell(valor, money=i in (4, 8, 9, 10, 11), semanal=True)
             for i, valor in enumerate(valores_periodo)
         ])
+        ws_det.row_dimensions[numero_linha].outlineLevel = 1
+        ws_det.row_dimensions[numero_linha].hidden = True
         ws_det.row_dimensions[numero_linha].collapsed = True
         numero_linha += 1
         pos = inicio_contrato
@@ -3705,7 +3714,7 @@ def exportar_lancamentos():
                 dia_soma["inss"], dia_soma["sest"], dia_soma["enc"],
                 dia_soma["liq"], ""
             ]
-            ws_det.row_dimensions[numero_linha].outlineLevel = 1
+            ws_det.row_dimensions[numero_linha].outlineLevel = 2
             ws_det.row_dimensions[numero_linha].hidden = True
             ws_det.append([
                 export_cell(valor, money=i in (4, 8, 9, 10, 11),
@@ -3714,7 +3723,7 @@ def exportar_lancamentos():
             ])
             numero_linha += 1
             for registro in export_details[inicio_dia:pos]:
-                ws_det.row_dimensions[numero_linha].outlineLevel = 1
+                ws_det.row_dimensions[numero_linha].outlineLevel = 2
                 ws_det.row_dimensions[numero_linha].hidden = True
                 ws_det.append(detail_row(registro))
                 # Para a consulta filtravel, recriar celulas pertencentes
