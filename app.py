@@ -3358,7 +3358,7 @@ def exportar_lancamentos():
     # ABA 1 - Lançamentos
     # ============================================================
     ws_det = wb.create_sheet("Lançamentos")
-    header_det = ["Data", "Dia", "Nº", "Cooperado", "Contrato", "Valor por dia", "Quantidade de entregas", "Hora início da escala", "Hora fim da escala", "INSS", "SEST/SENAT", "Descontos", "Líquido", "Status"]
+    header_det = ["Data", "Dia", "Nº", "Cooperado", "Contrato", "Valor por dia", "Quantidade de entregas", "Hora início da escala", "Hora fim da escala", "INSS", "SEST/SENAT", "Descontos", "Líquido", "Status", "Produção no período"]
     _append_header(ws_det, header_det)
 
     totais_contrato = defaultdict(lambda: {
@@ -3677,7 +3677,8 @@ def exportar_lancamentos():
                 item["qtd"], inicio, fim, _cell(ws_det, item["inss"], currency_fmt),
                 _cell(ws_det, item["sest"], currency_fmt), _cell(ws_det, item["enc"], currency_fmt),
                 _cell(ws_det, item["liq"], currency_fmt),
-                _cell(ws_det, item["status"], font=red_font if item["status"] != "OK" else None)]
+                _cell(ws_det, item["status"], font=red_font if item["status"] != "OK" else None),
+                "Com produção" if (item["contrato"] or "").casefold() in contratos_com_producao else "Sem produção"]
         color = azul_noite if (item["_horario"][0] or "") >= "16:00" else amarelo_dia
         for cell in row:
             if hasattr(cell, "fill"):
@@ -3694,12 +3695,16 @@ def exportar_lancamentos():
     linhas_excel = 1
     while pos < len(export_details):
         contrato_atual = export_details[pos]["contrato"]
+        possui_producao = (contrato_atual or "").casefold() in contratos_com_producao
+        filtro_producao = "Com produção" if possui_producao else "Sem produção"
         soma_contrato = dict(valor=0.0, qtd=0, inss=0.0, sest=0.0, enc=0.0, liq=0.0)
         current = export_details[pos]
         key = (current["data"], current["contrato"])
         sums = dict(valor=0.0, qtd=0, inss=0.0, sest=0.0, enc=0.0, liq=0.0)
         while pos < len(export_details) and (export_details[pos]["data"], export_details[pos]["contrato"]) == key:
             entry = export_details[pos]
+            if not possui_producao:
+                ws_det.row_dimensions[linhas_excel + 1].hidden = True
             ws_det.append(detail_row(entry))
             linhas_excel += 1
             for field in sums:
@@ -3707,7 +3712,9 @@ def exportar_lancamentos():
                 soma_contrato[field] += entry[field]
             pos += 1
         values = [key[0], dias_pt[key[0].weekday()], "", "TOTAL DO DIA", key[1], sums["valor"],
-                  sums["qtd"], "", "", sums["inss"], sums["sest"], sums["enc"], sums["liq"], ""]
+                  sums["qtd"], "", "", sums["inss"], sums["sest"], sums["enc"], sums["liq"], "", filtro_producao]
+        if not possui_producao:
+            ws_det.row_dimensions[linhas_excel + 1].hidden = True
         ws_det.append([export_cell(val, money=i in (5,9,10,11,12), subtotal=True, date_value=i==0) for i, val in enumerate(values)])
         linhas_excel += 1
 
@@ -3716,12 +3723,18 @@ def exportar_lancamentos():
             total = ["", "", "", "TOTAL DO CONTRATO", contrato_atual,
                      soma_contrato["valor"], soma_contrato["qtd"], "", "",
                      soma_contrato["inss"], soma_contrato["sest"],
-                     soma_contrato["enc"], soma_contrato["liq"], ""]
+                     soma_contrato["enc"], soma_contrato["liq"], "", filtro_producao]
+            if not possui_producao:
+                ws_det.row_dimensions[linhas_excel + 1].hidden = True
             ws_det.append([export_cell(v, money=i in (5,9,10,11,12), contrato_total=True)
                            for i,v in enumerate(total)])
             linhas_excel += 1
 
-    ws_det.auto_filter.ref = f"A1:N{linhas_excel}"
+    # Deixar pré-selecionado "Com produção"; o usuário pode marcar
+    # "Sem produção" no filtro para exibir os contratos finais.
+    ws_det.auto_filter.ref = f"A1:O{linhas_excel}"
+    ws_det.auto_filter.add_filter_column(14, ["Com produção"])
+    ws_det.column_dimensions["O"].width = 23
 
     # ============================================================
     # ABA 2 - Totais por Contrato
