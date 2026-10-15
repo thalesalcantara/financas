@@ -1,7 +1,12 @@
 """Exclusão financeira por competência, sem perda do histórico."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+
+def _today_local():
+    return datetime.now(ZoneInfo('America/Fortaleza')).date()
 from functools import wraps
 from flask import g
 from sqlalchemy import text
@@ -53,7 +58,7 @@ def _visible(receita):
     rest = getattr(receita, "restaurante", None)
     if rest is not None and getattr(rest, "ativo", True) is False:
         competencia = _month_of_receipt(receita)
-        return bool(competencia and competencia < date.today().strftime("%Y-%m"))
+        return bool(competencia and competencia < _today_local().strftime("%Y-%m"))
     return True
 
 
@@ -130,7 +135,7 @@ if _original_delete:
     def _delete_with_cutoff(id):
         # Confirma a competência no mesmo commit que desativa o estabelecimento.
         # A rotina original ainda faz a verificação de permissão e o commit.
-        cutoff = date.today().strftime("%Y-%m")
+        cutoff = _today_local().strftime("%Y-%m")
         db.session.execute(text("""
             INSERT INTO finance_restaurant_cutoffs (restaurante_id, competencia)
             VALUES (:id, :competencia)
