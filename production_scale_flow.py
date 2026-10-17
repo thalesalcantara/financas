@@ -88,7 +88,8 @@ def _end_at(scale_date: date | None, start: str, end: str) -> datetime | None:
     result = datetime.combine(scale_date, time(end_minutes // 60, end_minutes % 60), tzinfo=TZ)
     if start_minutes is not None and end_minutes <= start_minutes:
         result += timedelta(days=1)
-    return result
+    # Liberação para lançamento exatamente um minuto após o fim da escala.
+    return result + timedelta(minutes=1)
 
 
 def _resolve_restaurants(scales: list[Escala]) -> dict[int, Restaurante | None]:
