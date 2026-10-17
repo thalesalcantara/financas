@@ -240,6 +240,16 @@ def _coopex_v5_context():
                     current_ids, current_map = _rest_current_shift_data(rest)
                     context["coopex_rest_current_coop_ids"] = current_ids
                     context["coopex_rest_current_shift_map"] = current_map
+        elif role == "cooperado" and request.endpoint == "portal_cooperado":
+            coop = legacy.request_cooperado()
+            if coop:
+                today = datetime.now(TZ).date()
+                # O quadro "Produção de hoje" é renderizado diretamente
+                # em painel_cooperado.html. Não depende da timeline AJAX
+                # (histórico filtrado), que continua separada.
+                context["coopex_coop_timeline"] = perf._timeline_fast(coop, today, today)
+                context["coopex_filter_start"] = today
+                context["coopex_filter_end"] = today
     except Exception:
         app.logger.exception("Falha ao montar contexto operacional V5")
 
